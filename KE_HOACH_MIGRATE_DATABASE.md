@@ -643,6 +643,24 @@ Checklist deploy dưới đây (mục cũ) coi như bước 1/3/4 đã xong; gi�
 
 ---
 
+## 13. Gộp toàn bộ code Supabase vào 1 repo duy nhất — `mes-toyotaki` (2026-08-14)
+
+Theo yêu cầu của user ("đóng gói toàn bộ code của dự án MES này vào một folder nào đó... từ giờ chúng ta sẽ làm việc trên các file mới đó"), toàn bộ code ĐÃ CHUYỂN XONG SANG SUPABASE (không kèm code Apps Script cũ) được gộp từ 2 repo cũ vào 1 repo Git mới:
+
+- **Repo mới**: `https://github.com/dangnaf-toyo/mes-toyotaki` — deploy tại `https://dangnaf-toyo.github.io/mes-toyotaki/`.
+- **Từ giờ về sau, LÀM VIỆC TRÊN REPO NÀY** (`D:\Project\MES\mes-toyotaki`), không phải `Dashboard_SL_CL` hay `Quản lý NVL` nữa — 2 repo cũ vẫn còn nguyên (không xoá), vẫn tự chạy GitHub Pages riêng, nhưng KHÔNG cập nhật tiếp từ đây trở đi.
+- **Nội dung đã gộp**: 10 trang HTML Supabase (`sanluong-supabase.html`, `chatluong-supabase.html`, `chuyencongdoan.html`, `duc-dashboard.html`, `intem.html`, `ipqc.html`, `khsx-tuan.html`, `ncp-detail.html`, `qc-manager.html`), `shared/` (client Supabase + trang đăng nhập dùng chung), toàn bộ `supabase/*.sql`+`*.mjs` (mọi migration/schema/import script đã viết từ đầu dự án), và `KE_HOACH_MIGRATE_DATABASE.md` (chính file này).
+- **2 đổi tên duy nhất khi gộp** (do 2 file cùng có ý nghĩa "trang chủ"/"trang NVL" nhưng khác tên ở 2 repo cũ):
+  - `home-supabase.html` (Dashboard_SL_CL) → **`index.html`** (repo mới) — vì repo mới không còn `index.html` cũ (Apps Script) để phân biệt nữa, nên trang chủ Supabase nghiễm nhiên là `index.html`.
+  - `index-final.html` (Quản lý NVL) → **`nvl.html`** (repo mới) — tên rõ nghĩa hơn trong ngữ cảnh 1 repo chứa nhiều module.
+  - Đã sửa lại 1 link nội bộ trong `index.html` (thẻ "Kho NVL") từ URL tuyệt đối sang repo khác (`https://dangnaf-toyo.github.io/Ton-kho-NVL/index-final.html`) thành link tương đối `nvl.html` trong cùng repo.
+  - **Tất cả tên file khác GIỮ NGUYÊN** để không phải sửa lại các link chéo giữa trang (VD `duc-dashboard.html` gọi `intem.html`/`khsx-tuan.html` bằng tên tương đối).
+- **KHÔNG gộp**: `index.html` cũ + `sanluong.html`/`chatluong.html`/`chuyencongdoan-supabase.html`/`duc-supabase.html` (các trang cũ/pilot dùng Apps Script hoặc đã bị thay thế) — theo đúng lựa chọn của user "chỉ các file Supabase mới".
+- **Công cụ đã cài trong phiên này để tạo repo**: GitHub CLI (`gh`, cài qua `winget install GitHub.cli`, xác thực qua `gh auth login` — user tự đăng nhập bằng mã thiết bị qua trình duyệt). Có thể dùng lại `gh` cho các thao tác GitHub khác sau này (VD tạo PR, xem issue).
+- **Việc cần làm tiếp theo trong repo mới**: khi có thay đổi/module mới, làm việc trực tiếp trong `D:\Project\MES\mes-toyotaki`, commit+push vào `origin` (remote `mes-toyotaki`, đã cấu hình sẵn). Domain riêng `mes.toyotaki.vn` (nếu sau này có) nên trỏ CNAME vào `dangnaf-toyo.github.io` và trỏ tới repo này.
+
+---
+
 **Việc cần làm ngay tiếp theo (lịch sử, đã gộp vào checklist trên)**:
 1. Nhận 3 `scriptId` còn thiếu từ user (mục 11.3) → `clasp clone` → set Script Properties → `clasp push` + deploy bản test cho Phase 3, test quét thật.
 2. Chạy `supabase/migration_phase3_chuyencongdoan.sql` trong Supabase SQL Editor (độc lập, không cần chờ scriptId — có thể làm ngay).
