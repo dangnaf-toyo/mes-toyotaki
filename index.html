@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TOYOTAKI | Trang Chủ MES (Supabase)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<!--
+  index.html — trang chủ MES (repo mes-toyotaki, gộp lại 2026-08-14 từ
+  Dashboard_SL_CL (repo "Toyotaki") + Quản lý NVL (repo "Ton-kho-NVL")).
+  Repo này CHỈ chứa code đã chuyển xong sang Supabase — không có bản Apps
+  Script cũ. Trước đây file này tên home-supabase.html, sống trong repo
+  Dashboard_SL_CL cùng index.html cũ (Apps Script) — nay đổi thành index.html
+  vì repo mới không còn trang chủ cũ nào để phân biệt.
+-->
+<style>
+  :root{
+    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
+    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C; --tk-good:#1a7a3a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',sans-serif;color:var(--tk-black);-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Zilla Slab',serif;}
+
+  header.top{background:var(--tk-black);color:var(--tk-cream);padding:22px 0;border-bottom:5px solid var(--tk-orange);}
+  header.top .inner{max-width:1240px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
+  .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--tk-orange);font-weight:600;margin-bottom:8px;}
+  header.top h1{font-size:25px;margin:0 0 6px;font-weight:600;color:#fff;letter-spacing:.01em;}
+  header.top .sub{font-size:13px;color:#c9c2b6;}
+  .tk-mark{height:40px;width:auto;max-width:140px;object-fit:contain;}
+  .auth-bar{font-size:12px;color:#c9c2b6;margin-top:4px}
+  .auth-bar a{color:var(--tk-orange);text-decoration:none;font-weight:600}
+
+  .banner{max-width:1180px;margin:22px auto 0;padding:0 28px;}
+  .banner-box{background:#fff;border:1px solid var(--tk-line);border-left:5px solid var(--tk-good);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--tk-black);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .banner-box b{color:var(--tk-good)}
+  .banner-box a{color:var(--tk-orange-deep);font-weight:600;text-decoration:none}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 28px 60px;}
+  .wrap > .lead{text-align:center;margin-bottom:44px;}
+  .wrap > .lead h2{font-size:22px;margin:0 0 8px;font-weight:600;}
+  .wrap > .lead p{font-size:14px;color:var(--tk-muted);margin:0;}
+
+  .group{margin-bottom:40px;}
+  .group-title{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;border-bottom:1px solid var(--tk-line);padding-bottom:10px;}
+  .group-title h2{font-size:17px;margin:0;font-weight:600;}
+  .group-title .count{margin-left:auto;font-size:12px;color:var(--tk-muted);}
+
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  @media (max-width:900px){.card-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:600px){.card-grid{grid-template-columns:1fr;}}
+
+  .dash-card{
+    display:block;background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;
+    padding:28px 24px;text-decoration:none;color:var(--tk-black);position:relative;overflow:hidden;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .dash-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--tk-orange);}
+  .dash-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(33,26,21,.08);}
+  .dash-card .no{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tk-orange-deep);font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+  .dash-card h3{font-size:19px;margin:8px 0 6px;font-weight:600;}
+  .dash-card p{font-size:13px;color:var(--tk-muted);margin:0 0 16px;line-height:1.5;}
+  .dash-card .enter{
+    display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--tk-orange-deep);
+  }
+  .dash-card .enter .arrow{transition:transform .15s ease;}
+  .dash-card:hover .enter .arrow{transform:translateX(4px);}
+  .dash-card .badge{position:absolute;top:16px;right:16px;font-size:10px;font-weight:600;color:#fff;background:var(--tk-good);padding:3px 8px;border-radius:100px;letter-spacing:.03em;}
+
+  footer{text-align:center;font-size:12px;color:var(--tk-muted);padding:30px 0;}
+  footer a{color:var(--tk-orange-deep)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <div>
+      <div class="eyebrow">TOYOTAKI · Nội bộ · Supabase</div>
+      <h1>Trang Chủ MES</h1>
+      <div class="sub">Các công cụ đã chuyển sang nền tảng Supabase — không còn phụ thuộc Google</div>
+      <div class="auth-bar" id="authInfo">…</div>
+    </div>
+    <img class="tk-mark" src="https://lh3.googleusercontent.com/d/1Da5A4JNUXZsUWeJwc1WW9lhI47_xz9LR" alt="TOYOTAKI">
+  </div>
+</header>
+
+<div class="banner">
+  <div class="banner-box">
+    ⚡ Đây là trang chủ <b>mới</b>, riêng cho các công cụ đã chuyển xong sang Supabase (đọc công khai, ghi cần đăng nhập).
+    Công cụ nào chưa kịp chuyển vẫn nằm ở <a href="index.html">trang chủ cũ</a>.
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="lead">
+    <h2>Chọn chức năng bạn muốn sử dụng</h2>
+    <p>Bấm vào một mục bên dưới để chuyển đến đúng công cụ/dashboard.</p>
+  </div>
+
+  <div class="group">
+    <div class="group-title"><h2>Dashboard &amp; Báo cáo</h2><span class="count">4 mục</span></div>
+    <div class="card-grid">
+      <a class="dash-card" href="sanluong-supabase.html">
+        <span class="badge">Supabase</span>
+        <div class="no">Sản lượng</div>
+        <h3>Dashboard Sản Lượng &amp; Giao Hàng</h3>
+        <p>Tỷ lệ giao hàng đúng hạn, hoàn thành KHSX, capacity máy, forecast sản lượng.</p>
+        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="chatluong-supabase.html">
+        <span class="badge">Supabase</span>
+        <div class="no">Chất lượng</div>
+        <h3>Dashboard KPI Chất Lượng</h3>
+        <p>Tổng quan, theo công đoạn, theo khách hàng, bất thường chất lượng, tỷ lệ NG lần 1.</p>
+        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="duc-dashboard.html">
+        <span class="badge">Supabase</span>
+        <div class="no">Đúc</div>
+        <h3>Bảng Điều Khiển Đúc (Trưởng ca)</h3>
+        <p>Gán kế hoạch, theo dõi sự cố, đổi sản phẩm, nhập shot/NG, kết ca, quản lý khuôn.</p>
+        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="qc-manager.html">
+        <span class="badge">Supabase</span>
+        <div class="no">QC</div>
+        <h3>QC Giám Sát &amp; Xử Lý SP Không Phù Hợp</h3>
+        <p>Giám sát real-time, tra cứu lịch sử IPQC, xử lý phiếu NCP (cách ly/lọc/sửa/phế), quản lý tiêu chuẩn kiểm.</p>
+        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-title"><h2>Công cụ hiện trường</h2><span class="count">5 mục</span></div>
+    <div class="card-grid">
+      <a class="dash-card" href="chuyencongdoan.html">
+        <span class="badge">Supabase</span>
+        <div class="no">QR Code</div>
+        <h3>Chuyển Công Đoạn &amp; Xác Nhận Nhận Hàng</h3>
+        <p>Quét QR camera trực tiếp để ghi nhận chuyển hàng, xác nhận hoặc từ chối nhận hàng giữa các công đoạn.</p>
+        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="intem.html">
+        <span class="badge">Supabase</span>
+        <div class="no">In tem</div>
+        <h3>In Tem Công Đoạn Đúc</h3>
+        <p>Tạo và in tem nhãn QR cho sản phẩm tại công đoạn Đúc — tra cứu, sửa, in lại, xoá tem.</p>
+        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="ipqc.html">
+        <span class="badge">Supabase</span>
+        <div class="no">IPQC</div>
+        <h3>Màn Hình IPQC Kiểm Tra Tuần Kiểm</h3>
+        <p>Hàng đợi điểm kiểm chất lượng đang chờ, nộp kết quả kèm ảnh bằng chứng và checklist theo mã SP.</p>
+        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="khsx-tuan.html">
+        <span class="badge">Supabase</span>
+        <div class="no">Kế hoạch</div>
+        <h3>Nhập Kế Hoạch Sản Xuất Tuần (Đúc)</h3>
+        <p>Bộ phận kế hoạch nhập/sửa KHSX tuần theo máy — nguồn gợi ý tự điền cho Bảng điều khiển Đúc.</p>
+        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
+      </a>
+
+      <a class="dash-card" href="nvl.html">
+        <span class="badge">Supabase</span>
+        <div class="no">Kho NVL</div>
+        <h3>Quản Lý Tồn Kho Nguyên Vật Liệu</h3>
+        <p>Theo dõi tồn kho, biểu đồ kế hoạch nhập 30 ngày, in tem QR, quét QR nhập/xuất theo lô — đang trong giai đoạn test, chưa thay hẳn bản Apps Script cũ.</p>
+        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-title"><h2>Tài khoản</h2><span class="count">1 mục</span></div>
+    <div class="card-grid">
+      <a class="dash-card" href="shared/login.html">
+        <div class="no">Đăng nhập</div>
+        <h3>Đăng Nhập / Đăng Xuất</h3>
+        <p>Đọc dữ liệu không cần đăng nhập — mọi thao tác GHI (lưu kế hoạch, xác nhận, kết ca...) đều cần đăng nhập trước.</p>
+        <span class="enter">Đăng nhập <span class="arrow">→</span></span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<footer>TOYOTAKI · Trang chủ MES (Supabase) — cập nhật thêm công cụ khi migrate xong từng module. <a href="index.html">Trang chủ cũ (Apps Script)</a></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); location.reload(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
+  }
+}
+initAuthStatus();
+</script>
+</body>
+</html>

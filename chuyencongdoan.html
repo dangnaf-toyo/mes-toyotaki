@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Chuyển Công Đoạn — TOYOTAKI</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;padding:16px 12px 40px}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:16px;width:100%;max-width:480px}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr h1{font-size:16px;font-weight:700;color:#1a1a2e;line-height:1.2}
+.hdr p{font-size:10px;color:#999;margin-top:2px}
+.auth-info{font-size:11px;color:#667}
+.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.card{background:#fff;border-radius:14px;
+  box-shadow:0 2px 16px rgba(0,0,0,.08);
+  padding:18px 16px;width:100%;max-width:480px;margin-bottom:14px}
+.card-ttl{font-size:12px;font-weight:700;color:#C87941;
+  text-transform:uppercase;letter-spacing:.5px;
+  margin-bottom:14px;padding-bottom:8px;
+  border-bottom:2px solid #f5e6d7;display:flex;align-items:center;gap:6px}
+.scan-btn{width:100%;padding:16px;border:none;border-radius:12px;
+  background:#C87941;color:#fff;font-size:16px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.scan-btn:active{background:#a85e2a}
+.scan-btn.rescan{background:#fff;color:#C87941;border:1.5px solid #C87941;
+  padding:11px;font-size:13px;margin-top:10px}
+.empty-hint{font-size:12.5px;color:#999;text-align:center;padding:6px 4px 2px}
+.scanned-box{display:none}
+.scanned-box.show{display:block}
+.sr{display:flex;justify-content:space-between;align-items:baseline;
+  padding:6px 0;border-bottom:1px dashed #eee;gap:10px}
+.sr:last-child{border-bottom:none}
+.sr .k{font-size:11.5px;color:#777;font-weight:700;flex-shrink:0}
+.sr .v{font-size:13.5px;color:#1a1a2e;font-weight:700;text-align:right;word-break:break-word}
+.badge-ok{display:inline-flex;align-items:center;gap:5px;background:#f0fff4;
+  color:#1a7a3a;border:1px solid #c3e6cb;border-radius:20px;
+  font-size:11.5px;font-weight:700;padding:4px 10px;margin-bottom:10px}
+.form-section{display:none}
+.form-section.show{display:block}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+label{font-size:11px;font-weight:700;color:#555;
+  text-transform:uppercase;letter-spacing:.4px}
+.req::after{content:" *";color:#e53}
+input,select{border:1.5px solid #ddd;border-radius:7px;
+  padding:10px 11px;font-size:14.5px;color:#1a1a2e;
+  width:100%;transition:border-color .2s;font-family:inherit;background:#fff}
+input:focus,select:focus{outline:none;border-color:#C87941;
+  box-shadow:0 0 0 3px rgba(200,121,65,.12)}
+.hint{font-size:11px;color:#999;margin-top:2px}
+.submit-btn{width:100%;padding:15px;border:none;border-radius:12px;
+  font-size:16px;font-weight:700;cursor:pointer;
+  background:#C87941;color:#fff;display:flex;align-items:center;
+  justify-content:center;gap:8px}
+.submit-btn:disabled{opacity:.45;cursor:not-allowed}
+#msg{width:100%;max-width:480px;margin-top:2px;padding:12px 14px;
+  border-radius:9px;font-size:13.5px;display:none;font-weight:600}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.wait{background:#fff8f0;color:#C87941;border:1px solid #f5e6d7;display:block!important}
+.tabs-wrap{display:flex;gap:8px;width:100%;max-width:480px;margin-bottom:14px}
+.tab-btn{flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;
+  color:#555;font-size:12.5px;font-weight:700;cursor:pointer}
+.tab-btn.active{background:#C87941;border-color:#C87941;color:#fff}
+.pending-item{border:1px solid #eee;border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.pending-item .sr{padding:3px 0}
+.confirm-btn{width:100%;margin-top:8px;padding:9px;border:none;border-radius:8px;
+  background:#1a7a3a;color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+.confirm-btn:disabled{opacity:.5;cursor:not-allowed}
+.pending-actions{display:flex;gap:8px;margin-top:8px}
+.pending-actions .confirm-btn{margin-top:0}
+.reject-btn{flex:1;padding:9px;border:1.5px solid #c00;border-radius:8px;
+  background:#fff;color:#c00;font-size:13px;font-weight:700;cursor:pointer}
+.reject-btn:disabled{opacity:.5;cursor:not-allowed}
+.reject-form{display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #eee}
+.reject-form.show{display:block}
+.reject-form textarea{width:100%;border:1.5px solid #ddd;border-radius:7px;padding:8px 10px;
+  font-size:13px;font-family:inherit;resize:vertical;min-height:56px}
+.reject-form .row{display:flex;gap:8px;margin-top:8px}
+.reject-form .row button{flex:1;padding:8px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer}
+.reject-form .btn-send{border:none;background:#c00;color:#fff}
+.reject-form .btn-cancel{border:1.5px solid #ccc;background:#fff;color:#666}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div><h1>Chuyển Công Đoạn Sản Phẩm</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</p></div>
+  </div>
+  <div class="auth-info" id="authInfo">…</div>
+</div>
+
+<div class="tabs-wrap">
+  <button type="button" class="tab-btn active" id="tabBtnScan">📷 Quét QR chuyển hàng</button>
+  <button type="button" class="tab-btn" id="tabBtnConfirm">✅ Xác nhận nhận hàng</button>
+</div>
+
+<div id="tabScan">
+<div class="card">
+  <div class="card-ttl">📷 Bước 1 — Quét mã QR trên tem</div>
+  <button class="scan-btn" id="btnScan">📷&nbsp; Mở Camera Quét QR</button>
+  <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+  <div class="scan-video-wrap" id="scanVideoWrap" style="display:none;">
+    <video id="scanVideo" playsinline autoplay muted style="width:100%;border-radius:10px;background:#000;"></video>
+    <button class="scan-btn rescan" id="btnCancelScan" type="button" style="margin-top:8px;">✖ Huỷ quét</button>
+  </div>
+  <div class="empty-hint" id="emptyHint">Chưa quét tem nào. Bấm nút phía trên, hướng camera về phía mã QR trên tem — hệ thống tự nhận diện, không cần bấm chụp.</div>
+
+  <div class="scanned-box" id="scannedBox">
+    <div class="badge-ok">✅ Đã đọc được tem</div>
+    <div class="sr"><div class="k">Tag No</div><div class="v" id="svTag"></div></div>
+    <div class="sr"><div class="k">Mã sản phẩm</div><div class="v" id="svMa"></div></div>
+    <div class="sr"><div class="k">Tên sản phẩm</div><div class="v" id="svTen"></div></div>
+    <div class="sr"><div class="k">Ngày đúc</div><div class="v" id="svNgay"></div></div>
+    <div class="sr"><div class="k">Lot No</div><div class="v" id="svLot"></div></div>
+    <div class="sr"><div class="k">Số khuôn</div><div class="v" id="svKhuon"></div></div>
+    <div class="sr"><div class="k">Nguyên liệu</div><div class="v" id="svNL"></div></div>
+    <div class="sr"><div class="k">Máy đúc</div><div class="v" id="svMay"></div></div>
+    <div class="sr"><div class="k">SL trên tem</div><div class="v" id="svSL"></div></div>
+    <button class="scan-btn rescan" id="btnRescan">🔄 Chụp lại tem khác</button>
+  </div>
+</div>
+<div class="card form-section" id="formSection">
+  <div class="card-ttl">🔀 Bước 2 — Thông tin chuyển công đoạn</div>
+
+  <div class="fg">
+    <label class="req" for="soLuong">Số lượng thực tế chuyển</label>
+    <input id="soLuong" type="number" min="1">
+    <div class="hint" id="slHint"></div>
+  </div>
+
+  <div class="fg">
+    <label class="req" for="congDoanGiao">Công đoạn giao</label>
+    <select id="congDoanGiao"></select>
+  </div>
+
+  <div class="fg">
+    <label class="req" for="congDoanNhan">Công đoạn nhận</label>
+    <select id="congDoanNhan"></select>
+  </div>
+
+  <div class="fg">
+    <label for="nguoiGiao">Người giao</label>
+    <select id="nguoiGiao"></select>
+    <div class="hint">Có thể bỏ trống — công đoạn giao sẽ xác nhận lại sau.</div>
+  </div>
+
+  <div class="fg">
+    <label class="req" for="nguoiNhan">Người nhận</label>
+    <select id="nguoiNhan"></select>
+  </div>
+
+  <button class="submit-btn" id="btnSubmit" disabled>🔀&nbsp; Chuyển Công Đoạn</button>
+</div>
+</div>
+
+<div id="tabConfirm" style="display:none;">
+  <div class="card">
+    <div class="card-ttl">✅ Xác nhận đã nhận hàng — chọn bộ phận của bạn</div>
+    <div class="fg">
+      <label class="req" for="confirmCongDoan">Bộ phận (Công đoạn giao — nơi bạn xác nhận thay mặt)</label>
+      <select id="confirmCongDoan"></select>
+    </div>
+    <div class="fg">
+      <label class="req" for="confirmNguoiXacNhan">Người xác nhận</label>
+      <select id="confirmNguoiXacNhan"></select>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-ttl">📋 Phiếu đang chờ xác nhận</div>
+    <div id="confirmList" style="font-size:13px;color:#999;">Chọn bộ phận ở trên để xem danh sách.</div>
+  </div>
+  <div class="card" id="confirmAllCard" style="display:none;">
+    <button type="button" class="confirm-btn" id="btnConfirmAll">✅ Xác nhận tất cả</button>
+  </div>
+</div>
+
+<div id="msg"></div>
+
+<canvas id="scanCanvas" style="display:none"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+/* ============================================================================
+ * Chuyển Công Đoạn — bản web tĩnh (Giai đoạn "bỏ Google"), thay Apps Script.
+ * Business logic giữ nguyên như bản Apps Script cũ (WebApp/ChuyenCongDoan.gs):
+ * chụp ảnh QR trên tem → giải mã (jsQR) → nhập số lượng/công đoạn/người →
+ * gửi RPC cd_ghi_chuyen_cong_doan (đã có sẵn từ Phase 3 migrate database).
+ *
+ * Đơn giản hoá so với bản cũ (ghi lại để biết, không phải thiếu sót):
+ * - "Công đoạn giao/nhận" cố định 5 giá trị (CONG_DOAN_LIST) — bản cũ cũng
+ *   hardcode y hệt trong Config.js, không đổi.
+ * - "Người giao/nhận" hiện lấy TOÀN BỘ danh sách nhân viên (bảng
+ *   master_employees), KHÔNG lọc riêng theo từng công đoạn như bản cũ (bản cũ
+ *   lọc theo cột Y:AC trong KHSX Master — dữ liệu này CHƯA được đưa vào
+ *   Supabase). Không ảnh hưởng tính đúng đắn (vẫn ghi đúng ai giao/ai nhận),
+ *   chỉ mất phần gợi ý rút gọn theo bộ phận — có thể bổ sung sau nếu cần.
+ * ============================================================================ */
+
+const CONG_DOAN_LIST = ["Đúc", "Bavia", "Gia Công", "Sơn", "OQC"];
+
+let scannedData = null;
+
+function fillSelect(id, arr, placeholder){
+  const sel = document.getElementById(id);
+  sel.innerHTML = '<option value="">' + placeholder + '</option>';
+  (arr || []).forEach(v => { sel.innerHTML += `<option value="${v}">${v}</option>`; });
+}
+
+function err(t){ showMsg("❌ " + t, "err"); }
+let msgToken = 0;
+function showMsg(t, cls, autoHideMs){
+  const el = document.getElementById("msg");
+  el.textContent = t; el.className = cls; el.style.display = "block";
+  msgToken += 1;
+  const myToken = msgToken;
+  if (autoHideMs){
+    setTimeout(() => { if (myToken === msgToken) el.style.display = "none"; }, autoHideMs);
+  }
+}
+
+async function loadDanhMuc(){
+  fillSelect("congDoanGiao", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+  fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien');
+  if (error) { err("Không tải được danh sách nhân viên: " + error.message); return; }
+  const names = (data || []).map(r => r.ten_nhan_vien);
+  fillSelect("nguoiGiao", names, "-- Chọn người giao (có thể bỏ trống) --");
+  fillSelect("nguoiNhan", names, "-- Chọn người nhận --");
+}
+
+/* ─── Chụp ảnh + giải mã QR (giữ nguyên cách làm bản cũ: chụp ảnh tĩnh rồi
+   giải mã, KHÔNG quét video trực tiếp — camera video live từng bị chặn trong
+   sandbox Apps Script; giữ cách này cho ổn định, có thể nâng cấp sau). ─── */
+// Hiện lỗi JS bất kỳ ngay trên màn hình (điện thoại khó xem console) — chỉ để
+// chẩn đoán trong giai đoạn test, có thể gỡ sau khi ổn định.
+window.addEventListener("error", (e) => { err("Lỗi JS: " + e.message); });
+
+/* ─── Quét QR trực tiếp qua camera (getUserMedia + vòng lặp jsQR) ───────────
+   Bản Apps Script cũ phải né cách này vì bị sandbox Google chặn camera trực
+   tiếp — web tĩnh thường không bị hạn chế đó, quét được ngay khi đưa mã QR
+   vào khung hình, không cần bấm chụp. Có fallback "chụp ảnh tĩnh" (input
+   file cũ) cho trình duyệt không hỗ trợ getUserMedia. ─────────────────── */
+let scanStream = null;
+let scanRAF = null;
+
+async function openCamera(){
+  document.getElementById("msg").style.display = "none";
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showMsg("📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…", "wait");
+    document.getElementById("qrFileInput").click();
+    return;
+  }
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  } catch(e){
+    err("Không mở được camera: " + e.message + ". Kiểm tra đã cho phép quyền Camera cho trang này chưa (biểu tượng khoá/camera trên thanh địa chỉ trình duyệt).");
+    return;
+  }
+  const video = document.getElementById("scanVideo");
+  video.srcObject = scanStream;
+  document.getElementById("scanVideoWrap").style.display = "block";
+  document.getElementById("emptyHint").style.display = "none";
+  document.getElementById("scannedBox").classList.remove("show");
+  document.getElementById("formSection").classList.remove("show");
+  await video.play();
+  scanRAF = requestAnimationFrame(scanLoop);
+}
+
+function stopCamera(){
+  if (scanRAF) cancelAnimationFrame(scanRAF);
+  scanRAF = null;
+  if (scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  document.getElementById("scanVideoWrap").style.display = "none";
+}
+
+function scanLoop(){
+  const video = document.getElementById("scanVideo");
+  if (video.readyState === video.HAVE_ENOUGH_DATA){
+    try {
+      const canvas = document.getElementById("scanCanvas");
+      const w = video.videoWidth, h = video.videoHeight;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(data.data, data.width, data.height, { inversionAttempts: "dontInvert" });
+      if (code && code.data){
+        stopCamera();
+        onQrDecoded(code.data);
+        return;
+      }
+    } catch(e){ /* frame lỗi thoáng qua — bỏ qua, thử tiếp frame sau */ }
+  }
+  scanRAF = requestAnimationFrame(scanLoop);
+}
+
+document.getElementById("btnScan").addEventListener("click", openCamera);
+document.getElementById("btnRescan").addEventListener("click", openCamera);
+document.getElementById("btnCancelScan").addEventListener("click", () => {
+  stopCamera();
+  document.getElementById("emptyHint").style.display = "block";
+});
+document.getElementById("qrFileInput").addEventListener("change", onFileChosen);
+
+/* Fallback chụp ảnh tĩnh — chỉ dùng khi trình duyệt không hỗ trợ getUserMedia. */
+function onFileChosen(evt){
+  showMsg("⏳ Đang xử lý ảnh vừa chụp…", "wait");
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) { err("Không nhận được ảnh (có thể bạn đã huỷ chụp)."); return; }
+  if (typeof jsQR !== "function") { err("Lỗi tải thư viện đọc QR (jsQR) — kiểm tra kết nối mạng rồi tải lại trang."); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const canvas = document.getElementById("scanCanvas");
+      const ctx = canvas.getContext("2d");
+      const w = img.width, h = img.height;
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const data = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(data.data, data.width, data.height);
+      if (code && code.data) onQrDecoded(code.data);
+      else err("Không đọc được mã QR trong ảnh vừa chụp (kích thước ảnh " + w + "x" + h + "). Vui lòng chụp lại, đảm bảo mã QR rõ nét, đủ sáng và nằm giữa khung ảnh.");
+    } catch(e){
+      err("Lỗi xử lý ảnh: " + e.message);
+    }
+    evt.target.value = "";
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); err("Không đọc được ảnh vừa chụp (lỗi tải ảnh). Vui lòng thử lại."); };
+  img.src = url;
+}
+
+async function onQrDecoded(text){
+  const parts = String(text).split(">");
+  if (parts.length < 9){
+    err("Mã QR không đúng định dạng tem TOYOTAKI. Vui lòng quét lại đúng mã QR trên tem sản phẩm.");
+    return;
+  }
+  scannedData = {
+    tagNo: parts[0].trim(), tenSP: parts[1], maSP: parts[2], soLuongTem: parts[3],
+    ngay: parts[4], lotNo: parts[5], soKhuon: parts[6], nguyenLieu: parts[7], mayDuc: parts[8]
+  };
+  renderScanned();
+
+  // Gợi ý sẵn "Công đoạn giao" theo vị trí hiện tại của tem (nếu đã từng chuyển trước đó).
+  try {
+    const { data } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', scannedData.tagNo).maybeSingle();
+    if (data && data.vi_tri_hien_tai) document.getElementById("congDoanGiao").value = data.vi_tri_hien_tai;
+  } catch(e){ /* không chặn luồng chính nếu lỗi */ }
+  checkReady();
+}
+
+function renderScanned(){
+  document.getElementById("svTag").textContent = scannedData.tagNo;
+  document.getElementById("svMa").textContent = scannedData.maSP;
+  document.getElementById("svTen").textContent = scannedData.tenSP;
+  document.getElementById("svNgay").textContent = scannedData.ngay;
+  document.getElementById("svLot").textContent = scannedData.lotNo || "—";
+  document.getElementById("svKhuon").textContent = scannedData.soKhuon || "—";
+  document.getElementById("svNL").textContent = scannedData.nguyenLieu || "—";
+  document.getElementById("svMay").textContent = scannedData.mayDuc;
+  document.getElementById("svSL").textContent = scannedData.soLuongTem;
+
+  document.getElementById("emptyHint").style.display = "none";
+  document.getElementById("scannedBox").classList.add("show");
+  document.getElementById("formSection").classList.add("show");
+
+  const slInput = document.getElementById("soLuong");
+  slInput.value = scannedData.soLuongTem;
+  slInput.max = scannedData.soLuongTem;
+  document.getElementById("slHint").textContent = "Tối đa " + scannedData.soLuongTem + " (số lượng gốc trên tem). Có thể giảm nếu bị hao hụt thực tế.";
+
+  document.getElementById("msg").style.display = "none";
+  checkReady();
+}
+
+function checkReady(){
+  let ok = !!scannedData;
+  const sl = Number(document.getElementById("soLuong").value);
+  ok = ok && sl > 0 && sl <= Number(scannedData ? scannedData.soLuongTem : 0);
+  ok = ok && document.getElementById("congDoanGiao").value !== "";
+  ok = ok && document.getElementById("congDoanNhan").value !== "";
+  ok = ok && document.getElementById("nguoiNhan").value !== "";
+  document.getElementById("btnSubmit").disabled = !ok;
+}
+["soLuong", "congDoanGiao", "congDoanNhan", "nguoiGiao", "nguoiNhan"].forEach(id => {
+  document.getElementById(id).addEventListener("input", checkReady);
+  document.getElementById(id).addEventListener("change", checkReady);
+});
+
+function resetForNext(){
+  scannedData = null;
+  document.getElementById("scannedBox").classList.remove("show");
+  document.getElementById("formSection").classList.remove("show");
+  document.getElementById("emptyHint").style.display = "block";
+  document.getElementById("soLuong").value = "";
+  document.getElementById("btnSubmit").disabled = true;
+}
+
+document.getElementById("btnSubmit").addEventListener("click", submitTransfer);
+async function submitTransfer(){
+  const congDoanGiao = document.getElementById("congDoanGiao").value;
+  const congDoanNhan = document.getElementById("congDoanNhan").value;
+  if (congDoanGiao === congDoanNhan){
+    err("Công đoạn giao và Công đoạn nhận không được trùng nhau.");
+    return;
+  }
+
+  const session = await MesAuth.getSession();
+  if (!session){
+    err("Cần đăng nhập trước khi ghi nhận. Đang chuyển sang trang đăng nhập…");
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return;
+  }
+
+  const btn = document.getElementById("btnSubmit");
+  btn.disabled = true;
+  btn.textContent = "⏳ Đang xử lý...";
+
+  const soLuong = Number(document.getElementById("soLuong").value);
+
+  const { data, error } = await sb.rpc('cd_ghi_chuyen_cong_doan', {
+    p_tag_no: scannedData.tagNo, p_ma_sp: scannedData.maSP, p_ten_sp: scannedData.tenSP,
+    p_sl_tren_tem: Number(scannedData.soLuongTem), p_sl_thuc_chuyen: soLuong,
+    p_lot_no: scannedData.lotNo || '', p_so_khuon: scannedData.soKhuon || '',
+    p_nguyen_lieu: scannedData.nguyenLieu || '', p_may_duc: scannedData.mayDuc,
+    p_ngay_duc: scannedData.ngay || '',
+    p_cong_doan_giao: congDoanGiao, p_cong_doan_nhan: congDoanNhan,
+    p_nguoi_giao: document.getElementById("nguoiGiao").value || '',
+    p_nguoi_nhan: document.getElementById("nguoiNhan").value
+  });
+
+  btn.textContent = "🔀  Chuyển Công Đoạn";
+  if (error){
+    err("Lỗi: " + error.message);
+    checkReady();
+    return;
+  }
+  const r = data[0];
+  const thoiGian = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN');
+  showMsg("✅ " + r.id_phieu + " — đã chuyển " + soLuong + " từ " + congDoanGiao + " sang " + congDoanNhan + " lúc " + thoiGian, "ok", 6000);
+  resetForNext();
+}
+
+/* ---------- Chỉ báo đăng nhập ---------- */
+async function initAuthStatus(){
+  const bar = document.getElementById("authInfo");
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = `👤 ${email} · <a href="#" id="mesSignOut">Đăng xuất</a>`;
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = `<a href="shared/login.html">Đăng nhập</a>`;
+  }
+}
+
+/* ---------- Khởi tạo ---------- */
+/* ---------- Tab: Xác nhận nhận hàng ---------- */
+document.getElementById("tabBtnScan").addEventListener("click", () => switchTab("scan"));
+document.getElementById("tabBtnConfirm").addEventListener("click", () => switchTab("confirm"));
+function switchTab(tab){
+  document.getElementById("tabScan").style.display = tab === "scan" ? "" : "none";
+  document.getElementById("tabConfirm").style.display = tab === "confirm" ? "" : "none";
+  document.getElementById("tabBtnScan").classList.toggle("active", tab === "scan");
+  document.getElementById("tabBtnConfirm").classList.toggle("active", tab === "confirm");
+  if (tab === "confirm") stopCamera();
+}
+
+async function loadConfirmDanhMuc(){
+  fillSelect("confirmCongDoan", CONG_DOAN_LIST, "-- Chọn bộ phận --");
+  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien');
+  if (!error) fillSelect("confirmNguoiXacNhan", (data || []).map(r => r.ten_nhan_vien), "-- Chọn tên bạn --");
+}
+
+document.getElementById("confirmCongDoan").addEventListener("change", loadPendingList);
+
+let pendingIds = [];
+
+async function loadPendingList(){
+  const dept = document.getElementById("confirmCongDoan").value;
+  const listEl = document.getElementById("confirmList");
+  const allCard = document.getElementById("confirmAllCard");
+  const allBtn = document.getElementById("btnConfirmAll");
+  allCard.style.display = "none";
+  pendingIds = [];
+  if (!dept){ listEl.innerHTML = 'Chọn bộ phận ở trên để xem danh sách.'; return; }
+  listEl.textContent = 'Đang tải…';
+  const { data, error } = await sb.from('cd_chuyen_cong_doan_log')
+    .select('id_phieu,tag_no,ma_sp,ten_sp,sl_thuc_chuyen,cong_doan_nhan,nguoi_nhan,thoi_gian_chuyen')
+    .eq('cong_doan_giao', dept)
+    .eq('trang_thai_xac_nhan', 'Chờ công đoạn trước xác nhận')
+    .order('thoi_gian_chuyen', { ascending: false });
+  if (error){ listEl.innerHTML = '❌ Lỗi tải danh sách: ' + error.message; return; }
+  if (!data || !data.length){ listEl.innerHTML = 'Không có phiếu nào đang chờ xác nhận cho bộ phận này.'; return; }
+  pendingIds = data.map(r => r.id_phieu);
+  allCard.style.display = data.length > 1 ? "block" : "none";
+  allBtn.textContent = "✅ Xác nhận tất cả (" + data.length + " phiếu)";
+  listEl.innerHTML = '';
+  data.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'pending-item';
+    const t = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN');
+    div.innerHTML = `
+      <div class="sr"><div class="k">Tag No</div><div class="v">${r.tag_no}</div></div>
+      <div class="sr"><div class="k">SP</div><div class="v">${r.ma_sp} — ${r.ten_sp || ''}</div></div>
+      <div class="sr"><div class="k">SL chuyển</div><div class="v">${r.sl_thuc_chuyen}</div></div>
+      <div class="sr"><div class="k">Sang</div><div class="v">${r.cong_doan_nhan} (${r.nguoi_nhan})</div></div>
+      <div class="sr"><div class="k">Lúc</div><div class="v">${t}</div></div>
+      <div class="pending-actions">
+        <button type="button" class="confirm-btn">✅ Xác nhận đã giao</button>
+        <button type="button" class="reject-btn">❌ Từ chối</button>
+      </div>
+      <div class="reject-form">
+        <textarea placeholder="Lý do từ chối (bắt buộc)..."></textarea>
+        <div class="row">
+          <button type="button" class="btn-cancel">Huỷ</button>
+          <button type="button" class="btn-send">Gửi từ chối</button>
+        </div>
+      </div>`;
+    div.querySelector('.confirm-btn').addEventListener('click', (e) => confirmOne(r.id_phieu, e.target));
+    const rejectForm = div.querySelector('.reject-form');
+    div.querySelector('.reject-btn').addEventListener('click', () => rejectForm.classList.add('show'));
+    div.querySelector('.btn-cancel').addEventListener('click', () => rejectForm.classList.remove('show'));
+    div.querySelector('.btn-send').addEventListener('click', (e) => rejectOne(r.id_phieu, rejectForm, e.target));
+    listEl.appendChild(div);
+  });
+}
+
+async function requireNguoiXacNhanAndAuth(){
+  const nguoiXacNhan = document.getElementById("confirmNguoiXacNhan").value;
+  if (!nguoiXacNhan){ err("Chưa chọn Người xác nhận."); return null; }
+  const session = await MesAuth.getSession();
+  if (!session){
+    err("Cần đăng nhập trước khi xác nhận. Đang chuyển sang trang đăng nhập…");
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return null;
+  }
+  return nguoiXacNhan;
+}
+
+async function confirmOne(idPhieu, btn){
+  const nguoiXacNhan = await requireNguoiXacNhanAndAuth();
+  if (!nguoiXacNhan) return;
+  btn.disabled = true;
+  btn.textContent = "⏳ Đang xử lý...";
+  const { error } = await sb.rpc('cd_xac_nhan_chuyen', {
+    p_id_phieu: idPhieu, p_nguoi_giao: nguoiXacNhan, p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN')
+  });
+  if (error){ err("Lỗi xác nhận: " + error.message); btn.disabled = false; btn.textContent = "✅ Xác nhận đã giao"; return; }
+  showMsg("✅ Đã xác nhận phiếu " + idPhieu, "ok", 4000);
+  loadPendingList();
+}
+
+async function rejectOne(idPhieu, formEl, btn){
+  const ly_do = formEl.querySelector('textarea').value.trim();
+  if (!ly_do){ err("Chưa nhập lý do từ chối."); return; }
+  const nguoiXacNhan = await requireNguoiXacNhanAndAuth();
+  if (!nguoiXacNhan) return;
+  btn.disabled = true;
+  btn.textContent = "⏳ Đang gửi...";
+  const { error } = await sb.rpc('cd_tu_choi_chuyen', {
+    p_id_phieu: idPhieu, p_nguoi_tu_choi: nguoiXacNhan, p_ly_do: ly_do,
+    p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN')
+  });
+  if (error){ err("Lỗi từ chối: " + error.message); btn.disabled = false; btn.textContent = "Gửi từ chối"; return; }
+  showMsg("❌ Đã từ chối phiếu " + idPhieu, "err", 4000);
+  loadPendingList();
+}
+
+document.getElementById("btnConfirmAll").addEventListener("click", confirmAll);
+async function confirmAll(){
+  const nguoiXacNhan = await requireNguoiXacNhanAndAuth();
+  if (!nguoiXacNhan) return;
+  const btn = document.getElementById("btnConfirmAll");
+  const ids = pendingIds.slice();
+  btn.disabled = true;
+  let done = 0, failed = 0;
+  for (const id of ids){
+    btn.textContent = "⏳ Đang xác nhận " + (done + failed + 1) + "/" + ids.length + "…";
+    const { error } = await sb.rpc('cd_xac_nhan_chuyen', {
+      p_id_phieu: id, p_nguoi_giao: nguoiXacNhan, p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN')
+    });
+    if (error) failed++; else done++;
+  }
+  btn.disabled = false;
+  if (failed) showMsg("⚠️ Đã xác nhận " + done + "/" + ids.length + " phiếu — " + failed + " phiếu lỗi.", "err", 6000);
+  else showMsg("✅ Đã xác nhận tất cả " + done + " phiếu.", "ok", 5000);
+  loadPendingList();
+}
+
+initAuthStatus();
+loadDanhMuc();
+loadConfirmDanhMuc();
+</script>
+</body>
+</html>

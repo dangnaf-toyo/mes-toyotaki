@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nguyên nhân & Đối sách — Dashboard Đúc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!--
+  ncp-detail.html — bản web tĩnh (Supabase) thay Web App Google Apps Script
+  "NcpDetail.html". Mở qua link ncp-detail.html?id=<id_ncp> (từ qc-manager.html).
+  Đọc công khai, GHI (lưu nháp/gửi phê duyệt/duyệt/mở lại) bắt buộc đăng nhập.
+
+  THAY ĐỔI SO VỚI BẢN GỐC: id phiếu đọc thẳng từ location.search (query string
+  bình thường) thay vì được server bơm qua scriptlet <?= id ?> — bản gốc phải
+  làm vậy vì Apps Script HtmlService chạy trong iframe sandbox
+  googleusercontent.com nên client không thấy query string gốc của URL /exec;
+  web tĩnh không có giới hạn đó. Ảnh nguyên nhân/đối sách upload thẳng lên
+  Storage bucket "ipqc-evidence" (dùng chung, đúng như ghi chú trong
+  migration_phase4_step6_ncp.sql).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--good-fg:#047857;--good-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased}
+.app{max-width:980px;margin:0 auto;padding:12px 12px 60px;display:flex;flex-direction:column;gap:14px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm)}
+header .back{background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:8px;font-size:16px;cursor:pointer;flex-shrink:0}
+header .titles{display:flex;flex-direction:column;line-height:1.3;min-width:0}
+header .co{font-size:10px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+header .title{font-size:17px;font-weight:700}
+header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
+header .auth-info{margin-left:auto;font-size:11px;color:#94A3B8}
+header .auth-info a{color:#93C5FD;text-decoration:none;font-weight:600}
+
+.banner{border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
+.banner.nhap{background:var(--bg-sunken);color:var(--text-muted);border:1px solid var(--border)}
+.banner.cho_duyet{background:var(--warn-bg);color:var(--warn-fg);border:1px solid #FDE9C4}
+.banner.da_duyet{background:var(--good-bg);color:var(--good-fg);border:1px solid #C9F0DD}
+.banner.tu_choi{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FBD5D5}
+.banner .msg{font-weight:700;font-size:13px}
+.banner .detail{font-size:12px;font-weight:500;opacity:.85}
+.banner-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.panel{background:var(--bg-panel);border-radius:10px;border:1px solid var(--border);box-shadow:var(--shadow-sm);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.info-item{display:flex;flex-direction:column;gap:2px}
+.info-item .k{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:700}
+.info-item .v{font-size:13px}
+.info-item .v.mono{font-family:'JetBrains Mono',monospace}
+
+.cause-section{display:flex;flex-direction:column;gap:14px}
+.cause-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+
+.field-row{display:flex;flex-direction:column;gap:5px}
+.field-row label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em}
+.field-row input,.field-row textarea{padding:9px 11px;border:1px solid var(--border-strong);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
+.field-row textarea{min-height:64px;resize:vertical}
+.field-row input:disabled,.field-row textarea:disabled,.field-row input[readonly],.field-row textarea[readonly]{background:var(--bg-sunken);color:var(--text-muted)}
+
+.img-gallery{display:flex;flex-wrap:wrap;gap:8px}
+.img-thumb{position:relative;width:74px;height:74px;border-radius:7px;overflow:hidden;background:var(--bg-sunken);border:1px solid var(--border)}
+.img-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer}
+.img-thumb button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(15,23,42,.7);color:#fff;border:none;font-size:10px;font-weight:700;cursor:pointer;padding:0}
+.img-upload-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px dashed var(--border-strong);border-radius:7px;background:var(--bg-sunken);color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;width:fit-content}
+.img-upload-btn.disabled{opacity:.4;pointer-events:none}
+
+.ds-group{display:flex;flex-direction:column;gap:8px}
+.ds-group-head{display:flex;align-items:center;justify-content:space-between}
+.ds-group-head .h{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:6px}
+.ds-empty{font-size:12px;color:var(--text-dim);padding:10px;text-align:center;background:var(--bg-sunken);border-radius:7px}
+
+.ds-table-wrap{overflow-x:auto}
+.ds-row-head,.ds-row{display:grid;grid-template-columns:1.8fr 1.3fr 1fr 1fr 1.8fr 30px;gap:10px;min-width:860px}
+.ds-row-head{padding:0 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted)}
+.ds-list{display:flex;flex-direction:column;gap:8px}
+.ds-row{border:1px solid var(--border);border-radius:9px;padding:10px;background:#fff;align-items:start}
+.ds-row textarea{min-height:60px;width:100%}
+.ds-row input[type=text],.ds-row input[type=date]{width:100%}
+.ds-row-img{display:flex;flex-wrap:wrap;gap:5px;align-items:flex-start}
+.ds-row-img .img-thumb{width:40px;height:40px}
+.ds-row-img .img-upload-btn{width:40px;height:40px;padding:0;justify-content:center;font-size:15px}
+.ds-row-img .img-upload-btn span{display:none}
+.ds-row .btn-remove{padding:4px 6px;font-size:11px;width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+
+.btn{padding:9px 16px;border-radius:8px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{background:#fff;border:1px solid var(--border-strong);color:var(--text)}
+.btn-add{background:var(--bg-sunken);color:var(--accent);border:1px dashed var(--border-strong);padding:5px 12px;font-size:11px}
+.btn-remove{background:var(--alarm-bg);color:var(--alarm-fg);border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.btn-good{background:var(--good-fg);color:#fff}
+.btn-alarm{background:var(--alarm-fg);color:#fff}
+.hidden{display:none!important}
+
+.footer-actions{position:sticky;bottom:0;background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;gap:10px;justify-content:flex-end;box-shadow:var(--shadow-md)}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:none;align-items:center;justify-content:center;z-index:100;color:#fff;font-size:13px;font-weight:600}
+.overlay.show{display:flex}
+.lightbox{position:fixed;inset:0;background:rgba(15,23,42,.85);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;cursor:zoom-out}
+.lightbox.show{display:flex}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay">Đang xử lý...</div>
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightbox-img"></div>
+
+<div class="app">
+  <header>
+    <button class="back" onclick="window.close()">←</button>
+    <div class="titles">
+      <div class="co">Toyotaki — Bộ phận Đúc</div>
+      <div class="title">📝 Nguyên nhân & Đối sách</div>
+      <div class="sub" id="h-id-ncp">—</div>
+    </div>
+    <div class="auth-info" id="authInfo">…</div>
+  </header>
+
+  <div class="banner nhap" id="banner">
+    <div>
+      <div class="msg" id="banner-msg">Đang tải...</div>
+      <div class="detail" id="banner-detail"></div>
+    </div>
+    <div class="banner-actions" id="banner-actions"></div>
+  </div>
+
+  <div class="panel">
+    <div class="info-grid">
+      <div class="info-item"><span class="k">Số phiếu</span><span class="v mono" id="i-id-ncp">—</span></div>
+      <div class="info-item"><span class="k">Máy</span><span class="v" id="i-ma-may">—</span></div>
+      <div class="info-item"><span class="k">Mã SP</span><span class="v mono" id="i-ma-sp">—</span></div>
+      <div class="info-item"><span class="k">Số lượng nghi vấn</span><span class="v" id="i-so-luong">—</span></div>
+      <div class="info-item"><span class="k">Người đảm nhiệm xử lý</span><span class="v" id="i-nguoi-dam-nhiem">—</span></div>
+    </div>
+    <div class="info-item"><span class="k">Mô tả lỗi</span><span class="v" id="i-mo-ta">—</span></div>
+    <div class="field-row">
+      <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
+      <input type="text" id="f-nguoi-dam-nhiem">
+    </div>
+  </div>
+
+  <div class="panel cause-section">
+    <div class="cause-title">🔍 Nguyên nhân phát sinh <span style="font-weight:400;font-size:11px;color:var(--text-dim)">— tại sao lỗi xảy ra</span></div>
+    <div class="field-row"><textarea id="f-nn-phat-sinh" placeholder="Mô tả nguyên nhân phát sinh..."></textarea></div>
+    <div class="field-row">
+      <label>Hình ảnh / sơ đồ minh hoạ</label>
+      <div class="img-gallery" id="img-phat_sinh"></div>
+      <label class="img-upload-btn" id="upload-btn-phat_sinh">📷 Thêm ảnh/sơ đồ<input type="file" accept="image/*" class="hidden" onchange="onCauseImageSelected(event,'phat_sinh')"></label>
+    </div>
+
+    <div class="ds-group">
+      <div class="ds-group-head"><span class="h">⏱ Đối sách tạm thời</span><button type="button" class="btn btn-add" id="add-btn-ps_tam_thoi" onclick="addDoiSach('ps_tam_thoi')">+ Thêm đối sách</button></div>
+      <div class="ds-table-wrap">
+        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
+        <div class="ds-list" id="ds-ps_tam_thoi-list"></div>
+      </div>
+    </div>
+    <div class="ds-group">
+      <div class="ds-group-head"><span class="h">🏗 Đối sách lâu dài</span><button type="button" class="btn btn-add" id="add-btn-ps_lau_dai" onclick="addDoiSach('ps_lau_dai')">+ Thêm đối sách</button></div>
+      <div class="ds-table-wrap">
+        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
+        <div class="ds-list" id="ds-ps_lau_dai-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel cause-section">
+    <div class="cause-title">🔍 Nguyên nhân lưu xuất <span style="font-weight:400;font-size:11px;color:var(--text-dim)">— tại sao lọt ra ngoài không phát hiện được</span></div>
+    <div class="field-row"><textarea id="f-nn-luu-xuat" placeholder="Mô tả nguyên nhân lưu xuất..."></textarea></div>
+    <div class="field-row">
+      <label>Hình ảnh / sơ đồ minh hoạ</label>
+      <div class="img-gallery" id="img-luu_xuat"></div>
+      <label class="img-upload-btn" id="upload-btn-luu_xuat">📷 Thêm ảnh/sơ đồ<input type="file" accept="image/*" class="hidden" onchange="onCauseImageSelected(event,'luu_xuat')"></label>
+    </div>
+
+    <div class="ds-group">
+      <div class="ds-group-head"><span class="h">⏱ Đối sách tạm thời</span><button type="button" class="btn btn-add" id="add-btn-lx_tam_thoi" onclick="addDoiSach('lx_tam_thoi')">+ Thêm đối sách</button></div>
+      <div class="ds-table-wrap">
+        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
+        <div class="ds-list" id="ds-lx_tam_thoi-list"></div>
+      </div>
+    </div>
+    <div class="ds-group">
+      <div class="ds-group-head"><span class="h">🏗 Đối sách lâu dài</span><button type="button" class="btn btn-add" id="add-btn-lx_lau_dai" onclick="addDoiSach('lx_lau_dai')">+ Thêm đối sách</button></div>
+      <div class="ds-table-wrap">
+        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
+        <div class="ds-list" id="ds-lx_lau_dai-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-actions">
+    <button class="btn btn-outline" id="btn-save" onclick="saveDraft()">💾 Lưu nháp</button>
+    <button class="btn btn-primary" id="btn-submit" onclick="submitForApproval()">📤 Gửi phê duyệt</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+const state = {
+  id: null, case: null, locked: false, currentUserEmail: '',
+  images: { phat_sinh: [], luu_xuat: [] },
+  doiSach: { ps_tam_thoi: [], ps_lau_dai: [], lx_tam_thoi: [], lx_lau_dai: [] },
+};
+const DS_KEYS = ['ps_tam_thoi', 'ps_lau_dai', 'lx_tam_thoi', 'lx_lau_dai'];
+
+function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showOverlay(text){ const o = document.getElementById('overlay'); o.textContent = text || 'Đang xử lý...'; o.classList.add('show'); }
+function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
+function showLightbox(url){ document.getElementById('lightbox-img').src = url; document.getElementById('lightbox').classList.add('show'); }
+async function ensureAuth(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    alert('Cần đăng nhập để thao tác — đang chuyển sang trang đăng nhập.');
+    window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
+    return false;
+  }
+  return true;
+}
+
+function jsonArr(v){ return Array.isArray(v) ? v : []; }
+
+async function load(){
+  state.id = new URLSearchParams(location.search).get('id');
+  if (!state.id) { document.body.innerHTML = '<p style="padding:20px">Thiếu id phiếu trên URL.</p>'; return; }
+
+  const { data, error } = await sb.from('duc_ncp').select('*').eq('id_ncp', state.id).maybeSingle();
+  if (error) return alert('Lỗi: ' + error.message);
+  if (!data) return alert('Không tìm thấy phiếu: ' + state.id);
+
+  state.case = data;
+  state.currentUserEmail = await MesAuth.getCurrentUserEmail() || '';
+  state.images.phat_sinh = jsonArr(data.hinh_anh_phat_sinh_json).slice();
+  state.images.luu_xuat = jsonArr(data.hinh_anh_luu_xuat_json).slice();
+  DS_KEYS.forEach(key => {
+    state.doiSach[key] = jsonArr(data['doi_sach_' + key + '_json']).map(x => Object.assign({ noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: [] }, x));
+  });
+  renderAll();
+}
+
+function renderAll(){
+  const c = state.case;
+  state.locked = c.rc_trang_thai_duyet === 'cho_duyet' || c.rc_trang_thai_duyet === 'da_duyet';
+
+  document.getElementById('h-id-ncp').textContent = c.id_ncp;
+  document.getElementById('i-id-ncp').textContent = c.id_ncp;
+  document.getElementById('i-ma-may').textContent = c.ma_may;
+  document.getElementById('i-ma-sp').textContent = c.ma_sp;
+  document.getElementById('i-so-luong').textContent = c.so_luong_nghi_van;
+  document.getElementById('i-mo-ta').textContent = c.mo_ta_loi;
+  document.getElementById('i-nguoi-dam-nhiem').textContent = c.nguoi_dam_nhiem || '—';
+  document.getElementById('f-nguoi-dam-nhiem').value = c.nguoi_dam_nhiem_doi_sach || '';
+  document.getElementById('f-nn-phat-sinh').value = c.nguyen_nhan_phat_sinh || '';
+  document.getElementById('f-nn-luu-xuat').value = c.nguyen_nhan_luu_xuat || '';
+
+  ['f-nguoi-dam-nhiem', 'f-nn-phat-sinh', 'f-nn-luu-xuat'].forEach(id => { document.getElementById(id).readOnly = state.locked; });
+  document.getElementById('upload-btn-phat_sinh').classList.toggle('disabled', state.locked);
+  document.getElementById('upload-btn-luu_xuat').classList.toggle('disabled', state.locked);
+  DS_KEYS.forEach(key => document.getElementById('add-btn-' + key).classList.toggle('hidden', state.locked));
+
+  renderCauseImages('phat_sinh');
+  renderCauseImages('luu_xuat');
+  DS_KEYS.forEach(renderDoiSachList);
+  renderBanner();
+
+  document.getElementById('btn-save').classList.toggle('hidden', state.locked);
+  document.getElementById('btn-submit').classList.toggle('hidden', state.locked);
+}
+
+function renderBanner(){
+  const c = state.case;
+  const banner = document.getElementById('banner');
+  const msg = document.getElementById('banner-msg');
+  const detail = document.getElementById('banner-detail');
+  const actions = document.getElementById('banner-actions');
+  banner.className = 'banner ' + c.rc_trang_thai_duyet;
+  actions.innerHTML = '';
+
+  if (c.rc_trang_thai_duyet === 'nhap' || !c.rc_trang_thai_duyet) {
+    msg.textContent = '📝 Nháp — chưa gửi phê duyệt';
+    detail.textContent = 'Điền đầy đủ nguyên nhân & đối sách rồi bấm "Gửi phê duyệt".';
+  } else if (c.rc_trang_thai_duyet === 'cho_duyet') {
+    msg.textContent = '🟡 Đang chờ phê duyệt';
+    detail.textContent = 'Gửi bởi ' + c.rc_nguoi_gui_duyet + ' lúc ' + new Date(c.rc_thoi_diem_gui_duyet).toLocaleString('vi-VN');
+    actions.innerHTML = `
+      <button class="btn btn-good" onclick="approve('Duyet')">✅ Duyệt</button>
+      <button class="btn btn-alarm" onclick="approve('Tu_choi')">❌ Từ chối</button>`;
+  } else if (c.rc_trang_thai_duyet === 'da_duyet') {
+    msg.textContent = '🟢 Đã phê duyệt';
+    detail.textContent = 'Duyệt bởi ' + c.rc_nguoi_duyet + ' lúc ' + new Date(c.rc_thoi_diem_duyet).toLocaleString('vi-VN');
+    actions.innerHTML = `<button class="btn btn-outline" onclick="reopen()">🔓 Mở lại để chỉnh sửa</button>`;
+  } else if (c.rc_trang_thai_duyet === 'tu_choi') {
+    msg.textContent = '🔴 Bị từ chối';
+    detail.textContent = (c.rc_ghi_chu_duyet ? 'Lý do: ' + c.rc_ghi_chu_duyet + ' — ' : '') +
+      'bởi ' + c.rc_nguoi_duyet + ' lúc ' + new Date(c.rc_thoi_diem_duyet).toLocaleString('vi-VN');
+  }
+}
+
+// ===================== Ảnh nguyên nhân =====================
+function renderCauseImages(key){
+  document.getElementById('img-' + key).innerHTML = state.images[key].map((u, i) => `
+    <div class="img-thumb">
+      <img src="${u}" onclick="showLightbox('${u}')">
+      ${state.locked ? '' : `<button type="button" onclick="removeCauseImage('${key}',${i})">✕</button>`}
+    </div>`).join('');
+}
+function removeCauseImage(key, i){ state.images[key].splice(i, 1); renderCauseImages(key); }
+
+function resizeImageToBlob(file, cb){
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1280;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => cb(blob), 'image/jpeg', 0.82);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadNcpImage(blob){
+  const path = state.id + '/' + Date.now() + '_' + Math.round(Math.random() * 1e6) + '.jpg';
+  const { error } = await sb.storage.from('ipqc-evidence').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = sb.storage.from('ipqc-evidence').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function onCauseImageSelected(e, key){
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file || state.locked) return;
+  if (!(await ensureAuth())) return;
+  resizeImageToBlob(file, async blob => {
+    showOverlay('Đang tải ảnh...');
+    try {
+      const url = await uploadNcpImage(blob);
+      state.images[key].push(url);
+      renderCauseImages(key);
+    } catch (e) { alert('Lỗi: ' + e.message); }
+    hideOverlay();
+  });
+}
+
+// ===================== Đối sách =====================
+function addDoiSach(key){
+  state.doiSach[key].push({ noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: [] });
+  renderDoiSachList(key);
+}
+function removeDoiSach(key, idx){ state.doiSach[key].splice(idx, 1); renderDoiSachList(key); }
+function updateDoiSachField(key, idx, field, value){ state.doiSach[key][idx][field] = value; }
+
+function renderDoiSachList(key){
+  const list = state.doiSach[key];
+  const container = document.getElementById('ds-' + key + '-list');
+  if (!list.length) { container.innerHTML = '<div class="ds-empty">Chưa có đối sách nào.</div>'; return; }
+  container.innerHTML = list.map((item, idx) => dsCardHtml(key, idx, item)).join('');
+}
+
+function dsCardHtml(key, idx, item){
+  const dis = state.locked ? 'disabled' : '';
+  const ro = state.locked ? 'readonly' : '';
+  return `<div class="ds-row">
+    <textarea ${ro} placeholder="Nội dung đối sách..." oninput="updateDoiSachField('${key}',${idx},'noi_dung',this.value)">${escapeHtml(item.noi_dung)}</textarea>
+    <div class="ds-row-img">
+      ${dsImgThumbsHtml(item.hinh_anh, key, idx)}
+      ${state.locked ? '' : `<label class="img-upload-btn" title="Thêm ảnh">📷<span>Thêm ảnh</span><input type="file" accept="image/*" class="hidden" onchange="onDsImageSelected(event,'${key}',${idx})"></label>`}
+    </div>
+    <input type="text" ${ro} placeholder="Người thực hiện" value="${escapeHtml(item.nguoi_thuc_hien)}" oninput="updateDoiSachField('${key}',${idx},'nguoi_thuc_hien',this.value)">
+    <input type="date" ${dis} value="${item.thoi_han ? String(item.thoi_han).slice(0, 10) : ''}" onchange="updateDoiSachField('${key}',${idx},'thoi_han',this.value)">
+    <textarea ${ro} placeholder="Đánh giá hiệu quả..." oninput="updateDoiSachField('${key}',${idx},'danh_gia',this.value)">${escapeHtml(item.danh_gia)}</textarea>
+    ${state.locked ? '<div></div>' : `<button type="button" class="btn-remove" onclick="removeDoiSach('${key}',${idx})" title="Xoá">✕</button>`}
+  </div>`;
+}
+
+function dsImgThumbsHtml(urls, key, idx){
+  return (urls || []).map((u, i) => `
+    <div class="img-thumb">
+      <img src="${u}" onclick="showLightbox('${u}')">
+      ${state.locked ? '' : `<button type="button" onclick="removeDsImage('${key}',${idx},${i})">✕</button>`}
+    </div>`).join('');
+}
+function removeDsImage(key, idx, imgIdx){ state.doiSach[key][idx].hinh_anh.splice(imgIdx, 1); renderDoiSachList(key); }
+async function onDsImageSelected(e, key, idx){
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file || state.locked) return;
+  if (!(await ensureAuth())) return;
+  resizeImageToBlob(file, async blob => {
+    showOverlay('Đang tải ảnh...');
+    try {
+      const url = await uploadNcpImage(blob);
+      state.doiSach[key][idx].hinh_anh.push(url);
+      renderDoiSachList(key);
+    } catch (e) { alert('Lỗi: ' + e.message); }
+    hideOverlay();
+  });
+}
+
+// ===================== Lưu / Gửi duyệt / Duyệt / Mở lại =====================
+function collectParams(){
+  const p = {
+    p_id_ncp: state.id,
+    p_nguoi_dam_nhiem_doi_sach: document.getElementById('f-nguoi-dam-nhiem').value.trim(),
+    p_nguyen_nhan_phat_sinh: document.getElementById('f-nn-phat-sinh').value.trim(),
+    p_nguyen_nhan_luu_xuat: document.getElementById('f-nn-luu-xuat').value.trim(),
+    p_hinh_anh_phat_sinh: state.images.phat_sinh,
+    p_hinh_anh_luu_xuat: state.images.luu_xuat,
+    p_user: state.currentUserEmail,
+  };
+  DS_KEYS.forEach(key => { p['p_doi_sach_' + key] = state.doiSach[key]; });
+  return p;
+}
+
+async function saveDraft(){
+  if (!(await ensureAuth())) return;
+  showOverlay('Đang lưu...');
+  const p = collectParams();
+  const { data, error } = await sb.rpc('duc_ncp_update_root_cause', {
+    p_id_ncp: p.p_id_ncp, p_nguoi_dam_nhiem_doi_sach: p.p_nguoi_dam_nhiem_doi_sach,
+    p_nguyen_nhan_phat_sinh: p.p_nguyen_nhan_phat_sinh, p_nguyen_nhan_luu_xuat: p.p_nguyen_nhan_luu_xuat,
+    p_hinh_anh_phat_sinh: p.p_hinh_anh_phat_sinh, p_hinh_anh_luu_xuat: p.p_hinh_anh_luu_xuat,
+    p_doi_sach_ps_tam_thoi: p.p_doi_sach_ps_tam_thoi, p_doi_sach_ps_lau_dai: p.p_doi_sach_ps_lau_dai,
+    p_doi_sach_lx_tam_thoi: p.p_doi_sach_lx_tam_thoi, p_doi_sach_lx_lau_dai: p.p_doi_sach_lx_lau_dai,
+    p_user: p.p_user,
+  });
+  hideOverlay();
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  alert('✓ Đã lưu nháp');
+}
+
+async function submitForApproval(){
+  if (!(await ensureAuth())) return;
+  if (!confirm('Gửi phê duyệt toàn bộ Nguyên nhân & Đối sách của phiếu này?')) return;
+  showOverlay('Đang lưu & gửi phê duyệt...');
+  const p = collectParams();
+  const { data: d1, error: e1 } = await sb.rpc('duc_ncp_update_root_cause', {
+    p_id_ncp: p.p_id_ncp, p_nguoi_dam_nhiem_doi_sach: p.p_nguoi_dam_nhiem_doi_sach,
+    p_nguyen_nhan_phat_sinh: p.p_nguyen_nhan_phat_sinh, p_nguyen_nhan_luu_xuat: p.p_nguyen_nhan_luu_xuat,
+    p_hinh_anh_phat_sinh: p.p_hinh_anh_phat_sinh, p_hinh_anh_luu_xuat: p.p_hinh_anh_luu_xuat,
+    p_doi_sach_ps_tam_thoi: p.p_doi_sach_ps_tam_thoi, p_doi_sach_ps_lau_dai: p.p_doi_sach_ps_lau_dai,
+    p_doi_sach_lx_tam_thoi: p.p_doi_sach_lx_tam_thoi, p_doi_sach_lx_lau_dai: p.p_doi_sach_lx_lau_dai,
+    p_user: p.p_user,
+  });
+  if (e1) { hideOverlay(); return alert('Lỗi: ' + e1.message); }
+  if (d1 && d1.ok === false) { hideOverlay(); return alert('Lỗi: ' + d1.error); }
+
+  const { data: d2, error: e2 } = await sb.rpc('duc_ncp_submit_root_cause_for_approval', { p_id_ncp: state.id, p_user: state.currentUserEmail });
+  hideOverlay();
+  if (e2) return alert('Lỗi: ' + e2.message);
+  if (d2 && d2.ok === false) return alert('Lỗi: ' + d2.error);
+  load();
+}
+
+async function approve(ketQua){
+  if (!(await ensureAuth())) return;
+  if (ketQua === 'Duyet' && state.case.rc_nguoi_gui_duyet === state.currentUserEmail) {
+    if (!confirm('Bạn đang tự duyệt phiếu do chính bạn gửi — vẫn tiếp tục?')) return;
+  }
+  let ghiChu = '';
+  if (ketQua === 'Tu_choi') {
+    ghiChu = prompt('Lý do từ chối (bắt buộc):') || '';
+    if (!ghiChu.trim()) return alert('Cần nhập lý do từ chối');
+  }
+  showOverlay('Đang xử lý...');
+  const { data, error } = await sb.rpc('duc_ncp_approve_root_cause', { p_id_ncp: state.id, p_ket_qua: ketQua, p_ghi_chu: ghiChu, p_user: state.currentUserEmail });
+  hideOverlay();
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  load();
+}
+
+async function reopen(){
+  if (!(await ensureAuth())) return;
+  if (!confirm('Mở lại phiếu để chỉnh sửa? Trạng thái phê duyệt sẽ về "Nháp".')) return;
+  showOverlay('Đang mở lại...');
+  const { data, error } = await sb.rpc('duc_ncp_reopen_root_cause', { p_id_ncp: state.id, p_user: state.currentUserEmail });
+  hideOverlay();
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  load();
+}
+
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = '👤 ' + escapeHtml(email) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">🔒 Đăng nhập để ghi dữ liệu</a>';
+  }
+}
+
+load();
+initAuthStatus();
+</script>
+</body>
+</html>

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>In Tem Đúc — TOYOTAKI</title>
+<!--
+  intem.html — bản web tĩnh (Supabase) thay Web App Google Apps Script
+  "Intem QR" (D:\Project\MES\Intem QR\Code.gs + Index.html). Đọc công khai,
+  GHI (in tem mới/lưu sửa/xoá) bắt buộc đăng nhập Supabase Auth.
+
+  ĐÃ CHỦ ĐÍCH ĐƠN GIẢN HOÁ (ghi rõ để không tưởng là thiếu sót):
+  - "Nguyên liệu" đổi từ dropdown gợi ý (đọc cột E sheet KHSX Master) sang ô
+    nhập tay tự do: cột nguyên liệu theo từng mã SP chưa có trong bảng
+    Supabase master_products. Trường này vốn không bắt buộc ở bản gốc, không
+    ảnh hưởng tính đúng đắn dữ liệu ghi (duc_ghi_tem nhận text tự do).
+  - Thư viện tạo mã QR (qrcode-generator) trước đây nhúng base64 ngay trong
+    file vì chạy trong sandbox Apps Script (chặn CDN ngoài) — ở đây tải thẳng
+    từ CDN, cùng phiên bản/API, giữ nguyên 100% logic vẽ SVG (buildQrRects/
+    buildLabelSvg) so với bản gốc.
+  - Nhận prefill qua query string (?maSP=..&tenSP=..&mayDuc=..&nguoiTT=..&soKhuon=..)
+    khi mở từ nút "🖨" trên duc-dashboard.html — giữ đúng hành vi bản gốc.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;padding:16px 12px 40px}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:16px;width:100%;max-width:500px}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr h1{font-size:16px;font-weight:700;color:#1a1a2e;line-height:1.2}
+.hdr p{font-size:10px;color:#999;margin-top:2px}
+.auth-info{font-size:11px;color:#667}
+.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.card{background:#fff;border-radius:14px;
+  box-shadow:0 2px 16px rgba(0,0,0,.08);
+  padding:24px 20px;width:100%;max-width:500px}
+.card-ttl{font-size:12px;font-weight:700;color:#C87941;
+  text-transform:uppercase;letter-spacing:.5px;
+  margin-bottom:18px;padding-bottom:9px;
+  border-bottom:2px solid #f5e6d7}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+label{font-size:11px;font-weight:700;color:#555;
+  text-transform:uppercase;letter-spacing:.4px}
+.req::after{content:" *";color:#e53}
+input,select,textarea{border:1.5px solid #ddd;border-radius:7px;
+  padding:8px 10px;font-size:13px;color:#1a1a2e;
+  width:100%;transition:border-color .2s;font-family:inherit;background:#fff}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:#C87941;
+  box-shadow:0 0 0 3px rgba(200,121,65,.12)}
+input[disabled],select[disabled]{background:#f7f7f7;color:#888}
+textarea{resize:vertical;min-height:48px}
+.btns{display:flex;gap:10px;margin-top:20px}
+.btn{flex:1;padding:12px;border:none;border-radius:9px;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-p{background:#C87941;color:#fff}
+.btn-p:hover:not(:disabled){background:#a85e2a;transform:translateY(-1px)}
+.btn-p:disabled{opacity:.5;cursor:not-allowed}
+.btn-s{background:#f0f2f5;color:#555}
+.btn-s:hover{background:#e2e5ea}
+.btn-s:disabled{opacity:.5;cursor:not-allowed}
+#msg{margin-top:12px;padding:11px 14px;border-radius:7px;
+  font-size:13px;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.wait{background:#fff8f0;color:#C87941;border:1px solid #f5e6d7;display:block!important}
+.loading-overlay{display:flex;align-items:center;justify-content:center;
+  padding:30px;color:#C87941;font-size:14px;gap:10px}
+.spin{width:20px;height:20px;border:3px solid #f5e6d7;
+  border-top-color:#C87941;border-radius:50%;
+  animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-left">
+    <div><h1>🏷️ In Tem Sản Phẩm — Đúc</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</p></div>
+  </div>
+  <div class="auth-info" id="authInfo">…</div>
+</div>
+<div class="card">
+  <div class="card-ttl">Thông tin tem</div>
+
+  <div id="loading" class="loading-overlay">
+    <div class="spin"></div> Đang tải dữ liệu...
+  </div>
+
+  <div id="formWrap" style="display:none">
+    <div class="fg full" style="margin-bottom:12px">
+      <label for="searchTag">Tra cứu theo Tag No</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="searchTag" type="text" placeholder="Nhập Tag No">
+        <button class="btn btn-s" type="button" style="flex:none;padding:8px 14px" onclick="findTem()">🔎 Tìm</button>
+      </div>
+    </div>
+    <div class="btns" style="margin-top:8px">
+      <button class="btn btn-s" type="button" onclick="saveTemEdit()">💾 Lưu thay đổi</button>
+      <button class="btn btn-s" type="button" onclick="reprintTem()">🖨 In lại</button>
+      <button class="btn btn-s" type="button" onclick="deleteTem()">🗑 Xóa tem</button>
+    </div>
+    <div class="grid" style="margin-top:16px">
+      <div class="fg">
+        <label class="req" for="maSP">Mã sản phẩm</label>
+        <select id="maSP" onchange="onMaChange()"></select>
+      </div>
+      <div class="fg">
+        <label for="tenSP">Tên sản phẩm</label>
+        <input id="tenSP" type="text" placeholder="Tự điền theo mã" disabled>
+      </div>
+      <div class="fg">
+        <label class="req" for="soLuong">Số lượng / thùng</label>
+        <input id="soLuong" type="number" placeholder="Pcs" min="1">
+      </div>
+      <div class="fg">
+        <label for="lotNo">Ngày sản xuất</label>
+        <input id="lotNo" type="date">
+      </div>
+      <div class="fg">
+        <label for="soKhuon">Số khuôn</label>
+        <input id="soKhuon" type="text" placeholder="VD V45-46">
+      </div>
+      <div class="fg">
+        <label for="nguyenLieu">Nguyên liệu</label>
+        <input id="nguyenLieu" type="text" placeholder="Nhập tự do (tuỳ chọn)">
+      </div>
+      <div class="fg">
+        <label class="req" for="mayDuc">Máy đúc</label>
+        <select id="mayDuc"></select>
+      </div>
+      <div class="fg">
+        <label class="req" for="nguoiTT">Người thao tác</label>
+        <select id="nguoiTT"></select>
+      </div>
+      <div class="fg full">
+        <label for="ghiChu">Ghi chú</label>
+        <textarea id="ghiChu" placeholder="VD: Đúc mẫu"></textarea>
+      </div>
+      <div class="fg full">
+        <label class="req" for="loaiSP">Chủng loại sản phẩm</label>
+        <select id="loaiSP">
+          <option value="hangloat" selected>Sản phẩm sản xuất hàng loạt</option>
+          <option value="phattrien">Sản phẩm đang phát triển</option>
+        </select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn btn-s" onclick="clearAll()">🗑 Xóa</button>
+      <button class="btn btn-p" id="btnIn" onclick="inTem()">🖨 In Tem</button>
+    </div>
+  </div>
+
+  <div id="msg"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+var masterData = [];   // [{ma, ten}]
+var currentTagNo = "";
+var PREFILL = Object.fromEntries(new URLSearchParams(location.search));
+
+function getTodayString(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function setDefaultLotNo(){
+  var el = document.getElementById("lotNo");
+  if (el && !el.value) el.value = getTodayString();
+}
+function g(id){ return document.getElementById(id).value.trim(); }
+
+async function loadMaster(){
+  const [prod, may, nv] = await Promise.all([
+    sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp'),
+    sb.from('master_machines').select('ma_may').order('ma_may'),
+    sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
+  ]);
+  if (prod.error) throw new Error('Không tải được danh mục SP: ' + prod.error.message);
+  if (may.error) throw new Error('Không tải được danh mục máy: ' + may.error.message);
+  if (nv.error) throw new Error('Không tải được danh mục nhân sự: ' + nv.error.message);
+
+  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '' }));
+  buildSelects(masterData, (may.data||[]).map(r=>r.ma_may), (nv.data||[]).map(r=>r.ten_nhan_vien));
+}
+
+function buildSelects(items, mays, nguois){
+  var sel = document.getElementById("maSP");
+  sel.innerHTML = '<option value="">-- Chọn mã SP --</option>';
+  items.forEach(function(item){ sel.innerHTML += '<option value="'+item.ma+'">'+item.ma+'</option>'; });
+
+  var maySel = document.getElementById("mayDuc");
+  maySel.innerHTML = '<option value="">-- Chọn máy --</option>';
+  mays.forEach(function(m){ maySel.innerHTML += '<option>'+m+'</option>'; });
+
+  var nguoiSel = document.getElementById("nguoiTT");
+  nguoiSel.innerHTML = '<option value="">-- Chọn người --</option>';
+  nguois.forEach(function(n){ nguoiSel.innerHTML += '<option>'+n+'</option>'; });
+}
+
+function applyPrefill(){
+  if (!PREFILL || !PREFILL.maSP) return;
+  document.getElementById("maSP").value = PREFILL.maSP;
+  onMaChange();
+  if (!document.getElementById("tenSP").value && PREFILL.tenSP) {
+    document.getElementById("tenSP").value = PREFILL.tenSP;
+  }
+  if (PREFILL.soKhuon) document.getElementById("soKhuon").value = PREFILL.soKhuon;
+  if (PREFILL.mayDuc)  document.getElementById("mayDuc").value = PREFILL.mayDuc;
+  if (PREFILL.nguoiTT) document.getElementById("nguoiTT").value = PREFILL.nguoiTT;
+  var slEl = document.getElementById("soLuong");
+  if (slEl) slEl.focus();
+}
+
+function fillFormFromTem(t){
+  if(!t) return;
+  currentTagNo = t.tagNo || "";
+  document.getElementById("searchTag").value = currentTagNo;
+  document.getElementById("maSP").value = t.maSP || "";
+  document.getElementById("tenSP").value = t.tenSP || "";
+  document.getElementById("soLuong").value = t.soLuong || "";
+  document.getElementById("lotNo").value = t.lotNo ? String(t.lotNo).split("/").reverse().join("-") : getTodayString();
+  document.getElementById("soKhuon").value = t.soKhuon || "";
+  document.getElementById("nguyenLieu").value = t.nguyenLieu || "";
+  document.getElementById("mayDuc").value = t.mayDuc || "";
+  document.getElementById("nguoiTT").value = t.nguoiTT || "";
+  document.getElementById("ghiChu").value = t.ghiChu || "";
+  document.getElementById("loaiSP").value = t.loaiSP || "hangloat";
+}
+
+function temRowToClient(r){
+  return {
+    tagNo: r.tag_no || "", tenSP: r.ten_sp || "", maSP: r.ma_sp || "",
+    soLuong: r.so_luong || "", lotNo: r.lot || "", soKhuon: r.so_khuon || "",
+    nguyenLieu: r.nguyen_lieu || "", mayDuc: r.may_duc_chi_thi || "",
+    ghiChu: r.ghi_chu || "", nguoiTT: r.nguoi_tt || "", loaiSP: "hangloat",
+  };
+}
+
+async function findTem(){
+  var tagNo = g("searchTag");
+  if(!tagNo) return err("Nhập Tag No để tra cứu");
+  showMsg("⏳ Đang tra cứu tem...","wait");
+  const { data, error } = await sb.from('duc_tem').select('*').ilike('tag_no', tagNo);
+  if (error) return err("Lỗi tra cứu: " + error.message);
+  if (!data || !data.length) return err("Không tìm thấy tem");
+  fillFormFromTem(temRowToClient(data[0]));
+  showMsg("✅ Đã tìm thấy tem " + data[0].tag_no, "ok", 3000);
+}
+
+async function requireLoginOrRedirect(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    err("Cần đăng nhập trước khi thao tác. Đang chuyển sang trang đăng nhập…");
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return false;
+  }
+  return true;
+}
+
+async function saveTemEdit(){
+  if(!currentTagNo) return err("Tìm tem trước khi sửa");
+  if (!(await requireLoginOrRedirect())) return;
+  var ma=g("maSP"),sl=g("soLuong"),may=g("mayDuc"),nguoi=g("nguoiTT");
+  if(!ma) return err("Chọn Mã sản phẩm");
+  if(!sl||isNaN(sl)||+sl<=0) return err("Số lượng phải > 0");
+  if(!may) return err("Chọn Máy đúc");
+  if(!nguoi) return err("Chọn Người thao tác");
+
+  var patch = {
+    ten_sp: g("tenSP"), ma_sp: ma,
+    so_luong: Number(sl), so_luong_tt: Number(sl),
+    lot: g("lotNo"),
+    so_khuon: g("soKhuon"), so_khuon_tt: g("soKhuon"),
+    nguyen_lieu: g("nguyenLieu"),
+    may_duc_chi_thi: may, may_tt: may,
+    ghi_chu: g("ghiChu"), nguoi_tt: nguoi,
+  };
+  showMsg("⏳ Đang lưu thay đổi...","wait");
+  const { error } = await sb.from('duc_tem').update(patch).ilike('tag_no', currentTagNo);
+  if (error) return err("Lỗi lưu: " + error.message);
+  showMsg("✅ Đã lưu thay đổi cho tem " + currentTagNo, "ok", 3000);
+}
+
+async function reprintTem(){
+  if(!currentTagNo) return err("Tìm tem trước khi in lại");
+  showMsg("⏳ Đang chuẩn bị in lại...","wait");
+  const { data, error } = await sb.from('duc_tem').select('*').ilike('tag_no', currentTagNo);
+  if (error) return err("Lỗi in lại: " + error.message);
+  if (!data || !data.length) return err("Không tìm thấy tem");
+  var r = data[0];
+
+  var ngayISO = String(r.ngay || "");
+  var parts = ngayISO.split("-");
+  var ngayQR = parts.length === 3 ? (parts[0]+"/"+parts[1]+"/"+parts[2]) : ngayISO;
+  var ngayHienThi = parts.length === 3 ? (parts[2]+"/"+parts[1]+"/"+parts[0]) : ngayISO;
+  var lotNo = r.lot || ngayHienThi;
+  var qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, lotNo, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join(">\n");
+
+  var d = {
+    ok: true, tagNo: r.tag_no, qr: qr, ngay: ngayHienThi,
+    tenSP: r.ten_sp, maSP: r.ma_sp, soLuong: r.so_luong,
+    lotNo: lotNo, soKhuon: r.so_khuon || "", nguyenLieu: r.nguyen_lieu || "",
+    mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || "", ghiChu: r.ghi_chu || "",
+  };
+  showMsg("✅ Đang in lại tem " + r.tag_no, "ok", 3000);
+  openPrint(d);
+}
+
+async function deleteTem(){
+  if(!currentTagNo) return err("Tìm tem trước khi xóa");
+  if(!window.confirm("Xóa tem "+currentTagNo+" khỏi database?")) return;
+  if (!(await requireLoginOrRedirect())) return;
+  showMsg("⏳ Đang xóa tem...","wait");
+  const { error } = await sb.from('duc_tem').delete().ilike('tag_no', currentTagNo);
+  if (error) return err("Lỗi xóa: " + error.message);
+  clearAll();
+  showMsg("✅ Đã xóa tem " + currentTagNo, "ok", 3000);
+}
+
+function onMaChange(){
+  var ma = document.getElementById("maSP").value;
+  var item = masterData.find(function(x){return x.ma===ma;});
+  document.getElementById("tenSP").value = item ? item.ten : "";
+}
+
+async function inTem(){
+  if (!(await requireLoginOrRedirect())) return;
+  var ma=g("maSP"),sl=g("soLuong"),may=g("mayDuc"),nguoi=g("nguoiTT"),loai=g("loaiSP");
+  if(!ma)   return err("Chọn Mã sản phẩm");
+  if(!sl||isNaN(sl)||+sl<=0) return err("Số lượng phải > 0");
+  if(!may)  return err("Chọn Máy đúc");
+  if(!nguoi)return err("Chọn Người thao tác");
+  if(!loai) loai="hangloat";
+
+  setBtn(true);
+  showMsg("⏳ Đang sinh Tag No và ghi dữ liệu...","wait");
+
+  var now = new Date();
+  var pad2 = n => String(n).padStart(2,"0");
+  var ngayISO = now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate());
+  var ngay = pad2(now.getDate())+"/"+pad2(now.getMonth()+1)+"/"+now.getFullYear();
+  var ngayQR = now.getFullYear()+"/"+pad2(now.getMonth()+1)+"/"+pad2(now.getDate());
+  var lotNoInput = g("lotNo");
+  var lotNo = lotNoInput ? lotNoInput.split("-").reverse().join("/") : ngay;
+  var tenSP = g("tenSP"), soKhuon = g("soKhuon"), nguyenLieu = g("nguyenLieu"), ghiChu = g("ghiChu");
+
+  try {
+    const { data: tagNo, error } = await sb.rpc('duc_ghi_tem', {
+      p_loai_sp: loai, p_ten_sp: tenSP, p_ma_sp: ma, p_so_luong: Number(sl),
+      p_ngay: ngayISO, p_lot: lotNoInput || ngay, p_so_khuon: soKhuon,
+      p_nguyen_lieu: nguyenLieu, p_may_duc: may, p_ghi_chu: ghiChu,
+      p_ngay_gio_in: now.toISOString(), p_nguoi_tt: nguoi,
+    });
+    setBtn(false);
+    if (error) { err("Lỗi server: " + error.message); return; }
+
+    var qr = [tagNo, tenSP, ma, sl, ngayQR, lotNoInput || ngay, soKhuon, nguyenLieu, may].join(">\n");
+    var d = { tagNo: tagNo, qr: qr, ngay: ngay, tenSP: tenSP, maSP: ma, soLuong: sl,
+              lotNo: lotNoInput || ngay, soKhuon: soKhuon, nguyenLieu: nguyenLieu,
+              mayDuc: may, nguoiTT: nguoi, ghiChu: ghiChu };
+    showMsg("✅ " + tagNo + " — đang mở cửa sổ in...", "ok", 5000);
+    openPrint(d);
+  } catch (e) {
+    setBtn(false);
+    err("Lỗi: " + e.message);
+  }
+}
+
+function openPrint(d){
+  var svg = buildLabelSvg(d);
+  var css=[
+    "@page{size:72mm 100mm;margin:0}",
+    "*{margin:0;padding:0;box-sizing:border-box}",
+    "html,body{width:72mm;height:100mm;background:#fff}",
+    "svg{display:block;width:72mm;height:100mm}",
+    ".pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}",
+    "@media print{.pbtn{display:none}}"
+  ].join("");
+  var popupHtml =
+    "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"UTF-8\">"
+    +"<title>Tem: "+d.tagNo+"</title>"
+    +"<style>"+css+"</style></head><body>"
+    +svg
+    +'<button class="pbtn" onclick="window.print()">🖨 In ngay</button>'
+    +'<script>setTimeout(function(){window.print();},150);<\/script>'
+    +"</body></html>";
+  var w=window.open("","_blank","width=430,height=720,scrollbars=yes");
+  if(!w){err("Trình duyệt chặn popup — vào Settings cho phép popup rồi thử lại");return;}
+  w.document.open(); w.document.write(popupHtml); w.document.close();
+}
+
+function buildQrRects(data, sizeMm){
+  var qr = qrcode(0, "M");
+  qr.addData(data);
+  qr.make();
+  var n = qr.getModuleCount();
+  var cell = sizeMm / n;
+  var out = '<rect x="0" y="0" width="'+sizeMm+'" height="'+sizeMm+'" fill="#ffffff"/>';
+  for (var r=0; r<n; r++){
+    for (var c=0; c<n; c++){
+      if (qr.isDark(r,c)){
+        out += '<rect x="'+(c*cell).toFixed(3)+'" y="'+(r*cell).toFixed(3)+'" width="'+cell.toFixed(3)+'" height="'+cell.toFixed(3)+'" fill="#000000"/>';
+      }
+    }
+  }
+  return out;
+}
+
+function svgEsc(s){
+  s = String(s==null?"":s);
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function buildLabelSvg(d){
+  var W=72, H=100;
+  var logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPHBhdGggZD0iTTgyIDc2LjY4MDRINzkuODAzNFY2NC4zNTk3SDgyVjc2LjY4MDRaTTcyLjA2MDUgNzEuMzYyM0w3MC42MjE4IDcyLjg0NDdWNzYuNjg2MUg2OC40MTc1VjY0LjM1OTdINzAuNjIxOFY3MC4xMzlMNzEuODQyNiA2OC42NzM3TDc1LjU1NjkgNjQuMzU5N0g3OC4yMjIxTDczLjUwODggNjkuODE2OUw3OC40OTQgNzYuNjc2Nkg3NS44NzdMNzIuMDYwNSA3MS4zNjIzWk01OS4zMzI0IDcyLjA5NEg2My4wMUw2MS4xNzk5IDY2Ljk3OTdMNTkuMzMyNCA3Mi4wOTRaTTYzLjY0MDYgNzMuODIwM0g1OC43MjFMNTcuNjkxMiA3Ni42Nzg1SDU1LjQwMDFMNjAuMTk0NCA2NC4zNTc4SDYyLjE3M0w2Ni45NzY5IDc2LjY3ODVINjQuNjc2Mkw2My42NDA2IDczLjgyMDNaTTU1LjkyNjYgNjYuMDkxOEg1MS45NTU4Vjc2LjY4MDRINDkuNzY3VjY2LjA5MThINDUuODQ0NFY2NC4zNTk3SDU1LjkxNTFMNTUuOTI2NiA2Ni4wOTE4Wk00MS45OTMyIDcwLjE5OTlDNDEuOTkzMiA2OC44MzQ0IDQxLjcyNzcgNjcuNzg4OSA0MS4xOTY3IDY3LjA2MzZDNDAuNjY2NCA2Ni4zMzU3IDM5LjkxMDQgNjUuOTcxNyAzOC45MzQ2IDY1Ljk3MTdDMzguNTAwMSA2NS45NTQ1IDM4LjA2ODIgNjYuMDQ0NiAzNy42Nzc5IDY2LjIzMzlDMzcuMjg3NiA2Ni40MjMyIDM2Ljk1MTMgNjYuNzA1OCAzNi42OTk0IDY3LjA1NTlDMzYuMTYwNyA2Ny43ODI2IDM1Ljg4NjIgNjguODA3MSAzNS44NzYgNzAuMTI5NFY3MC44NDAyQzM1Ljg3NiA3Mi4xOTU2IDM2LjE0NzkgNzMuMjQxIDM2LjY5MTcgNzMuOTc2NUMzNi45NDQ3IDc0LjMzNDIgMzcuMjg0NiA3NC42MjMyIDM3LjY4MDMgNzQuODE3QzM4LjA3NTkgNzUuMDEwOCAzOC41MTQ1IDc1LjEwMzEgMzguOTU1OCA3NS4wODU1QzM5LjkzMzUgNzUuMDg1NSA0MC42OTE0IDc0LjcyNTQgNDEuMjEwMiA3NC4wMDMyQzQxLjcyOSA3My4yODEgNDEuOTk3IDcyLjIyNzMgNDEuOTk3IDcwLjg0MDJMNDEuOTkzMiA3MC4xOTk5Wk00NC4yMDEzIDcwLjg0MDJDNDQuMjI2MSA3MS45MzcyIDQ0LjAwNjIgNzMuMDI2MiA0My41NTcyIDc0LjAyOTlDNDMuMTY2NCA3NC44OTQyIDQyLjUyMzkgNzUuNjIzOSA0MS43MTE2IDc2LjEyNTlDNDAuODc1MyA3Ni42MDYzIDM5LjkyNTEgNzYuODU5NCAzOC45NTc3IDc2Ljg1OTRDMzcuOTkwMyA3Ni44NTk0IDM3LjA0MDEgNzYuNjA2MyAzNi4yMDM4IDc2LjEyNTlDMzUuMzg1OCA3NS42MjQ1IDM0LjczNjMgNzQuODk1MyAzNC4zMzcgNzQuMDI5OUMzMy44ODEgNzMuMDUwNiAzMy42NTMgNzEuOTgyOCAzMy42Njk4IDcwLjkwNVY3MC4yMTlDMzMuNjQ3IDY5LjEyMzIgMzMuODcxNiA2OC4wMzYxIDM0LjMyNzQgNjcuMDM2OUMzNC43MjA0IDY2LjE2NjUgMzUuMzY3IDY1LjQzMTUgMzYuMTg0NSA2NC45MjU2QzM3LjAxOTYgNjQuNDQ2NyAzNy45Njc3IDY0LjE5MzYgMzguOTMzMyA2NC4xOTE5QzM5Ljg5ODkgNjQuMTkwMyA0MC44NDc4IDY0LjQ0IDQxLjY4NDYgNjQuOTE2MUM0Mi40OTc4IDY1LjQxMzQgNDMuMTQyOSA2Ni4xMzgzIDQzLjUzNzkgNjYuOTk4OEM0My45OTI3IDY3Ljk5MTggNDQuMjE5MyA2OS4wNzIgNDQuMjAxMyA3MC4xNjE4VjcwLjg0MDJaTTI3LjU4NzMgNzAuMTk5OUwzMC41MDg5IDY0LjM1OTdIMzIuOTUwNEwyOC42OTQyIDcyLjE0NTRWNzYuNjgwNEgyNi40ODAzVjcyLjE0NTRMMjIuMjE4MyA2NC4zNTk3SDI0LjY2NzVMMjcuNTg3MyA3MC4xOTk5Wk0xOS40MTIzIDcwLjE5OTlDMTkuNDEyMyA2OC44MzQ0IDE5LjE0NjIgNjcuNzg4OSAxOC42MTM5IDY3LjA2MzZDMTguMDg1NSA2Ni4zMzU3IDE3LjMyOTUgNjUuOTcxNyAxNi4zNTM3IDY1Ljk3MTdDMTUuOTE5MiA2NS45NTQzIDE1LjQ4NzMgNjYuMDQ0MyAxNS4wOTY5IDY2LjIzMzdDMTQuNzA2NiA2Ni40MjMgMTQuMzcwMyA2Ni43MDU2IDE0LjExODYgNjcuMDU1OUMxMy41Nzg2IDY3Ljc4MjYgMTMuMzAzNSA2OC44MDcxIDEzLjI5MzIgNzAuMTI5NFY3MC44NDAyQzEzLjI5MzIgNzIuMTk1NiAxMy41NjUxIDczLjI0MSAxNC4xMDg5IDczLjk3NjVDMTQuMzYyMSA3NC4zMzM1IDE0LjcwMTggNzQuNjIyMSAxNS4wOTcgNzQuODE1OEMxNS40OTIyIDc1LjAwOTYgMTUuOTMwMiA3NS4xMDIzIDE2LjM3MTEgNzUuMDg1NUMxNy4zNDY5IDc1LjA4NTUgMTguMDk3NyA3NC43MjQ3IDE4LjYyMzYgNzQuMDAzMkMxOS4xNDk0IDczLjI4MTcgMTkuNDEyMyA3Mi4yMjczIDE5LjQxMjMgNzAuODQwMlY3MC4xOTk5Wk0yMS42MjA1IDcwLjg0MDJDMjEuNjQ0NiA3MS45Mzc0IDIxLjQyNDEgNzMuMDI2NCAyMC45NzQ0IDc0LjAyOTlDMjAuNTgzNyA3NC44OTQyIDE5Ljk0MTEgNzUuNjIzOSAxOS4xMjg4IDc2LjEyNTlDMTguMjk4NCA3Ni42MjM1IDE3LjM0MjEgNzYuODc3OSAxNi4zNzExIDc2Ljg1OTVDMTUuNDAyOCA3Ni44NzUzIDE0LjQ0OTYgNzYuNjIxMSAxMy42MjEgNzYuMTI1OUMxMi44MDcxIDc1LjYyMjYgMTIuMTYxMiA3NC44OTM2IDExLjc2MzkgNzQuMDI5OUMxMS4zMDg2IDczLjA1MDUgMTEuMDgxMiA3MS45ODI2IDExLjA5ODUgNzAuOTA1VjcwLjIxOUMxMS4wNzQ4IDY5LjEyMzEgMTEuMjk5NSA2OC4wMzU5IDExLjc1NjIgNjcuMDM2OUMxMi4xNDkyIDY2LjE2NjUgMTIuNzk1OCA2NS40MzE1IDEzLjYxMzMgNjQuOTI1NkMxNC40NDEyIDY0LjQyODggMTUuMzk0OSA2NC4xNzQ0IDE2LjM2MzQgNjQuMTkyQzE3LjMzMDYgNjQuMTc0MyAxOC4yODM0IDY0LjQyNTEgMTkuMTEzNCA2NC45MTYxQzE5LjkyNjUgNjUuNDEzNCAyMC41NzE2IDY2LjEzODMgMjAuOTY2NyA2Ni45OTg4QzIxLjQyMDYgNjcuOTkyMSAyMS42NDcxIDY5LjA3MjEgMjEuNjMwMSA3MC4xNjE4TDIxLjYyMDUgNzAuODQwMlpNMTAuMDcwNiA2Ni4wOTE4SDYuMTEzMzZWNzYuNjgwNEgzLjkyMjU4VjY2LjA5MThIMFY2NC4zNTk3SDEwLjA3MDZWNjYuMDkxOFoiIGZpbGw9IiNGREI4MTMiLz4KPC9zdmc+Cg==";
+  var rows = [
+    {lbl:"Mã sản phẩm", val:d.maSP, big:true},
+    {lbl:"Tên sản phẩm", val:d.tenSP, big:true},
+    {lbl:"Tag No", val:d.tagNo},
+    {lbl:"Số lượng", val:d.soLuong},
+    {lbl:"Người thao tác", val:d.nguoiTT},
+    {lbl:"Ngày sản xuất", val:d.lotNo},
+    {lbl:"Số khuôn", val:d.soKhuon},
+    {lbl:"Nguyên liệu", val:d.nguyenLieu},
+    {lbl:"Máy đúc", val:d.mayDuc},
+    {lbl:"Ghi chú", val:d.ghiChu}
+  ];
+  var logoX=4, logoY=4, logoW=8, logoH=7.2;
+  var titleX=logoX+logoW+3, titleY=9.6, titleSize=6.2;
+  var dividerY=13.5;
+  var rowStartY=17.5, rowH=3.9;
+  var rowsEndY = rowStartY + (rows.length-1)*rowH;
+  var qrSize=34, qrX=(W-qrSize)/2, qrY=rowsEndY+5;
+  var ftrLineY=qrY+qrSize+2, ftrTextY=ftrLineY+2.8, ftrSize=2.4;
+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#ffffff"/>';
+  svg += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'"/>';
+  svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="#000000">TEM SẢN PHẨM</text>';
+  svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="#000000" stroke-width="0.3"/>';
+  rows.forEach(function(r, i){
+    var y = rowStartY + i*rowH;
+    var lblSize = r.big ? 3.0 : 2.6;
+    var valSize = r.big ? 3.9 : 3.0;
+    var vLen = String(r.val||"").length;
+    if (vLen > 26) valSize -= 0.5;
+    if (vLen > 40) valSize -= 0.5;
+    svg += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="#000000">'+svgEsc(r.lbl)+'</text>';
+    svg += '<text x="27" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="#000000">'+svgEsc(r.val)+'</text>';
+  });
+  svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize)+'</g>';
+  svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="#000000" stroke-width="0.3"/>';
+  svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+ftrSize+'" font-weight="bold" fill="#000000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
+  svg += "</svg>";
+  return svg;
+}
+
+function clearAll(){
+  ["soLuong","soKhuon","nguyenLieu","ghiChu"].forEach(function(i){ document.getElementById(i).value=""; });
+  document.getElementById("lotNo").value = getTodayString();
+  document.getElementById("maSP").value="";
+  document.getElementById("tenSP").value="";
+  document.getElementById("mayDuc").value="";
+  document.getElementById("nguoiTT").value="";
+  document.getElementById("loaiSP").value="hangloat";
+  document.getElementById("searchTag").value="";
+  currentTagNo = "";
+  document.getElementById("msg").style.display="none";
+  document.getElementById("maSP").focus();
+}
+function setBtn(v){
+  var b=document.getElementById("btnIn");
+  b.disabled=v;
+  b.textContent=v?"⏳ Đang xử lý...":"🖨 In Tem";
+}
+var msgToken = 0;
+function showMsg(t,cls,autoHideMs){
+  var el=document.getElementById("msg");
+  el.textContent=t;el.className=cls;el.style.display="block";
+  msgToken += 1;
+  var myToken = msgToken;
+  if (autoHideMs){
+    setTimeout(function(){ if (myToken === msgToken){ el.style.display="none"; } }, autoHideMs);
+  }
+}
+function err(t){ showMsg("❌ "+t,"err"); }
+
+async function initAuthStatus(){
+  const bar = document.getElementById("authInfo");
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = `👤 ${email} · <a href="#" id="mesSignOut">Đăng xuất</a>`;
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = `<a href="shared/login.html">Đăng nhập</a>`;
+  }
+}
+
+(async function init(){
+  try {
+    await loadMaster();
+    document.getElementById("loading").style.display="none";
+    setDefaultLotNo();
+    applyPrefill();
+    document.getElementById("formWrap").style.display="block";
+  } catch (e) {
+    document.getElementById("loading").style.display="none";
+    err("Không tải được dữ liệu: " + e.message);
+  }
+  initAuthStatus();
+})();
+</script>
+</body>
+</html>

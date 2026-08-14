@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IPQC Đúc">
+<meta name="theme-color" content="#1E293B">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%231E293B'%2F%3E%3Ctext%20x%3D'50'%20y%3D'62'%20font-size%3D'52'%20text-anchor%3D'middle'%3E%F0%9F%94%8D%3C%2Ftext%3E%3C%2Fsvg%3E">
+<title>IPQC — Kiểm tra chất lượng</title>
+<!--
+  ipqc.html — bản web tĩnh (Supabase) thay Web App Google Apps Script
+  "Ipqc.html" (D:\Project\MES\Dashboard Đúc\Ipqc.html + IpqcCheckpoint.js).
+  Đọc hàng đợi công khai (anon), NỘP kết quả kiểm bắt buộc đăng nhập Supabase Auth.
+
+  THAY ĐỔI SO VỚI BẢN GỐC (ghi rõ để không tưởng là thiếu sót):
+  1) Bản gốc phải để IPQC TỰ GÕ email (modal "Xác nhận người kiểm tra", lưu
+     localStorage) vì Session.getActiveUser() của Google Apps Script chỉ trả
+     về email cho người CÓ QUYỀN EDIT script — nhân viên thường luôn rỗng.
+     Ở đây đã có Supabase Auth (đăng nhập thật, email/mật khẩu) nên bỏ hẳn
+     modal tự khai — dùng thẳng email của phiên đăng nhập làm "người kiểm".
+     Đây là CẢI TIẾN (không phải rút gọn tính năng): danh tính đáng tin hơn.
+  2) Ảnh bằng chứng: bản gốc gửi base64 lên Apps Script → ghi vào Google Drive
+     (_uploadIpqcEvidence_). Ở đây trình duyệt tự upload thẳng lên Supabase
+     Storage bucket "ipqc-evidence" (đã tạo ở migration_phase_D0_foundation.sql),
+     lấy URL công khai, rồi truyền mảng URL vào duc_submit_ipqc_check qua
+     p_anh_urls — đúng thiết kế đã ghi trong migration_phase4_step4.
+  3) Hàng đợi (getIpqcQueue_) vốn lọc theo "id_dong đang active" (dòng SP mới
+     nhất mỗi máy, gồm cả khuôn kép) — không có RPC/view public sẵn cho việc
+     này (RPC duc_get_ipqc_due_by_id_dong ở step9 chỉ phục vụ badge trên
+     duc-dashboard.html, lọc luôn cả "chưa tới hạn" nên KHÔNG đủ cho hàng đợi
+     IPQC cần thấy cả checkpoint "sắp tới"). Trang này tự đọc duc_ca_hien_tai +
+     duc_ipqc_checkpoint (đều đã có RLS đọc công khai) rồi tính active-set
+     ngay trên trình duyệt — cùng logic _getActiveIdDongSet_ (ưu tiên row_seq
+     mới nhất mỗi máy, cộng thêm dòng ghép cặp qua khuon_kep_voi).
+  4) Server-side đã bổ sung lại các kiểm tra nghiệp vụ (OK cần mọi mục Đạt,
+     NG/Cảnh báo cần ≥1 mục Không đạt + bắt buộc ghi chú...) vào chính RPC
+     duc_submit_ipqc_check (migration_phase4_step12) — bản gốc chỉ kiểm tra
+     ở server Apps Script (đáng tin), còn RPC public thì trình duyệt gọi
+     thẳng nên phải kiểm tra lại ở server, không chỉ tin client.
+  PHẠM VI: chỉ tương đương Ipqc.html (màn kiểm tra viên nộp kết quả). Màn
+  "Quản lý tiêu chuẩn IPQC"/giám sát QC/NCP nằm ở qc-manager.html (chưa làm).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--good-fg:#047857;--good-bg:#ECFDF5;--good-stripe:#10B981;--warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-stripe:#F59E0B;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--alarm-stripe:#EF4444;--shadow-sm:0 1px 2px rgba(15,23,42,.08);--shadow-md:0 4px 14px rgba(15,23,42,.12);}
+html{font-size:44px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior-y:contain;overflow-x:hidden;max-width:100vw;overflow-anchor:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-page);color:var(--text);font-size:.9375rem;line-height:1.35}
+button{cursor:pointer;font-family:inherit}
+.hidden{display:none!important}
+
+.screen{display:none;min-height:calc(100vh - 3.5rem);padding-bottom:1.5rem;overflow-anchor:none}
+.screen.active{display:block}
+.appbar{position:sticky;top:0;z-index:20;background:var(--bg-header);color:#fff;padding:.65rem .75rem;display:flex;align-items:center;gap:.5rem;box-shadow:var(--shadow-md)}
+.appbar .back{width:2.4rem;height:2.4rem;border-radius:.5rem;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:1.15rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.appbar .title{font-size:1.05rem;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appbar .sub{font-size:.7rem;color:#94A3B8;font-weight:500}
+.appbar .sub a{color:#cbd5e1}
+
+.list{padding:.7rem .75rem;display:flex;flex-direction:column;gap:.6rem}
+.qcard{background:var(--bg-panel);border:1px solid var(--border);border-left:.3rem solid var(--good-stripe);border-radius:.55rem;padding:.85rem;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:.6rem}
+.qcard[data-lvl="warn"]{border-left-color:var(--warn-stripe);background:var(--warn-bg)}
+.qcard[data-lvl="alarm"]{border-left-color:var(--alarm-stripe);background:var(--alarm-bg)}
+.qcard[data-lvl="upcoming"]{border-left-color:var(--accent);background:var(--bg-sunken)}
+.qcard-main{flex:1;min-width:0}
+.qcard-may{font-size:1.25rem;font-weight:700}
+.qcard-sp{font-family:'JetBrains Mono',monospace;font-size:.9rem;color:var(--text-muted);margin-top:.1rem}
+.qcard-meta{font-size:.8rem;color:var(--text-dim);margin-top:.25rem}
+.qcard-time{font-size:1.1rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.qcard-time.warn{color:var(--warn-fg)}
+.qcard-time.alarm{color:var(--alarm-fg)}
+.qcard-time.upcoming{color:var(--accent);font-size:.95rem}
+.qcard-arrow{color:var(--text-dim);font-size:1.3rem}
+.loai-tag{display:inline-block;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:1rem;background:var(--bg-sunken);color:var(--text-muted);margin-top:.2rem}
+.empty-note{text-align:center;color:var(--text-muted);font-size:.95rem;padding:3rem 1rem}
+
+.detail-info{background:var(--bg-panel);margin:.75rem;padding:.9rem;border-radius:.7rem;box-shadow:var(--shadow-sm)}
+.detail-sp{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:700}
+.detail-name{font-size:.9rem;color:var(--text-muted);margin-top:.15rem}
+.detail-meta{font-size:.85rem;color:var(--text-dim);margin-top:.4rem}
+.pdf-btn{margin:0 .75rem .75rem;width:calc(100% - 1.5rem);padding:.75rem;border:1px solid var(--accent);border-radius:.55rem;background:#fff;color:var(--accent);font-weight:700;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
+
+.checklist{margin:0 .75rem .75rem;background:var(--bg-panel);border-radius:.7rem;box-shadow:var(--shadow-sm);overflow:hidden}
+.cl-item{display:flex;align-items:center;gap:.6rem;padding:.75rem .85rem;border-bottom:1px solid var(--border)}
+.cl-item:last-child{border-bottom:none}
+.cl-item .cl-text{flex:1;font-size:.95rem}
+.cl-toggle{display:flex;border:1px solid var(--border-strong);border-radius:.4rem;overflow:hidden;flex-shrink:0}
+.cl-toggle button{border:none;background:#fff;padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:var(--text-muted)}
+.cl-toggle button.sel-ok{background:var(--good-bg);color:var(--good-fg)}
+.cl-toggle button.sel-bad{background:var(--alarm-bg);color:var(--alarm-fg)}
+
+.photo-wrap{margin:0 .75rem .75rem}
+.photo-btn{width:100%;padding:1rem;border:2px dashed var(--border-strong);border-radius:.7rem;background:var(--bg-panel);font-weight:700;font-size:1rem;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:.3rem}
+.photo-btn.has-photo{border-color:var(--good-stripe);color:var(--good-fg)}
+.photo-btn:disabled{opacity:.45}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.5rem}
+.photo-thumb{position:relative;aspect-ratio:1;border-radius:.5rem;overflow:hidden;background:var(--bg-sunken)}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-thumb .rm{position:absolute;top:.15rem;right:.15rem;width:1.4rem;height:1.4rem;border-radius:50%;background:rgba(15,23,42,.65);color:#fff;border:none;font-size:.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0}
+
+.field{margin:0 .75rem .9rem}
+.field label{font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em;display:block;margin-bottom:.35rem}
+.field textarea{width:100%;padding:.7rem;font-size:1rem;border:1px solid var(--border-strong);border-radius:.5rem;min-height:3.5rem;resize:vertical}
+
+.result-grid{display:flex;flex-direction:column;gap:.6rem;margin:0 .75rem 1.5rem}
+.result-row{display:flex;gap:.6rem}
+.btn-result{flex:1;padding:1.15rem .5rem;border:none;border-radius:.7rem;font-weight:700;font-size:1.15rem;box-shadow:var(--shadow-sm);color:#fff}
+.btn-result.ok{background:var(--good-fg)}
+.btn-result.ng{background:var(--alarm-fg)}
+.btn-result.warn{background:var(--warn-stripe);color:#3F2A00;padding:.9rem .5rem;font-size:1rem}
+.btn-result:active{opacity:.85}
+.btn-result:disabled{opacity:.45}
+
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:100;flex-direction:column;gap:.6rem;color:#fff;font-size:1rem}
+.overlay.show{display:flex}
+.spinner{width:2.2rem;height:2.2rem;border:.2rem solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:.75rem;right:.75rem;bottom:1rem;background:#1E293B;color:#fff;padding:.8rem 1rem;border-radius:.6rem;font-size:.95rem;box-shadow:var(--shadow-md);transform:translateY(120%);transition:transform .25s;z-index:110}
+.toast.show{transform:translateY(0)}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div id="overlay" class="overlay"><div class="spinner"></div><div id="overlay-text">Đang tải...</div></div>
+<div id="toast" class="toast"></div>
+
+<!-- ============ SCREEN: Hàng đợi ============ -->
+<div class="screen active" id="scr-queue">
+  <div class="appbar">
+    <div>
+      <div class="title">🔍 IPQC — Hàng đợi kiểm tra</div>
+      <div class="sub" id="queue-user-label">…</div>
+    </div>
+  </div>
+  <div class="list" id="queue-list"></div>
+</div>
+
+<!-- ============ SCREEN: Chi tiết kiểm tra ============ -->
+<div class="screen" id="scr-check">
+  <div class="appbar">
+    <button class="back" onclick="showScreen('scr-queue')">←</button>
+    <div>
+      <div class="title" id="ck-may">—</div>
+      <div class="sub" id="ck-loai">—</div>
+    </div>
+  </div>
+  <div class="detail-info">
+    <div class="detail-sp" id="ck-ma-sp">—</div>
+    <div class="detail-meta" id="ck-meta">—</div>
+  </div>
+  <button class="pdf-btn hidden" id="ck-pdf-btn">📄 Xem tiêu chuẩn (PDF)</button>
+
+  <div class="checklist" id="ck-checklist"></div>
+
+  <div class="photo-wrap">
+    <button class="photo-btn" id="ck-photo-btn" onclick="document.getElementById('ck-photo-input').click()">
+      <span style="font-size:1.6rem">📷</span>
+      <span id="ck-photo-label">Bấm để chụp ảnh bằng chứng (bắt buộc, tối đa 6 ảnh)</span>
+    </button>
+    <input type="file" accept="image/*" capture="environment" id="ck-photo-input" class="hidden" onchange="onPhotoSelected(event)">
+    <div class="photo-grid" id="ck-photo-grid"></div>
+  </div>
+
+  <div class="field">
+    <label>Ghi chú (tuỳ chọn)</label>
+    <textarea id="ck-ghi-chu" placeholder="Ghi chú thêm nếu cần..."></textarea>
+  </div>
+
+  <div class="result-grid">
+    <div class="result-row">
+      <button class="btn-result ok" onclick="submitCheck('OK')">✅ OK<br><span style="font-weight:500;font-size:.75rem">Cho phép SX</span></button>
+      <button class="btn-result ng" onclick="submitCheck('NG')">❌ NG<br><span style="font-weight:500;font-size:.75rem">Dừng máy</span></button>
+    </div>
+    <button class="btn-result warn" onclick="submitCheck('CANH_BAO')">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Sản xuất tạm đến hết chỉ thị hiện tại</span></button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
+const IPQC_MAX_PHOTOS = 6;
+const IPQC_DEFAULT_CHECKLIST = [
+  'Kích thước (theo bảng tuần kiểm)',
+  'Ngoại quan — Cào xước; dính nhôm',
+  'Ngoại quan — Sứt; thiếu một phần vật liệu',
+  'Ngoại quan — Vết lồi; thừa vật liệu',
+  'Ngoại quan — Nhăn; vết dòng chảy',
+  'Ngoại quan — Nứt',
+  'Ngoại quan — Bong nhôm; phồng rộp',
+  'Ngoại quan — Bavia dày; mụn',
+  'Ngoại quan — Chiều cao pin đẩy',
+];
+const LOAI_LABEL = { dinh_ky: '⏱ Định kỳ', sau_su_co: '🛠 Sau xử lý sự cố', doi_khuon: '🔧 Lên khuôn/SP mới' };
+
+const state = {
+  queue: [],
+  current: null,
+  checkStartedAt: null,
+  tieuChuan: null,
+  checklistAnswers: [],
+  photos: [],   // [{blob, mime, dataUrl}]
+  pollTimer: null,
+};
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if (id === 'scr-queue') startPolling(); else stopPolling();
+}
+
+function showOverlay(text){ document.getElementById('overlay-text').textContent = text || 'Đang tải...'; document.getElementById('overlay').classList.add('show'); }
+function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
+let toastTimer;
+function showToast(text, isError){
+  const toast = document.getElementById('toast');
+  toast.textContent = text;
+  toast.classList.toggle('error', !!isError);
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+}
+function onError(e){ hideOverlay(); showToast('Lỗi: ' + (e && e.message ? e.message : e), true); }
+function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function updateUserLabel(){
+  const email = await MesAuth.getCurrentUserEmail();
+  document.getElementById('queue-user-label').innerHTML = email
+    ? 'Người kiểm: ' + escapeHtml(email) + ' · <a href="#" id="ipqcSignOut">đăng xuất</a>'
+    : 'Chưa đăng nhập — <a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">đăng nhập</a> để nộp kết quả';
+  const so = document.getElementById('ipqcSignOut');
+  if (so) so.addEventListener('click', e => { e.preventDefault(); MesAuth.signOut(); });
+}
+
+// =============================================================================
+// Active id_dong set — port _getActiveIdDongSet_ (IpqcCheckpoint.js): dòng SP
+// mới nhất mỗi máy (row_seq lớn nhất), cộng cả dòng ghép cặp khuôn kép.
+// =============================================================================
+async function getActiveIdDongSet(){
+  const { data, error } = await sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi');
+  if (error) throw new Error('Không tải được Ca_hien_tai: ' + error.message);
+  const byMachine = {};
+  (data || []).forEach(r => {
+    if (!r.id_dong) return;
+    if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
+  });
+  const active = new Set();
+  Object.values(byMachine).forEach(r => {
+    active.add(r.id_dong);
+    if (r.khuon_kep_voi) active.add(r.khuon_kep_voi);
+  });
+  return active;
+}
+
+function ipqcDueInfo(loaiKiem, phutDaTroi){
+  const dueAfter = loaiKiem === 'dinh_ky' ? IPQC_CHECK_INTERVAL_MIN : 0;
+  const daDenHan = phutDaTroi >= dueAfter;
+  return {
+    da_den_han: daDenHan,
+    phut_con_lai: daDenHan ? 0 : (dueAfter - phutDaTroi),
+    phut_qua_han: daDenHan ? (phutDaTroi - dueAfter) : 0,
+  };
+}
+
+// Port getIpqcQueue_ (IpqcCheckpoint.js) — đọc thẳng bảng, lọc + tính toán ở client.
+async function loadQueue(){
+  const [activeSet, cpRes] = await Promise.all([
+    getActiveIdDongSet(),
+    sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'cho_kiem'),
+  ]);
+  if (cpRes.error) throw new Error('Không tải được hàng đợi IPQC: ' + cpRes.error.message);
+
+  const now = Date.now();
+  const PRIORITY = { sau_su_co: 0, doi_khuon: 0, dinh_ky: 1 };
+  const queue = (cpRes.data || [])
+    .filter(r => r.id_checkpoint && activeSet.has(r.id_dong))
+    .map(r => {
+      const phutDaTroi = r.han_kiem ? Math.round((now - new Date(r.han_kiem).getTime()) / 60000) : 0;
+      return Object.assign({
+        id_checkpoint: r.id_checkpoint, id_dong: r.id_dong, ma_may: r.ma_may, ma_sp: r.ma_sp,
+        ngay: r.ngay, ca: r.ca, loai_kiem: r.loai_kiem, thoi_diem_tao: r.thoi_diem_tao,
+        phut_da_troi: phutDaTroi,
+      }, ipqcDueInfo(r.loai_kiem, phutDaTroi));
+    })
+    .sort((a, b) => {
+      const pa = PRIORITY[a.loai_kiem] != null ? PRIORITY[a.loai_kiem] : 2;
+      const pb = PRIORITY[b.loai_kiem] != null ? PRIORITY[b.loai_kiem] : 2;
+      if (pa !== pb) return pa - pb;
+      if (a.da_den_han !== b.da_den_han) return a.da_den_han ? -1 : 1;
+      return b.phut_da_troi - a.phut_da_troi;
+    });
+  return queue;
+}
+
+window.addEventListener('load', async () => {
+  updateUserLabel();
+  showOverlay('Đang tải hàng đợi...');
+  try {
+    state.queue = await loadQueue();
+    hideOverlay();
+    renderQueue();
+    startPolling();
+  } catch (e) { onError(e); }
+});
+
+function startPolling(){
+  stopPolling();
+  state.pollTimer = setInterval(async () => {
+    try { state.queue = await loadQueue(); renderQueue(); } catch (e) { /* im lặng khi poll lỗi, giữ nguyên hàng đợi cũ */ }
+  }, 20000);
+}
+function stopPolling(){ if (state.pollTimer) clearInterval(state.pollTimer); state.pollTimer = null; }
+
+function levelForMinutes(m){
+  if (m >= 90) return 'alarm';
+  if (m >= 30) return 'warn';
+  return 'ok';
+}
+
+function renderQueue(){
+  const list = document.getElementById('queue-list');
+  if (!state.queue.length) {
+    list.innerHTML = '<div class="empty-note">✅ Không có điểm kiểm nào đang chờ.<br>Hàng đợi sẽ tự cập nhật khi có yêu cầu mới.</div>';
+    return;
+  }
+  list.innerHTML = state.queue.map(cp => {
+    const lvl = cp.da_den_han ? levelForMinutes(cp.phut_da_troi) : 'upcoming';
+    const timeLabel = cp.da_den_han ? (cp.phut_da_troi + 'p') : ('còn ' + cp.phut_con_lai + 'p');
+    return `
+      <div class="qcard" data-lvl="${lvl}" onclick="openCheck('${cp.id_checkpoint}')">
+        <div class="qcard-main">
+          <div class="qcard-may">${escapeHtml(cp.ma_may)}</div>
+          <div class="qcard-sp">${escapeHtml(cp.ma_sp)}</div>
+          <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.da_den_han ? '' : ' · sắp tới'}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="qcard-time ${lvl === 'ok' ? '' : lvl}">${timeLabel}</div>
+        </div>
+        <div class="qcard-arrow">›</div>
+      </div>`;
+  }).join('');
+}
+
+async function openCheck(idCheckpoint){
+  const cp = state.queue.find(x => x.id_checkpoint === idCheckpoint);
+  if (!cp) return;
+  state.current = cp;
+  state.checkStartedAt = Date.now();
+  state.photos = [];
+  renderPhotoGrid();
+  document.getElementById('ck-ghi-chu').value = '';
+
+  document.getElementById('ck-may').textContent = cp.ma_may;
+  document.getElementById('ck-loai').textContent = LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem;
+  document.getElementById('ck-ma-sp').textContent = cp.ma_sp;
+  document.getElementById('ck-meta').textContent = 'Chờ đã ' + cp.phut_da_troi + ' phút — ' + cp.ca + ', ' + (cp.ngay ? new Date(cp.ngay).toLocaleDateString('vi-VN') : '');
+
+  showScreen('scr-check');
+  showOverlay('Đang tải tiêu chuẩn...');
+  try {
+    const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').eq('ma_sp', cp.ma_sp).maybeSingle();
+    if (error) throw new Error(error.message);
+    let mucKiem = IPQC_DEFAULT_CHECKLIST.slice();
+    let filePdfUrl = '';
+    if (data) {
+      const parsed = Array.isArray(data.danh_sach_muc_kiem_json) ? data.danh_sach_muc_kiem_json : [];
+      if (parsed.length) mucKiem = parsed;
+      filePdfUrl = data.file_pdf_url || '';
+    }
+    hideOverlay();
+    state.tieuChuan = { ma_sp: cp.ma_sp, muc_kiem: mucKiem, file_pdf_url: filePdfUrl };
+    state.checklistAnswers = mucKiem.map(m => ({ muc: m, dat: null }));
+    renderChecklist();
+
+    const pdfBtn = document.getElementById('ck-pdf-btn');
+    if (filePdfUrl) {
+      pdfBtn.classList.remove('hidden');
+      pdfBtn.onclick = () => window.open(filePdfUrl, '_blank');
+    } else {
+      pdfBtn.classList.add('hidden');
+    }
+  } catch (e) { onError(e); }
+}
+
+function renderChecklist(){
+  const wrap = document.getElementById('ck-checklist');
+  wrap.innerHTML = state.checklistAnswers.map((a, i) => `
+    <div class="cl-item">
+      <div class="cl-text">${escapeHtml(a.muc)}</div>
+      <div class="cl-toggle">
+        <button id="cl-ok-${i}" onclick="setChecklistAnswer(${i}, true)">Đạt</button>
+        <button id="cl-bad-${i}" onclick="setChecklistAnswer(${i}, false)">Không đạt</button>
+      </div>
+    </div>`).join('');
+}
+
+function setChecklistAnswer(i, dat){
+  state.checklistAnswers[i].dat = dat;
+  document.getElementById('cl-ok-' + i).classList.toggle('sel-ok', dat === true);
+  document.getElementById('cl-bad-' + i).classList.toggle('sel-bad', dat === false);
+}
+
+function onPhotoSelected(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (state.photos.length >= IPQC_MAX_PHOTOS) return showToast('Đã đạt tối đa ' + IPQC_MAX_PHOTOS + ' ảnh', true);
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1280;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        state.photos.push({ blob: blob, mime: 'image/jpeg', dataUrl: canvas.toDataURL('image/jpeg', 0.82) });
+        renderPhotoGrid();
+      }, 'image/jpeg', 0.82);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(idx){
+  state.photos.splice(idx, 1);
+  renderPhotoGrid();
+}
+
+function renderPhotoGrid(){
+  const grid = document.getElementById('ck-photo-grid');
+  grid.innerHTML = state.photos.map((p, i) => `
+    <div class="photo-thumb">
+      <img src="${p.dataUrl}">
+      <button type="button" class="rm" onclick="removePhoto(${i})">✕</button>
+    </div>`).join('');
+
+  const btn = document.getElementById('ck-photo-btn');
+  const label = document.getElementById('ck-photo-label');
+  const n = state.photos.length;
+  btn.classList.toggle('has-photo', n > 0);
+  if (n === 0) label.textContent = 'Bấm để chụp ảnh bằng chứng (bắt buộc, tối đa ' + IPQC_MAX_PHOTOS + ' ảnh)';
+  else if (n >= IPQC_MAX_PHOTOS) label.textContent = '✓ Đã đủ ' + IPQC_MAX_PHOTOS + ' ảnh (tối đa)';
+  else label.textContent = '✓ Đã chụp ' + n + '/' + IPQC_MAX_PHOTOS + ' — bấm để chụp thêm';
+  btn.disabled = n >= IPQC_MAX_PHOTOS;
+}
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+async function uploadEvidencePhotos(maMay, maSp, ketQua){
+  const now = new Date();
+  const dateFolder = now.getFullYear()+'-'+pad2(now.getMonth()+1)+'-'+pad2(now.getDate());
+  const stamp = pad2(now.getDate())+pad2(now.getMonth()+1)+now.getFullYear()+'_'+pad2(now.getHours())+pad2(now.getMinutes());
+  const safeMay = String(maMay||'').replace(/[^a-zA-Z0-9_-]/g,'');
+  const safeSp = String(maSp||'').replace(/[^a-zA-Z0-9_-]/g,'');
+  const urls = [];
+  for (let i = 0; i < state.photos.length; i++) {
+    const p = state.photos[i];
+    const idxPart = state.photos.length > 1 ? ('_' + (i+1)) : '';
+    const path = dateFolder + '/' + stamp + '_' + safeMay + '_' + safeSp + '_' + ketQua + idxPart + '.jpg';
+    const { error } = await sb.storage.from('ipqc-evidence').upload(path, p.blob, { contentType: p.mime, upsert: false });
+    if (error) throw new Error('Lỗi tải ảnh lên: ' + error.message);
+    const { data } = sb.storage.from('ipqc-evidence').getPublicUrl(path);
+    urls.push(data.publicUrl);
+  }
+  return urls;
+}
+
+async function submitCheck(ketQua){
+  if (!state.current) return;
+
+  const session = await MesAuth.getSession();
+  if (!session){
+    showToast('Cần đăng nhập trước khi nộp kết quả. Đang chuyển sang trang đăng nhập…', true);
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return;
+  }
+  const nguoiKiem = session.user.email;
+
+  if (!state.photos.length) return showToast('Vui lòng chụp ít nhất 1 ảnh bằng chứng trước khi lưu', true);
+
+  const allPass = state.checklistAnswers.every(a => a.dat === true);
+  const anyFail = state.checklistAnswers.some(a => a.dat === false);
+  if (ketQua === 'OK' && !allPass) {
+    return showToast('Chỉ được chọn OK khi TẤT CẢ các mục kiểm đều Đạt', true);
+  }
+  if ((ketQua === 'NG' || ketQua === 'CANH_BAO') && !anyFail) {
+    return showToast('NG / Cảnh báo cần ít nhất 1 mục kiểm Không đạt', true);
+  }
+  const ghiChu = document.getElementById('ck-ghi-chu').value.trim();
+  if ((ketQua === 'NG' || ketQua === 'CANH_BAO') && !ghiChu) {
+    return showToast('NG / Cảnh báo bắt buộc phải nhập ghi chú', true);
+  }
+
+  showOverlay('Đang tải ảnh bằng chứng...');
+  try {
+    const anhUrls = await uploadEvidencePhotos(state.current.ma_may, state.current.ma_sp, ketQua);
+
+    showOverlay('Đang lưu kết quả...');
+    const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
+    const { data, error } = await sb.rpc('duc_submit_ipqc_check', {
+      p_id_checkpoint: state.current.id_checkpoint,
+      p_checklist: state.checklistAnswers,
+      p_ket_qua: ketQua,
+      p_anh_urls: anhUrls,
+      p_ghi_chu: ghiChu,
+      p_thoi_gian_kiem_giay: thoiGianKiemGiay,
+      p_nguoi_kiem: nguoiKiem,
+    });
+    hideOverlay();
+    if (error) return onError(new Error(error.message));
+    if (data && data.ok === false) return onError(new Error(data.error));
+
+    const msg = ketQua === 'OK' ? '✓ Đã lưu — OK, cho phép sản xuất'
+      : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
+      : '✓ Đã lưu — Cảnh báo ghi nhận, đã báo bộ phận bảo dưỡng khuôn';
+    showToast(msg + (data && data.note ? ' (' + data.note + ')' : ''));
+    state.queue = state.queue.filter(x => x.id_checkpoint !== state.current.id_checkpoint);
+    state.current = null;
+    renderQueue();
+    showScreen('scr-queue');
+  } catch (e) {
+    onError(e);
+  }
+}
+</script>
+</body>
+</html>

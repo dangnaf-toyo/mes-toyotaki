@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản Lý Tồn Kho NVL — TOYOTAKI</title>
+<!--
+  index-final.html — bản web tĩnh (Supabase) THAY HẲN Web App Google Apps Script
+  của module "Tồn kho NVL" (code.js + index.html cũ trong cùng thư mục này).
+  Không còn bất kỳ phụ thuộc Google nào: không Apps Script, không Google Sheet,
+  không Drive. Đọc dữ liệu công khai; GHI (giao dịch, tồn đầu kỳ, cài đặt, kế
+  hoạch nhập, in tem, quét QR nhập/xuất) bắt buộc đăng nhập Supabase Auth.
+
+  ĐÃ CHỦ ĐÍCH ĐƠN GIẢN HOÁ / THAY ĐỔI SO VỚI BẢN CŨ (ghi rõ để không tưởng là lỗi):
+
+  1) THAY HẲN BACKEND APPS SCRIPT.
+     Mọi action cũ của code.js được thay bằng bảng/view/RPC Supabase:
+       getAllData/getOpening/getPlanDaily/getSettings/getTransactions
+                              → SELECT nvl_ton_dau_ky / nvl_ke_hoach_ngay /
+                                nvl_cai_dat / nvl_giao_dich
+       getCurrentStock        → VIEW nvl_v_ton_hien_tai (tồn suy ra từ tồn đầu
+                                kỳ + giao dịch, KHÔNG còn ô state bị ghi đè tay)
+       getTemList/getTemByTagNo → SELECT nvl_tem
+       addTransaction         → RPC nvl_add_transaction
+       updateOpening          → RPC nvl_update_opening
+       updateSettings         → RPC nvl_update_settings
+       updatePlanNhap         → RPC nvl_update_plan_nhap
+       recalcAllPlanStock     → RPC nvl_recalc_all_plan_stock
+       createTem              → RPC nvl_create_tem
+       processMultiTransaction→ RPC nvl_process_multi_transaction
+       checkFIFO              → RPC nvl_check_fifo (public, không cần đăng nhập)
+       updateStock            → BỎ HẲN: tồn hiện tại nay là dữ liệu suy ra
+                                (view), không còn ghi đè tay được nữa.
+
+  2) ĐƠN VỊ: TẤT CẢ LÀ KG.
+     Bản cũ trộn kg và tấn (Tồn Đầu Kỳ / Cài Đặt / Giao Dịch / Tồn Hiện Tại lưu
+     TẤN, còn Kế Hoạch và Tem lưu KG — xem gotcha #3 trong Readme.md). Schema
+     Supabase đã chuẩn hoá mọi cột số về KG khi import. Vì vậy trang này KHÔNG
+     có bất kỳ phép ÷1000 hay ×1000 nào; mọi ô nhập, mọi con số hiển thị, mọi
+     nhãn biểu đồ đều là kg.
+
+  3) DANH MỤC MÃ NVL: bảng nvl_materials là NGUỒN DUY NHẤT.
+     Thay hẳn getMasterMaterials() đọc file Google Sheet "KHSX Master" (cột V:W)
+     và thay luôn mảng MATERIALS 7 mã hardcode trong code.js. Vì không còn nguồn
+     nào khác để quản lý danh mục, trang này có thêm tab "🗂️ Danh Mục NVL" để
+     thêm/sửa tên mã qua RPC nvl_upsert_material.
+
+  4) QR: DÙNG THƯ VIỆN CDN, BỎ KHỐI BASE64 NHÚNG.
+     Bản cũ nhúng ~174KB base64 (jsQR + engine phụ) ngay trong file vì lịch sử
+     chạy trong sandbox Apps Script. Nay tải thẳng từ CDN, cùng thư viện đang
+     chạy ổn định ở các module khác của hệ thống MES:
+       - Quét QR camera : jsQR 1.4.0 (giống chuyencongdoan.html), có dùng thêm
+                          BarcodeDetector native làm đường nhanh nếu trình duyệt
+                          hỗ trợ, jsQR luôn là fallback chạy mọi nơi.
+       - In tem QR      : qrcode-generator 1.4.4 (giống intem.html).
+     Logo trên tem cũng đổi từ link Google Drive sang SVG nhúng base64 (offline).
+
+  5) BỔ SUNG NHỎ: card "Ghi nhận thủ công" trong tab Nhập/Xuất (gọi RPC
+     nvl_add_transaction). Bản cũ có action addTransaction nhưng giao diện không
+     hề gọi tới; nay mở ra vì cần cách ghi nhập/xuất cho lô không có tem QR.
+-->
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --primary: #C87941; --dark: #1a1a1a; --light: #f5f3f0;
+  --gray: #999; --success: #4CAF50; --warning: #FFC107;
+  --danger: #f44336; --border: #ddd; --blue: #1F4E78;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: var(--light); color: var(--dark); }
+.header { background: var(--dark); color: white; padding: 1.2rem 2rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.header-left { display: flex; align-items: center; gap: 1rem; }
+.header-logo { width: 52px; height: 52px; flex-shrink: 0; background: white; border-radius: 6px; padding: 4px; display: flex; align-items: center; justify-content: center; }
+.header-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.header-title { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.3px; }
+.header-brand { font-size: 0.72rem; color: var(--primary); font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
+.header-right { text-align: right; }
+.sync-status { font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 20px; background: rgba(255,255,255,0.1); display: inline-block; }
+.sync-status.ok { color: #4CAF50; }
+.sync-status.error { color: #f44336; }
+.sync-status.loading { color: #FFC107; }
+.auth-info { font-size: 0.72rem; color: #bbb; margin-top: 6px; }
+.auth-info a { color: var(--primary); text-decoration: none; font-weight: 600; }
+.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+.tabs { display: flex; gap: 0.3rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); overflow-x: auto; flex-wrap: wrap; }
+.tab-btn { background: none; border: none; padding: 0.8rem 1.2rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--gray); border-bottom: 3px solid transparent; white-space: nowrap; }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.section { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary); }
+.section-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-size: 0.8rem; font-weight: 600; color: var(--gray); text-transform: uppercase; margin-bottom: 0.5rem; }
+.form-group input, .form-group select, .form-group textarea { padding: 0.7rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.95rem; font-family: inherit; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(200,121,65,.12); }
+.btn-group { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 1rem; }
+button { padding: 0.7rem 1.4rem; border: none; border-radius: 4px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover:not(:disabled) { background: #b56b3a; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secondary { background: #f0f0f0; color: var(--dark); border: 1px solid var(--border); }
+.btn-secondary:hover { background: #e4e4e4; }
+.btn-danger { background: #ffebee; color: var(--danger); border: 1px solid #ffcdd2; }
+.card { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-top: 3px solid var(--primary); margin-bottom: 1.5rem; }
+.card-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+.chart-container { position: relative; height: 400px; margin-bottom: 1rem; }
+#overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.overview-card { background: white; border-radius: 8px; padding: 1.5rem; border-top: 3px solid var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer; }
+.overview-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.overview-card-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; gap: .5rem; }
+.overview-card-code { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+.badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.7rem; white-space: nowrap; }
+.badge-ok { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+.badge-warning { background: rgba(255, 193, 7, 0.15); color: #F57F17; }
+.badge-danger { background: rgba(244, 67, 54, 0.15); color: var(--danger); }
+.overview-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.stat-small { background: #f9f9f9; padding: 0.6rem; border-radius: 4px; }
+.stat-label { font-size: 0.65rem; color: var(--gray); text-transform: uppercase; font-weight: 600; margin-bottom: 0.2rem; }
+.stat-value { font-size: 1.05rem; font-weight: 700; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 1rem; }
+.data-table th { background: #f5f5f5; padding: 0.7rem; text-align: left; font-weight: 600; color: var(--gray); border-bottom: 2px solid var(--border); text-transform: uppercase; font-size: 0.72rem; }
+.data-table td { padding: 0.7rem; border-bottom: 1px solid var(--border); }
+.table-scroll { overflow-x: auto; }
+.material-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+.material-btn { padding: 0.75rem; border: 2px solid var(--border); border-radius: 4px; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.material-btn:hover { border-color: var(--primary); }
+.material-btn.active { border-color: var(--primary); background: rgba(200, 121, 65, 0.1); color: var(--primary); }
+.alert { padding: 1rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.88rem; line-height: 1.5; }
+.alert-info { background: rgba(33, 150, 243, 0.1); color: #1976D2; border-left: 4px solid #1976D2; }
+.alert-warn { background: #fff8e1; color: #8d6e00; border-left: 4px solid var(--warning); }
+.plan-nhap-wrapper { overflow-x: auto; margin-top: 1rem; border: 1px solid var(--border); border-radius: 6px; }
+.plan-nhap-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.plan-nhap-table th, .plan-nhap-table td { border: 1px solid #eee; padding: 0.4rem; text-align: center; }
+.plan-nhap-table thead th { background: #1F4E78; color: white; font-weight: 600; position: sticky; top: 0; z-index: 5; font-size: 0.75rem; }
+.plan-nhap-table thead .weekend { background: #f57c00; }
+.plan-nhap-table thead .today-col { background: #C87941; }
+.plan-nhap-table tbody td.material-cell { background: #f5f5f5; font-weight: 700; color: var(--blue); text-align: left; padding-left: 0.75rem; position: sticky; left: 0; z-index: 4; min-width: 120px; }
+.plan-nhap-table tbody td.weekend-col { background: #fff3e0; }
+.plan-nhap-table tbody td.today-col { background: #ffe0b2; }
+.plan-nhap-input { width: 68px; padding: 0.3rem; border: 1px solid transparent; background: transparent; text-align: center; font-size: 0.85rem; font-family: inherit; border-radius: 3px; }
+.plan-nhap-input:hover { border-color: var(--border); background: white; }
+.plan-nhap-input:focus { outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 2px rgba(200, 121, 65, 0.2); }
+.plan-nhap-input.changed { background: #fff9e6; border-color: var(--warning); font-weight: 700; }
+.plan-nhap-legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.8rem; font-size: 0.8rem; color: var(--gray); }
+.plan-nhap-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.plan-nhap-legend .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid #ccc; }
+
+/* ============ FULLSCREEN CAMERA QR SCANNER ============ */
+.fs-scanner { display: none; position: fixed; inset: 0; background: #000; z-index: 10000; flex-direction: column; color: white; }
+.fs-scanner.active { display: flex; }
+.fs-scanner-header { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1rem; background: rgba(0,0,0,0.7); position: relative; z-index: 2; }
+.fs-scanner-header .title { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.fs-scanner-header .type-badge { padding: 0.25rem 0.7rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+.fs-scanner-header .type-badge.out { background: #E53935; color: white; }
+.fs-scanner-header .type-badge.in { background: #43A047; color: white; }
+.fs-scanner-header button { background: rgba(255,255,255,0.15); color: white; border: none; padding: 0.5rem 0.9rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.fs-scanner-header .btn-close { background: #E53935; }
+.fs-video-container { flex: 1; position: relative; overflow: hidden; background: #000; }
+.fs-video-container video { width: 100%; height: 100%; object-fit: cover; }
+.fs-qr-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(70vw, 70vh, 400px); height: min(70vw, 70vh, 400px); border: 3px solid rgba(255,255,255,0.4); border-radius: 12px; pointer-events: none; }
+.fs-qr-frame::before { content: ''; position: absolute; top: -3px; left: -3px; width: 30px; height: 30px; border-top: 5px solid #4CAF50; border-left: 5px solid #4CAF50; border-top-left-radius: 12px; }
+.fs-qr-frame::after { content: ''; position: absolute; top: -3px; right: -3px; width: 30px; height: 30px; border-top: 5px solid #4CAF50; border-right: 5px solid #4CAF50; border-top-right-radius: 12px; }
+.fs-scan-line { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #4CAF50, transparent); box-shadow: 0 0 12px #4CAF50; animation: scan-line-move 2.5s ease-in-out infinite; }
+@keyframes scan-line-move { 0%, 100% { top: 0; } 50% { top: calc(100% - 3px); } }
+.fs-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.85); font-size: 0.85rem; text-align: center; background: rgba(0,0,0,0.5); padding: 0.4rem 1rem; border-radius: 20px; }
+.fs-scanner-footer { background: rgba(0,0,0,0.85); padding: 0.8rem 1rem; border-top: 2px solid rgba(255,255,255,0.1); max-height: 42vh; overflow-y: auto; }
+.fs-last-scan { background: rgba(76,175,80,0.15); border-left: 4px solid #4CAF50; padding: 0.6rem 0.8rem; border-radius: 6px; margin-bottom: 0.6rem; font-size: 0.85rem; }
+.fs-last-scan.error { background: rgba(244,67,54,0.15); border-left-color: #f44336; }
+.fs-last-scan.pending { background: rgba(255,193,7,0.15); border-left-color: #FFC107; }
+.fs-last-scan.duplicate { background: rgba(158,158,158,0.15); border-left-color: #9E9E9E; }
+.fs-last-scan-tag { font-family: monospace; font-weight: 800; font-size: 1rem; margin-bottom: 0.2rem; }
+.fs-last-scan-info { color: rgba(255,255,255,0.75); font-size: 0.8rem; }
+.fs-cart-summary { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; padding: 0.4rem 0.2rem; gap: .6rem; }
+.fs-cart-summary .count { font-weight: 800; color: #4CAF50; font-size: 1.15rem; }
+.fs-cart-summary button { background: #4CAF50; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
+.fs-cart-summary button:disabled { background: #555; cursor: not-allowed; }
+@keyframes fs-flash { 0% { background: rgba(76,175,80,0); } 30% { background: rgba(76,175,80,0.35); } 100% { background: rgba(76,175,80,0); } }
+.fs-video-container.flash::after { content: ''; position: absolute; inset: 0; pointer-events: none; animation: fs-flash 0.35s ease-out; }
+
+/* ============ TEM NVL 70x100mm ============ */
+.tem-preview-container { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.tem-preview-container > * { flex-shrink: 0; }
+.tem-nvl { width: 70mm; height: 100mm; box-sizing: border-box; background: white; padding: 3mm; font-family: 'Arial Black', 'Segoe UI', Arial, sans-serif; font-weight: 900; display: flex; flex-direction: column; page-break-inside: avoid; page-break-after: always; color: #000; overflow: hidden; border: 1px dashed #ccc; }
+.tem-header { display: flex; align-items: center; gap: 2mm; margin-bottom: 2mm; }
+.tem-logo { width: 14mm; height: 14mm; display: flex; align-items: center; justify-content: center; overflow: hidden; background: white; flex-shrink: 0; }
+.tem-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.tem-title { flex: 1; text-align: center; font-size: 4.5mm; font-weight: 900; color: #000; letter-spacing: 0.15mm; line-height: 1.1; }
+.tem-info { font-size: 3mm; line-height: 1.4; color: #000; margin-bottom: 1.5mm; font-weight: 900; }
+.tem-info-row { display: flex; margin-bottom: 0.6mm; align-items: baseline; }
+.tem-info-label { width: 18mm; font-weight: 900; color: #000; flex-shrink: 0; }
+.tem-info-colon { width: 2mm; flex-shrink: 0; font-weight: 900; }
+.tem-info-value { flex: 1; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tem-info-value.big { font-size: 3.2mm; font-weight: 900; }
+.tem-info-value.tag { font-size: 3.1mm; letter-spacing: -0.05mm; }
+.tem-info-value.name { white-space: normal; font-size: 2.8mm; line-height: 1.25; }
+.tem-qr-block { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 30mm; }
+.tem-qr-wrapper > div { width: 30mm; height: 30mm; display: flex; align-items: center; justify-content: center; }
+.tem-qr-wrapper svg { width: 30mm !important; height: 30mm !important; display: block; }
+.tem-footer { text-align: center; font-size: 2.3mm; font-weight: 900; color: #000; margin-top: 1.5mm; line-height: 1.15; flex-shrink: 0; }
+.multi-qty-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+.multi-qty-table th { background: #1F4E78; color: white; padding: 0.5rem; font-size: 0.78rem; font-weight: 600; }
+.multi-qty-table td { padding: 0.4rem; border-bottom: 1px solid var(--border); text-align: center; }
+.multi-qty-table input { width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 3px; font-size: 0.9rem; text-align: center; font-family: inherit; }
+.multi-qty-table .row-num { font-weight: 700; color: var(--gray); width: 40px; }
+.multi-qty-summary { text-align: right; font-size: 0.85rem; color: var(--gray); margin-top: 0.5rem; }
+.multi-qty-summary b { color: var(--primary); }
+
+#printArea { display: none; }
+@media print {
+  .header, .container, .loading-overlay, .fs-scanner { display: none !important; }
+  #printArea { display: block !important; position: static !important; margin: 0 !important; padding: 0 !important; background: white !important; }
+  #printArea .tem-nvl { border: none !important; margin: 0 !important; box-shadow: none !important; page-break-after: always; display: flex !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 900 !important; }
+  #printArea .tem-nvl * { font-weight: 900 !important; }
+  #printArea .tem-nvl:last-child { page-break-after: auto; }
+  @page { size: 70mm 100mm; margin: 0; }
+  html, body { margin: 0 !important; padding: 0 !important; background: white !important; height: auto !important; }
+}
+.loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: none; justify-content: center; align-items: center; flex-direction: column; }
+.loading-overlay.show { display: flex; }
+.spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 768px) {
+  .container { padding: 1rem; }
+  .form-row { grid-template-columns: 1fr; }
+  .chart-container { height: 300px; }
+  #overview-grid { grid-template-columns: 1fr; }
+  .header { padding: 0.8rem 1rem; }
+  .header-logo { width: 40px; height: 40px; padding: 3px; }
+  .header-title { font-size: 0.95rem; line-height: 1.15; }
+  .header-brand { font-size: 0.6rem; }
+  .sync-status { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p style="margin-top: 1rem; color: var(--gray);">Đang tải...</p>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo"><img id="hdrLogo" alt="TYK"></div>
+    <div>
+      <div class="header-title">QUẢN LÝ TỒN KHO NGUYÊN VẬT LIỆU</div>
+      <div class="header-brand">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="sync-status" id="syncStatus">⏳ Đang kết nối...</span>
+    <div class="auth-info" id="authInfo">…</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview">📊 Tổng Quan</button>
+    <button class="tab-btn" data-tab="charts">📈 Biểu Đồ 30 Ngày</button>
+    <button class="tab-btn" data-tab="qr-input">📱 Nhập/Xuất</button>
+    <button class="tab-btn" data-tab="tem-nvl">🏷️ In Tem NVL</button>
+    <button class="tab-btn" data-tab="plan-nhap">🚚 KH Nhập Nhôm</button>
+    <button class="tab-btn" data-tab="opening">🏁 Tồn Đầu Kỳ</button>
+    <button class="tab-btn" data-tab="settings">⚙️ Cài Đặt</button>
+    <button class="tab-btn" data-tab="materials">🗂️ Danh Mục NVL</button>
+    <button class="tab-btn" data-tab="history">📋 Lịch Sử</button>
+  </div>
+
+  <!-- Tab 1: Tổng Quan -->
+  <div id="overview" class="tab-content active">
+    <div class="btn-group" style="margin-bottom: 1rem;">
+      <button class="btn-primary" id="btnReload">🔄 Đồng Bộ Dữ Liệu</button>
+    </div>
+    <div id="overview-grid"></div>
+  </div>
+
+  <!-- Tab 2: Biểu Đồ 30 Ngày -->
+  <div id="charts" class="tab-content">
+    <div class="section">
+      <div class="section-title">Chọn Loại NVL</div>
+      <div class="material-btns" id="materialButtonsContainer"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Kế Hoạch vs Thực Tế 30 Ngày - <span id="chartMaterialLabel" style="color: var(--primary);"></span></div>
+      <div class="alert alert-info" id="chartInfo" style="font-size: 0.85rem;"></div>
+      <div class="chart-container"><canvas id="planChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Quét QR Xuất/Nhập (multi-pallet) -->
+  <div id="qr-input" class="tab-content">
+    <div class="section">
+      <div class="section-title">📱 Quét QR - Xuất/Nhập Kho Nhiều Pallet</div>
+      <div class="alert alert-info">
+        💡 <b>Quy trình:</b><br>
+        1. Chọn loại giao dịch (Nhập/Xuất) → 2. Quét QR liên tiếp các pallet → 3. Nhấn "Ghi Nhận Tất Cả"<br>
+        <b>FIFO:</b> Khi xuất, hệ thống tự động cảnh báo nếu còn pallet cũ hơn cùng mã chưa xuất.
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Loại Giao Dịch</label>
+          <select id="cartTxType">
+            <option value="OUT">📤 XUẤT KHO</option>
+            <option value="IN">📥 NHẬP KHO</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Quét QR Code (hoặc gõ Tag No + Enter)</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="qrScanInput" placeholder="Đưa mã QR vào camera hoặc gõ Tag No..." style="flex: 1;">
+            <button class="btn-primary" type="button" id="btnOpenScanner" style="white-space: nowrap;">📷 Bật Camera</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #f9f9f9; border-radius: 6px; padding: 1rem; margin-top: 0.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <div style="font-weight: 600;">🛒 Giỏ Pallet Đã Quét</div>
+          <div style="font-size: 0.85rem; color: var(--gray);">Tổng: <b id="cartCount" style="color: var(--primary);">0</b> pallet</div>
+        </div>
+        <div style="max-height: 400px; overflow: auto; border: 1px solid var(--border); border-radius: 4px; background: white;">
+          <table class="multi-qty-table" id="cartTable">
+            <thead>
+              <tr>
+                <th style="width: 30px;">#</th><th>Tag No</th><th>Mã NVL</th><th>Ngày Nhập</th>
+                <th>Số Lượng</th><th>ĐV</th><th style="width: 110px;">Trạng Thái</th><th style="width: 50px;">Xóa</th>
+              </tr>
+            </thead>
+            <tbody id="cartTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--gray); padding: 1.5rem;">Chưa có pallet nào trong giỏ. Hãy quét QR.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="text-align: right; margin-top: 0.5rem; font-size: 0.85rem; color: var(--gray);">
+          Tổng khối lượng: <b id="cartTotalKg" style="color: var(--primary);">0</b> kg / <b id="cartTotalPcs" style="color: var(--primary);">0</b> pcs
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn-primary" id="btnSubmitCart">✓ Ghi Nhận Tất Cả</button>
+        <button class="btn-secondary" id="btnClearCart">🗑️ Xóa Giỏ</button>
+        <button class="btn-secondary" id="btnFocusQR">🔍 Focus Ô Quét</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 Tồn Hiện Tại Sau Giao Dịch (dự kiến so với kế hoạch hôm nay)</div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã NVL</th><th>Tồn Hiện Tại (kg)</th><th>Δ Sau Giao Dịch (kg)</th>
+              <th>Tồn Dự Kiến (kg)</th><th>Min (kg)</th><th>Max (kg)</th><th>Trạng Thái</th>
+            </tr>
+          </thead>
+          <tbody id="cartPreviewTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✍️ Ghi Nhận Thủ Công (lô không có tem QR)</div>
+      <div class="alert alert-warn">
+        Dùng khi nhập/xuất một lượng NVL không gắn tem pallet. Giao dịch ghi thẳng vào lịch sử,
+        <b>không</b> đổi trạng thái tem nào. Đơn vị: <b>kg</b>.
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Ngày</label><input type="date" id="manNgay"></div>
+        <div class="form-group"><label>Loại</label>
+          <select id="manLoai"><option value="IN">📥 NHẬP</option><option value="OUT">📤 XUẤT</option></select>
+        </div>
+        <div class="form-group"><label>Mã NVL</label><select id="manMaNvl"></select></div>
+        <div class="form-group"><label>Khối lượng (kg)</label><input type="number" id="manSoLuong" step="0.001" min="0" placeholder="0"></div>
+        <div class="form-group" style="grid-column: span 2;"><label>Ghi chú</label><input type="text" id="manGhiChu" placeholder="VD: Bù kiểm kê, hao hụt..."></div>
+      </div>
+      <div class="btn-group"><button class="btn-primary" id="btnManualTx">💾 Ghi Giao Dịch</button></div>
+    </div>
+  </div>
+
+  <!-- Tab: In Tem NVL -->
+  <div id="tem-nvl" class="tab-content">
+    <div class="section">
+      <div class="section-title">🏷️ In Tem Nguyên Vật Liệu (QR Code) - 70x100mm</div>
+      <div class="alert alert-info">
+        💡 Chọn thông tin pallet → xem preview → in tem. Tag No được sinh tự động theo format <b>TYK-YYYYMMDD-XXXX</b>.<br>
+        Có thể in 1 tem hoặc nhiều tem cùng lúc. Mỗi tem có Tag No riêng, lưu vào database và tự sinh giao dịch NHẬP tương ứng.
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Mã NVL <span id="temMasterStatus" style="font-size: 0.7rem; color: var(--gray); font-weight: normal;"></span></label>
+          <select id="temMaterial"></select>
+        </div>
+        <div class="form-group"><label>Tên NVL</label><input type="text" id="temName" readonly style="background: #f5f5f5;"></div>
+        <div class="form-group"><label>Ngày Nhập</label><input type="date" id="temDate"></div>
+        <div class="form-group"><label>Đơn Vị</label>
+          <select id="temUnit"><option value="kg">kg (kilogram)</option><option value="pcs">pcs (pieces)</option></select>
+        </div>
+        <div class="form-group"><label>Số Tem Cần In</label><input type="number" id="temCount" value="1" min="1" max="100" step="1"></div>
+        <div class="form-group">
+          <label>Số Lượng Mặc Định (áp dụng nhanh)</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="number" id="temDefaultQty" step="0.001" min="0" placeholder="0.000">
+            <button class="btn-secondary" style="white-space: nowrap;" id="btnApplyDefaultQty">↓ Áp dụng</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Ghi Chú (in trên tất cả tem)</label>
+          <input type="text" id="temNote" placeholder="VD: Lot 2607-A, xe container XYZ...">
+        </div>
+      </div>
+
+      <div style="margin-top: 1rem;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem;">📋 Số lượng cho từng tem (mỗi pallet 1 dòng)</div>
+        <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px;">
+          <table class="multi-qty-table" id="temQtyTable"></table>
+        </div>
+        <div class="multi-qty-summary">Tổng: <b id="temTotalQty">0</b> <span id="temTotalUnit">kg</span> | Số tem: <b id="temTotalCount">0</b></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn-primary" id="btnPrintTem">🖨️ In Tem &amp; Lưu Database</button>
+        <button class="btn-secondary" id="btnResetTem">⟲ Xóa Form</button>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <div class="card-title">👁️ Preview Tem (Kích Thước Thật 70x100mm)</div>
+        <div class="tem-preview-container">
+          <div id="temPreviewSingle"></div>
+          <div style="font-size: 0.85rem; color: var(--gray); max-width: 320px;">
+            <p style="margin-bottom: 0.5rem;"><b>Tem preview:</b></p>
+            <p>• Tag No hiện là mẫu, khi in sẽ sinh mã thực tế từ database.</p>
+            <p>• QR Code chứa: <code>Tag No&gt;Mã&gt;Tên&gt;Ngày&gt;SL&gt;ĐV</code></p>
+            <p>• Khi bấm "In Tem", browser sẽ mở dialog in — chọn máy in nhiệt Zywell 307 hoặc PDF để lưu.</p>
+            <p style="margin-top: 0.5rem;">• <b>Chú ý</b> khi in: set giấy = 70x100mm, margin = 0.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📜 Danh Sách Tem Đã Tạo (100 mới nhất)</div>
+      <div class="btn-group" style="margin-bottom: 0.5rem; margin-top: 0;">
+        <button class="btn-secondary" id="btnLoadTemList">🔄 Tải Danh Sách</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tag No</th><th>Mã NVL</th><th>Ngày Nhập</th><th>Số Lượng</th><th>ĐV</th><th>Trạng Thái</th><th>Ghi Chú</th><th>Tạo Lúc</th><th>In Lại</th></tr>
+          </thead>
+          <tbody id="temListTable">
+            <tr><td colspan="9" style="text-align: center; color: var(--gray);">Nhấn "Tải Danh Sách" để xem</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Kế Hoạch Nhập Nhôm -->
+  <div id="plan-nhap" class="tab-content">
+    <div class="section">
+      <div class="section-title">🚚 Kế Hoạch Nhập Nhôm 30 Ngày</div>
+      <div class="alert alert-info">
+        💡 Chỉnh sửa lượng nhập nhôm dự kiến (đơn vị: <b>kg</b>) cho từng ngày.<br>
+        Khi thực tế nhập lệch so với kế hoạch → sửa ở đây → nhấn <b>Lưu</b> để cập nhật database + tồn kế hoạch tự tính lại.
+      </div>
+
+      <div class="btn-group" style="margin-bottom: 0.5rem; margin-top: 0;">
+        <button class="btn-primary" id="btnSavePlan">💾 Lưu Tất Cả Thay Đổi</button>
+        <button class="btn-secondary" id="btnResetPlan">⟲ Hủy Thay Đổi</button>
+        <button class="btn-secondary" id="btnRecalcPlan">🧮 Tính Lại Tồn Kế Hoạch</button>
+        <button class="btn-secondary" id="btnReloadPlan">🔄 Tải Lại Dữ Liệu</button>
+        <span id="planNhapChangeCount" style="margin-left: auto; align-self: center; color: #8d6e00; font-weight: 600; font-size: 0.9rem;"></span>
+      </div>
+
+      <div class="plan-nhap-wrapper">
+        <table class="plan-nhap-table" id="planNhapTable">
+          <thead id="planNhapHead"></thead>
+          <tbody id="planNhapBody"></tbody>
+        </table>
+      </div>
+
+      <div class="plan-nhap-legend">
+        <span><span class="swatch" style="background: #fff9e6; border-color: #FFC107;"></span> Ô đã sửa (chưa lưu)</span>
+        <span><span class="swatch" style="background: #fff3e0;"></span> Cuối tuần (T7, CN)</span>
+        <span><span class="swatch" style="background: #ffe0b2;"></span> Hôm nay</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Tồn Đầu Kỳ -->
+  <div id="opening" class="tab-content">
+    <div class="section">
+      <div class="section-title">🏁 Tồn Đầu Kỳ (Kiểm Kê Đầu Tháng)</div>
+      <div class="alert alert-info">
+        💡 Đầu tháng: Kiểm kê thực tế → Nhập ngày + số lượng vào đây.<br>
+        Dashboard sẽ tính tồn thực tế mỗi ngày = <b>Tồn đầu kỳ + Σ(Nhập - Xuất)</b> từ ngày đầu kỳ đến ngày đó.
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Mã NVL</th><th>Ngày Đầu Kỳ</th><th>Tồn Đầu Kỳ (kg)</th><th>Hành Động</th></tr></thead>
+          <tbody id="openingTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Cài Đặt -->
+  <div id="settings" class="tab-content">
+    <div class="section">
+      <div class="section-title">⚙️ Cài Đặt Bề Rộng Quản Lý</div>
+      <div class="alert alert-info">💡 Min = Kế Hoạch - Bề Rộng | Max = Kế Hoạch + Bề Rộng (đơn vị: kg)</div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Mã NVL</th><th>Bề Rộng (kg)</th><th>Hành Động</th></tr></thead>
+          <tbody id="settingsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Danh Mục NVL -->
+  <div id="materials" class="tab-content">
+    <div class="section">
+      <div class="section-title">🗂️ Danh Mục Mã NVL</div>
+      <div class="alert alert-info">
+        💡 Bảng này là <b>nguồn duy nhất</b> của danh mục mã/tên NVL (thay hẳn file KHSX Master trên Google Sheet).
+        Mọi màn hình khác (in tem, giao dịch, tồn đầu kỳ, cài đặt, kế hoạch) đều lấy mã từ đây.<br>
+        Thêm mã mới xong nhớ vào tab <b>Tồn Đầu Kỳ</b> để khai tồn đầu kỳ, nếu không tồn hiện tại của mã đó sẽ không hiển thị.
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Mã NVL</label><input type="text" id="newMaCode" placeholder="VD: ADC12-DAK"></div>
+        <div class="form-group"><label>Tên NVL</label><input type="text" id="newMaName" placeholder="VD: Nhôm ADC12 Daikin"></div>
+      </div>
+      <div class="btn-group" style="margin-top: 0;"><button class="btn-primary" id="btnUpsertMaterial">💾 Thêm / Cập Nhật</button></div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Mã NVL</th><th>Tên NVL</th><th>Tồn Hiện Tại (kg)</th><th>Hành Động</th></tr></thead>
+          <tbody id="materialsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Lịch Sử -->
+  <div id="history" class="tab-content">
+    <div class="card">
+      <div class="card-title">Lịch Sử Giao Dịch (100 mới nhất)</div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Ngày</th><th>Loại</th><th>Mã NVL</th><th>Khối Lượng (kg)</th><th>Tồn Sau (kg)</th><th>Ghi Chú</th></tr></thead>
+          <tbody id="transactionHistoryTable"><tr><td colspan="6" style="text-align: center; color: var(--gray);">Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Print Area (con trực tiếp của body để CSS print hoạt động đúng) -->
+<div id="printArea"></div>
+
+<!-- Fullscreen QR Scanner Overlay -->
+<div class="fs-scanner" id="fsScanner">
+  <div class="fs-scanner-header">
+    <button class="btn-close" id="btnCloseScanner">✕ Đóng</button>
+    <div class="title"><span>📷 Quét QR</span><span id="fsTypeBadge" class="type-badge out">XUẤT KHO</span></div>
+    <div style="display: flex; gap: 0.4rem;"><button id="btnFlipCamera" title="Đảo camera">🔄 Đảo</button></div>
+  </div>
+  <div class="fs-video-container" id="fsVideoContainer">
+    <video id="fsVideo" autoplay playsinline muted></video>
+    <div class="fs-qr-frame"><div class="fs-scan-line"></div></div>
+    <div class="fs-hint">Đưa QR gần camera 10-20cm • Chạm màn hình để lấy nét</div>
+  </div>
+  <div class="fs-scanner-footer">
+    <div class="fs-last-scan" id="fsLastScan" style="display: none;">
+      <div class="fs-last-scan-tag" id="fsLastScanTag"></div>
+      <div class="fs-last-scan-info" id="fsLastScanInfo"></div>
+    </div>
+    <div class="fs-cart-summary">
+      <div>Giỏ pallet: <span class="count" id="fsCartCount">0</span></div>
+      <button id="btnFsFinish" disabled>✓ Xong &amp; Ghi Nhận</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+/* ==========================================================================
+ * DỮ LIỆU CHUNG — mọi số đều là KG (xem chú thích đầu file).
+ * ========================================================================== */
+const TX_FETCH_LIMIT = 5000;   // số giao dịch mới nhất tải về (đủ cho biểu đồ 30 ngày)
+const TEM_LIST_LIMIT = 100;    // giống bản cũ: 100 tem mới nhất
+
+// Logo TOYOTAKI nhúng sẵn (SVG base64) — bỏ link Google Drive của bản cũ.
+const LOGO_URI = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPHBhdGggZD0iTTgyIDc2LjY4MDRINzkuODAzNFY2NC4zNTk3SDgyVjc2LjY4MDRaTTcyLjA2MDUgNzEuMzYyM0w3MC42MjE4IDcyLjg0NDdWNzYuNjg2MUg2OC40MTc1VjY0LjM1OTdINzAuNjIxOFY3MC4xMzlMNzEuODQyNiA2OC42NzM3TDc1LjU1NjkgNjQuMzU5N0g3OC4yMjIxTDczLjUwODggNjkuODE2OUw3OC40OTQgNzYuNjc2Nkg3NS44NzdMNzIuMDYwNSA3MS4zNjIzWk01OS4zMzI0IDcyLjA5NEg2My4wMUw2MS4xNzk5IDY2Ljk3OTdMNTkuMzMyNCA3Mi4wOTRaTTYzLjY0MDYgNzMuODIwM0g1OC43MjFMNTcuNjkxMiA3Ni42Nzg1SDU1LjQwMDFMNjAuMTk0NCA2NC4zNTc4SDYyLjE3M0w2Ni45NzY5IDc2LjY3ODVINjQuNjc2Mkw2My42NDA2IDczLjgyMDNaTTU1LjkyNjYgNjYuMDkxOEg1MS45NTU4Vjc2LjY4MDRINDkuNzY3VjY2LjA5MThINDUuODQ0NFY2NC4zNTk3SDU1LjkxNTFMNTUuOTI2NiA2Ni4wOTE4Wk00MS45OTMyIDcwLjE5OTlDNDEuOTkzMiA2OC44MzQ0IDQxLjcyNzcgNjcuNzg4OSA0MS4xOTY3IDY3LjA2MzZDNDAuNjY2NCA2Ni4zMzU3IDM5LjkxMDQgNjUuOTcxNyAzOC45MzQ2IDY1Ljk3MTdDMzguNTAwMSA2NS45NTQ1IDM4LjA2ODIgNjYuMDQ0NiAzNy42Nzc5IDY2LjIzMzlDMzcuMjg3NiA2Ni40MjMyIDM2Ljk1MTMgNjYuNzA1OCAzNi42OTk0IDY3LjA1NTlDMzYuMTYwNyA2Ny43ODI2IDM1Ljg4NjIgNjguODA3MSAzNS44NzYgNzAuMTI5NFY3MC44NDAyQzM1Ljg3NiA3Mi4xOTU2IDM2LjE0NzkgNzMuMjQxIDM2LjY5MTcgNzMuOTc2NUMzNi45NDQ3IDc0LjMzNDIgMzcuMjg0NiA3NC42MjMyIDM3LjY4MDMgNzQuODE3QzM4LjA3NTkgNzUuMDEwOCAzOC41MTQ1IDc1LjEwMzEgMzguOTU1OCA3NS4wODU1QzM5LjkzMzUgNzUuMDg1NSA0MC42OTE0IDc0LjcyNTQgNDEuMjEwMiA3NC4wMDMyQzQxLjcyOSA3My4yODEgNDEuOTk3IDcyLjIyNzMgNDEuOTk3IDcwLjg0MDJMNDEuOTkzMiA3MC4xOTk5Wk00NC4yMDEzIDcwLjg0MDJDNDQuMjI2MSA3MS45MzcyIDQ0LjAwNjIgNzMuMDI2MiA0My41NTcyIDc0LjAyOTlDNDMuMTY2NCA3NC44OTQyIDQyLjUyMzkgNzUuNjIzOSA0MS43MTE2IDc2LjEyNTlDNDAuODc1MyA3Ni42MDYzIDM5LjkyNTEgNzYuODU5NCAzOC45NTc3IDc2Ljg1OTRDMzcuOTkwMyA3Ni44NTk0IDM3LjA0MDEgNzYuNjA2MyAzNi4yMDM4IDc2LjEyNTlDMzUuMzg1OCA3NS42MjQ1IDM0LjczNjMgNzQuODk1MyAzNC4zMzcgNzQuMDI5OUMzMy44ODEgNzMuMDUwNiAzMy42NTMgNzEuOTgyOCAzMy42Njk4IDcwLjkwNVY3MC4yMTlDMzMuNjQ3IDY5LjEyMzIgMzMuODcxNiA2OC4wMzYxIDM0LjMyNzQgNjcuMDM2OUMzNC43MjA0IDY2LjE2NjUgMzUuMzY3IDY1LjQzMTUgMzYuMTg0NSA2NC45MjU2QzM3LjAxOTYgNjQuNDQ2NyAzNy45Njc3IDY0LjE5MzYgMzguOTMzMyA2NC4xOTE5QzM5Ljg5ODkgNjQuMTkwMyA0MC44NDc4IDY0LjQ0IDQxLjY4NDYgNjQuOTE2MUM0Mi40OTc4IDY1LjQxMzQgNDMuMTQyOSA2Ni4xMzgzIDQzLjUzNzkgNjYuOTk4OEM0My45OTI3IDY3Ljk5MTggNDQuMjE5MyA2OS4wNzIgNDQuMjAxMyA3MC4xNjE4VjcwLjg0MDJaTTI3LjU4NzMgNzAuMTk5OUwzMC41MDg5IDY0LjM1OTdIMzIuOTUwNEwyOC42OTQyIDcyLjE0NTRWNzYuNjgwNEgyNi40ODAzVjcyLjE0NTRMMjIuMjE4MyA2NC4zNTk3SDI0LjY2NzVMMjcuNTg3MyA3MC4xOTk5Wk0xOS40MTIzIDcwLjE5OTlDMTkuNDEyMyA2OC44MzQ0IDE5LjE0NjIgNjcuNzg4OSAxOC42MTM5IDY3LjA2MzZDMTguMDg1NSA2Ni4zMzU3IDE3LjMyOTUgNjUuOTcxNyAxNi4zNTM3IDY1Ljk3MTdDMTUuOTE5MiA2NS45NTQzIDE1LjQ4NzMgNjYuMDQ0MyAxNS4wOTY5IDY2LjIzMzdDMTQuNzA2NiA2Ni40MjMgMTQuMzcwMyA2Ni43MDU2IDE0LjExODYgNjcuMDU1OUMxMy41Nzg2IDY3Ljc4MjYgMTMuMzAzNSA2OC44MDcxIDEzLjI5MzIgNzAuMTI5NFY3MC44NDAyQzEzLjI5MzIgNzIuMTk1NiAxMy41NjUxIDczLjI0MSAxNC4xMDg5IDczLjk3NjVDMTQuMzYyMSA3NC4zMzM1IDE0LjcwMTggNzQuNjIyMSAxNS4wOTcgNzQuODE1OEMxNS40OTIyIDc1LjAwOTYgMTUuOTMwMiA3NS4xMDIzIDE2LjM3MTEgNzUuMDg1NUMxNy4zNDY5IDc1LjA4NTUgMTguMDk3NyA3NC43MjQ3IDE4LjYyMzYgNzQuMDAzMkMxOS4xNDk0IDczLjI4MTcgMTkuNDEyMyA3Mi4yMjczIDE5LjQxMjMgNzAuODQwMlY3MC4xOTk5Wk0yMS42MjA1IDcwLjg0MDJDMjEuNjQ0NiA3MS45Mzc0IDIxLjQyNDEgNzMuMDI2NCAyMC45NzQ0IDc0LjAyOTlDMjAuNTgzNyA3NC44OTQyIDE5Ljk0MTEgNzUuNjIzOSAxOS4xMjg4IDc2LjEyNTlDMTguMjk4NCA3Ni42MjM1IDE3LjM0MjEgNzYuODc3OSAxNi4zNzExIDc2Ljg1OTVDMTUuNDAyOCA3Ni44NzUzIDE0LjQ0OTYgNzYuNjIxMSAxMy42MjEgNzYuMTI1OUMxMi44MDcxIDc1LjYyMjYgMTIuMTYxMiA3NC44OTM2IDExLjc2MzkgNzQuMDI5OUMxMS4zMDg2IDczLjA1MDUgMTEuMDgxMiA3MS45ODI2IDExLjA5ODUgNzAuOTA1VjcwLjIxOUMxMS4wNzQ4IDY5LjEyMzEgMTEuMjk5NSA2OC4wMzU5IDExLjc1NjIgNjcuMDM2OUMxMi4xNDkyIDY2LjE2NjUgMTIuNzk1OCA2NS40MzE1IDEzLjYxMzMgNjQuOTI1NkMxNC40NDEyIDY0LjQyODggMTUuMzk0OSA2NC4xNzQ0IDE2LjM2MzQgNjQuMTkyQzE3LjMzMDYgNjQuMTc0MyAxOC4yODM0IDY0LjQyNTEgMTkuMTEzNCA2NC45MTYxQzE5LjkyNjUgNjUuNDEzNCAyMC41NzE2IDY2LjEzODMgMjAuOTY2NyA2Ni45OTg4QzIxLjQyMDYgNjcuOTkyMSAyMS42NDcxIDY5LjA3MjEgMjEuNjMwMSA3MC4xNjE4TDIxLjYyMDUgNzAuODQwMlpNMTAuMDcwNiA2Ni4wOTE4SDYuMTEzMzZWNzYuNjgwNEgzLjkyMjU4VjY2LjA5MThIMFY2NC4zNTk3SDEwLjA3MDZWNjYuMDkxOFoiIGZpbGw9IiNGREI4MTMiLz4KPC9zdmc+Cg==";
+document.getElementById('hdrLogo').src = LOGO_URI;
+
+let DB = {
+  materials: [],      // [{ma_nvl, ten_nvl}]
+  opening: {},        // { ma: {ngay_dau_ky, ton_dau_ky_kg} }
+  planDates: [],      // ['2026-08-01', ...] (union các ngày trong nvl_ke_hoach_ngay)
+  plan: {},           // { ma: {nhap:[], tieuHao:[], tonDuKien:[]} } — index khớp planDates
+  transactions: [],   // [{ngay, loai, ma_nvl, so_luong_kg, ghi_chu, ton_sau_kg}]
+  settings: {},       // { ma: be_rong_kg }
+  currentStock: {},   // { ma: ton_hien_tai_kg }  ← từ VIEW nvl_v_ton_hien_tai
+};
+let currentMaterial = null;
+let planChart = null;
+let planNhapChanges = {};   // { ma: { dayIndex: kg } }
+
+/* ---------- Tiện ích ---------- */
+const $ = (id) => document.getElementById(id);
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function fmtKg(v, digits) { return num(v).toLocaleString('vi-VN', { maximumFractionDigits: (digits === undefined ? 1 : digits) }); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function setSyncStatus(status, message) { const el = $('syncStatus'); el.className = 'sync-status ' + status; el.textContent = message; }
+function showLoading(show) { $('loadingOverlay').classList.toggle('show', show); }
+
+/** Chuẩn hoá kết quả RPC: trả về chuỗi lỗi, hoặc null nếu OK. */
+function rpcError(res) {
+  if (res.error) return res.error.message;
+  const d = res.data;
+  if (d && typeof d === 'object' && d.ok === false) return d.error || 'Lỗi không xác định';
+  return null;
+}
+
+/** Gate ghi dữ liệu: chưa đăng nhập → chuyển sang trang login (giống các trang MES khác). */
+async function requireLoginOrRedirect() {
+  const session = await MesAuth.getSession();
+  if (!session) {
+    alert('Cần đăng nhập trước khi ghi dữ liệu. Đang chuyển sang trang đăng nhập…');
+    window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
+    return null;
+  }
+  return session.user.email || '';
+}
+
+async function initAuthStatus() {
+  const bar = $('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email) {
+    bar.innerHTML = '👤 ' + esc(email) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    $('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(window.location.href) + '">Đăng nhập để ghi dữ liệu</a>';
+  }
+}
+
+/* ==========================================================================
+ * TẢI DỮ LIỆU (đọc công khai — không cần đăng nhập)
+ * ========================================================================== */
+async function loadAllData() {
+  showLoading(true);
+  setSyncStatus('loading', '⏳ Đang đồng bộ...');
+  try {
+    const [mat, op, plan, tx, st, cur] = await Promise.all([
+      sb.from('nvl_materials').select('ma_nvl,ten_nvl').order('ma_nvl'),
+      sb.from('nvl_ton_dau_ky').select('*'),
+      sb.from('nvl_ke_hoach_ngay').select('*').order('ngay'),
+      sb.from('nvl_giao_dich').select('*').order('ngay', { ascending: false }).order('sheet_row', { ascending: false }).limit(TX_FETCH_LIMIT),
+      sb.from('nvl_cai_dat').select('*'),
+      sb.from('nvl_v_ton_hien_tai').select('*'),
+    ]);
+    [mat, op, plan, tx, st, cur].forEach(r => { if (r.error) throw new Error(r.error.message); });
+
+    DB.materials = mat.data || [];
+
+    DB.opening = {};
+    (op.data || []).forEach(r => { DB.opening[r.ma_nvl] = { ngay_dau_ky: r.ngay_dau_ky, ton_dau_ky_kg: num(r.ton_dau_ky_kg) }; });
+
+    // Kế hoạch: bảng dạng "dài" → gom về mảng theo ngày cho từng mã
+    const dateSet = new Set();
+    (plan.data || []).forEach(r => dateSet.add(r.ngay));
+    DB.planDates = Array.from(dateSet).sort();
+    const dateIdx = {};
+    DB.planDates.forEach((d, i) => { dateIdx[d] = i; });
+    DB.plan = {};
+    (plan.data || []).forEach(r => {
+      if (!DB.plan[r.ma_nvl]) {
+        DB.plan[r.ma_nvl] = {
+          nhap: new Array(DB.planDates.length).fill(0),
+          tieuHao: new Array(DB.planDates.length).fill(0),
+          tonDuKien: new Array(DB.planDates.length).fill(0),
+        };
+      }
+      const i = dateIdx[r.ngay];
+      DB.plan[r.ma_nvl].nhap[i] = num(r.nhap_kg);
+      DB.plan[r.ma_nvl].tieuHao[i] = num(r.tieu_hao_kg);
+      DB.plan[r.ma_nvl].tonDuKien[i] = num(r.ton_du_kien_kg);
+    });
+
+    // Giao dịch: fetch mới nhất trước rồi đảo lại thành thứ tự tăng dần theo ngày
+    DB.transactions = (tx.data || []).slice().reverse();
+
+    DB.settings = {};
+    (st.data || []).forEach(r => { DB.settings[r.ma_nvl] = num(r.be_rong_kg); });
+
+    DB.currentStock = {};
+    (cur.data || []).forEach(r => { DB.currentStock[r.ma_nvl] = num(r.ton_hien_tai_kg); });
+
+    if (!currentMaterial || !DB.materials.find(m => m.ma_nvl === currentMaterial)) {
+      currentMaterial = DB.materials.length ? DB.materials[0].ma_nvl : null;
+    }
+
+    renderOverview();
+    renderMaterialButtons();
+    renderOpeningTable();
+    renderSettingsTable();
+    renderMaterialsTable();
+    renderPlanNhapTable();
+    renderTransactionHistory();
+    populateMaterialSelects();
+    renderCart();
+    if (planChart) updatePlanChart();
+
+    setSyncStatus('ok', '✓ ' + new Date().toLocaleTimeString('vi-VN'));
+  } catch (e) {
+    console.error(e);
+    setSyncStatus('error', '❌ Lỗi kết nối');
+    alert('Không thể tải dữ liệu: ' + e.message);
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ==========================================================================
+ * TÍNH TOÁN TỒN (kg)
+ * ========================================================================== */
+// Tồn thực tế theo từng ngày trong dải kế hoạch:
+//   D < ngày đầu kỳ → null; D > hôm nay → null;
+//   ngược lại: tồn đầu kỳ + Σ(nhập - xuất) của mọi giao dịch từ đầu kỳ đến D.
+function calculateActualStockByDate(code, dates) {
+  const op = DB.opening[code];
+  if (!op || !op.ngay_dau_ky) return dates.map(() => null);
+  const openingDate = op.ngay_dau_ky;
+  const openingStock = num(op.ton_dau_ky_kg);
+  const today = todayISO();
+  const txs = DB.transactions.filter(t => t.ma_nvl === code && t.ngay >= openingDate)
+                             .sort((a, b) => String(a.ngay).localeCompare(String(b.ngay)));
+  return dates.map(d => {
+    if (d < openingDate) return null;
+    if (d > today) return null;
+    let stock = openingStock;
+    for (const t of txs) {
+      if (t.ngay <= d) stock += (t.loai === 'IN' ? num(t.so_luong_kg) : -num(t.so_luong_kg));
+      else break;
+    }
+    return stock;
+  });
+}
+
+// Tồn hiện tại: lấy thẳng VIEW nvl_v_ton_hien_tai (không tự tính lại ở client).
+function getCurrentStock(code) { return num(DB.currentStock[code]); }
+
+// Tồn kế hoạch của hôm nay (hoặc ngày kế hoạch gần nhất kể từ hôm nay)
+function getPlanTodayForMaterial(code) {
+  const plan = DB.plan[code];
+  if (!plan || !DB.planDates.length) return 0;
+  const today = todayISO();
+  let idx = DB.planDates.indexOf(today);
+  if (idx === -1) {
+    for (let i = 0; i < DB.planDates.length; i++) { if (DB.planDates[i] >= today) { idx = i; break; } }
+    if (idx === -1) idx = DB.planDates.length - 1;
+  }
+  return num(plan.tonDuKien[idx]);
+}
+function getBeRong(code) { const v = DB.settings[code]; return (v === undefined || v === null) ? 5 : num(v); }
+
+/* ==========================================================================
+ * TAB TỔNG QUAN
+ * ========================================================================== */
+function renderOverview() {
+  const container = $('overview-grid');
+  container.innerHTML = '';
+  if (!DB.materials.length) {
+    container.innerHTML = '<div class="alert alert-warn">Chưa có mã NVL nào trong danh mục. Vào tab "🗂️ Danh Mục NVL" để thêm.</div>';
+    return;
+  }
+  DB.materials.forEach(m => {
+    const code = m.ma_nvl;
+    const stock = getCurrentStock(code);
+    const planToday = getPlanTodayForMaterial(code);
+    const bw = getBeRong(code);
+    const lsl = Math.max(0, planToday - bw);
+    const usl = planToday + bw;
+
+    let status, statusText;
+    if (stock < lsl) { status = 'danger'; statusText = '⚠ Tồn kho thấp'; }
+    else if (stock > usl) { status = 'warning'; statusText = '⚠ Tồn kho cao'; }
+    else { status = 'ok'; statusText = '✓ Bình Thường'; }
+
+    const card = document.createElement('div');
+    card.className = 'overview-card';
+    card.onclick = () => { currentMaterial = code; switchTab('charts'); };
+    card.innerHTML =
+      '<div class="overview-card-header">' +
+        '<div><div class="overview-card-code">' + esc(code) + '</div>' +
+        '<div style="font-size:.75rem;color:var(--gray);margin-top:2px;">' + esc(m.ten_nvl || '') + '</div></div>' +
+        '<span class="badge badge-' + status + '">' + statusText + '</span>' +
+      '</div>' +
+      '<div class="overview-card-stats">' +
+        '<div class="stat-small"><div class="stat-label">Tồn Thực Tế (kg)</div><div class="stat-value" style="color: var(--primary);">' + fmtKg(stock) + '</div></div>' +
+        '<div class="stat-small"><div class="stat-label">KH Hôm Nay (kg)</div><div class="stat-value">' + fmtKg(planToday) + '</div></div>' +
+        '<div class="stat-small"><div class="stat-label">Min (kg)</div><div class="stat-value" style="font-size:.95rem;color:#8d6e00;">' + fmtKg(lsl) + '</div></div>' +
+        '<div class="stat-small"><div class="stat-label">Max (kg)</div><div class="stat-value" style="font-size:.95rem;color:#8d6e00;">' + fmtKg(usl) + '</div></div>' +
+      '</div>';
+    container.appendChild(card);
+  });
+}
+
+/* ==========================================================================
+ * TAB BIỂU ĐỒ 30 NGÀY (Chart.js — giữ nguyên cách vẽ của bản cũ, đổi nguồn
+ * dữ liệu sang Supabase và đổi đơn vị hiển thị từ tấn sang kg)
+ * ========================================================================== */
+function renderMaterialButtons() {
+  const container = $('materialButtonsContainer');
+  container.innerHTML = '';
+  DB.materials.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'material-btn' + (currentMaterial === m.ma_nvl ? ' active' : '');
+    btn.textContent = m.ma_nvl;
+    btn.onclick = () => { currentMaterial = m.ma_nvl; renderMaterialButtons(); updatePlanChart(); };
+    container.appendChild(btn);
+  });
+}
+
+function updatePlanChart() {
+  if (!currentMaterial) return;
+  const plan = DB.plan[currentMaterial];
+  $('chartMaterialLabel').textContent = currentMaterial;
+  const infoBox = $('chartInfo');
+
+  if (!plan || !DB.planDates.length) {
+    infoBox.innerHTML = '⚠️ Chưa có dữ liệu kế hoạch cho ' + esc(currentMaterial) + '.';
+    if (planChart) { planChart.destroy(); planChart = null; }
+    return;
+  }
+
+  const planStock = plan.tonDuKien.slice();
+  const bw = getBeRong(currentMaterial);
+  const lslData = planStock.map(v => Math.max(0, v - bw));
+  const uslData = planStock.map(v => v + bw);
+  const actualStock = calculateActualStockByDate(currentMaterial, DB.planDates);
+
+  const op = DB.opening[currentMaterial];
+  if (op && op.ngay_dau_ky) {
+    const txCount = DB.transactions.filter(t => t.ma_nvl === currentMaterial && t.ngay >= op.ngay_dau_ky).length;
+    infoBox.innerHTML = '📌 Tồn đầu kỳ: <b>' + fmtKg(op.ton_dau_ky_kg) + ' kg</b> vào ngày <b>' + esc(op.ngay_dau_ky) + '</b> | ' + txCount + ' giao dịch từ đầu kỳ';
+  } else {
+    infoBox.innerHTML = '⚠️ Chưa có tồn đầu kỳ cho ' + esc(currentMaterial) + '. Vào tab "Tồn Đầu Kỳ" để nhập.';
+  }
+
+  const labels = DB.planDates.map(d => { const dt = new Date(d); return (dt.getMonth() + 1) + '/' + dt.getDate(); });
+  if (planChart) planChart.destroy();
+  planChart = new Chart($('planChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Tồn Kế Hoạch', data: planStock, borderColor: '#999999', borderWidth: 1.5, borderDash: [3,3], tension: 0, pointRadius: 0 },
+        { label: 'Min', data: lslData, borderColor: '#E07B39', borderWidth: 1.5, borderDash: [5,5], tension: 0, pointRadius: 0 },
+        { label: 'Max', data: uslData, borderColor: '#E07B39', borderWidth: 1.5, borderDash: [5,5], tension: 0, pointRadius: 0 },
+        { label: 'Tồn Thực Tế', data: actualStock, borderColor: '#1F4E78', backgroundColor: 'rgba(31,78,120,0.1)',
+          borderWidth: 2.5, tension: 0.2, pointRadius: 4, pointBackgroundColor: '#1F4E78', pointBorderColor: 'white', pointBorderWidth: 2, spanGaps: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'bottom' },
+        tooltip: { callbacks: { label: (c) => (c.raw === null ? null : c.dataset.label + ': ' + fmtKg(c.raw) + ' kg') } }
+      },
+      scales: {
+        y: { beginAtZero: false, title: { display: true, text: 'Tồn Kho (kg)' } },
+        x: { title: { display: true, text: 'Ngày' } }
+      }
+    }
+  });
+}
+
+/* ==========================================================================
+ * TAB QUÉT QR — GIỎ NHIỀU PALLET
+ * ========================================================================== */
+// Mỗi item: { tagNo, material, tenNVL, ngayNhap, soLuong, donVi,
+//             validationStatus: 'pending'|'ok'|'error'|'fifo-warn', errorMsg?, fifoWarnings?, fifoCount? }
+let scanCart = [];
+let pendingValidations = 0;
+let currentPlanWarnings = [];
+
+function focusQRInput() { $('qrScanInput').focus(); }
+
+function parseQRContent(rawText) {
+  const parts = String(rawText).split('>').map(p => p.trim());
+  if (parts.length >= 6) {
+    return { tagNo: parts[0], material: parts[1], tenNVL: parts[2], ngayNhap: parts[3], soLuong: num(parts[4]), donVi: parts[5], fromQR: true };
+  }
+  return { tagNo: parts[0], fromQR: false };
+}
+
+function addPalletToCart(rawText, fromCamera) {
+  const parsed = parseQRContent(rawText);
+  if (!parsed.tagNo) return;
+  if (scanCart.find(x => x.tagNo === parsed.tagNo)) {
+    playBeep(400, 200);
+    if (fromCamera) showFsLastScan('⚠ Đã có trong giỏ', parsed.tagNo, 'duplicate');
+    else { showToast('⚠️ ' + parsed.tagNo + ' đã có trong giỏ'); focusQRInput(); }
+    return;
+  }
+  playBeep(1000, 80);
+  scanCart.push(parsed.fromQR
+    ? { tagNo: parsed.tagNo, material: parsed.material, tenNVL: parsed.tenNVL, ngayNhap: parsed.ngayNhap,
+        soLuong: parsed.soLuong, donVi: parsed.donVi, validationStatus: 'pending' }
+    : { tagNo: parsed.tagNo, material: '?', tenNVL: '(đang tải...)', ngayNhap: '?',
+        soLuong: 0, donVi: '?', validationStatus: 'pending' });
+  renderCart();
+  const idx = scanCart.length - 1;
+  if (fromCamera) {
+    showFsLastScan('⏳ ' + parsed.tagNo, parsed.fromQR ? (parsed.material + ' · ' + parsed.soLuong + ' ' + parsed.donVi + ' · ' + parsed.ngayNhap) : 'Đang tải thông tin...', 'pending');
+    validatePalletAsync(idx).then(() => {
+      const item = scanCart[idx];
+      if (!item || item.tagNo !== parsed.tagNo) return;
+      if (item.validationStatus === 'ok') showFsLastScan('✅ ' + item.tagNo, item.material + ' · ' + item.soLuong + ' ' + item.donVi + ' · Sẵn sàng', '');
+      else if (item.validationStatus === 'fifo-warn') showFsLastScan('⚠️ FIFO: ' + item.tagNo, item.material + ' · Có ' + item.fifoCount + ' pallet cũ hơn chưa xuất', 'pending');
+      else if (item.validationStatus === 'error') showFsLastScan('❌ ' + item.tagNo, item.errorMsg || 'Lỗi kiểm tra', 'error');
+    });
+  } else {
+    focusQRInput();
+    validatePalletAsync(idx);
+  }
+}
+
+// Kiểm tra 1 pallet ở nền: đọc tem từ nvl_tem + gọi RPC nvl_check_fifo (nếu XUẤT)
+async function validatePalletAsync(cartIdx) {
+  const item = scanCart[cartIdx];
+  if (!item) return;
+  const txType = $('cartTxType').value;
+  pendingValidations++;
+  updateSubmitButtonState();
+  try {
+    const jobs = [sb.from('nvl_tem').select('*').eq('tag_no', item.tagNo).maybeSingle()];
+    if (txType === 'OUT') jobs.push(sb.rpc('nvl_check_fifo', { p_tag_no: item.tagNo }));
+    const [temRes, fifoRes] = await Promise.all(jobs);
+
+    if (!scanCart[cartIdx] || scanCart[cartIdx].tagNo !== item.tagNo) return; // đã bị xoá khỏi giỏ
+
+    if (temRes.error || !temRes.data) {
+      scanCart[cartIdx].validationStatus = 'error';
+      scanCart[cartIdx].errorMsg = temRes.error ? temRes.error.message : ('Không tìm thấy tem: ' + item.tagNo);
+      renderCart(); return;
+    }
+    const t = temRes.data;
+    scanCart[cartIdx].material = t.ma_nvl;
+    scanCart[cartIdx].tenNVL = t.ten_nvl || t.ma_nvl;
+    scanCart[cartIdx].ngayNhap = t.ngay_nhap;
+    scanCart[cartIdx].soLuong = num(t.so_luong);
+    scanCart[cartIdx].donVi = t.don_vi;
+
+    if (txType === 'OUT' && t.trang_thai !== 'Đã nhập kho') {
+      scanCart[cartIdx].validationStatus = 'error';
+      scanCart[cartIdx].errorMsg = 'Trạng thái: ' + (t.trang_thai || '(chưa nhập)') + '. Chỉ pallet "Đã nhập kho" mới xuất được.';
+      renderCart(); return;
+    }
+    if (txType === 'IN' && t.trang_thai === 'Đã nhập kho') {
+      scanCart[cartIdx].validationStatus = 'error';
+      scanCart[cartIdx].errorMsg = 'Pallet đã ở trạng thái "Đã nhập kho" rồi';
+      renderCart(); return;
+    }
+
+    if (txType === 'OUT' && fifoRes && !fifoRes.error && fifoRes.data && fifoRes.data.ok && fifoRes.data.olderCount > 0) {
+      scanCart[cartIdx].validationStatus = 'fifo-warn';
+      scanCart[cartIdx].fifoWarnings = fifoRes.data.olderPallets || [];
+      scanCart[cartIdx].fifoCount = fifoRes.data.olderCount;
+      renderCart(); return;
+    }
+
+    scanCart[cartIdx].validationStatus = 'ok';
+    renderCart();
+  } catch (e) {
+    if (scanCart[cartIdx] && scanCart[cartIdx].tagNo === item.tagNo) {
+      scanCart[cartIdx].validationStatus = 'error';
+      scanCart[cartIdx].errorMsg = 'Lỗi kết nối: ' + e.message;
+      renderCart();
+    }
+  } finally {
+    pendingValidations--;
+    updateSubmitButtonState();
+  }
+}
+
+function removeFromCart(idx) { scanCart.splice(idx, 1); renderCart(); }
+function clearCart() {
+  if (!scanCart.length) return;
+  if (confirm('Xóa toàn bộ ' + scanCart.length + ' pallet khỏi giỏ?')) { scanCart = []; renderCart(); }
+}
+function showFifoWarnings(idx) {
+  const item = scanCart[idx];
+  if (!item || !item.fifoWarnings) return;
+  const list = item.fifoWarnings.slice(0, 10).map(p => '  • ' + p.tagNo + ' (nhập ' + p.ngayNhap + ', SL ' + p.soLuong + ' ' + p.donVi + ')').join('\n');
+  const more = item.fifoCount > 10 ? ('\n  ...và ' + (item.fifoCount - 10) + ' pallet khác') : '';
+  alert('⚠️ FIFO: Mã ' + item.material + ' có ' + item.fifoCount + ' pallet CŨ HƠN đang trong kho:\n\n' + list + more +
+        '\n\nNgày nhập của pallet ' + item.tagNo + ' là ' + item.ngayNhap + '.\nBạn nên dùng pallet cũ hơn trước.');
+}
+
+function updateSubmitButtonState() {
+  const btn = $('btnSubmitCart');
+  const hasError = scanCart.some(x => x.validationStatus === 'error');
+  const hasPending = pendingValidations > 0 || scanCart.some(x => x.validationStatus === 'pending');
+  if (!scanCart.length) { btn.disabled = true; btn.textContent = '✓ Ghi Nhận Tất Cả'; }
+  else if (hasPending) { btn.disabled = true; btn.textContent = '⏳ Đang kiểm tra (' + pendingValidations + '/' + scanCart.length + ')...'; }
+  else if (hasError) { btn.disabled = true; btn.textContent = '❌ Có pallet lỗi - xóa để tiếp tục'; }
+  else {
+    btn.disabled = false;
+    const fifoWarns = scanCart.filter(x => x.validationStatus === 'fifo-warn').length;
+    const planWarns = currentPlanWarnings.length;
+    const parts = [];
+    if (fifoWarns) parts.push(fifoWarns + ' FIFO');
+    if (planWarns) parts.push(planWarns + ' lệch KH');
+    btn.textContent = parts.length ? ('⚠️ Ghi Nhận (' + parts.join(', ') + ')') : '✓ Ghi Nhận Tất Cả';
+  }
+  updateFsCartCount();
+}
+
+function renderCart() {
+  const tbody = $('cartTableBody');
+  $('cartCount').textContent = scanCart.length;
+
+  if (!scanCart.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:1.5rem;">Chưa có pallet nào trong giỏ. Hãy quét QR.</td></tr>';
+    $('cartTotalKg').textContent = '0';
+    $('cartTotalPcs').textContent = '0';
+    updateCartPreviewTable();
+    updateSubmitButtonState();
+    return;
+  }
+
+  let html = '', totalKg = 0, totalPcs = 0;
+  scanCart.forEach((item, idx) => {
+    let icon, color, rowStyle;
+    switch (item.validationStatus) {
+      case 'ok': icon = '✅'; color = 'var(--success)'; rowStyle = ''; break;
+      case 'error': icon = '❌'; color = 'var(--danger)'; rowStyle = 'background:#ffebee;'; break;
+      case 'fifo-warn': icon = '⚠️'; color = '#F57F17'; rowStyle = 'background:#fff8e1;'; break;
+      default: icon = '⏳'; color = 'var(--gray)'; rowStyle = 'background:#f5f5f5;opacity:.85;';
+    }
+    const statusCell = item.validationStatus === 'fifo-warn'
+      ? '<span style="cursor:pointer;color:' + color + ';font-weight:700;" title="Nhấn xem chi tiết" onclick="showFifoWarnings(' + idx + ')">' + icon + ' FIFO (' + item.fifoCount + ')</span>'
+      : item.validationStatus === 'error'
+      ? '<span style="color:' + color + ';font-weight:700;" title="' + esc(item.errorMsg || '') + '">' + icon + ' Lỗi</span>'
+      : '<span style="color:' + color + ';">' + icon + '</span>';
+
+    html += '<tr style="' + rowStyle + '">' +
+      '<td>' + (idx + 1) + '</td>' +
+      '<td style="font-family:monospace;font-weight:700;">' + esc(item.tagNo) + '</td>' +
+      '<td><strong>' + esc(item.material) + '</strong></td>' +
+      '<td>' + esc(item.ngayNhap) + '</td>' +
+      '<td>' + (item.soLuong ? fmtKg(item.soLuong, 3) : '?') + '</td>' +
+      '<td>' + esc(item.donVi) + '</td>' +
+      '<td style="text-align:center;">' + statusCell + '</td>' +
+      '<td><button class="btn-danger" style="padding:.3rem .6rem;font-size:.8rem;" onclick="removeFromCart(' + idx + ')">✕</button></td>' +
+      '</tr>';
+
+    if (item.validationStatus === 'ok' || item.validationStatus === 'fifo-warn') {
+      if (item.donVi === 'kg') totalKg += num(item.soLuong);
+      else if (item.donVi === 'pcs') totalPcs += num(item.soLuong);
+    }
+    if (item.validationStatus === 'error' && item.errorMsg) {
+      html += '<tr style="background:#ffebee;"><td></td><td colspan="7" style="font-size:.8rem;color:var(--danger);padding-left:1rem;">↳ ' + esc(item.errorMsg) + '</td></tr>';
+    }
+  });
+  tbody.innerHTML = html;
+  $('cartTotalKg').textContent = fmtKg(totalKg, 3);
+  $('cartTotalPcs').textContent = fmtKg(totalPcs, 0);
+  updateCartPreviewTable();
+  updateSubmitButtonState();
+}
+
+// Bảng preview tồn dự kiến sau giao dịch. LƯU Ý: tem đơn vị "pcs" KHÔNG cộng
+// vào tồn kg (giữ đúng hành vi bản gốc và các RPC nvl_create_tem /
+// nvl_process_multi_transaction).
+function updateCartPreviewTable() {
+  const tbody = $('cartPreviewTable');
+  const txType = $('cartTxType').value;
+  const byMat = {};
+  scanCart.forEach(item => {
+    if (item.validationStatus !== 'ok' && item.validationStatus !== 'fifo-warn') return;
+    const kg = item.donVi === 'kg' ? num(item.soLuong) : 0;
+    byMat[item.material] = (byMat[item.material] || 0) + kg;
+  });
+  if (!Object.keys(byMat).length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray);">Chưa có pallet nào (hoặc chưa xác thực xong)</td></tr>';
+    currentPlanWarnings = [];
+    return;
+  }
+  const warnings = [];
+  let html = '';
+  Object.keys(byMat).sort().forEach(mat => {
+    const current = getCurrentStock(mat);
+    const delta = txType === 'IN' ? byMat[mat] : -byMat[mat];
+    const after = Math.max(0, current + delta);
+    const planToday = getPlanTodayForMaterial(mat);
+    const bw = getBeRong(mat);
+    const lsl = Math.max(0, planToday - bw);
+    const usl = planToday + bw;
+
+    let rowBg = '', statusLabel = '<span style="color:var(--success);font-weight:700;">✓ Bình thường</span>';
+    if (after > usl) {
+      rowBg = 'background:#fff3e0;';
+      statusLabel = '<span style="color:#E65100;font-weight:700;">⚠ Tồn kho cao</span>';
+      warnings.push({ material: mat, after: after, lsl: lsl, usl: usl, status: 'high', delta: after - usl });
+    } else if (after < lsl) {
+      rowBg = 'background:#ffebee;';
+      statusLabel = '<span style="color:var(--danger);font-weight:700;">⚠ Tồn kho thấp</span>';
+      warnings.push({ material: mat, after: after, lsl: lsl, usl: usl, status: 'low', delta: lsl - after });
+    }
+    const deltaColor = delta > 0 ? 'var(--success)' : 'var(--danger)';
+    html += '<tr style="' + rowBg + '">' +
+      '<td><strong>' + esc(mat) + '</strong></td>' +
+      '<td>' + fmtKg(current) + '</td>' +
+      '<td style="color:' + deltaColor + ';font-weight:700;">' + (delta > 0 ? '+' : '') + fmtKg(delta) + '</td>' +
+      '<td style="color:var(--primary);font-weight:700;">' + fmtKg(after) + '</td>' +
+      '<td style="font-size:.85rem;color:var(--gray);">' + fmtKg(lsl) + '</td>' +
+      '<td style="font-size:.85rem;color:var(--gray);">' + fmtKg(usl) + '</td>' +
+      '<td>' + statusLabel + '</td></tr>';
+  });
+  tbody.innerHTML = html;
+  currentPlanWarnings = warnings;
+}
+
+async function submitCartTransaction() {
+  const validItems = scanCart.filter(x => x.validationStatus === 'ok' || x.validationStatus === 'fifo-warn');
+  const errorItems = scanCart.filter(x => x.validationStatus === 'error');
+  const pendingItems = scanCart.filter(x => x.validationStatus === 'pending');
+
+  if (!validItems.length) { alert('Không có pallet hợp lệ để ghi nhận'); return; }
+  if (pendingItems.length) { alert('Còn ' + pendingItems.length + ' pallet đang kiểm tra, hãy đợi hoặc xóa'); return; }
+
+  const txType = $('cartTxType').value;
+  const typeText = txType === 'IN' ? 'NHẬP' : 'XUẤT';
+  const fifoWarns = validItems.filter(x => x.validationStatus === 'fifo-warn').length;
+
+  let msg = 'Sẽ ' + typeText + ' kho ' + validItems.length + ' pallet.';
+  if (fifoWarns) msg += '\n\n⚠️ FIFO: có ' + fifoWarns + ' pallet còn pallet cũ hơn chưa xuất.';
+  if (currentPlanWarnings.length) {
+    msg += '\n\n⚠️ CẢNH BÁO KẾ HOẠCH: ' + currentPlanWarnings.length + ' mã sẽ VƯỢT NGOÀI kế hoạch sau giao dịch:';
+    currentPlanWarnings.forEach(w => {
+      msg += w.status === 'high'
+        ? ('\n  • ' + w.material + ': Tồn dự kiến ' + fmtKg(w.after) + ' kg > Max ' + fmtKg(w.usl) + ' kg (vượt +' + fmtKg(w.delta) + ')')
+        : ('\n  • ' + w.material + ': Tồn dự kiến ' + fmtKg(w.after) + ' kg < Min ' + fmtKg(w.lsl) + ' kg (thiếu -' + fmtKg(w.delta) + ')');
+    });
+  }
+  if (errorItems.length) msg += '\n\n(' + errorItems.length + ' pallet lỗi sẽ bị bỏ qua)';
+  msg += '\n\nTiếp tục?';
+  if (!confirm(msg)) return;
+
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+
+  showLoading(true);
+  setSyncStatus('loading', '⏳ Đang xử lý...');
+  try {
+    const res = await sb.rpc('nvl_process_multi_transaction', {
+      p_loai: txType,
+      p_items: validItems.map(x => ({ tagNo: x.tagNo, ghiChu: '' })),
+      p_user: user
+    });
+    const errMsg = rpcError(res);
+    if (errMsg) {
+      const detail = (res.data && res.data.errors) ? ('\n\n' + res.data.errors.join('\n')) : '';
+      throw new Error(errMsg + detail);
+    }
+    const result = res.data;
+    setSyncStatus('ok', '✓ Đã ghi ' + result.processedCount + ' giao dịch');
+
+    await loadAllData();
+
+    // Cảnh báo min/max tính lại trên tồn MỚI (sau khi đã ghi thật)
+    const affected = Array.from(new Set(validItems.map(x => x.material)));
+    const post = [];
+    affected.forEach(mat => {
+      const cur = getCurrentStock(mat);
+      const planToday = getPlanTodayForMaterial(mat);
+      const bw = getBeRong(mat);
+      const lsl = Math.max(0, planToday - bw), usl = planToday + bw;
+      if (cur > usl) post.push({ material: mat, current: cur, usl: usl, lsl: lsl, status: 'high', delta: cur - usl });
+      else if (cur < lsl) post.push({ material: mat, current: cur, usl: usl, lsl: lsl, status: 'low', delta: lsl - cur });
+    });
+
+    let done = '✓ Ghi nhận ' + result.processedCount + ' giao dịch ' + typeText + ' thành công!';
+    if (result.errors && result.errors.length) done += '\n\n⚠️ Một số pallet có lỗi:\n' + result.errors.join('\n');
+    if (post.length) {
+      done += '\n\n⚠️ CẢNH BÁO: ' + post.length + ' mã đang lệch kế hoạch:';
+      post.forEach(w => {
+        done += w.status === 'high'
+          ? ('\n  • ' + w.material + ': Tồn ' + fmtKg(w.current) + ' kg > Max ' + fmtKg(w.usl) + ' kg (vượt +' + fmtKg(w.delta) + ')')
+          : ('\n  • ' + w.material + ': Tồn ' + fmtKg(w.current) + ' kg < Min ' + fmtKg(w.lsl) + ' kg (thiếu -' + fmtKg(w.delta) + ')');
+      });
+      done += '\n\nKiểm tra tab "Tổng Quan" để xem chi tiết.';
+    }
+    alert(done);
+
+    scanCart = [];
+    currentPlanWarnings = [];
+    renderCart();
+    focusQRInput();
+  } catch (e) {
+    setSyncStatus('error', '❌ Lỗi');
+    alert('Lỗi: ' + e.message);
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ---------- Ghi nhận thủ công (RPC nvl_add_transaction) ---------- */
+async function submitManualTransaction() {
+  const ngay = $('manNgay').value || todayISO();
+  const loai = $('manLoai').value;
+  const ma = $('manMaNvl').value;
+  const sl = num($('manSoLuong').value);
+  const ghiChu = $('manGhiChu').value.trim();
+  if (!ma) { alert('Chọn mã NVL'); return; }
+  if (sl <= 0) { alert('Khối lượng phải > 0'); return; }
+  if (!confirm('Ghi giao dịch ' + (loai === 'IN' ? 'NHẬP' : 'XUẤT') + ' ' + fmtKg(sl, 3) + ' kg mã ' + ma + ' ngày ' + ngay + '?')) return;
+
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+  showLoading(true);
+  try {
+    const res = await sb.rpc('nvl_add_transaction', {
+      p_ngay: ngay, p_loai: loai, p_ma_nvl: ma, p_so_luong_kg: sl, p_ghi_chu: ghiChu, p_user: user
+    });
+    const err = rpcError(res);
+    if (err) throw new Error(err);
+    $('manSoLuong').value = '';
+    $('manGhiChu').value = '';
+    await loadAllData();
+    alert('✓ Đã ghi giao dịch. Tồn sau: ' + fmtKg(res.data.ton_sau_kg) + ' kg');
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ---------- Toast + beep ---------- */
+function showToast(m) {
+  let toast = $('scanToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'scanToast';
+    toast.style.cssText = 'position:fixed;top:80px;right:20px;background:#333;color:#fff;padding:10px 16px;border-radius:4px;font-size:.85rem;z-index:9998;opacity:0;transition:opacity .2s;max-width:300px;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = m;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+}
+function playBeep(freq, dur) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = freq || 1000; gain.gain.value = 0.1;
+    osc.start();
+    setTimeout(() => { osc.stop(); ctx.close(); }, dur || 100);
+  } catch (e) { /* ignore */ }
+}
+
+/* ==========================================================================
+ * QUÉT QR BẰNG CAMERA — getUserMedia + requestAnimationFrame + jsQR
+ * (đúng pattern đang chạy ổn định ở chuyencongdoan.html; BarcodeDetector chỉ
+ *  là đường nhanh khi trình duyệt có sẵn, jsQR luôn là phương án chạy mọi nơi)
+ * ========================================================================== */
+let fsStream = null, fsScanRunning = false, fsScanBusy = false;
+let fsCanvas = null, fsCanvasCtx = null;
+let fsFacingMode = 'environment';
+let fsLastText = '', fsLastTime = 0;
+const FS_COOLDOWN_MS = 1500;
+let fsBarcodeDetector = null;
+if ('BarcodeDetector' in window) {
+  try { fsBarcodeDetector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { fsBarcodeDetector = null; }
+}
+
+function updateFsTypeBadge() {
+  const badge = $('fsTypeBadge');
+  const type = $('cartTxType').value;
+  badge.textContent = type === 'OUT' ? 'XUẤT KHO' : 'NHẬP KHO';
+  badge.className = 'type-badge ' + (type === 'OUT' ? 'out' : 'in');
+}
+function updateFsCartCount() {
+  const countEl = $('fsCartCount'), btn = $('btnFsFinish');
+  if (!countEl || !btn) return;
+  const validCount = scanCart.filter(x => x.validationStatus === 'ok' || x.validationStatus === 'fifo-warn').length;
+  countEl.textContent = scanCart.length;
+  btn.disabled = validCount === 0;
+  btn.textContent = validCount > 0 ? ('✓ Xong & Ghi Nhận (' + validCount + ')') : '✓ Xong & Ghi Nhận';
+}
+function showFsLastScan(tag, info, type) {
+  const box = $('fsLastScan');
+  box.style.display = 'block';
+  box.className = 'fs-last-scan' + (type ? ' ' + type : '');
+  $('fsLastScanTag').textContent = tag;
+  $('fsLastScanInfo').textContent = info;
+}
+
+async function openFullscreenScanner() {
+  $('fsScanner').classList.add('active');
+  updateFsTypeBadge();
+  updateFsCartCount();
+  document.body.style.overflow = 'hidden';
+  if (!fsBarcodeDetector && typeof jsQR === 'undefined') {
+    showFsLastScan('❌ Lỗi thư viện QR', 'Không load được jsQR từ CDN. Kiểm tra mạng rồi tải lại trang (Ctrl+Shift+R).', 'error');
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showFsLastScan('❌ Trình duyệt không hỗ trợ camera', 'Hãy gõ Tag No bằng tay vào ô quét ở màn hình chính.', 'error');
+    return;
+  }
+  try {
+    await fsStartCamera(fsFacingMode);
+    startFsScanLoop();
+  } catch (e) {
+    console.error(e);
+    showFsLastScan('❌ Không mở được camera', e.message, 'error');
+    if (e.name === 'NotAllowedError' || /permission|denied/i.test(e.message)) {
+      alert('❌ Bạn chưa cho phép truy cập camera.\n\nCách bật:\n' +
+            '• Chrome/Edge: nhấn icon 🔒 ở thanh URL → Site settings → Camera → Allow\n' +
+            '• Safari (iOS): Settings > Safari > Camera > Allow\n• Sau đó reload trang và thử lại');
+    }
+  }
+}
+
+async function fsStartCamera(facingMode) {
+  if (fsStream) { fsStream.getTracks().forEach(t => t.stop()); fsStream = null; }
+  // Yêu cầu HD 1280x720: QR trên tem NVL chỉ 3cm, cần đủ pixel để decode.
+  fsStream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  });
+  const track = fsStream.getVideoTracks()[0];
+  try {
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.focusMode && caps.focusMode.includes('continuous')) {
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    }
+  } catch (e) { /* không critical */ }
+  const video = $('fsVideo');
+  video.srcObject = fsStream;
+  await video.play();
+}
+
+async function fsFlipCamera() {
+  fsFacingMode = (fsFacingMode === 'environment') ? 'user' : 'environment';
+  try { await fsStartCamera(fsFacingMode); }
+  catch (e) {
+    fsFacingMode = (fsFacingMode === 'environment') ? 'user' : 'environment';
+    try { await fsStartCamera(fsFacingMode); }
+    catch (e2) { showFsLastScan('❌ Không đảo được camera', e.message, 'error'); }
+  }
+}
+
+function startFsScanLoop() {
+  if (fsScanRunning) return;
+  fsScanRunning = true;
+  if (!fsCanvas) {
+    fsCanvas = document.createElement('canvas');
+    fsCanvasCtx = fsCanvas.getContext('2d', { willReadFrequently: true });
+  }
+  const video = $('fsVideo');
+  async function scanFrame() {
+    if (!fsScanRunning) return;
+    if (!fsScanBusy && video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+      fsScanBusy = true;
+      try {
+        fsCanvas.width = video.videoWidth;
+        fsCanvas.height = video.videoHeight;
+        fsCanvasCtx.drawImage(video, 0, 0);
+        let decoded = null;
+        if (fsBarcodeDetector) {
+          try {
+            const results = await fsBarcodeDetector.detect(fsCanvas);
+            if (results.length) decoded = results[0].rawValue;
+          } catch (e) { /* rơi xuống jsQR */ }
+        }
+        if (!decoded && typeof jsQR !== 'undefined') {
+          const img = fsCanvasCtx.getImageData(0, 0, fsCanvas.width, fsCanvas.height);
+          const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+          if (code && code.data) decoded = code.data;
+        }
+        if (decoded) handleFsScanSuccess(decoded);
+      } catch (e) { /* frame lỗi thoáng qua */ }
+      finally { fsScanBusy = false; }
+    }
+    if (fsScanRunning) requestAnimationFrame(scanFrame);
+  }
+  scanFrame();
+}
+
+function handleFsScanSuccess(text) {
+  const now = Date.now();
+  if (text === fsLastText && (now - fsLastTime) < FS_COOLDOWN_MS) return;
+  fsLastText = text; fsLastTime = now;
+  const container = $('fsVideoContainer');
+  container.classList.remove('flash');
+  void container.offsetWidth;
+  container.classList.add('flash');
+  addPalletToCart(text, true);
+  updateFsCartCount();
+}
+
+function stopFsCamera() {
+  fsScanRunning = false;
+  if (fsStream) { fsStream.getTracks().forEach(t => t.stop()); fsStream = null; }
+  const video = $('fsVideo');
+  if (video) video.srcObject = null;
+  fsLastText = '';
+}
+function closeFullscreenScanner() {
+  stopFsCamera();
+  $('fsScanner').classList.remove('active');
+  document.body.style.overflow = '';
+}
+document.addEventListener('visibilitychange', () => {
+  const overlay = $('fsScanner');
+  if (!overlay.classList.contains('active')) return;
+  if (document.hidden) stopFsCamera();
+  else if (!fsStream) fsStartCamera(fsFacingMode).then(startFsScanLoop).catch(e => console.warn('Resume camera failed:', e));
+});
+
+/* ==========================================================================
+ * TAB TỒN ĐẦU KỲ (RPC nvl_update_opening)
+ * ========================================================================== */
+function renderOpeningTable() {
+  const tbody = $('openingTable');
+  tbody.innerHTML = '';
+  DB.materials.forEach(m => {
+    const code = m.ma_nvl;
+    const op = DB.opening[code] || { ngay_dau_ky: '', ton_dau_ky_kg: 0 };
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong>' + esc(code) + '</strong><div style="font-size:.75rem;color:var(--gray);">' + esc(m.ten_nvl || '') + '</div></td>' +
+      '<td><input type="date" id="opening-date-' + esc(code) + '" value="' + esc(op.ngay_dau_ky || '') + '" style="padding:.4rem;border:1px solid var(--border);border-radius:4px;"></td>' +
+      '<td><input type="number" id="opening-stock-' + esc(code) + '" value="' + num(op.ton_dau_ky_kg) + '" step="0.001" min="0" style="width:140px;padding:.4rem;border:1px solid var(--border);border-radius:4px;"></td>' +
+      '<td><button class="btn-primary" style="padding:.4rem .8rem;font-size:.85rem;" onclick="saveOpening(\'' + esc(code) + '\')">💾 Lưu</button></td>';
+    tbody.appendChild(row);
+  });
+}
+
+async function saveOpening(code) {
+  const ngay = $('opening-date-' + code).value;
+  const ton = parseFloat($('opening-stock-' + code).value);
+  if (!ngay || isNaN(ton) || ton < 0) { alert('Vui lòng nhập ngày và số lượng hợp lệ'); return; }
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+  showLoading(true);
+  try {
+    const res = await sb.rpc('nvl_update_opening', { p_ma_nvl: code, p_ngay_dau_ky: ngay, p_ton_dau_ky_kg: ton, p_user: user });
+    const err = rpcError(res);
+    if (err) throw new Error(err);
+    await loadAllData();
+    alert('✓ Đã lưu tồn đầu kỳ ' + code + ': ' + fmtKg(ton, 3) + ' kg (' + ngay + ')');
+  } catch (e) { alert('Lỗi: ' + e.message); }
+  finally { showLoading(false); }
+}
+
+/* ==========================================================================
+ * TAB CÀI ĐẶT (RPC nvl_update_settings)
+ * ========================================================================== */
+function renderSettingsTable() {
+  const tbody = $('settingsTable');
+  tbody.innerHTML = '';
+  DB.materials.forEach(m => {
+    const code = m.ma_nvl;
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong>' + esc(code) + '</strong></td>' +
+      '<td><input type="number" id="setting-' + esc(code) + '" value="' + getBeRong(code) + '" step="1" min="0" style="width:140px;padding:.4rem;border:1px solid var(--border);border-radius:4px;"></td>' +
+      '<td><button class="btn-primary" style="padding:.4rem .8rem;font-size:.85rem;" onclick="saveOneSetting(\'' + esc(code) + '\')">💾 Lưu</button></td>';
+    tbody.appendChild(row);
+  });
+}
+
+async function saveOneSetting(code) {
+  const width = parseFloat($('setting-' + code).value);
+  if (isNaN(width) || width <= 0) { alert('Bề rộng phải > 0'); return; }
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+  showLoading(true);
+  try {
+    const res = await sb.rpc('nvl_update_settings', { p_ma_nvl: code, p_be_rong_kg: width, p_user: user });
+    const err = rpcError(res);
+    if (err) throw new Error(err);
+    DB.settings[code] = width;
+    renderOverview();
+    if (planChart) updatePlanChart();
+    setSyncStatus('ok', '✓ ' + new Date().toLocaleTimeString('vi-VN'));
+    alert('✓ Đã lưu bề rộng ' + code + ' = ' + fmtKg(width) + ' kg');
+  } catch (e) { alert('Lỗi: ' + e.message); }
+  finally { showLoading(false); }
+}
+
+/* ==========================================================================
+ * TAB DANH MỤC NVL (RPC nvl_upsert_material) — thay KHSX Master
+ * ========================================================================== */
+function renderMaterialsTable() {
+  const tbody = $('materialsTable');
+  tbody.innerHTML = '';
+  if (!DB.materials.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--gray);">Chưa có mã NVL nào</td></tr>';
+    return;
+  }
+  DB.materials.forEach(m => {
+    const hasOpening = !!DB.opening[m.ma_nvl];
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong>' + esc(m.ma_nvl) + '</strong></td>' +
+      '<td>' + esc(m.ten_nvl || '') + '</td>' +
+      '<td>' + (hasOpening ? fmtKg(getCurrentStock(m.ma_nvl)) : '<span style="color:var(--danger);font-size:.8rem;">chưa khai tồn đầu kỳ</span>') + '</td>' +
+      '<td><button class="btn-secondary" style="padding:.35rem .7rem;font-size:.8rem;" onclick="editMaterial(\'' + esc(m.ma_nvl) + '\')">✏️ Sửa tên</button></td>';
+    tbody.appendChild(row);
+  });
+}
+function editMaterial(code) {
+  const m = DB.materials.find(x => x.ma_nvl === code);
+  $('newMaCode').value = code;
+  $('newMaName').value = m ? (m.ten_nvl || '') : '';
+  $('newMaName').focus();
+}
+async function upsertMaterial() {
+  const ma = $('newMaCode').value.trim();
+  const ten = $('newMaName').value.trim();
+  if (!ma) { alert('Nhập mã NVL'); return; }
+  const exists = DB.materials.find(x => x.ma_nvl === ma);
+  const verb = exists ? 'Cập nhật tên mã' : 'THÊM MÃ MỚI';
+  if (!confirm(verb + ' "' + ma + '" → "' + (ten || ma) + '"?')) return;
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+  showLoading(true);
+  try {
+    const res = await sb.rpc('nvl_upsert_material', { p_ma_nvl: ma, p_ten_nvl: ten || ma, p_user: user });
+    const err = rpcError(res);
+    if (err) throw new Error(err);
+    $('newMaCode').value = ''; $('newMaName').value = '';
+    await loadAllData();
+    alert('✓ Đã lưu mã ' + ma + (exists ? '' : '.\n\nNhớ vào tab "Tồn Đầu Kỳ" khai tồn đầu kỳ cho mã này.'));
+  } catch (e) { alert('Lỗi: ' + e.message); }
+  finally { showLoading(false); }
+}
+
+/* ==========================================================================
+ * TAB IN TEM NVL (RPC nvl_create_tem + qrcode-generator)
+ * ========================================================================== */
+function populateMaterialSelects() {
+  const opts = DB.materials.map(m => '<option value="' + esc(m.ma_nvl) + '">' + esc(m.ma_nvl) + '</option>').join('');
+  const temSel = $('temMaterial');
+  const prevTem = temSel.value;
+  temSel.innerHTML = opts || '<option value="">(Không có mã nào)</option>';
+  if (prevTem && DB.materials.find(m => m.ma_nvl === prevTem)) temSel.value = prevTem;
+  $('temMasterStatus').textContent = '(' + DB.materials.length + ' mã trong danh mục nvl_materials)';
+  $('temMasterStatus').style.color = DB.materials.length ? 'var(--success)' : 'var(--danger)';
+
+  const manSel = $('manMaNvl');
+  const prevMan = manSel.value;
+  manSel.innerHTML = opts || '<option value="">(Không có mã nào)</option>';
+  if (prevMan && DB.materials.find(m => m.ma_nvl === prevMan)) manSel.value = prevMan;
+
+  onTemMaterialChange();
+}
+
+function getFormValuesForTem() {
+  const material = $('temMaterial').value;
+  const found = DB.materials.find(m => m.ma_nvl === material);
+  return {
+    material: material,
+    tenNVL: found ? (found.ten_nvl || material) : material,
+    ngayNhap: $('temDate').value || todayISO(),
+    donVi: $('temUnit').value,
+    ghiChu: $('temNote').value.trim()
+  };
+}
+function onTemMaterialChange() {
+  const form = getFormValuesForTem();
+  $('temName').value = form.tenNVL;
+  rerenderTemQtyTable();
+}
+
+function rerenderTemQtyTable() {
+  const count = Math.min(Math.max(parseInt($('temCount').value) || 1, 1), 100);
+  const unit = $('temUnit').value;
+  const oldQty = {}, oldNote = {};
+  document.querySelectorAll('.tem-qty-input').forEach(i => { oldQty[i.dataset.idx] = i.value; });
+  document.querySelectorAll('.tem-note-input').forEach(i => { oldNote[i.dataset.idx] = i.value; });
+
+  let html = '<thead><tr><th class="row-num">#</th><th>Số lượng (' + esc(unit) + ')</th><th style="width:40%;">Ghi chú riêng cho tem này (tùy chọn)</th></tr></thead><tbody>';
+  for (let i = 0; i < count; i++) {
+    html += '<tr><td class="row-num">' + (i + 1) + '</td>' +
+      '<td><input type="number" class="tem-qty-input" data-idx="' + i + '" step="0.001" min="0" value="' + esc(oldQty[i] !== undefined ? oldQty[i] : '') + '" placeholder="0.000"></td>' +
+      '<td><input type="text" class="tem-note-input" data-idx="' + i + '" value="' + esc(oldNote[i] !== undefined ? oldNote[i] : '') + '" placeholder="(dùng ghi chú chung nếu để trống)"></td></tr>';
+  }
+  html += '</tbody>';
+  $('temQtyTable').innerHTML = html;
+  document.querySelectorAll('.tem-qty-input').forEach(i => i.addEventListener('input', updateTemTotalDisplay));
+  updateTemTotalDisplay();
+}
+
+function updateTemTotalDisplay() {
+  let total = 0, count = 0;
+  document.querySelectorAll('.tem-qty-input').forEach(i => { const v = num(i.value); if (v > 0) { total += v; count++; } });
+  $('temTotalQty').textContent = fmtKg(total, 3);
+  $('temTotalUnit').textContent = $('temUnit').value;
+  $('temTotalCount').textContent = count;
+  updateTemPreview();
+}
+
+function applyDefaultQtyToAll() {
+  const val = $('temDefaultQty').value;
+  if (!val || num(val) <= 0) { alert('Nhập số lượng mặc định > 0 trước khi áp dụng'); return; }
+  document.querySelectorAll('.tem-qty-input').forEach(i => { if (!i.value || num(i.value) === 0) i.value = val; });
+  updateTemTotalDisplay();
+}
+
+function collectTemQtyList() {
+  const qtyInputs = document.querySelectorAll('.tem-qty-input');
+  const noteInputs = document.querySelectorAll('.tem-note-input');
+  const list = [];
+  qtyInputs.forEach((inp, idx) => {
+    const qty = num(inp.value);
+    if (qty > 0) list.push({ soLuong: qty, ghiChuRieng: noteInputs[idx] ? noteInputs[idx].value.trim() : '' });
+  });
+  return list;
+}
+
+function buildTemHTML(tem) {
+  const soLuongDisplay = tem.donVi === 'kg' ? fmtKg(tem.soLuong, 3) : String(tem.soLuong);
+  let ngayDisplay = tem.ngayNhap;
+  try { ngayDisplay = new Date(tem.ngayNhap).toLocaleDateString('vi-VN'); } catch (e) { /* giữ nguyên */ }
+  return '' +
+    '<div class="tem-nvl">' +
+      '<div class="tem-header">' +
+        '<div class="tem-logo"><img src="' + LOGO_URI + '" alt="TYK"></div>' +
+        '<div class="tem-title">TEM NGUYÊN<br>VẬT LIỆU</div>' +
+      '</div>' +
+      '<div class="tem-info">' +
+        '<div class="tem-info-row"><span class="tem-info-label">Tag No</span><span class="tem-info-colon">:</span><span class="tem-info-value tag">' + esc(tem.tagNo) + '</span></div>' +
+        '<div class="tem-info-row"><span class="tem-info-label">Mã NVL</span><span class="tem-info-colon">:</span><span class="tem-info-value big">' + esc(tem.material) + '</span></div>' +
+        '<div class="tem-info-row"><span class="tem-info-label">Tên NVL</span><span class="tem-info-colon">:</span><span class="tem-info-value name">' + esc(tem.tenNVL) + '</span></div>' +
+        '<div class="tem-info-row"><span class="tem-info-label">Ngày nhập</span><span class="tem-info-colon">:</span><span class="tem-info-value">' + esc(ngayDisplay) + '</span></div>' +
+        '<div class="tem-info-row"><span class="tem-info-label">Số lượng</span><span class="tem-info-colon">:</span><span class="tem-info-value big">' + esc(soLuongDisplay) + '</span></div>' +
+        '<div class="tem-info-row"><span class="tem-info-label">Đơn vị</span><span class="tem-info-colon">:</span><span class="tem-info-value">' + esc(tem.donVi) + '</span></div>' +
+        (tem.ghiChu ? '<div class="tem-info-row"><span class="tem-info-label">Ghi chú</span><span class="tem-info-colon">:</span><span class="tem-info-value" style="font-size:2.3mm;">' + esc(tem.ghiChu) + '</span></div>' : '') +
+      '</div>' +
+      '<div class="tem-qr-block"><div class="tem-qr-wrapper"><div></div></div></div>' +
+      '<div class="tem-footer">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</div>' +
+    '</div>';
+}
+
+// Sinh SVG QR (qrcode-generator, error correction M) — cùng thư viện/cách dùng
+// như intem.html, thay cho khối base64 nhúng của bản cũ.
+function generateQRSvg(text) {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  } catch (e) {
+    console.error('QR generation error:', e);
+    return '<span style="color:red;font-size:2mm">QR error</span>';
+  }
+}
+function temQrContent(tem) {
+  return [tem.tagNo, tem.material, tem.tenNVL, tem.ngayNhap, tem.soLuong, tem.donVi].join('>');
+}
+function renderQRsInContainer(container, tems) {
+  const wrappers = container.querySelectorAll('.tem-qr-wrapper > div');
+  wrappers.forEach((div, idx) => {
+    if (!tems[idx]) return;
+    div.innerHTML = generateQRSvg(temQrContent(tems[idx]));
+    const svg = div.querySelector('svg');
+    if (svg) { svg.style.width = '28mm'; svg.style.height = '28mm'; svg.setAttribute('shape-rendering', 'crispEdges'); }
+  });
+}
+
+function updateTemPreview() {
+  const form = getFormValuesForTem();
+  $('temName').value = form.tenNVL;
+  const list = collectTemQtyList();
+  const preview = Object.assign({}, form, {
+    soLuong: list.length ? list[0].soLuong : 0,
+    ghiChu: (list.length && list[0].ghiChuRieng) ? list[0].ghiChuRieng : form.ghiChu,
+    tagNo: 'TYK-' + String(form.ngayNhap).replace(/-/g, '') + '-0001'
+  });
+  const container = $('temPreviewSingle');
+  container.innerHTML = buildTemHTML(preview);
+  renderQRsInContainer(container, [preview]);
+}
+
+function waitForQRs(container, expectedCount, maxWaitMs) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    (function check() {
+      const svgs = container.querySelectorAll('.tem-qr-wrapper svg');
+      if (svgs.length >= expectedCount) { setTimeout(resolve, 100); return; }
+      if (Date.now() - start > (maxWaitMs || 3000)) { resolve(); return; }
+      setTimeout(check, 50);
+    })();
+  });
+}
+
+async function printTem() {
+  const form = getFormValuesForTem();
+  const list = collectTemQtyList();
+  if (!form.material) { alert('Vui lòng chọn Mã NVL'); return; }
+  if (!list.length) { alert('Vui lòng nhập số lượng cho ít nhất 1 tem'); return; }
+  if (list.length > 100) { alert('Tối đa 100 tem/lần in'); return; }
+
+  const totalQty = list.reduce((s, x) => s + x.soLuong, 0);
+  if (!confirm('Sẽ tạo ' + list.length + ' tem (' + form.material + ', tổng ' + fmtKg(totalQty, 3) + ' ' + form.donVi +
+               ') và ghi nhận NHẬP KHO tương ứng.\n\nTiếp tục?')) return;
+
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+
+  showLoading(true);
+  setSyncStatus('loading', '⏳ Đang tạo tem...');
+  try {
+    const res = await sb.rpc('nvl_create_tem', {
+      p_ma_nvl: form.material,
+      p_ten_nvl: form.tenNVL,
+      p_ngay_nhap: form.ngayNhap,
+      p_don_vi: form.donVi,
+      p_ghi_chu: form.ghiChu,
+      p_so_luong_list: list.map(x => x.soLuong),
+      p_user: user
+    });
+    const err = rpcError(res);
+    if (err) throw new Error(err);
+
+    // Ghi chú riêng từng tem là dữ liệu chỉ có ở frontend (RPC chỉ nhận 1 ghi
+    // chú chung) — map lại theo thứ tự để in đúng, giống hệt bản cũ.
+    const tems = (res.data.tems || []).map((t, idx) => ({
+      tagNo: t.tagNo, material: t.material, tenNVL: t.tenNVL, ngayNhap: t.ngayNhap,
+      soLuong: num(t.soLuong), donVi: t.donVi,
+      ghiChu: (list[idx] && list[idx].ghiChuRieng) ? list[idx].ghiChuRieng : (t.ghiChu || '')
+    }));
+
+    setSyncStatus('ok', '✓ Đã tạo ' + tems.length + ' tem');
+
+    const printArea = $('printArea');
+    printArea.innerHTML = tems.map(buildTemHTML).join('');
+    renderQRsInContainer(printArea, tems);
+    await waitForQRs(printArea, tems.length, 5000);
+
+    showLoading(false);
+    printArea.style.display = 'block';
+    window.print();
+    printArea.style.display = 'none';
+
+    await loadAllData();   // tem vừa tạo đã sinh giao dịch NHẬP → tồn thay đổi
+    loadTemList();
+  } catch (e) {
+    showLoading(false);
+    setSyncStatus('error', '❌ Lỗi');
+    alert('Lỗi: ' + e.message);
+  }
+}
+
+function resetTemForm() {
+  $('temDate').value = todayISO();
+  $('temCount').value = '1';
+  $('temNote').value = '';
+  $('temUnit').value = 'kg';
+  $('temDefaultQty').value = '';
+  rerenderTemQtyTable();
+}
+
+async function loadTemList() {
+  const tbody = $('temListTable');
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);">Đang tải...</td></tr>';
+  const { data, error } = await sb.from('nvl_tem').select('*')
+    .order('ts_goc', { ascending: false }).order('tag_no', { ascending: false }).limit(TEM_LIST_LIMIT);
+  if (error) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--danger);">Lỗi: ' + esc(error.message) + '</td></tr>'; return; }
+  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray);">Chưa có tem nào</td></tr>'; return; }
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const tem = { tagNo: r.tag_no, material: r.ma_nvl, tenNVL: r.ten_nvl || r.ma_nvl, ngayNhap: r.ngay_nhap, soLuong: num(r.so_luong), donVi: r.don_vi, ghiChu: r.ghi_chu || '' };
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td><strong style="font-family:monospace;">' + esc(tem.tagNo) + '</strong></td>' +
+      '<td>' + esc(tem.material) + '</td>' +
+      '<td>' + esc(tem.ngayNhap) + '</td>' +
+      '<td>' + fmtKg(tem.soLuong, 3) + '</td>' +
+      '<td>' + esc(tem.donVi) + '</td>' +
+      '<td style="font-size:.8rem;">' + esc(r.trang_thai || '') + '</td>' +
+      '<td style="font-size:.85rem;">' + esc(tem.ghiChu || '-') + '</td>' +
+      '<td style="font-size:.8rem;color:var(--gray);">' + (r.ts_goc ? new Date(r.ts_goc).toLocaleString('vi-VN') : '-') + '</td>' +
+      '<td></td>';
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary';
+    btn.style.cssText = 'padding:.3rem .6rem;font-size:.8rem;';
+    btn.textContent = '🖨️ In lại';
+    btn.addEventListener('click', () => reprintTem(tem));
+    row.lastElementChild.appendChild(btn);
+    tbody.appendChild(row);
+  });
+}
+
+async function reprintTem(tem) {
+  const printArea = $('printArea');
+  printArea.innerHTML = buildTemHTML(tem);
+  renderQRsInContainer(printArea, [tem]);
+  await waitForQRs(printArea, 1, 3000);
+  printArea.style.display = 'block';
+  window.print();
+  printArea.style.display = 'none';
+}
+
+/* ==========================================================================
+ * TAB KẾ HOẠCH NHẬP NHÔM (RPC nvl_update_plan_nhap + nvl_recalc_all_plan_stock)
+ * ========================================================================== */
+function renderPlanNhapTable() {
+  const head = $('planNhapHead'), body = $('planNhapBody');
+  if (!DB.planDates.length) {
+    head.innerHTML = '<tr><th>Chưa có dữ liệu kế hoạch</th></tr>';
+    body.innerHTML = '';
+    return;
+  }
+  const today = todayISO();
+  const weekdayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+  let headHtml = '<tr><th rowspan="2" style="min-width:120px;">Mã NVL</th>';
+  DB.planDates.forEach(d => {
+    const dt = new Date(d), day = dt.getDay();
+    const cls = (d === today) ? 'today-col' : ((day === 0 || day === 6) ? 'weekend' : '');
+    headHtml += '<th class="' + cls + '">' + (dt.getMonth() + 1) + '/' + dt.getDate() + '</th>';
+  });
+  headHtml += '</tr><tr>';
+  DB.planDates.forEach(d => {
+    const dt = new Date(d), day = dt.getDay();
+    const cls = (d === today) ? 'today-col' : ((day === 0 || day === 6) ? 'weekend' : '');
+    headHtml += '<th class="' + cls + '" style="font-size:.7rem;font-weight:normal;">' + weekdayNames[day] + '</th>';
+  });
+  headHtml += '</tr>';
+  head.innerHTML = headHtml;
+
+  let bodyHtml = '';
+  DB.materials.forEach(m => {
+    const code = m.ma_nvl;
+    const plan = DB.plan[code];
+    bodyHtml += '<tr><td class="material-cell">' + esc(code) + '</td>';
+    DB.planDates.forEach((d, idx) => {
+      const dt = new Date(d), day = dt.getDay();
+      const cellCls = (d === today) ? 'today-col' : ((day === 0 || day === 6) ? 'weekend-col' : '');
+      const original = plan ? num(plan.nhap[idx]) : 0;
+      const changed = (planNhapChanges[code] && planNhapChanges[code][idx] !== undefined) ? planNhapChanges[code][idx] : null;
+      const display = changed !== null ? changed : original;
+      const inputCls = changed !== null ? 'plan-nhap-input changed' : 'plan-nhap-input';
+      bodyHtml += '<td class="' + cellCls + '"><input type="number" class="' + inputCls + '" data-code="' + esc(code) + '" data-day="' + idx + '" value="' + (display || '') + '" placeholder="0" step="1" min="0" onchange="onPlanNhapChange(this)"></td>';
+    });
+    bodyHtml += '</tr>';
+  });
+  body.innerHTML = bodyHtml;
+  updatePlanNhapChangeCount();
+}
+
+function onPlanNhapChange(input) {
+  const code = input.dataset.code;
+  const day = parseInt(input.dataset.day);
+  const newValue = num(input.value);
+  const original = (DB.plan[code] && DB.plan[code].nhap[day] !== undefined) ? num(DB.plan[code].nhap[day]) : 0;
+  if (Math.abs(newValue - original) < 0.001) {
+    if (planNhapChanges[code]) {
+      delete planNhapChanges[code][day];
+      if (!Object.keys(planNhapChanges[code]).length) delete planNhapChanges[code];
+    }
+    input.classList.remove('changed');
+  } else {
+    if (!planNhapChanges[code]) planNhapChanges[code] = {};
+    planNhapChanges[code][day] = newValue;
+    input.classList.add('changed');
+  }
+  updatePlanNhapChangeCount();
+}
+
+function updatePlanNhapChangeCount() {
+  let count = 0;
+  Object.keys(planNhapChanges).forEach(code => { count += Object.keys(planNhapChanges[code]).length; });
+  $('planNhapChangeCount').textContent = count > 0 ? ('⚠ ' + count + ' ô đã thay đổi (chưa lưu)') : '';
+}
+
+async function savePlanNhap() {
+  const codes = Object.keys(planNhapChanges);
+  if (!codes.length) { alert('Không có thay đổi nào để lưu'); return; }
+  if (!confirm('Sẽ cập nhật kế hoạch nhập của ' + codes.length + ' mã NVL.\nTồn dự kiến sẽ được tính lại tự động.\n\nTiếp tục?')) return;
+
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+
+  showLoading(true);
+  setSyncStatus('loading', '⏳ Đang lưu kế hoạch nhập...');
+  let ok = 0;
+  const errors = [];
+
+  for (const code of codes) {
+    try {
+      // Gửi TOÀN BỘ dải ngày (giá trị gốc + giá trị đã sửa). RPC dùng ngày nhỏ
+      // nhất trong p_updates làm mốc baseline tồn dự kiến, đúng convention "ô
+      // đầu tiên = tồn đầu kỳ" của bản Sheet cũ. KHÔNG gửi tieu_hao_kg để giữ
+      // nguyên kế hoạch tiêu hao đang có.
+      const plan = DB.plan[code];
+      const updates = DB.planDates.map((ngay, idx) => {
+        const changed = planNhapChanges[code][idx];
+        return { ngay: ngay, nhap_kg: (changed !== undefined ? changed : (plan ? num(plan.nhap[idx]) : 0)) };
+      });
+      const res = await sb.rpc('nvl_update_plan_nhap', { p_ma_nvl: code, p_updates: updates, p_user: user });
+      const err = rpcError(res);
+      if (err) errors.push(code + ': ' + err); else ok++;
+    } catch (e) {
+      errors.push(code + ': ' + e.message);
+    }
+  }
+
+  planNhapChanges = {};
+  await loadAllData();
+  showLoading(false);
+
+  if (!errors.length) {
+    setSyncStatus('ok', '✓ Đã lưu ' + new Date().toLocaleTimeString('vi-VN'));
+    alert('✓ Đã lưu kế hoạch nhập của ' + ok + ' mã NVL. Tồn dự kiến đã được tính lại.');
+  } else {
+    setSyncStatus('error', '❌ Một số lỗi');
+    alert('Lưu ' + ok + ' mã thành công.\n\nLỗi:\n' + errors.join('\n'));
+  }
+}
+
+function resetPlanNhap() {
+  if (!Object.keys(planNhapChanges).length) return;
+  if (confirm('Hủy tất cả thay đổi chưa lưu?')) { planNhapChanges = {}; renderPlanNhapTable(); }
+}
+
+async function recalcAllPlanStock() {
+  if (!confirm('Tính lại tồn dự kiến 30 ngày cho TẤT CẢ mã NVL (dùng khi kế hoạch tiêu hao vừa bị sửa)?')) return;
+  const user = await requireLoginOrRedirect();
+  if (user === null) return;
+  showLoading(true);
+  try {
+    const res = await sb.rpc('nvl_recalc_all_plan_stock', { p_user: user });
+    const err = rpcError(res);
+    if (err) throw new Error(err);
+    await loadAllData();
+    alert('✓ Đã tính lại tồn kế hoạch cho ' + ((res.data.results || []).length) + ' mã.');
+  } catch (e) { alert('Lỗi: ' + e.message); }
+  finally { showLoading(false); }
+}
+
+/* ==========================================================================
+ * TAB LỊCH SỬ
+ * ========================================================================== */
+function renderTransactionHistory() {
+  const tbody = $('transactionHistoryTable');
+  tbody.innerHTML = '';
+  if (!DB.transactions.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);">Chưa có giao dịch</td></tr>';
+    return;
+  }
+  DB.transactions.slice().reverse().slice(0, 100).forEach(tx => {
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td>' + esc(tx.ngay) + '</td>' +
+      '<td>' + (tx.loai === 'IN' ? '📥 Nhập' : '📤 Xuất') + '</td>' +
+      '<td><strong>' + esc(tx.ma_nvl) + '</strong></td>' +
+      '<td>' + fmtKg(tx.so_luong_kg, 3) + '</td>' +
+      '<td style="color:var(--primary);font-weight:600;">' + fmtKg(tx.ton_sau_kg, 3) + '</td>' +
+      '<td style="font-size:.85rem;">' + esc(tx.ghi_chu || '-') + '</td>';
+    tbody.appendChild(row);
+  });
+}
+
+/* ==========================================================================
+ * TABS + KHỞI TẠO
+ * ========================================================================== */
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  $(tabName).classList.add('active');
+  const btn = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+  if (btn) btn.classList.add('active');
+  if (tabName === 'charts') setTimeout(updatePlanChart, 100);
+  if (tabName === 'plan-nhap') renderPlanNhapTable();
+  if (tabName === 'tem-nvl') { rerenderTemQtyTable(); }
+  if (tabName === 'qr-input') setTimeout(focusQRInput, 100);
+  if (tabName !== 'qr-input' && $('fsScanner').classList.contains('active')) closeFullscreenScanner();
+}
+
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+$('btnReload').addEventListener('click', loadAllData);
+$('btnReloadPlan').addEventListener('click', loadAllData);
+$('btnOpenScanner').addEventListener('click', openFullscreenScanner);
+$('btnCloseScanner').addEventListener('click', closeFullscreenScanner);
+$('btnFlipCamera').addEventListener('click', fsFlipCamera);
+$('btnFsFinish').addEventListener('click', () => { closeFullscreenScanner(); setTimeout(submitCartTransaction, 100); });
+$('btnSubmitCart').addEventListener('click', submitCartTransaction);
+$('btnClearCart').addEventListener('click', clearCart);
+$('btnFocusQR').addEventListener('click', focusQRInput);
+$('btnManualTx').addEventListener('click', submitManualTransaction);
+$('cartTxType').addEventListener('change', () => {
+  // Đổi chiều giao dịch → mọi pallet phải kiểm tra lại (điều kiện trạng thái + FIFO khác nhau)
+  scanCart.forEach(item => { item.validationStatus = 'pending'; item.errorMsg = undefined; item.fifoWarnings = undefined; item.fifoCount = undefined; });
+  renderCart();
+  scanCart.forEach((_, idx) => validatePalletAsync(idx));
+  updateFsTypeBadge();
+});
+$('qrScanInput').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const v = e.target.value.trim();
+  if (!v) return;
+  e.target.value = '';
+  addPalletToCart(v, false);
+});
+$('temMaterial').addEventListener('change', onTemMaterialChange);
+$('temDate').addEventListener('change', updateTemPreview);
+$('temUnit').addEventListener('change', rerenderTemQtyTable);
+$('temCount').addEventListener('input', rerenderTemQtyTable);
+$('temNote').addEventListener('input', updateTemPreview);
+$('btnApplyDefaultQty').addEventListener('click', applyDefaultQtyToAll);
+$('btnPrintTem').addEventListener('click', printTem);
+$('btnResetTem').addEventListener('click', resetTemForm);
+$('btnLoadTemList').addEventListener('click', loadTemList);
+$('btnSavePlan').addEventListener('click', savePlanNhap);
+$('btnResetPlan').addEventListener('click', resetPlanNhap);
+$('btnRecalcPlan').addEventListener('click', recalcAllPlanStock);
+$('btnUpsertMaterial').addEventListener('click', upsertMaterial);
+
+(async function init() {
+  $('temDate').value = todayISO();
+  $('manNgay').value = todayISO();
+  initAuthStatus();
+  await loadAllData();
+  rerenderTemQtyTable();
+  renderCart();
+})();
+</script>
+</body>
+</html>

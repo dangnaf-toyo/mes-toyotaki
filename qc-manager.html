@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Giám sát — Dashboard Đúc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!--
+  qc-manager.html — bản web tĩnh (Supabase) thay Web App Google Apps Script
+  "QcManager.html" (D:\Project\MES\Dashboard Đúc\QcManager.html + IpqcCheckpoint.js
+  + Ncp.js). Đọc công khai (anon), MỌI thao tác ghi bắt buộc đăng nhập Supabase Auth.
+
+  THAY ĐỔI SO VỚI BẢN GỐC:
+  1) Board giám sát/tra cứu lịch sử/danh sách NCP: bản gốc gọi 1 hàm server tổng
+     hợp (getQcManagerBoard_/searchIpqcHistory_/getAllNcpCases_) đọc trực tiếp
+     Sheet. Ở đây đọc thẳng bảng duc_ipqc_checkpoint/duc_ncp (đều RLS đọc công
+     khai) rồi tự lọc/tổng hợp trên trình duyệt — cùng logic gốc, số dòng nhỏ
+     (24h/7 ngày) nên không cần RPC tổng hợp riêng.
+  2) "Đang chờ kiểm tra" cần lọc theo "id_dong đang active" — dùng lại đúng
+     logic _getActiveIdDongSet_ đã port trong ipqc.html (nhân bản 1 bản nhỏ ở
+     đây, xem getActiveIdDongSet()) vì đây là 2 trang độc lập, không chia sẻ
+     JS module (đúng quy ước "không build step" của cả repo).
+  3) "Nguyên nhân & Đối sách" mở bằng link nội bộ ncp-detail.html?id=... thay
+     vì window.open(baseUrl + '?view=ncp-detail&id=...') — bản gốc phải dùng
+     URL /exec tuyệt đối vì Apps Script chạy trong iframe sandbox
+     googleusercontent.com; web tĩnh không có giới hạn đó.
+  4) Upload PDF tiêu chuẩn IPQC: đổi từ gửi base64 lên Apps Script ghi Google
+     Drive → trình duyệt tự upload thẳng lên Storage bucket "report-files"
+     (đã tạo ở migration_phase_D0_foundation.sql, dùng đúng mục đích ghi rõ
+     trong comment của file đó: "PDF tiêu chuẩn IPQC").
+  PHẠM VI: tương đương QcManager.html — bao gồm cả 3 tab đầu VÀ tab "Xử lý SP
+  không phù hợp" (mở case + các bước lọc/sửa/phế, KHÔNG gồm phần "Nguyên nhân
+  & Đối sách" — xem ncp-detail.html, file riêng theo đúng cấu trúc màn hình gốc).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--good-fg:#047857;--good-bg:#ECFDF5;--good-stripe:#10B981;--warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-stripe:#F59E0B;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--alarm-stripe:#EF4444;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:8px;gap:8px;max-width:1500px;margin:0 auto}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:10px 18px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:16px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.tabs{display:flex;gap:6px;margin-left:8px;flex-wrap:wrap}
+.tab-btn{background:transparent;border:1px solid #475569;color:#CBD5E1;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#FFF}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#94A3B8}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--good-stripe);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.auth-info{font-size:11px;color:#94A3B8}
+.auth-info a{color:#93C5FD;text-decoration:none;font-weight:600}
+
+.tabpanel{display:none;flex-direction:column;gap:8px}
+.tabpanel.active{display:flex}
+
+.grid2{display:grid;grid-template-columns:1.1fr 1fr;gap:8px;align-items:start}
+@media (max-width:1000px){.grid2{grid-template-columns:1fr}}
+
+.panel{background:var(--bg-panel);border-radius:8px;border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between}
+.panel-head .count{font-size:11px;font-weight:600;color:var(--text-muted);background:var(--bg-sunken);padding:2px 8px;border-radius:10px}
+.panel-body{padding:8px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);padding:6px 8px;border-bottom:2px solid var(--border)}
+td{padding:7px 8px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.mono{font-family:'JetBrains Mono',monospace}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.pill.ok{background:var(--good-bg);color:var(--good-fg)}
+.pill.ng{background:var(--alarm-bg);color:var(--alarm-fg)}
+.pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.pill.neutral{background:var(--bg-sunken);color:var(--text-muted)}
+.link-list{display:flex;gap:8px}
+.row-alarm{background:var(--alarm-bg)}
+.row-warn{background:var(--warn-bg)}
+.empty-note{text-align:center;color:var(--text-muted);padding:20px;font-size:12px}
+.link-btn{color:var(--accent);font-weight:600;text-decoration:none;font-size:11px}
+.link-btn:hover{text-decoration:underline}
+
+.filter-grid{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:4px 6px}
+.filter-field{display:flex;flex-direction:column;gap:4px;min-width:150px}
+.filter-field label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em}
+.filter-field select{padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:var(--text)}
+
+.tc-form{display:flex;flex-direction:column;gap:10px;padding:10px 14px}
+.tc-form label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:4px}
+.tc-form input[type=text],.tc-form select{width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
+.muc-row{display:flex;gap:6px;margin-bottom:6px}
+.muc-row input{flex:1}
+.muc-row button{background:var(--alarm-bg);color:var(--alarm-fg);border:none;border-radius:5px;padding:0 10px;font-weight:700;cursor:pointer}
+.btn{padding:8px 14px;border-radius:6px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{background:#fff;border:1px solid var(--border-strong);color:var(--text)}
+.btn-add{background:var(--bg-sunken);color:var(--text-muted);border:1px dashed var(--border-strong)}
+.tc-list-item{padding:8px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.tc-list-item:hover{background:var(--bg-sunken)}
+.tc-list-item .sp{font-family:'JetBrains Mono',monospace;font-weight:700}
+.tc-list-item .n{font-size:11px;color:var(--text-muted)}
+
+.panel-actions{padding:10px 14px;border-bottom:1px solid var(--border)}
+.ncp-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap}
+.ncp-badge.do{background:var(--alarm-bg);color:var(--alarm-fg)}
+.ncp-badge.vang{background:var(--warn-bg);color:var(--warn-fg)}
+.ncp-badge.xanh{background:var(--good-bg);color:var(--good-fg)}
+.ncp-qty{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)}
+.ncp-btn-row{display:flex;gap:6px}
+.ncp-btn-row button{padding:4px 9px;font-size:11px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+.modal-overlay.show{display:flex}
+.modal-box{background:#fff;border-radius:10px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md)}
+.ncp-rc-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.ncp-rc-badge.nhap{background:var(--bg-sunken);color:var(--text-muted)}
+.ncp-rc-badge.cho_duyet{background:var(--warn-bg);color:var(--warn-fg)}
+.ncp-rc-badge.da_duyet{background:var(--good-bg);color:var(--good-fg)}
+.ncp-rc-badge.tu_choi{background:var(--alarm-bg);color:var(--alarm-fg)}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff}
+.modal-head .x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.field-row{display:flex;flex-direction:column;gap:4px}
+.field-row label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em}
+.field-row input,.field-row select,.field-row textarea{padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
+.field-row textarea{min-height:56px;resize:vertical}
+.radio-row{display:flex;gap:18px;font-size:13px}
+.radio-row label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.ncp-summary{background:var(--bg-sunken);border-radius:8px;padding:10px 12px;font-size:12px;display:flex;flex-direction:column;gap:3px}
+.ncp-summary .row{display:flex;justify-content:space-between;gap:10px}
+.ncp-summary .label{color:var(--text-muted)}
+.ncp-step{display:flex;flex-direction:column;gap:10px}
+.ncp-step-choice{display:flex;gap:8px}
+.ncp-step-choice button{flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.ncp-step-choice button:hover{background:var(--bg-sunken)}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="co">Toyotaki — Bộ phận Đúc</div><div class="title">🔬 QC Giám sát</div></div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-btn-monitor" onclick="switchTab('monitor')">Giám sát real-time</button>
+      <button class="tab-btn" id="tab-btn-tracuu" onclick="switchTab('tracuu')">Tra cứu lịch sử</button>
+      <button class="tab-btn" id="tab-btn-ncp" onclick="switchTab('ncp')">Xử lý sản phẩm không phù hợp</button>
+      <button class="tab-btn" id="tab-btn-tieuchuan" onclick="switchTab('tieuchuan')">Quản lý tiêu chuẩn</button>
+    </div>
+    <div class="header-clock">
+      <div class="live-badge"><span class="live-dot"></span><span id="live-status">Đang tải...</span></div>
+      <div class="time" id="clock-time">--:--:--</div>
+      <div class="auth-info" id="authInfo">…</div>
+    </div>
+  </header>
+
+  <!-- ===================== TAB: GIÁM SÁT REAL-TIME ===================== -->
+  <div class="tabpanel active" id="tab-monitor">
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-head">🔴 Đang chờ kiểm tra <span class="count" id="pending-count">0</span></div>
+        <div class="panel-body table-wrap">
+          <table>
+            <thead><tr><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Trạng thái</th></tr></thead>
+            <tbody id="pending-tbody"></tbody>
+          </table>
+          <div class="empty-note hidden" id="pending-empty">Không có điểm kiểm nào đang chờ.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">👤 Tuân thủ theo IPQC (24h gần nhất)</div>
+        <div class="panel-body table-wrap">
+          <table>
+            <thead><tr><th>IPQC</th><th>Tổng</th><th>Đúng hạn</th><th>Trễ</th><th>OK</th><th>NG</th><th>Cảnh báo</th><th>Tổng thời gian kiểm</th></tr></thead>
+            <tbody id="nguoi-tbody"></tbody>
+          </table>
+          <div class="empty-note hidden" id="nguoi-empty">Chưa có dữ liệu kiểm tra.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">📋 Kết quả kiểm tra gần đây <span class="count" id="done-count">0</span></div>
+      <div class="panel-body table-wrap">
+        <table>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th>Phản hồi (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
+          <tbody id="done-tbody"></tbody>
+        </table>
+        <div class="empty-note hidden" id="done-empty">Chưa có kết quả kiểm tra nào.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB: TRA CỨU LỊCH SỬ ===================== -->
+  <div class="tabpanel" id="tab-tracuu">
+    <div class="panel">
+      <div class="panel-body">
+        <div class="filter-grid">
+          <div class="filter-field">
+            <label>Ngày kiểm</label>
+            <select id="fl-ngay" onchange="searchHistory()"><option value="">Tất cả</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Máy</label>
+            <select id="fl-ma-may" onchange="searchHistory()"><option value="">Tất cả</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Mã SP</label>
+            <select id="fl-ma-sp" onchange="searchHistory()"><option value="">Tất cả</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Người kiểm</label>
+            <select id="fl-nguoi-kiem" onchange="searchHistory()"><option value="">Tất cả</option></select>
+          </div>
+          <button class="btn btn-primary" onclick="searchHistory()">🔍 Tra cứu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">📋 Kết quả tra cứu <span class="count" id="history-count">0</span></div>
+      <div class="panel-body table-wrap">
+        <table>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th>Phản hồi (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+        <div class="empty-note hidden" id="history-empty">Không tìm thấy kết quả nào khớp bộ lọc.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB: XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP ===================== -->
+  <div class="tabpanel" id="tab-ncp">
+    <div class="panel">
+      <div class="panel-head">🚧 Phiếu đang xử lý <span class="count" id="ncp-open-count">0</span></div>
+      <div class="panel-actions"><button class="btn btn-primary" onclick="openNcpNewModal()">+ Mở phiếu mới</button></div>
+      <div class="panel-body table-wrap">
+        <table>
+          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Đã lọc</th><th>OK</th><th>NG</th><th>Bước hiện tại</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian</th><th></th></tr></thead>
+          <tbody id="ncp-open-tbody"></tbody>
+        </table>
+        <div class="empty-note hidden" id="ncp-open-empty">Không có phiếu nào đang xử lý.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">📁 Phiếu đã xử lý xong <span class="count" id="ncp-closed-count">0</span></div>
+      <div class="panel-body table-wrap">
+        <table>
+          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Lưu thông (lọc+sửa OK)</th><th>Đã phế</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian mở</th><th></th></tr></thead>
+          <tbody id="ncp-closed-tbody"></tbody>
+        </table>
+        <div class="empty-note hidden" id="ncp-closed-empty">Chưa có phiếu nào xử lý xong.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Mở phiếu mới -->
+  <div class="modal-overlay" id="ncp-modal-new">
+    <div class="modal-box">
+      <div class="modal-head"><span>Mở phiếu xử lý sản phẩm không phù hợp</span><button class="x" onclick="closeNcpModal('ncp-modal-new')">✕</button></div>
+      <div class="modal-body">
+        <div class="radio-row">
+          <label><input type="radio" name="ncp-src" value="ng" checked onchange="ncpSourceChanged()"> Từ 1 lần NG của IPQC</label>
+          <label><input type="radio" name="ncp-src" value="thu_cong" onchange="ncpSourceChanged()"> Thủ công</label>
+        </div>
+
+        <div class="field-row" id="ncp-src-ng-wrap">
+          <label>Chọn lần NG (7 ngày gần nhất)</label>
+          <select id="ncp-src-ng" onchange="onNcpNgSelected()"></select>
+        </div>
+
+        <div class="field-row">
+          <label>Máy</label>
+          <select id="ncp-ma-may"></select>
+        </div>
+        <div class="field-row">
+          <label>Mã sản phẩm</label>
+          <select id="ncp-ma-sp" onchange="onNcpMaSpChanged()"></select>
+        </div>
+        <div class="field-row">
+          <label>Tên sản phẩm</label>
+          <input type="text" id="ncp-ten-sp" disabled placeholder="Tự động theo mã SP">
+        </div>
+        <div class="field-row">
+          <label>Số khuôn</label>
+          <select id="ncp-so-khuon-select" onchange="onSoKhuonSelectChange('ncp')" style="display:none;"></select>
+          <input type="text" id="ncp-so-khuon">
+          <div id="ncp-so-khuon-hint" style="margin-top:3px;font-size:10px;color:var(--text-muted)"></div>
+        </div>
+        <div class="field-row">
+          <label>Mô tả lỗi</label>
+          <textarea id="ncp-mo-ta-loi"></textarea>
+        </div>
+        <div class="field-row">
+          <label>Số lượng nghi vấn cần cách ly</label>
+          <input type="number" id="ncp-so-luong" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <label>Số lượng SP NG (tham khảo)</label>
+          <input type="number" id="ncp-so-luong-ng-du-kien" min="0" step="1" placeholder="Ước lượng nhanh, không ảnh hưởng số liệu lọc thật">
+        </div>
+        <div class="field-row">
+          <label>Vị trí cách ly</label>
+          <input type="text" id="ncp-vi-tri" placeholder="VD: Kệ cách ly khu A">
+        </div>
+        <div class="field-row">
+          <label>Người đảm nhiệm xử lý</label>
+          <input type="text" id="ncp-nguoi-dam-nhiem">
+        </div>
+        <div class="field-row">
+          <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
+          <input type="text" id="ncp-nguoi-dam-nhiem-doi-sach">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" onclick="closeNcpModal('ncp-modal-new')">Huỷ</button>
+        <button class="btn btn-primary" onclick="submitNcpNewCase()">Mở phiếu & Cách ly</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cập nhật xử lý -->
+  <div class="modal-overlay" id="ncp-modal-update">
+    <div class="modal-box">
+      <div class="modal-head"><span id="ncp-update-title">Cập nhật xử lý</span><button class="x" onclick="closeNcpModal('ncp-modal-update')">✕</button></div>
+      <div class="modal-body">
+        <div class="ncp-summary" id="ncp-update-summary"></div>
+
+        <div class="ncp-step hidden" id="ncp-step-loc">
+          <div class="field-row"><label>Số lượng OK (đợt lọc này)</label><input type="number" id="ncp-loc-ok" min="0" step="1" value="0"></div>
+          <div class="field-row"><label>Số lượng NG (đợt lọc này)</label><input type="number" id="ncp-loc-ng" min="0" step="1" value="0"></div>
+          <button class="btn btn-primary" onclick="submitNcpSorting()">Lưu kết quả lọc</button>
+        </div>
+
+        <div class="ncp-step hidden" id="ncp-step-quyet-dinh">
+          <div class="ncp-step-choice">
+            <button onclick="showNcpDecisionForm('sua')">🔧 Sửa chữa</button>
+            <button onclick="showNcpDecisionForm('phe')">🗑 Báo phế</button>
+          </div>
+          <div class="ncp-step hidden" id="ncp-decision-sua">
+            <div class="field-row"><label>Mô tả phương án sửa chữa</label><textarea id="ncp-mo-ta-sua"></textarea></div>
+            <button class="btn btn-primary" onclick="submitNcpChooseSua()">Xác nhận chọn Sửa chữa</button>
+          </div>
+          <div class="ncp-step hidden" id="ncp-decision-phe">
+            <div class="field-row"><label>Số lượng đề nghị phế</label><input type="number" id="ncp-phe-so-luong" min="1" step="1"></div>
+            <div class="field-row"><label>Lý do báo phế</label><textarea id="ncp-phe-ly-do"></textarea></div>
+            <button class="btn btn-primary" onclick="submitNcpRequestScrap()">Gửi đề nghị báo phế</button>
+          </div>
+        </div>
+
+        <div class="ncp-step hidden" id="ncp-step-sua">
+          <div class="field-row"><label>Số lượng sửa OK (đợt này)</label><input type="number" id="ncp-sua-ok" min="0" step="1" value="0"></div>
+          <div class="field-row"><label>Số lượng không sửa được (đợt này)</label><input type="number" id="ncp-sua-khong-duoc" min="0" step="1" value="0"></div>
+          <button class="btn btn-primary" onclick="submitNcpRepair()">Lưu kết quả sửa chữa</button>
+        </div>
+
+        <div class="ncp-step hidden" id="ncp-step-duyet-phe">
+          <div class="ncp-summary" id="ncp-duyet-phe-info"></div>
+          <div class="field-row"><label>Ghi chú (tuỳ chọn)</label><textarea id="ncp-duyet-ghi-chu"></textarea></div>
+          <div class="ncp-btn-row" style="gap:10px">
+            <button class="btn btn-primary" style="flex:1;background:var(--good-fg)" onclick="submitNcpApproveScrap('Duyet')">✅ Duyệt phế</button>
+            <button class="btn btn-primary" style="flex:1;background:var(--alarm-fg)" onclick="submitNcpApproveScrap('Tu_choi')">❌ Từ chối</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TAB: QUẢN LÝ TIÊU CHUẨN ===================== -->
+  <div class="tabpanel" id="tab-tieuchuan">
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-head">Danh sách mã SP đã có tiêu chuẩn <span class="count" id="tc-count">0</span></div>
+        <div id="tc-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Soạn / sửa tiêu chuẩn</div>
+        <div class="tc-form">
+          <div>
+            <label>Mã sản phẩm</label>
+            <select id="tc-ma-sp"><option value="">-- Chọn mã SP --</option></select>
+          </div>
+          <div>
+            <label>Checklist kiểm tra</label>
+            <div id="tc-muc-list"></div>
+            <button class="btn btn-add" style="width:100%;margin-top:4px" onclick="addMucRow('')">+ Thêm mục kiểm</button>
+          </div>
+          <button class="btn btn-primary" onclick="saveTieuChuan()">💾 Lưu checklist</button>
+
+          <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+            <label>File PDF tiêu chuẩn gốc (tuỳ chọn)</label>
+            <div id="tc-pdf-current" style="font-size:11px;color:var(--text-muted);margin-bottom:6px"></div>
+            <input type="file" accept="application/pdf" id="tc-pdf-input" onchange="onPdfSelected(event)">
+            <button class="btn btn-outline" style="margin-top:6px" onclick="uploadPdf()" id="tc-pdf-btn" disabled>⬆ Upload PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
+
+function switchTab(tab){
+  document.getElementById('tab-monitor').classList.toggle('active', tab === 'monitor');
+  document.getElementById('tab-tracuu').classList.toggle('active', tab === 'tracuu');
+  document.getElementById('tab-ncp').classList.toggle('active', tab === 'ncp');
+  document.getElementById('tab-tieuchuan').classList.toggle('active', tab === 'tieuchuan');
+  document.getElementById('tab-btn-monitor').classList.toggle('active', tab === 'monitor');
+  document.getElementById('tab-btn-tracuu').classList.toggle('active', tab === 'tracuu');
+  document.getElementById('tab-btn-ncp').classList.toggle('active', tab === 'ncp');
+  document.getElementById('tab-btn-tieuchuan').classList.toggle('active', tab === 'tieuchuan');
+  if (tab === 'tieuchuan') loadTieuChuanList();
+  if (tab === 'ncp' && !state.ncpLoaded) { state.ncpLoaded = true; loadNcpList(); }
+}
+
+function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtTime(d){ return d.toLocaleTimeString('vi-VN'); }
+function fmtDurationSec(sec){
+  sec = Number(sec) || 0;
+  if (sec <= 0) return '—';
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60);
+  if (h > 0) return h + 'h ' + m + 'p';
+  if (m > 0) return m + 'p ' + s + 's';
+  return s + 's';
+}
+async function ensureAuth(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    alert('Cần đăng nhập để thao tác — đang chuyển sang trang đăng nhập.');
+    window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
+    return false;
+  }
+  return true;
+}
+
+const LOAI_LABEL = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Lên khuôn/SP mới' };
+
+function startClock(){ setInterval(() => { document.getElementById('clock-time').textContent = fmtTime(new Date()); }, 1000); }
+
+// =============================================================================
+// Active id_dong set — cùng logic với ipqc.html (xem comment ở đó).
+// =============================================================================
+async function getActiveIdDongSet(){
+  const { data, error } = await sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi');
+  if (error) throw new Error(error.message);
+  const byMachine = {};
+  (data || []).forEach(r => { if (r.id_dong && (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq)) byMachine[r.ma_may] = r; });
+  const active = new Set();
+  Object.values(byMachine).forEach(r => { active.add(r.id_dong); if (r.khuon_kep_voi) active.add(r.khuon_kep_voi); });
+  return active;
+}
+function ipqcDueInfo(loaiKiem, phutDaTroi){
+  const dueAfter = loaiKiem === 'dinh_ky' ? 120 : 0;
+  const daDenHan = phutDaTroi >= dueAfter;
+  return { da_den_han: daDenHan, phut_con_lai: daDenHan ? 0 : (dueAfter - phutDaTroi), phut_qua_han: daDenHan ? (phutDaTroi - dueAfter) : 0 };
+}
+function parsePhotoUrls(raw){
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [raw]; } catch (e) { return [String(raw)]; }
+}
+function mapIpqcDoneRow(r){
+  const mocCho = r.han_kiem ? new Date(r.han_kiem) : null;
+  const thoiDiemKiem = r.thoi_diem_kiem_thuc_te ? new Date(r.thoi_diem_kiem_thuc_te) : null;
+  const phutPhanHoi = (thoiDiemKiem && mocCho) ? Math.round((thoiDiemKiem - mocCho) / 60000) : null;
+  return {
+    id_checkpoint: r.id_checkpoint, ma_may: r.ma_may, ma_sp: r.ma_sp, ngay: r.ngay, ca: r.ca,
+    loai_kiem: r.loai_kiem, ket_qua: r.ket_qua, nguoi_kiem: r.nguoi_kiem || '(không rõ)',
+    thoi_diem_kiem_thuc_te: r.thoi_diem_kiem_thuc_te, phut_phan_hoi: phutPhanHoi,
+    anh_bang_chung_urls: parsePhotoUrls(r.anh_bang_chung_url), ghi_chu: r.ghi_chu || '',
+    id_van_de_lien_quan: r.id_van_de_lien_quan || '', thoi_gian_kiem_giay: Number(r.thoi_gian_kiem_giay) || null,
+  };
+}
+
+// ===================== Board giám sát real-time (24h) =====================
+async function loadBoard(){
+  try {
+    const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
+    const [activeSet, cpRes] = await Promise.all([
+      getActiveIdDongSet(),
+      sb.from('duc_ipqc_checkpoint').select('*').gte('thoi_diem_tao', cutoff),
+    ]);
+    if (cpRes.error) throw new Error(cpRes.error.message);
+
+    const now = Date.now();
+    const PRIORITY = { sau_su_co: 0, doi_khuon: 0, dinh_ky: 1 };
+    const pending = [], done = [], byNguoiKiem = {};
+
+    (cpRes.data || []).forEach(r => {
+      if (r.trang_thai === 'cho_kiem' && activeSet.has(r.id_dong)) {
+        const mocCho = r.han_kiem ? new Date(r.han_kiem) : null;
+        const phutTao = mocCho ? Math.round((now - mocCho.getTime()) / 60000) : 0;
+        const dueInfo = ipqcDueInfo(r.loai_kiem, phutTao);
+        pending.push(Object.assign({ id_checkpoint: r.id_checkpoint, ma_may: r.ma_may, ma_sp: r.ma_sp, loai_kiem: r.loai_kiem, phut_da_troi: phutTao }, dueInfo));
+      } else if (r.trang_thai === 'da_kiem') {
+        const mapped = mapIpqcDoneRow(r);
+        done.push(mapped);
+        const nguoiKiem = mapped.nguoi_kiem;
+        const dungHan = mapped.phut_phan_hoi != null && mapped.phut_phan_hoi < 30;
+        if (!byNguoiKiem[nguoiKiem]) byNguoiKiem[nguoiKiem] = { nguoi_kiem: nguoiKiem, dung_han: 0, tre: 0, tong: 0, so_ok: 0, so_ng: 0, so_canh_bao: 0, tong_thoi_gian_kiem_giay: 0 };
+        byNguoiKiem[nguoiKiem].tong++;
+        if (dungHan) byNguoiKiem[nguoiKiem].dung_han++; else byNguoiKiem[nguoiKiem].tre++;
+        if (r.ket_qua === 'OK') byNguoiKiem[nguoiKiem].so_ok++;
+        if (r.ket_qua === 'NG') byNguoiKiem[nguoiKiem].so_ng++;
+        if (r.ket_qua === 'CANH_BAO') byNguoiKiem[nguoiKiem].so_canh_bao++;
+        byNguoiKiem[nguoiKiem].tong_thoi_gian_kiem_giay += Number(r.thoi_gian_kiem_giay) || 0;
+      }
+    });
+    pending.sort((a, b) => {
+      const pa = PRIORITY[a.loai_kiem] != null ? PRIORITY[a.loai_kiem] : 2, pb = PRIORITY[b.loai_kiem] != null ? PRIORITY[b.loai_kiem] : 2;
+      if (pa !== pb) return pa - pb;
+      if (a.da_den_han !== b.da_den_han) return a.da_den_han ? -1 : 1;
+      return b.phut_da_troi - a.phut_da_troi;
+    });
+    done.sort((a, b) => new Date(b.thoi_diem_kiem_thuc_te || 0) - new Date(a.thoi_diem_kiem_thuc_te || 0));
+
+    renderBoard({ pending, done, byNguoiKiem: Object.values(byNguoiKiem) });
+    document.getElementById('live-status').textContent = 'OK — cập nhật ' + fmtTime(new Date());
+  } catch (e) {
+    document.getElementById('live-status').textContent = 'Lỗi tải dữ liệu';
+  }
+}
+
+function levelForMinutes(m){
+  if (m >= 90) return 'row-alarm';
+  if (m >= 30) return 'row-warn';
+  return '';
+}
+
+function doneRowHtml(d){
+  return `<tr>
+    <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN') : '—'}</td>
+    <td><b>${escapeHtml(d.ma_may)}</b></td>
+    <td class="mono">${escapeHtml(d.ma_sp)}</td>
+    <td>${escapeHtml(LOAI_LABEL[d.loai_kiem] || d.loai_kiem)}</td>
+    <td>${escapeHtml(d.nguoi_kiem)}</td>
+    <td class="mono">${d.phut_phan_hoi != null ? d.phut_phan_hoi : '—'}</td>
+    <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
+    <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
+    <td class="link-list">
+      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+      ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
+      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan ? '—' : ''}
+    </td>
+  </tr>`;
+}
+
+function renderBoard(b){
+  document.getElementById('pending-count').textContent = b.pending.length;
+  document.getElementById('pending-tbody').innerHTML = b.pending.map(p => `
+    <tr class="${p.da_den_han ? levelForMinutes(p.phut_da_troi) : ''}">
+      <td><b>${escapeHtml(p.ma_may)}</b></td>
+      <td class="mono">${escapeHtml(p.ma_sp)}</td>
+      <td>${escapeHtml(LOAI_LABEL[p.loai_kiem] || p.loai_kiem)}</td>
+      <td class="mono">${p.da_den_han ? ('Đang chờ ' + p.phut_da_troi + 'p') : ('<span class="pill neutral">Sắp tới · còn ' + p.phut_con_lai + 'p</span>')}</td>
+    </tr>`).join('');
+  document.getElementById('pending-empty').classList.toggle('hidden', b.pending.length > 0);
+
+  document.getElementById('nguoi-tbody').innerHTML = b.byNguoiKiem.map(n => `
+    <tr>
+      <td>${escapeHtml(n.nguoi_kiem)}</td>
+      <td class="mono">${n.tong}</td>
+      <td class="mono" style="color:var(--good-fg)">${n.dung_han}</td>
+      <td class="mono" style="color:${n.tre > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${n.tre}</td>
+      <td class="mono" style="color:var(--good-fg)">${n.so_ok}</td>
+      <td class="mono" style="color:${n.so_ng > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${n.so_ng}</td>
+      <td class="mono" style="color:${n.so_canh_bao > 0 ? 'var(--warn-fg)' : 'var(--text-muted)'}">${n.so_canh_bao}</td>
+      <td class="mono">${fmtDurationSec(n.tong_thoi_gian_kiem_giay)}</td>
+    </tr>`).join('');
+  document.getElementById('nguoi-empty').classList.toggle('hidden', b.byNguoiKiem.length > 0);
+
+  document.getElementById('done-count').textContent = b.done.length;
+  document.getElementById('done-tbody').innerHTML = b.done.map(doneRowHtml).join('');
+  document.getElementById('done-empty').classList.toggle('hidden', b.done.length > 0);
+}
+
+// ===================== Tra cứu lịch sử =====================
+function toVnDateStr(iso){ return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso)); }
+
+function fillSelect(id, values){
+  const sel = document.getElementById(id);
+  values.slice().sort((a, b) => a.localeCompare(b, 'vi')).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadQcFilters(){
+  const [mProd, mMachines, mMolds] = await Promise.all([
+    sb.from('master_products').select('ma_sp,ten_sp'),
+    sb.from('master_machines').select('ma_may'),
+    sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat'),
+  ]);
+  state.machines = (mMachines.data || []).map(r => r.ma_may).filter(Boolean);
+  state.products = (mProd.data || []).map(r => r.ma_sp).filter(Boolean);
+  state.productMap = {};
+  (mProd.data || []).forEach(p => { state.productMap[p.ma_sp] = p.ten_sp || ''; });
+  state.currentUserEmail = await MesAuth.getCurrentUserEmail() || '';
+
+  state.moldsByProduct = {};
+  (mMolds.data || []).forEach(m => {
+    const maSp = String(m.ten_sp_gan_nhat || '').split(' (')[0].trim();
+    const maKhuon = String(m.ma_khuon || '').trim();
+    if (!maSp || !maKhuon) return;
+    if (!state.moldsByProduct[maSp]) state.moldsByProduct[maSp] = [];
+    if (state.moldsByProduct[maSp].indexOf(maKhuon) === -1) state.moldsByProduct[maSp].push(maKhuon);
+  });
+
+  fillSelect('fl-ma-may', state.machines);
+  fillSelect('fl-ma-sp', state.products);
+  fillSelect('tc-ma-sp', state.products);
+  searchHistory();
+}
+
+function populateSoKhuonField(prefix, maSp, currentValue){
+  const sel = document.getElementById(prefix + '-so-khuon-select');
+  const inp = document.getElementById(prefix + '-so-khuon');
+  const hint = document.getElementById(prefix + '-so-khuon-hint');
+  const molds = (maSp && state.moldsByProduct[maSp]) || [];
+
+  if (molds.length === 0) {
+    sel.style.display = 'none'; inp.style.display = ''; inp.value = currentValue != null ? currentValue : '';
+    hint.textContent = maSp ? 'Chưa có khuôn khai báo cho SP ' + maSp + ' — nhập thủ công' : 'Chọn mã SP trước để lọc danh sách khuôn';
+    return;
+  }
+  sel.innerHTML = '';
+  if (molds.length > 1) { const ph = document.createElement('option'); ph.value = ''; ph.textContent = '— Chọn khuôn (' + molds.length + ' khuôn) —'; sel.appendChild(ph); }
+  molds.forEach(mk => { const opt = document.createElement('option'); opt.value = mk; opt.textContent = mk; sel.appendChild(opt); });
+  const manualOpt = document.createElement('option'); manualOpt.value = '__manual__'; manualOpt.textContent = '✏️ Khác (nhập tay)'; sel.appendChild(manualOpt);
+
+  let selectVal;
+  if (currentValue && molds.indexOf(currentValue) !== -1) selectVal = currentValue;
+  else if (molds.length === 1) selectVal = molds[0];
+  else selectVal = currentValue ? '__manual__' : '';
+  sel.value = selectVal; sel.style.display = '';
+
+  if (selectVal === '__manual__') { inp.style.display = ''; inp.value = currentValue || ''; hint.textContent = ''; }
+  else { inp.style.display = 'none'; inp.value = selectVal; hint.textContent = molds.length === 1 ? 'Tự động chọn khuôn duy nhất của SP này' : ''; }
+}
+function onSoKhuonSelectChange(prefix){
+  const sel = document.getElementById(prefix + '-so-khuon-select');
+  const inp = document.getElementById(prefix + '-so-khuon');
+  const hint = document.getElementById(prefix + '-so-khuon-hint');
+  if (sel.value === '__manual__') { inp.style.display = ''; inp.value = ''; inp.focus(); hint.textContent = ''; }
+  else { inp.style.display = 'none'; inp.value = sel.value; hint.textContent = ''; }
+}
+
+function populateDynamicFilterOptions(list){
+  const dates = Array.from(new Set(list.map(x => x.thoi_diem_kiem_thuc_te ? toVnDateStr(x.thoi_diem_kiem_thuc_te) : null).filter(Boolean))).sort().reverse();
+  const dateSel = document.getElementById('fl-ngay');
+  dates.forEach(dt => { const opt = document.createElement('option'); opt.value = dt; opt.textContent = new Date(dt + 'T00:00:00').toLocaleDateString('vi-VN'); dateSel.appendChild(opt); });
+  const inspectors = Array.from(new Set(list.map(x => x.nguoi_kiem).filter(Boolean)));
+  fillSelect('fl-nguoi-kiem', inspectors);
+}
+
+async function searchHistory(){
+  const ngay = document.getElementById('fl-ngay').value;
+  const maMay = document.getElementById('fl-ma-may').value;
+  const maSp = document.getElementById('fl-ma-sp').value;
+  const nguoiKiem = document.getElementById('fl-nguoi-kiem').value;
+
+  let q = sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'da_kiem');
+  if (maMay) q = q.eq('ma_may', maMay);
+  if (maSp) q = q.eq('ma_sp', maSp);
+  if (nguoiKiem) q = q.eq('nguoi_kiem', nguoiKiem);
+  const { data, error } = await q;
+  if (error) return;
+
+  let list = (data || []).map(mapIpqcDoneRow);
+  if (!state.dynamicFiltersLoaded) { populateDynamicFilterOptions(list); state.dynamicFiltersLoaded = true; }
+  if (ngay) list = list.filter(x => x.thoi_diem_kiem_thuc_te && toVnDateStr(x.thoi_diem_kiem_thuc_te) === ngay);
+  list.sort((a, b) => new Date(b.thoi_diem_kiem_thuc_te || 0) - new Date(a.thoi_diem_kiem_thuc_te || 0));
+  renderHistory(list);
+}
+
+function renderHistory(list){
+  document.getElementById('history-count').textContent = list.length;
+  document.getElementById('history-tbody').innerHTML = list.map(doneRowHtml).join('');
+  document.getElementById('history-empty').classList.toggle('hidden', list.length > 0);
+}
+
+// ===================== Xử lý sản phẩm không phù hợp =====================
+const NCP_MAU_THE = { da_cach_ly: 'do', dang_loc: 'do', cho_quyet_dinh: 'vang', dang_sua: 'vang', cho_duyet_phe: 'vang', dong: 'xanh' };
+const NCP_TRANG_THAI_LABEL = { da_cach_ly: 'Đã cách ly — chờ lọc', dang_loc: 'Đang lọc lại', cho_quyet_dinh: 'Chờ chọn phương án (Sửa/Phế)', dang_sua: 'Đang sửa chữa', cho_duyet_phe: 'Chờ duyệt phế', dong: 'Đã xử lý xong' };
+const NCP_BADGE_LABEL = { do: '🔴 Đỏ', vang: '🟡 Vàng', xanh: '🟢 Xanh' };
+const NCP_RC_BADGE_LABEL = { nhap: 'Nháp', cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' };
+
+async function loadNcpList(){
+  const { data, error } = await sb.from('duc_ncp').select('*').order('ngay_tao', { ascending: false });
+  if (error) return;
+  state.ncpList = (data || []).map(c => Object.assign({ mau_the: NCP_MAU_THE[c.trang_thai] || 'do' }, c));
+  const priority = { do: 0, vang: 1, xanh: 2 };
+  state.ncpList.sort((a, b) => {
+    const pa = priority[a.mau_the] != null ? priority[a.mau_the] : 9, pb = priority[b.mau_the] != null ? priority[b.mau_the] : 9;
+    if (pa !== pb) return pa - pb;
+    return new Date(b.ngay_tao) - new Date(a.ngay_tao);
+  });
+  renderNcpList();
+}
+
+function renderNcpList(){
+  const open = state.ncpList.filter(c => c.trang_thai !== 'dong');
+  const closed = state.ncpList.filter(c => c.trang_thai === 'dong');
+
+  document.getElementById('ncp-open-count').textContent = open.length;
+  document.getElementById('ncp-open-tbody').innerHTML = open.map(c => `
+    <tr>
+      <td><span class="ncp-badge ${c.mau_the}">${NCP_BADGE_LABEL[c.mau_the]}</span></td>
+      <td class="mono">${escapeHtml(c.id_ncp)}</td>
+      <td><b>${escapeHtml(c.ma_may)}</b></td>
+      <td class="mono">${escapeHtml(c.ma_sp)}</td>
+      <td class="ncp-qty">${c.so_luong_nghi_van}</td>
+      <td class="ncp-qty">${c.so_luong_da_loc}</td>
+      <td class="ncp-qty" style="color:var(--good-fg)">${c.so_luong_loc_ok}</td>
+      <td class="ncp-qty" style="color:${c.so_luong_loc_ng > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_loc_ng}</td>
+      <td>${escapeHtml(NCP_TRANG_THAI_LABEL[c.trang_thai] || c.trang_thai)}</td>
+      <td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
+      <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN') : '—'}</td>
+      <td class="ncp-btn-row">
+        <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
+        <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
+        <button class="btn btn-primary" onclick="openNcpUpdateModal('${c.id_ncp}')">Cập nhật</button>
+      </td>
+    </tr>`).join('');
+  document.getElementById('ncp-open-empty').classList.toggle('hidden', open.length > 0);
+
+  document.getElementById('ncp-closed-count').textContent = closed.length;
+  document.getElementById('ncp-closed-tbody').innerHTML = closed.map(c => `
+    <tr>
+      <td><span class="ncp-badge ${c.mau_the}">${NCP_BADGE_LABEL[c.mau_the]}</span></td>
+      <td class="mono">${escapeHtml(c.id_ncp)}</td>
+      <td><b>${escapeHtml(c.ma_may)}</b></td>
+      <td class="mono">${escapeHtml(c.ma_sp)}</td>
+      <td class="ncp-qty">${c.so_luong_nghi_van}</td>
+      <td class="ncp-qty" style="color:var(--good-fg)">${c.so_luong_loc_ok + c.so_luong_sua_ok}</td>
+      <td class="ncp-qty" style="color:${c.so_luong_phe_da_duyet > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_phe_da_duyet}</td>
+      <td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
+      <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN') : '—'}</td>
+      <td class="ncp-btn-row">
+        <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
+        <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
+      </td>
+    </tr>`).join('');
+  document.getElementById('ncp-closed-empty').classList.toggle('hidden', closed.length > 0);
+}
+
+function closeNcpModal(id){ document.getElementById(id).classList.remove('show'); }
+
+async function openNcpNewModal(){
+  if (!(await ensureAuth())) return;
+  document.getElementById('ncp-src-ng').innerHTML = '<option value="">Đang tải...</option>';
+  document.getElementById('ncp-ma-may').innerHTML = '<option value="">-- Chọn máy --</option>';
+  document.getElementById('ncp-ma-sp').innerHTML = '<option value="">-- Chọn mã SP --</option>';
+  fillSelect('ncp-ma-may', state.machines);
+  fillSelect('ncp-ma-sp', state.products);
+  document.getElementById('ncp-ten-sp').value = '';
+  document.getElementById('ncp-so-khuon').value = '';
+  document.getElementById('ncp-mo-ta-loi').value = '';
+  document.getElementById('ncp-so-luong').value = '';
+  document.getElementById('ncp-so-luong-ng-du-kien').value = '';
+  document.getElementById('ncp-vi-tri').value = '';
+  document.getElementById('ncp-nguoi-dam-nhiem').value = '';
+  document.getElementById('ncp-nguoi-dam-nhiem-doi-sach').value = '';
+  document.querySelector('input[name=ncp-src][value=ng]').checked = true;
+  populateSoKhuonField('ncp', '', '');
+  ncpSourceChanged();
+
+  const { data, error } = await sb.rpc('duc_get_available_ng_checkpoints_for_ncp');
+  const sel = document.getElementById('ncp-src-ng');
+  if (error || !data || !data.length) { sel.innerHTML = '<option value="">Không có lần NG nào khả dụng</option>'; }
+  else {
+    state.ncpAvailableNg = data.map(x => ({ id_checkpoint: x.id_checkpoint, ma_may: x.ma_may, ma_sp: x.ma_sp, so_khuon: x.so_khuon, thoi_diem_kiem_thuc_te: x.thoi_diem_kiem_thuc_te, mo_ta_de_xuat: x.mo_ta_de_xuat }));
+    sel.innerHTML = '<option value="">-- Chọn --</option>' + state.ncpAvailableNg.map(x =>
+      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN')}</option>`).join('');
+    onNcpNgSelected();
+  }
+  document.getElementById('ncp-modal-new').classList.add('show');
+}
+
+function ncpSourceChanged(){
+  const isNg = document.querySelector('input[name=ncp-src]:checked').value === 'ng';
+  document.getElementById('ncp-src-ng-wrap').classList.toggle('hidden', !isNg);
+  const selMay = document.getElementById('ncp-ma-may'), selSp = document.getElementById('ncp-ma-sp');
+  selMay.disabled = isNg; selSp.disabled = isNg;
+  if (isNg) { onNcpNgSelected(); }
+  else { selMay.value = ''; selSp.value = ''; document.getElementById('ncp-ten-sp').value = ''; document.getElementById('ncp-mo-ta-loi').value = ''; populateSoKhuonField('ncp', '', ''); }
+}
+function onNcpMaSpChanged(){
+  const maSp = document.getElementById('ncp-ma-sp').value;
+  document.getElementById('ncp-ten-sp').value = (maSp && state.productMap[maSp]) || '';
+  populateSoKhuonField('ncp', maSp, document.getElementById('ncp-so-khuon').value.trim());
+}
+function onNcpNgSelected(){
+  const id = document.getElementById('ncp-src-ng').value;
+  const cp = state.ncpAvailableNg.find(x => x.id_checkpoint === id);
+  document.getElementById('ncp-ma-may').value = cp ? cp.ma_may : '';
+  document.getElementById('ncp-ma-sp').value = cp ? cp.ma_sp : '';
+  document.getElementById('ncp-ten-sp').value = cp ? ((state.productMap[cp.ma_sp]) || '') : '';
+  document.getElementById('ncp-mo-ta-loi').value = cp ? (cp.mo_ta_de_xuat || '') : '';
+  populateSoKhuonField('ncp', cp ? cp.ma_sp : '', cp ? (cp.so_khuon || '') : '');
+}
+
+async function submitNcpNewCase(){
+  if (!(await ensureAuth())) return;
+  const isNg = document.querySelector('input[name=ncp-src]:checked').value === 'ng';
+  const idCheckpoint = isNg ? document.getElementById('ncp-src-ng').value : '';
+  if (isNg && !idCheckpoint) return alert('Chọn 1 lần NG làm nguồn');
+
+  const maMay = document.getElementById('ncp-ma-may').value;
+  const maSp = document.getElementById('ncp-ma-sp').value;
+  if (!maMay) return alert('Chọn máy');
+  if (!maSp) return alert('Chọn mã sản phẩm');
+
+  const soLuongNgDuKienRaw = document.getElementById('ncp-so-luong-ng-du-kien').value;
+  const p = {
+    idCheckpoint: idCheckpoint || null, maMay, maSp,
+    tenSp: document.getElementById('ncp-ten-sp').value.trim(),
+    nguoiDamNhiem: document.getElementById('ncp-nguoi-dam-nhiem').value.trim(),
+    nguoiDamNhiemDoiSach: document.getElementById('ncp-nguoi-dam-nhiem-doi-sach').value.trim(),
+    soKhuon: document.getElementById('ncp-so-khuon').value.trim(),
+    moTaLoi: document.getElementById('ncp-mo-ta-loi').value.trim(),
+    soLuong: Number(document.getElementById('ncp-so-luong').value),
+    soLuongNgDuKien: soLuongNgDuKienRaw === '' ? null : Number(soLuongNgDuKienRaw),
+    viTri: document.getElementById('ncp-vi-tri').value.trim(),
+  };
+  if (!p.tenSp) return alert('Chưa xác định tên sản phẩm — chọn lại mã SP');
+  if (!p.soKhuon) return alert('Chọn số khuôn');
+  if (!p.moTaLoi) return alert('Nhập mô tả lỗi');
+  if (!p.soLuong || p.soLuong <= 0) return alert('Nhập số lượng nghi vấn hợp lệ');
+  if (p.soLuongNgDuKien === null) return alert('Nhập số lượng SP NG (tham khảo)');
+  if (p.soLuongNgDuKien < 0 || p.soLuongNgDuKien > p.soLuong) return alert('Số lượng SP NG (tham khảo) không hợp lệ');
+  if (!p.viTri) return alert('Nhập vị trí cách ly');
+  if (!p.nguoiDamNhiem) return alert('Nhập người đảm nhiệm xử lý');
+  if (!p.nguoiDamNhiemDoiSach) return alert('Nhập người đảm nhiệm trả lời Nguyên nhân & Đối sách');
+
+  const { data, error } = await sb.rpc('duc_ncp_open_case', {
+    p_id_checkpoint_goc: p.idCheckpoint, p_ma_may: p.maMay, p_ma_sp: p.maSp, p_ten_sp: p.tenSp, p_so_khuon: p.soKhuon,
+    p_mo_ta_loi: p.moTaLoi, p_so_luong_nghi_van: p.soLuong, p_so_luong_ng_du_kien: p.soLuongNgDuKien,
+    p_vi_tri_cach_ly: p.viTri, p_nguoi_dam_nhiem: p.nguoiDamNhiem, p_nguoi_dam_nhiem_doi_sach: p.nguoiDamNhiemDoiSach,
+    p_user: state.currentUserEmail,
+  });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  closeNcpModal('ncp-modal-new');
+  loadNcpList();
+}
+
+function openNcpUpdateModal(idNcp){
+  const c = state.ncpList.find(x => x.id_ncp === idNcp);
+  if (!c) return;
+  state.ncpCurrentCase = c;
+
+  document.getElementById('ncp-update-title').textContent = c.id_ncp + ' — ' + c.ma_may + ' / ' + c.ma_sp;
+  document.getElementById('ncp-update-summary').innerHTML = `
+    <div class="row"><span class="label">Mô tả lỗi</span><span>${escapeHtml(c.mo_ta_loi)}</span></div>
+    <div class="row"><span class="label">Nghi vấn / Đã lọc</span><span>${c.so_luong_nghi_van} / ${c.so_luong_da_loc}</span></div>
+    <div class="row"><span class="label">Lọc OK / NG</span><span>${c.so_luong_loc_ok} / ${c.so_luong_loc_ng}</span></div>
+    <div class="row"><span class="label">Sửa OK / Không được</span><span>${c.so_luong_sua_ok} / ${c.so_luong_sua_khong_duoc}</span></div>
+    <div class="row"><span class="label">Đề nghị phế / Đã duyệt</span><span>${c.so_luong_de_nghi_phe} / ${c.so_luong_phe_da_duyet}</span></div>`;
+
+  ['ncp-step-loc', 'ncp-step-quyet-dinh', 'ncp-step-sua', 'ncp-step-duyet-phe', 'ncp-decision-sua', 'ncp-decision-phe']
+    .forEach(id => document.getElementById(id).classList.add('hidden'));
+
+  if (c.trang_thai === 'da_cach_ly' || c.trang_thai === 'dang_loc') {
+    document.getElementById('ncp-loc-ok').value = 0; document.getElementById('ncp-loc-ng').value = 0;
+    document.getElementById('ncp-step-loc').classList.remove('hidden');
+  } else if (c.trang_thai === 'cho_quyet_dinh') {
+    document.getElementById('ncp-mo-ta-sua').value = '';
+    document.getElementById('ncp-phe-so-luong').value = c.so_luong_loc_ng - c.so_luong_sua_ok - c.so_luong_phe_da_duyet;
+    document.getElementById('ncp-phe-ly-do').value = '';
+    document.getElementById('ncp-step-quyet-dinh').classList.remove('hidden');
+  } else if (c.trang_thai === 'dang_sua') {
+    document.getElementById('ncp-sua-ok').value = 0; document.getElementById('ncp-sua-khong-duoc').value = 0;
+    document.getElementById('ncp-step-sua').classList.remove('hidden');
+  } else if (c.trang_thai === 'cho_duyet_phe') {
+    document.getElementById('ncp-duyet-phe-info').innerHTML = `
+      <div class="row"><span class="label">Phiếu</span><span>${escapeHtml(c.so_phieu_phe)}</span></div>
+      <div class="row"><span class="label">Số lượng đề nghị</span><span>${c.so_luong_de_nghi_phe}</span></div>
+      <div class="row"><span class="label">Lý do</span><span>${escapeHtml(c.ly_do_phe)}</span></div>
+      <div class="row"><span class="label">Người đề nghị</span><span>${escapeHtml(c.nguoi_de_nghi_phe)}</span></div>`;
+    document.getElementById('ncp-duyet-ghi-chu').value = '';
+    document.getElementById('ncp-step-duyet-phe').classList.remove('hidden');
+  }
+  document.getElementById('ncp-modal-update').classList.add('show');
+}
+
+function showNcpDecisionForm(which){
+  document.getElementById('ncp-decision-sua').classList.toggle('hidden', which !== 'sua');
+  document.getElementById('ncp-decision-phe').classList.toggle('hidden', which !== 'phe');
+}
+
+async function submitNcpSorting(){
+  if (!(await ensureAuth())) return;
+  const { data, error } = await sb.rpc('duc_ncp_record_sorting', {
+    p_id_ncp: state.ncpCurrentCase.id_ncp,
+    p_so_luong_loc_ok: Number(document.getElementById('ncp-loc-ok').value) || 0,
+    p_so_luong_loc_ng: Number(document.getElementById('ncp-loc-ng').value) || 0,
+    p_user: state.currentUserEmail,
+  });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  closeNcpModal('ncp-modal-update'); loadNcpList();
+}
+
+async function submitNcpChooseSua(){
+  if (!(await ensureAuth())) return;
+  const moTa = document.getElementById('ncp-mo-ta-sua').value.trim();
+  if (!moTa) return alert('Nhập mô tả phương án sửa chữa');
+  const { data, error } = await sb.rpc('duc_ncp_choose_sua', { p_id_ncp: state.ncpCurrentCase.id_ncp, p_mo_ta_phuong_an_sua: moTa, p_user: state.currentUserEmail });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  closeNcpModal('ncp-modal-update'); loadNcpList();
+}
+
+async function submitNcpRequestScrap(){
+  if (!(await ensureAuth())) return;
+  const soLuong = Number(document.getElementById('ncp-phe-so-luong').value);
+  const lyDo = document.getElementById('ncp-phe-ly-do').value.trim();
+  if (!soLuong || soLuong <= 0) return alert('Nhập số lượng đề nghị phế hợp lệ');
+  if (!lyDo) return alert('Nhập lý do báo phế');
+  const { data, error } = await sb.rpc('duc_ncp_request_scrap', { p_id_ncp: state.ncpCurrentCase.id_ncp, p_so_luong_de_nghi_phe: soLuong, p_ly_do_phe: lyDo, p_user: state.currentUserEmail });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  closeNcpModal('ncp-modal-update'); loadNcpList();
+}
+
+async function submitNcpRepair(){
+  if (!(await ensureAuth())) return;
+  const { data, error } = await sb.rpc('duc_ncp_record_repair', {
+    p_id_ncp: state.ncpCurrentCase.id_ncp,
+    p_so_luong_sua_ok: Number(document.getElementById('ncp-sua-ok').value) || 0,
+    p_so_luong_sua_khong_duoc: Number(document.getElementById('ncp-sua-khong-duoc').value) || 0,
+    p_user: state.currentUserEmail,
+  });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  closeNcpModal('ncp-modal-update'); loadNcpList();
+}
+
+async function submitNcpApproveScrap(ketQua){
+  if (!(await ensureAuth())) return;
+  const c = state.ncpCurrentCase;
+  if (ketQua === 'Duyet' && c.nguoi_de_nghi_phe === state.currentUserEmail) {
+    if (!confirm('Bạn đang tự duyệt phiếu phế do chính bạn đề nghị — vẫn tiếp tục?')) return;
+  }
+  const { data, error } = await sb.rpc('duc_ncp_approve_scrap', { p_id_ncp: c.id_ncp, p_ket_qua: ketQua, p_ghi_chu: document.getElementById('ncp-duyet-ghi-chu').value.trim(), p_user: state.currentUserEmail });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  closeNcpModal('ncp-modal-update'); loadNcpList();
+}
+
+const NCP_MAU_BG = { do: '#FEF2F2', vang: '#FFFBEB', xanh: '#ECFDF5' };
+const NCP_MAU_BORDER = { do: '#EF4444', vang: '#F59E0B', xanh: '#10B981' };
+function printNcpTag(idNcp){
+  const c = state.ncpList.find(x => x.id_ncp === idNcp);
+  if (!c) return;
+  const w = window.open('', '_blank', 'width=420,height=560');
+  w.document.write(`
+    <html><head><title>Thẻ ${escapeHtml(c.id_ncp)}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:18px;background:${NCP_MAU_BG[c.mau_the]}}
+      .tag{border:4px solid ${NCP_MAU_BORDER[c.mau_the]};border-radius:10px;padding:16px}
+      .badge{display:inline-block;padding:4px 14px;border-radius:12px;font-weight:700;background:${NCP_MAU_BORDER[c.mau_the]};color:#fff;font-size:14px;margin-bottom:10px}
+      h1{font-size:20px;margin:6px 0}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      td{padding:5px 0;font-size:14px;vertical-align:top}
+      td.k{color:#555;width:38%}
+      .desc{margin-top:10px;padding:8px;background:#fff;border-radius:6px;font-size:13px}
+    </style></head>
+    <body onload="print()">
+      <div class="tag">
+        <div class="badge">${NCP_BADGE_LABEL[c.mau_the]}</div>
+        <h1>${escapeHtml(c.id_ncp)}</h1>
+        <table>
+          <tr><td class="k">Máy</td><td><b>${escapeHtml(c.ma_may)}</b></td></tr>
+          <tr><td class="k">Mã SP</td><td><b>${escapeHtml(c.ma_sp)}</b></td></tr>
+          <tr><td class="k">Số lượng</td><td><b>${c.so_luong_nghi_van}</b></td></tr>
+          <tr><td class="k">Vị trí cách ly</td><td>${escapeHtml(c.vi_tri_cach_ly)}</td></tr>
+          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN') : ''}</td></tr>
+          <tr><td class="k">Người mở</td><td>${escapeHtml(c.nguoi_mo_case)}</td></tr>
+        </table>
+        <div class="desc">${escapeHtml(c.mo_ta_loi)}</div>
+      </div>
+    </body></html>`);
+  w.document.close();
+}
+
+// ===================== Quản lý tiêu chuẩn =====================
+let tieuChuanList = [];
+async function loadTieuChuanList(){
+  const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').order('ma_sp');
+  if (error) return;
+  tieuChuanList = (data || []).map(t => ({ ma_sp: t.ma_sp, muc_kiem: Array.isArray(t.danh_sach_muc_kiem_json) ? t.danh_sach_muc_kiem_json : [], file_pdf_url: t.file_pdf_url || '' }));
+  document.getElementById('tc-count').textContent = tieuChuanList.length;
+  const list = document.getElementById('tc-list');
+  if (!tieuChuanList.length) { list.innerHTML = '<div class="empty-note">Chưa có mã SP nào được khai báo tiêu chuẩn.</div>'; return; }
+  list.innerHTML = tieuChuanList.map(t => `
+    <div class="tc-list-item" onclick="editTieuChuan('${escapeHtml(t.ma_sp)}')">
+      <div><div class="sp">${escapeHtml(t.ma_sp)}</div><div class="n">${t.muc_kiem.length} mục kiểm${t.file_pdf_url ? ' · có PDF' : ''}</div></div>
+      <div style="color:var(--text-dim)">›</div>
+    </div>`).join('');
+}
+
+function editTieuChuan(maSp){
+  const t = tieuChuanList.find(x => x.ma_sp === maSp);
+  document.getElementById('tc-ma-sp').value = maSp;
+  document.getElementById('tc-muc-list').innerHTML = '';
+  (t ? t.muc_kiem : []).forEach(m => addMucRow(m));
+  document.getElementById('tc-pdf-current').textContent = t && t.file_pdf_url ? '📄 Đã có PDF — upload file mới để thay thế' : 'Chưa có PDF';
+  state.pdfBase64 = null; state.pdfBlob = null;
+  document.getElementById('tc-pdf-btn').disabled = true;
+}
+
+function addMucRow(value){
+  const wrap = document.getElementById('tc-muc-list');
+  const row = document.createElement('div');
+  row.className = 'muc-row';
+  row.innerHTML = `<input type="text" value="${escapeHtml(value)}" placeholder="VD: Kích thước theo bản vẽ"><button onclick="this.parentElement.remove()">✕</button>`;
+  wrap.appendChild(row);
+}
+
+async function saveTieuChuan(){
+  if (!(await ensureAuth())) return;
+  const maSp = document.getElementById('tc-ma-sp').value.trim();
+  if (!maSp) return alert('Nhập mã SP');
+  const rows = Array.from(document.querySelectorAll('#tc-muc-list .muc-row input')).map(i => i.value.trim()).filter(v => v);
+  if (!rows.length) return alert('Cần ít nhất 1 mục kiểm');
+
+  const { data, error } = await sb.rpc('duc_ipqc_save_tieu_chuan', { p_ma_sp: maSp, p_muc_kiem: rows, p_user: state.currentUserEmail });
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  alert('✓ Đã lưu checklist cho ' + maSp);
+  loadTieuChuanList();
+}
+
+function onPdfSelected(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  state.pdfBlob = file;
+  state.pdfFileName = file.name;
+  document.getElementById('tc-pdf-btn').disabled = false;
+}
+
+async function uploadPdf(){
+  if (!(await ensureAuth())) return;
+  const maSp = document.getElementById('tc-ma-sp').value.trim();
+  if (!maSp) return alert('Nhập mã SP trước');
+  if (!state.pdfBlob) return alert('Chọn file PDF trước');
+
+  const btn = document.getElementById('tc-pdf-btn');
+  btn.disabled = true; btn.textContent = 'Đang upload...';
+  try {
+    const path = maSp.replace(/[^a-zA-Z0-9_-]/g, '') + '/tieuchuan_' + Date.now() + '.pdf';
+    const { error: upErr } = await sb.storage.from('report-files').upload(path, state.pdfBlob, { contentType: 'application/pdf', upsert: false });
+    if (upErr) throw new Error(upErr.message);
+    const { data: pub } = sb.storage.from('report-files').getPublicUrl(path);
+
+    const { data, error } = await sb.rpc('duc_ipqc_set_tieu_chuan_pdf', { p_ma_sp: maSp, p_url: pub.publicUrl, p_user: state.currentUserEmail });
+    if (error) throw new Error(error.message);
+    if (data && data.ok === false) throw new Error(data.error);
+    alert('✓ Đã upload PDF cho ' + maSp);
+    loadTieuChuanList();
+  } catch (e) {
+    alert('Lỗi: ' + e.message);
+  } finally {
+    btn.textContent = '⬆ Upload PDF'; btn.disabled = false;
+  }
+}
+
+// ===================== Chỉ báo đăng nhập =====================
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = '👤 ' + escapeHtml(email) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">🔒 Đăng nhập để ghi dữ liệu</a>';
+  }
+}
+
+// ===================== Init =====================
+startClock();
+loadBoard();
+loadQcFilters();
+initAuthStatus();
+setInterval(loadBoard, 15000);
+</script>
+</body>
+</html>
