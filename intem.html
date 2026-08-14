@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
-    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu').order('ma_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon').order('ma_sp'),
     sb.from('master_machines').select('ma_may').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
@@ -293,7 +293,7 @@ async function loadMaster(){
   if (may.error) throw new Error('Không tải được danh mục máy: ' + may.error.message);
   if (nv.error) throw new Error('Không tải được danh mục nhân sự: ' + nv.error.message);
 
-  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '' }));
+  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '' }));
   masterMap = {};
   masterData.forEach(m => { masterMap[m.ma] = m; });
   buildSelects(masterData, (may.data||[]).map(r=>r.ma_may), (nv.data||[]).map(r=>r.ten_nhan_vien));
@@ -314,12 +314,14 @@ function buildSelects(items, mays, nguois){
   ['nguoiTT', 's_nguoiTT'].forEach(id => fillOptions(document.getElementById(id), nguois, '-- Chọn người --'));
 }
 
-/** prefix '' = tab In Tem, 's_' = tab Tra cứu — tự điền tên SP + nguyên liệu. */
+/** prefix '' = tab In Tem, 's_' = tab Tra cứu — tự điền tên SP + nguyên liệu
+    + số khuôn gợi ý (theo master_products, có thể sửa tay sau khi điền). */
 function onMaChange(prefix){
   var ma = document.getElementById(prefix + "maSP").value;
   var item = masterMap[ma];
   document.getElementById(prefix + "tenSP").value = item ? item.ten : "";
   document.getElementById(prefix + "nguyenLieu").value = item ? item.nguyenLieu : "";
+  document.getElementById(prefix + "soKhuon").value = item ? item.soKhuon : "";
 }
 
 function applyPrefill(){
