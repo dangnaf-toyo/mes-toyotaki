@@ -126,6 +126,7 @@
             <div><label for="sp-ten">Tên SP</label><input type="text" id="sp-ten"></div>
             <div><label for="sp-cavity">Cavity</label><input type="number" step="any" id="sp-cavity"></div>
             <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
+            <div style="grid-column:1/-1"><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" id="sp-nguyenlieu"></div>
           </div>
           <div class="form-actions"><button type="submit" id="sp-submit">Thêm sản phẩm</button></div>
         </form>
@@ -134,7 +135,7 @@
         <h2>Danh sách sản phẩm</h2>
         <div class="table-wrap">
           <table id="sp-table" style="display:none">
-            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Cavity</th><th>Cycle time (s)</th><th></th></tr></thead>
+            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Cavity</th><th>Cycle time (s)</th><th>Nguyên liệu</th><th></th></tr></thead>
             <tbody id="sp-tbody"></tbody>
           </table>
         </div>
@@ -310,7 +311,7 @@ function spResetForm(){
 document.getElementById('sp-cancel').addEventListener('click', spResetForm);
 
 async function loadSp(){
-  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, cavity, cycle_time_s').order('ma_sp');
+  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, cavity, cycle_time_s, nguyen_lieu').order('ma_sp');
   if (error){ showMsg('sp-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('sp-msg');
   const table = document.getElementById('sp-table'), tbody = document.getElementById('sp-tbody'), empty = document.getElementById('sp-empty');
@@ -322,6 +323,7 @@ async function loadSp(){
       <td>${escapeHtml(r.ten_sp) || '<span class="muted">—</span>'}</td>
       <td>${r.cavity ?? '<span class="muted">—</span>'}</td>
       <td>${r.cycle_time_s ?? '<span class="muted">—</span>'}</td>
+      <td>${escapeHtml(r.nguyen_lieu) || '<span class="muted">—</span>'}</td>
       <td class="row-actions">
         <button type="button" class="edit">Sửa</button>
         <button type="button" class="del">Xoá</button>
@@ -337,6 +339,7 @@ async function loadSp(){
       document.getElementById('sp-ten').value = r.ten_sp || '';
       document.getElementById('sp-cavity').value = r.cavity ?? '';
       document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
+      document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
       document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
       document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
       document.getElementById('sp-cancel').style.display = 'inline';
@@ -358,13 +361,14 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const ctRaw = document.getElementById('sp-ct').value;
   const cavity = cavityRaw === '' ? null : Number(cavityRaw);
   const cycle_time_s = ctRaw === '' ? null : Number(ctRaw);
+  const nguyen_lieu = document.getElementById('sp-nguyenlieu').value.trim() || null;
   if (!ma_sp) return;
 
   let error;
   if (spEditing){
-    ({ error } = await sb.from('master_products').update({ ten_sp, cavity, cycle_time_s }).eq('ma_sp', spEditing));
+    ({ error } = await sb.from('master_products').update({ ten_sp, cavity, cycle_time_s, nguyen_lieu }).eq('ma_sp', spEditing));
   } else {
-    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, cavity, cycle_time_s }));
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, cavity, cycle_time_s, nguyen_lieu }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
   showMsg('sp-msg', 'ok', spEditing ? 'Đã lưu ' + ma_sp + '.' : 'Đã thêm ' + ma_sp + '.');

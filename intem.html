@@ -9,17 +9,24 @@
   "Intem QR" (D:\Project\MES\Intem QR\Code.gs + Index.html). Đọc công khai,
   GHI (in tem mới/lưu sửa/xoá) bắt buộc đăng nhập Supabase Auth.
 
-  ĐÃ CHỦ ĐÍCH ĐƠN GIẢN HOÁ (ghi rõ để không tưởng là thiếu sót):
-  - "Nguyên liệu" đổi từ dropdown gợi ý (đọc cột E sheet KHSX Master) sang ô
-    nhập tay tự do: cột nguyên liệu theo từng mã SP chưa có trong bảng
-    Supabase master_products. Trường này vốn không bắt buộc ở bản gốc, không
-    ảnh hưởng tính đúng đắn dữ liệu ghi (duc_ghi_tem nhận text tự do).
-  - Thư viện tạo mã QR (qrcode-generator) trước đây nhúng base64 ngay trong
-    file vì chạy trong sandbox Apps Script (chặn CDN ngoài) — ở đây tải thẳng
-    từ CDN, cùng phiên bản/API, giữ nguyên 100% logic vẽ SVG (buildQrRects/
-    buildLabelSvg) so với bản gốc.
+  CẬP NHẬT 2026-08-14 (theo yêu cầu tối ưu hoá):
+  1) Tách 2 tab riêng biệt: "In Tem" (tạo tem mới) và "Tra cứu Tem" (tìm tem
+     đã in để xem/sửa/in lại/xoá) — trước đây gộp chung 1 form.
+  2) Tra cứu tem: ngoài gõ tay Tag No, thêm quét QR trực tiếp bằng camera
+     (jsQR + getUserMedia, cùng cách chuyencongdoan.html đã dùng) — tự tra
+     cứu ngay khi đọc được mã, không cần gõ tay.
+  3) "Nguyên liệu" tự điền theo master_products.nguyen_lieu khi chọn mã SP
+     (cột mới, quản lý qua quan-ly-danh-muc.html tab Sản phẩm) — vẫn sửa tay
+     được sau khi tự điền, không khoá cứng.
+  4) Chủng loại "Sản phẩm đang phát triển" in tem nền đen chữ trắng (trước
+     luôn nền trắng chữ đen bất kể chủng loại). Tag No tự phân biệt qua tiền
+     tố D-TKD (đang phát triển) / TKD (hàng loạt) — dùng lại để suy ra chủng
+     loại khi tra cứu/in lại tem cũ (KHÔNG có cột loai_sp riêng trong
+     duc_tem, xem migration_phase4_step2_intem.sql).
+  - Thư viện tạo mã QR (qrcode-generator) tải từ CDN, giữ nguyên 100% logic
+    vẽ SVG (buildQrRects/buildLabelSvg) so với bản gốc.
   - Nhận prefill qua query string (?maSP=..&tenSP=..&mayDuc=..&nguoiTT=..&soKhuon=..)
-    khi mở từ nút "🖨" trên duc-dashboard.html — giữ đúng hành vi bản gốc.
+    khi mở từ nút "🖨" trên duc-dashboard.html — đổ vào tab "In Tem".
 -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -33,9 +40,13 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;
 .hdr p{font-size:10px;color:#999;margin-top:2px}
 .auth-info{font-size:11px;color:#667}
 .auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.tabs-wrap{display:flex;gap:8px;width:100%;max-width:500px;margin-bottom:14px}
+.tab-btn{flex:1;padding:11px;border:1.5px solid #ddd;border-radius:10px;background:#fff;
+  color:#555;font-size:13px;font-weight:700;cursor:pointer}
+.tab-btn.active{background:#C87941;border-color:#C87941;color:#fff}
 .card{background:#fff;border-radius:14px;
   box-shadow:0 2px 16px rgba(0,0,0,.08);
-  padding:24px 20px;width:100%;max-width:500px}
+  padding:24px 20px;width:100%;max-width:500px;margin-bottom:14px}
 .card-ttl{font-size:12px;font-weight:700;color:#C87941;
   text-transform:uppercase;letter-spacing:.5px;
   margin-bottom:18px;padding-bottom:9px;
@@ -54,26 +65,34 @@ input:focus,select:focus,textarea:focus{
   box-shadow:0 0 0 3px rgba(200,121,65,.12)}
 input[disabled],select[disabled]{background:#f7f7f7;color:#888}
 textarea{resize:vertical;min-height:48px}
-.btns{display:flex;gap:10px;margin-top:20px}
+.btns{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .btn{flex:1;padding:12px;border:none;border-radius:9px;
-  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;min-width:120px}
 .btn-p{background:#C87941;color:#fff}
 .btn-p:hover:not(:disabled){background:#a85e2a;transform:translateY(-1px)}
 .btn-p:disabled{opacity:.5;cursor:not-allowed}
 .btn-s{background:#f0f2f5;color:#555}
 .btn-s:hover{background:#e2e5ea}
 .btn-s:disabled{opacity:.5;cursor:not-allowed}
+.scan-btn{width:100%;padding:14px;border:none;border-radius:10px;
+  background:#C87941;color:#fff;font-size:14.5px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px}
+.scan-btn:active{background:#a85e2a}
+.scan-btn.rescan{background:#fff;color:#C87941;border:1.5px solid #C87941;padding:10px;font-size:13px}
+.scan-video-wrap{margin-top:10px}
+.scan-video-wrap video{width:100%;border-radius:10px;background:#000}
 #msg{margin-top:12px;padding:11px 14px;border-radius:7px;
-  font-size:13px;display:none}
+  font-size:13px;display:none;width:100%;max-width:500px}
 .err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
 .ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
 .wait{background:#fff8f0;color:#C87941;border:1px solid #f5e6d7;display:block!important}
 .loading-overlay{display:flex;align-items:center;justify-content:center;
-  padding:30px;color:#C87941;font-size:14px;gap:10px}
+  padding:30px;color:#C87941;font-size:14px;gap:10px;width:100%;max-width:500px}
 .spin{width:20px;height:20px;border:3px solid #f5e6d7;
   border-top-color:#C87941;border-radius:50%;
   animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.empty-hint{font-size:12px;color:#999;text-align:center;padding:8px 4px 0}
 </style>
 </head>
 <body>
@@ -83,85 +102,159 @@ textarea{resize:vertical;min-height:48px}
   </div>
   <div class="auth-info" id="authInfo">…</div>
 </div>
-<div class="card">
-  <div class="card-ttl">Thông tin tem</div>
 
-  <div id="loading" class="loading-overlay">
-    <div class="spin"></div> Đang tải dữ liệu...
-  </div>
-
-  <div id="formWrap" style="display:none">
-    <div class="fg full" style="margin-bottom:12px">
-      <label for="searchTag">Tra cứu theo Tag No</label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="searchTag" type="text" placeholder="Nhập Tag No">
-        <button class="btn btn-s" type="button" style="flex:none;padding:8px 14px" onclick="findTem()">🔎 Tìm</button>
-      </div>
-    </div>
-    <div class="btns" style="margin-top:8px">
-      <button class="btn btn-s" type="button" onclick="saveTemEdit()">💾 Lưu thay đổi</button>
-      <button class="btn btn-s" type="button" onclick="reprintTem()">🖨 In lại</button>
-      <button class="btn btn-s" type="button" onclick="deleteTem()">🗑 Xóa tem</button>
-    </div>
-    <div class="grid" style="margin-top:16px">
-      <div class="fg">
-        <label class="req" for="maSP">Mã sản phẩm</label>
-        <select id="maSP" onchange="onMaChange()"></select>
-      </div>
-      <div class="fg">
-        <label for="tenSP">Tên sản phẩm</label>
-        <input id="tenSP" type="text" placeholder="Tự điền theo mã" disabled>
-      </div>
-      <div class="fg">
-        <label class="req" for="soLuong">Số lượng / thùng</label>
-        <input id="soLuong" type="number" placeholder="Pcs" min="1">
-      </div>
-      <div class="fg">
-        <label for="lotNo">Ngày sản xuất</label>
-        <input id="lotNo" type="date">
-      </div>
-      <div class="fg">
-        <label for="soKhuon">Số khuôn</label>
-        <input id="soKhuon" type="text" placeholder="VD V45-46">
-      </div>
-      <div class="fg">
-        <label for="nguyenLieu">Nguyên liệu</label>
-        <input id="nguyenLieu" type="text" placeholder="Nhập tự do (tuỳ chọn)">
-      </div>
-      <div class="fg">
-        <label class="req" for="mayDuc">Máy đúc</label>
-        <select id="mayDuc"></select>
-      </div>
-      <div class="fg">
-        <label class="req" for="nguoiTT">Người thao tác</label>
-        <select id="nguoiTT"></select>
-      </div>
-      <div class="fg full">
-        <label for="ghiChu">Ghi chú</label>
-        <textarea id="ghiChu" placeholder="VD: Đúc mẫu"></textarea>
-      </div>
-      <div class="fg full">
-        <label class="req" for="loaiSP">Chủng loại sản phẩm</label>
-        <select id="loaiSP">
-          <option value="hangloat" selected>Sản phẩm sản xuất hàng loạt</option>
-          <option value="phattrien">Sản phẩm đang phát triển</option>
-        </select>
-      </div>
-    </div>
-    <div class="btns">
-      <button class="btn btn-s" onclick="clearAll()">🗑 Xóa</button>
-      <button class="btn btn-p" id="btnIn" onclick="inTem()">🖨 In Tem</button>
-    </div>
-  </div>
-
-  <div id="msg"></div>
+<div id="loading" class="loading-overlay">
+  <div class="spin"></div> Đang tải dữ liệu...
 </div>
 
+<div id="mainWrap" style="display:none;width:100%;max-width:500px">
+  <div class="tabs-wrap">
+    <button type="button" class="tab-btn active" id="tabBtnPrint">🖨️ In Tem</button>
+    <button type="button" class="tab-btn" id="tabBtnSearch">🔎 Tra cứu Tem</button>
+  </div>
+
+  <!-- ============ TAB: In Tem (tạo tem mới) ============ -->
+  <div id="panelPrint">
+    <div class="card">
+      <div class="card-ttl">Thông tin tem mới</div>
+      <div class="grid">
+        <div class="fg">
+          <label class="req" for="maSP">Mã sản phẩm</label>
+          <select id="maSP" onchange="onMaChange('')"></select>
+        </div>
+        <div class="fg">
+          <label for="tenSP">Tên sản phẩm</label>
+          <input id="tenSP" type="text" placeholder="Tự điền theo mã" disabled>
+        </div>
+        <div class="fg">
+          <label class="req" for="soLuong">Số lượng / thùng</label>
+          <input id="soLuong" type="number" placeholder="Pcs" min="1">
+        </div>
+        <div class="fg">
+          <label for="lotNo">Ngày sản xuất</label>
+          <input id="lotNo" type="date">
+        </div>
+        <div class="fg">
+          <label for="soKhuon">Số khuôn</label>
+          <input id="soKhuon" type="text" placeholder="VD V45-46">
+        </div>
+        <div class="fg">
+          <label for="nguyenLieu">Nguyên liệu</label>
+          <input id="nguyenLieu" type="text" placeholder="Tự điền theo mã SP (sửa được)">
+        </div>
+        <div class="fg">
+          <label class="req" for="mayDuc">Máy đúc</label>
+          <select id="mayDuc"></select>
+        </div>
+        <div class="fg">
+          <label class="req" for="nguoiTT">Người thao tác</label>
+          <select id="nguoiTT"></select>
+        </div>
+        <div class="fg full">
+          <label for="ghiChu">Ghi chú</label>
+          <textarea id="ghiChu" placeholder="VD: Đúc mẫu"></textarea>
+        </div>
+        <div class="fg full">
+          <label class="req" for="loaiSP">Chủng loại sản phẩm</label>
+          <select id="loaiSP">
+            <option value="hangloat" selected>Sản phẩm sản xuất hàng loạt</option>
+            <option value="phattrien">Sản phẩm đang phát triển (in tem nền đen)</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-s" onclick="clearAll()">🗑 Xóa</button>
+        <button class="btn btn-p" id="btnIn" onclick="inTem()">🖨 In Tem</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: Tra cứu Tem ============ -->
+  <div id="panelSearch" style="display:none">
+    <div class="card">
+      <div class="card-ttl">Tra cứu theo Tag No</div>
+      <div class="fg">
+        <label for="searchTag">Tag No</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="searchTag" type="text" placeholder="Nhập Tag No">
+          <button class="btn btn-s" type="button" style="flex:none;padding:8px 14px" onclick="findTem()">🔎 Tìm</button>
+        </div>
+      </div>
+      <button class="scan-btn" type="button" id="btnScanSearch">📷 Quét QR trên tem</button>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+      <div class="scan-video-wrap" id="scanVideoWrap" style="display:none">
+        <video id="scanVideo" playsinline autoplay muted></video>
+        <button class="scan-btn rescan" type="button" id="btnCancelScan" style="margin-top:8px">✖ Huỷ quét</button>
+      </div>
+      <div class="empty-hint" id="scanEmptyHint">Hướng camera vào mã QR trên tem — hệ thống tự nhận diện và tra cứu, không cần bấm chụp.</div>
+    </div>
+
+    <div class="card" id="searchResultCard" style="display:none">
+      <div class="card-ttl">Thông tin tem tìm thấy</div>
+      <div class="grid">
+        <div class="fg">
+          <label class="req" for="s_maSP">Mã sản phẩm</label>
+          <select id="s_maSP" onchange="onMaChange('s_')"></select>
+        </div>
+        <div class="fg">
+          <label for="s_tenSP">Tên sản phẩm</label>
+          <input id="s_tenSP" type="text" disabled>
+        </div>
+        <div class="fg">
+          <label class="req" for="s_soLuong">Số lượng / thùng</label>
+          <input id="s_soLuong" type="number" placeholder="Pcs" min="1">
+        </div>
+        <div class="fg">
+          <label for="s_lotNo">Ngày sản xuất</label>
+          <input id="s_lotNo" type="date">
+        </div>
+        <div class="fg">
+          <label for="s_soKhuon">Số khuôn</label>
+          <input id="s_soKhuon" type="text" placeholder="VD V45-46">
+        </div>
+        <div class="fg">
+          <label for="s_nguyenLieu">Nguyên liệu</label>
+          <input id="s_nguyenLieu" type="text">
+        </div>
+        <div class="fg">
+          <label class="req" for="s_mayDuc">Máy đúc</label>
+          <select id="s_mayDuc"></select>
+        </div>
+        <div class="fg">
+          <label class="req" for="s_nguoiTT">Người thao tác</label>
+          <select id="s_nguoiTT"></select>
+        </div>
+        <div class="fg full">
+          <label for="s_ghiChu">Ghi chú</label>
+          <textarea id="s_ghiChu"></textarea>
+        </div>
+        <div class="fg full">
+          <label for="s_loaiSP">Chủng loại sản phẩm (áp dụng khi In lại)</label>
+          <select id="s_loaiSP">
+            <option value="hangloat">Sản phẩm sản xuất hàng loạt</option>
+            <option value="phattrien">Sản phẩm đang phát triển (in tem nền đen)</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-s" type="button" onclick="saveTemEdit()">💾 Lưu thay đổi</button>
+        <button class="btn btn-s" type="button" onclick="reprintTem()">🖨 In lại</button>
+        <button class="btn btn-s" type="button" onclick="deleteTem()">🗑 Xóa tem</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="msg"></div>
+<canvas id="scanCanvas" style="display:none"></canvas>
+
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script>
-var masterData = [];   // [{ma, ten}]
+var masterData = [];   // [{ma, ten, nguyenLieu}]
+var masterMap = {};    // ma_sp -> {ten, nguyenLieu}
 var currentTagNo = "";
 var PREFILL = Object.fromEntries(new URLSearchParams(location.search));
 
@@ -169,15 +262,30 @@ function getTodayString(){
   var d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
-function setDefaultLotNo(){
-  var el = document.getElementById("lotNo");
-  if (el && !el.value) el.value = getTodayString();
-}
 function g(id){ return document.getElementById(id).value.trim(); }
 
+// =============================================================================
+// TABS
+// =============================================================================
+function switchTab(tab){
+  const isPrint = tab === 'print';
+  document.getElementById('tabBtnPrint').classList.toggle('active', isPrint);
+  document.getElementById('tabBtnSearch').classList.toggle('active', !isPrint);
+  document.getElementById('panelPrint').style.display = isPrint ? 'block' : 'none';
+  document.getElementById('panelSearch').style.display = isPrint ? 'none' : 'block';
+  if (!isPrint) { stopCamera(); }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tabBtnPrint').addEventListener('click', () => switchTab('print'));
+  document.getElementById('tabBtnSearch').addEventListener('click', () => switchTab('search'));
+});
+
+// =============================================================================
+// MASTER DATA
+// =============================================================================
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
-    sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu').order('ma_sp'),
     sb.from('master_machines').select('ma_may').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
@@ -185,28 +293,39 @@ async function loadMaster(){
   if (may.error) throw new Error('Không tải được danh mục máy: ' + may.error.message);
   if (nv.error) throw new Error('Không tải được danh mục nhân sự: ' + nv.error.message);
 
-  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '' }));
+  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '' }));
+  masterMap = {};
+  masterData.forEach(m => { masterMap[m.ma] = m; });
   buildSelects(masterData, (may.data||[]).map(r=>r.ma_may), (nv.data||[]).map(r=>r.ten_nhan_vien));
 }
 
+function fillOptions(sel, values, placeholder){
+  sel.innerHTML = '<option value="">' + placeholder + '</option>';
+  values.forEach(v => { sel.innerHTML += '<option value="' + v + '">' + v + '</option>'; });
+}
+
 function buildSelects(items, mays, nguois){
-  var sel = document.getElementById("maSP");
-  sel.innerHTML = '<option value="">-- Chọn mã SP --</option>';
-  items.forEach(function(item){ sel.innerHTML += '<option value="'+item.ma+'">'+item.ma+'</option>'; });
+  ['maSP', 's_maSP'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">-- Chọn mã SP --</option>';
+    items.forEach(item => { sel.innerHTML += '<option value="'+item.ma+'">'+item.ma+'</option>'; });
+  });
+  ['mayDuc', 's_mayDuc'].forEach(id => fillOptions(document.getElementById(id), mays, '-- Chọn máy --'));
+  ['nguoiTT', 's_nguoiTT'].forEach(id => fillOptions(document.getElementById(id), nguois, '-- Chọn người --'));
+}
 
-  var maySel = document.getElementById("mayDuc");
-  maySel.innerHTML = '<option value="">-- Chọn máy --</option>';
-  mays.forEach(function(m){ maySel.innerHTML += '<option>'+m+'</option>'; });
-
-  var nguoiSel = document.getElementById("nguoiTT");
-  nguoiSel.innerHTML = '<option value="">-- Chọn người --</option>';
-  nguois.forEach(function(n){ nguoiSel.innerHTML += '<option>'+n+'</option>'; });
+/** prefix '' = tab In Tem, 's_' = tab Tra cứu — tự điền tên SP + nguyên liệu. */
+function onMaChange(prefix){
+  var ma = document.getElementById(prefix + "maSP").value;
+  var item = masterMap[ma];
+  document.getElementById(prefix + "tenSP").value = item ? item.ten : "";
+  document.getElementById(prefix + "nguyenLieu").value = item ? item.nguyenLieu : "";
 }
 
 function applyPrefill(){
   if (!PREFILL || !PREFILL.maSP) return;
   document.getElementById("maSP").value = PREFILL.maSP;
-  onMaChange();
+  onMaChange('');
   if (!document.getElementById("tenSP").value && PREFILL.tenSP) {
     document.getElementById("tenSP").value = PREFILL.tenSP;
   }
@@ -217,20 +336,13 @@ function applyPrefill(){
   if (slEl) slEl.focus();
 }
 
-function fillFormFromTem(t){
-  if(!t) return;
-  currentTagNo = t.tagNo || "";
-  document.getElementById("searchTag").value = currentTagNo;
-  document.getElementById("maSP").value = t.maSP || "";
-  document.getElementById("tenSP").value = t.tenSP || "";
-  document.getElementById("soLuong").value = t.soLuong || "";
-  document.getElementById("lotNo").value = t.lotNo ? String(t.lotNo).split("/").reverse().join("-") : getTodayString();
-  document.getElementById("soKhuon").value = t.soKhuon || "";
-  document.getElementById("nguyenLieu").value = t.nguyenLieu || "";
-  document.getElementById("mayDuc").value = t.mayDuc || "";
-  document.getElementById("nguoiTT").value = t.nguoiTT || "";
-  document.getElementById("ghiChu").value = t.ghiChu || "";
-  document.getElementById("loaiSP").value = t.loaiSP || "hangloat";
+// =============================================================================
+// TRA CỨU TEM
+// =============================================================================
+/** Suy ra chủng loại từ tiền tố Tag No — duc_tem không có cột loai_sp riêng
+    (xem migration_phase4_step2_intem.sql: D-TKD = đang phát triển, TKD = hàng loạt). */
+function loaiSpFromTagNo(tagNo){
+  return String(tagNo || '').toUpperCase().startsWith('D-TKD') ? 'phattrien' : 'hangloat';
 }
 
 function temRowToClient(r){
@@ -238,8 +350,26 @@ function temRowToClient(r){
     tagNo: r.tag_no || "", tenSP: r.ten_sp || "", maSP: r.ma_sp || "",
     soLuong: r.so_luong || "", lotNo: r.lot || "", soKhuon: r.so_khuon || "",
     nguyenLieu: r.nguyen_lieu || "", mayDuc: r.may_duc_chi_thi || "",
-    ghiChu: r.ghi_chu || "", nguoiTT: r.nguoi_tt || "", loaiSP: "hangloat",
+    ghiChu: r.ghi_chu || "", nguoiTT: r.nguoi_tt || "",
+    loaiSP: loaiSpFromTagNo(r.tag_no),
   };
+}
+
+function fillFormFromTem(t){
+  if(!t) return;
+  currentTagNo = t.tagNo || "";
+  document.getElementById("searchTag").value = currentTagNo;
+  document.getElementById("s_maSP").value = t.maSP || "";
+  document.getElementById("s_tenSP").value = t.tenSP || "";
+  document.getElementById("s_soLuong").value = t.soLuong || "";
+  document.getElementById("s_lotNo").value = t.lotNo ? String(t.lotNo).split("/").reverse().join("-") : getTodayString();
+  document.getElementById("s_soKhuon").value = t.soKhuon || "";
+  document.getElementById("s_nguyenLieu").value = t.nguyenLieu || "";
+  document.getElementById("s_mayDuc").value = t.mayDuc || "";
+  document.getElementById("s_nguoiTT").value = t.nguoiTT || "";
+  document.getElementById("s_ghiChu").value = t.ghiChu || "";
+  document.getElementById("s_loaiSP").value = t.loaiSP || "hangloat";
+  document.getElementById("searchResultCard").style.display = "block";
 }
 
 async function findTem(){
@@ -266,20 +396,20 @@ async function requireLoginOrRedirect(){
 async function saveTemEdit(){
   if(!currentTagNo) return err("Tìm tem trước khi sửa");
   if (!(await requireLoginOrRedirect())) return;
-  var ma=g("maSP"),sl=g("soLuong"),may=g("mayDuc"),nguoi=g("nguoiTT");
+  var ma=g("s_maSP"),sl=g("s_soLuong"),may=g("s_mayDuc"),nguoi=g("s_nguoiTT");
   if(!ma) return err("Chọn Mã sản phẩm");
   if(!sl||isNaN(sl)||+sl<=0) return err("Số lượng phải > 0");
   if(!may) return err("Chọn Máy đúc");
   if(!nguoi) return err("Chọn Người thao tác");
 
   var patch = {
-    ten_sp: g("tenSP"), ma_sp: ma,
+    ten_sp: g("s_tenSP"), ma_sp: ma,
     so_luong: Number(sl), so_luong_tt: Number(sl),
-    lot: g("lotNo"),
-    so_khuon: g("soKhuon"), so_khuon_tt: g("soKhuon"),
-    nguyen_lieu: g("nguyenLieu"),
+    lot: g("s_lotNo"),
+    so_khuon: g("s_soKhuon"), so_khuon_tt: g("s_soKhuon"),
+    nguyen_lieu: g("s_nguyenLieu"),
     may_duc_chi_thi: may, may_tt: may,
-    ghi_chu: g("ghiChu"), nguoi_tt: nguoi,
+    ghi_chu: g("s_ghiChu"), nguoi_tt: nguoi,
   };
   showMsg("⏳ Đang lưu thay đổi...","wait");
   const { error } = await sb.from('duc_tem').update(patch).ilike('tag_no', currentTagNo);
@@ -307,6 +437,9 @@ async function reprintTem(){
     tenSP: r.ten_sp, maSP: r.ma_sp, soLuong: r.so_luong,
     lotNo: lotNo, soKhuon: r.so_khuon || "", nguyenLieu: r.nguyen_lieu || "",
     mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || "", ghiChu: r.ghi_chu || "",
+    // Dùng giá trị đang hiển thị trên form (cho phép đổi kiểu in khi In lại)
+    // thay vì suy ra lại từ Tag No, để người dùng chủ động chọn nếu cần.
+    loaiSP: document.getElementById("s_loaiSP").value || loaiSpFromTagNo(r.tag_no),
   };
   showMsg("✅ Đang in lại tem " + r.tag_no, "ok", 3000);
   openPrint(d);
@@ -319,16 +452,113 @@ async function deleteTem(){
   showMsg("⏳ Đang xóa tem...","wait");
   const { error } = await sb.from('duc_tem').delete().ilike('tag_no', currentTagNo);
   if (error) return err("Lỗi xóa: " + error.message);
-  clearAll();
+  clearSearch();
   showMsg("✅ Đã xóa tem " + currentTagNo, "ok", 3000);
 }
 
-function onMaChange(){
-  var ma = document.getElementById("maSP").value;
-  var item = masterData.find(function(x){return x.ma===ma;});
-  document.getElementById("tenSP").value = item ? item.ten : "";
+function clearSearch(){
+  currentTagNo = "";
+  document.getElementById("searchTag").value = "";
+  document.getElementById("searchResultCard").style.display = "none";
 }
 
+// ─── Quét QR trực tiếp qua camera (getUserMedia + vòng lặp jsQR) — cùng cách
+// chuyencongdoan.html đã dùng ổn định trên production. ─────────────────────
+let scanStream = null;
+let scanRAF = null;
+
+async function openCameraForSearch(){
+  document.getElementById("msg").style.display = "none";
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showMsg("📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…", "wait");
+    document.getElementById("qrFileInput").click();
+    return;
+  }
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  } catch(e){
+    err("Không mở được camera: " + e.message + ". Kiểm tra đã cho phép quyền Camera cho trang này chưa.");
+    return;
+  }
+  const video = document.getElementById("scanVideo");
+  video.srcObject = scanStream;
+  document.getElementById("scanVideoWrap").style.display = "block";
+  document.getElementById("scanEmptyHint").style.display = "none";
+  await video.play();
+  scanRAF = requestAnimationFrame(scanLoop);
+}
+
+function stopCamera(){
+  if (scanRAF) cancelAnimationFrame(scanRAF);
+  scanRAF = null;
+  if (scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  document.getElementById("scanVideoWrap").style.display = "none";
+  document.getElementById("scanEmptyHint").style.display = "block";
+}
+
+function scanLoop(){
+  const video = document.getElementById("scanVideo");
+  if (video.readyState === video.HAVE_ENOUGH_DATA){
+    try {
+      const canvas = document.getElementById("scanCanvas");
+      const w = video.videoWidth, h = video.videoHeight;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(data.data, data.width, data.height, { inversionAttempts: "dontInvert" });
+      if (code && code.data){
+        stopCamera();
+        onQrDecodedForSearch(code.data);
+        return;
+      }
+    } catch(e){ /* frame lỗi thoáng qua — bỏ qua, thử tiếp frame sau */ }
+  }
+  scanRAF = requestAnimationFrame(scanLoop);
+}
+
+/* Fallback chụp ảnh tĩnh — chỉ dùng khi trình duyệt không hỗ trợ getUserMedia. */
+function onFileChosenForSearch(evt){
+  showMsg("⏳ Đang xử lý ảnh vừa chụp…", "wait");
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) { err("Không nhận được ảnh (có thể bạn đã huỷ chụp)."); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const canvas = document.getElementById("scanCanvas");
+      const ctx = canvas.getContext("2d");
+      const w = img.width, h = img.height;
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const data = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(data.data, data.width, data.height);
+      if (code && code.data) onQrDecodedForSearch(code.data);
+      else err("Không đọc được mã QR trong ảnh vừa chụp — chụp lại, đảm bảo mã QR rõ nét và nằm giữa khung ảnh.");
+    } catch(e){ err("Lỗi xử lý ảnh: " + e.message); }
+    evt.target.value = "";
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); err("Không đọc được ảnh vừa chụp. Vui lòng thử lại."); };
+  img.src = url;
+}
+
+function onQrDecodedForSearch(text){
+  const tagNo = String(text).split(">")[0].trim();
+  if (!tagNo){ err("Mã QR không đúng định dạng tem TOYOTAKI."); return; }
+  document.getElementById("searchTag").value = tagNo;
+  findTem();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById("btnScanSearch").addEventListener("click", openCameraForSearch);
+  document.getElementById("btnCancelScan").addEventListener("click", stopCamera);
+  document.getElementById("qrFileInput").addEventListener("change", onFileChosenForSearch);
+});
+
+// =============================================================================
+// IN TEM (tạo tem mới)
+// =============================================================================
 async function inTem(){
   if (!(await requireLoginOrRedirect())) return;
   var ma=g("maSP"),sl=g("soLuong"),may=g("mayDuc"),nguoi=g("nguoiTT"),loai=g("loaiSP");
@@ -363,7 +593,7 @@ async function inTem(){
     var qr = [tagNo, tenSP, ma, sl, ngayQR, lotNoInput || ngay, soKhuon, nguyenLieu, may].join(">\n");
     var d = { tagNo: tagNo, qr: qr, ngay: ngay, tenSP: tenSP, maSP: ma, soLuong: sl,
               lotNo: lotNoInput || ngay, soKhuon: soKhuon, nguyenLieu: nguyenLieu,
-              mayDuc: may, nguoiTT: nguoi, ghiChu: ghiChu };
+              mayDuc: may, nguoiTT: nguoi, ghiChu: ghiChu, loaiSP: loai };
     showMsg("✅ " + tagNo + " — đang mở cửa sổ in...", "ok", 5000);
     openPrint(d);
   } catch (e) {
@@ -372,12 +602,16 @@ async function inTem(){
   }
 }
 
+// =============================================================================
+// IN / VẼ TEM SVG
+// =============================================================================
 function openPrint(d){
   var svg = buildLabelSvg(d);
+  var bg = d.loaiSP === 'phattrien' ? '#000' : '#fff';
   var css=[
     "@page{size:72mm 100mm;margin:0}",
     "*{margin:0;padding:0;box-sizing:border-box}",
-    "html,body{width:72mm;height:100mm;background:#fff}",
+    "html,body{width:72mm;height:100mm;background:"+bg+"}",
     "svg{display:block;width:72mm;height:100mm}",
     ".pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}",
     "@media print{.pbtn{display:none}}"
@@ -395,17 +629,17 @@ function openPrint(d){
   w.document.open(); w.document.write(popupHtml); w.document.close();
 }
 
-function buildQrRects(data, sizeMm){
+function buildQrRects(data, sizeMm, bgColor, fgColor){
   var qr = qrcode(0, "M");
   qr.addData(data);
   qr.make();
   var n = qr.getModuleCount();
   var cell = sizeMm / n;
-  var out = '<rect x="0" y="0" width="'+sizeMm+'" height="'+sizeMm+'" fill="#ffffff"/>';
+  var out = '<rect x="0" y="0" width="'+sizeMm+'" height="'+sizeMm+'" fill="'+bgColor+'"/>';
   for (var r=0; r<n; r++){
     for (var c=0; c<n; c++){
       if (qr.isDark(r,c)){
-        out += '<rect x="'+(c*cell).toFixed(3)+'" y="'+(r*cell).toFixed(3)+'" width="'+cell.toFixed(3)+'" height="'+cell.toFixed(3)+'" fill="#000000"/>';
+        out += '<rect x="'+(c*cell).toFixed(3)+'" y="'+(r*cell).toFixed(3)+'" width="'+cell.toFixed(3)+'" height="'+cell.toFixed(3)+'" fill="'+fgColor+'"/>';
       }
     }
   }
@@ -419,6 +653,13 @@ function svgEsc(s){
 
 function buildLabelSvg(d){
   var W=72, H=100;
+  // Sản phẩm đang phát triển -> tem nền đen chữ trắng (dễ phân biệt bằng mắt
+  // với tem hàng loạt trên cùng dây chuyền). Mã QR luôn giữ ô nền trắng
+  // riêng bên trong (buildQrRects) để đảm bảo máy quét đọc được bất kể nền
+  // tem là màu gì.
+  var dark = d.loaiSP === 'phattrien';
+  var bg = dark ? '#000000' : '#ffffff';
+  var fg = dark ? '#ffffff' : '#000000';
   var logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPHBhdGggZD0iTTgyIDc2LjY4MDRINzkuODAzNFY2NC4zNTk3SDgyVjc2LjY4MDRaTTcyLjA2MDUgNzEuMzYyM0w3MC42MjE4IDcyLjg0NDdWNzYuNjg2MUg2OC40MTc1VjY0LjM1OTdINzAuNjIxOFY3MC4xMzlMNzEuODQyNiA2OC42NzM3TDc1LjU1NjkgNjQuMzU5N0g3OC4yMjIxTDczLjUwODggNjkuODE2OUw3OC40OTQgNzYuNjc2Nkg3NS44NzdMNzIuMDYwNSA3MS4zNjIzWk01OS4zMzI0IDcyLjA5NEg2My4wMUw2MS4xNzk5IDY2Ljk3OTdMNTkuMzMyNCA3Mi4wOTRaTTYzLjY0MDYgNzMuODIwM0g1OC43MjFMNTcuNjkxMiA3Ni42Nzg1SDU1LjQwMDFMNjAuMTk0NCA2NC4zNTc4SDYyLjE3M0w2Ni45NzY5IDc2LjY3ODVINjQuNjc2Mkw2My42NDA2IDczLjgyMDNaTTU1LjkyNjYgNjYuMDkxOEg1MS45NTU4Vjc2LjY4MDRINDkuNzY3VjY2LjA5MThINDUuODQ0NFY2NC4zNTk3SDU1LjkxNTFMNTUuOTI2NiA2Ni4wOTE4Wk00MS45OTMyIDcwLjE5OTlDNDEuOTkzMiA2OC44MzQ0IDQxLjcyNzcgNjcuNzg4OSA0MS4xOTY3IDY3LjA2MzZDNDAuNjY2NCA2Ni4zMzU3IDM5LjkxMDQgNjUuOTcxNyAzOC45MzQ2IDY1Ljk3MTdDMzguNTAwMSA2NS45NTQ1IDM4LjA2ODIgNjYuMDQ0NiAzNy42Nzc5IDY2LjIzMzlDMzcuMjg3NiA2Ni40MjMyIDM2Ljk1MTMgNjYuNzA1OCAzNi42OTk0IDY3LjA1NTlDMzYuMTYwNyA2Ny43ODI2IDM1Ljg4NjIgNjguODA3MSAzNS44NzYgNzAuMTI5NFY3MC44NDAyQzM1Ljg3NiA3Mi4xOTU2IDM2LjE0NzkgNzMuMjQxIDM2LjY5MTcgNzMuOTc2NUMzNi45NDQ3IDc0LjMzNDIgMzcuMjg0NiA3NC42MjMyIDM3LjY4MDMgNzQuODE3QzM4LjA3NTkgNzUuMDEwOCAzOC41MTQ1IDc1LjEwMzEgMzguOTU1OCA3NS4wODU1QzM5LjkzMzUgNzUuMDg1NSA0MC42OTE0IDc0LjcyNTQgNDEuMjEwMiA3NC4wMDMyQzQxLjcyOSA3My4yODEgNDEuOTk3IDcyLjIyNzMgNDEuOTk3IDcwLjg0MDJMNDEuOTkzMiA3MC4xOTk5Wk00NC4yMDEzIDcwLjg0MDJDNDQuMjI2MSA3MS45MzcyIDQ0LjAwNjIgNzMuMDI2MiA0My41NTcyIDc0LjAyOTlDNDMuMTY2NCA3NC44OTQyIDQyLjUyMzkgNzUuNjIzOSA0MS43MTE2IDc2LjEyNTlDNDAuODc1MyA3Ni42MDYzIDM5LjkyNTEgNzYuODU5NCAzOC45NTc3IDc2Ljg1OTRDMzcuOTkwMyA3Ni44NTk0IDM3LjA0MDEgNzYuNjA2MyAzNi4yMDM4IDc2LjEyNTlDMzUuMzg1OCA3NS42MjQ1IDM0LjczNjMgNzQuODk1MyAzNC4zMzcgNzQuMDI5OUMzMy44ODEgNzMuMDUwNiAzMy42NTMgNzEuOTgyOCAzMy42Njk4IDcwLjkwNVY3MC4yMTlDMzMuNjQ3IDY5LjEyMzIgMzMuODcxNiA2OC4wMzYxIDM0LjMyNzQgNjcuMDM2OUMzNC43MjA0IDY2LjE2NjUgMzUuMzY3IDY1LjQzMTUgMzYuMTg0NSA2NC45MjU2QzM3LjAxOTYgNjQuNDQ2NyAzNy45Njc3IDY0LjE5MzYgMzguOTMzMyA2NC4xOTE5QzM5Ljg5ODkgNjQuMTkwMyA0MC44NDc4IDY0LjQ0IDQxLjY4NDYgNjQuOTE2MUM0Mi40OTc4IDY1LjQxMzQgNDMuMTQyOSA2Ni4xMzgzIDQzLjUzNzkgNjYuOTk4OEM0My45OTI3IDY3Ljk5MTggNDQuMjE5MyA2OS4wNzIgNDQuMjAxMyA3MC4xNjE4VjcwLjg0MDJaTTI3LjU4NzMgNzAuMTk5OUwzMC41MDg5IDY0LjM1OTdIMzIuOTUwNEwyOC42OTQyIDcyLjE0NTRWNzYuNjgwNEgyNi40ODAzVjcyLjE0NTRMMjIuMjE4MyA2NC4zNTk3SDI0LjY2NzVMMjcuNTg3MyA3MC4xOTk5Wk0xOS40MTIzIDcwLjE5OTlDMTkuNDEyMyA2OC44MzQ0IDE5LjE0NjIgNjcuNzg4OSAxOC42MTM5IDY3LjA2MzZDMTguMDg1NSA2Ni4zMzU3IDE3LjMyOTUgNjUuOTcxNyAxNi4zNTM3IDY1Ljk3MTdDMTUuOTE5MiA2NS45NTQzIDE1LjQ4NzMgNjYuMDQ0MyAxNS4wOTY5IDY2LjIzMzdDMTQuNzA2NiA2Ni40MjMgMTQuMzcwMyA2Ni43MDU2IDE0LjExODYgNjcuMDU1OUMxMy41Nzg2IDY3Ljc4MjYgMTMuMzAzNSA2OC44MDcxIDEzLjI5MzIgNzAuMTI5NFY3MC44NDAyQzEzLjI5MzIgNzIuMTk1NiAxMy41NjUxIDczLjI0MSAxNC4xMDg5IDczLjk3NjVDMTQuMzYyMSA3NC4zMzM1IDE0LjcwMTggNzQuNjIyMSAxNS4wOTcgNzQuODE1OEMxNS40OTIyIDc1LjAwOTYgMTUuOTMwMiA3NS4xMDIzIDE2LjM3MTEgNzUuMDg1NUMxNy4zNDY5IDc1LjA4NTUgMTguMDk3NyA3NC43MjQ3IDE4LjYyMzYgNzQuMDAzMkMxOS4xNDk0IDczLjI4MTcgMTkuNDEyMyA3Mi4yMjczIDE5LjQxMjMgNzAuODQwMlY3MC4xOTk5Wk0yMS42MjA1IDcwLjg0MDJDMjEuNjQ0NiA3MS45Mzc0IDIxLjQyNDEgNzMuMDI2NCAyMC45NzQ0IDc0LjAyOTlDMjAuNTgzNyA3NC44OTQyIDE5Ljk0MTEgNzUuNjIzOSAxOS4xMjg4IDc2LjEyNTlDMTguMjk4NCA3Ni42MjM1IDE3LjM0MjEgNzYuODc3OSAxNi4zNzExIDc2Ljg1OTVDMTUuNDAyOCA3Ni44NzUzIDE0LjQ0OTYgNzYuNjIxMSAxMy42MjEgNzYuMTI1OUMxMi44MDcxIDc1LjYyMjYgMTIuMTYxMiA3NC44OTM2IDExLjc2MzkgNzQuMDI5OUMxMS4zMDg2IDczLjA1MDUgMTEuMDgxMiA3MS45ODI2IDExLjA5ODUgNzAuOTA1VjcwLjIxOUMxMS4wNzQ4IDY5LjEyMzEgMTEuMjk5NSA2OC4wMzU5IDExLjc1NjIgNjcuMDM2OUMxMi4xNDkyIDY2LjE2NjUgMTIuNzk1OCA2NS40MzE1IDEzLjYxMzMgNjQuOTI1NkMxNC40NDEyIDY0LjQyODggMTUuMzk0OSA2NC4xNzQ0IDE2LjM2MzQgNjQuMTkyQzE3LjMzMDYgNjQuMTc0MyAxOC4yODM0IDY0LjQyNTEgMTkuMTEzNCA2NC45MTYxQzE5LjkyNjUgNjUuNDEzNCAyMC41NzE2IDY2LjEzODMgMjAuOTY2NyA2Ni45OTg4QzIxLjQyMDYgNjcuOTkyMSAyMS42NDcxIDY5LjA3MjEgMjEuNjMwMSA3MC4xNjE4TDIxLjYyMDUgNzAuODQwMlpNMTAuMDcwNiA2Ni4wOTE4SDYuMTEzMzZWNzYuNjgwNEgzLjkyMjU4VjY2LjA5MThIMFY2NC4zNTk3SDEwLjA3MDZWNjYuMDkxOFoiIGZpbGw9IiNGREI4MTMiLz4KPC9zdmc+Cg==";
   var rows = [
     {lbl:"Mã sản phẩm", val:d.maSP, big:true},
@@ -441,10 +682,10 @@ function buildLabelSvg(d){
   var ftrLineY=qrY+qrSize+2, ftrTextY=ftrLineY+2.8, ftrSize=2.4;
 
   var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
-  svg += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#ffffff"/>';
+  svg += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="'+bg+'"/>';
   svg += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'"/>';
-  svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="#000000">TEM SẢN PHẨM</text>';
-  svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="#000000" stroke-width="0.3"/>';
+  svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="'+fg+'">TEM SẢN PHẨM'+(dark ? ' — ĐANG PHÁT TRIỂN' : '')+'</text>';
+  svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="'+fg+'" stroke-width="0.3"/>';
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
     var lblSize = r.big ? 3.0 : 2.6;
@@ -452,12 +693,17 @@ function buildLabelSvg(d){
     var vLen = String(r.val||"").length;
     if (vLen > 26) valSize -= 0.5;
     if (vLen > 40) valSize -= 0.5;
-    svg += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="#000000">'+svgEsc(r.lbl)+'</text>';
-    svg += '<text x="27" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="#000000">'+svgEsc(r.val)+'</text>';
+    svg += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.lbl)+'</text>';
+    svg += '<text x="27" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
   });
-  svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize)+'</g>';
-  svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="#000000" stroke-width="0.3"/>';
-  svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+ftrSize+'" font-weight="bold" fill="#000000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
+  if (dark){
+    // Viền trắng quanh QR khi nền tem là đen — giữ vùng yên tĩnh (quiet zone)
+    // để máy quét đọc ổn định, vì QR luôn cần nền sáng bao quanh nó.
+    svg += '<rect x="'+(qrX-1.5)+'" y="'+(qrY-1.5)+'" width="'+(qrSize+3)+'" height="'+(qrSize+3)+'" fill="#ffffff"/>';
+  }
+  svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
+  svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="'+fg+'" stroke-width="0.3"/>';
+  svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+ftrSize+'" font-weight="bold" fill="'+fg+'">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
   svg += "</svg>";
   return svg;
 }
@@ -470,8 +716,6 @@ function clearAll(){
   document.getElementById("mayDuc").value="";
   document.getElementById("nguoiTT").value="";
   document.getElementById("loaiSP").value="hangloat";
-  document.getElementById("searchTag").value="";
-  currentTagNo = "";
   document.getElementById("msg").style.display="none";
   document.getElementById("maSP").focus();
 }
@@ -506,10 +750,10 @@ async function initAuthStatus(){
 (async function init(){
   try {
     await loadMaster();
+    document.getElementById("lotNo").value = getTodayString();
     document.getElementById("loading").style.display="none";
-    setDefaultLotNo();
     applyPrefill();
-    document.getElementById("formWrap").style.display="block";
+    document.getElementById("mainWrap").style.display="block";
   } catch (e) {
     document.getElementById("loading").style.display="none";
     err("Không tải được dữ liệu: " + e.message);
