@@ -60,12 +60,22 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const email = String(body.email || '').trim().toLowerCase();
+    const rawUsername = body.username ? String(body.username).trim().toLowerCase() : null;
+    const rawEmail = body.email ? String(body.email).trim().toLowerCase() : null;
     const password = String(body.password || '');
     const fullName = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role || '');
 
-    if (!email || !password) return json({ error: 'Cần email và mật khẩu' }, 400);
+    // Công nhân không có email thật -> đăng nhập bằng mã nhân viên (username).
+    // Supabase Auth vẫn bắt buộc có email nên sinh email nội bộ không ai dùng
+    // để nhận thư (@mes.local) — người dùng chỉ cần biết username + mật khẩu.
+    if (!rawUsername && !rawEmail) return json({ error: 'Cần mã nhân viên (username) hoặc email' }, 400);
+    if (rawUsername && !/^[a-z0-9._-]{2,32}$/.test(rawUsername)) {
+      return json({ error: 'Mã nhân viên chỉ gồm chữ/số/._- , độ dài 2-32 ký tự' }, 400);
+    }
+    const email = rawEmail || (rawUsername + '@mes.local');
+
+    if (!password) return json({ error: 'Cần mật khẩu' }, 400);
     if (password.length < 6) return json({ error: 'Mật khẩu tối thiểu 6 ký tự' }, 400);
     if (!ROLES.includes(role)) return json({ error: 'Vai trò không hợp lệ: ' + role }, 400);
 
@@ -80,6 +90,7 @@ Deno.serve(async (req) => {
     const { error: roleErr } = await admin.from('user_roles').insert({
       user_id: newUser.id,
       email,
+      username: rawUsername,
       full_name: fullName,
       role,
       created_by: caller.id,
@@ -92,7 +103,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Tạo tài khoản OK nhưng gán vai trò lỗi: ' + roleErr.message }, 500);
     }
 
-    return json({ ok: true, user_id: newUser.id, email, role });
+    return json({ ok: true, user_id: newUser.id, email, username: rawUsername, role });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }

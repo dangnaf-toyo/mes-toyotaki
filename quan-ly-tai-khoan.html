@@ -79,8 +79,12 @@
       <form id="createForm">
         <div class="form-grid">
           <div>
-            <label for="cEmail">Email</label>
-            <input type="email" id="cEmail" required autocomplete="off">
+            <label for="cUsername">Mã nhân viên (dùng để đăng nhập)</label>
+            <input type="text" id="cUsername" placeholder="vd: nv001" autocomplete="off">
+          </div>
+          <div>
+            <label for="cEmail">Email thật (tuỳ chọn, nếu có)</label>
+            <input type="email" id="cEmail" autocomplete="off">
           </div>
           <div>
             <label for="cFullName">Họ tên (tuỳ chọn)</label>
@@ -95,6 +99,7 @@
             <select id="cRole" required></select>
           </div>
         </div>
+        <p class="muted" style="margin:10px 0 0">Điền ít nhất 1 trong 2: mã nhân viên (công nhân không có email) hoặc email thật.</p>
         <div class="form-actions">
           <button type="submit" id="createBtn">Tạo tài khoản</button>
         </div>
@@ -106,7 +111,7 @@
       <div class="msg" id="listMsg"></div>
       <table id="userTable" style="display:none">
         <thead>
-          <tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Tạo lúc</th><th></th></tr>
+          <tr><th>Mã NV / Email</th><th>Họ tên</th><th>Vai trò</th><th>Tạo lúc</th><th></th></tr>
         </thead>
         <tbody id="userTbody"></tbody>
       </table>
@@ -154,7 +159,7 @@ async function loadUsers(){
 
   const { data, error } = await sb
     .from('user_roles')
-    .select('user_id, email, full_name, role, created_at')
+    .select('user_id, email, username, full_name, role, created_at')
     .order('created_at', { ascending: false });
 
   if (error){
@@ -177,8 +182,9 @@ async function loadUsers(){
   for (const row of data){
     const tr = document.createElement('tr');
     const createdAt = row.created_at ? new Date(row.created_at).toLocaleString('vi-VN') : '';
+    const idLabel = row.username ? row.username : row.email;
     tr.innerHTML = `
-      <td>${row.email}</td>
+      <td>${idLabel}</td>
       <td>${row.full_name || '<span class="muted">—</span>'}</td>
       <td></td>
       <td class="muted">${createdAt}</td>
@@ -224,10 +230,18 @@ async function handleCreate(e){
   msg.className = 'msg info';
   msg.textContent = 'Đang tạo tài khoản...';
 
+  const username = document.getElementById('cUsername').value.trim();
   const email = document.getElementById('cEmail').value.trim();
   const password = document.getElementById('cPassword').value;
   const full_name = document.getElementById('cFullName').value.trim() || null;
   const role = document.getElementById('cRole').value;
+
+  if (!username && !email){
+    msg.className = 'msg error';
+    msg.textContent = 'Cần điền mã nhân viên hoặc email.';
+    btn.disabled = false;
+    return;
+  }
 
   try {
     const resp = await fetch(SUPABASE_URL + '/functions/v1/admin-create-user', {
@@ -237,14 +251,15 @@ async function handleCreate(e){
         'Authorization': 'Bearer ' + currentSession.access_token,
         'apikey': SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ email, password, full_name, role }),
+      body: JSON.stringify({ username: username || undefined, email: email || undefined, password, full_name, role }),
     });
     const result = await resp.json();
     if (!resp.ok){
       throw new Error(result.error || ('Lỗi HTTP ' + resp.status));
     }
     msg.className = 'msg ok';
-    msg.textContent = 'Đã tạo tài khoản ' + result.email + ' (vai trò: ' + ROLE_LABELS[result.role] + ').';
+    const who = result.username ? ('mã NV ' + result.username) : result.email;
+    msg.textContent = 'Đã tạo tài khoản ' + who + ' (vai trò: ' + ROLE_LABELS[result.role] + ').';
     document.getElementById('createForm').reset();
     fillRoleSelect(document.getElementById('cRole'), '');
     await loadUsers();
