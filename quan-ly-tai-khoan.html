@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Quản Lý Tài Khoản & Phân Quyền — MES Toyotaki</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
+    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C; --tk-good:#1a7a3a; --tk-bad:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',sans-serif;color:var(--tk-black);-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Zilla Slab',serif;}
+
+  header.top{background:var(--tk-black);color:var(--tk-cream);padding:22px 0;border-bottom:5px solid var(--tk-orange);}
+  header.top .inner{max-width:1040px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
+  .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--tk-orange);font-weight:600;margin-bottom:8px;}
+  header.top h1{font-size:23px;margin:0 0 6px;font-weight:600;color:#fff;}
+  header.top .sub{font-size:13px;color:#c9c2b6;}
+  .auth-bar{font-size:12px;color:#c9c2b6;margin-top:4px}
+  .auth-bar a{color:var(--tk-orange);text-decoration:none;font-weight:600}
+  header.top .back{font-size:12px;}
+  header.top .back a{color:var(--tk-orange);text-decoration:none;font-weight:600}
+
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 28px 60px;}
+
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:22px 24px;margin-bottom:24px;}
+  .card h2{font-size:16px;margin:0 0 16px;font-weight:600;border-bottom:1px solid var(--tk-line);padding-bottom:10px;}
+
+  .msg{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;}
+  .msg.error{display:block;background:#fbe9e7;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .msg.ok{display:block;background:#e7f5ea;color:var(--tk-good);border:1px solid #bfe3c8;}
+  .msg.info{display:block;background:#eef2f6;color:var(--tk-navy);border:1px solid #cfd9e3;}
+
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:640px){.form-grid{grid-template-columns:1fr;}}
+  label{display:block;font-size:12.5px;font-weight:600;color:#445;margin-bottom:5px;}
+  input,select{width:100%;padding:9px 11px;border:1px solid #ccd;border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff;}
+  input:focus,select:focus{outline:none;border-color:var(--tk-orange);}
+  button{padding:10px 20px;border:none;border-radius:8px;background:var(--tk-orange);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;}
+  button:hover:not(:disabled){background:var(--tk-orange-deep);}
+  button:disabled{opacity:.6;cursor:default;}
+  .form-actions{margin-top:16px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--tk-line);}
+  th{color:var(--tk-muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}
+  td select{padding:6px 8px;font-size:12.5px;}
+  .role-save{padding:6px 12px;font-size:12px;margin-left:8px;}
+  .muted{color:var(--tk-muted);font-size:12px;}
+  .empty{padding:20px;text-align:center;color:var(--tk-muted);font-size:13px;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <div>
+      <div class="eyebrow">TOYOTAKI · Quản lý hệ thống</div>
+      <h1>Quản Lý Tài Khoản &amp; Phân Quyền</h1>
+      <div class="sub">Tạo tài khoản đăng nhập, gán vai trò cho từng người dùng.</div>
+      <div class="auth-bar" id="authInfo">…</div>
+    </div>
+    <div class="back"><a href="index.html">← Trang chủ MES</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="gate"></div>
+
+  <div id="adminArea" style="display:none">
+    <div class="card">
+      <h2>Tạo tài khoản mới</h2>
+      <div class="msg" id="createMsg"></div>
+      <form id="createForm">
+        <div class="form-grid">
+          <div>
+            <label for="cEmail">Email</label>
+            <input type="email" id="cEmail" required autocomplete="off">
+          </div>
+          <div>
+            <label for="cFullName">Họ tên (tuỳ chọn)</label>
+            <input type="text" id="cFullName" autocomplete="off">
+          </div>
+          <div>
+            <label for="cPassword">Mật khẩu tạm</label>
+            <input type="text" id="cPassword" required minlength="6" autocomplete="off">
+          </div>
+          <div>
+            <label for="cRole">Vai trò</label>
+            <select id="cRole" required></select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="createBtn">Tạo tài khoản</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Danh sách tài khoản</h2>
+      <div class="msg" id="listMsg"></div>
+      <table id="userTable" style="display:none">
+        <thead>
+          <tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Tạo lúc</th><th></th></tr>
+        </thead>
+        <tbody id="userTbody"></tbody>
+      </table>
+      <div class="empty" id="userEmpty" style="display:none">Chưa có tài khoản nào được gán vai trò.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+const ROLE_LABELS = {
+  admin: 'Admin',
+  truong_ca: 'Trưởng ca',
+  ipqc: 'IPQC',
+  qc_manager: 'QC Manager',
+  kho_nvl: 'Kho NVL',
+  ke_hoach: 'Kế hoạch',
+};
+
+let currentSession = null;
+
+function fillRoleSelect(sel, selected){
+  sel.innerHTML = Object.entries(ROLE_LABELS).map(([v, l]) =>
+    `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`
+  ).join('');
+}
+
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
+  }
+}
+
+async function loadUsers(){
+  const listMsg = document.getElementById('listMsg');
+  const table = document.getElementById('userTable');
+  const tbody = document.getElementById('userTbody');
+  const empty = document.getElementById('userEmpty');
+
+  const { data, error } = await sb
+    .from('user_roles')
+    .select('user_id, email, full_name, role, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error){
+    listMsg.className = 'msg error';
+    listMsg.textContent = 'Không tải được danh sách: ' + error.message;
+    return;
+  }
+  listMsg.className = 'msg';
+  listMsg.textContent = '';
+
+  if (!data.length){
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  tbody.innerHTML = '';
+  for (const row of data){
+    const tr = document.createElement('tr');
+    const createdAt = row.created_at ? new Date(row.created_at).toLocaleString('vi-VN') : '';
+    tr.innerHTML = `
+      <td>${row.email}</td>
+      <td>${row.full_name || '<span class="muted">—</span>'}</td>
+      <td></td>
+      <td class="muted">${createdAt}</td>
+      <td></td>
+    `;
+    const roleTd = tr.children[2];
+    const sel = document.createElement('select');
+    fillRoleSelect(sel, row.role);
+    roleTd.appendChild(sel);
+
+    const actionTd = tr.children[4];
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'role-save';
+    saveBtn.textContent = 'Lưu';
+    saveBtn.disabled = true;
+    sel.addEventListener('change', () => { saveBtn.disabled = (sel.value === row.role); });
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = '...';
+      const { error: updErr } = await sb
+        .from('user_roles')
+        .update({ role: sel.value, updated_at: new Date().toISOString() })
+        .eq('user_id', row.user_id);
+      if (updErr){
+        alert('Lỗi lưu vai trò: ' + updErr.message);
+        saveBtn.disabled = false;
+      } else {
+        row.role = sel.value;
+        saveBtn.textContent = 'Đã lưu';
+        setTimeout(() => { saveBtn.textContent = 'Lưu'; }, 1200);
+      }
+    });
+    actionTd.appendChild(saveBtn);
+    tbody.appendChild(tr);
+  }
+}
+
+async function handleCreate(e){
+  e.preventDefault();
+  const msg = document.getElementById('createMsg');
+  const btn = document.getElementById('createBtn');
+  btn.disabled = true;
+  msg.className = 'msg info';
+  msg.textContent = 'Đang tạo tài khoản...';
+
+  const email = document.getElementById('cEmail').value.trim();
+  const password = document.getElementById('cPassword').value;
+  const full_name = document.getElementById('cFullName').value.trim() || null;
+  const role = document.getElementById('cRole').value;
+
+  try {
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/admin-create-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + currentSession.access_token,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ email, password, full_name, role }),
+    });
+    const result = await resp.json();
+    if (!resp.ok){
+      throw new Error(result.error || ('Lỗi HTTP ' + resp.status));
+    }
+    msg.className = 'msg ok';
+    msg.textContent = 'Đã tạo tài khoản ' + result.email + ' (vai trò: ' + ROLE_LABELS[result.role] + ').';
+    document.getElementById('createForm').reset();
+    fillRoleSelect(document.getElementById('cRole'), '');
+    await loadUsers();
+  } catch (err){
+    msg.className = 'msg error';
+    msg.textContent = 'Lỗi: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function main(){
+  initAuthStatus();
+  currentSession = await MesAuth.requireAuth();
+
+  const gate = document.getElementById('gate');
+  const { data: myRole, error } = await sb
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', currentSession.user.id)
+    .maybeSingle();
+
+  if (error){
+    gate.innerHTML = '<div class="msg error" style="display:block">Không kiểm tra được quyền: ' + error.message + '</div>';
+    return;
+  }
+  if (!myRole || myRole.role !== 'admin'){
+    gate.innerHTML = '<div class="msg error" style="display:block">Bạn không có quyền admin để vào trang này. Liên hệ quản trị viên hệ thống nếu cần quyền truy cập.</div>';
+    return;
+  }
+
+  document.getElementById('adminArea').style.display = 'block';
+  fillRoleSelect(document.getElementById('cRole'), '');
+  document.getElementById('createForm').addEventListener('submit', handleCreate);
+  await loadUsers();
+}
+
+main();
+</script>
+</body>
+</html>
