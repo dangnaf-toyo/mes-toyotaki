@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Quản Lý Danh Mục — MES Toyotaki</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
+    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C; --tk-good:#1a7a3a; --tk-bad:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',sans-serif;color:var(--tk-black);-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Zilla Slab',serif;}
+
+  header.top{background:var(--tk-black);color:var(--tk-cream);padding:22px 0;border-bottom:5px solid var(--tk-orange);}
+  header.top .inner{max-width:1100px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
+  .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--tk-orange);font-weight:600;margin-bottom:8px;}
+  header.top h1{font-size:23px;margin:0 0 6px;font-weight:600;color:#fff;}
+  header.top .sub{font-size:13px;color:#c9c2b6;}
+  .auth-bar{font-size:12px;color:#c9c2b6;margin-top:4px}
+  .auth-bar a{color:var(--tk-orange);text-decoration:none;font-weight:600}
+  header.top .back a{color:var(--tk-orange);text-decoration:none;font-weight:600;font-size:12px;}
+
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 28px 60px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+  .tab-btn{padding:9px 18px;border:1px solid var(--tk-line);border-radius:100px;background:var(--tk-card);color:var(--tk-black);font-size:13px;font-weight:600;cursor:pointer;}
+  .tab-btn.active{background:var(--tk-orange);color:#fff;border-color:var(--tk-orange);}
+
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:22px 24px;margin-bottom:24px;}
+  .card h2{font-size:16px;margin:0 0 16px;font-weight:600;border-bottom:1px solid var(--tk-line);padding-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+  .card h2 .cancel-edit{font-size:12px;font-weight:600;color:var(--tk-navy);cursor:pointer;display:none;}
+
+  .msg{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;}
+  .msg.error{display:block;background:#fbe9e7;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .msg.ok{display:block;background:#e7f5ea;color:var(--tk-good);border:1px solid #bfe3c8;}
+  .msg.info{display:block;background:#eef2f6;color:var(--tk-navy);border:1px solid #cfd9e3;}
+
+  .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media (max-width:800px){.form-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:480px){.form-grid{grid-template-columns:1fr;}}
+  label{display:block;font-size:12.5px;font-weight:600;color:#445;margin-bottom:5px;}
+  input,select{width:100%;padding:9px 11px;border:1px solid #ccd;border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff;}
+  input:disabled{background:#f1efe9;color:#88806f;}
+  input:focus,select:focus{outline:none;border-color:var(--tk-orange);}
+  button{padding:10px 20px;border:none;border-radius:8px;background:var(--tk-orange);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;}
+  button:hover:not(:disabled){background:var(--tk-orange-deep);}
+  button:disabled{opacity:.6;cursor:default;}
+  .form-actions{margin-top:16px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--tk-line);white-space:nowrap;}
+  th{color:var(--tk-muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}
+  .row-actions button{padding:5px 12px;font-size:12px;margin-right:6px;}
+  .row-actions .del{background:transparent;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .row-actions .del:hover{background:#fbe9e7;}
+  .muted{color:var(--tk-muted);font-size:12px;}
+  .empty{padding:20px;text-align:center;color:var(--tk-muted);font-size:13px;}
+  .table-wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <div>
+      <div class="eyebrow">TOYOTAKI · Quản lý hệ thống</div>
+      <h1>Quản Lý Danh Mục</h1>
+      <div class="sub">Máy, sản phẩm, nhân sự, khuôn — thay vì sửa trực tiếp qua Supabase Dashboard.</div>
+      <div class="auth-bar" id="authInfo">…</div>
+    </div>
+    <div class="back"><a href="index.html">← Trang chủ MES</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="gate"></div>
+
+  <div id="adminArea" style="display:none">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="may">Máy</button>
+      <button class="tab-btn" data-tab="sp">Sản phẩm</button>
+      <button class="tab-btn" data-tab="ns">Nhân sự</button>
+      <button class="tab-btn" data-tab="khuon">Khuôn</button>
+    </div>
+
+    <!-- ── Tab Máy ─────────────────────────────────────────────────────── -->
+    <section id="tab-may" class="tab-pane">
+      <div class="card">
+        <h2>Thêm máy</h2>
+        <div class="msg" id="may-msg"></div>
+        <form id="may-form">
+          <div class="form-grid">
+            <div><label for="may-ma">Mã máy</label><input type="text" id="may-ma" required></div>
+          </div>
+          <div class="form-actions"><button type="submit">Thêm máy</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Danh sách máy</h2>
+        <div class="table-wrap">
+          <table id="may-table" style="display:none">
+            <thead><tr><th>Mã máy</th><th></th></tr></thead>
+            <tbody id="may-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="may-empty" style="display:none">Chưa có máy nào.</div>
+      </div>
+    </section>
+
+    <!-- ── Tab Sản phẩm ────────────────────────────────────────────────── -->
+    <section id="tab-sp" class="tab-pane" style="display:none">
+      <div class="card">
+        <h2>
+          <span id="sp-form-title">Thêm sản phẩm</span>
+          <span class="cancel-edit" id="sp-cancel">Huỷ sửa ✕</span>
+        </h2>
+        <div class="msg" id="sp-msg"></div>
+        <form id="sp-form">
+          <div class="form-grid">
+            <div><label for="sp-ma">Mã SP</label><input type="text" id="sp-ma" required></div>
+            <div><label for="sp-ten">Tên SP</label><input type="text" id="sp-ten"></div>
+            <div><label for="sp-cavity">Cavity</label><input type="number" step="any" id="sp-cavity"></div>
+            <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
+          </div>
+          <div class="form-actions"><button type="submit" id="sp-submit">Thêm sản phẩm</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Danh sách sản phẩm</h2>
+        <div class="table-wrap">
+          <table id="sp-table" style="display:none">
+            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Cavity</th><th>Cycle time (s)</th><th></th></tr></thead>
+            <tbody id="sp-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="sp-empty" style="display:none">Chưa có sản phẩm nào.</div>
+      </div>
+    </section>
+
+    <!-- ── Tab Nhân sự ─────────────────────────────────────────────────── -->
+    <section id="tab-ns" class="tab-pane" style="display:none">
+      <div class="card">
+        <h2>
+          <span id="ns-form-title">Thêm nhân sự</span>
+          <span class="cancel-edit" id="ns-cancel">Huỷ sửa ✕</span>
+        </h2>
+        <div class="msg" id="ns-msg"></div>
+        <form id="ns-form">
+          <div class="form-grid">
+            <div><label for="ns-ten">Tên nhân viên</label><input type="text" id="ns-ten" required></div>
+            <div><label for="ns-vaitro">Vai trò (ca sản xuất)</label>
+              <select id="ns-vaitro">
+                <option value="nhan_vien">Nhân viên</option>
+                <option value="truong_ca">Trưởng ca</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions"><button type="submit" id="ns-submit">Thêm nhân sự</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Danh sách nhân sự</h2>
+        <div class="table-wrap">
+          <table id="ns-table" style="display:none">
+            <thead><tr><th>Tên nhân viên</th><th>Vai trò</th><th></th></tr></thead>
+            <tbody id="ns-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="ns-empty" style="display:none">Chưa có nhân sự nào.</div>
+      </div>
+    </section>
+
+    <!-- ── Tab Khuôn ───────────────────────────────────────────────────── -->
+    <section id="tab-khuon" class="tab-pane" style="display:none">
+      <div class="card">
+        <h2>
+          <span id="khuon-form-title">Thêm khuôn</span>
+          <span class="cancel-edit" id="khuon-cancel">Huỷ sửa ✕</span>
+        </h2>
+        <p class="muted" style="margin:-8px 0 14px">Lưu ý: số shot luỹ kế/trạng thái khuôn cũng được hệ thống tự cập nhật mỗi khi kết ca — chỉnh ở đây chỉ dùng để hiệu chỉnh thủ công.</p>
+        <div class="msg" id="khuon-msg"></div>
+        <form id="khuon-form">
+          <div class="form-grid">
+            <div><label for="khuon-ma">Mã khuôn</label><input type="text" id="khuon-ma" required></div>
+            <div><label for="khuon-sp">SP gắn gần nhất</label><input type="text" id="khuon-sp"></div>
+            <div><label for="khuon-tongshot">Tổng shot luỹ kế</label><input type="number" step="any" id="khuon-tongshot"></div>
+            <div><label for="khuon-nguongbd">Ngưỡng bảo dưỡng (shot)</label><input type="number" step="any" id="khuon-nguongbd"></div>
+            <div><label for="khuon-nguonglm">Ngưỡng làm mới (shot)</label><input type="number" step="any" id="khuon-nguonglm"></div>
+            <div><label for="khuon-langanbd">Lần bảo dưỡng gần nhất</label><input type="date" id="khuon-langanbd"></div>
+            <div><label for="khuon-shotbd">Shot tại lần BD gần nhất</label><input type="number" step="any" id="khuon-shotbd"></div>
+            <div><label for="khuon-trangthai">Trạng thái</label><input type="text" id="khuon-trangthai" placeholder="binh_thuong / can_bao_duong / can_lam_moi"></div>
+            <div style="grid-column:1/-1"><label for="khuon-ghichu">Ghi chú</label><input type="text" id="khuon-ghichu"></div>
+          </div>
+          <div class="form-actions"><button type="submit" id="khuon-submit">Thêm khuôn</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Danh sách khuôn</h2>
+        <div class="table-wrap">
+          <table id="khuon-table" style="display:none">
+            <thead><tr><th>Mã khuôn</th><th>SP gần nhất</th><th>Tổng shot</th><th>Ngưỡng BD</th><th>Ngưỡng LM</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody id="khuon-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="khuon-empty" style="display:none">Chưa có khuôn nào.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
+  }
+}
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showMsg(id, cls, text){
+  const el = document.getElementById(id);
+  el.className = 'msg ' + cls;
+  el.textContent = text;
+}
+function clearMsg(id){
+  const el = document.getElementById(id);
+  el.className = 'msg';
+  el.textContent = '';
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).style.display = 'block';
+  });
+});
+
+// ── Tab Máy ──────────────────────────────────────────────────────────────
+async function loadMay(){
+  const { data, error } = await sb.from('master_machines').select('ma_may').order('ma_may');
+  if (error){ showMsg('may-msg', 'error', 'Không tải được: ' + error.message); return; }
+  clearMsg('may-msg');
+  const table = document.getElementById('may-table'), tbody = document.getElementById('may-tbody'), empty = document.getElementById('may-empty');
+  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${escapeHtml(r.ma_may)}</td>
+      <td class="row-actions"><button type="button" class="del" data-ma="${escapeHtml(r.ma_may)}">Xoá</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('.del').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Xoá máy "' + b.dataset.ma + '"?')) return;
+    const { error: delErr } = await sb.from('master_machines').delete().eq('ma_may', b.dataset.ma);
+    if (delErr) return alert('Lỗi xoá: ' + delErr.message + (delErr.message.includes('foreign key') ? ' (máy này đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
+    loadMay();
+  }));
+}
+document.getElementById('may-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ma_may = document.getElementById('may-ma').value.trim();
+  if (!ma_may) return;
+  const { error } = await sb.from('master_machines').insert({ ma_may });
+  if (error) return showMsg('may-msg', 'error', 'Lỗi: ' + error.message);
+  showMsg('may-msg', 'ok', 'Đã thêm máy ' + ma_may + '.');
+  document.getElementById('may-form').reset();
+  loadMay();
+});
+
+// ── Tab Sản phẩm ─────────────────────────────────────────────────────────
+let spEditing = null;
+function spResetForm(){
+  spEditing = null;
+  document.getElementById('sp-form').reset();
+  document.getElementById('sp-ma').disabled = false;
+  document.getElementById('sp-form-title').textContent = 'Thêm sản phẩm';
+  document.getElementById('sp-submit').textContent = 'Thêm sản phẩm';
+  document.getElementById('sp-cancel').style.display = 'none';
+}
+document.getElementById('sp-cancel').addEventListener('click', spResetForm);
+
+async function loadSp(){
+  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, cavity, cycle_time_s').order('ma_sp');
+  if (error){ showMsg('sp-msg', 'error', 'Không tải được: ' + error.message); return; }
+  clearMsg('sp-msg');
+  const table = document.getElementById('sp-table'), tbody = document.getElementById('sp-tbody'), empty = document.getElementById('sp-empty');
+  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${escapeHtml(r.ma_sp)}</td>
+      <td>${escapeHtml(r.ten_sp) || '<span class="muted">—</span>'}</td>
+      <td>${r.cavity ?? '<span class="muted">—</span>'}</td>
+      <td>${r.cycle_time_s ?? '<span class="muted">—</span>'}</td>
+      <td class="row-actions">
+        <button type="button" class="edit">Sửa</button>
+        <button type="button" class="del">Xoá</button>
+      </td>
+    </tr>
+  `).join('');
+  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
+    const r = data[i];
+    tr.querySelector('.edit').addEventListener('click', () => {
+      spEditing = r.ma_sp;
+      document.getElementById('sp-ma').value = r.ma_sp;
+      document.getElementById('sp-ma').disabled = true;
+      document.getElementById('sp-ten').value = r.ten_sp || '';
+      document.getElementById('sp-cavity').value = r.cavity ?? '';
+      document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
+      document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
+      document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
+      document.getElementById('sp-cancel').style.display = 'inline';
+      window.scrollTo({ top: document.getElementById('sp-form').offsetTop - 20, behavior: 'smooth' });
+    });
+    tr.querySelector('.del').addEventListener('click', async () => {
+      if (!confirm('Xoá sản phẩm "' + r.ma_sp + '"?')) return;
+      const { error: delErr } = await sb.from('master_products').delete().eq('ma_sp', r.ma_sp);
+      if (delErr) return alert('Lỗi xoá: ' + delErr.message);
+      loadSp();
+    });
+  });
+}
+document.getElementById('sp-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ma_sp = document.getElementById('sp-ma').value.trim();
+  const ten_sp = document.getElementById('sp-ten').value.trim() || null;
+  const cavityRaw = document.getElementById('sp-cavity').value;
+  const ctRaw = document.getElementById('sp-ct').value;
+  const cavity = cavityRaw === '' ? null : Number(cavityRaw);
+  const cycle_time_s = ctRaw === '' ? null : Number(ctRaw);
+  if (!ma_sp) return;
+
+  let error;
+  if (spEditing){
+    ({ error } = await sb.from('master_products').update({ ten_sp, cavity, cycle_time_s }).eq('ma_sp', spEditing));
+  } else {
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, cavity, cycle_time_s }));
+  }
+  if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
+  showMsg('sp-msg', 'ok', spEditing ? 'Đã lưu ' + ma_sp + '.' : 'Đã thêm ' + ma_sp + '.');
+  spResetForm();
+  loadSp();
+});
+
+// ── Tab Nhân sự ──────────────────────────────────────────────────────────
+let nsEditing = null;
+function nsResetForm(){
+  nsEditing = null;
+  document.getElementById('ns-form').reset();
+  document.getElementById('ns-ten').disabled = false;
+  document.getElementById('ns-form-title').textContent = 'Thêm nhân sự';
+  document.getElementById('ns-submit').textContent = 'Thêm nhân sự';
+  document.getElementById('ns-cancel').style.display = 'none';
+}
+document.getElementById('ns-cancel').addEventListener('click', nsResetForm);
+
+const NS_ROLE_LABELS = { nhan_vien: 'Nhân viên', truong_ca: 'Trưởng ca' };
+
+async function loadNs(){
+  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro').order('ten_nhan_vien');
+  if (error){ showMsg('ns-msg', 'error', 'Không tải được: ' + error.message); return; }
+  clearMsg('ns-msg');
+  const table = document.getElementById('ns-table'), tbody = document.getElementById('ns-tbody'), empty = document.getElementById('ns-empty');
+  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${escapeHtml(r.ten_nhan_vien)}</td>
+      <td>${NS_ROLE_LABELS[r.vai_tro] || escapeHtml(r.vai_tro) || '<span class="muted">—</span>'}</td>
+      <td class="row-actions">
+        <button type="button" class="edit">Sửa</button>
+        <button type="button" class="del">Xoá</button>
+      </td>
+    </tr>
+  `).join('');
+  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
+    const r = data[i];
+    tr.querySelector('.edit').addEventListener('click', () => {
+      nsEditing = r.ten_nhan_vien;
+      document.getElementById('ns-ten').value = r.ten_nhan_vien;
+      document.getElementById('ns-ten').disabled = true;
+      document.getElementById('ns-vaitro').value = r.vai_tro || 'nhan_vien';
+      document.getElementById('ns-form-title').textContent = 'Sửa nhân sự: ' + r.ten_nhan_vien;
+      document.getElementById('ns-submit').textContent = 'Lưu thay đổi';
+      document.getElementById('ns-cancel').style.display = 'inline';
+      window.scrollTo({ top: document.getElementById('ns-form').offsetTop - 20, behavior: 'smooth' });
+    });
+    tr.querySelector('.del').addEventListener('click', async () => {
+      if (!confirm('Xoá nhân sự "' + r.ten_nhan_vien + '"?')) return;
+      const { error: delErr } = await sb.from('master_employees').delete().eq('ten_nhan_vien', r.ten_nhan_vien);
+      if (delErr) return alert('Lỗi xoá: ' + delErr.message);
+      loadNs();
+    });
+  });
+}
+document.getElementById('ns-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ten_nhan_vien = document.getElementById('ns-ten').value.trim();
+  const vai_tro = document.getElementById('ns-vaitro').value;
+  if (!ten_nhan_vien) return;
+
+  let error;
+  if (nsEditing){
+    ({ error } = await sb.from('master_employees').update({ vai_tro }).eq('ten_nhan_vien', nsEditing));
+  } else {
+    ({ error } = await sb.from('master_employees').insert({ ten_nhan_vien, vai_tro }));
+  }
+  if (error) return showMsg('ns-msg', 'error', 'Lỗi: ' + error.message);
+  showMsg('ns-msg', 'ok', nsEditing ? 'Đã lưu ' + ten_nhan_vien + '.' : 'Đã thêm ' + ten_nhan_vien + '.');
+  nsResetForm();
+  loadNs();
+});
+
+// ── Tab Khuôn ────────────────────────────────────────────────────────────
+let khuonEditing = null;
+function khuonResetForm(){
+  khuonEditing = null;
+  document.getElementById('khuon-form').reset();
+  document.getElementById('khuon-ma').disabled = false;
+  document.getElementById('khuon-form-title').textContent = 'Thêm khuôn';
+  document.getElementById('khuon-submit').textContent = 'Thêm khuôn';
+  document.getElementById('khuon-cancel').style.display = 'none';
+}
+document.getElementById('khuon-cancel').addEventListener('click', khuonResetForm);
+
+async function loadKhuon(){
+  const { data, error } = await sb.from('duc_shot_khuon')
+    .select('ma_khuon, ten_sp_gan_nhat, tong_shot_luy_ke, nguong_bao_duong, nguong_lam_moi, lan_bao_duong_gan_nhat, shot_tai_lan_bao_duong_gan_nhat, trang_thai_khuon, ghi_chu')
+    .order('ma_khuon');
+  if (error){ showMsg('khuon-msg', 'error', 'Không tải được: ' + error.message); return; }
+  clearMsg('khuon-msg');
+  const table = document.getElementById('khuon-table'), tbody = document.getElementById('khuon-tbody'), empty = document.getElementById('khuon-empty');
+  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${escapeHtml(r.ma_khuon)}</td>
+      <td>${escapeHtml(r.ten_sp_gan_nhat) || '<span class="muted">—</span>'}</td>
+      <td>${r.tong_shot_luy_ke ?? '<span class="muted">—</span>'}</td>
+      <td>${r.nguong_bao_duong ?? '<span class="muted">—</span>'}</td>
+      <td>${r.nguong_lam_moi ?? '<span class="muted">—</span>'}</td>
+      <td>${escapeHtml(r.trang_thai_khuon) || '<span class="muted">—</span>'}</td>
+      <td class="row-actions">
+        <button type="button" class="edit">Sửa</button>
+        <button type="button" class="del">Xoá</button>
+      </td>
+    </tr>
+  `).join('');
+  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
+    const r = data[i];
+    tr.querySelector('.edit').addEventListener('click', () => {
+      khuonEditing = r.ma_khuon;
+      document.getElementById('khuon-ma').value = r.ma_khuon;
+      document.getElementById('khuon-ma').disabled = true;
+      document.getElementById('khuon-sp').value = r.ten_sp_gan_nhat || '';
+      document.getElementById('khuon-tongshot').value = r.tong_shot_luy_ke ?? '';
+      document.getElementById('khuon-nguongbd').value = r.nguong_bao_duong ?? '';
+      document.getElementById('khuon-nguonglm').value = r.nguong_lam_moi ?? '';
+      document.getElementById('khuon-langanbd').value = r.lan_bao_duong_gan_nhat || '';
+      document.getElementById('khuon-shotbd').value = r.shot_tai_lan_bao_duong_gan_nhat ?? '';
+      document.getElementById('khuon-trangthai').value = r.trang_thai_khuon || '';
+      document.getElementById('khuon-ghichu').value = r.ghi_chu || '';
+      document.getElementById('khuon-form-title').textContent = 'Sửa khuôn: ' + r.ma_khuon;
+      document.getElementById('khuon-submit').textContent = 'Lưu thay đổi';
+      document.getElementById('khuon-cancel').style.display = 'inline';
+      window.scrollTo({ top: document.getElementById('khuon-form').offsetTop - 20, behavior: 'smooth' });
+    });
+    tr.querySelector('.del').addEventListener('click', async () => {
+      if (!confirm('Xoá khuôn "' + r.ma_khuon + '"?')) return;
+      const { error: delErr } = await sb.from('duc_shot_khuon').delete().eq('ma_khuon', r.ma_khuon);
+      if (delErr) return alert('Lỗi xoá: ' + delErr.message);
+      loadKhuon();
+    });
+  });
+}
+document.getElementById('khuon-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ma_khuon = document.getElementById('khuon-ma').value.trim();
+  if (!ma_khuon) return;
+  const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+  const str = (id) => document.getElementById(id).value.trim() || null;
+
+  const payload = {
+    ten_sp_gan_nhat: str('khuon-sp'),
+    tong_shot_luy_ke: num('khuon-tongshot'),
+    nguong_bao_duong: num('khuon-nguongbd'),
+    nguong_lam_moi: num('khuon-nguonglm'),
+    lan_bao_duong_gan_nhat: str('khuon-langanbd'),
+    shot_tai_lan_bao_duong_gan_nhat: num('khuon-shotbd'),
+    trang_thai_khuon: str('khuon-trangthai'),
+    ghi_chu: str('khuon-ghichu'),
+    last_updated_at: new Date().toISOString(),
+  };
+
+  let error;
+  if (khuonEditing){
+    ({ error } = await sb.from('duc_shot_khuon').update(payload).eq('ma_khuon', khuonEditing));
+  } else {
+    ({ error } = await sb.from('duc_shot_khuon').insert({ ma_khuon, ...payload }));
+  }
+  if (error) return showMsg('khuon-msg', 'error', 'Lỗi: ' + error.message);
+  showMsg('khuon-msg', 'ok', khuonEditing ? 'Đã lưu ' + ma_khuon + '.' : 'Đã thêm ' + ma_khuon + '.');
+  khuonResetForm();
+  loadKhuon();
+});
+
+// ── Gate + khởi động ────────────────────────────────────────────────────
+async function main(){
+  initAuthStatus();
+  const session = await MesAuth.requireAuth();
+
+  const gate = document.getElementById('gate');
+  const { data: myRole, error } = await sb
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', session.user.id)
+    .maybeSingle();
+
+  if (error){
+    gate.innerHTML = '<div class="msg error" style="display:block">Không kiểm tra được quyền: ' + error.message + '</div>';
+    return;
+  }
+  if (!myRole || myRole.role !== 'admin'){
+    gate.innerHTML = '<div class="msg error" style="display:block">Bạn không có quyền admin để vào trang này.</div>';
+    return;
+  }
+
+  document.getElementById('adminArea').style.display = 'block';
+  loadMay();
+  loadSp();
+  loadNs();
+  loadKhuon();
+}
+
+main();
+</script>
+</body>
+</html>
