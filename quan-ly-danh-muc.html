@@ -159,6 +159,19 @@
                 <option value="truong_ca">Trưởng ca</option>
               </select>
             </div>
+            <div>
+              <label for="ns-bophan">Bộ phận</label>
+              <input type="text" id="ns-bophan" list="ns-bophan-list" placeholder="vd: Đúc">
+              <datalist id="ns-bophan-list">
+                <option value="Đúc">
+                <option value="Bavia">
+                <option value="QC">
+                <option value="IPQC">
+                <option value="Kho NVL">
+                <option value="Kế hoạch">
+                <option value="Bảo trì">
+              </datalist>
+            </div>
           </div>
           <div class="form-actions"><button type="submit" id="ns-submit">Thêm nhân sự</button></div>
         </form>
@@ -167,7 +180,7 @@
         <h2>Danh sách nhân sự</h2>
         <div class="table-wrap">
           <table id="ns-table" style="display:none">
-            <thead><tr><th>Tên nhân viên</th><th>Vai trò</th><th></th></tr></thead>
+            <thead><tr><th>Tên nhân viên</th><th>Vai trò</th><th>Bộ phận</th><th></th></tr></thead>
             <tbody id="ns-tbody"></tbody>
           </table>
         </div>
@@ -374,7 +387,7 @@ document.getElementById('ns-cancel').addEventListener('click', nsResetForm);
 const NS_ROLE_LABELS = { nhan_vien: 'Nhân viên', truong_ca: 'Trưởng ca' };
 
 async function loadNs(){
-  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro').order('ten_nhan_vien');
+  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro, bo_phan').order('ten_nhan_vien');
   if (error){ showMsg('ns-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('ns-msg');
   const table = document.getElementById('ns-table'), tbody = document.getElementById('ns-tbody'), empty = document.getElementById('ns-empty');
@@ -384,6 +397,7 @@ async function loadNs(){
     <tr>
       <td>${escapeHtml(r.ten_nhan_vien)}</td>
       <td>${NS_ROLE_LABELS[r.vai_tro] || escapeHtml(r.vai_tro) || '<span class="muted">—</span>'}</td>
+      <td>${escapeHtml(r.bo_phan) || '<span class="muted">—</span>'}</td>
       <td class="row-actions">
         <button type="button" class="edit">Sửa</button>
         <button type="button" class="del">Xoá</button>
@@ -397,6 +411,7 @@ async function loadNs(){
       document.getElementById('ns-ten').value = r.ten_nhan_vien;
       document.getElementById('ns-ten').disabled = true;
       document.getElementById('ns-vaitro').value = r.vai_tro || 'nhan_vien';
+      document.getElementById('ns-bophan').value = r.bo_phan || '';
       document.getElementById('ns-form-title').textContent = 'Sửa nhân sự: ' + r.ten_nhan_vien;
       document.getElementById('ns-submit').textContent = 'Lưu thay đổi';
       document.getElementById('ns-cancel').style.display = 'inline';
@@ -414,13 +429,14 @@ document.getElementById('ns-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const ten_nhan_vien = document.getElementById('ns-ten').value.trim();
   const vai_tro = document.getElementById('ns-vaitro').value;
+  const bo_phan = document.getElementById('ns-bophan').value.trim() || null;
   if (!ten_nhan_vien) return;
 
   let error;
   if (nsEditing){
-    ({ error } = await sb.from('master_employees').update({ vai_tro }).eq('ten_nhan_vien', nsEditing));
+    ({ error } = await sb.from('master_employees').update({ vai_tro, bo_phan }).eq('ten_nhan_vien', nsEditing));
   } else {
-    ({ error } = await sb.from('master_employees').insert({ ten_nhan_vien, vai_tro }));
+    ({ error } = await sb.from('master_employees').insert({ ten_nhan_vien, vai_tro, bo_phan }));
   }
   if (error) return showMsg('ns-msg', 'error', 'Lỗi: ' + error.message);
   showMsg('ns-msg', 'ok', nsEditing ? 'Đã lưu ' + ten_nhan_vien + '.' : 'Đã thêm ' + ten_nhan_vien + '.');
