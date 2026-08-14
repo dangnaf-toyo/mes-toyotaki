@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xem Lại Báo Cáo Kết Ca — MES Toyotaki</title>
+<!--
+  bao-cao-ca.html — tra cứu + in lại báo cáo kết ca của khối Đúc cho 1 ngày/ca
+  bất kỳ trong quá khứ. duc-dashboard.html chỉ hiện báo cáo NGAY LÚC kết ca
+  (dữ liệu trả về từ RPC duc_end_shift, không lưu lại ở đâu) — nếu trưởng ca
+  quên bấm "In / Lưu PDF" lúc đó thì mất, dù dữ liệu thô vẫn còn trong DB.
+  Trang này dựng lại báo cáo từ dữ liệu ĐÃ LƯU (duc_bao_cao_ca +
+  duc_lich_su_san_xuat + duc_su_co_log).
+
+  GIỚI HẠN DỮ LIỆU (không phải lỗi — do thiết kế schema từ đầu):
+  - duc_lich_su_san_xuat KHÔNG lưu OEE/Availability/Performance/Quality,
+    shot nóng khuôn, số khuôn, phân loại NG theo từng dòng máy/SP — các số
+    này chỉ có trong lúc kết ca (RPC tính xong rồi trả về, không ghi lại).
+    Vì vậy bảng "Sản lượng từng máy" ở đây CHỈ có Máy/SP/KH/TT/%HT/NG.
+  - Mục "Chuyển tiếp sang ca sau" cũng chỉ có tại thời điểm kết ca, không
+    lưu lại — không hiện được ở đây.
+  - Ngược lại, KPI tổng ca (duc_bao_cao_ca) và toàn bộ sự cố (duc_su_co_log)
+    đầy đủ 100% như báo cáo gốc.
+-->
+<style>
+  :root{
+    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
+    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C; --tk-good:#1a7a3a; --tk-bad:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--tk-black);}
+  header.top{background:var(--tk-black);color:var(--tk-cream);padding:22px 0;border-bottom:5px solid var(--tk-orange);}
+  header.top .inner{max-width:1000px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
+  .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--tk-orange);font-weight:600;margin-bottom:8px;}
+  header.top h1{font-size:23px;margin:0 0 6px;font-weight:600;color:#fff;}
+  header.top .sub{font-size:13px;color:#c9c2b6;}
+  .auth-bar{font-size:12px;color:#c9c2b6;margin-top:4px}
+  .auth-bar a{color:var(--tk-orange);text-decoration:none;font-weight:600}
+  header.top .back a{color:var(--tk-orange);text-decoration:none;font-weight:600;font-size:12px;}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 28px 60px;}
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:22px 24px;margin-bottom:24px;}
+  .card h2{font-size:16px;margin:0 0 16px;font-weight:600;border-bottom:1px solid var(--tk-line);padding-bottom:10px;}
+
+  .form-row{display:flex;gap:14px;flex-wrap:wrap;align-items:end;}
+  .fg{display:flex;flex-direction:column;gap:5px;}
+  label{font-size:12px;font-weight:600;color:#445;}
+  input,select{padding:9px 11px;border:1px solid #ccd;border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff;}
+  input:focus,select:focus{outline:none;border-color:var(--tk-orange);}
+  button{padding:10px 20px;border:none;border-radius:8px;background:var(--tk-orange);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;}
+  button:hover:not(:disabled){background:var(--tk-orange-deep);}
+  button.outline{background:#fff;color:var(--tk-orange-deep);border:1.5px solid var(--tk-orange);}
+
+  .msg{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;}
+  .msg.error{display:block;background:#fbe9e7;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .msg.info{display:block;background:#eef2f6;color:var(--tk-navy);border:1px solid #cfd9e3;}
+
+  .limits-note{font-size:11.5px;color:var(--tk-muted);margin-top:10px;line-height:1.5;}
+
+  /* ── Khối báo cáo (giống hệt CSS .rpt của duc-dashboard.html để nhất quán khi in) ── */
+  #reportWrap{display:none;}
+  #reportWrap .top-actions{display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;}
+  .rpt{font-size:11.5px;color:#0F172A;background:#fff;border:1px solid var(--tk-line);border-radius:10px;padding:20px 22px;}
+  .rpt h1{font-size:17px;margin:0 0 2px;}
+  .rpt .rpt-sub{font-size:11px;color:#64748B;margin-bottom:10px;}
+  .rpt h2{font-size:13px;margin:12px 0 5px;padding-bottom:3px;border-bottom:1px solid #D9DFE5;}
+  .rpt table{width:100%;border-collapse:collapse;font-size:10.5px;}
+  .rpt th,.rpt td{border:1px solid #D9DFE5;padding:3px 5px;text-align:left;vertical-align:top;}
+  .rpt th{background:#F5F7FA;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.03em;}
+  .rpt td.num,.rpt th.num{text-align:right;font-family:'JetBrains Mono',monospace;}
+  .rpt .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:8px;}
+  .rpt .kpi>div{border:1px solid #D9DFE5;border-radius:5px;padding:5px 7px;}
+  .rpt .kpi .k{font-size:9px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;}
+  .rpt .kpi .v{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;}
+  .rpt .note{white-space:pre-wrap;border:1px solid #D9DFE5;border-radius:5px;padding:6px 8px;background:#F5F7FA;font-size:11px;}
+  .rpt .data-limit{font-size:10px;color:#94A3B8;font-style:italic;margin-top:4px;}
+  @media print{
+    @page{size:A4 portrait;margin:10mm}
+    body *{visibility:hidden;}
+    #reportWrap, #reportWrap *{visibility:visible;}
+    #reportWrap{position:absolute;left:0;top:0;width:100%;}
+    #reportWrap .top-actions{display:none;}
+    .rpt{border:none;padding:0;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="inner">
+    <div>
+      <div class="eyebrow">TOYOTAKI · Khối Đúc</div>
+      <h1>Xem Lại Báo Cáo Kết Ca</h1>
+      <div class="sub">Tra cứu báo cáo kết ca đã lưu theo ngày/ca — dùng khi lúc kết ca quên bấm Lưu PDF.</div>
+      <div class="auth-bar" id="authInfo">…</div>
+    </div>
+    <div class="back"><a href="index.html">← Trang chủ MES</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Tra cứu</h2>
+    <div class="msg" id="searchMsg"></div>
+    <div class="form-row">
+      <div class="fg">
+        <label for="fNgay">Ngày</label>
+        <input type="date" id="fNgay">
+      </div>
+      <div class="fg">
+        <label for="fCa">Ca</label>
+        <select id="fCa">
+          <option value="Ca ngày">Ca ngày</option>
+          <option value="Ca đêm">Ca đêm</option>
+          <option value="Ca 1">Ca 1</option>
+          <option value="Ca 2">Ca 2</option>
+        </select>
+      </div>
+      <button type="button" onclick="searchReport()">🔎 Tìm báo cáo</button>
+    </div>
+    <div class="limits-note">
+      Lưu ý: bảng "Sản lượng từng máy" ở đây chỉ có Máy/SP/KH/TT/%HT/NG — OEE, shot nóng khuôn, số khuôn,
+      phân loại NG theo từng dòng chỉ có ngay lúc kết ca (không được lưu lại), nên không hiện được khi tra cứu sau.
+      Toàn bộ sự cố và KPI tổng ca vẫn đầy đủ.
+    </div>
+  </div>
+
+  <div id="reportWrap">
+    <div class="top-actions">
+      <button type="button" class="outline" onclick="document.getElementById('reportWrap').style.display='none'">✕ Đóng</button>
+      <button type="button" onclick="window.print()">🖨 In / Lưu PDF</button>
+    </div>
+    <div class="rpt" id="reportBody"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function fmtPct(x){ return x == null ? '—' : ((Number(x)||0)*100).toFixed(1)+'%'; }
+function formatDateShort(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); }
+function naturalCompare(a,b){ return String(a).localeCompare(String(b),'vi',{numeric:true,sensitivity:'base'}); }
+function escapeHtml(s){
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showSearchMsg(cls, text){
+  const el = document.getElementById('searchMsg');
+  el.className = 'msg ' + cls;
+  el.textContent = text;
+}
+function clearSearchMsg(){
+  const el = document.getElementById('searchMsg');
+  el.className = 'msg';
+  el.textContent = '';
+}
+
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  if (email){
+    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
+    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+  } else {
+    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
+  }
+}
+
+async function searchReport(){
+  const ngay = document.getElementById('fNgay').value;
+  const ca = document.getElementById('fCa').value;
+  if (!ngay) { showSearchMsg('error', 'Chọn ngày cần tra cứu.'); return; }
+
+  document.getElementById('reportWrap').style.display = 'none';
+  showSearchMsg('info', '⏳ Đang tìm báo cáo...');
+
+  const [bcRes, lsRes, scRes] = await Promise.all([
+    sb.from('duc_bao_cao_ca').select('*').eq('ngay', ngay).eq('ca', ca)
+      .order('thoi_diem_ket_ca', { ascending: false }).limit(1).maybeSingle(),
+    sb.from('duc_lich_su_san_xuat').select('*').eq('ngay', ngay).eq('ca', ca),
+    sb.from('duc_su_co_log').select('*').eq('ngay', ngay).eq('ca', ca),
+  ]);
+
+  if (bcRes.error) return showSearchMsg('error', 'Lỗi tra cứu: ' + bcRes.error.message);
+  if (!bcRes.data) return showSearchMsg('error', 'Không tìm thấy báo cáo đã kết ca cho ' + ca + ' ngày ' + formatDateShort(new Date(ngay + 'T00:00:00')) + ' — ca này có thể chưa kết ca, hoặc chưa từng có kế hoạch.');
+
+  clearSearchMsg();
+  renderReport(bcRes.data, lsRes.data || [], scRes.data || []);
+  document.getElementById('reportWrap').style.display = 'block';
+  document.getElementById('reportWrap').scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderReport(s, lichSuRows, incidents){
+  const rowsHTML = lichSuRows.slice()
+    .sort((a, b) => naturalCompare(a.ma_may, b.ma_may))
+    .map(r => {
+      const pct = r.kh_ca > 0 ? Math.round(r.tt_ca / r.kh_ca * 100) : 0;
+      return '<tr>' +
+        '<td>' + escapeHtml(r.ma_may) + '</td>' +
+        '<td>' + escapeHtml(r.ma_sp) + '<br><span style="color:#64748B">' + escapeHtml(r.ten_sp || '') + '</span></td>' +
+        '<td class="num">' + fmtNum(r.kh_ca) + '</td>' +
+        '<td class="num">' + fmtNum(r.tt_ca) + '</td>' +
+        '<td class="num">' + pct + '%</td>' +
+        '<td class="num">' + fmtNum(r.so_luong_ng) + '</td>' +
+      '</tr>';
+    }).join('');
+
+  const incHTML = incidents.length === 0
+    ? '<tr><td colspan="7" style="color:#64748B;font-style:italic">Không có sự cố nào trong ca.</td></tr>'
+    : incidents.slice().sort((a,b) => new Date(a.gio_phat_sinh) - new Date(b.gio_phat_sinh)).map(i => {
+        const st = new Date(i.gio_phat_sinh), en = i.gio_tro_lai ? new Date(i.gio_tro_lai) : null;
+        return '<tr>' +
+          '<td>' + escapeHtml(i.ma_may) + '</td>' +
+          '<td>' + escapeHtml(i.ma_sp || '—') + '</td>' +
+          '<td>' + escapeHtml(i.loai_su_co || '—') + '</td>' +
+          '<td>' + pad(st.getHours()) + ':' + pad(st.getMinutes()) + ' → ' + (en ? (pad(en.getHours()) + ':' + pad(en.getMinutes())) : 'chưa xử lý xong') + '</td>' +
+          '<td class="num">' + (i.thoi_gian_dung_phut != null ? i.thoi_gian_dung_phut + "'" : '—') + '</td>' +
+          '<td>' + escapeHtml(i.van_de || '—') + '</td>' +
+          '<td>' + escapeHtml(i.noi_dung_xu_ly || '—') + '</td>' +
+        '</tr>';
+      }).join('');
+
+  const html =
+    '<h1>BÁO CÁO KẾT CA — BỘ PHẬN ĐÚC</h1>' +
+    '<div class="rpt-sub">Công ty CP Công nghiệp Toyotaki · Ngày ' + escapeHtml(formatDateShort(new Date(s.ngay + 'T00:00:00'))) +
+      ' · ' + escapeHtml(s.ca) + ' (' + escapeHtml(s.phuong_an_ca || '—') + ') · Trưởng ca: <b>' + escapeHtml(s.truong_ca || '—') + '</b>' +
+      ' · Mã báo cáo: ' + escapeHtml(s.id_bao_cao || '—') +
+      ' · Kết ca lúc ' + (s.thoi_diem_ket_ca ? new Date(s.thoi_diem_ket_ca).toLocaleString('vi-VN') : '—') + '</div>' +
+
+    '<div class="kpi">' +
+      '<div><div class="k">Tổng KH ca</div><div class="v">' + fmtNum(s.tong_kh_ca) + '</div></div>' +
+      '<div><div class="k">Tổng TT ca</div><div class="v">' + fmtNum(s.tong_tt_ca) + '</div></div>' +
+      '<div><div class="k">% Hoàn thành</div><div class="v">' + (s.tong_kh_ca > 0 ? Math.round(s.tong_tt_ca / s.tong_kh_ca * 100) : 0) + '%</div></div>' +
+      '<div><div class="k">Tổng NG</div><div class="v">' + fmtNum(s.tong_ng_ca) + '</div></div>' +
+      '<div><div class="k">Tổng phút dừng</div><div class="v">' + fmtNum(Math.round(s.tong_phut_dung_ca || 0)) + "'</div></div>" +
+      '<div><div class="k">OEE ca</div><div class="v">' + fmtPct(s.oee_ca) + '</div></div>' +
+    '</div>' +
+    '<div class="kpi">' +
+      '<div><div class="k">Availability</div><div class="v">' + fmtPct(s.availability_ca) + '</div></div>' +
+      '<div><div class="k">Performance</div><div class="v">' + fmtPct(s.performance_ca) + '</div></div>' +
+      '<div><div class="k">Quality</div><div class="v">' + fmtPct(s.quality_ca) + '</div></div>' +
+      '<div><div class="k">Máy có KH</div><div class="v">' + fmtNum(s.so_may_co_kh) + '</div></div>' +
+      '<div><div class="k">Máy đạt KH</div><div class="v">' + fmtNum(s.so_may_hoan_thanh_kh) + '</div></div>' +
+      '<div><div class="k">Số sự cố</div><div class="v">' + fmtNum(s.so_su_co_ca) + '</div></div>' +
+    '</div>' +
+    '<div style="font-size:10.5px;color:#64748B;margin-bottom:6px">Nhân sự ca: ' + escapeHtml(s.nv_ca_bao_cao || '—') +
+      ' · Tổng shot nóng khuôn (toàn ca): ' + fmtNum(s.tong_shot_nong_khuon_ca) + '</div>' +
+
+    '<h2>1. Sản lượng từng máy</h2>' +
+    '<table><thead><tr><th>Máy</th><th>Sản phẩm</th><th class="num">KH ca</th><th class="num">TT ca</th>' +
+      '<th class="num">%HT</th><th class="num">NG</th></tr></thead>' +
+      '<tbody>' + (rowsHTML || '<tr><td colspan="6" style="color:#64748B;font-style:italic">Không có dữ liệu.</td></tr>') + '</tbody></table>' +
+    '<div class="data-limit">OEE, shot nóng khuôn, số khuôn, phân loại NG theo từng máy chỉ có tại thời điểm kết ca — không lưu lại được.</div>' +
+
+    '<h2>2. Sự cố trong ca</h2>' +
+    '<table><thead><tr><th>Máy</th><th>SP</th><th>Loại sự cố</th><th>Từ → Đến</th><th class="num">Phút</th><th>Vấn đề</th><th>Xử lý</th></tr></thead>' +
+      '<tbody>' + incHTML + '</tbody></table>' +
+
+    '<h2>3. Ghi chú trưởng ca</h2>' +
+    '<div class="note">' + (s.comment_truong_ca ? escapeHtml(s.comment_truong_ca) : '(không có ghi chú)') + '</div>';
+
+  document.getElementById('reportBody').innerHTML = html;
+}
+
+(function init(){
+  const today = new Date();
+  document.getElementById('fNgay').value = today.getFullYear() + '-' + pad(today.getMonth()+1) + '-' + pad(today.getDate());
+  initAuthStatus();
+})();
+</script>
+</body>
+</html>
