@@ -93,6 +93,10 @@ textarea{resize:vertical;min-height:48px}
   animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty-hint{font-size:12px;color:#999;text-align:center;padding:8px 4px 0}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.chip-row:empty{display:none;margin:0}
+.chip-opt{padding:6px 11px;border:1.5px solid #ddd;border-radius:20px;font-size:12px;font-weight:700;background:#fff;color:#555;cursor:pointer}
+.chip-opt.sel{background:#C87941;color:#fff;border-color:#C87941}
 </style>
 </head>
 <body>
@@ -136,11 +140,12 @@ textarea{resize:vertical;min-height:48px}
         </div>
         <div class="fg">
           <label for="soKhuon">Số khuôn</label>
-          <input id="soKhuon" type="text" placeholder="VD V45-46">
+          <div class="chip-row" id="soKhuon-chips"></div>
+          <input id="soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
         </div>
         <div class="fg">
           <label for="nguyenLieu">Nguyên liệu</label>
-          <input id="nguyenLieu" type="text" placeholder="Tự điền theo mã SP (sửa được)">
+          <input id="nguyenLieu" type="text" placeholder="Tự điền theo mã SP" disabled>
         </div>
         <div class="fg">
           <label class="req" for="mayDuc">Máy đúc</label>
@@ -210,11 +215,12 @@ textarea{resize:vertical;min-height:48px}
         </div>
         <div class="fg">
           <label for="s_soKhuon">Số khuôn</label>
-          <input id="s_soKhuon" type="text" placeholder="VD V45-46">
+          <div class="chip-row" id="s_soKhuon-chips"></div>
+          <input id="s_soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
         </div>
         <div class="fg">
           <label for="s_nguyenLieu">Nguyên liệu</label>
-          <input id="s_nguyenLieu" type="text">
+          <input id="s_nguyenLieu" type="text" disabled>
         </div>
         <div class="fg">
           <label class="req" for="s_mayDuc">Máy đúc</label>
@@ -315,13 +321,41 @@ function buildSelects(items, mays, nguois){
 }
 
 /** prefix '' = tab In Tem, 's_' = tab Tra cứu — tự điền tên SP + nguyên liệu
-    + số khuôn gợi ý (theo master_products, có thể sửa tay sau khi điền). */
+    (khoá cứng, mỗi mã SP chỉ có đúng 1 nguyên liệu) + số khuôn (SP nào chạy
+    nhiều khuôn cùng lúc thì hiện chip cho người dùng chọn 1 trong số đó). */
 function onMaChange(prefix){
   var ma = document.getElementById(prefix + "maSP").value;
   var item = masterMap[ma];
   document.getElementById(prefix + "tenSP").value = item ? item.ten : "";
   document.getElementById(prefix + "nguyenLieu").value = item ? item.nguyenLieu : "";
-  document.getElementById(prefix + "soKhuon").value = item ? item.soKhuon : "";
+  populateSoKhuonChips(prefix, item ? item.soKhuon : "");
+}
+
+/** Danh sách khuôn của 1 mã SP lưu dạng "KPH #13-14, KPH #15-16" (text, xem
+    migration_phase_S7_sokhuon_real.sql) -- chỉ 1 khuôn thì điền thẳng vào ô,
+    nhiều khuôn thì hiện chip để chọn (ô vẫn sửa tay được nếu cần khuôn khác). */
+function populateSoKhuonChips(prefix, soKhuonRaw){
+  var chipsEl = document.getElementById(prefix + "soKhuon-chips");
+  var inputEl = document.getElementById(prefix + "soKhuon");
+  var molds = String(soKhuonRaw || "").split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+
+  if (molds.length <= 1){
+    chipsEl.innerHTML = "";
+    inputEl.value = molds[0] || "";
+    return;
+  }
+
+  chipsEl.innerHTML = molds.map(function(mk){
+    return '<button type="button" class="chip-opt" data-mk="' + mk.replace(/"/g,'&quot;') + '">' + mk + '</button>';
+  }).join("");
+  [].forEach.call(chipsEl.querySelectorAll(".chip-opt"), function(btn){
+    btn.addEventListener("click", function(){
+      inputEl.value = btn.dataset.mk;
+      [].forEach.call(chipsEl.querySelectorAll(".chip-opt"), function(b){ b.classList.toggle("sel", b === btn); });
+    });
+  });
+  inputEl.value = molds[0];
+  chipsEl.querySelector(".chip-opt").classList.add("sel");
 }
 
 function applyPrefill(){
@@ -712,6 +746,7 @@ function buildLabelSvg(d){
 
 function clearAll(){
   ["soLuong","soKhuon","nguyenLieu","ghiChu"].forEach(function(i){ document.getElementById(i).value=""; });
+  document.getElementById("soKhuon-chips").innerHTML = "";
   document.getElementById("lotNo").value = getTodayString();
   document.getElementById("maSP").value="";
   document.getElementById("tenSP").value="";
