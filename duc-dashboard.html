@@ -2108,34 +2108,34 @@ function updateTimers(){
 // KHÔNG quyết định máy nào đang chạy (trước đây "Máy đang chạy" tính thẳng
 // từ state.rows, vốn bị lọc theo ngày/ca đang chọn, nên đổi ca là đổi luôn
 // danh sách máy chạy — không hợp lý, vì máy chạy thật hay không là 1 sự thật
-// độc lập). Tính lại: máy "còn hoạt động" = dòng mới nhất (row_seq) của máy
-// đó chưa hết cửa sổ ca (sp_end_time) HOẶC đang có sự cố mở — cùng cách
-// getActiveIdDongSet() bên ipqc.html đang dùng. "Đang chạy" = còn hoạt động
-// VÀ không có sự cố mở.
+// độc lập). Máy chỉ thật sự "dừng" khi trưởng ca đã bấm KẾT CA cho đúng
+// ngày/ca của dòng mới nhất trên máy đó (và không tick "tiếp tục" — có tiếp
+// tục thì đã có dòng mới, dòng cũ không còn là row_seq lớn nhất) — KHÔNG
+// dùng mốc thời gian (sp_end_time) để đoán, vì ca chạy trễ hơn dự kiến bao
+// lâu cũng không có nghĩa là đã dừng. "Đang chạy" = còn hoạt động (chưa kết
+// ca, hoặc đang có sự cố mở) VÀ không có sự cố mở.
 // =============================================================================
-// Khoảng đệm sau giờ kết ca dự kiến trước khi coi 1 dòng là "đã dừng hẳn" —
-// cùng giá trị/lý do với ipqc.html (ca chạy trễ vài giờ so dự kiến là bình
-// thường, không nên coi máy vừa qua giờ kết ca vài phút là đã dừng).
-const IPQC_STALE_GRACE_MIN = 240;
-
 async function loadLiveMachineStatus(){
   try {
-    const { data, error } = await sb.from('duc_ca_hien_tai')
-      .select('ma_may,ma_sp,row_seq,sp_end_time,open_gio_phat_sinh');
-    if (error) throw new Error(error.message);
+    const [chtRes, baoCaoRes] = await Promise.all([
+      sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,row_seq,ngay,ca,open_gio_phat_sinh'),
+      sb.from('duc_bao_cao_ca').select('ngay,ca'),
+    ]);
+    if (chtRes.error) throw new Error(chtRes.error.message);
+    if (baoCaoRes.error) throw new Error(baoCaoRes.error.message);
+    const ketCaSet = new Set((baoCaoRes.data || []).map(r => r.ngay + '|' + r.ca));
+
     const byMachine = {};
-    (data || []).forEach(r => {
+    (chtRes.data || []).forEach(r => {
       if (!r.ma_may) return;
       if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
     });
-    const nowMs = Date.now();
     let running = 0, conHoatDong = 0;
     (state.machines || []).forEach(m => {
       const r = byMachine[m];
       if (!r || !r.ma_sp) return;
-      const conLai = r.open_gio_phat_sinh ? true
-        : (!r.sp_end_time || (nowMs - new Date(r.sp_end_time).getTime()) <= IPQC_STALE_GRACE_MIN * 60000);
-      if (!conLai) return; // ca đã kết thúc từ trước, không sự cố mở — máy thực chất đang trống
+      const conLai = r.open_gio_phat_sinh ? true : !ketCaSet.has(r.ngay + '|' + r.ca);
+      if (!conLai) return; // đã kết ca cho đúng ngày/ca này, không sự cố mở — máy thực chất đang trống
       conHoatDong++;
       if (!r.open_gio_phat_sinh) running++;
     });

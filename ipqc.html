@@ -186,11 +186,6 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/supabase-client.js"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
-// Khoảng đệm sau giờ kết ca dự kiến trước khi coi 1 dòng là "đã dừng hẳn"
-// (loại khỏi active set) — ca chạy trễ vài giờ so với dự kiến (tăng ca chưa
-// kịp ghi nhận) là chuyện bình thường, không nên coi là máy đã dừng ngay khi
-// vừa qua giờ kết ca.
-const IPQC_STALE_GRACE_MIN = 240;
 const IPQC_MAX_PHOTOS = 6;
 const IPQC_DEFAULT_CHECKLIST = [
   'Kích thước (theo bảng tuần kiểm)',
@@ -260,11 +255,18 @@ async function updateUserLabel(){
 // mới nhất mỗi máy (row_seq lớn nhất), cộng cả dòng ghép cặp khuôn kép.
 // =============================================================================
 async function getActiveIdDongSet(){
-  const { data, error } = await sb.from('duc_ca_hien_tai')
-    .select('id_dong,ma_may,row_seq,khuon_kep_voi,sp_end_time,open_gio_phat_sinh');
-  if (error) throw new Error('Không tải được Ca_hien_tai: ' + error.message);
+  const [chtRes, baoCaoRes] = await Promise.all([
+    sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,ngay,ca,open_gio_phat_sinh'),
+    sb.from('duc_bao_cao_ca').select('ngay,ca'),
+  ]);
+  if (chtRes.error) throw new Error('Không tải được Ca_hien_tai: ' + chtRes.error.message);
+  if (baoCaoRes.error) throw new Error('Không tải được Báo cáo ca: ' + baoCaoRes.error.message);
+  // Ngày/ca nào đã có bản ghi Báo_cáo_ca = trưởng ca đã bấm "Kết ca" cho đúng
+  // ngày/ca đó.
+  const ketCaSet = new Set((baoCaoRes.data || []).map(r => r.ngay + '|' + r.ca));
+
   const byMachine = {}, byId = {};
-  (data || []).forEach(r => {
+  (chtRes.data || []).forEach(r => {
     if (!r.id_dong) return;
     byId[r.id_dong] = r;
     if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
@@ -274,19 +276,17 @@ async function getActiveIdDongSet(){
     active.add(r.id_dong);
     if (r.khuon_kep_voi) active.add(r.khuon_kep_voi);
   });
-  // Loại các dòng đã kết thúc ca (sp_end_time đã qua QUÁ LÂU — hơn
-  // IPQC_STALE_GRACE_MIN phút) VÀ không có sự cố đang mở — dòng vẫn "sống"
-  // trong bảng chỉ vì chưa có dòng mới ghi đè (máy thật ra đã trống/không
-  // chạy) không nên tính là active. Có khoảng đệm (grace) vì ca thực tế chạy
-  // trễ hơn giờ kết ca dự kiến vài giờ là chuyện thường (tăng ca chưa kịp ghi
-  // nhận) — không thể coi máy vừa quá giờ vài phút là "đã dừng".
-  const now = Date.now();
+  // Máy chỉ thật sự "dừng" khi trưởng ca đã KẾT CA cho đúng ngày/ca của dòng
+  // đó (không tick "tiếp tục" cho máy này — nếu có tiếp tục thì máy đã có
+  // dòng mới, dòng cũ không còn là row_seq lớn nhất nữa nên không lọt vào
+  // `active` ở trên). KHÔNG dùng mốc thời gian (sp_end_time) để đoán máy đã
+  // dừng hay chưa — ca chạy trễ hơn dự kiến bao lâu cũng không có nghĩa đã
+  // dừng, chỉ có hành động "Kết ca" mới xác định điều đó.
   const conLai = (idDong) => {
     const r = byId[idDong];
     if (!r) return false;
     if (r.open_gio_phat_sinh) return true;
-    if (!r.sp_end_time) return true;
-    return now - new Date(r.sp_end_time).getTime() <= IPQC_STALE_GRACE_MIN * 60000;
+    return !ketCaSet.has(r.ngay + '|' + r.ca);
   };
   return new Set([...active].filter(conLai));
 }

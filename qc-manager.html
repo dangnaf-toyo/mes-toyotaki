@@ -444,9 +444,6 @@ async function ensureAuth(){
 }
 
 const LOAI_LABEL = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Lên khuôn/SP mới' };
-// Khoảng đệm sau giờ kết ca dự kiến trước khi coi 1 dòng là "đã dừng hẳn" —
-// cùng giá trị/lý do với ipqc.html (ca chạy trễ vài giờ so dự kiến là bình thường).
-const IPQC_STALE_GRACE_MIN = 240;
 
 function startClock(){ setInterval(() => { document.getElementById('clock-time').textContent = fmtTime(new Date()); }, 1000); }
 
@@ -454,26 +451,29 @@ function startClock(){ setInterval(() => { document.getElementById('clock-time')
 // Active id_dong set — cùng logic với ipqc.html (xem comment ở đó).
 // =============================================================================
 async function getActiveIdDongSet(){
-  const { data, error } = await sb.from('duc_ca_hien_tai')
-    .select('id_dong,ma_may,row_seq,khuon_kep_voi,sp_end_time,open_gio_phat_sinh');
-  if (error) throw new Error(error.message);
+  const [chtRes, baoCaoRes] = await Promise.all([
+    sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,ngay,ca,open_gio_phat_sinh'),
+    sb.from('duc_bao_cao_ca').select('ngay,ca'),
+  ]);
+  if (chtRes.error) throw new Error(chtRes.error.message);
+  if (baoCaoRes.error) throw new Error(baoCaoRes.error.message);
+  const ketCaSet = new Set((baoCaoRes.data || []).map(r => r.ngay + '|' + r.ca));
+
   const byMachine = {}, byId = {};
-  (data || []).forEach(r => {
+  (chtRes.data || []).forEach(r => {
     if (!r.id_dong) return;
     byId[r.id_dong] = r;
     if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
   });
   const active = new Set();
   Object.values(byMachine).forEach(r => { active.add(r.id_dong); if (r.khuon_kep_voi) active.add(r.khuon_kep_voi); });
-  // Loại các dòng đã kết thúc ca và không có sự cố đang mở — xem ipqc.html
-  // (cùng logic) để tránh board giữ mãi các máy thật ra đã dừng từ lâu.
-  const now = Date.now();
+  // Máy chỉ thật sự "dừng" khi trưởng ca đã KẾT CA cho đúng ngày/ca của dòng
+  // đó (xem comment đầy đủ ở ipqc.html) — không dùng mốc thời gian để đoán.
   const conLai = (idDong) => {
     const r = byId[idDong];
     if (!r) return false;
     if (r.open_gio_phat_sinh) return true;
-    if (!r.sp_end_time) return true;
-    return now - new Date(r.sp_end_time).getTime() <= IPQC_STALE_GRACE_MIN * 60000;
+    return !ketCaSet.has(r.ngay + '|' + r.ca);
   };
   return new Set([...active].filter(conLai));
 }
