@@ -2721,6 +2721,13 @@ async function submitResolve(){
     });
     hideOverlay(); closeModal();
     showToast('✓ Đã lưu sự cố — dừng ' + d.thoi_gian_dung_phut + ' phút');
+    // Giai đoạn 1 (mềm) của yêu cầu bắt buộc IPQC OK trước khi kết thúc sự cố
+    // (A1/A2/A3/B1/B2/C3/E1/F1) — RPC vẫn cho kết thúc nhưng báo cờ này khi
+    // chưa có kết quả IPQC OK. Dùng alert() (không phải showToast) để chắc
+    // chắn trưởng ca phải bấm xác nhận mới đóng được, tránh bỏ sót cảnh báo.
+    if (d.canh_bao_ipqc) {
+      alert('⚠️ Hệ thống chưa ghi nhận có kết quả kiểm tra IPQC cho sự cố này, hãy nhắc nhân viên IPQC kiểm tra và hoàn thiện trên hệ thống.');
+    }
     loadShiftState(false);
   } catch (e) { onError(e); }
 }
