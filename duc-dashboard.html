@@ -2113,6 +2113,11 @@ function updateTimers(){
 // getActiveIdDongSet() bên ipqc.html đang dùng. "Đang chạy" = còn hoạt động
 // VÀ không có sự cố mở.
 // =============================================================================
+// Khoảng đệm sau giờ kết ca dự kiến trước khi coi 1 dòng là "đã dừng hẳn" —
+// cùng giá trị/lý do với ipqc.html (ca chạy trễ vài giờ so dự kiến là bình
+// thường, không nên coi máy vừa qua giờ kết ca vài phút là đã dừng).
+const IPQC_STALE_GRACE_MIN = 240;
+
 async function loadLiveMachineStatus(){
   try {
     const { data, error } = await sb.from('duc_ca_hien_tai')
@@ -2128,7 +2133,8 @@ async function loadLiveMachineStatus(){
     (state.machines || []).forEach(m => {
       const r = byMachine[m];
       if (!r || !r.ma_sp) return;
-      const conLai = r.open_gio_phat_sinh ? true : (!r.sp_end_time || new Date(r.sp_end_time).getTime() >= nowMs);
+      const conLai = r.open_gio_phat_sinh ? true
+        : (!r.sp_end_time || (nowMs - new Date(r.sp_end_time).getTime()) <= IPQC_STALE_GRACE_MIN * 60000);
       if (!conLai) return; // ca đã kết thúc từ trước, không sự cố mở — máy thực chất đang trống
       conHoatDong++;
       if (!r.open_gio_phat_sinh) running++;

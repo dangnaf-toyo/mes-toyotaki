@@ -444,6 +444,9 @@ async function ensureAuth(){
 }
 
 const LOAI_LABEL = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Lên khuôn/SP mới' };
+// Khoảng đệm sau giờ kết ca dự kiến trước khi coi 1 dòng là "đã dừng hẳn" —
+// cùng giá trị/lý do với ipqc.html (ca chạy trễ vài giờ so dự kiến là bình thường).
+const IPQC_STALE_GRACE_MIN = 240;
 
 function startClock(){ setInterval(() => { document.getElementById('clock-time').textContent = fmtTime(new Date()); }, 1000); }
 
@@ -470,7 +473,7 @@ async function getActiveIdDongSet(){
     if (!r) return false;
     if (r.open_gio_phat_sinh) return true;
     if (!r.sp_end_time) return true;
-    return new Date(r.sp_end_time).getTime() >= now;
+    return now - new Date(r.sp_end_time).getTime() <= IPQC_STALE_GRACE_MIN * 60000;
   };
   return new Set([...active].filter(conLai));
 }

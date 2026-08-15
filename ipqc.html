@@ -186,6 +186,11 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/supabase-client.js"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
+// Khoảng đệm sau giờ kết ca dự kiến trước khi coi 1 dòng là "đã dừng hẳn"
+// (loại khỏi active set) — ca chạy trễ vài giờ so với dự kiến (tăng ca chưa
+// kịp ghi nhận) là chuyện bình thường, không nên coi là máy đã dừng ngay khi
+// vừa qua giờ kết ca.
+const IPQC_STALE_GRACE_MIN = 240;
 const IPQC_MAX_PHOTOS = 6;
 const IPQC_DEFAULT_CHECKLIST = [
   'Kích thước (theo bảng tuần kiểm)',
@@ -269,18 +274,19 @@ async function getActiveIdDongSet(){
     active.add(r.id_dong);
     if (r.khuon_kep_voi) active.add(r.khuon_kep_voi);
   });
-  // Loại các dòng đã kết thúc ca (sp_end_time đã qua) VÀ không có sự cố đang
-  // mở — dòng vẫn "sống" trong bảng chỉ vì chưa có dòng mới ghi đè (máy thật
-  // ra đã trống/không chạy) không nên tính là active, tránh hàng đợi IPQC giữ
-  // mãi các máy đã dừng từ lâu (không khớp với "không có kế hoạch" trên
-  // Dashboard Đúc, vốn lọc theo đúng ngày/ca hiện tại).
+  // Loại các dòng đã kết thúc ca (sp_end_time đã qua QUÁ LÂU — hơn
+  // IPQC_STALE_GRACE_MIN phút) VÀ không có sự cố đang mở — dòng vẫn "sống"
+  // trong bảng chỉ vì chưa có dòng mới ghi đè (máy thật ra đã trống/không
+  // chạy) không nên tính là active. Có khoảng đệm (grace) vì ca thực tế chạy
+  // trễ hơn giờ kết ca dự kiến vài giờ là chuyện thường (tăng ca chưa kịp ghi
+  // nhận) — không thể coi máy vừa quá giờ vài phút là "đã dừng".
   const now = Date.now();
   const conLai = (idDong) => {
     const r = byId[idDong];
     if (!r) return false;
     if (r.open_gio_phat_sinh) return true;
     if (!r.sp_end_time) return true;
-    return new Date(r.sp_end_time).getTime() >= now;
+    return now - new Date(r.sp_end_time).getTime() <= IPQC_STALE_GRACE_MIN * 60000;
   };
   return new Set([...active].filter(conLai));
 }
