@@ -88,7 +88,9 @@ textarea{resize:vertical;min-height:48px}
 .qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
 .qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
-#qrReaderDiv{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#qrReaderDiv{position:relative;flex:1;overflow:hidden}
+#qrReaderDiv video{position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;object-fit:cover!important}
 #msg{margin-top:12px;padding:11px 14px;border-radius:7px;
   font-size:13px;display:none;width:100%;max-width:500px}
 .err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
@@ -517,6 +519,15 @@ function clearSearch(){
 // jsQR tự viết trước đây (camera hiện hình nhưng không giải mã được). Mở
 // toàn màn hình khi quét cho dễ căn mã QR. ──────────────────────────────────
 let html5QrCode = null;
+let scanningActive = false;
+
+// Dùng lại DUY NHẤT 1 instance Html5Qrcode cho mọi lần quét — tạo mới +
+// clear() mỗi lần (cách làm ban đầu) làm trình duyệt (đặc biệt Edge) tích
+// rác bộ nhớ camera/canvas dần dần, crash tab sau vài lần quét liên tiếp.
+function getScanner(){
+  if (!html5QrCode) html5QrCode = new Html5Qrcode("qrReaderDiv");
+  return html5QrCode;
+}
 
 async function openCameraForSearch(){
   document.getElementById("msg").style.display = "none";
@@ -525,15 +536,17 @@ async function openCameraForSearch(){
     return;
   }
   document.getElementById("qrModal").classList.add("show");
-  html5QrCode = new Html5Qrcode("qrReaderDiv");
+  const scanner = getScanner();
+  scanningActive = true;
   try {
-    await html5QrCode.start(
+    await scanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
+      { fps: 8, qrbox: { width: 260, height: 260 } },
       onScanSuccessForSearch,
       () => { /* chưa thấy mã trong frame này — bỏ qua, thử tiếp frame sau */ }
     );
   } catch(e){
+    scanningActive = false;
     await closeQrModal();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
       showMsg("📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…", "wait");
@@ -546,18 +559,17 @@ async function openCameraForSearch(){
 
 async function closeQrModal(){
   document.getElementById("qrModal").classList.remove("show");
-  const inst = html5QrCode;
-  html5QrCode = null;
-  if (inst){
-    try { await inst.stop(); } catch(e){ /* đã dừng rồi hoặc chưa start xong — bỏ qua */ }
-    try { inst.clear(); } catch(e){}
+  scanningActive = false;
+  if (html5QrCode && html5QrCode.isScanning){
+    try { await html5QrCode.stop(); } catch(e){ /* đã dừng rồi hoặc chưa start xong — bỏ qua */ }
   }
 }
 
 function stopCamera(){ closeQrModal(); }
 
 async function onScanSuccessForSearch(decodedText){
-  if (!html5QrCode) return; // đã đóng rồi — bỏ qua các lần callback bắn muộn
+  if (!scanningActive) return; // đã xử lý/đóng rồi — bỏ qua các lần callback bắn muộn
+  scanningActive = false;
   showMsg("🔎 Đã đọc được mã: " + decodedText.slice(0, 50) + "…", "wait");
   try {
     await closeQrModal();
