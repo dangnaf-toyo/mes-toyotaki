@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>TOYOTAKI | Dashboard Chất Lượng (bản thử nghiệm Supabase)</title>
+<title>TOYOTAKI | Dashboard Chất Lượng</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -143,6 +143,16 @@
   .sync-banner.loading .dot{background:#33465C;animation:pulse 1s infinite;}
   .sync-banner.error{background:#F5E2DD;color:var(--bad);}
   .sync-banner.error .dot{background:var(--bad);}
+
+  .cmt-month-bar{
+    max-width:1200px;margin:0 auto 14px;padding:9px 20px;font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:#F4F1EA;color:#33465C;border-radius:8px;font-weight:600;
+  }
+  .cmt-month-bar select{
+    border:1.5px solid var(--orange, #C87941);border-radius:6px;padding:4px 8px;font-size:12.5px;font-weight:700;
+    color:#8A4A22;background:#fff;cursor:pointer;
+  }
+  .cmt-month-bar .cmt-month-hint{font-weight:400;color:#7a746a;font-size:11.5px;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
   .top-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;}
   .action-btn{background:var(--orange);color:#fff;border:none;padding:7px 14px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
@@ -163,7 +173,7 @@
   details.setup-guide code{background:var(--paper-2);padding:1px 6px;border-radius:4px;font-size:12px;}
   details.setup-guide ol{padding-left:20px;}
   @media print{
-    nav.tabs, .sync-banner, .top-actions, details.setup-guide, .comment-save-row{display:none !important;}
+    nav.tabs, .sync-banner, .cmt-month-bar, .top-actions, details.setup-guide, .comment-save-row{display:none !important;}
     section.view{display:block !important;page-break-after:always;}
   }
 </style>
@@ -175,7 +185,7 @@
     <div class="brand">
       <img class="mark" src="https://lh3.googleusercontent.com/d/1Da5A4JNUXZsUWeJwc1WW9lhI47_xz9LR" alt="TOYOTAKI">
       <div>
-        <h1>DASHBOARD KPI CHẤT LƯỢNG <span style="font-size:14px;font-weight:600;color:#C87941;border:1px solid #C87941;border-radius:6px;padding:2px 8px;vertical-align:middle;">BẢN THỬ NGHIỆM — Supabase</span></h1>
+        <h1>DASHBOARD KPI CHẤT LƯỢNG</h1>
         <p>Công ty CP Công nghiệp TOYOTAKI · KCN Khai Quang, Vĩnh Phúc, Phú Thọ</p>
       </div>
     </div>
@@ -192,6 +202,12 @@
 
   <div class="sync-banner demo" id="syncBanner">
     <span class="dot"></span><span id="syncText">Đang khởi tạo…</span>
+  </div>
+
+  <div class="cmt-month-bar" id="cmtMonthBar">
+    <span>📝 Xem/ghi chú (comment) của tháng:</span>
+    <select id="cmtMonthSelect"></select>
+    <span class="cmt-month-hint">Mỗi tháng có ô comment riêng — đổi tháng để xem lại comment tháng khác (không ảnh hưởng số liệu/biểu đồ).</span>
   </div>
 
   <nav class="tabs">
@@ -483,16 +499,17 @@ const DEMO_DATA = (function(){
   const ngLan1 = {
     Duc: Array(12).fill(null), Bavia: Array(12).fill(null), GiaCong: Array(12).fill(null), Son: Array(12).fill(null)
   };
+  // Comment demo minh hoạ cho tháng 6 — { [key]: { [thang]: noiDung } }. Đổi dropdown
+  // "Xem/ghi comment tháng" sang tháng khác sẽ thấy ô trống (mỗi tháng 1 ô riêng).
   const comments = {
-    conclusion: "Tháng 6/2026: Tỷ lệ báo phế nội bộ toàn công ty đạt 3,77% (mục tiêu 2,00%) — chưa đạt, tập trung chủ yếu tại EXEDY và KHÁC ở công đoạn Đúc.\nTỷ lệ hàng khách hàng trả về Tháng 6 là 2,29% (mục tiêu 0,76%), chủ yếu do sự cố KWW NG nhăn (7.404pcs, phát sinh 1 lần, đã có đối sách). Nếu loại trừ sự cố này, tỷ lệ thực tế chỉ 0,49% — cho thấy chất lượng nền vẫn trong tầm kiểm soát.\nĐề xuất: theo dõi hiệu quả đối sách KWW trong Tháng 7, đồng thời rà soát nguyên nhân NG tại EXEDY/KHÁC công đoạn Đúc.",
-    overview_return: "Tháng 6 thực tế 2,29% (mục tiêu 0,76%) — chủ yếu do sự cố KWW NG nhăn 7.404pcs, phát sinh 1 lần, đã có đối sách. Nếu loại trừ KWW: tỷ lệ thực tế chỉ 0,49% (dưới mục tiêu).",
-    customer_internal_Hitachi: 'NG nhăn 246pcs, NG kích thước 203pcs, NG thiếu nhôm 164pcs (sản phẩm FR)',
-    customer_internal_FCC: 'Outer K09 NG nhăn 994pcs; sản phẩm KFM NG dính dầu 316pcs',
-    customer_internal_FOMECO: 'Panel L NG lõm pin 251pcs',
-    customer_internal_EXEDY: 'Sản phẩm Plly NG thiếu nhôm 961pcs; CL Center NG bong nhôm 779pcs',
-    customer_internal_KHAC: '647119002 NG vênh phôi 832pcs; Premo NG thiếu nhôm 772pcs/nhăn 457pcs; Ligo NG ngấn bậc 550pcs; 8001/8002 NG bong nhôm 352/381pcs',
-    customer_return_KHAC: 'Sản phẩm KWW NG nhăn 7.404pcs — nguyên nhân chính khiến tỷ lệ trả hàng T6 vượt mục tiêu mạnh (đã có đối sách)',
-    batthuong_khbar: '', batthuong_nbbar: '', batthuong_pie1: '', batthuong_pie2: '', batthuong_pie3: '', ng_lan1: ''
+    conclusion: {6: "Tháng 6/2026: Tỷ lệ báo phế nội bộ toàn công ty đạt 3,77% (mục tiêu 2,00%) — chưa đạt, tập trung chủ yếu tại EXEDY và KHÁC ở công đoạn Đúc.\nTỷ lệ hàng khách hàng trả về Tháng 6 là 2,29% (mục tiêu 0,76%), chủ yếu do sự cố KWW NG nhăn (7.404pcs, phát sinh 1 lần, đã có đối sách). Nếu loại trừ sự cố này, tỷ lệ thực tế chỉ 0,49% — cho thấy chất lượng nền vẫn trong tầm kiểm soát.\nĐề xuất: theo dõi hiệu quả đối sách KWW trong Tháng 7, đồng thời rà soát nguyên nhân NG tại EXEDY/KHÁC công đoạn Đúc."},
+    overview_return: {6: "Tháng 6 thực tế 2,29% (mục tiêu 0,76%) — chủ yếu do sự cố KWW NG nhăn 7.404pcs, phát sinh 1 lần, đã có đối sách. Nếu loại trừ KWW: tỷ lệ thực tế chỉ 0,49% (dưới mục tiêu)."},
+    customer_internal_Hitachi: {6: 'NG nhăn 246pcs, NG kích thước 203pcs, NG thiếu nhôm 164pcs (sản phẩm FR)'},
+    customer_internal_FCC: {6: 'Outer K09 NG nhăn 994pcs; sản phẩm KFM NG dính dầu 316pcs'},
+    customer_internal_FOMECO: {6: 'Panel L NG lõm pin 251pcs'},
+    customer_internal_EXEDY: {6: 'Sản phẩm Plly NG thiếu nhôm 961pcs; CL Center NG bong nhôm 779pcs'},
+    customer_internal_KHAC: {6: '647119002 NG vênh phôi 832pcs; Premo NG thiếu nhôm 772pcs/nhăn 457pcs; Ligo NG ngấn bậc 550pcs; 8001/8002 NG bong nhôm 352/381pcs'},
+    customer_return_KHAC: {6: 'Sản phẩm KWW NG nhăn 7.404pcs — nguyên nhân chính khiến tỷ lệ trả hàng T6 vượt mục tiêu mạnh (đã có đối sách)'}
   };
   return {
     internalTotal, returnTotal, bonusPoints, internalByCustomer, returnByCustomer,
@@ -654,8 +671,14 @@ function buildDataModel(raw){
     else if (loai.includes('lai') || loai.includes('lại')) qcRepaint.sonLai = v;
   });
 
+  // Comment nay lưu theo (key, thang) — mỗi key gom thành { [thang]: noiDung }.
   const comments = {};
-  (raw.comments||[]).forEach(r=>{ comments[r['Key']] = r['NoiDung']; });
+  (raw.comments||[]).forEach(r=>{
+    const k = r['Key'], m = parseInt(r['Thang'],10);
+    if (!k || !(m>=1 && m<=12)) return;
+    if (!comments[k]) comments[k] = {};
+    comments[k][m] = r['NoiDung'];
+  });
 
   const cfg = {};
   (raw.config||[]).forEach(r=>{ cfg[r['Key']] = r['Value']; });
@@ -693,8 +716,19 @@ function buildDataModel(raw){
 }
 
 /* ---------- Comment save-to-sheet ---------- */
-const savedRecently = {};
+const savedRecently = {}; // keyed "key:thang"
 const SAVED_GRACE_MS = 6 * 60 * 1000;
+
+// Comment nay lưu theo (key, thang) — dropdown "Xem/ghi comment tháng" ở đầu trang
+// chọn tháng đang xem/ghi; mặc định tháng hiện tại theo đồng hồ máy (nhớ lựa chọn
+// gần nhất qua localStorage).
+let selectedCommentMonth = (function(){
+  try {
+    const saved = parseInt(localStorage.getItem('mes_cmt_month'), 10);
+    if (saved >= 1 && saved <= 12) return saved;
+  } catch(e){}
+  return new Date().getMonth() + 1;
+})();
 // Google's "Publish to web" CSV export doesn't reliably preserve real newline characters
 // inside a cell (can merge multi-line comments back into one line). To make round-tripping
 // bulletproof, newlines are escaped to a literal "\n" token before saving and decoded back
@@ -772,19 +806,32 @@ function upgradeCommentTextareaToRich(ta){
   autoGrowEditable(ed);
   return ed;
 }
+// comments: { [key]: { [thang]: noiDung } }. Luôn hiển thị đúng comment của
+// selectedCommentMonth — kể cả trống, để không giữ lại nội dung của tháng trước.
 function applyCommentValue(ed, comments){
   if (document.activeElement === ed) return;
   const key = ed.dataset.key;
-  if (savedRecently[key] && (Date.now() - savedRecently[key] < SAVED_GRACE_MS)) return;
-  const text = comments ? comments[key] : null;
+  const gkey = key + ':' + selectedCommentMonth;
+  if (savedRecently[gkey] && (Date.now() - savedRecently[gkey] < SAVED_GRACE_MS)) return;
+  const text = (comments && comments[key]) ? comments[key][selectedCommentMonth] : null;
   if (text){ ed.innerHTML = unescapeForSheet(text).replace(/\n/g, '<br>'); }
   else if (ed.dataset.default && !ed.innerHTML){ ed.innerHTML = ed.dataset.default.replace(/\n/g, '<br>'); }
   autoGrowEditable(ed);
 }
+// Xoá sạch nội dung đang hiển thị trước khi chuyển sang tháng khác (trừ ô đang gõ
+// dở) — để applyCommentValue phía trên tự điền đúng comment (hoặc để trống) của
+// tháng mới, không giữ lại nội dung tháng cũ.
+function clearAllCommentBoxes(){
+  document.querySelectorAll('.comment-edit[data-key]').forEach(ed=>{
+    if (document.activeElement !== ed) ed.innerHTML = '';
+  });
+}
 async function saveComment(key, text, btnEl, statusEl){
+  const month = selectedCommentMonth;
+  const draftKey = 'mes_draft_comment_' + key + ':' + month;
   const session = await MesAuth.getSession();
   if (!session){
-    try { localStorage.setItem('mes_draft_comment_' + key, text); } catch(e){}
+    try { localStorage.setItem(draftKey, text); } catch(e){}
     statusEl.textContent = '⚠️ Cần đăng nhập trước khi lưu — đang chuyển sang trang đăng nhập…';
     statusEl.className = 'save-status err';
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
@@ -796,14 +843,14 @@ async function saveComment(key, text, btnEl, statusEl){
   statusEl.className = 'save-status';
   try {
     const { error } = await sb.from('cl_comments').upsert(
-      { key: key, noi_dung: escapeForSheet(text), updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
+      { key: key, thang: month, noi_dung: escapeForSheet(text), updated_at: new Date().toISOString() },
+      { onConflict: 'key,thang' }
     );
     if (!error){
-      savedRecently[key] = Date.now();
-      statusEl.textContent = '✓ Đã lưu lúc ' + nowStr();
+      savedRecently[key + ':' + month] = Date.now();
+      statusEl.textContent = '✓ Đã lưu lúc ' + nowStr() + ' (Tháng ' + month + ')';
       statusEl.className = 'save-status ok';
-      try { localStorage.removeItem('mes_draft_comment_' + key); } catch(e){}
+      try { localStorage.removeItem(draftKey); } catch(e){}
     } else {
       statusEl.textContent = '❌ Lỗi: ' + error.message;
       statusEl.className = 'save-status err';
@@ -828,9 +875,10 @@ function wireAllCommentBoxes(root, comments){
   root.querySelectorAll('textarea[data-key], .comment-edit[data-key]').forEach(el=>{
     const ed = el.tagName === 'TEXTAREA' ? upgradeCommentTextareaToRich(el) : el;
     applyCommentValue(ed, comments);
-    // Khôi phục nội dung đang gõ dở nếu vừa bị chuyển sang trang đăng nhập lúc bấm Lưu.
+    // Khôi phục nội dung đang gõ dở nếu vừa bị chuyển sang trang đăng nhập lúc bấm Lưu
+    // (chỉ khôi phục đúng tháng đang chọn — tránh dính nhầm sang tháng khác).
     try {
-      const draft = localStorage.getItem('mes_draft_comment_' + ed.dataset.key);
+      const draft = localStorage.getItem('mes_draft_comment_' + ed.dataset.key + ':' + selectedCommentMonth);
       if (draft) ed.innerHTML = unescapeForSheet(draft).replace(/\n/g, '<br>');
     } catch(e){}
     const row = ed.parentElement.querySelector('.comment-save-row');
@@ -1186,14 +1234,21 @@ function renderDashboard(data){
   }
 
   // Comments — value-only update (respects focus + just-saved grace period), never touches DOM structure
-  wireAllCommentBoxes(document.getElementById('overview'), data.comments);
-  wireAllCommentBoxes(document.getElementById('process'), data.comments);
-  wireAllCommentBoxes(document.getElementById('customer'), data.comments);
-  wireAllCommentBoxes(document.getElementById('batthuong'), data.comments);
-  wireAllCommentBoxes(document.getElementById('nglan1'), data.comments);
+  reapplyAllComments(data.comments);
+}
 
+// Dùng chung cho renderDashboard (dữ liệu mới tải) VÀ khi người dùng đổi tháng ở
+// dropdown "Xem/ghi comment tháng" (cùng dữ liệu đã tải, chỉ đổi tháng hiển thị).
+let lastComments = null;
+function reapplyAllComments(comments){
+  lastComments = comments;
+  wireAllCommentBoxes(document.getElementById('overview'), comments);
+  wireAllCommentBoxes(document.getElementById('process'), comments);
+  wireAllCommentBoxes(document.getElementById('customer'), comments);
+  wireAllCommentBoxes(document.getElementById('batthuong'), comments);
+  wireAllCommentBoxes(document.getElementById('nglan1'), comments);
   const box = document.getElementById('conclusionBox');
-  applyCommentValue(box, data.comments);
+  applyCommentValue(box, comments);
 }
 
 /* ---------- Diagnostics ---------- */
@@ -1267,7 +1322,7 @@ async function loadData(){
       qcDaily: {ngay:'Ngay', so_luong_ng:'SoLuongNG', ty_le_ng:'TyLeNG'},
       qcRepaint: {loai:'Loai', ty_le_ng:'TyLeNG'},
       targets: {loai:'Loai', ten:'Ten', muc_tieu_noi_bo:'MucTieuNoiBo', muc_tieu_tra_ve:'MucTieuTraVe', theo_doi_tra_ve:'TheoDoiTraVe'},
-      comments: {key:'Key', noi_dung:'NoiDung'},
+      comments: {key:'Key', thang:'Thang', noi_dung:'NoiDung'},
       config: {key:'Key', value:'Value'},
       batThuongThang: {thang:'Thang', kh_tong_so:'KH_TongSo', kh_da_doi_sach:'KH_DaDoiSach', nb_tong_so:'NB_TongSo', nb_da_doi_sach:'NB_DaDoiSach'},
       batThuongKH: {thang:'Thang', duc:'Duc', bavia:'Bavia', gia_cong:'GiaCong', son:'Son'},
@@ -1319,6 +1374,24 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     });
   });
 });
+
+/* ---------- Dropdown chọn tháng xem/ghi comment ---------- */
+(function initCommentMonthSelect(){
+  const sel = document.getElementById('cmtMonthSelect');
+  for (let m = 1; m <= 12; m++){
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = 'Tháng ' + m;
+    if (m === selectedCommentMonth) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', () => {
+    selectedCommentMonth = parseInt(sel.value, 10);
+    try { localStorage.setItem('mes_cmt_month', String(selectedCommentMonth)); } catch(e){}
+    clearAllCommentBoxes();
+    reapplyAllComments(lastComments);
+  });
+})();
 
 /* ---------- Init ---------- */
 renderDashboard(DEMO_DATA);

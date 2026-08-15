@@ -128,8 +128,10 @@ async function main() {
     astemo: toNum(o.Astemo), tti: toNum(o.TTI), khac: toNum(o.Khac),
   })).filter(r => r.thang && r.loai), ['thang', 'loai']);
 
-  await upsert('sl_comments', raw.comments.map(o => ({ key: o.Key, noi_dung: o.NoiDung }))
-    .filter(r => r.key), ['key']);
+  // sl_comments nay khoá theo (key, thang) — script import 1 lần này gán vào tháng
+  // hiện tại lúc chạy (không có cột tháng trong Sheet gốc).
+  await upsert('sl_comments', raw.comments.map(o => ({ key: o.Key, thang: new Date().getMonth() + 1, noi_dung: o.NoiDung }))
+    .filter(r => r.key), ['key', 'thang']);
 
   await upsert('sl_config', raw.config.map(o => ({ key: o.Key, value: o.Value }))
     .filter(r => r.key), ['key']);

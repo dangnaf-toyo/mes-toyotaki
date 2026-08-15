@@ -64,9 +64,11 @@ create table if not exists cl_targets (
 -- Tab "comments": Key,NoiDung — NoiDung chứa HTML rich-text thật (bold/color/div lồng
 -- nhau), lưu nguyên vào cột text, KHÔNG xử lý/strip HTML.
 create table if not exists cl_comments (
-  key        text primary key,
+  key        text,
+  thang      smallint not null check (thang between 1 and 12),
   noi_dung   text,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (key, thang)
 );
 
 -- Tab "config": Key,Value

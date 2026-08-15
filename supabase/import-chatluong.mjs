@@ -153,9 +153,10 @@ async function main() {
   })).filter(r => r.loai && r.ten), ['loai', 'ten']);
 
   // comments: NoiDung chứa HTML rich-text thật (bold/color/div lồng nhau) — lưu nguyên
-  // văn, KHÔNG xử lý/strip HTML.
-  await upsert('cl_comments', raw.comments.map(o => ({ key: o.Key, noi_dung: o.NoiDung }))
-    .filter(r => r.key), ['key']);
+  // văn, KHÔNG xử lý/strip HTML. cl_comments nay khoá theo (key, thang) — script import
+  // 1 lần này gán vào tháng hiện tại lúc chạy (không có cột tháng trong Sheet gốc).
+  await upsert('cl_comments', raw.comments.map(o => ({ key: o.Key, thang: new Date().getMonth() + 1, noi_dung: o.NoiDung }))
+    .filter(r => r.key), ['key', 'thang']);
 
   await upsert('cl_config', raw.config.map(o => ({ key: o.Key, value: o.Value }))
     .filter(r => r.key), ['key']);

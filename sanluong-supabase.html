@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>TOYOTAKI | Dashboard Sản Lượng (bản thử nghiệm Supabase)</title>
+<title>TOYOTAKI | Dashboard Sản Lượng</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -49,6 +49,17 @@
   .sync-banner.loading .dot{background:var(--tk-navy);animation:pulse 1s infinite;}
   .sync-banner.error{background:var(--tk-bad-bg);color:var(--tk-bad);}
   .sync-banner.error .dot{background:var(--tk-bad);}
+
+  .cmt-month-bar{
+    max-width:1240px;margin:0 auto;padding:9px 28px;font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:#F4F1EA;color:var(--tk-navy);border-bottom:1px solid var(--tk-line);font-weight:600;
+  }
+  .cmt-month-bar select{
+    border:1.5px solid var(--tk-orange);border-radius:6px;padding:4px 8px;font-size:12.5px;font-weight:700;
+    color:var(--tk-orange-deep);background:#fff;cursor:pointer;
+  }
+  .cmt-month-bar .cmt-month-hint{font-weight:400;color:var(--tk-muted);font-size:11.5px;}
+  @media print{ .cmt-month-bar{display:none;} }
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 
   /* Tabs */
@@ -163,7 +174,7 @@
       <img class="tk-mark" src="https://lh3.googleusercontent.com/d/1Da5A4JNUXZsUWeJwc1WW9lhI47_xz9LR" alt="TOYOTAKI" style="margin-bottom:0;">
       <div>
         <div class="eyebrow">Quản Lý Sản Xuất · QLSX</div>
-        <h1>Dashboard Sản Lượng &amp; Giao Hàng <span style="font-size:14px;font-weight:600;color:#C87941;border:1px solid #C87941;border-radius:6px;padding:2px 8px;vertical-align:middle;">BẢN THỬ NGHIỆM — Supabase</span></h1>
+        <h1>Dashboard Sản Lượng &amp; Giao Hàng</h1>
         <div class="sub">Năm 2026 — dữ liệu đồng bộ từ Google Sheet</div>
       </div>
     </div>
@@ -180,6 +191,12 @@
 <div class="sync-banner demo" id="syncBanner">
   <span class="dot"></span>
   <span id="syncText">Đang khởi tạo…</span>
+</div>
+
+<div class="cmt-month-bar" id="cmtMonthBar">
+  <span>📝 Xem/ghi chú (comment) của tháng:</span>
+  <select id="cmtMonthSelect"></select>
+  <span class="cmt-month-hint">Mỗi tháng có ô comment riêng — đổi tháng để xem lại comment tháng khác (không ảnh hưởng số liệu/biểu đồ).</span>
 </div>
 
 <nav class="tabnav">
@@ -505,17 +522,19 @@ const DEMO_DATA = {
     values: {FCC:new Array(12).fill(null), Exedy:new Array(12).fill(null), Astemo:new Array(12).fill(null), TTI:new Array(12).fill(null), Khac:new Array(12).fill(null)},
     loai: ['ThucTe','ThucTe','ThucTe','ThucTe','ThucTe','ThucTe','Forecast','Forecast','Forecast','Forecast','Forecast','Forecast']
   },
+  // Comment demo minh hoạ cho tháng 6 — đổi dropdown "Xem/ghi comment tháng" sang
+  // tháng khác sẽ thấy ô trống (đúng hành vi mỗi tháng 1 ô riêng, không dùng chung).
   comments:{
-    giaohang:'Tháng 6 tỉ lệ giao hàng đạt 98.8% (giảm nhẹ so với 5 tháng đầu năm đạt 100%), do hàng NG trả về tăng lên 9,733 Pcs. Cần bộ phận QC và Đúc phối hợp giảm tỉ lệ hàng lỗi trả về trong tháng 7.',
-    duc:'Tháng 6 đạt 81.7% — thấp nhất từ đầu năm. Nguyên nhân chính: sự cố khuôn (Fr, K09, KFM) và thiếu nhân lực. Bộ phận Đúc không đạt mục tiêu quý 2 liên tiếp, cần theo dõi sát kế hoạch sửa/thay khuôn.',
-    bavia:'Tháng 6 đạt 95.6%, cải thiện so với tháng 4 (93.0%). Sản lượng Bavia phụ thuộc trực tiếp vào sản lượng đầu vào từ Đúc — cần Đúc ổn định để Bavia đạt mục tiêu 100%.',
-    giacong:'Tháng 6 đạt 100.6%, vượt kế hoạch. Bộ phận Gia công duy trì ổn định trong 6 tháng đầu năm, không phát sinh vướng mắc lớn.',
-    son:'Tháng 6 đạt 100%. Bộ phận Sơn ổn định nhất trong 4 công đoạn, bám sát kế hoạch sản xuất hàng tháng.',
-    capa350:'Capa giảm rõ từ T4 (45.8%) đến T6 (37.2%) do đơn hàng thấp hơn dự báo. Cần Kinh doanh thúc đẩy đơn hàng cũ và tìm mã hàng mới để lấp đầy công suất.',
-    capa850:'Capa máy 850T rất thấp so với mục tiêu (chỉ 4.3% lũy kế) do đơn hàng cho dòng máy này còn hạn chế. Cần đánh giá lại nhu cầu sử dụng máy 850T trong kế hoạch phát triển đơn hàng mới.',
-    capaGC:'Capa GC giảm mạnh từ T4 đến T6 (62% → 45%) sau khi vượt mục tiêu ở Q1. Cần rà soát lịch sản xuất GC để cân bằng tải máy trong quý 3.',
-    'forecast-doiung':'',
-    'forecast-hoatdong':''
+    giaohang:{6:'Tháng 6 tỉ lệ giao hàng đạt 98.8% (giảm nhẹ so với 5 tháng đầu năm đạt 100%), do hàng NG trả về tăng lên 9,733 Pcs. Cần bộ phận QC và Đúc phối hợp giảm tỉ lệ hàng lỗi trả về trong tháng 7.'},
+    duc:{6:'Tháng 6 đạt 81.7% — thấp nhất từ đầu năm. Nguyên nhân chính: sự cố khuôn (Fr, K09, KFM) và thiếu nhân lực. Bộ phận Đúc không đạt mục tiêu quý 2 liên tiếp, cần theo dõi sát kế hoạch sửa/thay khuôn.'},
+    bavia:{6:'Tháng 6 đạt 95.6%, cải thiện so với tháng 4 (93.0%). Sản lượng Bavia phụ thuộc trực tiếp vào sản lượng đầu vào từ Đúc — cần Đúc ổn định để Bavia đạt mục tiêu 100%.'},
+    giacong:{6:'Tháng 6 đạt 100.6%, vượt kế hoạch. Bộ phận Gia công duy trì ổn định trong 6 tháng đầu năm, không phát sinh vướng mắc lớn.'},
+    son:{6:'Tháng 6 đạt 100%. Bộ phận Sơn ổn định nhất trong 4 công đoạn, bám sát kế hoạch sản xuất hàng tháng.'},
+    capa350:{6:'Capa giảm rõ từ T4 (45.8%) đến T6 (37.2%) do đơn hàng thấp hơn dự báo. Cần Kinh doanh thúc đẩy đơn hàng cũ và tìm mã hàng mới để lấp đầy công suất.'},
+    capa850:{6:'Capa máy 850T rất thấp so với mục tiêu (chỉ 4.3% lũy kế) do đơn hàng cho dòng máy này còn hạn chế. Cần đánh giá lại nhu cầu sử dụng máy 850T trong kế hoạch phát triển đơn hàng mới.'},
+    capaGC:{6:'Capa GC giảm mạnh từ T4 đến T6 (62% → 45%) sau khi vượt mục tiêu ở Q1. Cần rà soát lịch sản xuất GC để cân bằng tải máy trong quý 3.'},
+    'forecast-doiung':{},
+    'forecast-hoatdong':{}
   }
 };
 
@@ -635,8 +654,14 @@ function buildDataModel(raw){
   });
   const forecastLoai = toMonthArrayRaw(raw.forecast, 'Loai');
 
+  // Comment nay lưu theo (key, thang) — mỗi key gom thành { [thang]: noiDung }.
   const cmt = {};
-  (raw.comments||[]).forEach(r=>{ cmt[r['Key']] = r['NoiDung']; });
+  (raw.comments||[]).forEach(r=>{
+    const k = r['Key'], m = parseInt(r['Thang'],10);
+    if (!k || !(m>=1 && m<=12)) return;
+    if (!cmt[k]) cmt[k] = {};
+    cmt[k][m] = r['NoiDung'];
+  });
 
   const cfgMap = {};
   (raw.config||[]).forEach(r=>{ cfgMap[r['Key']] = r['Value']; });
@@ -699,8 +724,20 @@ function fmtPct1(n){ return n==null ? '—' : (n*100).toFixed(1)+'%'; }
 
 // Tracks keys the user just saved, so a stale cached CSV read (Google's "Publish to web"
 // can lag a few minutes) doesn't visually revert their just-saved text.
+// Keyed by "key:thang" — mỗi tháng có comment riêng nên grace phải theo đúng tháng đó.
 const savedRecently = {};
 const SAVED_GRACE_MS = 6 * 60 * 1000;
+
+// Comment nay lưu theo (key, thang) — giữ toàn bộ dữ liệu đã tải ở đây, chỉ hiển thị
+// đúng tháng người dùng đang chọn ở dropdown "Xem/ghi comment tháng" phía trên.
+let lastCommentsByKey = {}; // { [key]: { [thang]: noiDung } }
+let selectedCommentMonth = (function(){
+  try {
+    const saved = parseInt(localStorage.getItem('mes_cmt_month'), 10);
+    if (saved >= 1 && saved <= 12) return saved;
+  } catch(e){}
+  return new Date().getMonth() + 1;
+})();
 
 // Google's "Publish to web" CSV export doesn't reliably preserve real newline characters
 // inside a cell (multi-line comments can come back merged into one line). To make
@@ -778,14 +815,30 @@ function upgradeCommentTextareaToRich(ta){
   autoGrowEditable(ed);
   return ed;
 }
+// Dùng khi auto-refresh dữ liệu nền (mỗi 5 phút) — chỉ cập nhật đúng ô/tháng đang
+// xem, không đụng tới nội dung người dùng đang gõ dở hoặc vừa lưu xong.
 function setComment(id, text){
   const el = document.getElementById(id);
   if (!el) return;
   if (document.activeElement === el) return; // don't clobber while the user is typing
   const key = id.replace(/^cmt-/, '');
-  if (savedRecently[key] && (Date.now() - savedRecently[key] < SAVED_GRACE_MS)) return;
-  if (text) el.innerHTML = unescapeForSheet(text).replace(/\n/g, '<br>');
+  const gkey = key + ':' + selectedCommentMonth;
+  if (savedRecently[gkey] && (Date.now() - savedRecently[gkey] < SAVED_GRACE_MS)) return;
+  el.innerHTML = text ? unescapeForSheet(text).replace(/\n/g, '<br>') : '';
   autoGrowEditable(el);
+}
+
+// Dùng khi người dùng chủ động đổi tháng ở dropdown — luôn hiển thị đúng nội dung
+// (kể cả trống) của tháng vừa chọn, không giữ lại nội dung của tháng trước đó.
+// Bỏ qua đúng ô đang gõ dở (nếu có) để không mất nội dung đang nhập.
+function applyCommentsForMonth(month){
+  document.querySelectorAll('[id^="cmt-"]').forEach(el=>{
+    if (document.activeElement === el) return;
+    const key = el.id.replace(/^cmt-/, '');
+    const text = lastCommentsByKey[key] ? lastCommentsByKey[key][month] : null;
+    el.innerHTML = text ? unescapeForSheet(text).replace(/\n/g, '<br>') : '';
+    autoGrowEditable(el);
+  });
 }
 
 function renderAll(data){
@@ -845,9 +898,11 @@ function renderAll(data){
   // Tab 4 forecast chart (rebuild — dataset shape/colors depend on data)
   buildForecastChart(data.forecast);
 
-  // Comments
-  Object.keys(data.comments).forEach(key=>{
-    setComment('cmt-' + key, data.comments[key]);
+  // Comments — lưu toàn bộ (mọi tháng đã tải); cập nhật qua setComment (có bảo vệ ô
+  // đang gõ dở + vừa lưu xong) nên an toàn khi hàm này chạy lại mỗi 5 phút (auto-refresh).
+  lastCommentsByKey = data.comments;
+  Object.keys(lastCommentsByKey).forEach(key=>{
+    setComment('cmt-' + key, lastCommentsByKey[key][selectedCommentMonth]);
   });
 }
 
@@ -908,7 +963,7 @@ async function loadData(){
     const khsx = remapKeys(khsxRaw, {thang:'Thang', duc_kh:'Duc_KH', duc_tt:'Duc_TT', bavia_kh:'Bavia_KH', bavia_tt:'Bavia_TT', gia_cong_kh:'GiaCong_KH', gia_cong_tt:'GiaCong_TT', son_kh:'Son_KH', son_tt:'Son_TT'});
     const capacity = remapKeys(capacityRaw, {thang:'Thang', capa350:'Capa350', capa850:'Capa850', capa_gc:'CapaGC', loai:'Loai'});
     const forecast = remapKeys(forecastRaw, {thang:'Thang', loai:'Loai', fcc:'FCC', exedy:'Exedy', astemo:'Astemo', tti:'TTI', khac:'Khac'});
-    const comments = remapKeys(commentsRaw, {key:'Key', noi_dung:'NoiDung'});
+    const comments = remapKeys(commentsRaw, {key:'Key', thang:'Thang', noi_dung:'NoiDung'});
     const config = remapKeys(configRaw, {key:'Key', value:'Value'});
     const data = buildDataModel({giaoHang, khsx, capacity, forecast, comments, config});
     renderAll(data);
@@ -927,12 +982,15 @@ async function loadData(){
   }
 }
 
-/* ---------- Save comments straight to Supabase (bảng sl_comments, cần đăng nhập) ---------- */
+/* ---------- Save comments straight to Supabase (bảng sl_comments, cần đăng nhập) ----------
+   Lưu theo (key, thang đang chọn) — không còn ghi đè comment của tháng khác. */
 async function saveComment(key, text, btnEl, statusEl){
+  const month = selectedCommentMonth;
+  const draftKey = 'mes_draft_comment_' + key + ':' + month;
   const session = await MesAuth.getSession();
   if (!session){
     // Lưu tạm nội dung đang gõ để không mất khi quay lại sau khi đăng nhập.
-    try { localStorage.setItem('mes_draft_comment_' + key, text); } catch(e){}
+    try { localStorage.setItem(draftKey, text); } catch(e){}
     statusEl.textContent = '⚠️ Cần đăng nhập trước khi lưu — đang chuyển sang trang đăng nhập…';
     statusEl.className = 'save-status err';
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
@@ -944,14 +1002,16 @@ async function saveComment(key, text, btnEl, statusEl){
   statusEl.className = 'save-status';
   try {
     const { error } = await sb.from('sl_comments').upsert(
-      { key: key, noi_dung: escapeForSheet(text), updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
+      { key: key, thang: month, noi_dung: escapeForSheet(text), updated_at: new Date().toISOString() },
+      { onConflict: 'key,thang' }
     );
     if (!error){
-      savedRecently[key] = Date.now();
-      statusEl.textContent = '✓ Đã lưu lúc ' + nowStr();
+      savedRecently[key + ':' + month] = Date.now();
+      if (!lastCommentsByKey[key]) lastCommentsByKey[key] = {};
+      lastCommentsByKey[key][month] = escapeForSheet(text);
+      statusEl.textContent = '✓ Đã lưu lúc ' + nowStr() + ' (Tháng ' + month + ')';
       statusEl.className = 'save-status ok';
-      try { localStorage.removeItem('mes_draft_comment_' + key); } catch(e){}
+      try { localStorage.removeItem(draftKey); } catch(e){}
     } else {
       statusEl.textContent = '❌ Lỗi: ' + error.message;
       statusEl.className = 'save-status err';
@@ -969,9 +1029,10 @@ async function saveComment(key, text, btnEl, statusEl){
 document.querySelectorAll('textarea.comment-edit[id^="cmt-"]').forEach(ta => {
   const el = upgradeCommentTextareaToRich(ta);
   const key = el.id.replace(/^cmt-/, '');
-  // Khôi phục nội dung đang gõ dở nếu vừa bị chuyển sang trang đăng nhập lúc bấm Lưu.
+  // Khôi phục nội dung đang gõ dở nếu vừa bị chuyển sang trang đăng nhập lúc bấm Lưu
+  // (chỉ khôi phục đúng tháng đang chọn — tránh dính nhầm sang tháng khác).
   try {
-    const draft = localStorage.getItem('mes_draft_comment_' + key);
+    const draft = localStorage.getItem('mes_draft_comment_' + key + ':' + selectedCommentMonth);
     if (draft) el.innerHTML = unescapeForSheet(draft).replace(/\n/g, '<br>');
   } catch(e){}
   const row = document.createElement('div');
@@ -982,6 +1043,23 @@ document.querySelectorAll('textarea.comment-edit[id^="cmt-"]').forEach(ta => {
   const status = row.querySelector('.save-status');
   btn.addEventListener('click', () => saveComment(key, el.innerHTML, btn, status));
 });
+
+/* ---------- Dropdown chọn tháng xem/ghi comment ---------- */
+(function initCommentMonthSelect(){
+  const sel = document.getElementById('cmtMonthSelect');
+  for (let m = 1; m <= 12; m++){
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = 'Tháng ' + m;
+    if (m === selectedCommentMonth) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', () => {
+    selectedCommentMonth = parseInt(sel.value, 10);
+    try { localStorage.setItem('mes_cmt_month', String(selectedCommentMonth)); } catch(e){}
+    applyCommentsForMonth(selectedCommentMonth);
+  });
+})();
 
 /* ---------- Chỉ báo đăng nhập (góc trên) ---------- */
 (async function initAuthStatus(){

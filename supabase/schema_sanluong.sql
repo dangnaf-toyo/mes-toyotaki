@@ -49,11 +49,13 @@ create table if not exists sl_forecast (
   primary key (thang, loai)
 );
 
--- Tab "Comments": Key,NoiDung
+-- Tab "Comments": Key,NoiDung — mỗi tháng 1 ô riêng (xem migration_phase_D4_comments_by_month.sql)
 create table if not exists sl_comments (
-  key        text primary key,
+  key        text,
+  thang      smallint not null check (thang between 1 and 12),
   noi_dung   text,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (key, thang)
 );
 
 -- Tab "Config": Key,Value
