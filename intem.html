@@ -803,7 +803,13 @@ function err(t){ showMsg("❌ "+t,"err"); }
 // cách chuyencongdoan.html đã dùng để chẩn đoán lỗi camera/quét QR khi test
 // thực tế trên điện thoại.
 window.addEventListener("error", (e) => { err("Lỗi JS: " + e.message); });
-window.addEventListener("unhandledrejection", (e) => { err("Lỗi JS (promise): " + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
+window.addEventListener("unhandledrejection", (e) => {
+  const m = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
+  // Cảnh báo vô hại của trình duyệt khi video bị dừng/thay thế đúng lúc
+  // play() đang chờ (xảy ra bình thường khi đóng camera quét QR) — bỏ qua.
+  if (/play\(\) request was interrupted/i.test(m)) return;
+  err("Lỗi JS (promise): " + m);
+});
 
 async function initAuthStatus(){
   const bar = document.getElementById("authInfo");
