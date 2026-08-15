@@ -1352,6 +1352,7 @@ async function bootstrap(){
   populateLoaiSuCo('ma-loai');
   attachEventListeners();
   startClock();
+  loadLiveMachineStatus();   // độc lập ngày/ca — không cần đợi, tự cập nhật ô "Máy đang chạy"
   await loadShiftState(true);
   loadWeeklyPlanSuggestions();
   restoreDraft();
@@ -1777,6 +1778,7 @@ async function fetchShiftState(ngay, ca){
 function startPolling(){
   if (state.pollTimer) clearInterval(state.pollTimer);
   state.pollTimer = setInterval(async () => {
+    loadLiveMachineStatus();   // độc lập ngày/ca — poll riêng, không phụ thuộc state.ngay/ca
     if (!state.ngay || !state.ca) return;
     const pollNgay = state.ngay, pollCa = state.ca;
     updateLiveStatus('Đang poll...');
@@ -2100,6 +2102,45 @@ function updateTimers(){
   });
 }
 
+// =============================================================================
+// TRẠNG THÁI MÁY THỰC TẾ — độc lập với ngày/ca đang chọn ở thanh trên cùng.
+// Dropdown ngày/ca chỉ phục vụ xem/nhập báo cáo sản lượng của đúng ca đó —
+// KHÔNG quyết định máy nào đang chạy (trước đây "Máy đang chạy" tính thẳng
+// từ state.rows, vốn bị lọc theo ngày/ca đang chọn, nên đổi ca là đổi luôn
+// danh sách máy chạy — không hợp lý, vì máy chạy thật hay không là 1 sự thật
+// độc lập). Tính lại: máy "còn hoạt động" = dòng mới nhất (row_seq) của máy
+// đó chưa hết cửa sổ ca (sp_end_time) HOẶC đang có sự cố mở — cùng cách
+// getActiveIdDongSet() bên ipqc.html đang dùng. "Đang chạy" = còn hoạt động
+// VÀ không có sự cố mở.
+// =============================================================================
+async function loadLiveMachineStatus(){
+  try {
+    const { data, error } = await sb.from('duc_ca_hien_tai')
+      .select('ma_may,ma_sp,row_seq,sp_end_time,open_gio_phat_sinh');
+    if (error) throw new Error(error.message);
+    const byMachine = {};
+    (data || []).forEach(r => {
+      if (!r.ma_may) return;
+      if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
+    });
+    const nowMs = Date.now();
+    let running = 0, conHoatDong = 0;
+    (state.machines || []).forEach(m => {
+      const r = byMachine[m];
+      if (!r || !r.ma_sp) return;
+      const conLai = r.open_gio_phat_sinh ? true : (!r.sp_end_time || new Date(r.sp_end_time).getTime() >= nowMs);
+      if (!conLai) return; // ca đã kết thúc từ trước, không sự cố mở — máy thực chất đang trống
+      conHoatDong++;
+      if (!r.open_gio_phat_sinh) running++;
+    });
+    state.liveMachineStatus = { running, conHoatDong };
+  } catch (e) {
+    console.error('Không tải được trạng thái máy thực tế:', e);
+    state.liveMachineStatus = null;
+  }
+  updateSummary();
+}
+
 function updateSummary(){
   const withPlan = state.rows.filter(r => r.ma_sp && r.kh_ca);
   const tongKh = withPlan.reduce((s,r) => s + (Number(r.kh_ca)||0), 0);
@@ -2130,9 +2171,15 @@ function updateSummary(){
   document.getElementById('sm-phut-sub').textContent = activeIncidents.length + ' xong' + (opens.length ? ' + ' + opens.length + ' đang mở' : '');
   document.getElementById('sm-loss').textContent = fmtVnd(totalDungMin * (state.downtimeCostPerMin || 0));
   document.getElementById('sm-loss-sub').textContent = 'quy đổi theo phút dừng';
-  document.getElementById('sm-running').textContent = running + ' / ' + withPlan.length;
-  document.getElementById('sm-running-sub').textContent = withPlan.length > 0
-    ? 'Tỷ lệ vận hành ' + Math.round(running / withPlan.length * 100) + '%' : '—';
+  // "Máy đang chạy" dùng trạng thái thực tế (độc lập ngày/ca đang chọn) — xem
+  // loadLiveMachineStatus(). Trước khi trạng thái này tải xong lần đầu, tạm
+  // hiện theo dữ liệu ca đang chọn để không trống ô.
+  const live = state.liveMachineStatus;
+  const runningLive = live ? live.running : running;
+  const totalLive = live ? live.conHoatDong : withPlan.length;
+  document.getElementById('sm-running').textContent = runningLive + ' / ' + totalLive;
+  document.getElementById('sm-running-sub').textContent = totalLive > 0
+    ? 'Tỷ lệ vận hành ' + Math.round(runningLive / totalLive * 100) + '%' : '—';
 }
 
 function startClock(){
