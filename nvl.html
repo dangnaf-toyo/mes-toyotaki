@@ -625,6 +625,17 @@ function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replac
 function setSyncStatus(status, message) { const el = $('syncStatus'); el.className = 'sync-status ' + status; el.textContent = message; }
 function showLoading(show) { $('loadingOverlay').classList.toggle('show', show); }
 
+// Hiện lỗi JS bất kỳ ngay trên màn hình quét (điện thoại khó xem console) —
+// giúp chẩn đoán khi camera lỗi mà không rõ nguyên nhân.
+window.addEventListener('error', (e) => {
+  if ($('fsScanner') && $('fsScanner').classList.contains('active')) showFsLastScan('❌ Lỗi JS', e.message, 'error');
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const m = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
+  if (/play\(\) request was interrupted/i.test(m)) return; // cảnh báo vô hại của trình duyệt — bỏ qua
+  if ($('fsScanner') && $('fsScanner').classList.contains('active')) showFsLastScan('❌ Lỗi JS (promise)', m, 'error');
+});
+
 /** Chuẩn hoá kết quả RPC: trả về chuỗi lỗi, hoặc null nếu OK. */
 function rpcError(res) {
   if (res.error) return res.error.message;
@@ -1333,8 +1344,9 @@ async function openFullscreenScanner() {
     await fsStartCamera(fsFacingMode);
   } catch (e) {
     console.error(e);
-    showFsLastScan('❌ Không mở được camera', e.message, 'error');
-    if (e.name === 'NotAllowedError' || /permission|denied/i.test(e.message)) {
+    const msg = (e && e.message) ? e.message : (typeof e === 'string' ? e : (e ? JSON.stringify(e) : 'Không rõ nguyên nhân'));
+    showFsLastScan('❌ Không mở được camera', msg, 'error');
+    if ((e && e.name === 'NotAllowedError') || /permission|denied/i.test(msg)) {
       alert('❌ Bạn chưa cho phép truy cập camera.\n\nCách bật:\n' +
             '• Chrome/Edge: nhấn icon 🔒 ở thanh URL → Site settings → Camera → Allow\n' +
             '• Safari (iOS): Settings > Safari > Camera > Allow\n• Sau đó reload trang và thử lại');
@@ -1345,12 +1357,26 @@ async function openFullscreenScanner() {
 async function fsStartCamera(facingMode) {
   const scanner = getFsScanner();
   if (scanner.isScanning) { try { await scanner.stop(); } catch (e) { /* bỏ qua */ } }
-  await scanner.start(
-    { facingMode: { ideal: facingMode } },
-    { fps: 8 },
-    (decodedText) => handleFsScanSuccess(decodedText),
-    () => { /* chưa thấy mã trong frame này — bỏ qua, thử tiếp frame sau */ }
-  );
+  try {
+    await scanner.start(
+      { facingMode: facingMode },
+      { fps: 8 },
+      (decodedText) => handleFsScanSuccess(decodedText),
+      () => { /* chưa thấy mã trong frame này — bỏ qua, thử tiếp frame sau */ }
+    );
+  } catch (e) {
+    // Một số thiết bị/trình duyệt từ chối constraint facingMode cụ thể (đặc
+    // biệt "user" trên máy không có camera trước) — thử lại không ép camera
+    // nào, để trình duyệt tự chọn camera mặc định.
+    console.warn('Không mở được camera với facingMode=' + facingMode + ', thử lại với "environment":', e);
+    if (facingMode === 'environment') throw e; // đã là fallback rồi, không thử lại nữa
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 8 },
+      (decodedText) => handleFsScanSuccess(decodedText),
+      () => { /* chưa thấy mã trong frame này — bỏ qua, thử tiếp frame sau */ }
+    );
+  }
 }
 
 async function fsFlipCamera() {
