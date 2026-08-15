@@ -166,10 +166,6 @@ input:focus,select:focus{outline:none;border-color:#C87941;
       <label class="req" for="confirmCongDoan">Bộ phận (Công đoạn giao — nơi bạn xác nhận thay mặt)</label>
       <select id="confirmCongDoan"></select>
     </div>
-    <div class="fg">
-      <label class="req" for="confirmNguoiXacNhan">Người xác nhận</label>
-      <select id="confirmNguoiXacNhan"></select>
-    </div>
   </div>
   <div class="card">
     <div class="card-ttl">📋 Phiếu đang chờ xác nhận</div>
@@ -477,8 +473,6 @@ function switchTab(tab){
 
 async function loadConfirmDanhMuc(){
   fillSelect("confirmCongDoan", CONG_DOAN_LIST, "-- Chọn bộ phận --");
-  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien');
-  if (!error) fillSelect("confirmNguoiXacNhan", (data || []).map(r => r.ten_nhan_vien), "-- Chọn tên bạn --");
 }
 
 document.getElementById("confirmCongDoan").addEventListener("change", loadPendingList);
@@ -536,15 +530,14 @@ async function loadPendingList(){
 }
 
 async function requireNguoiXacNhanAndAuth(){
-  const nguoiXacNhan = document.getElementById("confirmNguoiXacNhan").value;
-  if (!nguoiXacNhan){ err("Chưa chọn Người xác nhận."); return null; }
   const session = await MesAuth.getSession();
   if (!session){
     err("Cần đăng nhập trước khi xác nhận. Đang chuyển sang trang đăng nhập…");
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
     return null;
   }
-  return nguoiXacNhan;
+  const { data } = await sb.from('user_roles').select('full_name,email').eq('user_id', session.user.id).maybeSingle();
+  return (data && (data.full_name || data.email)) || session.user.email;
 }
 
 async function confirmOne(idPhieu, btn){
