@@ -86,6 +86,11 @@ button{cursor:pointer;font-family:inherit}
 .detail-meta{font-size:.85rem;color:var(--text-dim);margin-top:.4rem}
 .pdf-btn{margin:0 .75rem .75rem;width:calc(100% - 1.5rem);padding:.75rem;border:1px solid var(--accent);border-radius:.55rem;background:#fff;color:var(--accent);font-weight:700;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
 
+.incident-info{margin:0 .75rem .75rem;padding:.8rem .9rem;border-radius:.7rem;background:#FFF7ED;border:1px solid #FDBA74;box-shadow:var(--shadow-sm)}
+.incident-info .ii-title{font-size:.75rem;font-weight:700;color:#9A3412;text-transform:uppercase;letter-spacing:.03em;margin-bottom:.35rem}
+.incident-info .ii-row{font-size:.85rem;color:#7C2D12;margin-top:.25rem;white-space:pre-wrap}
+.incident-info .ii-row b{font-weight:700}
+
 .checklist{margin:0 .75rem .75rem;background:var(--bg-panel);border-radius:.7rem;box-shadow:var(--shadow-sm);overflow:hidden}
 .cl-item{display:flex;align-items:center;gap:.6rem;padding:.75rem .85rem;border-bottom:1px solid var(--border)}
 .cl-item:last-child{border-bottom:none}
@@ -154,6 +159,13 @@ button{cursor:pointer;font-family:inherit}
   <div class="detail-info">
     <div class="detail-sp" id="ck-ma-sp">—</div>
     <div class="detail-meta" id="ck-meta">—</div>
+  </div>
+  <div class="incident-info hidden" id="ck-incident-info">
+    <div class="ii-title">⚠ Nội dung sự cố (trưởng ca đã ghi)</div>
+    <div class="ii-row" id="ck-incident-loai"></div>
+    <div class="ii-row" id="ck-incident-van-de"></div>
+    <div class="ii-row" id="ck-incident-xu-ly"></div>
+    <div class="ii-row" id="ck-incident-dam-nhiem"></div>
   </div>
   <button class="pdf-btn hidden" id="ck-pdf-btn">📄 Xem tiêu chuẩn (PDF)</button>
 
@@ -240,6 +252,12 @@ document.addEventListener('focusin', e => {
   setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
 });
 function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Luôn dùng thang 24h (không AM/PM) cho mọi đồng hồ/giờ hiển thị trên trang.
+function fmtDateTime24(iso){
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
 
 async function updateUserLabel(){
   const email = await MesAuth.getCurrentUserEmail();
@@ -445,6 +463,9 @@ async function openCheck(idCheckpoint){
   document.getElementById('ck-ma-sp').textContent = cp.ma_sp;
   document.getElementById('ck-meta').textContent = 'Chờ đã ' + cp.phut_da_troi + ' phút — ' + cp.ca + ', ' + (cp.ngay ? new Date(cp.ngay).toLocaleDateString('vi-VN') : '');
 
+  document.getElementById('ck-incident-info').classList.add('hidden');
+  if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
+
   showScreen('scr-check');
   showOverlay('Đang tải tiêu chuẩn...');
   try {
@@ -470,6 +491,38 @@ async function openCheck(idCheckpoint){
       pdfBtn.classList.add('hidden');
     }
   } catch (e) { onError(e); }
+}
+
+// Điểm kiểm "Sau sự cố" — hiện nội dung sự cố trưởng ca đã ghi trên Dashboard
+// Đúc (đọc từ dòng open_* của duc_ca_hien_tai — trường hợp thường gặp nhất vì
+// checkpoint sau_su_co được tạo ngay lúc mở sự cố, IPQC thường tới kiểm khi
+// sự cố vẫn đang mở). Nếu sự cố đã được đóng trước khi IPQC kịp mở màn kiểm
+// (hiếm), lấy lại từ bản ghi Su_co_log gần nhất của đúng dòng này.
+async function loadIncidentInfo(idDong){
+  const box = document.getElementById('ck-incident-info');
+  try {
+    const { data: cht } = await sb.from('duc_ca_hien_tai')
+      .select('open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
+      .eq('id_dong', idDong).maybeSingle();
+    if (cht && cht.open_gio_phat_sinh) {
+      fillIncidentInfo(cht.open_loai_su_co, cht.open_gio_phat_sinh, cht.open_van_de, cht.open_noi_dung_xu_ly, cht.open_dam_nhiem);
+      return;
+    }
+    const { data: log } = await sb.from('duc_su_co_log')
+      .select('loai_su_co,gio_phat_sinh,van_de,noi_dung_xu_ly,dam_nhiem')
+      .ilike('id_ban_ghi', idDong + '_%')
+      .order('thoi_diem_luu', { ascending: false }).limit(1).maybeSingle();
+    if (log) fillIncidentInfo(log.loai_su_co, log.gio_phat_sinh, log.van_de, log.noi_dung_xu_ly, log.dam_nhiem);
+  } catch (e) { /* không chặn luồng kiểm chính nếu lỗi — chỉ là thông tin tham khảo */ }
+}
+function fillIncidentInfo(loai, gioPhatSinh, vanDe, xuLy, damNhiem){
+  const box = document.getElementById('ck-incident-info');
+  document.getElementById('ck-incident-loai').innerHTML = '<b>Loại:</b> ' + escapeHtml(loai || '—') +
+    (gioPhatSinh ? ' — phát sinh ' + fmtDateTime24(gioPhatSinh) : '');
+  document.getElementById('ck-incident-van-de').innerHTML = '<b>Vấn đề:</b> ' + escapeHtml(vanDe || '—');
+  document.getElementById('ck-incident-xu-ly').innerHTML = '<b>Đang xử lý:</b> ' + escapeHtml(xuLy || '—');
+  document.getElementById('ck-incident-dam-nhiem').innerHTML = '<b>Đảm nhiệm:</b> ' + escapeHtml(damNhiem || '—');
+  box.classList.remove('hidden');
 }
 
 function renderChecklist(){

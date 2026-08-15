@@ -474,7 +474,7 @@ async function submitTransfer(){
     return;
   }
   const r = data[0];
-  const thoiGian = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN');
+  const thoiGian = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN', { hour12: false });
   showMsg("✅ " + r.id_phieu + " — đã chuyển " + soLuong + " từ " + congDoanGiao + " sang " + congDoanNhan + " lúc " + thoiGian, "ok", 6000);
   resetForNext();
 }
@@ -534,7 +534,7 @@ async function loadPendingList(){
   data.forEach(r => {
     const div = document.createElement('div');
     div.className = 'pending-item';
-    const t = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN');
+    const t = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN', { hour12: false });
     div.innerHTML = `
       <div class="sr"><div class="k">Tag No</div><div class="v">${r.tag_no}</div></div>
       <div class="sr"><div class="k">SP</div><div class="v">${r.ma_sp} — ${r.ten_sp || ''}</div></div>
@@ -578,7 +578,7 @@ async function confirmOne(idPhieu, btn){
   btn.disabled = true;
   btn.textContent = "⏳ Đang xử lý...";
   const { error } = await sb.rpc('cd_xac_nhan_chuyen', {
-    p_id_phieu: idPhieu, p_nguoi_giao: nguoiXacNhan, p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN')
+    p_id_phieu: idPhieu, p_nguoi_giao: nguoiXacNhan, p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN', { hour12: false })
   });
   if (error){ err("Lỗi xác nhận: " + error.message); btn.disabled = false; btn.textContent = "✅ Xác nhận đã giao"; return; }
   showMsg("✅ Đã xác nhận phiếu " + idPhieu, "ok", 4000);
@@ -594,7 +594,7 @@ async function rejectOne(idPhieu, formEl, btn){
   btn.textContent = "⏳ Đang gửi...";
   const { error } = await sb.rpc('cd_tu_choi_chuyen', {
     p_id_phieu: idPhieu, p_nguoi_tu_choi: nguoiXacNhan, p_ly_do: ly_do,
-    p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN')
+    p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN', { hour12: false })
   });
   if (error){ err("Lỗi từ chối: " + error.message); btn.disabled = false; btn.textContent = "Gửi từ chối"; return; }
   showMsg("❌ Đã từ chối phiếu " + idPhieu, "err", 4000);
@@ -612,7 +612,7 @@ async function confirmAll(){
   for (const id of ids){
     btn.textContent = "⏳ Đang xác nhận " + (done + failed + 1) + "/" + ids.length + "…";
     const { error } = await sb.rpc('cd_xac_nhan_chuyen', {
-      p_id_phieu: id, p_nguoi_giao: nguoiXacNhan, p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN')
+      p_id_phieu: id, p_nguoi_giao: nguoiXacNhan, p_ngay_gio_xac_nhan: new Date().toLocaleString('vi-VN', { hour12: false })
     });
     if (error) failed++; else done++;
   }

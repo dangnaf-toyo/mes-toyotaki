@@ -424,7 +424,7 @@ function switchTab(tab){
 }
 
 function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtTime(d){ return d.toLocaleTimeString('vi-VN'); }
+function fmtTime(d){ return d.toLocaleTimeString('vi-VN', { hour12: false }); }
 function fmtDurationSec(sec){
   sec = Number(sec) || 0;
   if (sec <= 0) return '—';
@@ -571,7 +571,7 @@ function levelForMinutes(m){
 
 function doneRowHtml(d){
   return `<tr>
-    <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN') : '—'}</td>
+    <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
     <td><b>${escapeHtml(d.ma_may)}</b></td>
     <td class="mono">${escapeHtml(d.ma_sp)}</td>
     <td>${escapeHtml(LOAI_LABEL[d.loai_kiem] || d.loai_kiem)}</td>
@@ -759,7 +759,7 @@ function renderNcpList(){
       <td>${escapeHtml(NCP_TRANG_THAI_LABEL[c.trang_thai] || c.trang_thai)}</td>
       <td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
-      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN') : '—'}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
         <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
         <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
@@ -780,7 +780,7 @@ function renderNcpList(){
       <td class="ncp-qty" style="color:${c.so_luong_phe_da_duyet > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_phe_da_duyet}</td>
       <td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
-      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN') : '—'}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
         <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
         <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
@@ -816,7 +816,7 @@ async function openNcpNewModal(){
   else {
     state.ncpAvailableNg = data.map(x => ({ id_checkpoint: x.id_checkpoint, ma_may: x.ma_may, ma_sp: x.ma_sp, so_khuon: x.so_khuon, thoi_diem_kiem_thuc_te: x.thoi_diem_kiem_thuc_te, mo_ta_de_xuat: x.mo_ta_de_xuat }));
     sel.innerHTML = '<option value="">-- Chọn --</option>' + state.ncpAvailableNg.map(x =>
-      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN')}</option>`).join('');
+      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false })}</option>`).join('');
     onNcpNgSelected();
   }
   document.getElementById('ncp-modal-new').classList.add('show');
@@ -1021,7 +1021,7 @@ function printNcpTag(idNcp){
           <tr><td class="k">Mã SP</td><td><b>${escapeHtml(c.ma_sp)}</b></td></tr>
           <tr><td class="k">Số lượng</td><td><b>${c.so_luong_nghi_van}</b></td></tr>
           <tr><td class="k">Vị trí cách ly</td><td>${escapeHtml(c.vi_tri_cach_ly)}</td></tr>
-          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN') : ''}</td></tr>
+          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : ''}</td></tr>
           <tr><td class="k">Người mở</td><td>${escapeHtml(c.nguoi_mo_case)}</td></tr>
         </table>
         <div class="desc">${escapeHtml(c.mo_ta_loi)}</div>
