@@ -93,6 +93,7 @@ button{cursor:pointer;font-family:inherit}
 .incident-info .ii-code{font-family:'JetBrains Mono',monospace;font-weight:700;background:#FDBA74;color:#7C2D12;padding:.05rem .4rem;border-radius:.3rem}
 
 .checklist{margin:0 .75rem .75rem;background:var(--bg-panel);border-radius:.7rem;box-shadow:var(--shadow-sm);overflow:hidden}
+.cl-group-title{padding:.6rem .85rem .3rem;font-size:.78rem;font-weight:700;letter-spacing:.02em;color:var(--text-muted);text-transform:uppercase}
 .cl-item{display:flex;align-items:center;gap:.6rem;padding:.75rem .85rem;border-bottom:1px solid var(--border)}
 .cl-item:last-child{border-bottom:none}
 .cl-item .cl-text{flex:1;font-size:.95rem}
@@ -531,16 +532,35 @@ function fillIncidentInfo(idSuCo, loai, gioPhatSinh, vanDe, xuLy, damNhiem){
   box.classList.remove('hidden');
 }
 
+// Mục kiểm dạng "Nhóm — Chi tiết" (vd "Ngoại quan — Cào xước; dính nhôm") được
+// gom theo Nhóm, chỉ hiện tiêu đề nhóm 1 lần thay vì lặp lại ở từng dòng —
+// mục không có "—" (vd "Kích thước...") hiện riêng, không thuộc nhóm nào.
 function renderChecklist(){
   const wrap = document.getElementById('ck-checklist');
-  wrap.innerHTML = state.checklistAnswers.map((a, i) => `
+  const ungrouped = [];
+  const groups = [];
+  const byName = {};
+  state.checklistAnswers.forEach((a, i) => {
+    const sep = a.muc.indexOf(' — ');
+    if (sep < 0) { ungrouped.push({ i, label: a.muc }); return; }
+    const name = a.muc.slice(0, sep).trim();
+    const label = a.muc.slice(sep + 3).trim();
+    if (!byName[name]) { byName[name] = { name, items: [] }; groups.push(byName[name]); }
+    byName[name].items.push({ i, label });
+  });
+
+  const itemHtml = ({ i, label }) => `
     <div class="cl-item">
-      <div class="cl-text">${escapeHtml(a.muc)}</div>
+      <div class="cl-text">${escapeHtml(label)}</div>
       <div class="cl-toggle">
         <button id="cl-ok-${i}" onclick="setChecklistAnswer(${i}, true)">Đạt</button>
         <button id="cl-bad-${i}" onclick="setChecklistAnswer(${i}, false)">Không đạt</button>
       </div>
-    </div>`).join('');
+    </div>`;
+
+  wrap.innerHTML = ungrouped.map(itemHtml).join('') + groups.map(g =>
+    `<div class="cl-group-title">${escapeHtml(g.name)}</div>` + g.items.map(itemHtml).join('')
+  ).join('');
 }
 
 function setChecklistAnswer(i, dat){
