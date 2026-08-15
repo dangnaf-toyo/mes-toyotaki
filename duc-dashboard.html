@@ -195,6 +195,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .issue-open-top{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text-muted)}
 .issue-code{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--alarm-fg);font-size:10px}
 .row[data-state="warn"] .issue-code{color:var(--warn-fg)}
+.issue-ma-su-co{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:9px;background:#FDBA74;color:#7C2D12;padding:1px 5px;border-radius:4px}
 .timer{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;letter-spacing:-.02em;color:var(--alarm-fg);margin-left:auto;display:flex;align-items:center;gap:5px}
 .row[data-state="warn"] .timer{color:var(--warn-fg)}
 .timer::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1s ease-in-out infinite}
@@ -2005,6 +2006,7 @@ function makeRowHTML(row, stateClass, isActive){
       '<div class="issue-open">' +
         '<div class="issue-open-top">' +
           '<span class="issue-code">' + escapeHtml(row.open_loai_su_co || '—') + '</span>' +
+          (row.open_id_su_co ? '<span class="issue-ma-su-co">' + escapeHtml(row.open_id_su_co) + '</span>' : '') +
           '<span class="timer" data-start="' + startTime.toISOString() + '">--:--</span>' +
         '</div>' +
         '<div class="issue-detail">' + escapeHtml(row.open_van_de || '(chưa nhập mô tả)') + '</div>' +
@@ -2682,6 +2684,7 @@ async function openResolveModal(idDong){
   document.getElementById('mr-tag').textContent = row.ma_may;
   const startTime = new Date(row.open_gio_phat_sinh);
   document.getElementById('mr-summary').innerHTML =
+    (row.open_id_su_co ? '<div class="issue-ma-su-co" style="display:inline-block;margin-bottom:4px">' + escapeHtml(row.open_id_su_co) + '</div>' : '') +
     '<div style="font-weight:600;color:var(--alarm-fg);margin-bottom:4px">' + escapeHtml(row.open_loai_su_co) + '</div>' +
     '<div style="color:var(--text)">' + escapeHtml(row.open_van_de || '(chưa nhập mô tả)') + '</div>' +
     '<div style="color:var(--text-muted);margin-top:6px;font-size:11px">🕐 Phát sinh: ' +
@@ -2726,7 +2729,7 @@ async function submitResolve(){
     // chưa có kết quả IPQC OK. Dùng alert() (không phải showToast) để chắc
     // chắn trưởng ca phải bấm xác nhận mới đóng được, tránh bỏ sót cảnh báo.
     if (d.canh_bao_ipqc) {
-      alert('⚠️ Hệ thống chưa ghi nhận có kết quả kiểm tra IPQC cho sự cố này, hãy nhắc nhân viên IPQC kiểm tra và hoàn thiện trên hệ thống.');
+      alert('⚠️ Hệ thống chưa ghi nhận có kết quả kiểm tra IPQC cho sự cố' + (d.id_su_co ? ' ' + d.id_su_co : '') + ', hãy nhắc nhân viên IPQC kiểm tra và hoàn thiện trên hệ thống.');
     }
     loadShiftState(false);
   } catch (e) { onError(e); }

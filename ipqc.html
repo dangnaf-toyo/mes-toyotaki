@@ -90,6 +90,7 @@ button{cursor:pointer;font-family:inherit}
 .incident-info .ii-title{font-size:.75rem;font-weight:700;color:#9A3412;text-transform:uppercase;letter-spacing:.03em;margin-bottom:.35rem}
 .incident-info .ii-row{font-size:.85rem;color:#7C2D12;margin-top:.25rem;white-space:pre-wrap}
 .incident-info .ii-row b{font-weight:700}
+.incident-info .ii-code{font-family:'JetBrains Mono',monospace;font-weight:700;background:#FDBA74;color:#7C2D12;padding:.05rem .4rem;border-radius:.3rem}
 
 .checklist{margin:0 .75rem .75rem;background:var(--bg-panel);border-radius:.7rem;box-shadow:var(--shadow-sm);overflow:hidden}
 .cl-item{display:flex;align-items:center;gap:.6rem;padding:.75rem .85rem;border-bottom:1px solid var(--border)}
@@ -346,7 +347,7 @@ async function loadQueue(){
       return Object.assign({
         id_checkpoint: r.id_checkpoint, id_dong: r.id_dong, ma_may: r.ma_may, ma_sp: r.ma_sp,
         ngay: r.ngay, ca: r.ca, loai_kiem: r.loai_kiem, thoi_diem_tao: r.thoi_diem_tao,
-        phut_da_troi: phutDaTroi, virtual: false,
+        id_su_co_goc: r.id_su_co_goc, phut_da_troi: phutDaTroi, virtual: false,
       }, ipqcDueInfo(r.loai_kiem, phutDaTroi));
     });
   const fromDinhKy = (dinhKyRes.data || [])
@@ -410,7 +411,7 @@ function renderQueue(){
         <div class="qcard-main">
           <div class="qcard-may">${escapeHtml(cp.ma_may)}</div>
           <div class="qcard-sp">${escapeHtml(cp.ma_sp)}</div>
-          <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.da_den_han ? '' : ' · sắp tới'}</div>
+          <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.da_den_han ? '' : ' · sắp tới'}${cp.id_su_co_goc ? ' · ' + escapeHtml(cp.id_su_co_goc) : ''}</div>
         </div>
         <div style="text-align:right">
           <div class="qcard-time ${lvl === 'ok' ? '' : lvl}">${timeLabel}</div>
@@ -502,22 +503,27 @@ async function loadIncidentInfo(idDong){
   const box = document.getElementById('ck-incident-info');
   try {
     const { data: cht } = await sb.from('duc_ca_hien_tai')
-      .select('open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
+      .select('open_id_su_co,open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
       .eq('id_dong', idDong).maybeSingle();
     if (cht && cht.open_gio_phat_sinh) {
-      fillIncidentInfo(cht.open_loai_su_co, cht.open_gio_phat_sinh, cht.open_van_de, cht.open_noi_dung_xu_ly, cht.open_dam_nhiem);
+      fillIncidentInfo(cht.open_id_su_co, cht.open_loai_su_co, cht.open_gio_phat_sinh, cht.open_van_de, cht.open_noi_dung_xu_ly, cht.open_dam_nhiem);
       return;
     }
     const { data: log } = await sb.from('duc_su_co_log')
-      .select('loai_su_co,gio_phat_sinh,van_de,noi_dung_xu_ly,dam_nhiem')
+      .select('id_su_co,loai_su_co,gio_phat_sinh,van_de,noi_dung_xu_ly,dam_nhiem')
       .ilike('id_ban_ghi', idDong + '_%')
       .order('thoi_diem_luu', { ascending: false }).limit(1).maybeSingle();
-    if (log) fillIncidentInfo(log.loai_su_co, log.gio_phat_sinh, log.van_de, log.noi_dung_xu_ly, log.dam_nhiem);
+    if (log) fillIncidentInfo(log.id_su_co, log.loai_su_co, log.gio_phat_sinh, log.van_de, log.noi_dung_xu_ly, log.dam_nhiem);
   } catch (e) { /* không chặn luồng kiểm chính nếu lỗi — chỉ là thông tin tham khảo */ }
 }
-function fillIncidentInfo(loai, gioPhatSinh, vanDe, xuLy, damNhiem){
+// Mã sự cố (idSuCo, vd "SC-DC6-0815-1344") hiện song song trên Dashboard Đúc
+// và ở đây — để trưởng ca/IPQC tự đối chiếu bằng mắt, tránh nhầm khi có
+// nhiều sự cố cùng lúc trên nhiều máy.
+function fillIncidentInfo(idSuCo, loai, gioPhatSinh, vanDe, xuLy, damNhiem){
   const box = document.getElementById('ck-incident-info');
-  document.getElementById('ck-incident-loai').innerHTML = '<b>Loại:</b> ' + escapeHtml(loai || '—') +
+  document.getElementById('ck-incident-loai').innerHTML =
+    (idSuCo ? '<span class="ii-code">' + escapeHtml(idSuCo) + '</span> — ' : '') +
+    '<b>Loại:</b> ' + escapeHtml(loai || '—') +
     (gioPhatSinh ? ' — phát sinh ' + fmtDateTime24(gioPhatSinh) : '');
   document.getElementById('ck-incident-van-de').innerHTML = '<b>Vấn đề:</b> ' + escapeHtml(vanDe || '—');
   document.getElementById('ck-incident-xu-ly').innerHTML = '<b>Đang xử lý:</b> ' + escapeHtml(xuLy || '—');
