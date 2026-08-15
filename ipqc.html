@@ -281,25 +281,44 @@ function ipqcDueInfo(loaiKiem, phutDaTroi){
 }
 
 // Port getIpqcQueue_ (IpqcCheckpoint.js) — đọc thẳng bảng, lọc + tính toán ở client.
+// "Định kỳ" KHÔNG còn đọc từ dòng đã lưu sẵn (trước đây do trigger quét bên
+// Apps Script tạo) — tính trực tiếp qua RPC duc_get_ipqc_periodic_due() mỗi
+// lần tải: mọi máy đang chạy đều có 1 mục định kỳ ảo (chưa có id_checkpoint
+// thật), đếm giờ từ lần kiểm hoàn thành gần nhất của máy đó. Dòng checkpoint
+// thật chỉ được tạo khi IPQC bấm vào kiểm (xem openCheck → materializeVirtual).
 async function loadQueue(){
-  const [activeSet, cpRes] = await Promise.all([
+  const [activeSet, cpRes, dinhKyRes] = await Promise.all([
     getActiveIdDongSet(),
     sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'cho_kiem'),
+    sb.rpc('duc_get_ipqc_periodic_due'),
   ]);
   if (cpRes.error) throw new Error('Không tải được hàng đợi IPQC: ' + cpRes.error.message);
+  if (dinhKyRes.error) throw new Error('Không tính được điểm định kỳ IPQC: ' + dinhKyRes.error.message);
 
   const now = Date.now();
   const PRIORITY = { sau_su_co: 0, doi_khuon: 0, dinh_ky: 1 };
-  const queue = (cpRes.data || [])
+  // Bao gồm cả loai_kiem='dinh_ky' đã materialize (IPQC đã bấm vào 1 mục định
+  // kỳ ảo trước đó) — RPC duc_get_ipqc_periodic_due() tự loại các id_dong đã
+  // có dòng thật này ở tham số dưới, tránh hiện trùng 2 lần.
+  const fromCheckpoints = (cpRes.data || [])
     .filter(r => r.id_checkpoint && activeSet.has(r.id_dong))
     .map(r => {
       const phutDaTroi = r.han_kiem ? Math.round((now - new Date(r.han_kiem).getTime()) / 60000) : 0;
       return Object.assign({
         id_checkpoint: r.id_checkpoint, id_dong: r.id_dong, ma_may: r.ma_may, ma_sp: r.ma_sp,
         ngay: r.ngay, ca: r.ca, loai_kiem: r.loai_kiem, thoi_diem_tao: r.thoi_diem_tao,
-        phut_da_troi: phutDaTroi,
+        phut_da_troi: phutDaTroi, virtual: false,
       }, ipqcDueInfo(r.loai_kiem, phutDaTroi));
-    })
+    });
+  const fromDinhKy = (dinhKyRes.data || [])
+    .filter(r => activeSet.has(r.id_dong))
+    .map(r => Object.assign({
+      id_checkpoint: 'virtual:' + r.id_dong, id_dong: r.id_dong, ma_may: r.ma_may, ma_sp: r.ma_sp,
+      ngay: r.ngay, ca: r.ca, loai_kiem: 'dinh_ky', thoi_diem_tao: null,
+      phut_da_troi: r.phut_da_troi, virtual: true,
+    }, ipqcDueInfo('dinh_ky', r.phut_da_troi)));
+
+  const queue = fromCheckpoints.concat(fromDinhKy)
     .sort((a, b) => {
       const pa = PRIORITY[a.loai_kiem] != null ? PRIORITY[a.loai_kiem] : 2;
       const pb = PRIORITY[b.loai_kiem] != null ? PRIORITY[b.loai_kiem] : 2;
@@ -362,6 +381,35 @@ function renderQueue(){
 async function openCheck(idCheckpoint){
   const cp = state.queue.find(x => x.id_checkpoint === idCheckpoint);
   if (!cp) return;
+
+  if (cp.virtual){
+    // Mục "định kỳ" ảo (tính trực tiếp, chưa có dòng thật trong bảng) — tạo
+    // dòng checkpoint thật ngay bây giờ, giữ nguyên mốc đếm giờ đã tính sẵn
+    // (lần kiểm hoàn thành gần nhất của máy), rồi mới mở form kiểm. Tạo dòng
+    // là thao tác ghi nên cần đăng nhập (khác việc chỉ xem hàng đợi — công khai).
+    const session = await MesAuth.getSession();
+    if (!session){
+      showToast('Cần đăng nhập trước khi bắt đầu kiểm. Đang chuyển sang trang đăng nhập…', true);
+      setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+      return;
+    }
+    showOverlay('Đang chuẩn bị điểm kiểm...');
+    try {
+      const mocBatDau = new Date(Date.now() - cp.phut_da_troi * 60000).toISOString();
+      const { data, error } = await sb.rpc('duc_request_ipqc_check', {
+        p_id_dong: cp.id_dong, p_loai_kiem: 'dinh_ky', p_id_su_co_goc: null, p_moc_cho_override: mocBatDau,
+      });
+      if (error) throw new Error(error.message);
+      if (!data || data.ok !== true){
+        hideOverlay();
+        onError(new Error('Không tạo được điểm kiểm định kỳ: ' + (data && data.reason || 'không rõ nguyên nhân')));
+        return;
+      }
+      cp.id_checkpoint = data.id_checkpoint;
+      cp.virtual = false;
+    } catch (e) { hideOverlay(); onError(e); return; }
+  }
+
   state.current = cp;
   state.checkStartedAt = Date.now();
   state.photos = [];
