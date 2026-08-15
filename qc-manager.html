@@ -483,18 +483,32 @@ function mapIpqcDoneRow(r){
 }
 
 // ===================== Board giám sát real-time (24h) =====================
+// "Định kỳ" (dinh_ky) không còn dựa vào dòng checkpoint tạo sẵn (bỏ trigger
+// quét định kỳ bên Apps Script) — tính trực tiếp qua RPC
+// duc_get_ipqc_periodic_due(), cùng cách ipqc.html đang dùng: mọi máy đang
+// chạy đều có 1 mục định kỳ, đếm giờ từ lần kiểm hoàn thành gần nhất của máy
+// đó. Board này chỉ xem, không thao tác kiểm, nên không cần materialize dòng
+// thật — hiển thị thẳng kết quả RPC.
 async function loadBoard(){
   try {
     const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
-    const [activeSet, cpRes] = await Promise.all([
+    const [activeSet, cpRes, dinhKyRes] = await Promise.all([
       getActiveIdDongSet(),
       sb.from('duc_ipqc_checkpoint').select('*').gte('thoi_diem_tao', cutoff),
+      sb.rpc('duc_get_ipqc_periodic_due'),
     ]);
     if (cpRes.error) throw new Error(cpRes.error.message);
+    if (dinhKyRes.error) throw new Error(dinhKyRes.error.message);
 
     const now = Date.now();
     const PRIORITY = { sau_su_co: 0, doi_khuon: 0, dinh_ky: 1 };
     const pending = [], done = [], byNguoiKiem = {};
+
+    (dinhKyRes.data || []).forEach(r => {
+      if (!activeSet.has(r.id_dong)) return;
+      const dueInfo = ipqcDueInfo('dinh_ky', r.phut_da_troi);
+      pending.push(Object.assign({ id_checkpoint: null, ma_may: r.ma_may, ma_sp: r.ma_sp, loai_kiem: 'dinh_ky', phut_da_troi: r.phut_da_troi }, dueInfo));
+    });
 
     (cpRes.data || []).forEach(r => {
       if (r.trang_thai === 'cho_kiem' && activeSet.has(r.id_dong)) {
