@@ -383,7 +383,10 @@ function renderQueue(){
   }
   list.innerHTML = state.queue.map(cp => {
     const lvl = cp.da_den_han ? levelForMinutes(cp.phut_da_troi) : 'upcoming';
-    const timeLabel = cp.da_den_han ? (cp.phut_da_troi + 'p') : ('còn ' + cp.phut_con_lai + 'p');
+    // Thống nhất cách đếm cho cả 3 loại: luôn hiện "đã trôi qua bao lâu kể từ
+    // khi có yêu cầu kiểm" — kể cả loại định kỳ chưa tới hạn (không hiện đếm
+    // ngược "còn bao lâu" nữa, chỉ khác ở nhãn "sắp tới" + màu sắc).
+    const timeLabel = cp.phut_da_troi + 'p';
     return `
       <div class="qcard" data-lvl="${lvl}" onclick="openCheck('${cp.id_checkpoint}')">
         <div class="qcard-main">
