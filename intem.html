@@ -511,11 +511,23 @@ async function openCameraForSearch(){
     return;
   }
   try {
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
   } catch(e){
     err("Không mở được camera: " + e.message + ". Kiểm tra đã cho phép quyền Camera cho trang này chưa.");
     return;
   }
+  // Bật lấy nét liên tục nếu camera hỗ trợ — độ phân giải mặc định thấp và camera
+  // không lấy nét lại khi zoom gần tem là nguyên nhân phổ biến khiến jsQR không
+  // đọc được dù hình ảnh camera vẫn hiện bình thường.
+  try {
+    const track = scanStream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.focusMode && caps.focusMode.includes('continuous')){
+      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+    }
+  } catch(e){ /* không hỗ trợ — bỏ qua, không chặn luồng quét */ }
   const video = document.getElementById("scanVideo");
   video.srcObject = scanStream;
   document.getElementById("scanVideoWrap").style.display = "block";
