@@ -57,8 +57,8 @@ tr:hover td{background:#fffaf5}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid #eee}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
-.fg input{border:1.5px solid #ddd;border-radius:7px;padding:8px 9px;font-size:13.5px;font-family:inherit}
-.fg input:focus{outline:none;border-color:#C87941}
+.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%}
+.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
 .days-grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
 .days-grid .fg label{text-align:center}
 .days-grid .fg input{text-align:center}
@@ -90,14 +90,14 @@ tr:hover td{background:#fffaf5}
       <table>
         <thead>
           <tr>
-            <th>Mã máy</th><th>Mã SP</th><th>Tên SP</th>
+            <th>Mã máy</th><th>Mã SP</th><th>Tên SP</th><th>Số khuôn</th>
             <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
             <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
             <th>Tổng KH tuần</th><th>Ghi chú</th><th></th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr class="empty-row"><td colspan="13">Đang tải…</td></tr>
+          <tr class="empty-row"><td colspan="14">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
@@ -115,6 +115,12 @@ tr:hover td{background:#fffaf5}
       <div class="fg"><label>Mã máy *</label><input id="f-ma-may"></div>
       <div class="fg"><label>Mã SP *</label><input id="f-ma-sp"></div>
       <div class="fg full"><label>Tên SP</label><input id="f-ten-sp"></div>
+      <div class="fg full">
+        <label>Số khuôn</label>
+        <select id="f-so-khuon-select" onchange="onSoKhuonSelectChange()" style="display:none"></select>
+        <input id="f-so-khuon">
+        <div style="font-size:10.5px;color:#999;margin-top:2px" id="f-so-khuon-hint"></div>
+      </div>
       <div class="days-grid">
         <div class="fg"><label>T2</label><input id="f-t2" type="number" min="0" value="0"></div>
         <div class="fg"><label>T3</label><input id="f-t3" type="number" min="0" value="0"></div>
@@ -159,6 +165,82 @@ function fmtDateVN(d){
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// =============================================================================
+// Điền tự động Số khuôn theo Mã SP — mapping (ma_sp → [ma_khuon]) đọc từ
+// duc_shot_khuon (cùng nguồn/logic populateSoKhuonField() bên duc-dashboard.html).
+// SP chạy nhiều khuôn thì cho chọn 1 trong các khuôn đó; SP chưa khai báo khuôn
+// nào thì để nhập tay.
+// =============================================================================
+let moldsByProduct = {};
+async function loadMoldsByProduct(){
+  const { data, error } = await sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat');
+  if (error) return;
+  moldsByProduct = {};
+  (data || []).forEach(m => {
+    const maSp = String(m.ten_sp_gan_nhat || '').split(' (')[0].trim();
+    const maKhuon = String(m.ma_khuon || '').trim();
+    if (!maSp || !maKhuon) return;
+    if (!moldsByProduct[maSp]) moldsByProduct[maSp] = [];
+    if (moldsByProduct[maSp].indexOf(maKhuon) === -1) moldsByProduct[maSp].push(maKhuon);
+  });
+}
+
+function populateSoKhuonField(maSp, currentValue){
+  const sel = document.getElementById('f-so-khuon-select');
+  const inp = document.getElementById('f-so-khuon');
+  const hint = document.getElementById('f-so-khuon-hint');
+  const molds = (maSp && moldsByProduct[maSp]) || [];
+
+  if (molds.length === 0) {
+    sel.style.display = 'none';
+    inp.style.display = '';
+    inp.value = currentValue != null ? currentValue : '';
+    hint.textContent = maSp
+      ? 'Chưa có khuôn khai báo cho SP ' + maSp + ' trong Shot_Khuon — nhập thủ công'
+      : 'Nhập mã SP trước để lọc danh sách khuôn';
+    return;
+  }
+
+  sel.innerHTML = '';
+  if (molds.length > 1) {
+    const ph = document.createElement('option');
+    ph.value = ''; ph.textContent = '— Chọn khuôn (' + molds.length + ' khuôn) —';
+    sel.appendChild(ph);
+  }
+  molds.forEach(mk => {
+    const opt = document.createElement('option');
+    opt.value = mk; opt.textContent = mk;
+    sel.appendChild(opt);
+  });
+  const manualOpt = document.createElement('option');
+  manualOpt.value = '__manual__'; manualOpt.textContent = '✏️ Khác (nhập tay)';
+  sel.appendChild(manualOpt);
+
+  let selectVal;
+  if (currentValue && molds.indexOf(currentValue) !== -1) selectVal = currentValue;
+  else if (molds.length === 1) selectVal = molds[0];
+  else selectVal = currentValue ? '__manual__' : '';
+  sel.value = selectVal;
+  sel.style.display = '';
+
+  if (selectVal === '__manual__') {
+    inp.style.display = ''; inp.value = currentValue || ''; hint.textContent = '';
+  } else {
+    inp.style.display = 'none'; inp.value = selectVal;
+    hint.textContent = molds.length === 1 ? 'Tự động chọn khuôn duy nhất của SP này' : '';
+  }
+}
+function onSoKhuonSelectChange(){
+  const sel = document.getElementById('f-so-khuon-select');
+  const inp = document.getElementById('f-so-khuon');
+  const hint = document.getElementById('f-so-khuon-hint');
+  if (sel.value === '__manual__') {
+    inp.style.display = ''; inp.value = ''; inp.focus(); hint.textContent = '';
+  } else {
+    inp.style.display = 'none'; inp.value = sel.value; hint.textContent = '';
+  }
+}
+
 function showMsg(text, cls, ms){
   const el = document.getElementById('msg');
   el.textContent = text; el.className = cls;
@@ -171,7 +253,7 @@ function updateWeekLabel(){
 }
 
 async function loadRows(){
-  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="13">Đang tải…</td></tr>';
+  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="14">Đang tải…</td></tr>';
   const { data, error } = await sb.from('duc_khsx_tuan_plan')
     .select('*').eq('tuan_bat_dau', fmtDate(weekMonday)).order('ma_may');
   if (error) { showMsg('Lỗi tải dữ liệu: ' + error.message, 'err'); return; }
@@ -182,7 +264,7 @@ async function loadRows(){
 function renderRows(){
   const tbody = document.getElementById('tbody');
   if (rows.length === 0){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="13">Chưa có kế hoạch nào cho tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="14">Chưa có kế hoạch nào cho tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => {
@@ -191,6 +273,7 @@ function renderRows(){
       + '<td>' + escapeHtml(r.ma_may) + '</td>'
       + '<td>' + escapeHtml(r.ma_sp) + '</td>'
       + '<td>' + escapeHtml(r.ten_sp) + '</td>'
+      + '<td>' + escapeHtml(r.so_khuon) + '</td>'
       + '<td class="num">' + fmtNum(r.t2) + '</td>'
       + '<td class="num">' + fmtNum(r.t3) + '</td>'
       + '<td class="num">' + fmtNum(r.t4) + '</td>'
@@ -226,6 +309,7 @@ function openRowModal(id){
   document.getElementById('f-ma-sp').value = r ? r.ma_sp : '';
   document.getElementById('f-ten-sp').value = r ? r.ten_sp : '';
   document.getElementById('f-ghi-chu').value = r ? r.ghi_chu : '';
+  populateSoKhuonField(r ? r.ma_sp : '', r ? r.so_khuon : '');
   ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
     document.getElementById('f-' + d).value = r ? (r[d] || 0) : 0;
   });
@@ -248,6 +332,11 @@ function updateTongTuan(){
 ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
   document.getElementById('f-' + d).addEventListener('input', updateTongTuan);
 });
+// Gõ/đổi mã SP → tự lọc lại danh sách khuôn tương ứng (giữ nguyên khuôn đang
+// gõ tay nếu có, để không xoá mất khi người dùng đang gõ dở).
+document.getElementById('f-ma-sp').addEventListener('input', () => {
+  populateSoKhuonField(document.getElementById('f-ma-sp').value.trim(), document.getElementById('f-so-khuon').value.trim());
+});
 
 document.getElementById('btnAddRow').addEventListener('click', async () => {
   if (!(await requireLoginOrRedirect())) return;
@@ -266,6 +355,7 @@ document.getElementById('btnSaveRow').addEventListener('click', async () => {
     ma_may: maMay,
     ma_sp: maSp,
     ten_sp: document.getElementById('f-ten-sp').value.trim(),
+    so_khuon: document.getElementById('f-so-khuon').value.trim(),
     // kh_tuan vẫn ghi vào cột cũ (duc-dashboard.html đọc cột này để gợi ý khi
     // "Nạp kế hoạch từ KHSX tuần") — nay tự tính từ tổng 7 ngày thay vì gõ tay.
     kh_tuan: updateTongTuan(),
@@ -319,6 +409,7 @@ async function initAuthStatus(){
 
 updateWeekLabel();
 loadRows();
+loadMoldsByProduct();
 initAuthStatus();
 </script>
 </body>
