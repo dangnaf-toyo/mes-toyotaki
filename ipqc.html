@@ -255,11 +255,13 @@ async function updateUserLabel(){
 // mới nhất mỗi máy (row_seq lớn nhất), cộng cả dòng ghép cặp khuôn kép.
 // =============================================================================
 async function getActiveIdDongSet(){
-  const { data, error } = await sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi');
+  const { data, error } = await sb.from('duc_ca_hien_tai')
+    .select('id_dong,ma_may,row_seq,khuon_kep_voi,sp_end_time,open_gio_phat_sinh');
   if (error) throw new Error('Không tải được Ca_hien_tai: ' + error.message);
-  const byMachine = {};
+  const byMachine = {}, byId = {};
   (data || []).forEach(r => {
     if (!r.id_dong) return;
+    byId[r.id_dong] = r;
     if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
   });
   const active = new Set();
@@ -267,7 +269,20 @@ async function getActiveIdDongSet(){
     active.add(r.id_dong);
     if (r.khuon_kep_voi) active.add(r.khuon_kep_voi);
   });
-  return active;
+  // Loại các dòng đã kết thúc ca (sp_end_time đã qua) VÀ không có sự cố đang
+  // mở — dòng vẫn "sống" trong bảng chỉ vì chưa có dòng mới ghi đè (máy thật
+  // ra đã trống/không chạy) không nên tính là active, tránh hàng đợi IPQC giữ
+  // mãi các máy đã dừng từ lâu (không khớp với "không có kế hoạch" trên
+  // Dashboard Đúc, vốn lọc theo đúng ngày/ca hiện tại).
+  const now = Date.now();
+  const conLai = (idDong) => {
+    const r = byId[idDong];
+    if (!r) return false;
+    if (r.open_gio_phat_sinh) return true;
+    if (!r.sp_end_time) return true;
+    return new Date(r.sp_end_time).getTime() >= now;
+  };
+  return new Set([...active].filter(conLai));
 }
 
 function ipqcDueInfo(loaiKiem, phutDaTroi){

@@ -451,13 +451,28 @@ function startClock(){ setInterval(() => { document.getElementById('clock-time')
 // Active id_dong set — cùng logic với ipqc.html (xem comment ở đó).
 // =============================================================================
 async function getActiveIdDongSet(){
-  const { data, error } = await sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi');
+  const { data, error } = await sb.from('duc_ca_hien_tai')
+    .select('id_dong,ma_may,row_seq,khuon_kep_voi,sp_end_time,open_gio_phat_sinh');
   if (error) throw new Error(error.message);
-  const byMachine = {};
-  (data || []).forEach(r => { if (r.id_dong && (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq)) byMachine[r.ma_may] = r; });
+  const byMachine = {}, byId = {};
+  (data || []).forEach(r => {
+    if (!r.id_dong) return;
+    byId[r.id_dong] = r;
+    if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
+  });
   const active = new Set();
   Object.values(byMachine).forEach(r => { active.add(r.id_dong); if (r.khuon_kep_voi) active.add(r.khuon_kep_voi); });
-  return active;
+  // Loại các dòng đã kết thúc ca và không có sự cố đang mở — xem ipqc.html
+  // (cùng logic) để tránh board giữ mãi các máy thật ra đã dừng từ lâu.
+  const now = Date.now();
+  const conLai = (idDong) => {
+    const r = byId[idDong];
+    if (!r) return false;
+    if (r.open_gio_phat_sinh) return true;
+    if (!r.sp_end_time) return true;
+    return new Date(r.sp_end_time).getTime() >= now;
+  };
+  return new Set([...active].filter(conLai));
 }
 function ipqcDueInfo(loaiKiem, phutDaTroi){
   const dueAfter = loaiKiem === 'dinh_ky' ? 120 : 0;
