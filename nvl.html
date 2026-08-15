@@ -49,9 +49,10 @@
      Bản cũ nhúng ~174KB base64 (jsQR + engine phụ) ngay trong file vì lịch sử
      chạy trong sandbox Apps Script. Nay tải thẳng từ CDN, cùng thư viện đang
      chạy ổn định ở các module khác của hệ thống MES:
-       - Quét QR camera : jsQR 1.4.0 (giống chuyencongdoan.html), có dùng thêm
-                          BarcodeDetector native làm đường nhanh nếu trình duyệt
-                          hỗ trợ, jsQR luôn là fallback chạy mọi nơi.
+       - Quét QR camera : html5-qrcode 2.3.8 (giống chuyencongdoan.html/
+                          intem.html — đổi 2026-08-15, jsQR tự viết không đọc
+                          được ổn định trên thực tế), tự ưu tiên
+                          BarcodeDetector native nếu trình duyệt hỗ trợ.
        - In tem QR      : qrcode-generator 1.4.4 (giống intem.html).
      Logo trên tem cũng đổi từ link Google Drive sang SVG nhúng base64 (offline).
 
@@ -570,9 +571,9 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 4px; font-size: 0.
     <div style="display: flex; gap: 0.4rem;"><button id="btnFlipCamera" title="Đảo camera">🔄 Đảo</button></div>
   </div>
   <div class="fs-video-container" id="fsVideoContainer">
-    <video id="fsVideo" autoplay playsinline muted></video>
+    <div id="fsReaderDiv" style="width:100%;height:100%"></div>
     <div class="fs-qr-frame"><div class="fs-scan-line"></div></div>
-    <div class="fs-hint">Đưa QR gần camera 10-20cm • Chạm màn hình để lấy nét</div>
+    <div class="fs-hint">Đưa QR gần camera 10-20cm</div>
   </div>
   <div class="fs-scanner-footer">
     <div class="fs-last-scan" id="fsLastScan" style="display: none;">
@@ -588,7 +589,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 4px; font-size: 0.
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script>
@@ -1275,18 +1276,22 @@ function playBeep(freq, dur) {
 }
 
 /* ==========================================================================
- * QUÉT QR BẰNG CAMERA — getUserMedia + requestAnimationFrame + jsQR
- * (đúng pattern đang chạy ổn định ở chuyencongdoan.html; BarcodeDetector chỉ
- *  là đường nhanh khi trình duyệt có sẵn, jsQR luôn là phương án chạy mọi nơi)
+ * QUÉT QR BẰNG CAMERA — thư viện html5-qrcode (mebjas), cùng cách đã đổi
+ * sang cho chuyencongdoan.html/intem.html: tự ưu tiên BarcodeDetector phần
+ * cứng khi trình duyệt hỗ trợ, tự lấy nét/độ phân giải, dùng lại đúng 1
+ * instance cho cả vòng đời trang (tạo mới mỗi lần quét từng làm Edge crash
+ * tab sau vài lần quét liên tiếp). Khác các trang kia: giỏ hàng NVL quét
+ * NHIỀU pallet liên tục không đóng khung hình, nên không dừng scanner sau
+ * mỗi lần đọc được mã — chỉ dedupe qua fsLastText/fsLastTime như cũ.
  * ========================================================================== */
-let fsStream = null, fsScanRunning = false, fsScanBusy = false;
-let fsCanvas = null, fsCanvasCtx = null;
+let fsHtml5QrCode = null;
 let fsFacingMode = 'environment';
 let fsLastText = '', fsLastTime = 0;
 const FS_COOLDOWN_MS = 1500;
-let fsBarcodeDetector = null;
-if ('BarcodeDetector' in window) {
-  try { fsBarcodeDetector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { fsBarcodeDetector = null; }
+
+function getFsScanner(){
+  if (!fsHtml5QrCode) fsHtml5QrCode = new Html5Qrcode("fsReaderDiv");
+  return fsHtml5QrCode;
 }
 
 function updateFsTypeBadge() {
@@ -1316,8 +1321,8 @@ async function openFullscreenScanner() {
   updateFsTypeBadge();
   updateFsCartCount();
   document.body.style.overflow = 'hidden';
-  if (!fsBarcodeDetector && typeof jsQR === 'undefined') {
-    showFsLastScan('❌ Lỗi thư viện QR', 'Không load được jsQR từ CDN. Kiểm tra mạng rồi tải lại trang (Ctrl+Shift+R).', 'error');
+  if (typeof Html5Qrcode !== 'function') {
+    showFsLastScan('❌ Lỗi thư viện QR', 'Không load được html5-qrcode từ CDN. Kiểm tra mạng rồi tải lại trang (Ctrl+Shift+R).', 'error');
     return;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1326,7 +1331,6 @@ async function openFullscreenScanner() {
   }
   try {
     await fsStartCamera(fsFacingMode);
-    startFsScanLoop();
   } catch (e) {
     console.error(e);
     showFsLastScan('❌ Không mở được camera', e.message, 'error');
@@ -1339,22 +1343,14 @@ async function openFullscreenScanner() {
 }
 
 async function fsStartCamera(facingMode) {
-  if (fsStream) { fsStream.getTracks().forEach(t => t.stop()); fsStream = null; }
-  // Yêu cầu HD 1280x720: QR trên tem NVL chỉ 3cm, cần đủ pixel để decode.
-  fsStream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-    audio: false
-  });
-  const track = fsStream.getVideoTracks()[0];
-  try {
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    if (caps.focusMode && caps.focusMode.includes('continuous')) {
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-    }
-  } catch (e) { /* không critical */ }
-  const video = $('fsVideo');
-  video.srcObject = fsStream;
-  await video.play();
+  const scanner = getFsScanner();
+  if (scanner.isScanning) { try { await scanner.stop(); } catch (e) { /* bỏ qua */ } }
+  await scanner.start(
+    { facingMode: { ideal: facingMode } },
+    { fps: 8 },
+    (decodedText) => handleFsScanSuccess(decodedText),
+    () => { /* chưa thấy mã trong frame này — bỏ qua, thử tiếp frame sau */ }
+  );
 }
 
 async function fsFlipCamera() {
@@ -1365,43 +1361,6 @@ async function fsFlipCamera() {
     try { await fsStartCamera(fsFacingMode); }
     catch (e2) { showFsLastScan('❌ Không đảo được camera', e.message, 'error'); }
   }
-}
-
-function startFsScanLoop() {
-  if (fsScanRunning) return;
-  fsScanRunning = true;
-  if (!fsCanvas) {
-    fsCanvas = document.createElement('canvas');
-    fsCanvasCtx = fsCanvas.getContext('2d', { willReadFrequently: true });
-  }
-  const video = $('fsVideo');
-  async function scanFrame() {
-    if (!fsScanRunning) return;
-    if (!fsScanBusy && video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-      fsScanBusy = true;
-      try {
-        fsCanvas.width = video.videoWidth;
-        fsCanvas.height = video.videoHeight;
-        fsCanvasCtx.drawImage(video, 0, 0);
-        let decoded = null;
-        if (fsBarcodeDetector) {
-          try {
-            const results = await fsBarcodeDetector.detect(fsCanvas);
-            if (results.length) decoded = results[0].rawValue;
-          } catch (e) { /* rơi xuống jsQR */ }
-        }
-        if (!decoded && typeof jsQR !== 'undefined') {
-          const img = fsCanvasCtx.getImageData(0, 0, fsCanvas.width, fsCanvas.height);
-          const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-          if (code && code.data) decoded = code.data;
-        }
-        if (decoded) handleFsScanSuccess(decoded);
-      } catch (e) { /* frame lỗi thoáng qua */ }
-      finally { fsScanBusy = false; }
-    }
-    if (fsScanRunning) requestAnimationFrame(scanFrame);
-  }
-  scanFrame();
 }
 
 function handleFsScanSuccess(text) {
@@ -1417,11 +1376,10 @@ function handleFsScanSuccess(text) {
 }
 
 function stopFsCamera() {
-  fsScanRunning = false;
-  if (fsStream) { fsStream.getTracks().forEach(t => t.stop()); fsStream = null; }
-  const video = $('fsVideo');
-  if (video) video.srcObject = null;
   fsLastText = '';
+  if (fsHtml5QrCode && fsHtml5QrCode.isScanning) {
+    fsHtml5QrCode.stop().catch(() => { /* đã dừng rồi hoặc chưa start xong — bỏ qua */ });
+  }
 }
 function closeFullscreenScanner() {
   stopFsCamera();
@@ -1432,7 +1390,7 @@ document.addEventListener('visibilitychange', () => {
   const overlay = $('fsScanner');
   if (!overlay.classList.contains('active')) return;
   if (document.hidden) stopFsCamera();
-  else if (!fsStream) fsStartCamera(fsFacingMode).then(startFsScanLoop).catch(e => console.warn('Resume camera failed:', e));
+  else if (!fsHtml5QrCode || !fsHtml5QrCode.isScanning) fsStartCamera(fsFacingMode).catch(e => console.warn('Resume camera failed:', e));
 });
 
 /* ==========================================================================
