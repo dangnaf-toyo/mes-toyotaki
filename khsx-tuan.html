@@ -90,15 +90,14 @@ tr:hover td{background:#fffaf5}
       <table>
         <thead>
           <tr>
-            <th>Mã máy</th><th>Mã SP</th><th>Tên SP</th><th>Số khuôn</th>
-            <th>KH tuần</th><th>CT giây</th><th>Giờ công</th>
+            <th>Mã máy</th><th>Mã SP</th><th>Tên SP</th>
             <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
             <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
-            <th>Tổng ngày</th><th>Nhân lực</th><th>Chu kỳ</th><th>Ghi chú</th><th></th>
+            <th>Tổng KH tuần</th><th>Ghi chú</th><th></th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr class="empty-row"><td colspan="18">Đang tải…</td></tr>
+          <tr class="empty-row"><td colspan="13">Đang tải…</td></tr>
         </tbody>
       </table>
     </div>
@@ -114,13 +113,8 @@ tr:hover td{background:#fffaf5}
     </div>
     <div class="modal-body">
       <div class="fg"><label>Mã máy *</label><input id="f-ma-may"></div>
-      <div class="fg"><label>Số khuôn</label><input id="f-so-khuon"></div>
       <div class="fg"><label>Mã SP *</label><input id="f-ma-sp"></div>
-      <div class="fg"><label>Tên SP</label><input id="f-ten-sp"></div>
-      <div class="fg"><label>KH tuần</label><input id="f-kh-tuan" type="number" min="0"></div>
-      <div class="fg"><label>CT giây</label><input id="f-ct-giay" type="number" min="0" step="0.01"></div>
-      <div class="fg"><label>Giờ công</label><input id="f-gio-cong" type="number" min="0" step="0.5"></div>
-      <div class="fg"><label>Nhân lực</label><input id="f-nhan-luc"></div>
+      <div class="fg full"><label>Tên SP</label><input id="f-ten-sp"></div>
       <div class="days-grid">
         <div class="fg"><label>T2</label><input id="f-t2" type="number" min="0" value="0"></div>
         <div class="fg"><label>T3</label><input id="f-t3" type="number" min="0" value="0"></div>
@@ -130,7 +124,7 @@ tr:hover td{background:#fffaf5}
         <div class="fg"><label>T7</label><input id="f-t7" type="number" min="0" value="0"></div>
         <div class="fg"><label>CN</label><input id="f-cn" type="number" min="0" value="0"></div>
       </div>
-      <div class="fg"><label>Chu kỳ</label><input id="f-chu-ky"></div>
+      <div class="fg full"><label>Tổng kế hoạch tuần</label><input id="f-tong-tuan" value="0" disabled style="font-weight:700;color:#C87941;background:#faf5f0"></div>
       <div class="fg full"><label>Ghi chú</label><input id="f-ghi-chu"></div>
     </div>
     <div class="modal-foot">
@@ -177,7 +171,7 @@ function updateWeekLabel(){
 }
 
 async function loadRows(){
-  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="18">Đang tải…</td></tr>';
+  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="13">Đang tải…</td></tr>';
   const { data, error } = await sb.from('duc_khsx_tuan_plan')
     .select('*').eq('tuan_bat_dau', fmtDate(weekMonday)).order('ma_may');
   if (error) { showMsg('Lỗi tải dữ liệu: ' + error.message, 'err'); return; }
@@ -188,7 +182,7 @@ async function loadRows(){
 function renderRows(){
   const tbody = document.getElementById('tbody');
   if (rows.length === 0){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="18">Chưa có kế hoạch nào cho tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="13">Chưa có kế hoạch nào cho tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => {
@@ -197,10 +191,6 @@ function renderRows(){
       + '<td>' + escapeHtml(r.ma_may) + '</td>'
       + '<td>' + escapeHtml(r.ma_sp) + '</td>'
       + '<td>' + escapeHtml(r.ten_sp) + '</td>'
-      + '<td>' + escapeHtml(r.so_khuon) + '</td>'
-      + '<td class="num">' + fmtNum(r.kh_tuan) + '</td>'
-      + '<td class="num">' + fmtNum(r.ct_giay) + '</td>'
-      + '<td class="num">' + fmtNum(r.gio_cong) + '</td>'
       + '<td class="num">' + fmtNum(r.t2) + '</td>'
       + '<td class="num">' + fmtNum(r.t3) + '</td>'
       + '<td class="num">' + fmtNum(r.t4) + '</td>'
@@ -209,8 +199,6 @@ function renderRows(){
       + '<td class="num">' + fmtNum(r.t7) + '</td>'
       + '<td class="num">' + fmtNum(r.cn) + '</td>'
       + '<td class="num tong">' + fmtNum(tong) + '</td>'
-      + '<td>' + escapeHtml(r.nhan_luc) + '</td>'
-      + '<td>' + escapeHtml(r.chu_ky) + '</td>'
       + '<td>' + escapeHtml(r.ghi_chu) + '</td>'
       + '<td style="white-space:nowrap">'
         + '<button class="btn-outline btn" style="padding:5px 9px;font-size:11.5px;margin-right:4px" onclick="openRowModal(' + r.id + ')">Sửa</button>'
@@ -235,14 +223,8 @@ function openRowModal(id){
   const r = id ? rows.find(x => x.id === id) : null;
   document.getElementById('modalTitle').textContent = r ? 'Sửa dòng kế hoạch' : 'Thêm dòng kế hoạch';
   document.getElementById('f-ma-may').value = r ? r.ma_may : '';
-  document.getElementById('f-so-khuon').value = r ? r.so_khuon : '';
   document.getElementById('f-ma-sp').value = r ? r.ma_sp : '';
   document.getElementById('f-ten-sp').value = r ? r.ten_sp : '';
-  document.getElementById('f-kh-tuan').value = r ? r.kh_tuan : '';
-  document.getElementById('f-ct-giay').value = r ? r.ct_giay : '';
-  document.getElementById('f-gio-cong').value = r ? r.gio_cong : '';
-  document.getElementById('f-nhan-luc').value = r ? r.nhan_luc : '';
-  document.getElementById('f-chu-ky').value = r ? r.chu_ky : '';
   document.getElementById('f-ghi-chu').value = r ? r.ghi_chu : '';
   ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
     document.getElementById('f-' + d).value = r ? (r[d] || 0) : 0;
@@ -250,9 +232,22 @@ function openRowModal(id){
   // Mã máy/SP không sửa được sau khi tạo (là khoá cùng tuần) — chỉ cho sửa khi thêm mới
   document.getElementById('f-ma-may').disabled = !!r;
   document.getElementById('f-ma-sp').disabled = !!r;
+  updateTongTuan();
   document.getElementById('modalRow').classList.add('open');
 }
 function closeRowModal(){ document.getElementById('modalRow').classList.remove('open'); }
+
+// Tổng kế hoạch tuần = tổng 7 ô ngày — tính lại ngay khi người dùng gõ, thay
+// cho việc phải tự cộng tay và nhập riêng vào ô "KH tuần" như trước.
+function updateTongTuan(){
+  const tong = ['t2','t3','t4','t5','t6','t7','cn']
+    .reduce((s, d) => s + (Number(document.getElementById('f-' + d).value) || 0), 0);
+  document.getElementById('f-tong-tuan').value = fmtNum(tong);
+  return tong;
+}
+['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
+  document.getElementById('f-' + d).addEventListener('input', updateTongTuan);
+});
 
 document.getElementById('btnAddRow').addEventListener('click', async () => {
   if (!(await requireLoginOrRedirect())) return;
@@ -271,10 +266,9 @@ document.getElementById('btnSaveRow').addEventListener('click', async () => {
     ma_may: maMay,
     ma_sp: maSp,
     ten_sp: document.getElementById('f-ten-sp').value.trim(),
-    so_khuon: document.getElementById('f-so-khuon').value.trim(),
-    kh_tuan: Number(document.getElementById('f-kh-tuan').value) || 0,
-    ct_giay: Number(document.getElementById('f-ct-giay').value) || 0,
-    gio_cong: Number(document.getElementById('f-gio-cong').value) || 0,
+    // kh_tuan vẫn ghi vào cột cũ (duc-dashboard.html đọc cột này để gợi ý khi
+    // "Nạp kế hoạch từ KHSX tuần") — nay tự tính từ tổng 7 ngày thay vì gõ tay.
+    kh_tuan: updateTongTuan(),
     t2: Number(document.getElementById('f-t2').value) || 0,
     t3: Number(document.getElementById('f-t3').value) || 0,
     t4: Number(document.getElementById('f-t4').value) || 0,
@@ -282,8 +276,6 @@ document.getElementById('btnSaveRow').addEventListener('click', async () => {
     t6: Number(document.getElementById('f-t6').value) || 0,
     t7: Number(document.getElementById('f-t7').value) || 0,
     cn: Number(document.getElementById('f-cn').value) || 0,
-    nhan_luc: document.getElementById('f-nhan-luc').value.trim(),
-    chu_ky: document.getElementById('f-chu-ky').value.trim(),
     ghi_chu: document.getElementById('f-ghi-chu').value.trim(),
     updated_by: await MesAuth.getCurrentUserEmail(),
     updated_at: new Date().toISOString(),
