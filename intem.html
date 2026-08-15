@@ -157,6 +157,11 @@ textarea{resize:vertical;min-height:48px}
           <label for="nguyenLieu">Nguyên liệu</label>
           <input id="nguyenLieu" type="text" placeholder="Tự điền theo mã SP" disabled>
         </div>
+        <div class="fg full">
+          <label for="nvlLot-chips-label">Lot NVL đã dùng (không bắt buộc)</label>
+          <div class="chip-row" id="nvlLot-chips"></div>
+          <div class="empty-hint" id="nvlLot-hint" style="text-align:left;padding:0">Chọn mã SP để gợi ý lot NVL đang tồn kho — lò nung dùng chung nên có thể chọn nhiều lot.</div>
+        </div>
         <div class="fg">
           <label class="req" for="mayDuc">Máy đúc</label>
           <select id="mayDuc"></select>
@@ -228,6 +233,10 @@ textarea{resize:vertical;min-height:48px}
           <label for="s_nguyenLieu">Nguyên liệu</label>
           <input id="s_nguyenLieu" type="text" disabled>
         </div>
+        <div class="fg full">
+          <label for="s_nvlLot-chips-label">Lot NVL đã dùng (không bắt buộc)</label>
+          <div class="chip-row" id="s_nvlLot-chips"></div>
+        </div>
         <div class="fg">
           <label class="req" for="s_mayDuc">Máy đúc</label>
           <select id="s_mayDuc"></select>
@@ -254,6 +263,24 @@ textarea{resize:vertical;min-height:48px}
         <button class="btn btn-s" type="button" onclick="deleteTem()">🗑 Xóa tem</button>
       </div>
     </div>
+
+    <div class="card" id="tachTemCard" style="display:none">
+      <div class="card-ttl">Tách tem (chia sọt)</div>
+      <div class="grid">
+        <div class="fg">
+          <label class="req" for="tachSoLuong">Số lượng tách ra tem con</label>
+          <input id="tachSoLuong" type="number" placeholder="Pcs" min="1">
+        </div>
+        <div class="fg">
+          <label for="tachLyDo">Lý do</label>
+          <input id="tachLyDo" type="text" placeholder="VD: chia 2 sọt, chuyển thiếu...">
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-p" type="button" onclick="tachTem()">✂️ Tách tem & in tem con</button>
+      </div>
+      <div class="empty-hint" id="tachHistoryHint" style="text-align:left;padding-top:10px"></div>
+    </div>
   </div>
 </div>
 
@@ -278,6 +305,7 @@ var masterData = [];   // [{ma, ten, nguyenLieu}]
 var masterMap = {};    // ma_sp -> {ten, nguyenLieu}
 var currentTagNo = "";
 var PREFILL = Object.fromEntries(new URLSearchParams(location.search));
+var selectedNvlLots = { '': [], 's_': [] };   // prefix -> [nvl_tag_no đang chọn]
 
 function getTodayString(){
   var d = new Date();
@@ -344,6 +372,43 @@ function onMaChange(prefix){
   document.getElementById(prefix + "tenSP").value = item ? item.ten : "";
   document.getElementById(prefix + "nguyenLieu").value = item ? item.nguyenLieu : "";
   populateSoKhuonChips(prefix, item ? item.soKhuon : "");
+  loadNvlLotChips(prefix, []);
+}
+
+/** Gợi ý lot NVL đang tồn kho (trang_thai = 'Đã nhập kho') khớp mã nguyên liệu
+    của SP đang chọn — người thao tác chọn thủ công lot đã dùng (nhiều-nhiều,
+    vì 2 lò nung tập trung dùng chung nhiều lot ingot trước khi ra máy đúc,
+    xem migration_phase_T1_qr_lot_pallet.sql). preselect = danh sách tag_no đã
+    gán sẵn (dùng khi tra cứu tem cũ). */
+async function loadNvlLotChips(prefix, preselect){
+  var chipsEl = document.getElementById(prefix + "nvlLot-chips");
+  var maNvl = g(prefix + "nguyenLieu");
+  selectedNvlLots[prefix] = (preselect || []).slice();
+  if (!maNvl){ chipsEl.innerHTML = ""; return; }
+
+  const { data, error } = await sb.from('nvl_tem').select('tag_no,ngay_nhap,so_luong,don_vi')
+    .eq('ma_nvl', maNvl).eq('trang_thai', 'Đã nhập kho').order('ngay_nhap', { ascending: false }).limit(30);
+  if (error || !data){ chipsEl.innerHTML = ""; return; }
+
+  var known = {};
+  data.forEach(r => { known[r.tag_no] = true; });
+  // Giữ chip cho lot đã gán trước đó dù không còn nằm trong 30 lot mới nhất.
+  (preselect || []).forEach(t => { if (!known[t]) data.push({ tag_no: t, ngay_nhap: null, so_luong: null }); });
+
+  chipsEl.innerHTML = data.map(function(r){
+    var sel = (selectedNvlLots[prefix].indexOf(r.tag_no) >= 0) ? ' sel' : '';
+    var label = r.tag_no + (r.so_luong ? ' (' + r.so_luong + (r.don_vi||'') + ')' : '');
+    return '<button type="button" class="chip-opt' + sel + '" data-nvl="' + r.tag_no.replace(/"/g,'&quot;') + '">' + label + '</button>';
+  }).join("") || '<span class="empty-hint" style="padding:0">Không có lot NVL nào đang tồn kho cho mã này</span>';
+
+  [].forEach.call(chipsEl.querySelectorAll(".chip-opt"), function(btn){
+    btn.addEventListener("click", function(){
+      var t = btn.dataset.nvl;
+      var idx = selectedNvlLots[prefix].indexOf(t);
+      if (idx >= 0){ selectedNvlLots[prefix].splice(idx, 1); btn.classList.remove("sel"); }
+      else { selectedNvlLots[prefix].push(t); btn.classList.add("sel"); }
+    });
+  });
 }
 
 /** Danh sách khuôn của 1 mã SP lưu dạng "KPH #13-14, KPH #15-16" (text, xem
@@ -421,6 +486,7 @@ function fillFormFromTem(t){
   document.getElementById("s_ghiChu").value = t.ghiChu || "";
   document.getElementById("s_loaiSP").value = t.loaiSP || "hangloat";
   document.getElementById("searchResultCard").style.display = "block";
+  document.getElementById("tachTemCard").style.display = "block";
 }
 
 async function findTem(){
@@ -431,6 +497,18 @@ async function findTem(){
   if (error) return err("Lỗi tra cứu: " + error.message);
   if (!data || !data.length) return err("Không tìm thấy tem");
   fillFormFromTem(temRowToClient(data[0]));
+
+  const realTagNo = data[0].tag_no;
+  const [links, children] = await Promise.all([
+    sb.from('duc_tem_nvl_lot').select('nvl_tag_no').eq('tag_no', realTagNo),
+    sb.from('duc_tem_tach').select('tag_no_con,so_luong_con,thoi_diem').eq('tag_no_cha', realTagNo).order('thoi_diem'),
+  ]);
+  await loadNvlLotChips('s_', (links.data || []).map(r => r.nvl_tag_no));
+  var histEl = document.getElementById("tachHistoryHint");
+  histEl.textContent = (children.data && children.data.length)
+    ? "Đã tách: " + children.data.map(c => c.tag_no_con + " (" + c.so_luong_con + ")").join(", ")
+    : "";
+
   showMsg("✅ Đã tìm thấy tem " + data[0].tag_no, "ok", 3000);
 }
 
@@ -465,7 +543,46 @@ async function saveTemEdit(){
   showMsg("⏳ Đang lưu thay đổi...","wait");
   const { error } = await sb.from('duc_tem').update(patch).ilike('tag_no', currentTagNo);
   if (error) return err("Lỗi lưu: " + error.message);
+  const { error: linkErr } = await sb.rpc('duc_gan_lot_nvl', {
+    p_tag_no: currentTagNo, p_nvl_tag_nos: selectedNvlLots['s_'], p_nguoi: nguoi,
+  });
+  if (linkErr) return err("Đã lưu tem nhưng lỗi gán lot NVL: " + linkErr.message);
   showMsg("✅ Đã lưu thay đổi cho tem " + currentTagNo, "ok", 3000);
+}
+
+async function tachTem(){
+  if(!currentTagNo) return err("Tìm tem trước khi tách");
+  if (!(await requireLoginOrRedirect())) return;
+  var sl = g("tachSoLuong"), lyDo = g("tachLyDo");
+  if(!sl||isNaN(sl)||+sl<=0) return err("Số lượng tách phải > 0");
+  var nguoi = g("s_nguoiTT") || (await MesAuth.getSession())?.user?.email || "";
+
+  showMsg("⏳ Đang tách tem...","wait");
+  const { data: tagCon, error } = await sb.rpc('duc_tach_tem', {
+    p_tag_no_cha: currentTagNo, p_so_luong_tach: Number(sl), p_ly_do: lyDo, p_nguoi: nguoi,
+  });
+  if (error) return err("Lỗi tách tem: " + error.message);
+
+  document.getElementById("tachSoLuong").value = "";
+  document.getElementById("tachLyDo").value = "";
+  showMsg("✅ Đã tách tem con " + tagCon + " — đang mở cửa sổ in...", "ok", 5000);
+
+  const { data: conData } = await sb.from('duc_tem').select('*').eq('tag_no', tagCon);
+  if (conData && conData[0]){
+    var r = conData[0];
+    var ngayISO = String(r.ngay || "");
+    var parts = ngayISO.split("-");
+    var ngayQR = parts.length === 3 ? (parts[0]+"/"+parts[1]+"/"+parts[2]) : ngayISO;
+    var ngayHienThi = parts.length === 3 ? (parts[2]+"/"+parts[1]+"/"+parts[0]) : ngayISO;
+    var qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, r.lot || ngayHienThi, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join(">\n");
+    openPrint({
+      ok: true, tagNo: r.tag_no, qr: qr, ngay: ngayHienThi, tenSP: r.ten_sp, maSP: r.ma_sp,
+      soLuong: r.so_luong, lotNo: r.lot || ngayHienThi, soKhuon: r.so_khuon || "", nguyenLieu: r.nguyen_lieu || "",
+      mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || "", ghiChu: r.ghi_chu || "",
+      loaiSP: loaiSpFromTagNo(r.tag_no),
+    });
+  }
+  findTem();
 }
 
 async function reprintTem(){
@@ -501,16 +618,19 @@ async function deleteTem(){
   if(!window.confirm("Xóa tem "+currentTagNo+" khỏi database?")) return;
   if (!(await requireLoginOrRedirect())) return;
   showMsg("⏳ Đang xóa tem...","wait");
+  const deletedTagNo = currentTagNo;
   const { error } = await sb.from('duc_tem').delete().ilike('tag_no', currentTagNo);
   if (error) return err("Lỗi xóa: " + error.message);
   clearSearch();
-  showMsg("✅ Đã xóa tem " + currentTagNo, "ok", 3000);
+  showMsg("✅ Đã xóa tem " + deletedTagNo, "ok", 3000);
 }
 
 function clearSearch(){
   currentTagNo = "";
   document.getElementById("searchTag").value = "";
   document.getElementById("searchResultCard").style.display = "none";
+  document.getElementById("tachTemCard").style.display = "none";
+  selectedNvlLots['s_'] = [];
 }
 
 // ─── Quét QR trực tiếp qua camera — dùng thư viện html5-qrcode (mebjas), tự
@@ -652,6 +772,13 @@ async function inTem(){
     setBtn(false);
     if (error) { err("Lỗi server: " + error.message); return; }
 
+    if (selectedNvlLots[''].length){
+      const { error: linkErr } = await sb.rpc('duc_gan_lot_nvl', {
+        p_tag_no: tagNo, p_nvl_tag_nos: selectedNvlLots[''], p_nguoi: nguoi,
+      });
+      if (linkErr) err("Đã in tem nhưng lỗi gán lot NVL: " + linkErr.message);
+    }
+
     var qr = [tagNo, tenSP, ma, sl, ngayQR, lotNoInput || ngay, soKhuon, nguyenLieu, may].join(">\n");
     var d = { tagNo: tagNo, qr: qr, ngay: ngay, tenSP: tenSP, maSP: ma, soLuong: sl,
               lotNo: lotNoInput || ngay, soKhuon: soKhuon, nguyenLieu: nguyenLieu,
@@ -773,6 +900,8 @@ function buildLabelSvg(d){
 function clearAll(){
   ["soLuong","soKhuon","nguyenLieu","ghiChu"].forEach(function(i){ document.getElementById(i).value=""; });
   document.getElementById("soKhuon-chips").innerHTML = "";
+  document.getElementById("nvlLot-chips").innerHTML = "";
+  selectedNvlLots[''] = [];
   document.getElementById("lotNo").value = getTodayString();
   document.getElementById("maSP").value="";
   document.getElementById("tenSP").value="";

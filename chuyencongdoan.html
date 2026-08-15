@@ -140,6 +140,13 @@ input:focus,select:focus{outline:none;border-color:#C87941;
     <div class="hint" id="slHint"></div>
   </div>
 
+  <div class="fg" id="tachKhiChuyenWrap" style="display:none">
+    <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none">
+      <input type="checkbox" id="tachKhiChuyen" style="width:auto">
+      Phần còn lại vẫn ở công đoạn cũ (tách thành tem mới, không tính là hao hụt)
+    </label>
+  </div>
+
   <div class="fg">
     <label class="req" for="congDoanGiao">Công đoạn giao</label>
     <select id="congDoanGiao"></select>
@@ -419,6 +426,11 @@ function checkReady(){
   ok = ok && document.getElementById("congDoanNhan").value !== "";
   ok = ok && document.getElementById("nguoiNhan").value !== "";
   document.getElementById("btnSubmit").disabled = !ok;
+
+  const wrap = document.getElementById("tachKhiChuyenWrap");
+  const showTach = !!scannedData && sl > 0 && sl < Number(scannedData.soLuongTem);
+  wrap.style.display = showTach ? "block" : "none";
+  if (!showTach) document.getElementById("tachKhiChuyen").checked = false;
 }
 ["soLuong", "congDoanGiao", "congDoanNhan", "nguoiGiao", "nguoiNhan"].forEach(id => {
   document.getElementById(id).addEventListener("input", checkReady);
@@ -432,6 +444,8 @@ function resetForNext(){
   document.getElementById("emptyHint").style.display = "block";
   document.getElementById("soLuong").value = "";
   document.getElementById("btnSubmit").disabled = true;
+  document.getElementById("tachKhiChuyen").checked = false;
+  document.getElementById("tachKhiChuyenWrap").style.display = "none";
 }
 
 document.getElementById("btnSubmit").addEventListener("click", submitTransfer);
@@ -455,10 +469,35 @@ async function submitTransfer(){
   btn.textContent = "⏳ Đang xử lý...";
 
   const soLuong = Number(document.getElementById("soLuong").value);
+  const nguoiThaoTac = document.getElementById("nguoiNhan").value;
+
+  // Nếu người thao tác đánh dấu "phần còn lại vẫn ở công đoạn cũ", tách tem
+  // trước: tem con (đúng bằng số lượng thực chuyển) mới là tem thực sự di
+  // chuyển, tem cha giữ nguyên phần còn lại tại công đoạn nguồn — khác với
+  // hao hụt (mất hẳn, không còn tồn tại ở đâu cả).
+  let tagNoDeChuyen = scannedData.tagNo;
+  let slTemDeChuyen = Number(scannedData.soLuongTem);
+  if (document.getElementById("tachKhiChuyen").checked){
+    btn.textContent = "⏳ Đang tách tem...";
+    const { data: tagCon, error: tachErr } = await sb.rpc('duc_tach_tem', {
+      p_tag_no_cha: scannedData.tagNo, p_so_luong_tach: soLuong,
+      p_ly_do: 'Tách khi chuyển công đoạn (' + congDoanGiao + ' → ' + congDoanNhan + ')',
+      p_nguoi: nguoiThaoTac,
+    });
+    if (tachErr){
+      err("Lỗi tách tem trước khi chuyển: " + tachErr.message);
+      btn.textContent = "🔀  Chuyển Công Đoạn";
+      checkReady();
+      return;
+    }
+    tagNoDeChuyen = tagCon;
+    slTemDeChuyen = soLuong;
+    btn.textContent = "⏳ Đang ghi chuyển công đoạn...";
+  }
 
   const { data, error } = await sb.rpc('cd_ghi_chuyen_cong_doan', {
-    p_tag_no: scannedData.tagNo, p_ma_sp: scannedData.maSP, p_ten_sp: scannedData.tenSP,
-    p_sl_tren_tem: Number(scannedData.soLuongTem), p_sl_thuc_chuyen: soLuong,
+    p_tag_no: tagNoDeChuyen, p_ma_sp: scannedData.maSP, p_ten_sp: scannedData.tenSP,
+    p_sl_tren_tem: slTemDeChuyen, p_sl_thuc_chuyen: soLuong,
     p_lot_no: scannedData.lotNo || '', p_so_khuon: scannedData.soKhuon || '',
     p_nguyen_lieu: scannedData.nguyenLieu || '', p_may_duc: scannedData.mayDuc,
     p_ngay_duc: scannedData.ngay || '',
@@ -475,7 +514,8 @@ async function submitTransfer(){
   }
   const r = data[0];
   const thoiGian = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN', { hour12: false });
-  showMsg("✅ " + r.id_phieu + " — đã chuyển " + soLuong + " từ " + congDoanGiao + " sang " + congDoanNhan + " lúc " + thoiGian, "ok", 6000);
+  const tachNote = (tagNoDeChuyen !== scannedData.tagNo) ? (" — tem mới " + tagNoDeChuyen + ", tem gốc " + scannedData.tagNo + " giữ lại phần còn ở " + congDoanGiao) : "";
+  showMsg("✅ " + r.id_phieu + " — đã chuyển " + soLuong + " từ " + congDoanGiao + " sang " + congDoanNhan + " lúc " + thoiGian + tachNote, "ok", 8000);
   resetForNext();
 }
 
