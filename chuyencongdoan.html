@@ -91,8 +91,7 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 .qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
 .qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
-#qrReaderDiv{flex:1;overflow:hidden}
-#qrReaderDiv video{width:100%!important;height:100%!important;object-fit:cover}
+#qrReaderDiv{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
@@ -252,6 +251,7 @@ async function loadDanhMuc(){
 // Hiện lỗi JS bất kỳ ngay trên màn hình (điện thoại khó xem console) — chỉ để
 // chẩn đoán trong giai đoạn test, có thể gỡ sau khi ổn định.
 window.addEventListener("error", (e) => { err("Lỗi JS: " + e.message); });
+window.addEventListener("unhandledrejection", (e) => { err("Lỗi JS (promise): " + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
 
 /* ─── Quét QR trực tiếp qua camera — dùng thư viện html5-qrcode (mebjas), tự
    động ưu tiên BarcodeDetector phần cứng khi trình duyệt hỗ trợ (Chrome
@@ -303,8 +303,13 @@ function stopCamera(){ closeQrModal(); }
 
 async function onScanSuccess(decodedText){
   if (!html5QrCode) return; // đã đóng rồi — bỏ qua các lần callback bắn muộn
-  await closeQrModal();
-  onQrDecoded(decodedText);
+  showMsg("🔎 Đã đọc được mã: " + decodedText.slice(0, 50) + "…", "wait");
+  try {
+    await closeQrModal();
+    await onQrDecoded(decodedText);
+  } catch(e){
+    err("Lỗi xử lý dữ liệu vừa quét: " + (e && e.message ? e.message : e));
+  }
 }
 
 document.getElementById("btnScan").addEventListener("click", openCamera);

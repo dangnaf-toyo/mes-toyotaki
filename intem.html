@@ -88,8 +88,7 @@ textarea{resize:vertical;min-height:48px}
 .qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
 .qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
-#qrReaderDiv{flex:1;overflow:hidden}
-#qrReaderDiv video{width:100%!important;height:100%!important;object-fit:cover}
+#qrReaderDiv{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center}
 #msg{margin-top:12px;padding:11px 14px;border-radius:7px;
   font-size:13px;display:none;width:100%;max-width:500px}
 .err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
@@ -559,8 +558,13 @@ function stopCamera(){ closeQrModal(); }
 
 async function onScanSuccessForSearch(decodedText){
   if (!html5QrCode) return; // đã đóng rồi — bỏ qua các lần callback bắn muộn
-  await closeQrModal();
-  onQrDecodedForSearch(decodedText);
+  showMsg("🔎 Đã đọc được mã: " + decodedText.slice(0, 50) + "…", "wait");
+  try {
+    await closeQrModal();
+    onQrDecodedForSearch(decodedText);
+  } catch(e){
+    err("Lỗi xử lý dữ liệu vừa quét: " + (e && e.message ? e.message : e));
+  }
 }
 
 /* Fallback chụp ảnh tĩnh — chỉ dùng khi trình duyệt không hỗ trợ getUserMedia. */
@@ -787,6 +791,7 @@ function err(t){ showMsg("❌ "+t,"err"); }
 // cách chuyencongdoan.html đã dùng để chẩn đoán lỗi camera/quét QR khi test
 // thực tế trên điện thoại.
 window.addEventListener("error", (e) => { err("Lỗi JS: " + e.message); });
+window.addEventListener("unhandledrejection", (e) => { err("Lỗi JS (promise): " + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
 
 async function initAuthStatus(){
   const bar = document.getElementById("authInfo");
