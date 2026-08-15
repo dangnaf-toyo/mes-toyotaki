@@ -112,9 +112,9 @@ tr:hover td{background:#fffaf5}
       <button class="modal-close" onclick="closeRowModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div class="fg"><label>Mã máy *</label><input id="f-ma-may"></div>
-      <div class="fg"><label>Mã SP *</label><input id="f-ma-sp"></div>
-      <div class="fg full"><label>Tên SP</label><input id="f-ten-sp"></div>
+      <div class="fg"><label>Mã máy *</label><select id="f-ma-may"><option value="">— Chọn máy —</option></select></div>
+      <div class="fg"><label>Mã SP *</label><select id="f-ma-sp" onchange="onMaSpChange()"><option value="">— Chọn mã SP —</option></select></div>
+      <div class="fg full"><label>Tên SP</label><input id="f-ten-sp" disabled style="background:#faf5f0"></div>
       <div class="fg full">
         <label>Số khuôn</label>
         <select id="f-so-khuon-select" onchange="onSoKhuonSelectChange()" style="display:none"></select>
@@ -164,6 +164,51 @@ function fmtDateVN(d){
 }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// =============================================================================
+// Mã máy / Mã SP chọn từ danh mục master (master_machines/master_products) —
+// không cho gõ tự do nữa, tránh sai lệch chính tả/không khớp danh mục thật.
+// Tên SP tự điền theo đúng master_products khi chọn Mã SP.
+// =============================================================================
+let productMap = {}; // ma_sp -> ten_sp
+
+async function loadMasterLists(){
+  const [mMachines, mProducts] = await Promise.all([
+    sb.from('master_machines').select('ma_may'),
+    sb.from('master_products').select('ma_sp,ten_sp'),
+  ]);
+  const machines = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+  const products = (mProducts.data || []).filter(p => p.ma_sp).sort((a,b) => a.ma_sp.localeCompare(b.ma_sp, 'vi', { numeric: true }));
+  productMap = {};
+  products.forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
+
+  const selMay = document.getElementById('f-ma-may');
+  selMay.innerHTML = '<option value="">— Chọn máy —</option>' +
+    machines.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+
+  const selSp = document.getElementById('f-ma-sp');
+  selSp.innerHTML = '<option value="">— Chọn mã SP —</option>' +
+    products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp) + (p.ten_sp ? ' — ' + escapeHtml(p.ten_sp) : '') + '</option>').join('');
+}
+
+// Dòng cũ có thể tham chiếu 1 máy/SP đã bị xoá khỏi danh mục — vẫn phải hiện
+// đúng giá trị cũ khi mở sửa, nên chèn tạm 1 option cho giá trị đó nếu danh
+// mục hiện tại không có (đánh dấu rõ "không còn trong danh mục").
+function ensureOptionExists(selectEl, value, labelSuffix){
+  if (!value) return;
+  const has = Array.from(selectEl.options).some(o => o.value === value);
+  if (has) return;
+  const opt = document.createElement('option');
+  opt.value = value;
+  opt.textContent = value + (labelSuffix || '') + ' (không còn trong danh mục)';
+  selectEl.appendChild(opt);
+}
+
+function onMaSpChange(){
+  const maSp = document.getElementById('f-ma-sp').value;
+  document.getElementById('f-ten-sp').value = productMap[maSp] || '';
+  populateSoKhuonField(maSp, '');
+}
 
 // =============================================================================
 // Điền tự động Số khuôn theo Mã SP — mapping (ma_sp → [ma_khuon]) đọc từ
@@ -305,9 +350,11 @@ function openRowModal(id){
   editingId = id || null;
   const r = id ? rows.find(x => x.id === id) : null;
   document.getElementById('modalTitle').textContent = r ? 'Sửa dòng kế hoạch' : 'Thêm dòng kế hoạch';
-  document.getElementById('f-ma-may').value = r ? r.ma_may : '';
-  document.getElementById('f-ma-sp').value = r ? r.ma_sp : '';
-  document.getElementById('f-ten-sp').value = r ? r.ten_sp : '';
+  const selMay = document.getElementById('f-ma-may'), selSp = document.getElementById('f-ma-sp');
+  if (r) { ensureOptionExists(selMay, r.ma_may); ensureOptionExists(selSp, r.ma_sp); }
+  selMay.value = r ? r.ma_may : '';
+  selSp.value = r ? r.ma_sp : '';
+  document.getElementById('f-ten-sp').value = r ? r.ten_sp : (productMap[selSp.value] || '');
   document.getElementById('f-ghi-chu').value = r ? r.ghi_chu : '';
   populateSoKhuonField(r ? r.ma_sp : '', r ? r.so_khuon : '');
   ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
@@ -331,11 +378,6 @@ function updateTongTuan(){
 }
 ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
   document.getElementById('f-' + d).addEventListener('input', updateTongTuan);
-});
-// Gõ/đổi mã SP → tự lọc lại danh sách khuôn tương ứng (giữ nguyên khuôn đang
-// gõ tay nếu có, để không xoá mất khi người dùng đang gõ dở).
-document.getElementById('f-ma-sp').addEventListener('input', () => {
-  populateSoKhuonField(document.getElementById('f-ma-sp').value.trim(), document.getElementById('f-so-khuon').value.trim());
 });
 
 document.getElementById('btnAddRow').addEventListener('click', async () => {
@@ -409,6 +451,7 @@ async function initAuthStatus(){
 
 updateWeekLabel();
 loadRows();
+loadMasterLists();
 loadMoldsByProduct();
 initAuthStatus();
 </script>
