@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Kho Thành Phẩm — TOYOTAKI</title>
+<!--
+  kho-thanh-pham.html — quản lý kho thành phẩm bằng QR: Nhập kho (quét pallet
+  OQC hoặc tem lẻ), Xuất hàng (tạo phiếu xuất — khách hàng/số đơn hàng, quét
+  nhiều pallet/tem, đóng phiếu), Tồn kho hiện tại.
+
+  Cố ý TÁCH "OQC đóng gói xong pallet" (oqc.html, trạng thái da_dong_goi) khỏi
+  "đã thực sự nhập kho" (trang này, trạng thái da_nhap_kho) — 2 vị trí/thời
+  điểm vật lý khác nhau (đóng gói ở trạm OQC, nhập kho ở kho thành phẩm).
+  Tem lẻ không qua pallet cũng "nhập kho" được — chỉ cần đã ở 1 công đoạn nào
+  đó (thường là OQC) rồi quét vào đây.
+
+  Schema: supabase/migration_phase_T7_kho_thanh_pham.sql (oqc_pallet mở rộng
+  trạng thái, kho_phieu_xuat/kho_phieu_xuat_item, các RPC oqc_pallet_nhap_kho/
+  kho_nhap_kho_tem/kho_tao_phieu_xuat/kho_them_vao_phieu_xuat/
+  kho_xoa_khoi_phieu_xuat/kho_dong_phieu_xuat).
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+.wrap{max-width:640px;margin:0 auto}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.hdr h1{font-size:17px;font-weight:700}
+.hdr p{font-size:10px;color:#999;margin-top:2px}
+.auth-info{font-size:11.5px;color:#667}
+.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.tabs-wrap{display:flex;gap:8px;margin-bottom:14px}
+.tab-btn{flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;color:#555;font-size:12.5px;font-weight:700;cursor:pointer}
+.tab-btn.active{background:#C87941;border-color:#C87941;color:#fff}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;font-weight:700;color:#8a5a30;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f5e6d7}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:9px 11px;font-size:14px;font-family:inherit;width:100%}
+.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;background:#C87941;color:#fff;width:100%}
+.btn:hover{background:#a85e2a}
+.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
+.btn-danger{border:1.5px solid #c00;color:#c00;background:#fff;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
+.item-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed #eee;padding:8px 0;font-size:12.5px}
+.item-row .tag{font-family:monospace;font-weight:700}
+.item-row .meta{color:#888;font-size:11px}
+.empty{color:#999;font-style:italic;font-size:12.5px;padding:10px 0}
+#msg{max-width:640px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.phieu-hdr{background:#faf5f0;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px}
+.phieu-hdr b{font-size:14px}
+.qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
+.qr-modal.show{display:flex}
+.qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(0,0,0,.7);flex-shrink:0}
+.qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
+.qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+#qrReaderDiv{position:relative;flex:1;overflow:hidden}
+#qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+.stock-group{margin-bottom:10px}
+.stock-group .sp{font-weight:700;font-size:13px}
+.stock-group .tong{color:#1a7a3a;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h1>🏬 Kho Thành Phẩm</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI · nhập kho / xuất hàng bằng QR</p></div>
+  <div class="auth-info" id="authInfo">…</div>
+</div>
+
+<div class="tabs-wrap">
+  <button type="button" class="tab-btn active" id="tabBtnNhap">📥 Nhập kho</button>
+  <button type="button" class="tab-btn" id="tabBtnXuat">📤 Xuất hàng</button>
+  <button type="button" class="tab-btn" id="tabBtnTon">📦 Tồn kho</button>
+</div>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <!-- ================= TAB: NHẬP KHO ================= -->
+  <div id="tabNhap">
+    <div class="card">
+      <h2>Quét/nhập pallet hoặc tem để nhập kho</h2>
+      <button class="btn" id="btnScanNhap">📷 Quét QR</button>
+      <div class="fg" style="margin-top:10px">
+        <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
+        <input type="text" id="manualNhapInput" placeholder="Bấm vào đây rồi quét, hoặc gõ mã (PLT... hoặc Tag No) + Enter">
+      </div>
+    </div>
+    <div class="card">
+      <h2>Vừa nhập kho (phiên này)</h2>
+      <div id="nhapLog"><div class="empty">Chưa nhập kho gì trong phiên này.</div></div>
+    </div>
+  </div>
+
+  <!-- ================= TAB: XUẤT HÀNG ================= -->
+  <div id="tabXuat" style="display:none">
+    <div class="card" id="xuatNewCard">
+      <h2>Tạo phiếu xuất mới</h2>
+      <div class="fg"><label>Khách hàng / nơi giao đến</label><input type="text" id="xh-khach"></div>
+      <div class="fg"><label>Số phiếu xuất / số đơn hàng</label><input type="text" id="xh-sodon"></div>
+      <button class="btn" id="btnTaoPhieuXuat">+ Tạo phiếu xuất</button>
+      <div class="fg" style="margin-top:14px">
+        <label>Hoặc mở lại phiếu đang dở (nếu vừa tải lại trang)</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="xh-resume-id" placeholder="VD: XH20260816-001">
+          <button type="button" class="btn-outline btn" style="width:auto;flex:none;padding:8px 14px" id="btnResumePhieu">Mở</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="xuatOpenArea" style="display:none">
+      <div class="card">
+        <div class="phieu-hdr" id="phieuHdr"></div>
+        <button class="btn" id="btnScanXuat">📷 Quét pallet/tem để thêm vào phiếu</button>
+        <div class="fg" style="margin-top:10px">
+          <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
+          <input type="text" id="manualXuatInput" placeholder="Bấm vào đây rồi quét, hoặc gõ mã + Enter">
+        </div>
+      </div>
+      <div class="card">
+        <h2>Danh sách đã quét</h2>
+        <div id="xuatItemList"><div class="empty">Chưa quét gì.</div></div>
+      </div>
+      <div class="card">
+        <button class="btn" id="btnDongPhieuXuat" style="background:#1a7a3a">🚚 Đóng phiếu &amp; Xuất kho</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TAB: TỒN KHO ================= -->
+  <div id="tabTon" style="display:none">
+    <div class="card">
+      <h2>Tồn kho hiện tại (theo mã SP)</h2>
+      <button type="button" class="btn-outline btn" id="btnRefreshTon" style="margin-bottom:12px">🔄 Tải lại</button>
+      <div id="tonList"><div class="empty">Bấm "Tải lại" để xem tồn kho.</div></div>
+    </div>
+  </div>
+</div>
+
+<canvas id="scanCanvas" style="display:none"></canvas>
+<div class="qr-modal" id="qrModal">
+  <div class="qr-modal-hdr">
+    <span>📷 Đưa mã QR vào giữa khung hình</span>
+    <button type="button" class="qr-modal-close" id="btnCloseQrModal">✖ Đóng</button>
+  </div>
+  <div id="qrReaderDiv"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
+function err(t){ showMsg("❌ " + t, "err"); }
+let msgToken = 0;
+function showMsg(t, cls, autoHideMs){
+  const el = document.getElementById("msg");
+  el.textContent = t; el.className = cls; el.style.display = "block";
+  msgToken += 1; const my = msgToken;
+  if (autoHideMs) setTimeout(() => { if (my === msgToken) el.style.display = "none"; }, autoHideMs);
+}
+function parseCode(raw){
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  return s.includes(">") ? s.split(">")[0].trim() : s;
+}
+
+async function requireLogin(){
+  const session = await MesAuth.getSession();
+  if (session) return session;
+  err("Cần đăng nhập trước. Đang chuyển sang trang đăng nhập…");
+  setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+  return null;
+}
+
+/* ---------- Tabs ---------- */
+function switchTab(tab){
+  document.getElementById("tabNhap").style.display = tab === "nhap" ? "" : "none";
+  document.getElementById("tabXuat").style.display = tab === "xuat" ? "" : "none";
+  document.getElementById("tabTon").style.display = tab === "ton" ? "" : "none";
+  document.getElementById("tabBtnNhap").classList.toggle("active", tab === "nhap");
+  document.getElementById("tabBtnXuat").classList.toggle("active", tab === "xuat");
+  document.getElementById("tabBtnTon").classList.toggle("active", tab === "ton");
+  stopCamera();
+}
+document.getElementById("tabBtnNhap").addEventListener("click", () => switchTab("nhap"));
+document.getElementById("tabBtnXuat").addEventListener("click", () => switchTab("xuat"));
+document.getElementById("tabBtnTon").addEventListener("click", () => switchTab("ton"));
+
+/* ---------- Camera QR (dùng chung, đích xử lý phụ thuộc scanTarget) ------- */
+let html5QrCode = null;
+let scanningActive = false;
+let scanTarget = "nhap"; // "nhap" hoặc "xuat"
+function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode("qrReaderDiv"); return html5QrCode; }
+
+async function openCamera(target){
+  scanTarget = target;
+  if (typeof Html5Qrcode !== "function"){ err("Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang."); return; }
+  document.getElementById("qrModal").classList.add("show");
+  const scanner = getScanner();
+  scanningActive = true;
+  try {
+    await scanner.start({ facingMode: "environment" }, { fps: 8, qrbox: { width: 260, height: 260 } }, onScanSuccess, () => {});
+  } catch(e){
+    scanningActive = false;
+    await closeQrModal();
+    err("Không mở được camera: " + e);
+  }
+}
+async function closeQrModal(){
+  document.getElementById("qrModal").classList.remove("show");
+  scanningActive = false;
+  if (html5QrCode && html5QrCode.isScanning){ try { await html5QrCode.stop(); } catch(e){} }
+}
+function stopCamera(){ closeQrModal(); }
+async function onScanSuccess(decodedText){
+  if (!scanningActive) return;
+  scanningActive = false;
+  await closeQrModal();
+  const code = parseCode(decodedText);
+  if (scanTarget === "xuat") addToPhieuXuat(code); else nhapKho(code);
+}
+document.getElementById("btnScanNhap").addEventListener("click", () => openCamera("nhap"));
+document.getElementById("btnScanXuat").addEventListener("click", () => openCamera("xuat"));
+document.getElementById("btnCloseQrModal").addEventListener("click", closeQrModal);
+
+document.getElementById("manualNhapInput").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = e.target.value.trim(); if (!v) return;
+  e.target.value = ""; nhapKho(parseCode(v));
+});
+document.getElementById("manualXuatInput").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = e.target.value.trim(); if (!v) return;
+  e.target.value = ""; addToPhieuXuat(parseCode(v));
+});
+
+/* ================= NHẬP KHO ================= */
+let nhapLog = [];
+async function nhapKho(code){
+  if (!code) return;
+  const session = await requireLogin(); if (!session) return;
+  showMsg("⏳ Đang nhập kho " + code + "...", "ok");
+  const isPallet = code.startsWith("PLT");
+  const fn = isPallet ? "oqc_pallet_nhap_kho" : "kho_nhap_kho_tem";
+  const params = isPallet ? { p_id_pallet: code, p_nguoi: session.user.email } : { p_tag_no: code, p_nguoi: session.user.email };
+  const { data, error } = await sb.rpc(fn, params);
+  if (error){ err("Lỗi nhập kho " + code + ": " + error.message); return; }
+  showMsg("✅ Đã nhập kho " + code, "ok", 5000);
+  nhapLog.unshift({ code, isPallet, data, t: new Date() });
+  renderNhapLog();
+}
+function renderNhapLog(){
+  const el = document.getElementById("nhapLog");
+  if (!nhapLog.length){ el.innerHTML = '<div class="empty">Chưa nhập kho gì trong phiên này.</div>'; return; }
+  el.innerHTML = nhapLog.slice(0, 30).map(l => `
+    <div class="item-row">
+      <div><div class="tag">${escapeHtml(l.code)}</div><div class="meta">${l.isPallet ? 'Pallet' : (escapeHtml(l.data.ma_sp || '') + ' ' + escapeHtml(l.data.ten_sp || ''))} — ${fmtNum(l.data.so_luong || l.data.tong_so_luong)} sp</div></div>
+      <div class="meta">${l.t.toLocaleTimeString('vi-VN', { hour12: false })}</div>
+    </div>`).join("");
+}
+
+/* ================= XUẤT HÀNG ================= */
+let currentPhieuXuat = null; // {id_phieu, khach_hang, so_don_hang}
+let phieuItems = [];
+
+document.getElementById("btnTaoPhieuXuat").addEventListener("click", async () => {
+  const session = await requireLogin(); if (!session) return;
+  const khach = document.getElementById("xh-khach").value.trim();
+  const sodon = document.getElementById("xh-sodon").value.trim();
+  showMsg("⏳ Đang tạo phiếu xuất...", "ok");
+  const { data, error } = await sb.rpc("kho_tao_phieu_xuat", { p_khach_hang: khach, p_so_don_hang: sodon, p_nguoi: session.user.email });
+  if (error){ err("Lỗi tạo phiếu: " + error.message); return; }
+  openPhieuXuat(data, khach, sodon);
+  showMsg("✅ Đã tạo phiếu " + data, "ok", 4000);
+});
+
+document.getElementById("btnResumePhieu").addEventListener("click", async () => {
+  const id = document.getElementById("xh-resume-id").value.trim();
+  if (!id) return err("Nhập mã phiếu để mở lại.");
+  const { data: phieu, error } = await sb.from("kho_phieu_xuat").select("*").eq("id_phieu", id).maybeSingle();
+  if (error || !phieu) return err("Không tìm thấy phiếu " + id);
+  if (phieu.trang_thai !== "mo") return err("Phiếu " + id + " đã đóng rồi (trạng thái: " + phieu.trang_thai + ").");
+  openPhieuXuat(id, phieu.khach_hang, phieu.so_don_hang);
+});
+
+function openPhieuXuat(id, khach, sodon){
+  currentPhieuXuat = { id_phieu: id, khach_hang: khach, so_don_hang: sodon };
+  document.getElementById("xuatNewCard").style.display = "none";
+  document.getElementById("xuatOpenArea").style.display = "block";
+  document.getElementById("phieuHdr").innerHTML =
+    "<b>" + escapeHtml(id) + "</b><br>" +
+    (khach ? "Khách hàng: " + escapeHtml(khach) + "<br>" : "") +
+    (sodon ? "Số đơn hàng: " + escapeHtml(sodon) : "");
+  loadPhieuItems();
+}
+
+async function loadPhieuItems(){
+  const { data, error } = await sb.from("kho_phieu_xuat_item").select("*").eq("id_phieu", currentPhieuXuat.id_phieu).order("thoi_diem_quet");
+  if (error){ err("Lỗi tải danh sách: " + error.message); return; }
+  phieuItems = data || [];
+  renderPhieuItems();
+}
+
+async function addToPhieuXuat(code){
+  if (!code || !currentPhieuXuat) return;
+  const session = await requireLogin(); if (!session) return;
+  showMsg("⏳ Đang thêm " + code + "...", "ok");
+  const { data, error } = await sb.rpc("kho_them_vao_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_ma: code, p_nguoi: session.user.email });
+  if (error){ err("Lỗi thêm " + code + ": " + error.message); return; }
+  showMsg("✅ Đã thêm " + code, "ok", 3000);
+  loadPhieuItems();
+}
+
+async function removeFromPhieuXuat(code){
+  if (!confirm("Bỏ " + code + " khỏi phiếu xuất?")) return;
+  const { error } = await sb.rpc("kho_xoa_khoi_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_ma: code });
+  if (error){ err("Lỗi xoá: " + error.message); return; }
+  loadPhieuItems();
+}
+
+function renderPhieuItems(){
+  const el = document.getElementById("xuatItemList");
+  if (!phieuItems.length){ el.innerHTML = '<div class="empty">Chưa quét gì.</div>'; return; }
+  el.innerHTML = phieuItems.map(it => `
+    <div class="item-row">
+      <div><div class="tag">${escapeHtml(it.ma)}</div><div class="meta">${it.loai === 'pallet' ? 'Pallet' : escapeHtml(it.ma_sp || '')} — ${fmtNum(it.so_luong)} sp</div></div>
+      <button type="button" class="btn-danger" onclick="removeFromPhieuXuat('${it.ma}')">Bỏ</button>
+    </div>`).join("");
+}
+
+document.getElementById("btnDongPhieuXuat").addEventListener("click", async () => {
+  if (!currentPhieuXuat) return;
+  if (!phieuItems.length) return err("Chưa quét gì — quét ít nhất 1 pallet/tem trước khi đóng phiếu.");
+  if (!confirm("Đóng phiếu " + currentPhieuXuat.id_phieu + " và xuất kho " + phieuItems.length + " mục? Không hoàn tác được.")) return;
+  const session = await requireLogin(); if (!session) return;
+  showMsg("⏳ Đang đóng phiếu...", "ok");
+  const { data, error } = await sb.rpc("kho_dong_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_nguoi: session.user.email });
+  if (error){ err("Lỗi đóng phiếu: " + error.message); return; }
+  showMsg("✅ Đã xuất kho " + data.so_muc + " mục — phiếu " + currentPhieuXuat.id_phieu, "ok", 8000);
+  currentPhieuXuat = null; phieuItems = [];
+  document.getElementById("xuatOpenArea").style.display = "none";
+  document.getElementById("xuatNewCard").style.display = "block";
+  document.getElementById("xh-khach").value = ""; document.getElementById("xh-sodon").value = "";
+});
+
+/* ================= TỒN KHO ================= */
+document.getElementById("btnRefreshTon").addEventListener("click", loadTonKho);
+async function loadTonKho(){
+  const el = document.getElementById("tonList");
+  el.innerHTML = '<div class="empty">Đang tải...</div>';
+
+  const [palletRes, posRes] = await Promise.all([
+    sb.from("oqc_pallet").select("id_pallet,tong_so_luong").eq("trang_thai", "da_nhap_kho"),
+    sb.from("cd_v_vi_tri_hien_tai").select("tag_no").eq("vi_tri_hien_tai", "Nhập kho"),
+  ]);
+  if (palletRes.error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(palletRes.error.message) + '</div>'; return; }
+
+  const pallets = palletRes.data || [];
+  const palletIds = pallets.map(p => p.id_pallet);
+  const temTags = (posRes.data || []).map(p => p.tag_no);
+
+  const [palletItemsRes, temRes] = await Promise.all([
+    palletIds.length ? sb.from("oqc_pallet_item").select("id_pallet,tag_no,so_luong").in("id_pallet", palletIds) : Promise.resolve({ data: [] }),
+    temTags.length ? sb.from("duc_tem").select("tag_no,ma_sp,ten_sp,so_luong").in("tag_no", temTags).gt("so_luong", 0) : Promise.resolve({ data: [] }),
+  ]);
+
+  // Cần mã SP của tem bên trong pallet — tra thêm 1 lượt duc_tem theo tag_no của pallet items.
+  const palletTemTags = [...new Set((palletItemsRes.data || []).map(it => it.tag_no))];
+  const { data: palletTemInfo } = palletTemTags.length
+    ? await sb.from("duc_tem").select("tag_no,ma_sp,ten_sp").in("tag_no", palletTemTags)
+    : { data: [] };
+  const temInfoMap = {};
+  (palletTemInfo || []).forEach(t => { temInfoMap[t.tag_no] = t; });
+
+  const bySp = {}; // ma_sp -> { ten_sp, tong, soLuongPallet, soLuongTem }
+  (palletItemsRes.data || []).forEach(it => {
+    const info = temInfoMap[it.tag_no];
+    const ma = info ? info.ma_sp : "(không rõ)";
+    if (!bySp[ma]) bySp[ma] = { ten_sp: info ? info.ten_sp : "", tong: 0 };
+    bySp[ma].tong += Number(it.so_luong) || 0;
+  });
+  (temRes.data || []).forEach(t => {
+    if (!bySp[t.ma_sp]) bySp[t.ma_sp] = { ten_sp: t.ten_sp, tong: 0 };
+    bySp[t.ma_sp].tong += Number(t.so_luong) || 0;
+  });
+
+  const rows = Object.entries(bySp).sort((a, b) => a[0].localeCompare(b[0]));
+  if (!rows.length){ el.innerHTML = '<div class="empty">Kho đang trống.</div>'; return; }
+  el.innerHTML = rows.map(([ma, info]) => `
+    <div class="stock-group">
+      <div class="item-row">
+        <div><div class="sp">${escapeHtml(ma)}</div><div class="meta">${escapeHtml(info.ten_sp || '')}</div></div>
+        <div class="tong">${fmtNum(info.tong)} sp</div>
+      </div>
+    </div>`).join("") +
+    '<p style="font-size:11px;color:#999;margin-top:8px">' + pallets.length + ' pallet đã nhập kho, ' + temTags.length + ' tem lẻ đang trong kho.</p>';
+}
+
+async function initAuthStatus(){
+  const bar = document.getElementById("authInfo");
+  const email = await MesAuth.getCurrentUserEmail();
+  bar.innerHTML = email ? ("👤 " + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>') : '<a href="shared/login.html">Đăng nhập</a>';
+  const so = document.getElementById("mesSignOut");
+  if (so) so.addEventListener("click", (e) => { e.preventDefault(); MesAuth.signOut(); location.reload(); });
+}
+initAuthStatus();
+</script>
+</body>
+</html>

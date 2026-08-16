@@ -13,9 +13,15 @@
 
   Luồng: quét QR tem (duc_tem/tag_no, có thể là tem đã tách qua chuyencongdoan)
   → nhập số lượng ngoại quan OK → thêm vào pallet đang mở (tự tạo nếu chưa có)
-  → lặp lại tới khi đủ → "Đóng gói & Nhập kho" → in nhãn pallet.
+  → lặp lại tới khi đủ → "Đóng gói xong" → in nhãn pallet.
   Schema: supabase/migration_phase_T1_qr_lot_pallet.sql (oqc_pallet,
   oqc_pallet_item, oqc_tao_pallet, oqc_them_tem_vao_pallet, oqc_dong_pallet).
+
+  migration_phase_T7_kho_thanh_pham.sql (2026-08-16): TÁCH RIÊNG "đóng gói
+  xong" (trạng thái da_dong_goi, ở đây) khỏi "đã thực sự nhập kho" (trạng
+  thái da_nhap_kho — quét lại ở kho-thanh-pham.html, vì đóng gói xong ở
+  trạm OQC và nhập kho thật là 2 vị trí/thời điểm khác nhau). KHÔNG tự động
+  nhập kho khi đóng pallet ở đây nữa.
 -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -97,7 +103,7 @@ input:focus,select:focus{outline:none;border-color:#2a7a4f;box-shadow:0 0 0 3px 
     </div>
     <div id="palletItems"><div class="empty-hint">Bắt đầu pallet mới rồi quét tem để thêm sản phẩm.</div></div>
     <button class="btn btn-p" id="btnNewPallet" style="margin-top:12px">🆕 Bắt đầu pallet mới</button>
-    <button class="btn btn-s" id="btnClosePallet" style="display:none">📦 Đóng gói & Nhập kho</button>
+    <button class="btn btn-s" id="btnClosePallet" style="display:none">📦 Đóng gói xong</button>
   </div>
 
   <div class="card" id="scanCard" style="display:none">
@@ -221,14 +227,14 @@ document.getElementById("btnNewPallet").addEventListener("click", async () => {
 
 document.getElementById("btnClosePallet").addEventListener("click", async () => {
   if (!currentPalletId) return;
-  if (!window.confirm("Đóng gói pallet " + currentPalletId + " và nhập kho thành phẩm?")) return;
+  if (!window.confirm("Đóng gói xong pallet " + currentPalletId + "? Pallet vẫn cần được mang tới kho và quét \"Nhập kho\" (kho-thanh-pham.html) mới tính là đã nhập kho thật.")) return;
   showMsg("⏳ Đang đóng gói...", "wait");
   const { error } = await sb.rpc('oqc_dong_pallet', { p_id_pallet: currentPalletId });
   if (error) return err("Lỗi đóng pallet: " + error.message);
   const { data: items } = await sb.from('oqc_pallet_item').select('tag_no,so_luong').eq('id_pallet', currentPalletId);
   const closedId = currentPalletId;
   const { data: pallet } = await sb.from('oqc_pallet').select('*').eq('id_pallet', closedId).maybeSingle();
-  showMsg("✅ Đã nhập kho pallet " + closedId, "ok", 6000);
+  showMsg("✅ Đã đóng gói xong pallet " + closedId + " — nhớ mang tới kho và quét Nhập kho", "ok", 8000);
   printPalletLabel(closedId, pallet, items || []);
   currentPalletId = null;
   await refreshPalletView();
@@ -360,10 +366,16 @@ async function lookupPallet(){
   if (!pallet) { document.getElementById("lookupResult").innerHTML = '<div class="empty-hint">Không tìm thấy pallet ' + id + '</div>'; return; }
   const { data: items } = await sb.from('oqc_pallet_item').select('tag_no,so_luong').eq('id_pallet', id).order('thoi_diem_quet');
   const rows = (items || []).map(it => '<div class="item-row"><div class="tag">' + it.tag_no + '</div><div class="sl">' + it.so_luong + '</div></div>').join("");
+  const trangThaiLabel = {
+    dang_dong_goi: '⏳ Đang đóng gói', da_dong_goi: '📦 Đã đóng gói xong, chờ nhập kho',
+    da_nhap_kho: '✅ Đã nhập kho', da_xuat: '🚚 Đã xuất kho',
+  }[pallet.trang_thai] || pallet.trang_thai;
+  const moc_thoi_gian = pallet.trang_thai === 'da_nhap_kho' ? pallet.thoi_diem_nhap_kho
+    : pallet.trang_thai === 'da_dong_goi' ? pallet.thoi_diem_dong_goi : null;
   document.getElementById("lookupResult").innerHTML =
     '<div class="pallet-hdr"><div class="pallet-id">' + pallet.id_pallet + '</div><div class="pallet-total">Tổng: ' + pallet.tong_so_luong + '</div></div>'
-    + '<div style="font-size:11px;color:#888;margin-bottom:8px">Trạng thái: ' + (pallet.trang_thai === 'da_nhap_kho' ? '✅ Đã nhập kho' : '⏳ Đang đóng gói')
-    + (pallet.thoi_diem_nhap_kho ? (' · ' + new Date(pallet.thoi_diem_nhap_kho).toLocaleString('vi-VN', { hour12: false })) : '') + '</div>'
+    + '<div style="font-size:11px;color:#888;margin-bottom:8px">Trạng thái: ' + trangThaiLabel
+    + (moc_thoi_gian ? (' · ' + new Date(moc_thoi_gian).toLocaleString('vi-VN', { hour12: false })) : '') + '</div>'
     + rows;
 }
 
