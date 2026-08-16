@@ -136,6 +136,10 @@ input:focus,select:focus{outline:none;border-color:#C87941;
   <div class="card-ttl">📷 Bước 1 — Quét mã QR trên tem</div>
   <button class="scan-btn" id="btnScan">📷&nbsp; Mở Camera Quét QR</button>
   <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+  <div class="fg" style="margin-top:10px">
+    <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
+    <input type="text" id="manualTagInput" placeholder="Bấm vào đây rồi quét bằng đầu đọc QR, hoặc gõ Tag No + Enter">
+  </div>
   <div class="empty-hint" id="emptyHint">Chưa quét tem nào. Bấm nút phía trên, hướng camera về phía mã QR trên tem — hệ thống tự nhận diện, không cần bấm chụp.</div>
 
   <div class="scanned-box" id="scannedBox">
@@ -222,6 +226,10 @@ input:focus,select:focus{outline:none;border-color:#C87941;
       <div class="hint">Tem mới tạo ra sẽ được coi là đang ở công đoạn này.</div>
     </div>
     <button class="scan-btn" id="pkBtnScan">📷&nbsp; Quét thêm tem nguồn</button>
+    <div class="fg" style="margin-top:10px">
+      <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
+      <input type="text" id="pkManualTagInput" placeholder="Bấm vào đây rồi quét bằng đầu đọc QR, hoặc gõ Tag No + Enter">
+    </div>
     <div class="empty-hint" id="pkEmptyHint">Chưa quét tem nguồn nào.</div>
     <div id="pkSrcList" style="margin-top:10px"></div>
     <div class="pk-total" id="pkTotal" style="display:none"></div>
@@ -474,6 +482,20 @@ async function onScanSuccess(decodedText){
 document.getElementById("btnScan").addEventListener("click", () => { scanTarget = "transfer"; openCamera(); });
 document.getElementById("btnRescan").addEventListener("click", () => { scanTarget = "transfer"; openCamera(); });
 document.getElementById("pkBtnScan").addEventListener("click", () => { scanTarget = "pack"; openCamera(); });
+
+function wireManualTagInput(inputId, target){
+  document.getElementById(inputId).addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const v = e.target.value.trim();
+    if (!v) return;
+    e.target.value = "";
+    scanTarget = target;
+    onQrDecoded(v);
+  });
+}
+wireManualTagInput("manualTagInput", "transfer");
+wireManualTagInput("pkManualTagInput", "pack");
 document.getElementById("btnCloseQrModal").addEventListener("click", () => {
   closeQrModal();
   document.getElementById("emptyHint").style.display = "block";
@@ -509,26 +531,48 @@ function onFileChosen(evt){
   img.src = url;
 }
 
+// Nhận cả 2 dạng: chuỗi QR đầy đủ (đầu đọc QR rời gõ y hệt nội dung mã, có
+// dấu ">") HOẶC chỉ Tag No gõ tay (không có ">") — cả 2 đều rút ra Tag No rồi
+// tra cứu LIVE từ duc_tem, không tin tưởng số lượng nhúng sẵn trong QR (tem
+// có thể đã bị dùng 1 phần qua "Đóng gói lại"/tách kể từ lúc in — QR chỉ ghi
+// số lượng gốc lúc in, có thể đã cũ).
+function parseTagNo(raw){
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  return s.includes('>') ? s.split('>')[0].trim() : s;
+}
+
 async function onQrDecoded(text){
-  const parts = String(text).split(">");
-  if (parts.length < 9){
-    err("Mã QR không đúng định dạng tem TOYOTAKI. Vui lòng quét lại đúng mã QR trên tem sản phẩm.");
+  const tagNo = parseTagNo(text);
+  if (!tagNo){
+    err("Không đọc được Tag No từ dữ liệu vừa quét/nhập.");
     return;
   }
-  const decoded = {
-    tagNo: parts[0].trim(), tenSP: parts[1], maSP: parts[2], soLuongTem: parts[3],
-    ngay: parts[4], lotNo: parts[5], soKhuon: parts[6], nguyenLieu: parts[7], mayDuc: parts[8]
+
+  if (scanTarget === "pack"){ await addPackSource({ tagNo }); return; }
+
+  showMsg("⏳ Đang tra cứu tem " + tagNo + "...", "wait");
+  const { data, error } = await sb.from('duc_tem')
+    .select('tag_no,ma_sp,ten_sp,so_luong,ngay,lot,so_khuon,nguyen_lieu,may_duc_chi_thi')
+    .eq('tag_no', tagNo).maybeSingle();
+  if (error || !data){ err("Không tìm thấy tem " + tagNo + " trong hệ thống."); return; }
+  if (!data.so_luong || data.so_luong <= 0){
+    err("Tem " + tagNo + " đã hết số lượng (có thể đã dùng ở lần chuyển/đóng gói trước) — không dùng được nữa.");
+    return;
+  }
+
+  scannedData = {
+    tagNo: data.tag_no, tenSP: data.ten_sp || '', maSP: data.ma_sp || '', soLuongTem: data.so_luong,
+    ngay: data.ngay ? String(data.ngay).replace(/-/g, '/') : '', lotNo: data.lot || '',
+    soKhuon: data.so_khuon || '', nguyenLieu: data.nguyen_lieu || '', mayDuc: data.may_duc_chi_thi || '',
   };
-
-  if (scanTarget === "pack"){ await addPackSource(decoded); return; }
-
-  scannedData = decoded;
+  document.getElementById("msg").style.display = "none";
   renderScanned();
 
   // Gợi ý sẵn "Công đoạn giao" theo vị trí hiện tại của tem (nếu đã từng chuyển trước đó).
   try {
-    const { data } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', scannedData.tagNo).maybeSingle();
-    if (data && data.vi_tri_hien_tai) document.getElementById("congDoanGiao").value = data.vi_tri_hien_tai;
+    const { data: pos } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', scannedData.tagNo).maybeSingle();
+    if (pos && pos.vi_tri_hien_tai) document.getElementById("congDoanGiao").value = pos.vi_tri_hien_tai;
   } catch(e){ /* không chặn luồng chính nếu lỗi */ }
   applyRoutingHint();
   checkReady();

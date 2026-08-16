@@ -104,6 +104,10 @@ input:focus,select:focus{outline:none;border-color:#2a7a4f;box-shadow:0 0 0 3px 
     <div class="card-ttl">Quét tem sản phẩm</div>
     <button class="scan-btn" type="button" id="btnScan">📷 Quét QR trên tem</button>
     <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+    <div class="fg" style="margin-top:10px">
+      <label>Hoặc nhập tay / dùng đầu đọc QR rời (gõ Tag No rồi Enter)</label>
+      <input type="text" id="manualTagInput" placeholder="Bấm vào đây rồi quét bằng đầu đọc QR, hoặc gõ Tag No...">
+    </div>
   </div>
 
   <div class="card" id="pendingCard" style="display:none">
@@ -336,6 +340,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById("btnScan").addEventListener("click", openCameraForScan);
   document.getElementById("btnCloseQrModal").addEventListener("click", closeQrModal);
   document.getElementById("qrFileInput").addEventListener("change", onFileChosen);
+  document.getElementById("manualTagInput").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const v = e.target.value.trim();
+    if (!v) return;
+    e.target.value = "";
+    onTagScanned(v.split(">")[0].trim());
+  });
 });
 
 // =============================================================================
