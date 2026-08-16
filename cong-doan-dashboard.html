@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard công đoạn — TOYOTAKI</title>
+<!--
+  cong-doan-dashboard.html — dashboard dùng CHUNG cho Bavia/Gia công/Sơn/OQC,
+  khoá công đoạn qua query param (?cd=Bavia) — mỗi máy tính tại từng công đoạn
+  bookmark đúng URL của mình. KHÔNG có param thì cho chọn thủ công.
+
+  2 lớp tách biệt (quyết định đã chốt khi lập kế hoạch, xem
+  supabase/migration_phase_T3_cong_doan_dashboard.sql):
+  - Lớp truy xuất theo tem (QR) vẫn ở chuyencongdoan.html — trang này chỉ có
+    nút lối tắt mở sang đó, KHÔNG lặp lại camera/QR ở đây.
+  - Lớp này (mới) là bảng tính sổ tổ chức sản xuất: trạm/tổ lao động thủ công
+    (tên tự do, không phải danh mục máy cố định) — mã SP đang làm, ai đứng,
+    sản lượng OK/NG CỘNG DỒN real-time xuyên ca. Card "Hàng đang chờ" đọc
+    cd_v_vi_tri_hien_tai chỉ để trưởng ca tham khảo bằng mắt, KHÔNG link cứng
+    vào trạm.
+
+  Không có kế hoạch sản xuất trước — trưởng ca tạo trạm phản ứng theo hàng đã
+  nhận từ công đoạn trước (quyết định đã chốt: không cần đặt mục tiêu).
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+.wrap{max-width:1180px;margin:0 auto}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.hdr h1{font-size:17px;font-weight:700}
+.hdr p{font-size:10px;color:#999;margin-top:2px}
+.auth-info{font-size:11.5px;color:#667}
+.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;font-weight:700;color:#8a5a30;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f5e6d7;display:flex;align-items:center;gap:8px}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:8px 10px;font-size:13.5px;font-family:inherit;min-width:130px}
+.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#C87941;color:#fff}
+.btn:hover{background:#a85e2a}
+.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
+.btn-good{background:#1a7a3a}
+.btn-good:hover{background:#146030}
+.btn-tiny{border:1.5px solid #ddd;background:#fff;color:#555;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
+.btn-tiny:hover{border-color:#C87941;color:#C87941}
+.btn-tiny.danger{border-color:#c00;color:#c00}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px}
+th,td{border:1px solid #e5e5e5;padding:7px 8px;text-align:left}
+th{background:#faf5f0;color:#8a5a30;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px}
+td.num{text-align:right;font-weight:700}
+.empty-row td,.empty{text-align:center;color:#999;padding:20px;font-style:italic}
+#msg{max-width:1180px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.waiting-list{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.waiting-item{display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:5px 0}
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);align-items:center;justify-content:center;z-index:50;padding:14px}
+.modal-mask.open{display:flex}
+.modal{background:#fff;border-radius:12px;max-width:480px;width:100%;max-height:92vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #eee}
+.modal-title{font-size:14.5px;font-weight:700}
+.modal-close{border:none;background:none;font-size:18px;cursor:pointer;color:#999}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid #eee}
+.shortcut-row{display:flex;gap:8px;flex-wrap:wrap}
+.shortcut-row a{text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h1 id="pageTitle">🏭 Dashboard công đoạn</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI · trạm/tổ, sản lượng OK/NG real-time, nhân sự</p></div>
+  <div class="auth-info" id="authInfo">…</div>
+</div>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <div class="card" id="pickCongDoanCard" style="display:none">
+    <h2>Chọn công đoạn</h2>
+    <div class="toolbar">
+      <select id="pickCongDoan"></select>
+      <button type="button" class="btn" id="btnPickCongDoan">Mở dashboard</button>
+    </div>
+    <p style="font-size:11px;color:#999;margin-top:8px">Mẹo: bookmark thẳng URL kèm ?cd= (vd cong-doan-dashboard.html?cd=Bavia) cho máy tính tại đúng công đoạn đó, không cần chọn lại mỗi lần.</p>
+  </div>
+
+  <div id="mainArea" style="display:none">
+    <div class="card">
+      <div class="toolbar">
+        <div class="fg"><label>Ngày</label><input type="date" id="ngay"></div>
+        <div class="fg"><label>Ca</label><select id="ca"></select></div>
+        <div style="flex:1"></div>
+        <div class="shortcut-row">
+          <a id="lnkChuyen" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📷 Nhận / Chuyển hàng</button></a>
+          <a id="lnkDongGoi" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📦 Đóng gói / In tem</button></a>
+        </div>
+        <button type="button" class="btn btn-good" id="btnKetCa">🏁 Kết ca &amp; xem báo cáo</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📥 Hàng đang chờ tại công đoạn này</h2>
+      <div id="waitingList" class="waiting-list"><div class="empty">Đang tải...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>🧑‍🏭 Trạm đang hoạt động</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người thao tác</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
+          <tbody id="tramTbody"><tr class="empty-row"><td colspan="7">Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px"><button type="button" class="btn" id="btnAddTram">+ Thêm trạm</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Thêm trạm -->
+<div class="modal-mask" id="modalAddTram">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">+ Thêm trạm</div><button class="modal-close" onclick="closeModal('modalAddTram')">✕</button></div>
+    <div class="modal-body">
+      <div class="fg"><label class="req">Tên trạm/tổ</label><input type="text" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
+      <div class="fg"><label class="req">Mã SP</label><input type="text" id="at-masp" list="dlMaSp" oninput="onMaSpPick('at-masp','at-tensp')"></div>
+      <div class="fg"><label>Tên SP</label><input type="text" id="at-tensp"></div>
+      <div class="fg"><label>Người thao tác</label><input type="text" id="at-nguoi" list="dlNhanVien"></div>
+    </div>
+    <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalAddTram')">Huỷ</button><button class="btn" id="btnSubmitAddTram">Thêm trạm</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Nhập sản lượng -->
+<div class="modal-mask" id="modalNhapSL">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">+ Nhập sản lượng <span id="ns-tram-label"></span></div><button class="modal-close" onclick="closeModal('modalNhapSL')">✕</button></div>
+    <div class="modal-body">
+      <div class="fg"><label>Số OK thêm</label><input type="number" min="0" id="ns-ok" value="0"></div>
+      <div class="fg"><label>Số NG thêm</label><input type="number" min="0" id="ns-ng" value="0"></div>
+      <div class="fg"><label>Ghi chú (bắt buộc nếu có NG)</label><input type="text" id="ns-ghichu" placeholder="Lý do NG..."></div>
+    </div>
+    <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalNhapSL')">Huỷ</button><button class="btn" id="btnSubmitNhapSL">Lưu</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Đổi mã SP -->
+<div class="modal-mask" id="modalDoiMa">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">🔄 Đổi mã SP <span id="dm-tram-label"></span></div><button class="modal-close" onclick="closeModal('modalDoiMa')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:11.5px;color:#999">Sản lượng OK/NG hiện tại của trạm sẽ được cộng vào báo cáo cho đúng mã SP cũ, sau đó trạm reset về 0 với mã mới.</p>
+      <div class="fg"><label class="req">Mã SP mới</label><input type="text" id="dm-masp" list="dlMaSp" oninput="onMaSpPick('dm-masp','dm-tensp')"></div>
+      <div class="fg"><label>Tên SP</label><input type="text" id="dm-tensp"></div>
+      <div class="fg"><label>Người thao tác mới (để trống nếu giữ nguyên)</label><input type="text" id="dm-nguoi" list="dlNhanVien"></div>
+    </div>
+    <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalDoiMa')">Huỷ</button><button class="btn" id="btnSubmitDoiMa">Xác nhận đổi</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Báo cáo sau khi kết ca -->
+<div class="modal-mask" id="modalReport">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-head"><div class="modal-title">🏁 Báo cáo kết ca</div><button class="modal-close" onclick="closeModal('modalReport')">✕</button></div>
+    <div class="modal-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Nhận vào</th><th>OK</th><th>NG</th><th>Tỷ lệ NG</th></tr></thead>
+          <tbody id="reportTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modalReport')">Đóng</button></div>
+  </div>
+</div>
+
+<datalist id="dlMaSp"></datalist>
+<datalist id="dlNhanVien"></datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+const CONG_DOAN_LIST = ["Bavia", "Gia Công", "Sơn", "OQC"];
+const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
+let congDoan = null;
+let productMap = {};
+let trams = [];
+let currentTarget = null;
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
+function showMsg(text, cls){ const el = document.getElementById('msg'); el.textContent = text; el.className = cls; }
+function fillSelect(id, arr, placeholder){
+  const sel = document.getElementById(id);
+  sel.innerHTML = (placeholder ? '<option value="">' + placeholder + '</option>' : '') + (arr || []).map(v => `<option value="${v}">${v}</option>`).join("");
+}
+function getTodayString(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function onMaSpPick(inputId, tenId){
+  const ma = document.getElementById(inputId).value.trim();
+  if (productMap[ma]) document.getElementById(tenId).value = productMap[ma];
+}
+
+/* ---------- Khởi tạo công đoạn từ ?cd= ---------- */
+function initCongDoan(){
+  const params = new URLSearchParams(location.search);
+  const cd = params.get('cd');
+  if (cd && CONG_DOAN_LIST.includes(cd)){
+    congDoan = cd;
+    startDashboard();
+    return;
+  }
+  document.getElementById('pickCongDoanCard').style.display = 'block';
+  fillSelect('pickCongDoan', CONG_DOAN_LIST, '-- Chọn công đoạn --');
+  document.getElementById('btnPickCongDoan').addEventListener('click', () => {
+    const v = document.getElementById('pickCongDoan').value;
+    if (!v) return showMsg('Chọn công đoạn trước.', 'err');
+    location.href = location.pathname + '?cd=' + encodeURIComponent(v);
+  });
+}
+
+async function startDashboard(){
+  document.getElementById('pageTitle').textContent = '🏭 Dashboard công đoạn — ' + congDoan;
+  document.title = 'Dashboard ' + congDoan + ' — TOYOTAKI';
+  document.getElementById('mainArea').style.display = 'block';
+  document.getElementById('ngay').value = getTodayString();
+  fillSelect('ca', CA_LIST, '-- Chọn ca --');
+  document.getElementById('ngay').addEventListener('change', reloadAll);
+  document.getElementById('ca').addEventListener('change', reloadAll);
+
+  await loadDanhMuc();
+  reloadAll();
+}
+
+async function loadDanhMuc(){
+  const [prodRes, empRes] = await Promise.all([
+    sb.from('master_products').select('ma_sp,ten_sp'),
+    sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
+  ]);
+  (prodRes.data || []).forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
+  document.getElementById('dlMaSp').innerHTML = Object.keys(productMap).sort().map(ma => `<option value="${escapeHtml(ma)}">`).join('');
+  document.getElementById('dlNhanVien').innerHTML = (empRes.data || []).map(e => `<option value="${escapeHtml(e.ten_nhan_vien)}">`).join('');
+}
+
+function reloadAll(){
+  if (!document.getElementById('ca').value) return;
+  loadTrams();
+  loadWaiting();
+}
+
+/* ---------- Trạm đang hoạt động ---------- */
+async function loadTrams(){
+  const ngay = document.getElementById('ngay').value;
+  const ca = document.getElementById('ca').value;
+  const tbody = document.getElementById('tramTbody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải...</td></tr>';
+  const { data, error } = await sb.from('cd_tram_hien_tai')
+    .select('*').eq('cong_doan', congDoan).eq('ngay', ngay).eq('ca', ca).order('ten_tram');
+  if (error){ tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Lỗi: ' + escapeHtml(error.message) + '</td></tr>'; return; }
+  trams = data || [];
+  renderTrams();
+}
+
+function renderTrams(){
+  const tbody = document.getElementById('tramTbody');
+  if (!trams.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Chưa có trạm nào hoạt động trong ca này — bấm "+ Thêm trạm".</td></tr>'; return; }
+  tbody.innerHTML = trams.map(t => `
+    <tr>
+      <td>${escapeHtml(t.ten_tram)}</td>
+      <td>${escapeHtml(t.ma_sp)}</td>
+      <td>${escapeHtml(t.ten_sp) || '<span style="color:#999">—</span>'}</td>
+      <td>${escapeHtml(t.nguoi_thao_tac) || '<span style="color:#999">—</span>'}</td>
+      <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
+      <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
+      <td style="white-space:nowrap">
+        <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
+        <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi mã</button>
+        <button type="button" class="btn-tiny danger" onclick="ketThucTram('${t.id_tram}')">Kết thúc</button>
+      </td>
+    </tr>`).join('');
+}
+
+function findTram(id){ return trams.find(t => t.id_tram === id); }
+
+/* ---------- + Thêm trạm ---------- */
+document.getElementById('btnAddTram').addEventListener('click', () => {
+  document.getElementById('at-ten').value = '';
+  document.getElementById('at-masp').value = '';
+  document.getElementById('at-tensp').value = '';
+  document.getElementById('at-nguoi').value = '';
+  openModal('modalAddTram');
+});
+document.getElementById('btnSubmitAddTram').addEventListener('click', async () => {
+  const ten = document.getElementById('at-ten').value.trim();
+  const masp = document.getElementById('at-masp').value.trim();
+  if (!ten) return showMsg('Chưa nhập tên trạm.', 'err');
+  if (!masp) return showMsg('Chưa nhập mã SP.', 'err');
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('cd_tram_tao', {
+    p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoan,
+    p_ten_tram: ten, p_ma_sp: masp, p_ten_sp: document.getElementById('at-tensp').value.trim(),
+    p_nguoi: document.getElementById('at-nguoi').value.trim(), p_user: session.user.email,
+  });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  closeModal('modalAddTram');
+  showMsg('✅ Đã thêm trạm ' + ten, 'ok');
+  loadTrams();
+});
+
+/* ---------- + Nhập SL ---------- */
+function openNhapSL(id){
+  currentTarget = id;
+  const t = findTram(id);
+  document.getElementById('ns-tram-label').textContent = t ? '(' + t.ten_tram + ' — ' + t.ma_sp + ')' : '';
+  document.getElementById('ns-ok').value = 0;
+  document.getElementById('ns-ng').value = 0;
+  document.getElementById('ns-ghichu').value = '';
+  openModal('modalNhapSL');
+}
+document.getElementById('btnSubmitNhapSL').addEventListener('click', async () => {
+  const ok = Number(document.getElementById('ns-ok').value) || 0;
+  const ng = Number(document.getElementById('ns-ng').value) || 0;
+  const ghiChu = document.getElementById('ns-ghichu').value.trim();
+  if (ok <= 0 && ng <= 0) return showMsg('Phải nhập số OK hoặc NG lớn hơn 0.', 'err');
+  if (ng > 0 && !ghiChu) return showMsg('Có NG thì bắt buộc nhập ghi chú lý do.', 'err');
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('cd_tram_nhap_sanluong', {
+    p_id_tram: currentTarget, p_them_ok: ok, p_them_ng: ng, p_ghi_chu: ghiChu, p_user: session.user.email,
+  });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  closeModal('modalNhapSL');
+  showMsg('✅ Đã nhập sản lượng', 'ok');
+  loadTrams();
+});
+
+/* ---------- Đổi mã SP ---------- */
+function openDoiMa(id){
+  currentTarget = id;
+  const t = findTram(id);
+  document.getElementById('dm-tram-label').textContent = t ? '(' + t.ten_tram + ')' : '';
+  document.getElementById('dm-masp').value = '';
+  document.getElementById('dm-tensp').value = '';
+  document.getElementById('dm-nguoi').value = '';
+  openModal('modalDoiMa');
+}
+document.getElementById('btnSubmitDoiMa').addEventListener('click', async () => {
+  const masp = document.getElementById('dm-masp').value.trim();
+  if (!masp) return showMsg('Chưa nhập mã SP mới.', 'err');
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('cd_tram_doi_ma_sp', {
+    p_id_tram: currentTarget, p_ma_sp_moi: masp, p_ten_sp_moi: document.getElementById('dm-tensp').value.trim(),
+    p_nguoi_moi: document.getElementById('dm-nguoi').value.trim(), p_user: session.user.email,
+  });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  closeModal('modalDoiMa');
+  showMsg('✅ Đã đổi mã SP — sản lượng cũ đã gộp vào báo cáo', 'ok');
+  loadTrams();
+});
+
+/* ---------- Kết thúc trạm ---------- */
+async function ketThucTram(id){
+  const t = findTram(id);
+  if (!confirm('Kết thúc trạm "' + (t ? t.ten_tram : id) + '"? Sản lượng hiện tại sẽ được gộp vào báo cáo.')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('cd_tram_ket_thuc', { p_id_tram: id, p_user: session.user.email });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  showMsg('✅ Đã kết thúc trạm', 'ok');
+  loadTrams();
+}
+
+/* ---------- Kết ca ---------- */
+document.getElementById('btnKetCa').addEventListener('click', async () => {
+  const ngay = document.getElementById('ngay').value, ca = document.getElementById('ca').value;
+  if (!ngay || !ca) return showMsg('Chọn ngày/ca trước.', 'err');
+  if (!confirm('Kết ca ' + ca + ' ngày ' + ngay.split('-').reverse().join('/') + ' cho ' + congDoan + '? Toàn bộ trạm đang hoạt động sẽ được gộp vào báo cáo và xoá khỏi màn hình.')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { data, error } = await sb.rpc('cd_ket_ca_cong_doan', { p_ngay: ngay, p_ca: ca, p_cong_doan: congDoan, p_user: session.user.email });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  showReport(data || []);
+  loadTrams();
+});
+
+function showReport(rows){
+  const tbody = document.getElementById('reportTbody');
+  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Không có dữ liệu.</td></tr>'; }
+  else {
+    tbody.innerHTML = rows.map(r => {
+      const total = Number(r.so_luong_ok) + Number(r.so_luong_ng);
+      const pct = total > 0 ? (Number(r.so_luong_ng) / total * 100).toFixed(1) : '0.0';
+      return '<tr>' +
+        '<td>' + escapeHtml(r.ma_sp) + '</td><td>' + escapeHtml(r.ten_sp || '') + '</td>' +
+        '<td class="num">' + fmtNum(r.so_luong_nhan_vao) + '</td>' +
+        '<td class="num" style="color:#1a7a3a">' + fmtNum(r.so_luong_ok) + '</td>' +
+        '<td class="num" style="color:#c00">' + fmtNum(r.so_luong_ng) + '</td>' +
+        '<td class="num">' + pct + '%</td></tr>';
+    }).join('');
+  }
+  openModal('modalReport');
+}
+
+/* ---------- Hàng đang chờ tại công đoạn (tham khảo, không link cứng) ------- */
+async function loadWaiting(){
+  const el = document.getElementById('waitingList');
+  el.innerHTML = '<div class="empty">Đang tải...</div>';
+  const { data: positions, error } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', congDoan);
+  if (error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!positions || !positions.length){ el.innerHTML = '<div class="empty">Chưa có hàng nào chuyển đến công đoạn này.</div>'; return; }
+  const tags = positions.map(p => p.tag_no);
+  const { data: tems } = await sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,ngay').in('tag_no', tags).gt('so_luong', 0).order('ngay');
+  if (!tems || !tems.length){ el.innerHTML = '<div class="empty">Hàng tại đây đã được đóng gói/xử lý hết.</div>'; return; }
+  el.innerHTML = tems.map(t => `
+    <div class="waiting-item">
+      <span><b>${escapeHtml(t.tag_no)}</b> — ${escapeHtml(t.ma_sp)} ${escapeHtml(t.ten_sp || '')}</span>
+      <span>${fmtNum(t.so_luong)} sp · ${t.ngay ? String(t.ngay).split('-').reverse().join('/') : ''}</span>
+    </div>`).join('');
+}
+
+function requireLogin(){
+  showMsg('Cần đăng nhập trước. Đang chuyển sang trang đăng nhập…', 'err');
+  setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+}
+
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  bar.innerHTML = email ? ('👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>') : '<a href="shared/login.html">Đăng nhập</a>';
+  const so = document.getElementById('mesSignOut');
+  if (so) so.addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); location.reload(); });
+}
+
+initAuthStatus();
+initCongDoan();
+</script>
+</body>
+</html>

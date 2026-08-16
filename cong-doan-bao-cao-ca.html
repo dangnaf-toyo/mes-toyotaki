@@ -115,6 +115,30 @@ async function loadDanhMuc(){
   const { data } = await sb.from('master_products').select('ma_sp,ten_sp');
   (data || []).forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
   document.getElementById('dlMaSp').innerHTML = Object.keys(productMap).sort().map(ma => `<option value="${escapeHtml(ma)}">`).join('');
+  ["congDoan", "ngay", "ca"].forEach(id => document.getElementById(id).addEventListener("change", loadExisting));
+  loadExisting();
+}
+
+// Tự tải các dòng đã lưu sẵn cho đúng (công đoạn, ngày, ca) — dữ liệu có thể
+// đến từ cong-doan-dashboard.html (kết ca tự động cộng dồn) hoặc từ lần nhập
+// tay trước ở chính trang này — trang này giờ vừa là form nhập dự phòng vừa
+// là màn xem lại/sửa những gì đã có.
+async function loadExisting(){
+  const congDoan = document.getElementById("congDoan").value;
+  const ngay = document.getElementById("ngay").value;
+  const ca = document.getElementById("ca").value;
+  if (!congDoan || !ngay || !ca){ rows = []; renderRows(); return; }
+  const { data, error } = await sb.from('cd_bao_cao_ca')
+    .select('ma_sp,ten_sp,to_san_xuat,so_luong_nhan_vao,so_luong_ok,so_luong_ng,ghi_chu')
+    .eq('cong_doan', congDoan).eq('ngay', ngay).eq('ca', ca).order('ma_sp');
+  if (error){ showMsg("Lỗi tải dữ liệu đã lưu: " + error.message, "err"); return; }
+  rows = (data || []).map(r => ({
+    ma_sp: r.ma_sp, ten_sp: r.ten_sp || '', to_san_xuat: r.to_san_xuat || '',
+    so_luong_nhan_vao: r.so_luong_nhan_vao || 0, so_luong_ok: r.so_luong_ok || 0, so_luong_ng: r.so_luong_ng || 0,
+    ghi_chu: r.ghi_chu || '',
+  }));
+  renderRows();
+  if (rows.length) showMsg("ℹ️ Đã có " + rows.length + " dòng lưu sẵn cho ca này — sửa lại nếu cần rồi Lưu.", "ok");
 }
 
 function addRow(maSp, tenSp, soNhan){
