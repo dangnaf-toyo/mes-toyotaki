@@ -49,6 +49,34 @@
     { label: 'Danh mục', href: 'quan-ly-danh-muc.html' },
   ] };
 
+  // Tiêu đề chuẩn hoá cho từng trang — 1 nguồn duy nhất, thay cho header tự
+  // viết riêng (không đồng nhất) ở mỗi trang. Trang nào cần đổi tiêu đề theo
+  // ngữ cảnh (VD cong-doan-dashboard.html theo công đoạn đang chọn) gọi
+  // window.MesNav.setTitle(title, desc) — desc truyền null nếu giữ nguyên.
+  const PAGE_META = {
+    'index.html': { icon: '🏠', title: 'Trang chủ MES', desc: 'Chọn chức năng bạn muốn sử dụng' },
+    'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca' },
+    'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
+    'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh' },
+    'chuyencongdoan.html': { icon: '🔀', title: 'Chuyển công đoạn & Đóng gói', desc: 'Quét QR chuyển hàng, đóng gói lại, đổi mã SP' },
+    'oqc.html': { icon: '📦', title: 'OQC — Đóng gói Pallet', desc: 'Quét tem, gom pallet, đóng gói' },
+    'kho-thanh-pham.html': { icon: '🏬', title: 'Kho Thành Phẩm', desc: 'Nhập kho / Xuất hàng bằng QR' },
+    'truy-xuat-nguon-goc.html': { icon: '🔍', title: 'Truy Xuất Nguồn Gốc', desc: 'Phả hệ tem: tách/gộp xuyên công đoạn' },
+    'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo Cáo Cuối Ca — Ngoài Đúc', desc: 'Bavia / Gia công / Sơn / OQC' },
+    'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time' },
+    'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Kế Hoạch Bảo Dưỡng Khuôn Tuần', desc: 'Gợi ý tự động theo lịch sản xuất' },
+    'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần — Đúc', desc: 'Nhập/sửa kế hoạch theo máy' },
+    'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất' },
+    'intem.html': { icon: '🏷️', title: 'In Tem — Đúc', desc: 'Tạo, tra cứu, sửa, in lại tem' },
+    'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp' },
+    'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin' },
+    'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin' },
+    'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách' },
+    'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca' },
+    'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast' },
+    'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng' },
+  };
+
   const CSS = `
 :root{--navbar-h:50px}
 body{padding-top:var(--navbar-h)}
@@ -84,6 +112,16 @@ body{padding-top:var(--navbar-h)}
   .mnb-burger{display:block}
   .mnb-auth{display:none}
   .mnb-auth-mobile{display:flex;margin-top:8px;padding:12px 8px;border-top:2px solid #f0e6d8;font-size:12.5px;color:#666}
+}
+.mnb-title-bar{background:#fff;border-bottom:1px solid #E4DACB;padding:12px 20px;
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-family:Arial,Helvetica,sans-serif}
+.mnb-title-icon{font-size:18px;line-height:1}
+.mnb-page-title{font-size:16px;font-weight:700;color:#211a15;margin:0}
+.mnb-page-desc{font-size:11.5px;color:#8A7C68}
+@media (max-width:820px){
+  .mnb-title-bar{padding:10px 14px}
+  .mnb-page-title{font-size:14px}
+  .mnb-page-desc{width:100%}
 }
 `;
 
@@ -165,10 +203,34 @@ body{padding-top:var(--navbar-h)}
     renderAuthInto('mnbAuthMobile', null);
     wireInteractions();
 
+    // Thanh tiêu đề chuẩn hoá — thay header tự viết riêng (không đồng nhất)
+    // ở từng trang. Trang không có trong PAGE_META (hiếm) thì không vẽ gì,
+    // giữ nguyên header cũ của trang đó thay vì hiện rỗng.
+    const meta = PAGE_META[cur];
+    if (meta) {
+      const titleBar = document.createElement('div');
+      titleBar.className = 'mnb-title-bar';
+      titleBar.innerHTML =
+        '<span class="mnb-title-icon">' + (meta.icon || '') + '</span>' +
+        '<h1 class="mnb-page-title" id="mnbPageTitle">' + meta.title + '</h1>' +
+        '<span class="mnb-page-desc" id="mnbPageDesc">' + (meta.desc || '') + '</span>';
+      bar.after(titleBar);
+    }
+
     // Tăng cường sau: thêm nhóm "Quản trị" nếu là admin, cập nhật ô đăng nhập
     // — chạy nền, không chặn menu chính.
     enhanceWithAuth(cur);
   }
+
+  // Cho trang tự đổi tiêu đề theo ngữ cảnh (VD cong-doan-dashboard.html theo
+  // công đoạn đang chọn, ncp-detail.html theo mã NCP đang xem). Truyền null
+  // ở tham số nào muốn giữ nguyên.
+  window.MesNav = {
+    setTitle(title, desc) {
+      if (title != null) { const t = document.getElementById('mnbPageTitle'); if (t) t.textContent = title; }
+      if (desc != null) { const d = document.getElementById('mnbPageDesc'); if (d) d.textContent = desc; }
+    },
+  };
 
   async function enhanceWithAuth(cur) {
     let email = null;
