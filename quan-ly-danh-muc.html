@@ -129,7 +129,17 @@
             <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
             <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" id="sp-nguyenlieu"></div>
             <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
-            <div style="grid-column:1/-1"><label for="sp-quytrinh">Quy trình công đoạn (theo đúng thứ tự, cách nhau dấu phẩy)</label><input type="text" id="sp-quytrinh" placeholder="VD: Đúc,Bavia,Sơn,OQC — để trống nếu chưa xác định, chuyencongdoan.html sẽ cho chọn tự do"></div>
+            <div style="grid-column:1/-1">
+              <label>Quy trình công đoạn (chọn theo đúng thứ tự — để trống bước nào thì dừng ở đó)</label>
+              <div id="sp-quytrinh-steps" style="display:flex;gap:8px;flex-wrap:wrap">
+                <select class="sp-quytrinh-step"></select>
+                <select class="sp-quytrinh-step"></select>
+                <select class="sp-quytrinh-step"></select>
+                <select class="sp-quytrinh-step"></select>
+                <select class="sp-quytrinh-step"></select>
+              </div>
+              <p class="muted" style="margin-top:4px">Để trống toàn bộ nếu chưa xác định — <code>chuyencongdoan.html</code> sẽ cho chọn công đoạn tự do như hiện tại.</p>
+            </div>
           </div>
           <div class="form-actions"><button type="submit" id="sp-submit">Thêm sản phẩm</button></div>
         </form>
@@ -302,10 +312,28 @@ document.getElementById('may-form').addEventListener('submit', async (e) => {
 });
 
 // ── Tab Sản phẩm ─────────────────────────────────────────────────────────
+// Quy trình công đoạn chọn qua dropdown (không cho gõ tay) để tránh sai chính
+// tả — sai tên công đoạn sẽ làm chuyencongdoan.html không nhận ra được bước
+// kế tiếp hợp lệ, coi như SP chưa khai báo quy trình.
+const CONG_DOAN_LIST = ["Đúc", "Bavia", "Gia Công", "Sơn", "OQC"];
+function setupQuyTrinhSteps(){
+  document.querySelectorAll('.sp-quytrinh-step').forEach((sel, i) => {
+    sel.innerHTML = '<option value="">-- (dừng ở đây) --</option>' + CONG_DOAN_LIST.map(cd => `<option value="${cd}">Bước ${i + 1}: ${cd}</option>`).join('');
+  });
+}
+function getQuyTrinhValue(){
+  return [...document.querySelectorAll('.sp-quytrinh-step')].map(s => s.value).filter(Boolean).join(',');
+}
+function setQuyTrinhValue(str){
+  const steps = String(str || '').split(',').map(s => s.trim()).filter(Boolean);
+  document.querySelectorAll('.sp-quytrinh-step').forEach((sel, i) => { sel.value = steps[i] || ''; });
+}
+
 let spEditing = null;
 function spResetForm(){
   spEditing = null;
   document.getElementById('sp-form').reset();
+  setQuyTrinhValue('');
   document.getElementById('sp-ma').disabled = false;
   document.getElementById('sp-form-title').textContent = 'Thêm sản phẩm';
   document.getElementById('sp-submit').textContent = 'Thêm sản phẩm';
@@ -346,7 +374,7 @@ async function loadSp(){
       document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
       document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
       document.getElementById('sp-sokhuon').value = r.so_khuon || '';
-      document.getElementById('sp-quytrinh').value = r.quy_trinh_cong_doan || '';
+      setQuyTrinhValue(r.quy_trinh_cong_doan);
       document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
       document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
       document.getElementById('sp-cancel').style.display = 'inline';
@@ -370,7 +398,7 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const cycle_time_s = ctRaw === '' ? null : Number(ctRaw);
   const nguyen_lieu = document.getElementById('sp-nguyenlieu').value.trim() || null;
   const so_khuon = document.getElementById('sp-sokhuon').value.trim() || null;
-  const quy_trinh_cong_doan = document.getElementById('sp-quytrinh').value.trim() || null;
+  const quy_trinh_cong_doan = getQuyTrinhValue() || null;
   if (!ma_sp) return;
 
   let error;
@@ -572,6 +600,7 @@ async function main(){
   }
 
   document.getElementById('adminArea').style.display = 'block';
+  setupQuyTrinhSteps();
   loadMay();
   loadSp();
   loadNs();

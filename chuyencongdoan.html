@@ -111,6 +111,8 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 .pk-add{border:1.5px solid #C87941;background:#fff;color:#C87941}
 .pk-suggest{border:1.5px solid #1a7a3a;background:#fff;color:#1a7a3a}
 .pk-total{font-size:12.5px;color:#555;margin-bottom:10px;font-weight:700}
+.fg-row{display:flex;gap:10px}
+.fg-row .fg{flex:1}
 </style>
 </head>
 <body>
@@ -221,10 +223,23 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 <div id="tabPack" style="display:none;">
   <div class="card">
     <div class="card-ttl">📦 Đóng gói lại — gộp nhiều tem thành đơn vị mới</div>
+    <div class="fg-row">
+      <div class="fg"><label class="req" for="pkNgay">Ngày</label><input type="date" id="pkNgay"></div>
+      <div class="fg"><label class="req" for="pkCa">Ca</label><select id="pkCa"></select></div>
+    </div>
     <div class="fg">
       <label class="req" for="pkCongDoan">Đang đóng gói tại công đoạn</label>
       <select id="pkCongDoan"></select>
       <div class="hint">Tem mới tạo ra sẽ được coi là đang ở công đoạn này.</div>
+    </div>
+    <div class="fg">
+      <label for="pkTram">Trạm/Line/Máy đang hoạt động (Dashboard công đoạn)</label>
+      <select id="pkTram"></select>
+      <div class="hint">Chọn đúng trạm đang chạy mã SP này — người thao tác/ngày giờ tự điền theo trạm, NG hao hụt tự cộng vào đúng trạm đó.</div>
+    </div>
+    <div class="fg" id="pkTramManualWrap">
+      <label>Tên trạm/line/máy (tự nhập — chưa tạo trạm trên Dashboard)</label>
+      <input type="text" id="pkTramManual" placeholder="VD: Line 1, Máy CNC-02...">
     </div>
     <button class="scan-btn" id="pkBtnScan">📷&nbsp; Quét thêm tem nguồn</button>
     <div class="fg" style="margin-top:10px">
@@ -244,7 +259,20 @@ input:focus,select:focus{outline:none;border-color:#C87941;
       <button type="button" class="pk-suggest" id="pkBtnSuggest">🔄 Tính lại theo định mức</button>
     </div>
     <div class="fg">
-      <label class="req" for="pkNguoi">Người đóng gói</label>
+      <label>Số lượng NG/hao hụt phát sinh (không đóng thành tem, trừ thẳng khỏi tem nguồn)</label>
+      <input type="number" min="0" id="pkNgHaoHut" value="0">
+    </div>
+    <div class="fg">
+      <label>Người thao tác trên tem (tự điền theo trạm, sửa được nếu khác)</label>
+      <input type="text" id="pkNguoiThaoTac" list="dlNhanVienPk">
+      <datalist id="dlNhanVienPk"></datalist>
+    </div>
+    <div class="fg">
+      <label>Ngày giờ sản xuất</label>
+      <input type="datetime-local" id="pkThoiDiemSX">
+    </div>
+    <div class="fg">
+      <label class="req" for="pkNguoi">Người thực hiện đóng gói (xác nhận thao tác này)</label>
       <select id="pkNguoi"></select>
     </div>
     <button class="submit-btn" id="pkBtnSubmit">📦&nbsp; Đóng gói &amp; Tạo tem mới</button>
@@ -292,12 +320,24 @@ const CONG_DOAN_DONG_GOI = ["Bavia", "Gia Công", "Sơn", "OQC"];
 // Định mức gợi ý mặc định (sp/đơn vị) theo công đoạn — chỉ là gợi ý điền sẵn,
 // người đóng gói luôn sửa được số thực tế trước khi lưu.
 const CONFIG = { PACKAGING: { "Bavia": 36, "Gia Công": 60, "Sơn": 60, "OQC": 100 } };
+const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
 
 let scannedData = null;
 let scanTarget = "transfer"; // "transfer" (tab 1) hoặc "pack" (tab Đóng gói lại)
 let productRoutingMap = {};  // ma_sp -> ["Đúc","Bavia",...] theo đúng thứ tự khai báo
 let packSources = [];        // [{tag_no, ma_sp, ten_sp, so_luong, ngay, lot, so_khuon, nguyen_lieu, may_duc}]
 let packUnits = [];          // [numeric,...] mỗi phần tử = 1 đơn vị đóng gói mới
+let pkTrams = [];            // trạm đang hoạt động của đúng (ngày, ca, công đoạn) đang chọn ở tab Đóng gói lại
+
+function getTodayString(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function nowForDatetimeLocal(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
 
 function fillSelect(id, arr, placeholder){
   const sel = document.getElementById(id);
@@ -321,6 +361,9 @@ async function loadDanhMuc(){
   fillSelect("congDoanGiao", CONG_DOAN_LIST, "-- Chọn công đoạn --");
   fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
   fillSelect("pkCongDoan", CONG_DOAN_DONG_GOI, "-- Chọn công đoạn --");
+  fillSelect("pkCa", CA_LIST, "-- Chọn ca --");
+  document.getElementById("pkNgay").value = getTodayString();
+  document.getElementById("pkThoiDiemSX").value = nowForDatetimeLocal();
   const [empRes, prodRes] = await Promise.all([
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
     sb.from('master_products').select('ma_sp,quy_trinh_cong_doan'),
@@ -329,6 +372,7 @@ async function loadDanhMuc(){
   const names = (empRes.data || []).map(r => r.ten_nhan_vien);
   fillSelect("nguoiGiao", names, "-- Chọn người giao (có thể bỏ trống) --");
   fillSelect("nguoiNhan", names, "-- Chọn người nhận --");
+  document.getElementById("dlNhanVienPk").innerHTML = names.map(n => `<option value="${n}">`).join("");
   fillSelect("pkNguoi", names, "-- Chọn người đóng gói --");
   productRoutingMap = {};
   (prodRes.data || []).forEach(p => {
@@ -883,6 +927,36 @@ function removePackSource(tagNo){
   renderPackSources();
 }
 
+// Trạm đang hoạt động (Dashboard công đoạn) của đúng ngày/ca/công đoạn đang
+// chọn — chọn 1 trạm ở đây thì người thao tác/ngày giờ tự điền theo trạm, và
+// NG hao hụt lúc đóng gói tự cộng thẳng vào so_luong_ng của đúng trạm đó
+// (xem cd_dong_goi_lai, migration_phase_T6).
+async function loadPkTrams(){
+  const congDoan = document.getElementById("pkCongDoan").value;
+  const ngay = document.getElementById("pkNgay").value;
+  const ca = document.getElementById("pkCa").value;
+  const sel = document.getElementById("pkTram");
+  pkTrams = [];
+  if (!congDoan || !ngay || !ca){ fillSelect("pkTram", [], "-- Chọn công đoạn/ngày/ca trước --"); return; }
+  const { data, error } = await sb.from('cd_tram_hien_tai').select('*').eq('cong_doan', congDoan).eq('ngay', ngay).eq('ca', ca).order('ten_tram');
+  if (error){ err("Không tải được danh sách trạm: " + error.message); return; }
+  pkTrams = data || [];
+  sel.innerHTML = '<option value="">-- Không gắn trạm (tự nhập tay) --</option>' +
+    pkTrams.map(t => `<option value="${t.id_tram}">${t.ten_tram} — ${t.ma_sp}${t.nguoi_thao_tac ? ' (' + t.nguoi_thao_tac + ')' : ''}</option>`).join("");
+  onPkTramChange();
+}
+["pkCongDoan", "pkNgay", "pkCa"].forEach(id => document.getElementById(id).addEventListener("change", loadPkTrams));
+
+function onPkTramChange(){
+  const id = document.getElementById("pkTram").value;
+  const manualWrap = document.getElementById("pkTramManualWrap");
+  if (!id){ manualWrap.style.display = "block"; return; }
+  manualWrap.style.display = "none";
+  const t = pkTrams.find(x => x.id_tram === id);
+  if (t) document.getElementById("pkNguoiThaoTac").value = t.nguoi_thao_tac || "";
+}
+document.getElementById("pkTram").addEventListener("change", onPkTramChange);
+
 function renderPackSources(){
   const list = document.getElementById("pkSrcList");
   const emptyHint = document.getElementById("pkEmptyHint");
@@ -939,14 +1013,24 @@ function renderPackUnits(){
 document.getElementById("pkBtnSubmit").addEventListener("click", submitPackaging);
 async function submitPackaging(){
   const congDoan = document.getElementById("pkCongDoan").value;
+  const ngay = document.getElementById("pkNgay").value;
+  const ca = document.getElementById("pkCa").value;
   const nguoi = document.getElementById("pkNguoi").value;
+  const idTram = document.getElementById("pkTram").value;
+  const tramManual = document.getElementById("pkTramManual").value.trim();
+  const nguoiThaoTac = document.getElementById("pkNguoiThaoTac").value.trim();
+  const thoiDiemSX = document.getElementById("pkThoiDiemSX").value;
+  const ngHaoHut = Number(document.getElementById("pkNgHaoHut").value) || 0;
+
   if (!congDoan) return err("Chưa chọn công đoạn đang đóng gói.");
+  if (!ngay || !ca) return err("Chưa chọn ngày/ca.");
   if (!packSources.length) return err("Chưa quét tem nguồn nào.");
-  if (!packUnits.length || packUnits.some(v => !v || v <= 0)) return err("Đơn vị đóng gói phải có số lượng lớn hơn 0.");
-  if (!nguoi) return err("Chưa chọn người đóng gói.");
+  if (packUnits.some(v => !v || v <= 0)) return err("Đơn vị đóng gói phải có số lượng lớn hơn 0.");
+  if (!packUnits.length && ngHaoHut <= 0) return err("Chưa có đơn vị đóng gói nào (hoặc nhập NG hao hụt nếu toàn bộ là NG).");
+  if (!nguoi) return err("Chưa chọn người thực hiện đóng gói.");
   const total = packSources.reduce((sum, s) => sum + s.so_luong, 0);
-  const requested = packUnits.reduce((sum, v) => sum + v, 0);
-  if (requested > total) return err("Tổng đơn vị đóng gói (" + requested + ") vượt quá tổng tem nguồn (" + total + ").");
+  const requested = packUnits.reduce((sum, v) => sum + v, 0) + ngHaoHut;
+  if (requested > total) return err("Tổng đơn vị đóng gói + NG (" + requested + ") vượt quá tổng tem nguồn (" + total + ").");
 
   const session = await MesAuth.getSession();
   if (!session){
@@ -960,16 +1044,26 @@ async function submitPackaging(){
   const { data, error } = await sb.rpc('cd_dong_goi_lai', {
     p_cong_doan: congDoan,
     p_tag_no_nguon: packSources.map(s => s.tag_no),
-    p_so_luong_moi: packUnits,
+    p_so_luong_moi: packUnits.length ? packUnits : null,
+    p_id_tram: idTram || null,
+    p_tram: tramManual || null,
+    p_nguoi_thao_tac: nguoiThaoTac || null,
+    p_thoi_diem_sx: thoiDiemSX ? new Date(thoiDiemSX).toISOString() : null,
+    p_ng_hao_hut: ngHaoHut > 0 ? ngHaoHut : null,
+    p_ngay: ngay,
+    p_ca: ca,
     p_nguoi: nguoi,
   });
   btn.disabled = false; btn.textContent = "📦  Đóng gói & Tạo tem mới";
   if (error){ err("Lỗi đóng gói: " + error.message); return; }
 
-  showMsg("✅ Đã tạo " + data.length + " tem mới tại " + congDoan + " — đang mở cửa sổ in...", "ok", 8000);
+  const ngNote = ngHaoHut > 0 ? (" — đã ghi " + ngHaoHut + " NG hao hụt") : "";
+  showMsg("✅ Đã tạo " + data.length + " tem mới tại " + congDoan + ngNote + " — đang mở cửa sổ in...", "ok", 8000);
   data.forEach(t => printNewTem(t, congDoan));
   packSources = []; packUnits = [];
+  document.getElementById("pkNgHaoHut").value = 0;
   renderPackSources();
+  loadPkTrams();
 }
 
 function svgEsc(s){
