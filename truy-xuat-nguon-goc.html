@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Truy xuất nguồn gốc — TOYOTAKI</title>
+<!--
+  truy-xuat-nguon-goc.html — nhập/quét 1 Tag No, hiện toàn bộ phả hệ:
+  - "Nguồn gốc" (ngược): tem này được TÁCH TỪ hoặc GỘP TỪ những tem nào.
+  - "Đã dùng để tạo" (xuôi): tem này đã bị TÁCH RA hoặc DÙNG ĐỂ ĐÓNG GÓI
+    thành những tem nào.
+  Dữ liệu lấy từ RPC đệ quy cd_truy_xuat_pha_he (gộp duc_tem_tach +
+  cd_tem_nguon), xem supabase/migration_phase_T5_truy_xuat_pha_he.sql.
+  Đọc công khai, không có thao tác ghi nào ở trang này.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+.wrap{max-width:820px;margin:0 auto}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.hdr h1{font-size:17px;font-weight:700}
+.hdr p{font-size:10px;color:#999;margin-top:2px}
+.auth-info{font-size:11.5px;color:#667}
+.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;font-weight:700;color:#8a5a30;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f5e6d7;display:flex;align-items:center;gap:8px}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.fg input{border:1.5px solid #ddd;border-radius:7px;padding:9px 11px;font-size:14.5px;font-family:inherit;width:100%}
+.fg input:focus{outline:none;border-color:#C87941}
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;background:#C87941;color:#fff;width:100%}
+.btn:hover{background:#a85e2a}
+.sr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;font-size:13px;gap:10px}
+.sr:last-child{border-bottom:none}
+.sr .k{color:#777;font-weight:700;flex-shrink:0}
+.sr .v{text-align:right;font-weight:700}
+.badge-loc{display:inline-block;background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;border-radius:100px;padding:2px 9px;font-size:11px;font-weight:700}
+ul.tree{list-style:none;margin-left:16px;padding-left:14px;border-left:2px solid #f0e0cc}
+ul.tree.root{margin-left:0;padding-left:0;border-left:none}
+ul.tree li{margin:6px 0;font-size:12.5px}
+.tag-chip{font-family:monospace;font-weight:700;background:#faf5f0;border-radius:5px;padding:1px 6px}
+.rel-tach{color:#8a5a30}
+.rel-dong_goi{color:#1a7a3a}
+.node-meta{color:#999;font-size:11px}
+.empty{color:#999;font-style:italic;font-size:12.5px;padding:6px 0}
+#msg{max-width:820px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
+.qr-modal.show{display:flex}
+.qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(0,0,0,.7);flex-shrink:0}
+.qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
+.qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+#qrReaderDiv{position:relative;flex:1;overflow:hidden}
+#qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+.hist-item{font-size:12px;padding:5px 0;border-bottom:1px dashed #eee}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h1>🔍 Truy xuất nguồn gốc</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI · phả hệ tem: tách/gộp xuyên công đoạn</p></div>
+  <div class="auth-info" id="authInfo">…</div>
+</div>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Tra cứu Tag No</h2>
+    <div class="fg">
+      <label>Tag No</label>
+      <input type="text" id="searchTag" placeholder="Gõ Tag No hoặc dùng đầu đọc QR rời rồi Enter">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn" id="btnSearch" style="flex:1">🔎 Tra cứu</button>
+      <button type="button" class="btn" id="btnScan" style="flex:1;background:#fff;border:1.5px solid #C87941;color:#C87941">📷 Quét QR</button>
+    </div>
+    <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+  </div>
+
+  <div id="resultArea" style="display:none">
+    <div class="card">
+      <h2>📦 Tem hiện đang tra</h2>
+      <div id="currentInfo"></div>
+    </div>
+
+    <div class="card">
+      <h2>⬆ Nguồn gốc (tem này được tạo từ)</h2>
+      <div id="nguocTree"></div>
+    </div>
+
+    <div class="card">
+      <h2>⬇ Đã dùng để tạo (tem này đã dùng làm nguồn cho)</h2>
+      <div id="xuoiTree"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔀 Lịch sử chuyển công đoạn (của chính tem này)</h2>
+      <div id="histList"></div>
+    </div>
+  </div>
+</div>
+
+<canvas id="scanCanvas" style="display:none"></canvas>
+<div class="qr-modal" id="qrModal">
+  <div class="qr-modal-hdr">
+    <span>📷 Đưa mã QR trên tem vào giữa khung hình</span>
+    <button type="button" class="qr-modal-close" id="btnCloseQrModal">✖ Đóng</button>
+  </div>
+  <div id="qrReaderDiv"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
+function showMsg(text, cls){ const el = document.getElementById('msg'); el.textContent = text; el.className = cls; }
+function fmtDateVN(d){ return d ? String(d).split('-').reverse().join('/') : ''; }
+function parseTagNo(raw){
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  return s.includes('>') ? s.split('>')[0].trim() : s;
+}
+
+document.getElementById('btnSearch').addEventListener('click', () => search(document.getElementById('searchTag').value));
+document.getElementById('searchTag').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  search(e.target.value);
+});
+
+async function search(raw){
+  const tagNo = parseTagNo(raw);
+  if (!tagNo) return showMsg('Nhập hoặc quét Tag No trước.', 'err');
+  document.getElementById('searchTag').value = tagNo;
+  showMsg('⏳ Đang tra cứu ' + tagNo + '...', 'ok');
+  document.getElementById('resultArea').style.display = 'none';
+
+  const [temRes, edgeRes, locRes, histRes] = await Promise.all([
+    sb.from('duc_tem').select('*').eq('tag_no', tagNo).maybeSingle(),
+    sb.rpc('cd_truy_xuat_pha_he', { p_tag_no: tagNo }),
+    sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', tagNo).maybeSingle(),
+    sb.from('cd_chuyen_cong_doan_log').select('*').eq('tag_no', tagNo).order('thoi_gian_chuyen'),
+  ]);
+
+  if (temRes.error || !temRes.data){ showMsg('Không tìm thấy tem ' + tagNo + ' trong hệ thống.', 'err'); return; }
+  if (edgeRes.error){ showMsg('Lỗi tra phả hệ: ' + edgeRes.error.message, 'err'); return; }
+
+  const edges = (edgeRes.data || []).map(e => ({ huong: e.huong, cap: e.cap, tu: e.tag_cha, den: e.tag_con, so_luong: e.so_luong, loai: e.loai }));
+  const allTags = new Set([tagNo]);
+  edges.forEach(e => { allTags.add(e.tu); allTags.add(e.den); });
+
+  const { data: temList } = await sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,ngay').in('tag_no', [...allTags]);
+  const tagInfo = {};
+  (temList || []).forEach(t => { tagInfo[t.tag_no] = t; });
+  tagInfo[tagNo] = temRes.data;
+
+  document.getElementById('resultArea').style.display = 'block';
+  renderCurrent(temRes.data, locRes.data);
+  renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo);
+  renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo);
+  renderHistory(histRes.data || []);
+  showMsg('✅ Đã tra cứu ' + tagNo, 'ok');
+}
+
+function renderCurrent(t, loc){
+  document.getElementById('currentInfo').innerHTML = `
+    <div class="sr"><div class="k">Tag No</div><div class="v">${escapeHtml(t.tag_no)}</div></div>
+    <div class="sr"><div class="k">Mã SP</div><div class="v">${escapeHtml(t.ma_sp)}</div></div>
+    <div class="sr"><div class="k">Tên SP</div><div class="v">${escapeHtml(t.ten_sp || '—')}</div></div>
+    <div class="sr"><div class="k">Số lượng còn lại</div><div class="v">${fmtNum(t.so_luong)}</div></div>
+    <div class="sr"><div class="k">Ngày (gốc)</div><div class="v">${fmtDateVN(t.ngay)}</div></div>
+    <div class="sr"><div class="k">Số khuôn</div><div class="v">${escapeHtml(t.so_khuon) || '—'}</div></div>
+    <div class="sr"><div class="k">Nguyên liệu</div><div class="v">${escapeHtml(t.nguyen_lieu) || '—'}</div></div>
+    <div class="sr"><div class="k">Vị trí hiện tại</div><div class="v">${loc && loc.vi_tri_hien_tai ? '<span class="badge-loc">' + escapeHtml(loc.vi_tri_hien_tai) + '</span>' : '<span style="color:#999">Chưa từng chuyển công đoạn</span>'}</div></div>
+  `;
+}
+
+const REL_LABEL = {
+  nguoc: { tach: '✂ Tách từ', dong_goi: '📦 Gộp từ' },
+  xuoi:  { tach: '✂ Tách ra thành', dong_goi: '📦 Dùng để đóng gói thành' },
+};
+
+function renderTree(elId, edges, rootTag, direction, tagInfo){
+  const el = document.getElementById(elId);
+  if (!edges.length){ el.innerHTML = '<div class="empty">' + (direction === 'nguoc' ? 'Không có — đây là tem gốc, chưa được tách/gộp từ tem nào khác.' : 'Chưa được dùng để tách/đóng gói thành tem nào khác.') + '</div>'; return; }
+
+  function childrenOf(tag){
+    return edges.filter(e => direction === 'nguoc' ? e.den === tag : e.tu === tag);
+  }
+  function renderChildrenList(tag, visited){
+    const kids = childrenOf(tag);
+    if (!kids.length) return '';
+    return kids.map(e => {
+      const other = direction === 'nguoc' ? e.tu : e.den;
+      if (visited.has(other)) return '<li><span class="tag-chip">' + escapeHtml(other) + '</span> <span class="node-meta">(đã hiện ở nhánh khác)</span></li>';
+      const info = tagInfo[other];
+      const nextVisited = new Set(visited); nextVisited.add(other);
+      const grandChildren = renderChildrenList(other, nextVisited);
+      return '<li><span class="rel-' + e.loai + '">' + REL_LABEL[direction][e.loai] + '</span> ' +
+        '<span class="tag-chip">' + escapeHtml(other) + '</span> — ' + fmtNum(e.so_luong) + ' sp' +
+        (info ? ' <span class="node-meta">(' + escapeHtml(info.ma_sp) + ', còn ' + fmtNum(info.so_luong) + ')</span>' : '') +
+        (grandChildren ? '<ul class="tree">' + grandChildren + '</ul>' : '') + '</li>';
+    }).join('');
+  }
+  el.innerHTML = '<ul class="tree root">' + renderChildrenList(rootTag, new Set([rootTag])) + '</ul>';
+}
+
+function renderHistory(rows){
+  const el = document.getElementById('histList');
+  if (!rows.length){ el.innerHTML = '<div class="empty">Chưa từng chuyển công đoạn.</div>'; return; }
+  el.innerHTML = rows.map(r => {
+    const t = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN', { hour12: false });
+    return '<div class="hist-item">' + t + ' — <b>' + escapeHtml(r.cong_doan_giao) + '</b> → <b>' + escapeHtml(r.cong_doan_nhan) + '</b> · ' +
+      fmtNum(r.sl_thuc_chuyen) + ' sp · ' + escapeHtml(r.trang_thai_xac_nhan || '') + '</div>';
+  }).join('');
+}
+
+/* ---------- Quét QR camera (giống chuyencongdoan.html) ---------- */
+let html5QrCode = null;
+let scanningActive = false;
+function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode("qrReaderDiv"); return html5QrCode; }
+
+async function openCamera(){
+  if (typeof Html5Qrcode !== "function"){ showMsg("Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang.", "err"); return; }
+  document.getElementById("qrModal").classList.add("show");
+  const scanner = getScanner();
+  scanningActive = true;
+  try {
+    await scanner.start({ facingMode: "environment" }, { fps: 8, qrbox: { width: 260, height: 260 } }, onScanSuccess, () => {});
+  } catch(e){
+    scanningActive = false;
+    await closeQrModal();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      document.getElementById("qrFileInput").click();
+      return;
+    }
+    showMsg("Không mở được camera: " + e, "err");
+  }
+}
+async function closeQrModal(){
+  document.getElementById("qrModal").classList.remove("show");
+  scanningActive = false;
+  if (html5QrCode && html5QrCode.isScanning){ try { await html5QrCode.stop(); } catch(e){} }
+}
+async function onScanSuccess(decodedText){
+  if (!scanningActive) return;
+  scanningActive = false;
+  await closeQrModal();
+  search(decodedText);
+}
+function onFileChosen(evt){
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.getElementById("scanCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = img.width; canvas.height = img.height;
+    ctx.drawImage(img, 0, 0, img.width, img.height);
+    URL.revokeObjectURL(url);
+    const data = ctx.getImageData(0, 0, img.width, img.height);
+    const code = jsQR(data.data, data.width, data.height);
+    if (code && code.data) search(code.data);
+    else showMsg("Không đọc được mã QR trong ảnh.", "err");
+    evt.target.value = "";
+  };
+  img.src = url;
+}
+
+document.getElementById('btnScan').addEventListener('click', openCamera);
+document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
+document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
+
+async function initAuthStatus(){
+  const bar = document.getElementById('authInfo');
+  const email = await MesAuth.getCurrentUserEmail();
+  bar.innerHTML = email ? ('👤 ' + email) : '<a href="shared/login.html">Đăng nhập</a>';
+}
+initAuthStatus();
+</script>
+</body>
+</html>
