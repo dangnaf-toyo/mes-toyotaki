@@ -14,13 +14,18 @@
   - Lớp truy xuất theo tem (QR) vẫn ở chuyencongdoan.html — trang này chỉ có
     nút lối tắt mở sang đó, KHÔNG lặp lại camera/QR ở đây.
   - Lớp này (mới) là bảng tính sổ tổ chức sản xuất: trạm/tổ lao động thủ công
-    (tên tự do, không phải danh mục máy cố định) — mã SP đang làm, ai đứng,
-    sản lượng OK/NG CỘNG DỒN real-time xuyên ca. Card "Hàng đang chờ" đọc
-    cd_v_vi_tri_hien_tai chỉ để trưởng ca tham khảo bằng mắt, KHÔNG link cứng
-    vào trạm.
+    (tên tự do, không phải danh mục máy cố định — DB vẫn gọi chung "trạm"
+    (cd_tram_hien_tai/ten_tram), UI đổi nhãn hiển thị theo công đoạn qua
+    TRAM_LABEL: Bavia/Sơn = "Line", Gia Công = "Máy", OQC = "Bàn kiểm") — mã
+    SP đang làm, ai đứng, sản lượng OK/NG CỘNG DỒN real-time xuyên ca. Card
+    "Hàng đang chờ" đọc cd_v_vi_tri_hien_tai chỉ để trưởng ca tham khảo bằng
+    mắt, KHÔNG link cứng vào trạm.
 
-  Không có kế hoạch sản xuất trước — trưởng ca tạo trạm phản ứng theo hàng đã
-  nhận từ công đoạn trước (quyết định đã chốt: không cần đặt mục tiêu).
+  KHÔNG có kế hoạch sản xuất TRƯỚC ca (trưởng ca tạo trạm phản ứng theo hàng
+  đã nhận, không đặt mục tiêu tuần/ngày trước) — nhưng MỖI TRẠM khi gán mã SP
+  có thể nhập "KH ca (pcs)" làm mốc tham khảo tiến độ ngay trong ca đó (thêm
+  ở migration_phase_T4_ten_donvi_ke_hoach_ca.sql), không phải kế hoạch dài
+  hạn.
 -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -108,11 +113,11 @@ td.num{text-align:right;font-weight:700}
     </div>
 
     <div class="card">
-      <h2>🧑‍🏭 Trạm đang hoạt động</h2>
+      <h2 id="tramsSectionTitle">🧑‍🏭 Trạm đang hoạt động</h2>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người thao tác</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
-          <tbody id="tramTbody"><tr class="empty-row"><td colspan="7">Đang tải...</td></tr></tbody>
+          <thead><tr><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người thao tác</th><th>KH ca</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
+          <tbody id="tramTbody"><tr class="empty-row"><td colspan="8">Đang tải...</td></tr></tbody>
         </table>
       </div>
       <div style="margin-top:12px"><button type="button" class="btn" id="btnAddTram">+ Thêm trạm</button></div>
@@ -123,14 +128,15 @@ td.num{text-align:right;font-weight:700}
 <!-- MODAL: Thêm trạm -->
 <div class="modal-mask" id="modalAddTram">
   <div class="modal">
-    <div class="modal-head"><div class="modal-title">+ Thêm trạm</div><button class="modal-close" onclick="closeModal('modalAddTram')">✕</button></div>
+    <div class="modal-head"><div class="modal-title" id="addTramTitle">+ Thêm trạm</div><button class="modal-close" onclick="closeModal('modalAddTram')">✕</button></div>
     <div class="modal-body">
-      <div class="fg"><label class="req">Tên trạm/tổ</label><input type="text" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
+      <div class="fg"><label class="req" id="lblTenTram">Tên trạm/tổ</label><input type="text" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
       <div class="fg"><label class="req">Mã SP</label><input type="text" id="at-masp" list="dlMaSp" oninput="onMaSpPick('at-masp','at-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" id="at-tensp"></div>
+      <div class="fg"><label>KH ca (pcs) — mốc tham khảo tiến độ, không bắt buộc</label><input type="number" min="0" id="at-khca"></div>
       <div class="fg"><label>Người thao tác</label><input type="text" id="at-nguoi" list="dlNhanVien"></div>
     </div>
-    <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalAddTram')">Huỷ</button><button class="btn" id="btnSubmitAddTram">Thêm trạm</button></div>
+    <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalAddTram')">Huỷ</button><button class="btn" id="btnSubmitAddTram">Thêm</button></div>
   </div>
 </div>
 
@@ -152,9 +158,10 @@ td.num{text-align:right;font-weight:700}
   <div class="modal">
     <div class="modal-head"><div class="modal-title">🔄 Đổi mã SP <span id="dm-tram-label"></span></div><button class="modal-close" onclick="closeModal('modalDoiMa')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:#999">Sản lượng OK/NG hiện tại của trạm sẽ được cộng vào báo cáo cho đúng mã SP cũ, sau đó trạm reset về 0 với mã mới.</p>
+      <p style="font-size:11.5px;color:#999" id="dm-desc">Sản lượng OK/NG hiện tại sẽ được cộng vào báo cáo cho đúng mã SP cũ, sau đó reset về 0 với mã mới.</p>
       <div class="fg"><label class="req">Mã SP mới</label><input type="text" id="dm-masp" list="dlMaSp" oninput="onMaSpPick('dm-masp','dm-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" id="dm-tensp"></div>
+      <div class="fg"><label>KH ca (pcs) — không bắt buộc</label><input type="number" min="0" id="dm-khca"></div>
       <div class="fg"><label>Người thao tác mới (để trống nếu giữ nguyên)</label><input type="text" id="dm-nguoi" list="dlNhanVien"></div>
     </div>
     <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalDoiMa')">Huỷ</button><button class="btn" id="btnSubmitDoiMa">Xác nhận đổi</button></div>
@@ -189,6 +196,8 @@ let congDoan = null;
 let productMap = {};
 let trams = [];
 let currentTarget = null;
+const TRAM_LABEL_MAP = { 'Bavia': 'Line', 'Gia Công': 'Máy', 'Sơn': 'Line', 'OQC': 'Bàn kiểm' };
+function tramLabel(){ return TRAM_LABEL_MAP[congDoan] || 'Trạm'; }
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
@@ -230,6 +239,7 @@ async function startDashboard(){
   document.getElementById('pageTitle').textContent = '🏭 Dashboard công đoạn — ' + congDoan;
   document.title = 'Dashboard ' + congDoan + ' — TOYOTAKI';
   document.getElementById('mainArea').style.display = 'block';
+  applyTramLabel();
   document.getElementById('ngay').value = getTodayString();
   fillSelect('ca', CA_LIST, '-- Chọn ca --');
   document.getElementById('ngay').addEventListener('change', reloadAll);
@@ -255,28 +265,39 @@ function reloadAll(){
   loadWaiting();
 }
 
+function applyTramLabel(){
+  const lbl = tramLabel();
+  document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + lbl + ' đang hoạt động';
+  document.getElementById('thTenTram').textContent = 'Tên ' + lbl;
+  document.getElementById('btnAddTram').textContent = '+ Thêm ' + lbl;
+  document.getElementById('addTramTitle').textContent = '+ Thêm ' + lbl;
+  document.getElementById('lblTenTram').textContent = 'Tên ' + lbl;
+}
+
 /* ---------- Trạm đang hoạt động ---------- */
 async function loadTrams(){
   const ngay = document.getElementById('ngay').value;
   const ca = document.getElementById('ca').value;
   const tbody = document.getElementById('tramTbody');
-  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải...</td></tr>';
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải...</td></tr>';
   const { data, error } = await sb.from('cd_tram_hien_tai')
     .select('*').eq('cong_doan', congDoan).eq('ngay', ngay).eq('ca', ca).order('ten_tram');
-  if (error){ tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Lỗi: ' + escapeHtml(error.message) + '</td></tr>'; return; }
+  if (error){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Lỗi: ' + escapeHtml(error.message) + '</td></tr>'; return; }
   trams = data || [];
   renderTrams();
 }
 
 function renderTrams(){
   const tbody = document.getElementById('tramTbody');
-  if (!trams.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Chưa có trạm nào hoạt động trong ca này — bấm "+ Thêm trạm".</td></tr>'; return; }
+  const lbl = tramLabel().toLowerCase();
+  if (!trams.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
   tbody.innerHTML = trams.map(t => `
     <tr>
       <td>${escapeHtml(t.ten_tram)}</td>
       <td>${escapeHtml(t.ma_sp)}</td>
       <td>${escapeHtml(t.ten_sp) || '<span style="color:#999">—</span>'}</td>
       <td>${escapeHtml(t.nguoi_thao_tac) || '<span style="color:#999">—</span>'}</td>
+      <td class="num">${t.kh_ca != null ? fmtNum(t.kh_ca) : '<span style="color:#999">—</span>'}</td>
       <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
       <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
       <td style="white-space:nowrap">
@@ -289,29 +310,32 @@ function renderTrams(){
 
 function findTram(id){ return trams.find(t => t.id_tram === id); }
 
-/* ---------- + Thêm trạm ---------- */
+/* ---------- + Thêm trạm/line/máy/bàn kiểm ---------- */
 document.getElementById('btnAddTram').addEventListener('click', () => {
   document.getElementById('at-ten').value = '';
   document.getElementById('at-masp').value = '';
   document.getElementById('at-tensp').value = '';
+  document.getElementById('at-khca').value = '';
   document.getElementById('at-nguoi').value = '';
   openModal('modalAddTram');
 });
 document.getElementById('btnSubmitAddTram').addEventListener('click', async () => {
   const ten = document.getElementById('at-ten').value.trim();
   const masp = document.getElementById('at-masp').value.trim();
-  if (!ten) return showMsg('Chưa nhập tên trạm.', 'err');
+  if (!ten) return showMsg('Chưa nhập tên ' + tramLabel().toLowerCase() + '.', 'err');
   if (!masp) return showMsg('Chưa nhập mã SP.', 'err');
+  const khCaRaw = document.getElementById('at-khca').value;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_tao', {
     p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoan,
     p_ten_tram: ten, p_ma_sp: masp, p_ten_sp: document.getElementById('at-tensp').value.trim(),
+    p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
     p_nguoi: document.getElementById('at-nguoi').value.trim(), p_user: session.user.email,
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalAddTram');
-  showMsg('✅ Đã thêm trạm ' + ten, 'ok');
+  showMsg('✅ Đã thêm ' + ten, 'ok');
   loadTrams();
 });
 
@@ -349,16 +373,19 @@ function openDoiMa(id){
   document.getElementById('dm-tram-label').textContent = t ? '(' + t.ten_tram + ')' : '';
   document.getElementById('dm-masp').value = '';
   document.getElementById('dm-tensp').value = '';
+  document.getElementById('dm-khca').value = t && t.kh_ca != null ? t.kh_ca : '';
   document.getElementById('dm-nguoi').value = '';
   openModal('modalDoiMa');
 }
 document.getElementById('btnSubmitDoiMa').addEventListener('click', async () => {
   const masp = document.getElementById('dm-masp').value.trim();
   if (!masp) return showMsg('Chưa nhập mã SP mới.', 'err');
+  const khCaRaw = document.getElementById('dm-khca').value;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_doi_ma_sp', {
     p_id_tram: currentTarget, p_ma_sp_moi: masp, p_ten_sp_moi: document.getElementById('dm-tensp').value.trim(),
+    p_kh_ca_moi: khCaRaw === '' ? null : Number(khCaRaw),
     p_nguoi_moi: document.getElementById('dm-nguoi').value.trim(), p_user: session.user.email,
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
@@ -367,15 +394,15 @@ document.getElementById('btnSubmitDoiMa').addEventListener('click', async () => 
   loadTrams();
 });
 
-/* ---------- Kết thúc trạm ---------- */
+/* ---------- Kết thúc trạm/line/máy/bàn kiểm ---------- */
 async function ketThucTram(id){
   const t = findTram(id);
-  if (!confirm('Kết thúc trạm "' + (t ? t.ten_tram : id) + '"? Sản lượng hiện tại sẽ được gộp vào báo cáo.')) return;
+  if (!confirm('Kết thúc "' + (t ? t.ten_tram : id) + '"? Sản lượng hiện tại sẽ được gộp vào báo cáo.')) return;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_ket_thuc', { p_id_tram: id, p_user: session.user.email });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
-  showMsg('✅ Đã kết thúc trạm', 'ok');
+  showMsg('✅ Đã kết thúc ' + (t ? t.ten_tram : ''), 'ok');
   loadTrams();
 }
 
@@ -383,7 +410,7 @@ async function ketThucTram(id){
 document.getElementById('btnKetCa').addEventListener('click', async () => {
   const ngay = document.getElementById('ngay').value, ca = document.getElementById('ca').value;
   if (!ngay || !ca) return showMsg('Chọn ngày/ca trước.', 'err');
-  if (!confirm('Kết ca ' + ca + ' ngày ' + ngay.split('-').reverse().join('/') + ' cho ' + congDoan + '? Toàn bộ trạm đang hoạt động sẽ được gộp vào báo cáo và xoá khỏi màn hình.')) return;
+  if (!confirm('Kết ca ' + ca + ' ngày ' + ngay.split('-').reverse().join('/') + ' cho ' + congDoan + '? Toàn bộ ' + tramLabel().toLowerCase() + ' đang hoạt động sẽ được gộp vào báo cáo và xoá khỏi màn hình.')) return;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { data, error } = await sb.rpc('cd_ket_ca_cong_doan', { p_ngay: ngay, p_ca: ca, p_cong_doan: congDoan, p_user: session.user.email });
