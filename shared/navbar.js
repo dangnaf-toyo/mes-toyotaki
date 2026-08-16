@@ -65,7 +65,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-caret{font-size:9px;opacity:.7}
 .mnb-dropdown{display:none;position:absolute;top:100%;left:0;background:#fff;border-radius:0 0 8px 8px;
   box-shadow:0 8px 20px rgba(0,0,0,.22);min-width:230px;padding:6px;flex-direction:column;z-index:5001}
-.mnb-group:hover .mnb-dropdown{display:flex}
+.mnb-group:hover .mnb-dropdown,.mnb-group.open .mnb-dropdown{display:flex}
 .mnb-item{padding:9px 12px;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:600}
 .mnb-item:hover{background:#faf5f0;color:#C87941}
 .mnb-item.route-active{background:#f5e6d7;color:#a85e2a}
@@ -119,11 +119,25 @@ body{padding-top:var(--navbar-h)}
     document.getElementById('mnbBurger').addEventListener('click', () => {
       document.getElementById('mnbGroups').classList.toggle('open');
     });
+    // Bấm để mở/đóng dropdown — không chỉ dựa vào hover (chuột không rê qua,
+    // trackpad, hoặc bấm thẳng vào nút đều phải mở được). Trên desktop dùng
+    // class "open" (đè lên nội dung trang, đóng khi bấm ra ngoài); trên mobile
+    // dùng "mobile-open" (kiểu accordion, xổ ngay dưới nút, không cần đóng ra
+    // ngoài vì đã ở trong lớp phủ toàn màn hình riêng).
     document.querySelectorAll('.mnb-group-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (window.innerWidth > 820) return; // desktop: hover lo dropdown, không cần bấm
-        btn.parentElement.classList.toggle('mobile-open');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const group = btn.parentElement;
+        const cls = window.innerWidth > 820 ? 'open' : 'mobile-open';
+        const wasOpen = group.classList.contains(cls);
+        document.querySelectorAll('.mnb-group.open, .mnb-group.mobile-open').forEach(g => {
+          if (g !== group) { g.classList.remove('open'); g.classList.remove('mobile-open'); }
+        });
+        group.classList.toggle(cls, !wasOpen);
       });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.mnb-group.open').forEach(g => g.classList.remove('open'));
     });
   }
 
