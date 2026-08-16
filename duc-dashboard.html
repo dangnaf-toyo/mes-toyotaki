@@ -318,7 +318,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <span class="date" id="clock-date">—</span>
       <span class="time" id="clock-time">--:--:--</span>
     </div>
-    <div class="auth-info" id="auth-info">…</div>
     <div style="display:flex;gap:6px">
       <button class="btn btn-ghost" id="btn-bulk-incident" onclick="openBulkIncidentModal()">⚡ Sự cố nhiều máy</button>
       <button class="btn btn-ghost" id="btn-khuon-manage" onclick="openKhuonManageModal()">🧊 Quản lý khuôn</button>
@@ -1059,6 +1058,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
  * Dashboard Đúc — bản web tĩnh chạy thẳng trên Supabase (thay google.script.run).
@@ -1219,16 +1219,12 @@ async function rpcWrite(fn, params){
 // =============================================================================
 const DRAFT_KEY = 'ducdash_draft_v1';
 
+// Hiển thị đăng nhập/đăng xuất giờ do shared/navbar.js đảm nhiệm chung cho
+// mọi trang — hàm này chỉ còn giữ lại phần đồng bộ state.user (dùng khi ghi
+// last_updated_by ở các RPC ghi dữ liệu).
 async function initAuthStatus(){
-  const bar = document.getElementById('auth-info');
   const email = await MesAuth.getCurrentUserEmail();
   state.user = email || '';
-  if (email){
-    bar.innerHTML = '👤 ' + escapeHtml(email) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">🔒 Đăng nhập để ghi dữ liệu</a>';
-  }
 }
 
 function gotoLogin(){

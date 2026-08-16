@@ -68,7 +68,6 @@ tr:hover td{background:#fffaf5}
 
 <div class="hdr">
   <div><h1>📋 Kế hoạch sản xuất tuần — Khối Đúc</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI · thay Google Sheet KHSX</p></div>
-  <div class="auth-info" id="authInfo">…</div>
 </div>
 
 <div id="msg"></div>
@@ -142,6 +141,7 @@ tr:hover td{background:#fffaf5}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 let weekMonday = mondayOf(new Date());
 let rows = [];
@@ -438,22 +438,10 @@ document.getElementById('btnNextWeek').addEventListener('click', () => { weekMon
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
 function onWeekChange(){ updateWeekLabel(); loadRows(); }
 
-async function initAuthStatus(){
-  const bar = document.getElementById('authInfo');
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email){
-    bar.innerHTML = `👤 ${email} · <a href="#" id="mesSignOut">Đăng xuất</a>`;
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = `<a href="shared/login.html">Đăng nhập</a>`;
-  }
-}
-
 updateWeekLabel();
 loadRows();
 loadMasterLists();
 loadMoldsByProduct();
-initAuthStatus();
 </script>
 </body>
 </html>

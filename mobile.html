@@ -47,7 +47,7 @@ input,select,textarea,button{font-family:inherit;font-size:1rem}
 button{cursor:pointer}
 .hidden{display:none!important}
 
-.appbar{position:sticky;top:0;z-index:20;background:var(--bg-header);color:#fff;padding:.65rem .75rem;display:flex;align-items:center;gap:.5rem;box-shadow:var(--shadow-md)}
+.appbar{position:sticky;top:var(--navbar-h,0);z-index:20;background:var(--bg-header);color:#fff;padding:.65rem .75rem;display:flex;align-items:center;gap:.5rem;box-shadow:var(--shadow-md)}
 .appbar .back{width:2.4rem;height:2.4rem;border-radius:.5rem;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:1.15rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .appbar .title{font-size:1.05rem;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .appbar .sub{font-size:.7rem;color:#94A3B8;font-weight:500}
@@ -166,7 +166,6 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 <div class="screen active" id="scr-list">
   <div class="appbar">
     <div class="title">🏭 Nhập liệu sản xuất</div>
-    <div class="auth" id="auth-info">…</div>
   </div>
   <div class="ctx-summary" onclick="toggleCtxBar()">
     <div>
@@ -335,6 +334,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 const TEM_PRINT_URL = 'intem.html';
 const LS_KEYS = { PHUONG_AN_CA: 'mes_pa_ca_mobile', CA: 'mes_ca_mobile', TRUONG_CA: 'mes_truong_ca_mobile' };
@@ -406,16 +406,11 @@ document.addEventListener('focusin', e => {
 // AUTH — đọc công khai, GHI bắt buộc đăng nhập (gate khi MỞ màn ghi, giống
 // duc-dashboard.html — không đợi tới lúc Lưu mới báo).
 // =============================================================================
+// Hiển thị đăng nhập/đăng xuất giờ do shared/navbar.js đảm nhiệm chung — hàm
+// này chỉ còn đồng bộ state.user (dùng khi ghi last_updated_by).
 async function initAuthStatus(){
-  const bar = document.getElementById('auth-info');
   const email = await MesAuth.getCurrentUserEmail();
   state.user = email || '';
-  if (email) {
-    bar.innerHTML = '👤 ' + escapeHtml(email.split('@')[0]) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    document.getElementById('mesSignOut').addEventListener('click', e => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">🔒 Đăng nhập</a>';
-  }
 }
 function gotoLogin(){ window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }
 async function ensureAuth(){

@@ -64,7 +64,6 @@
       <div class="eyebrow">TOYOTAKI · Quản lý hệ thống</div>
       <h1>Quản Lý Tài Khoản &amp; Phân Quyền</h1>
       <div class="sub">Tạo tài khoản đăng nhập, gán vai trò cho từng người dùng.</div>
-      <div class="auth-bar" id="authInfo">…</div>
     </div>
     <div class="back"><a href="index.html">← Trang chủ MES</a></div>
   </div>
@@ -123,6 +122,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 const ROLE_LABELS = {
   admin: 'Admin',
@@ -139,17 +139,6 @@ function fillRoleSelect(sel, selected){
   sel.innerHTML = Object.entries(ROLE_LABELS).map(([v, l]) =>
     `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`
   ).join('');
-}
-
-async function initAuthStatus(){
-  const bar = document.getElementById('authInfo');
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email){
-    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
-  }
 }
 
 async function loadUsers(){
@@ -273,7 +262,6 @@ async function handleCreate(e){
 }
 
 async function main(){
-  initAuthStatus();
   currentSession = await MesAuth.requireAuth();
 
   const gate = document.getElementById('gate');

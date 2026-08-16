@@ -114,7 +114,6 @@ textarea{resize:vertical;min-height:48px}
   <div class="hdr-left">
     <div><h1>🏷️ In Tem Sản Phẩm — Đúc</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</p></div>
   </div>
-  <div class="auth-info" id="authInfo">…</div>
 </div>
 
 <div id="loading" class="loading-overlay">
@@ -291,6 +290,7 @@ textarea{resize:vertical;min-height:48px}
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 var masterData = [];   // [{ma, ten, nguyenLieu}]
 var masterMap = {};    // ma_sp -> {ten, nguyenLieu}
@@ -880,17 +880,6 @@ window.addEventListener("unhandledrejection", (e) => {
   err("Lỗi JS (promise): " + m);
 });
 
-async function initAuthStatus(){
-  const bar = document.getElementById("authInfo");
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email){
-    bar.innerHTML = `👤 ${email} · <a href="#" id="mesSignOut">Đăng xuất</a>`;
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = `<a href="shared/login.html">Đăng nhập</a>`;
-  }
-}
-
 (async function init(){
   try {
     await loadMaster();
@@ -902,7 +891,6 @@ async function initAuthStatus(){
     document.getElementById("loading").style.display="none";
     err("Không tải được dữ liệu: " + e.message);
   }
-  initAuthStatus();
 })();
 </script>
 </body>

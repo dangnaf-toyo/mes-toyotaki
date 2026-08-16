@@ -93,7 +93,6 @@
       <div class="eyebrow">TOYOTAKI · Khối Đúc</div>
       <h1>Xem Lại Báo Cáo Kết Ca</h1>
       <div class="sub">Tra cứu báo cáo kết ca đã lưu theo ngày/ca — dùng khi lúc kết ca quên bấm Lưu PDF.</div>
-      <div class="auth-bar" id="authInfo">…</div>
     </div>
     <div class="back"><a href="index.html">← Trang chủ MES</a></div>
   </div>
@@ -137,6 +136,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
@@ -157,17 +157,6 @@ function clearSearchMsg(){
   const el = document.getElementById('searchMsg');
   el.className = 'msg';
   el.textContent = '';
-}
-
-async function initAuthStatus(){
-  const bar = document.getElementById('authInfo');
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email){
-    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
-  }
 }
 
 async function searchReport(){
@@ -269,7 +258,6 @@ function renderReport(s, lichSuRows, incidents){
 (function init(){
   const today = new Date();
   document.getElementById('fNgay').value = today.getFullYear() + '-' + pad(today.getMonth()+1) + '-' + pad(today.getDate());
-  initAuthStatus();
 })();
 </script>
 </body>

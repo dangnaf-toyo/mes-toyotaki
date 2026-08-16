@@ -154,7 +154,6 @@ tr:last-child td{border-bottom:none}
     <div class="header-clock">
       <div class="live-badge"><span class="live-dot"></span><span id="live-status">Đang tải...</span></div>
       <div class="time" id="clock-time">--:--:--</div>
-      <div class="auth-info" id="authInfo">…</div>
     </div>
   </header>
 
@@ -408,6 +407,7 @@ tr:last-child td{border-bottom:none}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
 
@@ -1114,22 +1114,10 @@ async function uploadPdf(){
 }
 
 // ===================== Chỉ báo đăng nhập =====================
-async function initAuthStatus(){
-  const bar = document.getElementById('authInfo');
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email){
-    bar.innerHTML = '👤 ' + escapeHtml(email) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">🔒 Đăng nhập để ghi dữ liệu</a>';
-  }
-}
-
 // ===================== Init =====================
 startClock();
 loadBoard();
 loadQcFilters();
-initAuthStatus();
 setInterval(loadBoard, 15000);
 </script>
 </body>

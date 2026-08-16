@@ -89,7 +89,6 @@ input:focus,select:focus{outline:none;border-color:#2a7a4f;box-shadow:0 0 0 3px 
 <body>
 <div class="hdr">
   <div><h1>📦 OQC — Đóng gói Pallet</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</p></div>
-  <div class="auth-info" id="authInfo">…</div>
 </div>
 
 <div id="loading" class="loading-overlay"><div class="spin"></div> Đang tải dữ liệu...</div>
@@ -156,6 +155,7 @@ input:focus,select:focus{outline:none;border-color:#2a7a4f;box-shadow:0 0 0 3px 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 var currentPalletId = null;
 var currentNguoi = "";
@@ -172,8 +172,6 @@ async function init(){
   const session = await MesAuth.requireAuth();
   const { data } = await sb.from('user_roles').select('full_name,email').eq('user_id', session.user.id).maybeSingle();
   currentNguoi = (data && (data.full_name || data.email)) || session.user.email;
-  document.getElementById('authInfo').innerHTML = currentNguoi + ' — <a href="#" id="mesSignOut">Đăng xuất</a>';
-  document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('mainWrap').style.display = 'block';

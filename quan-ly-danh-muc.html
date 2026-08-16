@@ -72,7 +72,6 @@
       <div class="eyebrow">TOYOTAKI · Quản lý hệ thống</div>
       <h1>Quản Lý Danh Mục</h1>
       <div class="sub">Máy, sản phẩm, nhân sự, khuôn — thay vì sửa trực tiếp qua Supabase Dashboard.</div>
-      <div class="auth-bar" id="authInfo">…</div>
     </div>
     <div class="back"><a href="index.html">← Trang chủ MES</a></div>
   </div>
@@ -244,18 +243,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
-async function initAuthStatus(){
-  const bar = document.getElementById('authInfo');
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email){
-    bar.innerHTML = '👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    document.getElementById('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html">Đăng nhập</a>';
-  }
-}
-
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -582,7 +571,6 @@ document.getElementById('khuon-form').addEventListener('submit', async (e) => {
 
 // ── Gate + khởi động ────────────────────────────────────────────────────
 async function main(){
-  initAuthStatus();
   const session = await MesAuth.requireAuth();
 
   const gate = document.getElementById('gate');

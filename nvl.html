@@ -250,7 +250,6 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 4px; font-size: 0.
   </div>
   <div class="header-right">
     <span class="sync-status" id="syncStatus">⏳ Đang kết nối...</span>
-    <div class="auth-info" id="authInfo">…</div>
   </div>
 </div>
 
@@ -592,6 +591,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 4px; font-size: 0.
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
 <script>
 /* ==========================================================================
  * DỮ LIỆU CHUNG — mọi số đều là KG (xem chú thích đầu file).
@@ -653,17 +653,6 @@ async function requireLoginOrRedirect() {
     return null;
   }
   return session.user.email || '';
-}
-
-async function initAuthStatus() {
-  const bar = $('authInfo');
-  const email = await MesAuth.getCurrentUserEmail();
-  if (email) {
-    bar.innerHTML = '👤 ' + esc(email) + ' · <a href="#" id="mesSignOut">Đăng xuất</a>';
-    $('mesSignOut').addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
-  } else {
-    bar.innerHTML = '<a href="shared/login.html?returnTo=' + encodeURIComponent(window.location.href) + '">Đăng nhập để ghi dữ liệu</a>';
-  }
 }
 
 /* ==========================================================================
@@ -2027,7 +2016,6 @@ $('btnUpsertMaterial').addEventListener('click', upsertMaterial);
 (async function init() {
   $('temDate').value = todayISO();
   $('manNgay').value = todayISO();
-  initAuthStatus();
   await loadAllData();
   rerenderTemQtyTable();
   renderCart();
