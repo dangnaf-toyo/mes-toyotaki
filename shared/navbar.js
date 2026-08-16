@@ -57,7 +57,7 @@ body{padding-top:var(--navbar-h)}
   box-shadow:0 2px 8px rgba(0,0,0,.15);font-family:Arial,Helvetica,sans-serif}
 .mnb-logo{font-weight:800;font-size:14px;letter-spacing:.03em;color:#fff;text-decoration:none;flex-shrink:0;white-space:nowrap}
 .mnb-logo span{color:#C87941}
-.mnb-groups{display:flex;gap:2px;flex:1;overflow-x:auto;height:100%}
+.mnb-groups{display:flex;gap:2px;flex:1;height:100%;overflow:visible}
 .mnb-group{position:relative;flex-shrink:0}
 .mnb-group-btn{background:none;border:none;color:#e8e0d5;font-size:12.5px;font-weight:700;
   padding:0 10px;height:var(--navbar-h);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;font-family:inherit}
