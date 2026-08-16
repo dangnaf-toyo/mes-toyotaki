@@ -141,7 +141,7 @@ body{padding-top:var(--navbar-h)}
     });
   }
 
-  async function init() {
+  function init() {
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
@@ -155,22 +155,36 @@ body{padding-top:var(--navbar-h)}
       '<div class="mnb-auth" id="mnbAuth">…</div>';
     document.body.insertBefore(bar, document.body.firstChild);
 
-    let groups = MENU;
+    // Vẽ menu + gắn sự kiện click NGAY — không đợi mạng/đăng nhập, để menu
+    // luôn bấm được dù kiểm tra quyền admin bên dưới chậm hoặc treo (kiểm tra
+    // quyền chỉ ảnh hưởng việc CÓ THÊM nhóm "Quản trị" hay không, không phải
+    // điều kiện để menu hiển thị được).
+    const cur = currentFile();
+    document.getElementById('mnbGroups').innerHTML = groupsHtml(MENU, cur) + '<div class="mnb-auth-mobile" id="mnbAuthMobile"></div>';
+    renderAuthInto('mnbAuth', null);
+    renderAuthInto('mnbAuthMobile', null);
+    wireInteractions();
+
+    // Tăng cường sau: thêm nhóm "Quản trị" nếu là admin, cập nhật ô đăng nhập
+    // — chạy nền, không chặn menu chính.
+    enhanceWithAuth(cur);
+  }
+
+  async function enhanceWithAuth(cur) {
     let email = null;
     try {
       email = await MesAuth.getCurrentUserEmail();
       if (email) {
         const session = await MesAuth.getSession();
         const { data: myRole } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
-        if (myRole && myRole.role === 'admin') groups = MENU.concat([ADMIN_MENU]);
+        if (myRole && myRole.role === 'admin') {
+          document.getElementById('mnbGroups').innerHTML = groupsHtml(MENU.concat([ADMIN_MENU]), cur) + '<div class="mnb-auth-mobile" id="mnbAuthMobile"></div>';
+          wireInteractions();
+        }
       }
-    } catch (e) { /* không chặn hiện menu nếu lỗi tra quyền — chỉ không hiện nhóm Quản trị */ }
-
-    const cur = currentFile();
-    document.getElementById('mnbGroups').innerHTML = groupsHtml(groups, cur) + '<div class="mnb-auth-mobile" id="mnbAuthMobile"></div>';
+    } catch (e) { /* không chặn menu nếu lỗi tra quyền — chỉ không thêm nhóm Quản trị */ }
     renderAuthInto('mnbAuth', email);
     renderAuthInto('mnbAuthMobile', email);
-    wireInteractions();
   }
 
   if (document.readyState === 'loading') {
