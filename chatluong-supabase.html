@@ -605,6 +605,23 @@ function buildGroupedMonthly(rows, groupField, groupValue, valueField){
   });
   return arr;
 }
+// Gộp THEO THÁNG (chỉ dùng tháng trong "ngay" ISO yyyy-mm-dd, bỏ năm — cùng
+// quy ước đơn giản hoá "Thang" 1-12 như buildGroupedMonthly ở trên) và CỘNG
+// DỒN nhiều dòng ngày trong cùng 1 tháng (khác buildGroupedMonthly — mỗi dòng
+// tháng ở cl_theo_cong_doan là 1 số đã tổng sẵn, còn cd_bao_cao_ca là nhiều
+// dòng/ngày nên phải sum lại).
+function buildGroupedMonthlySum(rows, groupField, groupValue, valueFn){
+  const arr = new Array(12).fill(null);
+  (rows||[]).forEach(o=>{
+    if ((o[groupField]||'').trim() !== groupValue) return;
+    const m = parseInt(String(o.ngay||'').split('-')[1], 10);
+    if (!(m>=1 && m<=12)) return;
+    const v = valueFn(o);
+    if (v == null) return;
+    arr[m-1] = (arr[m-1] || 0) + v;
+  });
+  return arr;
+}
 function theoDoiTraVe(v){ return String(v||'').trim().toLowerCase() !== 'khong'; }
 
 function buildDataModel(raw){
@@ -649,11 +666,16 @@ function buildDataModel(raw){
 
   const processes = {};
   processes['Duc (tat ca KH)'] = { prod: tongHopProd, ng: tongHopNg, target: (targetsByName['Duc (tat ca KH)']||{}).mucTieuNoiBo ?? totalNoiBo };
-  ['Bavia','Gia cong (CNC)','Son'].forEach(k=>{
+  // Nhãn hiển thị trong dashboard này ("Gia cong (CNC)", "Son"...) khác đúng
+  // chữ cong_doan lưu trong cd_bao_cao_ca ("Gia Công", "Sơn" — theo
+  // CONG_DOAN_LIST của chuyencongdoan.html/cong-doan-dashboard.html) — map lại.
+  const CD_LABEL_TO_CONG_DOAN = { 'Bavia': 'Bavia', 'Gia cong (CNC)': 'Gia Công', 'Son': 'Sơn' };
+  Object.keys(CD_LABEL_TO_CONG_DOAN).forEach(k=>{
     const t = targetsByName[k] || {};
+    const congDoan = CD_LABEL_TO_CONG_DOAN[k];
     processes[k] = {
-      prod: buildGroupedMonthly(raw.theoCongDoan,'CongDoan',k,'SanLuong'),
-      ng:   buildGroupedMonthly(raw.theoCongDoan,'CongDoan',k,'BaoPhe'),
+      prod: buildGroupedMonthlySum(raw.cdBaoCaoCa, 'cong_doan', congDoan, r => (Number(r.so_luong_ok)||0) + (Number(r.so_luong_ng)||0)),
+      ng:   buildGroupedMonthlySum(raw.cdBaoCaoCa, 'cong_doan', congDoan, r => Number(r.so_luong_ng)||0),
       target: t.mucTieuNoiBo != null ? t.mucTieuNoiBo : 1
     };
   });
@@ -1292,7 +1314,7 @@ function nowStr(){
   return d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',hour12:false}) + ' ' + d.toLocaleDateString('vi-VN');
 }
 const CORE_TABLES = {
-  tongHop:'cl_tong_hop', theoKhachHang:'cl_theo_khach_hang', theoCongDoan:'cl_theo_cong_doan',
+  tongHop:'cl_tong_hop', theoKhachHang:'cl_theo_khach_hang',
   qcDaily:'cl_qc_daily', qcRepaint:'cl_qc_repaint', targets:'cl_targets', comments:'cl_comments', config:'cl_config'
 };
 const EXTRA_TABLES = {
@@ -1319,7 +1341,6 @@ async function loadData(){
     const KEY_MAPS = {
       tongHop: {thang:'Thang', san_luong_noi_bo_tong:'SanLuongNoiBoTong', bao_phe_noi_bo_tong:'BaoPheNoiBoTong', giao_hang_tong:'GiaoHangTong', tra_ve_tong:'TraVeTong', diem_thuong_phat:'DiemThuongPhat'},
       theoKhachHang: {thang:'Thang', khach_hang:'KhachHang', san_luong:'SanLuong', bao_phe:'BaoPhe', giao_hang:'GiaoHang', tra_ve:'TraVe'},
-      theoCongDoan: {thang:'Thang', cong_doan:'CongDoan', san_luong:'SanLuong', bao_phe:'BaoPhe'},
       qcDaily: {ngay:'Ngay', so_luong_ng:'SoLuongNG', ty_le_ng:'TyLeNG'},
       qcRepaint: {loai:'Loai', ty_le_ng:'TyLeNG'},
       targets: {loai:'Loai', ten:'Ten', muc_tieu_noi_bo:'MucTieuNoiBo', muc_tieu_tra_ve:'MucTieuTraVe', theo_doi_tra_ve:'TheoDoiTraVe'},
@@ -1340,7 +1361,14 @@ async function loadData(){
     const extraSettled = await Promise.allSettled(EXTRA_KEYS.map(k => fetchSupabaseTable(EXTRA_TABLES[k])));
     const extra = {};
     EXTRA_KEYS.forEach((k,i) => { extra[k] = extraSettled[i].status === 'fulfilled' ? remapKeys(extraSettled[i].value, KEY_MAPS[k]) : []; });
-    const data = buildDataModel(Object.assign({}, core, extra));
+    // NG theo công đoạn (Bavia/Gia công/Sơn) đọc trực tiếp cd_bao_cao_ca (dữ liệu
+    // NGÀY, ghi real-time từ cong-doan-dashboard.html + cong-doan-bao-cao-ca.html)
+    // — thay cho bảng tháng cl_theo_cong_doan cũ (không còn dùng). Không có cột
+    // Vietnamese-key nên không qua remapKeys — buildDataModel tự đọc snake_case.
+    let cdBaoCaoCa = [];
+    try { cdBaoCaoCa = await fetchSupabaseTable('cd_bao_cao_ca', 'ngay,cong_doan,so_luong_ok,so_luong_ng'); }
+    catch (e) { cdBaoCaoCa = []; }
+    const data = buildDataModel(Object.assign({}, core, extra, { cdBaoCaoCa }));
     renderDashboard(data);
     const missingExtra = extraSettled.filter(r => r.status !== 'fulfilled').length;
     const extraNote = missingExtra ? ` · ${missingExtra}/5 bảng "Bất thường/NG lần 1" lỗi hoặc chưa có dữ liệu` : '';
