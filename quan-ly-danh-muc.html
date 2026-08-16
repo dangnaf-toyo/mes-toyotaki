@@ -129,6 +129,7 @@
             <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
             <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" id="sp-nguyenlieu"></div>
             <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
+            <div style="grid-column:1/-1"><label for="sp-quytrinh">Quy trình công đoạn (theo đúng thứ tự, cách nhau dấu phẩy)</label><input type="text" id="sp-quytrinh" placeholder="VD: Đúc,Bavia,Sơn,OQC — để trống nếu chưa xác định, chuyencongdoan.html sẽ cho chọn tự do"></div>
           </div>
           <div class="form-actions"><button type="submit" id="sp-submit">Thêm sản phẩm</button></div>
         </form>
@@ -137,7 +138,7 @@
         <h2>Danh sách sản phẩm</h2>
         <div class="table-wrap">
           <table id="sp-table" style="display:none">
-            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Cavity</th><th>Cycle time (s)</th><th>Nguyên liệu</th><th>Số khuôn</th><th></th></tr></thead>
+            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Cavity</th><th>Cycle time (s)</th><th>Nguyên liệu</th><th>Số khuôn</th><th>Quy trình công đoạn</th><th></th></tr></thead>
             <tbody id="sp-tbody"></tbody>
           </table>
         </div>
@@ -313,7 +314,7 @@ function spResetForm(){
 document.getElementById('sp-cancel').addEventListener('click', spResetForm);
 
 async function loadSp(){
-  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, cavity, cycle_time_s, nguyen_lieu, so_khuon').order('ma_sp');
+  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, cavity, cycle_time_s, nguyen_lieu, so_khuon, quy_trinh_cong_doan').order('ma_sp');
   if (error){ showMsg('sp-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('sp-msg');
   const table = document.getElementById('sp-table'), tbody = document.getElementById('sp-tbody'), empty = document.getElementById('sp-empty');
@@ -327,6 +328,7 @@ async function loadSp(){
       <td>${r.cycle_time_s ?? '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(r.nguyen_lieu) || '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(r.so_khuon) || '<span class="muted">—</span>'}</td>
+      <td>${escapeHtml(r.quy_trinh_cong_doan) || '<span class="muted">—</span>'}</td>
       <td class="row-actions">
         <button type="button" class="edit">Sửa</button>
         <button type="button" class="del">Xoá</button>
@@ -344,6 +346,7 @@ async function loadSp(){
       document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
       document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
       document.getElementById('sp-sokhuon').value = r.so_khuon || '';
+      document.getElementById('sp-quytrinh').value = r.quy_trinh_cong_doan || '';
       document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
       document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
       document.getElementById('sp-cancel').style.display = 'inline';
@@ -367,13 +370,14 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const cycle_time_s = ctRaw === '' ? null : Number(ctRaw);
   const nguyen_lieu = document.getElementById('sp-nguyenlieu').value.trim() || null;
   const so_khuon = document.getElementById('sp-sokhuon').value.trim() || null;
+  const quy_trinh_cong_doan = document.getElementById('sp-quytrinh').value.trim() || null;
   if (!ma_sp) return;
 
   let error;
   if (spEditing){
-    ({ error } = await sb.from('master_products').update({ ten_sp, cavity, cycle_time_s, nguyen_lieu, so_khuon }).eq('ma_sp', spEditing));
+    ({ error } = await sb.from('master_products').update({ ten_sp, cavity, cycle_time_s, nguyen_lieu, so_khuon, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
   } else {
-    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, cavity, cycle_time_s, nguyen_lieu, so_khuon }));
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, cavity, cycle_time_s, nguyen_lieu, so_khuon, quy_trinh_cong_doan }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
   showMsg('sp-msg', 'ok', spEditing ? 'Đã lưu ' + ma_sp + '.' : 'Đã thêm ' + ma_sp + '.');

@@ -94,6 +94,23 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 #qrReaderDiv{position:relative;flex:1;overflow:hidden}
 #qrReaderDiv video{position:absolute!important;inset:0!important;
   width:100%!important;height:100%!important;object-fit:cover!important}
+.routing-hint{font-size:11px;color:#8a5a30;background:#faf5f0;border:1px dashed #f0d9bd;border-radius:6px;padding:6px 8px;margin-top:-6px;margin-bottom:14px;display:none}
+.routing-hint.show{display:block}
+.fifo-warn{font-size:12px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin-bottom:14px;display:none}
+.fifo-warn.show{display:block}
+.src-item{display:flex;justify-content:space-between;align-items:center;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12.5px}
+.src-item .info b{display:block;font-size:13px}
+.src-item .info span{color:#999;font-size:11px}
+.src-item button{border:1.5px solid #c00;color:#c00;background:#fff;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
+.unit-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.unit-row span{font-size:11.5px;color:#777;width:56px;flex-shrink:0}
+.unit-row input{flex:1}
+.unit-row button{border:1.5px solid #c00;color:#c00;background:#fff;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+.pk-actions{display:flex;gap:8px;margin-top:4px;margin-bottom:14px}
+.pk-actions button{flex:1;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer}
+.pk-add{border:1.5px solid #C87941;background:#fff;color:#C87941}
+.pk-suggest{border:1.5px solid #1a7a3a;background:#fff;color:#1a7a3a}
+.pk-total{font-size:12.5px;color:#555;margin-bottom:10px;font-weight:700}
 </style>
 </head>
 <body>
@@ -108,6 +125,10 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 <div class="tabs-wrap">
   <button type="button" class="tab-btn active" id="tabBtnScan">📷 Quét QR chuyển hàng</button>
   <button type="button" class="tab-btn" id="tabBtnConfirm">✅ Xác nhận nhận hàng</button>
+  <button type="button" class="tab-btn" id="tabBtnPack">📦 Đóng gói lại</button>
+</div>
+<div style="width:100%;max-width:480px;margin:-6px 0 10px;text-align:right">
+  <a href="cong-doan-bao-cao-ca.html" target="_blank" rel="noopener" style="font-size:11.5px;color:#C87941;text-decoration:none;font-weight:600">📋 Báo cáo NG cuối ca →</a>
 </div>
 
 <div id="tabScan">
@@ -155,7 +176,10 @@ input:focus,select:focus{outline:none;border-color:#C87941;
   <div class="fg">
     <label class="req" for="congDoanNhan">Công đoạn nhận</label>
     <select id="congDoanNhan"></select>
+    <div class="routing-hint" id="routingHint"></div>
   </div>
+
+  <div class="fifo-warn" id="fifoWarn"></div>
 
   <div class="fg">
     <label for="nguoiGiao">Người giao</label>
@@ -189,6 +213,35 @@ input:focus,select:focus{outline:none;border-color:#C87941;
   </div>
 </div>
 
+<div id="tabPack" style="display:none;">
+  <div class="card">
+    <div class="card-ttl">📦 Đóng gói lại — gộp nhiều tem thành đơn vị mới</div>
+    <div class="fg">
+      <label class="req" for="pkCongDoan">Đang đóng gói tại công đoạn</label>
+      <select id="pkCongDoan"></select>
+      <div class="hint">Tem mới tạo ra sẽ được coi là đang ở công đoạn này.</div>
+    </div>
+    <button class="scan-btn" id="pkBtnScan">📷&nbsp; Quét thêm tem nguồn</button>
+    <div class="empty-hint" id="pkEmptyHint">Chưa quét tem nguồn nào.</div>
+    <div id="pkSrcList" style="margin-top:10px"></div>
+    <div class="pk-total" id="pkTotal" style="display:none"></div>
+  </div>
+
+  <div class="card" id="pkUnitsCard" style="display:none">
+    <div class="card-ttl">📐 Đơn vị đóng gói mới</div>
+    <div id="pkUnitsList"></div>
+    <div class="pk-actions">
+      <button type="button" class="pk-add" id="pkBtnAddUnit">+ Thêm đơn vị</button>
+      <button type="button" class="pk-suggest" id="pkBtnSuggest">🔄 Tính lại theo định mức</button>
+    </div>
+    <div class="fg">
+      <label class="req" for="pkNguoi">Người đóng gói</label>
+      <select id="pkNguoi"></select>
+    </div>
+    <button class="submit-btn" id="pkBtnSubmit">📦&nbsp; Đóng gói &amp; Tạo tem mới</button>
+  </div>
+</div>
+
 <div id="msg"></div>
 
 <canvas id="scanCanvas" style="display:none"></canvas>
@@ -205,6 +258,7 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 <script src="shared/supabase-client.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
 /* ============================================================================
  * Chuyển Công Đoạn — bản web tĩnh (Giai đoạn "bỏ Google"), thay Apps Script.
@@ -223,8 +277,18 @@ input:focus,select:focus{outline:none;border-color:#C87941;
  * ============================================================================ */
 
 const CONG_DOAN_LIST = ["Đúc", "Bavia", "Gia Công", "Sơn", "OQC"];
+// Công đoạn có thể "Đóng gói lại" (gộp tem thành đơn vị mới) — không gồm Đúc
+// (sọt gốc được tạo thẳng ở intem.html, không phải gộp lại).
+const CONG_DOAN_DONG_GOI = ["Bavia", "Gia Công", "Sơn", "OQC"];
+// Định mức gợi ý mặc định (sp/đơn vị) theo công đoạn — chỉ là gợi ý điền sẵn,
+// người đóng gói luôn sửa được số thực tế trước khi lưu.
+const CONFIG = { PACKAGING: { "Bavia": 36, "Gia Công": 60, "Sơn": 60, "OQC": 100 } };
 
 let scannedData = null;
+let scanTarget = "transfer"; // "transfer" (tab 1) hoặc "pack" (tab Đóng gói lại)
+let productRoutingMap = {};  // ma_sp -> ["Đúc","Bavia",...] theo đúng thứ tự khai báo
+let packSources = [];        // [{tag_no, ma_sp, ten_sp, so_luong, ngay, lot, so_khuon, nguyen_lieu, may_duc}]
+let packUnits = [];          // [numeric,...] mỗi phần tử = 1 đơn vị đóng gói mới
 
 function fillSelect(id, arr, placeholder){
   const sel = document.getElementById(id);
@@ -247,12 +311,82 @@ function showMsg(t, cls, autoHideMs){
 async function loadDanhMuc(){
   fillSelect("congDoanGiao", CONG_DOAN_LIST, "-- Chọn công đoạn --");
   fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
-  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien');
-  if (error) { err("Không tải được danh sách nhân viên: " + error.message); return; }
-  const names = (data || []).map(r => r.ten_nhan_vien);
+  fillSelect("pkCongDoan", CONG_DOAN_DONG_GOI, "-- Chọn công đoạn --");
+  const [empRes, prodRes] = await Promise.all([
+    sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
+    sb.from('master_products').select('ma_sp,quy_trinh_cong_doan'),
+  ]);
+  if (empRes.error) { err("Không tải được danh sách nhân viên: " + empRes.error.message); return; }
+  const names = (empRes.data || []).map(r => r.ten_nhan_vien);
   fillSelect("nguoiGiao", names, "-- Chọn người giao (có thể bỏ trống) --");
   fillSelect("nguoiNhan", names, "-- Chọn người nhận --");
+  fillSelect("pkNguoi", names, "-- Chọn người đóng gói --");
+  productRoutingMap = {};
+  (prodRes.data || []).forEach(p => {
+    const route = String(p.quy_trinh_cong_doan || "").split(",").map(s => s.trim()).filter(Boolean);
+    if (route.length) productRoutingMap[p.ma_sp] = route;
+  });
 }
+
+// Định tuyến theo mã SP (quy_trinh_cong_doan) — nếu SP đã khai báo quy trình
+// và "Công đoạn giao" hiện tại nằm trong quy trình đó (không phải bước cuối),
+// chỉ cho chọn ĐÚNG bước kế tiếp thay vì tự do chọn 1 trong 5 công đoạn. SP
+// chưa khai báo quy trình, hoặc bước giao không khớp quy trình → giữ tự do
+// chọn như trước (không chặn ai chưa kịp cấu hình danh mục).
+function applyRoutingHint(){
+  const hintEl = document.getElementById("routingHint");
+  const route = scannedData ? productRoutingMap[scannedData.maSP] : null;
+  const giaoVal = document.getElementById("congDoanGiao").value;
+  if (!route || !route.length){
+    fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+    hintEl.classList.remove("show"); hintEl.textContent = "";
+    checkReady();
+    return;
+  }
+  const idx = route.indexOf(giaoVal);
+  if (idx === -1){
+    fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — công đoạn giao hiện chọn không khớp quy trình, tự chọn công đoạn nhận.";
+    hintEl.classList.add("show");
+  } else if (idx === route.length - 1){
+    fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — đã ở bước cuối, tự chọn công đoạn nhận nếu cần.";
+    hintEl.classList.add("show");
+  } else {
+    const next = route[idx + 1];
+    fillSelect("congDoanNhan", [next], "-- Chọn công đoạn --");
+    document.getElementById("congDoanNhan").value = next;
+    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — bước kế tiếp: " + next;
+    hintEl.classList.add("show");
+  }
+  checkReady();
+  checkFifoWarning();
+}
+document.getElementById("congDoanGiao").addEventListener("change", applyRoutingHint);
+
+// Cảnh báo FIFO (MỀM — không chặn) — có lô cùng mã SP, cùng đang chờ ở đúng
+// "Công đoạn nhận" đang chọn, nhưng có ngày trên tem CŨ HƠN tem đang xử lý.
+async function checkFifoWarning(){
+  const warnEl = document.getElementById("fifoWarn");
+  warnEl.classList.remove("show"); warnEl.textContent = "";
+  if (!scannedData) return;
+  const congDoanNhan = document.getElementById("congDoanNhan").value;
+  if (!congDoanNhan) return;
+  const { data: positions } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', congDoanNhan);
+  if (!positions || !positions.length) return;
+  const tags = positions.map(p => p.tag_no).filter(t => t !== scannedData.tagNo);
+  if (!tags.length) return;
+  const { data: tems } = await sb.from('duc_tem').select('tag_no,ngay').in('tag_no', tags).eq('ma_sp', scannedData.maSP).gt('so_luong', 0);
+  if (!tems || !tems.length) return;
+  const curNgay = new Date(scannedData.ngay);
+  if (isNaN(curNgay)) return;
+  const older = tems.filter(t => t.ngay && new Date(t.ngay) < curNgay).sort((a, b) => new Date(a.ngay) - new Date(b.ngay));
+  if (older.length){
+    warnEl.textContent = "⚠️ Có " + older.length + " lô cùng mã SP CŨ HƠN đang chờ ở " + congDoanNhan + " (VD: " + older[0].tag_no + " — " + older[0].ngay + ") — nên ưu tiên xử lý trước để đảm bảo FIFO.";
+    warnEl.classList.add("show");
+  }
+}
+document.getElementById("congDoanNhan").addEventListener("change", checkFifoWarning);
 
 /* ─── Chụp ảnh + giải mã QR (giữ nguyên cách làm bản cũ: chụp ảnh tĩnh rồi
    giải mã, KHÔNG quét video trực tiếp — camera video live từng bị chặn trong
@@ -337,8 +471,9 @@ async function onScanSuccess(decodedText){
   }
 }
 
-document.getElementById("btnScan").addEventListener("click", openCamera);
-document.getElementById("btnRescan").addEventListener("click", openCamera);
+document.getElementById("btnScan").addEventListener("click", () => { scanTarget = "transfer"; openCamera(); });
+document.getElementById("btnRescan").addEventListener("click", () => { scanTarget = "transfer"; openCamera(); });
+document.getElementById("pkBtnScan").addEventListener("click", () => { scanTarget = "pack"; openCamera(); });
 document.getElementById("btnCloseQrModal").addEventListener("click", () => {
   closeQrModal();
   document.getElementById("emptyHint").style.display = "block";
@@ -380,10 +515,14 @@ async function onQrDecoded(text){
     err("Mã QR không đúng định dạng tem TOYOTAKI. Vui lòng quét lại đúng mã QR trên tem sản phẩm.");
     return;
   }
-  scannedData = {
+  const decoded = {
     tagNo: parts[0].trim(), tenSP: parts[1], maSP: parts[2], soLuongTem: parts[3],
     ngay: parts[4], lotNo: parts[5], soKhuon: parts[6], nguyenLieu: parts[7], mayDuc: parts[8]
   };
+
+  if (scanTarget === "pack"){ await addPackSource(decoded); return; }
+
+  scannedData = decoded;
   renderScanned();
 
   // Gợi ý sẵn "Công đoạn giao" theo vị trí hiện tại của tem (nếu đã từng chuyển trước đó).
@@ -391,6 +530,7 @@ async function onQrDecoded(text){
     const { data } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', scannedData.tagNo).maybeSingle();
     if (data && data.vi_tri_hien_tai) document.getElementById("congDoanGiao").value = data.vi_tri_hien_tai;
   } catch(e){ /* không chặn luồng chính nếu lỗi */ }
+  applyRoutingHint();
   checkReady();
 }
 
@@ -535,12 +675,15 @@ async function initAuthStatus(){
 /* ---------- Tab: Xác nhận nhận hàng ---------- */
 document.getElementById("tabBtnScan").addEventListener("click", () => switchTab("scan"));
 document.getElementById("tabBtnConfirm").addEventListener("click", () => switchTab("confirm"));
+document.getElementById("tabBtnPack").addEventListener("click", () => switchTab("pack"));
 function switchTab(tab){
   document.getElementById("tabScan").style.display = tab === "scan" ? "" : "none";
   document.getElementById("tabConfirm").style.display = tab === "confirm" ? "" : "none";
+  document.getElementById("tabPack").style.display = tab === "pack" ? "" : "none";
   document.getElementById("tabBtnScan").classList.toggle("active", tab === "scan");
   document.getElementById("tabBtnConfirm").classList.toggle("active", tab === "confirm");
-  if (tab === "confirm") stopCamera();
+  document.getElementById("tabBtnPack").classList.toggle("active", tab === "pack");
+  if (tab !== "scan") stopCamera();
 }
 
 async function loadConfirmDanhMuc(){
@@ -660,6 +803,186 @@ async function confirmAll(){
   if (failed) showMsg("⚠️ Đã xác nhận " + done + "/" + ids.length + " phiếu — " + failed + " phiếu lỗi.", "err", 6000);
   else showMsg("✅ Đã xác nhận tất cả " + done + " phiếu.", "ok", 5000);
   loadPendingList();
+}
+
+/* ---------- Tab: Đóng gói lại (gộp tem → đơn vị mới theo quy cách công đoạn) ---------- */
+async function addPackSource(decoded){
+  if (packSources.find(s => s.tag_no === decoded.tagNo)){
+    showMsg("Tem " + decoded.tagNo + " đã quét rồi.", "err", 3000);
+    return;
+  }
+  showMsg("⏳ Đang kiểm tra tem " + decoded.tagNo + "...", "wait");
+  const { data, error } = await sb.from('duc_tem')
+    .select('tag_no,ma_sp,ten_sp,so_luong,ngay,lot,so_khuon,nguyen_lieu,may_duc_chi_thi')
+    .eq('tag_no', decoded.tagNo).maybeSingle();
+  if (error || !data){ err("Không tìm thấy tem trong hệ thống: " + decoded.tagNo); return; }
+  if (!data.so_luong || data.so_luong <= 0){
+    err("Tem " + decoded.tagNo + " đã hết số lượng (có thể đã dùng ở lần đóng gói/tách trước) — không dùng làm nguồn được.");
+    return;
+  }
+  if (packSources.length && packSources[0].ma_sp !== data.ma_sp){
+    err("Tem này khác mã SP (" + data.ma_sp + ") so với các tem đã quét (" + packSources[0].ma_sp + ") — mỗi lượt đóng gói chỉ gộp 1 mã SP.");
+    return;
+  }
+  packSources.push({
+    tag_no: data.tag_no, ma_sp: data.ma_sp, ten_sp: data.ten_sp, so_luong: Number(data.so_luong),
+    ngay: data.ngay, lot: data.lot, so_khuon: data.so_khuon, nguyen_lieu: data.nguyen_lieu, may_duc: data.may_duc_chi_thi,
+  });
+  document.getElementById("msg").style.display = "none";
+  renderPackSources();
+  if (!packUnits.length) suggestPackUnits();
+}
+
+function removePackSource(tagNo){
+  packSources = packSources.filter(s => s.tag_no !== tagNo);
+  renderPackSources();
+}
+
+function renderPackSources(){
+  const list = document.getElementById("pkSrcList");
+  const emptyHint = document.getElementById("pkEmptyHint");
+  const totalEl = document.getElementById("pkTotal");
+  const unitsCard = document.getElementById("pkUnitsCard");
+  emptyHint.style.display = packSources.length ? "none" : "block";
+  list.innerHTML = packSources.map(s => `
+    <div class="src-item">
+      <div class="info"><b>${s.tag_no}</b><span>${s.ma_sp} — ${s.so_luong} sp — ${s.ngay || ''}</span></div>
+      <button type="button" onclick="removePackSource('${s.tag_no}')">✕ Bỏ</button>
+    </div>`).join("");
+  const total = packSources.reduce((sum, s) => sum + s.so_luong, 0);
+  totalEl.style.display = packSources.length ? "block" : "none";
+  totalEl.textContent = "Tổng khả dụng: " + total + " sp (" + packSources.length + " tem nguồn, mã SP " + (packSources[0] ? packSources[0].ma_sp : "") + ")";
+  unitsCard.style.display = packSources.length ? "block" : "none";
+  if (!packSources.length){ packUnits = []; renderPackUnits(); }
+}
+
+function suggestPackUnits(){
+  const congDoan = document.getElementById("pkCongDoan").value;
+  const dinhMuc = CONFIG.PACKAGING[congDoan] || 0;
+  const total = packSources.reduce((sum, s) => sum + s.so_luong, 0);
+  if (!total){ packUnits = []; renderPackUnits(); return; }
+  if (!dinhMuc){ packUnits = [total]; renderPackUnits(); return; }
+  const full = Math.floor(total / dinhMuc);
+  const rest = total - full * dinhMuc;
+  packUnits = Array(full).fill(dinhMuc);
+  if (rest > 0) packUnits.push(rest);
+  renderPackUnits();
+}
+document.getElementById("pkBtnSuggest").addEventListener("click", suggestPackUnits);
+document.getElementById("pkCongDoan").addEventListener("change", () => { if (packSources.length) suggestPackUnits(); });
+
+function addPackUnit(){
+  const congDoan = document.getElementById("pkCongDoan").value;
+  packUnits.push(CONFIG.PACKAGING[congDoan] || 1);
+  renderPackUnits();
+}
+document.getElementById("pkBtnAddUnit").addEventListener("click", addPackUnit);
+
+function removePackUnit(i){ packUnits.splice(i, 1); renderPackUnits(); }
+function setPackUnit(i, v){ packUnits[i] = Number(v) || 0; }
+
+function renderPackUnits(){
+  const wrap = document.getElementById("pkUnitsList");
+  wrap.innerHTML = packUnits.map((v, i) => `
+    <div class="unit-row">
+      <span>Đơn vị ${i + 1}</span>
+      <input type="number" min="1" value="${v}" oninput="setPackUnit(${i}, this.value)">
+      <button type="button" onclick="removePackUnit(${i})">✕</button>
+    </div>`).join("") || '<div class="empty-hint">Chưa có đơn vị đóng gói nào — bấm "Tính lại theo định mức" hoặc "+ Thêm đơn vị".</div>';
+}
+
+document.getElementById("pkBtnSubmit").addEventListener("click", submitPackaging);
+async function submitPackaging(){
+  const congDoan = document.getElementById("pkCongDoan").value;
+  const nguoi = document.getElementById("pkNguoi").value;
+  if (!congDoan) return err("Chưa chọn công đoạn đang đóng gói.");
+  if (!packSources.length) return err("Chưa quét tem nguồn nào.");
+  if (!packUnits.length || packUnits.some(v => !v || v <= 0)) return err("Đơn vị đóng gói phải có số lượng lớn hơn 0.");
+  if (!nguoi) return err("Chưa chọn người đóng gói.");
+  const total = packSources.reduce((sum, s) => sum + s.so_luong, 0);
+  const requested = packUnits.reduce((sum, v) => sum + v, 0);
+  if (requested > total) return err("Tổng đơn vị đóng gói (" + requested + ") vượt quá tổng tem nguồn (" + total + ").");
+
+  const session = await MesAuth.getSession();
+  if (!session){
+    err("Cần đăng nhập trước khi đóng gói. Đang chuyển sang trang đăng nhập…");
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return;
+  }
+
+  const btn = document.getElementById("pkBtnSubmit");
+  btn.disabled = true; btn.textContent = "⏳ Đang đóng gói...";
+  const { data, error } = await sb.rpc('cd_dong_goi_lai', {
+    p_cong_doan: congDoan,
+    p_tag_no_nguon: packSources.map(s => s.tag_no),
+    p_so_luong_moi: packUnits,
+    p_nguoi: nguoi,
+  });
+  btn.disabled = false; btn.textContent = "📦  Đóng gói & Tạo tem mới";
+  if (error){ err("Lỗi đóng gói: " + error.message); return; }
+
+  showMsg("✅ Đã tạo " + data.length + " tem mới tại " + congDoan + " — đang mở cửa sổ in...", "ok", 8000);
+  data.forEach(t => printNewTem(t, congDoan));
+  packSources = []; packUnits = [];
+  renderPackSources();
+}
+
+function svgEsc(s){
+  s = String(s == null ? "" : s);
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildQrRects(data, sizeMm, bgColor, fgColor){
+  var qr = qrcode(0, "M");
+  qr.addData(data);
+  qr.make();
+  var n = qr.getModuleCount();
+  var cell = sizeMm / n;
+  var out = '<rect x="0" y="0" width="' + sizeMm + '" height="' + sizeMm + '" fill="' + bgColor + '"/>';
+  for (var r = 0; r < n; r++){
+    for (var c = 0; c < n; c++){
+      if (qr.isDark(r, c)){
+        out += '<rect x="' + (c * cell).toFixed(3) + '" y="' + (r * cell).toFixed(3) + '" width="' + cell.toFixed(3) + '" height="' + cell.toFixed(3) + '" fill="' + fgColor + '"/>';
+      }
+    }
+  }
+  return out;
+}
+
+// In tem mới — cùng định dạng QR 9 trường ">"-cách nhau như tem gốc (intem.html)
+// để quét lại được bình thường ở chính trang này cho công đoạn kế tiếp.
+function printNewTem(t, congDoan){
+  const ngayVN = t.ngay ? String(t.ngay).split("-").reverse().join("/") : "";
+  const ngayQR = t.ngay ? String(t.ngay).replace(/-/g, "/") : "";
+  const qr = [t.tag_no_moi, t.ten_sp, t.ma_sp, t.so_luong, ngayQR, t.lot || ngayVN, t.so_khuon || "", t.nguyen_lieu || "", t.may_duc || ""].join(">\n");
+  const rows = [
+    { lbl: "Mã sản phẩm", val: t.ma_sp }, { lbl: "Tên sản phẩm", val: t.ten_sp },
+    { lbl: "Tag No", val: t.tag_no_moi }, { lbl: "Số lượng", val: t.so_luong },
+    { lbl: "Đóng gói tại", val: congDoan }, { lbl: "Ngày SX gốc", val: ngayVN },
+    { lbl: "Số khuôn", val: t.so_khuon }, { lbl: "Nguyên liệu", val: t.nguyen_lieu },
+  ];
+  const W = 72, H = 100, qrSize = 34, qrX = (W - qrSize) / 2, qrY = 44;
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + 'mm" height="' + H + 'mm" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff"/>';
+  svg += '<text x="' + (W / 2) + '" y="7" text-anchor="middle" font-family="Arial" font-size="5" font-weight="bold">📦 TEM ĐÓNG GÓI LẠI</text>';
+  svg += '<line x1="4" y1="10" x2="' + (W - 4) + '" y2="10" stroke="#000" stroke-width="0.3"/>';
+  rows.forEach((r, i) => {
+    const y = 15 + i * 3.2;
+    svg += '<text x="5" y="' + y + '" font-family="Arial" font-size="2.6" font-weight="bold">' + svgEsc(r.lbl) + '</text>';
+    svg += '<text x="27" y="' + y + '" font-family="Arial" font-size="2.9" font-weight="bold">' + svgEsc(r.val) + '</text>';
+  });
+  svg += '<g transform="translate(' + qrX + ',' + qrY + ')">' + buildQrRects(qr, qrSize, "#fff", "#000") + '</g>';
+  svg += '</svg>';
+
+  const popupHtml = '<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Tem: ' + t.tag_no_moi + '</title>'
+    + '<style>@page{size:72mm 100mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{width:72mm;height:100mm;background:#fff}'
+    + '.pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer}'
+    + '@media print{.pbtn{display:none}}</style></head><body>' + svg
+    + '<button class="pbtn" onclick="window.print()">🖨 In ngay</button>'
+    + '<script>setTimeout(function(){window.print();},150);<\/script></body></html>';
+  const w = window.open("", "_blank", "width=430,height=720,scrollbars=yes");
+  if (!w){ err("Trình duyệt chặn popup — vào Settings cho phép popup rồi thử lại"); return; }
+  w.document.open(); w.document.write(popupHtml); w.document.close();
 }
 
 initAuthStatus();

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Báo cáo cuối ca — Bavia/Gia công/Sơn — TOYOTAKI</title>
+<!--
+  cong-doan-bao-cao-ca.html — báo cáo sản lượng/NG CUỐI CA cho các công đoạn
+  ngoài Đúc (Bavia/Gia công/Sơn/OQC), theo đúng quyết định đã chốt: NG không
+  ghi tại từng lần quét chuyển công đoạn — trưởng ca tổng hợp cuối ca theo
+  từng mã SP: nhận vào bao nhiêu, ra OK bao nhiêu, NG bao nhiêu. Xem
+  supabase/migration_phase_T2_dong_goi_routing.sql (bảng cd_bao_cao_ca, RPC
+  cd_luu_bao_cao_ca).
+  "Số nhận vào" gợi ý tự động lấy TỔNG THEO NGÀY (không chia chính xác theo
+  ranh giới ca — cd_chuyen_cong_doan_log không có cột ca) từ
+  cd_chuyen_cong_doan_log — trưởng ca tự đối chiếu/sửa lại cho khớp ca thực tế.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+.wrap{max-width:1100px;margin:0 auto}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.hdr h1{font-size:17px;font-weight:700}
+.hdr p{font-size:10px;color:#999;margin-top:2px}
+.auth-info{font-size:11.5px;color:#667}
+.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:8px 10px;font-size:13.5px;font-family:inherit;min-width:140px}
+.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#C87941;color:#fff}
+.btn:hover{background:#a85e2a}
+.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
+.btn-danger{background:#fff;border:1.5px solid #c00;color:#c00;padding:5px 9px;font-size:11.5px}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:820px}
+th,td{border:1px solid #e5e5e5;padding:6px 7px;text-align:left}
+th{background:#faf5f0;color:#8a5a30;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px}
+td input{width:100%;border:1px solid #ddd;border-radius:5px;padding:5px 6px;font-size:12.5px}
+td.num{text-align:right}
+.empty-row td{text-align:center;color:#999;padding:24px;font-style:italic}
+#msg{max-width:1100px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.hint{font-size:11px;color:#999;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h1>📋 Báo cáo cuối ca — Bavia / Gia công / Sơn / OQC</h1><p>CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI · sản lượng nhận/OK/NG theo mã SP</p></div>
+  <div class="auth-info" id="authInfo">…</div>
+</div>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="toolbar">
+      <div class="fg"><label class="req">Công đoạn</label><select id="congDoan"></select></div>
+      <div class="fg"><label class="req">Ngày</label><input type="date" id="ngay"></div>
+      <div class="fg"><label class="req">Ca</label><select id="ca"></select></div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn-outline btn" id="btnGoiY">💡 Gợi ý từ lượt chuyển đến (theo ngày)</button>
+      <button type="button" class="btn-outline btn" id="btnAddRow">+ Thêm dòng mã SP</button>
+    </div>
+    <div class="hint">"Số nhận vào" gợi ý theo TỔNG NGÀY (chưa chia đúng ranh giới ca) — kiểm tra/sửa lại cho khớp ca thực tế trước khi lưu.</div>
+  </div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="min-width:120px">Mã SP</th><th style="min-width:160px">Tên SP</th>
+          <th style="min-width:100px">Tổ/Dây chuyền</th>
+          <th style="min-width:90px">Nhận vào</th><th style="min-width:90px">OK</th><th style="min-width:90px">NG</th>
+          <th style="min-width:160px">Ghi chú</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"><tr class="empty-row"><td colspan="8">Chọn công đoạn/ngày/ca rồi bấm "+ Thêm dòng mã SP" hoặc "💡 Gợi ý".</td></tr></tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+      <button type="button" class="btn" id="btnSave">💾 Lưu báo cáo ca</button>
+    </div>
+  </div>
+</div>
+<datalist id="dlMaSp"></datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script>
+const CONG_DOAN_LIST = ["Bavia", "Gia Công", "Sơn", "OQC"];
+const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
+let rows = [];
+let productMap = {}; // ma_sp -> ten_sp
+
+function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showMsg(text, cls){ const el = document.getElementById('msg'); el.textContent = text; el.className = cls; }
+function fillSelect(id, arr, placeholder){
+  const sel = document.getElementById(id);
+  sel.innerHTML = (placeholder ? '<option value="">' + placeholder + '</option>' : '') + (arr || []).map(v => `<option value="${v}">${v}</option>`).join("");
+}
+function getTodayString(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+async function loadDanhMuc(){
+  fillSelect("congDoan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+  fillSelect("ca", CA_LIST, "-- Chọn ca --");
+  document.getElementById("ngay").value = getTodayString();
+  const { data } = await sb.from('master_products').select('ma_sp,ten_sp');
+  (data || []).forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
+  document.getElementById('dlMaSp').innerHTML = Object.keys(productMap).sort().map(ma => `<option value="${escapeHtml(ma)}">`).join('');
+}
+
+function addRow(maSp, tenSp, soNhan){
+  rows.push({ ma_sp: maSp || '', ten_sp: tenSp || '', to_san_xuat: '', so_luong_nhan_vao: soNhan || 0, so_luong_ok: 0, so_luong_ng: 0, ghi_chu: '' });
+  renderRows();
+}
+document.getElementById("btnAddRow").addEventListener("click", () => addRow('', '', 0));
+
+function renderRows(){
+  const tbody = document.getElementById("tbody");
+  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có dòng nào — bấm "+ Thêm dòng mã SP" hoặc "💡 Gợi ý".</td></tr>'; return; }
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input value="${escapeHtml(r.ma_sp)}" oninput="setField(${i},'ma_sp',this.value)" list="dlMaSp"></td>
+      <td><input value="${escapeHtml(r.ten_sp)}" oninput="setField(${i},'ten_sp',this.value)"></td>
+      <td><input value="${escapeHtml(r.to_san_xuat)}" oninput="setField(${i},'to_san_xuat',this.value)"></td>
+      <td class="num"><input type="number" min="0" value="${r.so_luong_nhan_vao}" oninput="setField(${i},'so_luong_nhan_vao',this.value)"></td>
+      <td class="num"><input type="number" min="0" value="${r.so_luong_ok}" oninput="setField(${i},'so_luong_ok',this.value)"></td>
+      <td class="num"><input type="number" min="0" value="${r.so_luong_ng}" oninput="setField(${i},'so_luong_ng',this.value)"></td>
+      <td><input value="${escapeHtml(r.ghi_chu)}" oninput="setField(${i},'ghi_chu',this.value)"></td>
+      <td><button type="button" class="btn-danger" onclick="removeRow(${i})">Xoá</button></td>
+    </tr>`).join("");
+}
+function setField(i, field, val){
+  const numeric = ['so_luong_nhan_vao','so_luong_ok','so_luong_ng'].includes(field);
+  rows[i][field] = numeric ? (Number(val) || 0) : val;
+  if (field === 'ma_sp' && productMap[val] && !rows[i].ten_sp) { rows[i].ten_sp = productMap[val]; renderRows(); }
+}
+function removeRow(i){ rows.splice(i, 1); renderRows(); }
+
+// Gợi ý "số nhận vào" — tổng sl_thuc_chuyen của cd_chuyen_cong_doan_log có
+// cong_doan_nhan = công đoạn đang chọn, trong đúng NGÀY đang chọn (không lọc
+// theo giờ ca vì log không có cột ca) — gộp theo mã SP.
+document.getElementById("btnGoiY").addEventListener("click", loadGoiY);
+async function loadGoiY(){
+  const congDoan = document.getElementById("congDoan").value;
+  const ngay = document.getElementById("ngay").value;
+  if (!congDoan || !ngay) { showMsg("Chọn công đoạn và ngày trước.", "err"); return; }
+  showMsg("⏳ Đang tải gợi ý...", "wait");
+  const start = ngay + "T00:00:00";
+  const end = ngay + "T23:59:59.999";
+  const { data, error } = await sb.from('cd_chuyen_cong_doan_log')
+    .select('ma_sp,ten_sp,sl_thuc_chuyen')
+    .eq('cong_doan_nhan', congDoan)
+    .gte('thoi_gian_chuyen', start).lte('thoi_gian_chuyen', end);
+  if (error) { showMsg("Lỗi tải gợi ý: " + error.message, "err"); return; }
+  if (!data || !data.length) { showMsg("Không có lượt chuyển đến nào trong ngày cho công đoạn này.", "err"); return; }
+  const bySp = {};
+  data.forEach(r => {
+    const k = r.ma_sp || '(không rõ)';
+    if (!bySp[k]) bySp[k] = { ma_sp: k, ten_sp: r.ten_sp || productMap[k] || '', tong: 0 };
+    bySp[k].tong += Number(r.sl_thuc_chuyen) || 0;
+  });
+  rows = Object.values(bySp).map(s => ({ ma_sp: s.ma_sp, ten_sp: s.ten_sp, to_san_xuat: '', so_luong_nhan_vao: s.tong, so_luong_ok: 0, so_luong_ng: 0, ghi_chu: '' }));
+  renderRows();
+  document.getElementById("msg").style.display = "none";
+}
+
+document.getElementById("btnSave").addEventListener("click", saveReport);
+async function saveReport(){
+  const congDoan = document.getElementById("congDoan").value;
+  const ngay = document.getElementById("ngay").value;
+  const ca = document.getElementById("ca").value;
+  if (!congDoan || !ngay || !ca) { showMsg("Chọn đủ Công đoạn / Ngày / Ca.", "err"); return; }
+  if (!rows.length) { showMsg("Chưa có dòng nào để lưu.", "err"); return; }
+  if (rows.some(r => !r.ma_sp.trim())) { showMsg("Có dòng chưa nhập Mã SP.", "err"); return; }
+
+  const session = await MesAuth.getSession();
+  if (!session){
+    showMsg("Cần đăng nhập trước khi lưu. Đang chuyển sang trang đăng nhập…", "err");
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return;
+  }
+  const nguoi = await MesAuth.getCurrentUserEmail();
+
+  const btn = document.getElementById("btnSave");
+  btn.disabled = true; btn.textContent = "⏳ Đang lưu...";
+  const payload = rows.map(r => Object.assign({}, r, { ngay, ca, cong_doan: congDoan }));
+  const { data, error } = await sb.rpc('cd_luu_bao_cao_ca', { p_rows: payload, p_nguoi: nguoi || '' });
+  btn.disabled = false; btn.textContent = "💾 Lưu báo cáo ca";
+  if (error) { showMsg("Lỗi lưu: " + error.message, "err"); return; }
+  showMsg("✅ Đã lưu " + data + " dòng báo cáo cho " + congDoan + " — " + ca + " ngày " + ngay.split("-").reverse().join("/"), "ok");
+}
+
+async function initAuthStatus(){
+  const bar = document.getElementById("authInfo");
+  const email = await MesAuth.getCurrentUserEmail();
+  bar.innerHTML = email ? ('👤 ' + email + ' · <a href="#" id="mesSignOut">Đăng xuất</a>') : '<a href="shared/login.html">Đăng nhập</a>';
+  const so = document.getElementById('mesSignOut');
+  if (so) so.addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); location.reload(); });
+}
+
+initAuthStatus();
+loadDanhMuc();
+</script>
+</body>
+</html>
