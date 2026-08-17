@@ -45,6 +45,7 @@
       { label: 'Kho NVL', href: 'nvl.html' },
       { label: 'Kho thành phẩm', href: 'kho-thanh-pham.html' },
       { label: 'Truy xuất nguồn gốc', href: 'truy-xuat-nguon-goc.html' },
+      { label: 'Tra cứu tem đã in', href: 'tra-cuu-tem.html' },
     ] },
   ];
   const ADMIN_MENU = { label: 'Quản trị', items: [
@@ -65,6 +66,7 @@
     'oqc.html': { icon: '📦', title: 'OQC — Đóng gói Pallet', desc: 'Quét tem, gom pallet, đóng gói' },
     'kho-thanh-pham.html': { icon: '🏬', title: 'Kho Thành Phẩm', desc: 'Nhập kho / Xuất hàng bằng QR' },
     'truy-xuat-nguon-goc.html': { icon: '🔍', title: 'Truy Xuất Nguồn Gốc', desc: 'Phả hệ tem: tách/gộp xuyên công đoạn' },
+    'tra-cuu-tem.html': { icon: '🏷️', title: 'Tra Cứu Tem Đã In', desc: 'Danh sách tem — lọc theo ngày in/máy/mã SP' },
     'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo Cáo Cuối Ca — Ngoài Đúc', desc: 'Bavia / Gia công / Sơn / OQC' },
     'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time' },
     'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Kế Hoạch Bảo Dưỡng Khuôn Tuần', desc: 'Gợi ý tự động theo lịch sản xuất' },

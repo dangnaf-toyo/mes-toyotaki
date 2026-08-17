@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tra cứu tem đã in — TOYOTAKI</title>
+<!--
+  tra-cuu-tem.html — danh sách tem (duc_tem) mới nhất, lọc theo ngày in/máy/
+  mã SP, tải thêm theo trang 100 bản ghi. Khác với tab "Tra cứu Tem" ở
+  intem.html (chỉ tra CHÍNH XÁC 1 Tag No/quét QR) — trang này để DUYỆT/lọc
+  danh sách. Bấm "Chi tiết" 1 dòng mở sang intem.html?tagNo=... (tab Tra cứu,
+  tự điền + tìm sẵn) để xem/sửa đầy đủ như trước giờ.
+  duc_tem đã có RLS đọc công khai (schema_duc.sql) — không cần migration mới.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+.wrap{max-width:1180px;margin:0 auto}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+.toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:8px 9px;font-size:13.5px;font-family:inherit;min-width:160px}
+.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#C87941;color:#fff}
+.btn:hover{background:#a85e2a}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
+.btn-outline:hover{background:#fff7f0}
+.result-count{font-size:12px;color:#999;margin-bottom:10px}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12px;min-width:980px}
+th,td{border:1px solid #e5e5e5;padding:7px 8px;text-align:left;white-space:nowrap}
+th{background:#faf5f0;color:#8a5a30;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+td.num{text-align:right}
+tr:hover td{background:#fffaf5}
+.empty-row td{text-align:center;color:#999;padding:24px;font-style:italic}
+.tag-mono{font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#f0f0f0;color:#666}
+.badge.xuat{background:#e6f7ee;color:#1a7a3a}
+.load-more-wrap{text-align:center;margin-top:16px}
+#msg{max-width:1180px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="toolbar">
+      <div class="fg">
+        <label>Ngày in</label>
+        <input type="date" id="fNgayIn">
+      </div>
+      <div class="fg">
+        <label>Máy</label>
+        <select id="fMay"><option value="">— Tất cả —</option></select>
+      </div>
+      <div class="fg">
+        <label>Mã sản phẩm</label>
+        <select id="fMaSp"><option value="">— Tất cả —</option></select>
+      </div>
+      <button type="button" class="btn" id="btnLoc">Lọc</button>
+      <button type="button" class="btn-outline btn" id="btnXoaLoc">Xoá lọc</button>
+    </div>
+
+    <div class="result-count" id="resultCount">Đang tải…</div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tag No</th><th>Ngày in</th><th>Ngày SX</th><th>Mã SP</th><th>Tên SP</th>
+            <th>Máy</th><th>Số khuôn</th><th class="num">Số lượng</th><th>Trạng thái</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr class="empty-row"><td colspan="10">Đang tải…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="load-more-wrap">
+      <button type="button" class="btn-outline btn" id="btnLoadMore">Tải thêm 100 bản ghi</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+const PAGE_SIZE = 100;
+let offset = 0;
+let rows = [];
+let noMore = false;
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function fmtDateVN(dateStr){
+  if (!dateStr) return '—';
+  const [y,m,d] = String(dateStr).slice(0,10).split('-');
+  return d + '/' + m + '/' + y;
+}
+function fmtDateTimeVN(iso){
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear()
+    + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  if (ms) setTimeout(() => { el.className = ''; }, ms);
+}
+
+async function loadFilterLists(){
+  const [mMay, mSp] = await Promise.all([
+    sb.from('master_machines').select('ma_may').order('ma_may'),
+    sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp'),
+  ]);
+  const selMay = document.getElementById('fMay');
+  (mMay.data || []).forEach(r => {
+    if (!r.ma_may) return;
+    selMay.innerHTML += '<option value="' + escapeHtml(r.ma_may) + '">' + escapeHtml(r.ma_may) + '</option>';
+  });
+  const selSp = document.getElementById('fMaSp');
+  (mSp.data || []).forEach(r => {
+    if (!r.ma_sp) return;
+    selSp.innerHTML += '<option value="' + escapeHtml(r.ma_sp) + '">' + escapeHtml(r.ma_sp) + (r.ten_sp ? ' — ' + escapeHtml(r.ten_sp) : '') + '</option>';
+  });
+}
+
+function buildQuery(){
+  let q = sb.from('duc_tem').select('*', { count: 'exact' });
+  const ngayIn = document.getElementById('fNgayIn').value;
+  const may = document.getElementById('fMay').value;
+  const maSp = document.getElementById('fMaSp').value;
+  if (ngayIn) {
+    // ngay_gio_in là timestamptz — lọc theo đúng ngày (00:00 -> 23:59:59) giờ VN.
+    q = q.gte('ngay_gio_in', ngayIn + 'T00:00:00+07:00').lt('ngay_gio_in', ngayIn + 'T23:59:59.999+07:00');
+  }
+  if (may) q = q.eq('may_duc_chi_thi', may);
+  if (maSp) q = q.eq('ma_sp', maSp);
+  return q;
+}
+
+async function loadFirstPage(){
+  offset = 0; rows = []; noMore = false;
+  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="10">Đang tải…</td></tr>';
+  document.getElementById('resultCount').textContent = 'Đang tải…';
+  await loadMore(true);
+}
+
+async function loadMore(isFirst){
+  const btn = document.getElementById('btnLoadMore');
+  btn.disabled = true; btn.textContent = 'Đang tải…';
+  const { data, error, count } = await buildQuery()
+    .order('ngay_gio_in', { ascending: false, nullsFirst: false })
+    .order('tag_no', { ascending: false })
+    .range(offset, offset + PAGE_SIZE - 1);
+  btn.disabled = false; btn.textContent = 'Tải thêm ' + PAGE_SIZE + ' bản ghi';
+  if (error) { showMsg('Lỗi tải dữ liệu: ' + error.message, 'err'); return; }
+
+  const page = data || [];
+  rows = isFirst ? page : rows.concat(page);
+  offset += page.length;
+  noMore = page.length < PAGE_SIZE;
+  btn.style.display = noMore ? 'none' : '';
+
+  renderRows();
+  document.getElementById('resultCount').textContent =
+    rows.length + (count != null ? ' / ' + fmtNum(count) + ' bản ghi khớp bộ lọc' : ' bản ghi');
+}
+
+function renderRows(){
+  const tbody = document.getElementById('tbody');
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Không tìm thấy tem nào khớp bộ lọc.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="tag-mono">${escapeHtml(r.tag_no)}</td>
+      <td>${fmtDateTimeVN(r.ngay_gio_in)}</td>
+      <td>${fmtDateVN(r.ngay)}</td>
+      <td>${escapeHtml(r.ma_sp)}</td>
+      <td>${escapeHtml(r.ten_sp)}</td>
+      <td>${escapeHtml(r.may_duc_chi_thi)}</td>
+      <td>${escapeHtml(r.so_khuon)}</td>
+      <td class="num">${fmtNum(r.so_luong)}</td>
+      <td><span class="badge${r.trang_thai === 'Đã xuất' ? ' xuat' : ''}">${escapeHtml(r.trang_thai || '—')}</span></td>
+      <td><a href="intem.html?tagNo=${encodeURIComponent(r.tag_no)}" target="_blank" rel="noopener"><button type="button" class="btn-outline btn" style="padding:5px 9px;font-size:11.5px">Chi tiết</button></a></td>
+    </tr>`).join('');
+}
+
+document.getElementById('btnLoc').addEventListener('click', loadFirstPage);
+document.getElementById('btnXoaLoc').addEventListener('click', () => {
+  document.getElementById('fNgayIn').value = '';
+  document.getElementById('fMay').value = '';
+  document.getElementById('fMaSp').value = '';
+  loadFirstPage();
+});
+document.getElementById('btnLoadMore').addEventListener('click', () => loadMore(false));
+
+loadFilterLists();
+loadFirstPage();
+</script>
+</body>
+</html>
