@@ -12,7 +12,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const ROLES = ['admin', 'truong_ca', 'ipqc', 'qc_manager', 'kho_nvl', 'ke_hoach'];
+const ROLES = [
+  'admin', 'truong_ca', 'ipqc', 'qc_manager', 'kho_nvl', 'ke_hoach',
+  'qlsx_nhan_vien', 'qlsx_truong_phong', 'quan_ly_bo_phan', 'giam_doc_sx',
+];
+const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Sơn', 'OQC'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +69,7 @@ Deno.serve(async (req) => {
     const password = String(body.password || '');
     const fullName = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role || '');
+    const boPhanPhuTrach = body.bo_phan_phu_trach ? String(body.bo_phan_phu_trach).trim() : null;
 
     // Công nhân không có email thật -> đăng nhập bằng mã nhân viên (username).
     // Supabase Auth vẫn bắt buộc có email nên sinh email nội bộ không ai dùng
@@ -78,6 +83,9 @@ Deno.serve(async (req) => {
     if (!password) return json({ error: 'Cần mật khẩu' }, 400);
     if (password.length < 6) return json({ error: 'Mật khẩu tối thiểu 6 ký tự' }, 400);
     if (!ROLES.includes(role)) return json({ error: 'Vai trò không hợp lệ: ' + role }, 400);
+    if (role === 'quan_ly_bo_phan' && !BO_PHAN_LIST.includes(boPhanPhuTrach || '')) {
+      return json({ error: 'Vai trò "Quản lý bộ phận" cần chọn đúng 1 công đoạn phụ trách' }, 400);
+    }
 
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
@@ -93,6 +101,7 @@ Deno.serve(async (req) => {
       username: rawUsername,
       full_name: fullName,
       role,
+      bo_phan_phu_trach: role === 'quan_ly_bo_phan' ? boPhanPhuTrach : null,
       created_by: caller.id,
     });
 

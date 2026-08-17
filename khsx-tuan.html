@@ -75,6 +75,27 @@ tr:hover td{background:#fffaf5}
 .days-grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
 .days-grid .fg label{text-align:center}
 .days-grid .fg input{text-align:center}
+/* Thanh trạng thái duyệt */
+.duyet-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:12.5px}
+.duyet-bar.st-nhap{background:#f3f4f6;border:1px solid #e0e0e0;color:#555}
+.duyet-bar.st-cho{background:#fff8e6;border:1px solid #f3d98b;color:#8a6d1f}
+.duyet-bar.st-da_duyet{background:#eafaf0;border:1px solid #b9e6c9;color:#1a7a3a}
+.duyet-badge{font-weight:700}
+.duyet-meta{color:inherit;opacity:.75;font-size:11px}
+.duyet-actions{display:flex;gap:6px;margin-left:auto}
+.btn-good{background:#1a7a3a}
+.btn-good:hover{background:#146030}
+.btn-reject{background:#fff;border:1.5px solid #c00;color:#c00}
+.btn-reject:hover{background:#fff0f0}
+/* Lịch sử thay đổi */
+.log-toggle{background:none;border:none;color:#C87941;font-size:12px;font-weight:700;cursor:pointer;padding:0;margin-bottom:10px}
+.log-list{display:none;flex-direction:column;gap:6px;margin-bottom:14px;max-height:320px;overflow-y:auto}
+.log-list.open{display:flex}
+.log-item{border:1px solid #eee;border-radius:8px;padding:8px 10px;font-size:11.5px;background:#fafafa}
+.log-item .lh{display:flex;justify-content:space-between;gap:8px;font-weight:700;color:#333}
+.log-item .lm{color:#999;font-size:10.5px;margin-top:2px}
+.log-item .lr{color:#a85e2a;margin-top:3px;font-style:italic}
+.log-empty{color:#999;font-size:12px;font-style:italic;padding:8px 0}
 </style>
 </head>
 <body>
@@ -94,6 +115,10 @@ tr:hover td{background:#fffaf5}
       <div style="flex:1"></div>
       <button type="button" class="btn" id="btnAddRow">+ Thêm dòng kế hoạch</button>
     </div>
+
+    <div class="duyet-bar" id="duyetBar"></div>
+    <button type="button" class="log-toggle" id="logToggle">▸ Xem lịch sử thay đổi &amp; duyệt (0)</button>
+    <div class="log-list" id="logList"></div>
 
     <!-- PANEL: Đúc (khoá theo máy) -->
     <div class="panel" id="panelDuc">
@@ -201,6 +226,24 @@ tr:hover td{background:#fffaf5}
   </div>
 </div>
 
+<!-- MODAL: nhập lý do (sửa kế hoạch đã gửi/đã duyệt, hoặc từ chối duyệt) -->
+<div class="modal-mask" id="modalLyDo">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <div class="modal-title" id="lyDoTitle">Nhập lý do</div>
+      <button class="modal-close" id="lyDoClose">✕</button>
+    </div>
+    <div class="modal-body" style="display:block">
+      <p id="lyDoDesc" style="font-size:12px;color:#666;margin-bottom:10px"></p>
+      <div class="fg"><label>Lý do *</label><textarea id="lyDoInput" rows="3" style="width:100%;padding:8px 9px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13.5px"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline btn" id="lyDoCancel">Huỷ</button>
+      <button class="btn" id="lyDoConfirm">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
@@ -213,6 +256,9 @@ let activeTab = TABS[0];
 let ducRows = [];
 let cdRows = [];
 let editingId = null;
+let myRole = null, myBoPhan = null;
+let duyetInfo = null;   // { trang_thai, updated_by, updated_at } | null (chưa gửi duyệt lần nào = 'nhap')
+let changeLog = [];
 
 function mondayOf(d){
   const x = new Date(d);
@@ -255,7 +301,217 @@ function onTabChange(){
   document.getElementById('panelCd').classList.toggle('active', !isDuc);
   if (window.MesNav) MesNav.setTitle('Kế hoạch sản xuất tuần — ' + activeTab, null);
   loadActivePanel();
+  loadDuyetInfo();
+  loadChangeLog();
 }
+
+// =============================================================================
+// QUY TRÌNH PHÊ DUYỆT KHSX — tách riêng theo TỪNG công đoạn (Đúc/Bavia/Gia
+// Công/Sơn/OQC không chờ nhau). Lộ trình:
+//   nhap -> cho_truong_phong -> cho_quan_ly_bo_phan -> cho_giam_doc -> da_duyet
+// Từ chối ở bất kỳ bước nào (bắt buộc lý do) -> quay về 'nhap'. Sửa 1 dòng khi
+// đã qua 'nhap' -> bắt buộc lý do, tự quay về 'cho_truong_phong' (RPC
+// khsx_ghi_log_sua lo việc reset, xem migration_phase_T11).
+// =============================================================================
+const DUYET_LABEL = {
+  nhap: '📝 Nháp — chưa gửi duyệt',
+  cho_truong_phong: '⏳ Chờ Trưởng phòng QLSX kiểm tra',
+  cho_quan_ly_bo_phan: '⏳ Chờ Quản lý bộ phận kiểm tra',
+  cho_giam_doc: '⏳ Chờ Giám đốc sản xuất duyệt',
+  da_duyet: '✅ Đã duyệt',
+};
+const LOG_LABEL = {
+  them_moi: '➕ Thêm dòng', sua: '✏️ Sửa', xoa: '🗑️ Xoá dòng',
+  gui_duyet: '📤 Gửi duyệt', tu_choi: '❌ Từ chối',
+  duyet_truong_phong: '✅ Trưởng phòng duyệt', duyet_quan_ly_bo_phan: '✅ Quản lý bộ phận duyệt',
+  duyet_giam_doc: '✅ Giám đốc duyệt',
+};
+
+async function loadMyRoleInfo(){
+  const session = await MesAuth.getSession();
+  if (!session) return;
+  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
+  myRole = data ? data.role : null;
+  myBoPhan = data ? data.bo_phan_phu_trach : null;
+  renderDuyetBar();
+}
+
+async function loadDuyetInfo(){
+  const { data } = await sb.from('khsx_duyet').select('*')
+    .eq('tuan_bat_dau', fmtDate(weekMonday)).eq('cong_doan', activeTab).maybeSingle();
+  duyetInfo = data || null;
+  renderDuyetBar();
+}
+
+function trangThaiHienTai(){ return duyetInfo ? duyetInfo.trang_thai : 'nhap'; }
+
+function renderDuyetBar(){
+  const bar = document.getElementById('duyetBar');
+  const tt = trangThaiHienTai();
+  bar.className = 'duyet-bar ' + (tt === 'da_duyet' ? 'st-da_duyet' : (tt === 'nhap' ? 'st-nhap' : 'st-cho'));
+
+  let label = DUYET_LABEL[tt] || tt;
+  if (tt === 'cho_quan_ly_bo_phan') label = '⏳ Chờ Quản lý bộ phận ' + activeTab + ' kiểm tra';
+
+  let meta = '';
+  if (duyetInfo && duyetInfo.updated_by) {
+    meta = '<span class="duyet-meta">— ' + escapeHtml(duyetInfo.updated_by) + ' · ' +
+      new Date(duyetInfo.updated_at).toLocaleString('vi-VN', { hour12: false }) + '</span>';
+  }
+
+  let actions = '';
+  const canGui = tt === 'nhap' && ['qlsx_nhan_vien','qlsx_truong_phong','admin'].includes(myRole);
+  const canDuyetTruongPhong = tt === 'cho_truong_phong' && ['qlsx_truong_phong','admin'].includes(myRole);
+  const canDuyetBoPhan = tt === 'cho_quan_ly_bo_phan' && (myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan === activeTab));
+  const canDuyetGiamDoc = tt === 'cho_giam_doc' && ['giam_doc_sx','admin'].includes(myRole);
+
+  if (canGui) {
+    actions = '<button type="button" class="btn" id="btnGuiDuyet">📤 Gửi duyệt</button>';
+  } else if (canDuyetTruongPhong || canDuyetBoPhan || canDuyetGiamDoc) {
+    actions = '<button type="button" class="btn btn-good" id="btnDuyet">✓ Duyệt</button>'
+      + '<button type="button" class="btn btn-reject" id="btnTuChoi">✗ Từ chối</button>';
+  } else if (tt === 'da_duyet') {
+    actions = '<span class="duyet-meta">Sửa dòng bất kỳ sẽ tự đưa kế hoạch này về chờ duyệt lại từ Trưởng phòng QLSX</span>';
+  }
+
+  bar.innerHTML = '<span class="duyet-badge">' + label + '</span>' + meta + '<div class="duyet-actions">' + actions + '</div>';
+
+  const btnGui = document.getElementById('btnGuiDuyet');
+  if (btnGui) btnGui.addEventListener('click', onGuiDuyet);
+  const btnD = document.getElementById('btnDuyet');
+  if (btnD) btnD.addEventListener('click', onDuyet);
+  const btnTC = document.getElementById('btnTuChoi');
+  if (btnTC) btnTC.addEventListener('click', onTuChoi);
+}
+
+async function onGuiDuyet(){
+  if (!(await requireLoginOrRedirect())) return;
+  const user = await MesAuth.getCurrentUserEmail();
+  const { data, error } = await sb.rpc('khsx_gui_duyet', { p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_user: user });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  if (data && data.ok === false) return showMsg(data.error, 'err');
+  showMsg('✓ Đã gửi duyệt', 'ok', 2000);
+  loadDuyetInfo(); loadChangeLog();
+}
+
+async function onDuyet(){
+  if (!(await requireLoginOrRedirect())) return;
+  const user = await MesAuth.getCurrentUserEmail();
+  const { data, error } = await sb.rpc('khsx_duyet', { p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_user: user });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  if (data && data.ok === false) return showMsg(data.error, 'err');
+  showMsg('✓ Đã duyệt', 'ok', 2000);
+  loadDuyetInfo(); loadChangeLog();
+}
+
+async function onTuChoi(){
+  if (!(await requireLoginOrRedirect())) return;
+  const lyDo = await openLyDoModal('Từ chối kế hoạch', 'Kế hoạch sẽ quay về trạng thái Nháp để nhân viên QLSX sửa lại.');
+  if (lyDo === null) return;
+  const user = await MesAuth.getCurrentUserEmail();
+  const { data, error } = await sb.rpc('khsx_tu_choi', { p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_ly_do: lyDo, p_user: user });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  if (data && data.ok === false) return showMsg(data.error, 'err');
+  showMsg('✓ Đã từ chối, kế hoạch quay về Nháp', 'ok', 2500);
+  loadDuyetInfo(); loadChangeLog();
+}
+
+// Hộp nhập lý do dùng chung cho "Từ chối" và "Sửa kế hoạch đã gửi/đã duyệt".
+// Trả về Promise<string|null> — null nếu người dùng bấm Huỷ.
+function openLyDoModal(title, desc){
+  return new Promise(resolve => {
+    const modal = document.getElementById('modalLyDo');
+    document.getElementById('lyDoTitle').textContent = title;
+    document.getElementById('lyDoDesc').textContent = desc || '';
+    const input = document.getElementById('lyDoInput');
+    input.value = '';
+    modal.classList.add('open');
+    setTimeout(() => input.focus(), 50);
+
+    function cleanup(){
+      modal.classList.remove('open');
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      closeBtn.removeEventListener('click', onCancel);
+    }
+    function onConfirm(){
+      const v = input.value.trim();
+      if (!v) { input.focus(); return; }
+      cleanup(); resolve(v);
+    }
+    function onCancel(){ cleanup(); resolve(null); }
+
+    const confirmBtn = document.getElementById('lyDoConfirm');
+    const cancelBtn = document.getElementById('lyDoCancel');
+    const closeBtn = document.getElementById('lyDoClose');
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    closeBtn.addEventListener('click', onCancel);
+  });
+}
+
+// Gọi trước khi lưu/xoá 1 dòng KHSX: nếu kế hoạch công đoạn này đã gửi duyệt
+// hoặc đã duyệt xong, bắt buộc xin lý do rồi ghi log (RPC tự đưa trạng thái
+// về "chờ Trưởng phòng" — duyệt lại từ đầu lộ trình). Nếu còn đang Nháp thì
+// ghi log luôn, không cần lý do. Trả về true nếu được phép tiếp tục lưu.
+async function ghiLogVaXinLyDoNeuCan(loai, viTri, giaTriCu, giaTriMoi){
+  let lyDo = '';
+  if (trangThaiHienTai() !== 'nhap') {
+    lyDo = await openLyDoModal(
+      'Kế hoạch đã gửi duyệt/đã duyệt',
+      'Sửa "' + viTri + '" sẽ đưa kế hoạch ' + activeTab + ' tuần này về chờ duyệt lại từ Trưởng phòng QLSX. Nhập lý do thay đổi:'
+    );
+    if (lyDo === null) return false;
+  }
+  const user = await MesAuth.getCurrentUserEmail();
+  const { data, error } = await sb.rpc('khsx_ghi_log_sua', {
+    p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_loai: loai, p_vi_tri: viTri,
+    p_gia_tri_cu: giaTriCu, p_gia_tri_moi: giaTriMoi, p_ly_do: lyDo, p_user: user,
+  });
+  if (error) { showMsg('Lỗi ghi log: ' + error.message, 'err'); return false; }
+  if (data && data.ok === false) { showMsg(data.error, 'err'); return false; }
+  return true;
+}
+
+function formatDayValues(r){
+  if (!r) return '';
+  return ['t2','t3','t4','t5','t6','t7','cn'].map(d => (Number(r[d])||0)).join('/');
+}
+
+async function loadChangeLog(){
+  const { data, error } = await sb.from('khsx_thay_doi_log').select('*')
+    .eq('tuan_bat_dau', fmtDate(weekMonday)).eq('cong_doan', activeTab)
+    .order('thoi_diem', { ascending: false }).limit(100);
+  changeLog = error ? [] : (data || []);
+  renderChangeLog();
+}
+
+function renderChangeLog(){
+  document.getElementById('logToggle').textContent =
+    (document.getElementById('logList').classList.contains('open') ? '▾' : '▸') +
+    ' Xem lịch sử thay đổi & duyệt (' + changeLog.length + ')';
+  const list = document.getElementById('logList');
+  if (changeLog.length === 0) {
+    list.innerHTML = '<div class="log-empty">Chưa có lịch sử nào cho ' + escapeHtml(activeTab) + ' tuần này.</div>';
+    return;
+  }
+  list.innerHTML = changeLog.map(l => {
+    const thoiDiem = new Date(l.thoi_diem).toLocaleString('vi-VN', { hour12: false });
+    const doiGiaTri = (l.gia_tri_cu || l.gia_tri_moi)
+      ? '<div class="lm">T2-CN: ' + escapeHtml(l.gia_tri_cu || '—') + ' → ' + escapeHtml(l.gia_tri_moi || '—') + '</div>' : '';
+    const lyDo = l.ly_do ? '<div class="lr">Lý do: ' + escapeHtml(l.ly_do) + '</div>' : '';
+    return '<div class="log-item">'
+      + '<div class="lh"><span>' + (LOG_LABEL[l.loai_su_kien] || l.loai_su_kien) + (l.vi_tri ? ' — ' + escapeHtml(l.vi_tri) : '') + '</span>'
+      + '<span style="font-weight:400;color:#999">' + thoiDiem + '</span></div>'
+      + '<div class="lm">' + escapeHtml(l.nguoi_thuc_hien || '') + '</div>'
+      + doiGiaTri + lyDo
+      + '</div>';
+  }).join('');
+}
+document.getElementById('logToggle').addEventListener('click', () => {
+  document.getElementById('logList').classList.toggle('open');
+  renderChangeLog();
+});
 
 function showMsg(text, cls, ms){
   const el = document.getElementById('msg');
@@ -511,6 +767,15 @@ document.getElementById('btnSaveRowDuc').addEventListener('click', async () => {
     updated_at: new Date().toISOString(),
   };
 
+  const oldRow = editingId ? ducRows.find(x => x.id === editingId) : null;
+  const viTri = 'Máy ' + maMay + ' — Mã SP ' + maSp;
+  const ok = await ghiLogVaXinLyDoNeuCan(
+    oldRow ? 'sua' : 'them_moi', viTri,
+    oldRow ? formatDayValues(oldRow) : '',
+    formatDayValues(payload)
+  );
+  if (!ok) return;
+
   const btn = document.getElementById('btnSaveRowDuc');
   btn.disabled = true;
   const { error } = await sb.from('duc_khsx_tuan_plan')
@@ -519,16 +784,21 @@ document.getElementById('btnSaveRowDuc').addEventListener('click', async () => {
   if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
   showMsg('✓ Đã lưu', 'ok', 2000);
   closeRowModal();
-  loadDucRows();
+  loadDucRows(); loadDuyetInfo(); loadChangeLog();
 });
 
 async function deleteRowDuc(id){
   if (!(await requireLoginOrRedirect())) return;
   if (!confirm('Xoá dòng kế hoạch này?')) return;
+  const r = ducRows.find(x => x.id === id);
+  const viTri = r ? ('Máy ' + r.ma_may + ' — Mã SP ' + r.ma_sp) : ('#' + id);
+  const ok = await ghiLogVaXinLyDoNeuCan('xoa', viTri, r ? formatDayValues(r) : '', '');
+  if (!ok) return;
+
   const { error } = await sb.from('duc_khsx_tuan_plan').delete().eq('id', id);
   if (error) { showMsg('Lỗi xoá: ' + error.message, 'err'); return; }
   showMsg('✓ Đã xoá', 'ok', 2000);
-  loadDucRows();
+  loadDucRows(); loadDuyetInfo(); loadChangeLog();
 }
 
 // =============================================================================
@@ -615,6 +885,15 @@ document.getElementById('btnSaveRowCd').addEventListener('click', async () => {
     updated_at: new Date().toISOString(),
   };
 
+  const oldRowCd = editingId ? cdRows.find(x => x.id === editingId) : null;
+  const viTriCd = 'Mã SP ' + maSp;
+  const okCd = await ghiLogVaXinLyDoNeuCan(
+    oldRowCd ? 'sua' : 'them_moi', viTriCd,
+    oldRowCd ? formatDayValues(oldRowCd) : '',
+    formatDayValues(payload)
+  );
+  if (!okCd) return;
+
   const btn = document.getElementById('btnSaveRowCd');
   btn.disabled = true;
   const { error } = await sb.from('cd_khsx_tuan_plan')
@@ -623,22 +902,27 @@ document.getElementById('btnSaveRowCd').addEventListener('click', async () => {
   if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
   showMsg('✓ Đã lưu', 'ok', 2000);
   closeRowModalCd();
-  loadCdRows();
+  loadCdRows(); loadDuyetInfo(); loadChangeLog();
 });
 
 async function deleteRowCd(id){
   if (!(await requireLoginOrRedirect())) return;
   if (!confirm('Xoá dòng kế hoạch này?')) return;
+  const r = cdRows.find(x => x.id === id);
+  const viTri = r ? ('Mã SP ' + r.ma_sp) : ('#' + id);
+  const ok = await ghiLogVaXinLyDoNeuCan('xoa', viTri, r ? formatDayValues(r) : '', '');
+  if (!ok) return;
+
   const { error } = await sb.from('cd_khsx_tuan_plan').delete().eq('id', id);
   if (error) { showMsg('Lỗi xoá: ' + error.message, 'err'); return; }
   showMsg('✓ Đã xoá', 'ok', 2000);
-  loadCdRows();
+  loadCdRows(); loadDuyetInfo(); loadChangeLog();
 }
 
 document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()-7); onWeekChange(); });
 document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()+7); onWeekChange(); });
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
-function onWeekChange(){ updateWeekLabel(); loadActivePanel(); }
+function onWeekChange(){ updateWeekLabel(); loadActivePanel(); loadDuyetInfo(); loadChangeLog(); }
 
 renderTabs();
 document.getElementById('panelDuc').classList.add('active');
@@ -646,6 +930,9 @@ updateWeekLabel();
 loadDucRows();
 loadMasterLists();
 loadMoldsByProduct();
+loadMyRoleInfo();
+loadDuyetInfo();
+loadChangeLog();
 </script>
 </body>
 </html>

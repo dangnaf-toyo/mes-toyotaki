@@ -87,6 +87,10 @@
             <label for="cRole">Vai trò</label>
             <select id="cRole" required></select>
           </div>
+          <div id="cBoPhanWrap" style="display:none">
+            <label for="cBoPhan">Bộ phận phụ trách</label>
+            <select id="cBoPhan"></select>
+          </div>
         </div>
         <p class="muted" style="margin:10px 0 0">Điền ít nhất 1 trong 2: mã nhân viên (công nhân không có email) hoặc email thật.</p>
         <div class="form-actions">
@@ -100,7 +104,7 @@
       <div class="msg" id="listMsg"></div>
       <table id="userTable" style="display:none">
         <thead>
-          <tr><th>Mã NV / Email</th><th>Họ tên</th><th>Vai trò</th><th>Tạo lúc</th><th></th></tr>
+          <tr><th>Mã NV / Email</th><th>Họ tên</th><th>Vai trò</th><th>Bộ phận</th><th>Tạo lúc</th><th></th></tr>
         </thead>
         <tbody id="userTbody"></tbody>
       </table>
@@ -120,7 +124,12 @@ const ROLE_LABELS = {
   qc_manager: 'QC Manager',
   kho_nvl: 'Kho NVL',
   ke_hoach: 'Kế hoạch',
+  qlsx_nhan_vien: 'QLSX — Nhân viên (lập KHSX)',
+  qlsx_truong_phong: 'QLSX — Trưởng phòng (duyệt bước 1)',
+  quan_ly_bo_phan: 'Quản lý bộ phận (duyệt bước 2)',
+  giam_doc_sx: 'Giám đốc sản xuất (duyệt cuối)',
 };
+const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Sơn', 'OQC'];
 
 let currentSession = null;
 
@@ -128,6 +137,10 @@ function fillRoleSelect(sel, selected){
   sel.innerHTML = Object.entries(ROLE_LABELS).map(([v, l]) =>
     `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`
   ).join('');
+}
+function fillBoPhanSelect(sel, selected){
+  sel.innerHTML = '<option value="">— Chọn công đoạn —</option>' +
+    BO_PHAN_LIST.map(v => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v}</option>`).join('');
 }
 
 async function loadUsers(){
@@ -138,7 +151,7 @@ async function loadUsers(){
 
   const { data, error } = await sb
     .from('user_roles')
-    .select('user_id, email, username, full_name, role, created_at')
+    .select('user_id, email, username, full_name, role, bo_phan_phu_trach, created_at')
     .order('created_at', { ascending: false });
 
   if (error){
@@ -166,6 +179,7 @@ async function loadUsers(){
       <td>${idLabel}</td>
       <td>${row.full_name || '<span class="muted">—</span>'}</td>
       <td></td>
+      <td></td>
       <td class="muted">${createdAt}</td>
       <td></td>
     `;
@@ -174,26 +188,55 @@ async function loadUsers(){
     fillRoleSelect(sel, row.role);
     roleTd.appendChild(sel);
 
-    const actionTd = tr.children[4];
+    const bpTd = tr.children[3];
+    const bpSel = document.createElement('select');
+    fillBoPhanSelect(bpSel, row.bo_phan_phu_trach || '');
+    bpSel.style.display = row.role === 'quan_ly_bo_phan' ? '' : 'none';
+    bpTd.appendChild(bpSel);
+    const bpNote = document.createElement('span');
+    bpNote.className = 'muted';
+    bpNote.textContent = '—';
+    bpNote.style.display = row.role === 'quan_ly_bo_phan' ? 'none' : '';
+    bpTd.appendChild(bpNote);
+
+    const actionTd = tr.children[5];
     const saveBtn = document.createElement('button');
     saveBtn.className = 'role-save';
     saveBtn.textContent = 'Lưu';
     saveBtn.disabled = true;
-    sel.addEventListener('change', () => { saveBtn.disabled = (sel.value === row.role); });
+    function syncChanged(){
+      bpSel.style.display = sel.value === 'quan_ly_bo_phan' ? '' : 'none';
+      bpNote.style.display = sel.value === 'quan_ly_bo_phan' ? 'none' : '';
+      const roleChanged = sel.value !== row.role;
+      const bpChanged = sel.value === 'quan_ly_bo_phan' && bpSel.value !== (row.bo_phan_phu_trach || '');
+      saveBtn.disabled = !(roleChanged || bpChanged);
+    }
+    sel.addEventListener('change', syncChanged);
+    bpSel.addEventListener('change', syncChanged);
     saveBtn.addEventListener('click', async () => {
+      if (sel.value === 'quan_ly_bo_phan' && !bpSel.value) {
+        alert('Vai trò "Quản lý bộ phận" cần chọn đúng 1 công đoạn phụ trách');
+        return;
+      }
       saveBtn.disabled = true;
       saveBtn.textContent = '...';
       const { error: updErr } = await sb
         .from('user_roles')
-        .update({ role: sel.value, updated_at: new Date().toISOString() })
+        .update({
+          role: sel.value,
+          bo_phan_phu_trach: sel.value === 'quan_ly_bo_phan' ? bpSel.value : null,
+          updated_at: new Date().toISOString(),
+        })
         .eq('user_id', row.user_id);
       if (updErr){
         alert('Lỗi lưu vai trò: ' + updErr.message);
         saveBtn.disabled = false;
+        saveBtn.textContent = 'Lưu';
       } else {
         row.role = sel.value;
+        row.bo_phan_phu_trach = sel.value === 'quan_ly_bo_phan' ? bpSel.value : null;
         saveBtn.textContent = 'Đã lưu';
-        setTimeout(() => { saveBtn.textContent = 'Lưu'; }, 1200);
+        setTimeout(() => { saveBtn.textContent = 'Lưu'; saveBtn.disabled = true; }, 1200);
       }
     });
     actionTd.appendChild(saveBtn);
@@ -214,7 +257,14 @@ async function handleCreate(e){
   const password = document.getElementById('cPassword').value;
   const full_name = document.getElementById('cFullName').value.trim() || null;
   const role = document.getElementById('cRole').value;
+  const bo_phan_phu_trach = document.getElementById('cBoPhan').value || null;
 
+  if (role === 'quan_ly_bo_phan' && !bo_phan_phu_trach){
+    msg.className = 'msg error';
+    msg.textContent = 'Vai trò "Quản lý bộ phận" cần chọn đúng 1 công đoạn phụ trách.';
+    btn.disabled = false;
+    return;
+  }
   if (!username && !email){
     msg.className = 'msg error';
     msg.textContent = 'Cần điền mã nhân viên hoặc email.';
@@ -230,7 +280,7 @@ async function handleCreate(e){
         'Authorization': 'Bearer ' + currentSession.access_token,
         'apikey': SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ username: username || undefined, email: email || undefined, password, full_name, role }),
+      body: JSON.stringify({ username: username || undefined, email: email || undefined, password, full_name, role, bo_phan_phu_trach: bo_phan_phu_trach || undefined }),
     });
     const result = await resp.json();
     if (!resp.ok){
@@ -241,6 +291,8 @@ async function handleCreate(e){
     msg.textContent = 'Đã tạo tài khoản ' + who + ' (vai trò: ' + ROLE_LABELS[result.role] + ').';
     document.getElementById('createForm').reset();
     fillRoleSelect(document.getElementById('cRole'), '');
+    fillBoPhanSelect(document.getElementById('cBoPhan'), '');
+    document.getElementById('cBoPhanWrap').style.display = 'none';
     await loadUsers();
   } catch (err){
     msg.className = 'msg error';
@@ -271,6 +323,10 @@ async function main(){
 
   document.getElementById('adminArea').style.display = 'block';
   fillRoleSelect(document.getElementById('cRole'), '');
+  fillBoPhanSelect(document.getElementById('cBoPhan'), '');
+  document.getElementById('cRole').addEventListener('change', (e) => {
+    document.getElementById('cBoPhanWrap').style.display = e.target.value === 'quan_ly_bo_phan' ? '' : 'none';
+  });
   document.getElementById('createForm').addEventListener('submit', handleCreate);
   await loadUsers();
 }
