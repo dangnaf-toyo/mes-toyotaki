@@ -2,272 +2,770 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>TOYOTAKI | Trang Chủ MES (Supabase)</title>
+<title>TOYOTAKI | Trang Chủ MES</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet"></noscript>
 <!--
-  index.html — trang chủ MES (repo mes-toyotaki, gộp lại 2026-08-14 từ
-  Dashboard_SL_CL (repo "Toyotaki") + Quản lý NVL (repo "Ton-kho-NVL")).
-  Repo này CHỈ chứa code đã chuyển xong sang Supabase — không có bản Apps
-  Script cũ. Trước đây file này tên home-supabase.html, sống trong repo
-  Dashboard_SL_CL cùng index.html cũ (Apps Script) — nay đổi thành index.html
-  vì repo mới không còn trang chủ cũ nào để phân biệt.
+  index.html — trang chủ MES, dashboard tổng quan nhà máy (thay cho danh sách
+  link điều hướng cũ — điều hướng nay đã có đủ trong navbar.js). Chia 2 nhóm
+  Sản lượng / Chất lượng theo yêu cầu người dùng (mockup duyệt trước khi code
+  chi tiết, xem lịch sử trò chuyện). TOÀN BỘ số liệu đọc TRỰC TIẾP từ Supabase
+  (không có số demo/giả nào) — mọi truy vấn public-read, không cần RPC mới.
+
+  Phương pháp tính "hôm nay" nhất quán cho cả 5 công đoạn: cộng dồn dữ liệu
+  đã "chốt" (duc_bao_cao_ca / cd_bao_cao_ca — ca đã kết) VỚI dữ liệu đang
+  "sống" (duc_ca_hien_tai / cd_tram_hien_tai — ca chưa kết) để ra đúng tổng
+  cả ngày kể cả ca đang chạy dở.
+
+  Biểu đồ xu hướng 10 ngày: chỉ vẽ từ dữ liệu THẬT có trong duc_bao_cao_ca/
+  cd_bao_cao_ca/cd_khsx_tuan_plan — nếu bảng nào mới triển khai (VD
+  cd_bao_cao_ca/cd_khsx_tuan_plan mới có từ 2026-08-16/17) thì những ngày
+  trước đó chưa có dữ liệu sẽ tự nhiên KHÔNG vẽ điểm (không bịa số) — sẽ tự
+  đầy đủ dần theo thời gian, không cần nhập tay bù lại.
 -->
 <style>
   :root{
     --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
     --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
-    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C; --tk-good:#1a7a3a;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C;
+    --good:#1a7a3a; --good-bg:#EAF6EE; --warn:#B45309; --warn-bg:#FFF6E9; --crit:#B91C1C; --crit-bg:#FDECEC;
+    --s-duc:#C8703A; --s-bavia:#1B5FA6; --s-giacong:#1F8A5F; --s-son:#8B3FA6; --s-oqc:#A6862C;
+    --grp-sl:#A25A2A; --grp-cl:#33465C;
   }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',sans-serif;color:var(--tk-black);-webkit-font-smoothing:antialiased;}
-  h1,h2,h3{font-family:'Zilla Slab',serif;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',sans-serif;color:var(--tk-black);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  h1,h2,h3{font-family:'Zilla Slab',serif}
 
-  header.top{background:var(--tk-black);color:var(--tk-cream);padding:22px 0;border-bottom:5px solid var(--tk-orange);}
-  header.top .inner{max-width:1240px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
-  .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--tk-orange);font-weight:600;margin-bottom:8px;}
-  header.top h1{font-size:25px;margin:0 0 6px;font-weight:600;color:#fff;letter-spacing:.01em;}
-  header.top .sub{font-size:13px;color:#c9c2b6;}
-  .tk-mark{height:40px;width:auto;max-width:140px;object-fit:contain;}
-  .auth-bar{font-size:12px;color:#c9c2b6;margin-top:4px}
-  .auth-bar a{color:var(--tk-orange);text-decoration:none;font-weight:600}
+  .wrap{max-width:1360px;margin:0 auto;padding:22px 24px 60px;display:flex;flex-direction:column;gap:34px}
 
-  .banner{max-width:1180px;margin:22px auto 0;padding:0 28px;}
-  .banner-box{background:#fff;border:1px solid var(--tk-line);border-left:5px solid var(--tk-good);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--tk-black);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .banner-box b{color:var(--tk-good)}
-  .banner-box a{color:var(--tk-orange-deep);font-weight:600;text-decoration:none}
+  .group-sec{display:flex;flex-direction:column;gap:16px}
+  .group-head{display:flex;align-items:center;gap:14px;padding-bottom:4px;flex-wrap:wrap}
+  .group-head .bar{width:5px;height:30px;border-radius:3px}
+  .group-head h2{font-size:20px;margin:0;font-weight:700}
+  .group-stats{display:flex;gap:14px;margin-left:auto}
+  .gstat{text-align:right}
+  .gstat .lbl{font-size:10px;color:var(--tk-muted);text-transform:uppercase;letter-spacing:.03em;font-weight:600}
+  .gstat .val{font-size:19px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+  .gstat .val.crit{color:var(--crit)}
+  .gstat .val.warn{color:var(--warn)}
+  .gstat .val.good{color:var(--good)}
 
-  .wrap{max-width:1180px;margin:0 auto;padding:36px 28px 60px;}
-  .wrap > .lead{text-align:center;margin-bottom:44px;}
-  .wrap > .lead h2{font-size:22px;margin:0 0 8px;font-weight:600;}
-  .wrap > .lead p{font-size:14px;color:var(--tk-muted);margin:0;}
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:18px 20px}
+  .card-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .card-head h3{font-size:13px;margin:0;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--tk-black);font-family:'IBM Plex Sans',sans-serif}
+  .card-head .hint{font-size:11px;color:var(--tk-muted)}
+  .card-head a.more{margin-left:auto;font-size:11.5px;color:var(--tk-orange-deep);text-decoration:none;font-weight:600;white-space:nowrap}
+  .card-head a.more:hover{text-decoration:underline}
 
-  .group{margin-bottom:40px;}
-  .group-title{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;border-bottom:1px solid var(--tk-line);padding-bottom:10px;}
-  .group-title h2{font-size:17px;margin:0;font-weight:600;}
-  .group-title .count{margin-left:auto;font-size:12px;color:var(--tk-muted);}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:1000px){.grid-2{grid-template-columns:1fr}}
 
-  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
-  @media (max-width:900px){.card-grid{grid-template-columns:1fr 1fr;}}
-  @media (max-width:600px){.card-grid{grid-template-columns:1fr;}}
+  .trend-multi{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  @media (max-width:980px){.trend-multi{grid-template-columns:repeat(2,1fr)}}
+  .trend-panel{border:1px solid var(--tk-line);border-radius:9px;padding:11px 12px 8px;background:var(--tk-cream)}
+  .trend-panel .hd{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;margin-bottom:2px}
+  .trend-panel .hd .sw{width:8px;height:8px;border-radius:3px;flex:none}
+  .trend-panel .cur{font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1.1}
+  .trend-panel .cur .u{font-size:11px;color:var(--tk-muted);font-weight:500}
+  .trend-panel .delta{font-size:10.5px;font-weight:600;margin-bottom:4px;min-height:14px}
+  .trend-panel .delta.up{color:var(--good)}
+  .trend-panel .delta.down{color:var(--crit)}
+  .trend-panel .delta.flat{color:var(--tk-muted)}
+  .trend-panel svg{display:block;width:100%;height:52px}
+  .trend-panel .nodata{font-size:10.5px;color:var(--tk-muted);font-style:italic;padding:14px 0}
 
-  .dash-card{
-    display:block;background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;
-    padding:28px 24px;text-decoration:none;color:var(--tk-black);position:relative;overflow:hidden;
-    transition:transform .15s ease, box-shadow .15s ease;
-  }
-  .dash-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--tk-orange);}
-  .dash-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(33,26,21,.08);}
-  .dash-card .no{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tk-orange-deep);font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
-  .dash-card h3{font-size:19px;margin:8px 0 6px;font-weight:600;}
-  .dash-card p{font-size:13px;color:var(--tk-muted);margin:0 0 16px;line-height:1.5;}
-  .dash-card .enter{
-    display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--tk-orange-deep);
-  }
-  .dash-card .enter .arrow{transition:transform .15s ease;}
-  .dash-card:hover .enter .arrow{transform:translateX(4px);}
-  .dash-card .badge{position:absolute;top:16px;right:16px;font-size:10px;font-weight:600;color:#fff;background:var(--tk-good);padding:3px 8px;border-radius:100px;letter-spacing:.03em;}
+  .bars{display:flex;flex-direction:column;gap:13px}
+  .bar-row{display:grid;grid-template-columns:88px 1fr 128px;align-items:center;gap:10px;font-size:12.5px}
+  .bar-row .name{display:flex;align-items:center;gap:7px;font-weight:600}
+  .bar-row .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+  .bar-track{position:relative;height:18px;background:var(--tk-cream-2);border-radius:5px;overflow:hidden}
+  .bar-fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px 4px 4px 5px}
+  .bar-kh-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tk-black);opacity:.55}
+  .bar-row .nums{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--tk-muted)}
+  .bar-row .nums b{color:var(--tk-black);font-weight:700}
+  .legend-note{display:flex;gap:16px;margin-top:12px;padding-top:11px;border-top:1px solid var(--tk-line);font-size:11px;color:var(--tk-muted);flex-wrap:wrap}
+  .legend-note span{display:flex;align-items:center;gap:5px}
+  .legend-note .mark-kh{width:2px;height:11px;background:var(--tk-black);opacity:.55;display:inline-block}
 
-  footer{text-align:center;font-size:12px;color:var(--tk-muted);padding:30px 0;}
-  footer a{color:var(--tk-orange-deep)}
+  .hbar-row{display:grid;grid-template-columns:82px 1fr 44px;align-items:center;gap:8px;font-size:12px;margin-bottom:10px}
+  .hbar-row:last-child{margin-bottom:0}
+  .hbar-track{height:14px;background:var(--tk-cream-2);border-radius:4px;overflow:hidden}
+  .hbar-fill{height:100%;border-radius:4px}
+  .hbar-row .pct{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700}
+
+  .rank-list{display:flex;flex-direction:column;gap:0}
+  .rank-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--tk-line)}
+  .rank-item:last-child{border-bottom:none;padding-bottom:0}
+  .rank-item .no{width:20px;height:20px;border-radius:50%;background:var(--tk-cream-2);color:var(--tk-muted);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+  .rank-item.r1 .no{background:var(--crit);color:#fff}
+  .rank-item.r2 .no{background:var(--warn);color:#fff}
+  .rank-item .txt{flex:1;font-size:12.5px;min-width:0}
+  .rank-item .txt b{font-weight:700}
+  .rank-item .meta{font-size:10.5px;color:var(--tk-muted);margin-top:2px}
+  .rank-item .metric{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;white-space:nowrap}
+  .rank-item .metric .u{font-size:10px;color:var(--tk-muted);font-weight:500;display:block;text-align:right}
+  .empty-note{color:var(--tk-muted);font-size:12px;font-style:italic;padding:10px 0}
+
+  .stock-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center;font-size:12px;margin-bottom:9px}
+  .stock-row:last-child{margin-bottom:0}
+  .stock-row .sp{font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:11.5px}
+  .stock-row .ten{color:var(--tk-muted);font-weight:400;font-size:10.5px;display:block}
+  .stock-row .qty{text-align:right;font-weight:700;font-family:'IBM Plex Mono',monospace}
+
+  .wip-row{display:grid;grid-template-columns:88px 1fr 90px;align-items:center;gap:8px;font-size:12.5px;margin-bottom:10px}
+  .wip-row:last-child{margin-bottom:0}
+  .wip-row .name{display:flex;align-items:center;gap:7px;font-weight:600}
+  .wip-row .swatch{width:9px;height:9px;border-radius:3px;flex:none}
+  .wip-row .qty{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700}
+  .wip-row .qty .u{color:var(--tk-muted);font-weight:500;font-size:10.5px}
+
+  .ncp-status-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .ncp-stat{border:1px solid var(--tk-line);border-radius:9px;padding:12px 14px;background:var(--tk-cream)}
+  .ncp-stat .lbl{font-size:10.5px;color:var(--tk-muted);text-transform:uppercase;letter-spacing:.03em;font-weight:600;margin-bottom:6px}
+  .ncp-stat .val{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+  .ncp-stat.crit{border-color:#f0c4bd}
+  .ncp-stat.crit .val{color:var(--crit)}
+  .ncp-stat.warn .val{color:var(--warn)}
+  .ncp-stat.good .val{color:var(--good)}
+  table.simple{width:100%;border-collapse:collapse;font-size:12px}
+  table.simple th{text-align:left;font-size:10px;color:var(--tk-muted);text-transform:uppercase;letter-spacing:.03em;font-weight:600;padding:0 8px 8px 0;border-bottom:1px solid var(--tk-line)}
+  table.simple td{padding:9px 8px 9px 0;border-bottom:1px solid var(--tk-line);vertical-align:middle}
+  table.simple tr:last-child td{border-bottom:none}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+  .pill.crit{background:var(--crit-bg);color:var(--crit)}
+  .pill.warn{background:var(--warn-bg);color:var(--warn)}
+  .pill.good{background:var(--good-bg);color:var(--good)}
+
+  footer{text-align:center;font-size:11px;color:var(--tk-muted);padding:10px 0 40px}
 </style>
 </head>
 <body>
 
-<div class="banner">
-  <div class="banner-box">
-    ⚡ Đây là trang chủ <b>mới</b>, riêng cho các công cụ đã chuyển xong sang Supabase (đọc công khai, ghi cần đăng nhập).
-    Công cụ nào chưa kịp chuyển vẫn nằm ở <a href="index.html">trang chủ cũ</a>.
-  </div>
-</div>
-
 <div class="wrap">
-  <div class="lead">
-    <h2>Chọn chức năng bạn muốn sử dụng</h2>
-    <p>Bấm vào một mục bên dưới để chuyển đến đúng công cụ/dashboard.</p>
-  </div>
 
-  <div class="group">
-    <div class="group-title"><h2>Dashboard &amp; Báo cáo</h2><span class="count">6 mục</span></div>
-    <div class="card-grid">
-      <a class="dash-card" target="_blank" rel="noopener" href="bao-duong-khuon-tuan.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Đúc · Khuôn</div>
-        <h3>Kế Hoạch Bảo Dưỡng Khuôn Tuần</h3>
-        <p>Gợi ý tự động: khuôn nào cần bảo dưỡng, ngày nào (theo lịch SX tuần), điểm cần chú ý từ vấn đề lần trước.</p>
-        <span class="enter">Xem kế hoạch <span class="arrow">→</span></span>
-      </a>
+  <!-- ======================================================================
+       NHÓM 1 — SẢN LƯỢNG
+  ====================================================================== -->
+  <div class="group-sec">
+    <div class="group-head">
+      <span class="bar" style="background:var(--grp-sl)"></span>
+      <h2>📦 Sản lượng</h2>
+      <div class="group-stats" id="slHeaderStats"></div>
+    </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="bao-cao-ca.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Đúc</div>
-        <h3>Xem Lại Báo Cáo Kết Ca</h3>
-        <p>Tra cứu báo cáo kết ca đã lưu theo ngày/ca — dùng khi lúc kết ca quên bấm Lưu PDF.</p>
-        <span class="enter">Xem báo cáo <span class="arrow">→</span></span>
-      </a>
+    <div class="card">
+      <div class="card-head">
+        <h3>Xu hướng hoàn thành kế hoạch — 10 ngày gần nhất</h3>
+        <span class="hint">% thực tế / kế hoạch mỗi ngày, theo công đoạn</span>
+        <a class="more" href="sanluong-supabase.html">Dashboard sản lượng →</a>
+      </div>
+      <div class="trend-multi" id="slTrendMulti"></div>
+    </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="sanluong-supabase.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Sản lượng</div>
-        <h3>Dashboard Sản Lượng &amp; Giao Hàng</h3>
-        <p>Tỷ lệ giao hàng đúng hạn, hoàn thành KHSX, capacity máy, forecast sản lượng.</p>
-        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
-      </a>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <h3>Tiến độ hoàn thành kế hoạch — hôm nay</h3>
+          <a class="more" href="khsx-tuan.html">Kế hoạch tuần →</a>
+        </div>
+        <div class="bars" id="barsCongDoan"></div>
+        <div class="legend-note"><span><span class="mark-kh"></span> Vạch đen = mục tiêu kế hoạch ngày</span></div>
+      </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="chatluong-supabase.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Chất lượng</div>
-        <h3>Dashboard KPI Chất Lượng</h3>
-        <p>Tổng quan, theo công đoạn, theo khách hàng, bất thường chất lượng, tỷ lệ NG lần 1.</p>
-        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
-      </a>
+      <div class="card">
+        <div class="card-head">
+          <h3>5 vấn đề nổi cộm — dừng máy hôm nay</h3>
+          <span class="hint">Đúc (duy nhất công đoạn có nhật ký dừng máy)</span>
+          <a class="more" href="duc-dashboard.html">Bảng điều khiển Đúc →</a>
+        </div>
+        <div class="rank-list" id="downtimeList"></div>
+      </div>
+    </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="duc-dashboard.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Đúc</div>
-        <h3>Bảng Điều Khiển Đúc (Trưởng ca)</h3>
-        <p>Gán kế hoạch, theo dõi sự cố, đổi sản phẩm, nhập shot/NG, kết ca, quản lý khuôn.</p>
-        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
-      </a>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <h3>Tồn kho bán thành phẩm (WIP)</h3>
+          <span class="hint">Đang chờ ở từng công đoạn</span>
+          <a class="more" href="truy-xuat-nguon-goc.html">Truy xuất nguồn gốc →</a>
+        </div>
+        <div id="wipStage"></div>
+      </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="mobile.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Đúc · Di động</div>
-        <h3>Nhập Liệu Sản Xuất (Điện thoại)</h3>
-        <p>Bản rút gọn cho điện thoại — 1 máy/màn hình: gán kế hoạch, báo/xử lý sự cố, đổi SP, nhập shot/NG, kết ca.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="qc-manager.html">
-        <span class="badge">Supabase</span>
-        <div class="no">QC</div>
-        <h3>QC Giám Sát &amp; Xử Lý SP Không Phù Hợp</h3>
-        <p>Giám sát real-time, tra cứu lịch sử IPQC, xử lý phiếu NCP (cách ly/lọc/sửa/phế), quản lý tiêu chuẩn kiểm.</p>
-        <span class="enter">Xem dashboard <span class="arrow">→</span></span>
-      </a>
+      <div class="card">
+        <div class="card-head">
+          <h3>Tồn kho thành phẩm — top mã SP</h3>
+          <a class="more" href="kho-thanh-pham.html">Kho thành phẩm →</a>
+        </div>
+        <div id="stockFG"></div>
+      </div>
     </div>
   </div>
 
-  <div class="group">
-    <div class="group-title"><h2>Công cụ hiện trường</h2><span class="count">10 mục</span></div>
-    <div class="card-grid">
-      <a class="dash-card" target="_blank" rel="noopener" href="kho-thanh-pham.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Kho thành phẩm</div>
-        <h3>Nhập Kho / Xuất Hàng</h3>
-        <p>Quét QR nhập kho (pallet OQC hoặc tem lẻ), tạo phiếu xuất hàng theo khách hàng/đơn hàng, xem tồn kho hiện tại theo mã SP.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
+  <!-- ======================================================================
+       NHÓM 2 — CHẤT LƯỢNG
+  ====================================================================== -->
+  <div class="group-sec">
+    <div class="group-head">
+      <span class="bar" style="background:var(--grp-cl)"></span>
+      <h2>🔍 Chất lượng</h2>
+      <div class="group-stats" id="clHeaderStats"></div>
+    </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="truy-xuat-nguon-goc.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Truy xuất</div>
-        <h3>Truy Xuất Nguồn Gốc</h3>
-        <p>Quét/nhập 1 Tag No — hiện toàn bộ phả hệ tách/gộp xuyên công đoạn, vị trí hiện tại, lịch sử chuyển công đoạn.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
+    <div class="card">
+      <div class="card-head">
+        <h3>Xu hướng tỷ lệ NG — 10 ngày gần nhất</h3>
+        <span class="hint">% NG mỗi ngày, theo công đoạn</span>
+        <a class="more" href="chatluong-supabase.html">Dashboard chất lượng →</a>
+      </div>
+      <div class="trend-multi" id="clTrendMulti"></div>
+    </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="cong-doan-dashboard.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Bavia/Gia công/Sơn/OQC</div>
-        <h3>Dashboard Công Đoạn</h3>
-        <p>Trạm/tổ đang hoạt động, mã SP đang làm, người thao tác, sản lượng OK/NG cộng dồn real-time xuyên ca, kết ca.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <h3>Tình trạng chất lượng — hôm nay</h3>
+          <a class="more" href="chatluong-supabase.html">Chi tiết →</a>
+        </div>
+        <div id="ngBars"></div>
+      </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="chuyencongdoan.html">
-        <span class="badge">Supabase</span>
-        <div class="no">QR Code</div>
-        <h3>Chuyển Công Đoạn &amp; Xác Nhận Nhận Hàng</h3>
-        <p>Quét QR chuyển hàng theo đúng quy trình mã SP, đóng gói lại thành đơn vị mới (sọt→thùng...), cảnh báo FIFO, xác nhận/từ chối nhận hàng.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
+      <div class="card">
+        <div class="card-head">
+          <h3>5 vấn đề nổi cộm — chất lượng hôm nay</h3>
+          <a class="more" href="qc-manager.html">QC Manager →</a>
+        </div>
+        <div class="rank-list" id="qualityIssueList"></div>
+      </div>
+    </div>
 
-      <a class="dash-card" target="_blank" rel="noopener" href="cong-doan-bao-cao-ca.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Bavia/Gia công/Sơn</div>
-        <h3>Báo Cáo Cuối Ca Ngoài Đúc</h3>
-        <p>Trưởng ca Bavia/Gia công/Sơn/OQC tổng hợp cuối ca theo từng mã SP: số nhận vào, số OK, số NG.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="intem.html">
-        <span class="badge">Supabase</span>
-        <div class="no">In tem</div>
-        <h3>In Tem Công Đoạn Đúc</h3>
-        <p>Tạo và in tem nhãn QR cho sản phẩm tại công đoạn Đúc — tra cứu, sửa, in lại, xoá tem.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="ipqc.html">
-        <span class="badge">Supabase</span>
-        <div class="no">IPQC</div>
-        <h3>Màn Hình IPQC Kiểm Tra Tuần Kiểm</h3>
-        <p>Hàng đợi điểm kiểm chất lượng đang chờ, nộp kết quả kèm ảnh bằng chứng và checklist theo mã SP.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="oqc.html">
-        <span class="badge">Supabase</span>
-        <div class="no">OQC</div>
-        <h3>OQC — Đóng Gói Pallet</h3>
-        <p>Quét tem thành phẩm sau ngoại quan, gom vào pallet, đóng gói và nhập kho thành phẩm — in nhãn pallet.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="khsx-tuan.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Kế hoạch</div>
-        <h3>Nhập Kế Hoạch Sản Xuất Tuần (Đúc)</h3>
-        <p>Bộ phận kế hoạch nhập/sửa KHSX tuần theo máy — nguồn gợi ý tự điền cho Bảng điều khiển Đúc.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="nvl.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Kho NVL</div>
-        <h3>Quản Lý Tồn Kho Nguyên Vật Liệu</h3>
-        <p>Theo dõi tồn kho, biểu đồ kế hoạch nhập 30 ngày, in tem QR, quét QR nhập/xuất theo lô — đang trong giai đoạn test, chưa thay hẳn bản Apps Script cũ.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
+    <div class="card">
+      <div class="card-head">
+        <h3>Tình trạng trả lời các NCP</h3>
+        <span class="hint">Sản phẩm không phù hợp — theo trạng thái xử lý</span>
+        <a class="more" href="qc-manager.html">QC Manager →</a>
+      </div>
+      <div class="ncp-status-row" id="ncpStatusRow"></div>
+      <table class="simple">
+        <thead><tr><th>Mã NCP</th><th>Mã SP</th><th>Trạng thái</th><th>Mở lúc</th><th>Thời gian chờ</th></tr></thead>
+        <tbody id="ncpOverdueTable"></tbody>
+      </table>
     </div>
   </div>
 
-  <div class="group">
-    <div class="group-title"><h2>Tài khoản &amp; Quản trị</h2><span class="count">3 mục</span></div>
-    <div class="card-grid">
-      <a class="dash-card" target="_blank" rel="noopener" href="shared/login.html">
-        <div class="no">Đăng nhập</div>
-        <h3>Đăng Nhập / Đăng Xuất</h3>
-        <p>Đọc dữ liệu không cần đăng nhập — mọi thao tác GHI (lưu kế hoạch, xác nhận, kết ca...) đều cần đăng nhập trước.</p>
-        <span class="enter">Đăng nhập <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="quan-ly-tai-khoan.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Admin</div>
-        <h3>Quản Lý Tài Khoản &amp; Phân Quyền</h3>
-        <p>Tạo tài khoản đăng nhập mới, gán vai trò (trưởng ca/IPQC/QC manager/kho NVL/kế hoạch/admin) — chỉ admin xem được.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-
-      <a class="dash-card" target="_blank" rel="noopener" href="quan-ly-danh-muc.html">
-        <span class="badge">Supabase</span>
-        <div class="no">Admin</div>
-        <h3>Quản Lý Danh Mục</h3>
-        <p>Máy, sản phẩm, nhân sự, khuôn (khối Đúc) — thêm/sửa/xoá trực tiếp thay vì vào Supabase Dashboard. Chỉ admin xem được.</p>
-        <span class="enter">Mở công cụ <span class="arrow">→</span></span>
-      </a>
-    </div>
-  </div>
 </div>
 
-<footer>TOYOTAKI · Trang chủ MES (Supabase) — cập nhật thêm công cụ khi migrate xong từng module. <a href="index.html">Trang chủ cũ (Apps Script)</a></footer>
+<footer>TOYOTAKI · Trang chủ MES — dữ liệu đọc trực tiếp từ Supabase, tự cập nhật khi tải lại trang.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script>
+const CD = [
+  { name:'Đúc',       key:'Đúc',       color:'var(--s-duc)' },
+  { name:'Bavia',     key:'Bavia',     color:'var(--s-bavia)' },
+  { name:'Gia Công',  key:'Gia Công',  color:'var(--s-giacong)' },
+  { name:'Sơn',       key:'Sơn',       color:'var(--s-son)' },
+  { name:'OQC',       key:'OQC',       color:'var(--s-oqc)' },
+];
+const NON_DUC = CD.slice(1);
+const DAY_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
+
+function resolveColor(v){ return v.startsWith('var') ? getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim() : v; }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function todayDate(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function mondayOf(d){
+  const x = new Date(d);
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  return x;
+}
+function dayColOf(d){ const jsDay = d.getDay(); return DAY_COLS[jsDay === 0 ? 6 : jsDay - 1]; }
+function last10Dates(){
+  const out = [];
+  const t = todayDate();
+  for (let i = 9; i >= 0; i--) { const d = new Date(t); d.setDate(d.getDate() - i); out.push(d); }
+  return out;
+}
+function fmtDateVN(d){ return pad2(d.getDate())+'/'+pad2(d.getMonth()+1); }
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showMsg(elId, text){ const el = document.getElementById(elId); if (el) el.innerHTML = '<div class="empty-note">' + escapeHtml(text) + '</div>'; }
+
+// =============================================================================
+// Mini sparkline (dùng chung cho 2 khối xu hướng 10 ngày) — bỏ qua ngày không
+// có dữ liệu thay vì vẽ giá trị 0 giả (null = chưa có báo cáo ngày đó).
+// =============================================================================
+function miniTrendSVG(values, color, refLine){
+  const known = values.filter(v => v != null);
+  if (known.length < 2) return null;
+  const W = 220, H = 52, pad = 4;
+  const maxV = Math.max(...known, refLine || 0) * 1.08 || 1;
+  const minV = Math.min(...known, refLine != null ? refLine : Infinity) * 0.9;
+  const span = (maxV - minV) || 1;
+  const x = i => pad + i/(values.length-1)*(W-2*pad);
+  const y = v => H - pad - (v-minV)/span*(H-2*pad);
+  let d = '', started = false;
+  values.forEach((v,i) => {
+    if (v == null) return;
+    d += (started ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1) + ' ';
+    started = true;
+  });
+  const col = resolveColor(color);
+  let ref = '';
+  if (refLine != null) ref = `<line x1="${pad}" y1="${y(refLine).toFixed(1)}" x2="${W-pad}" y2="${y(refLine).toFixed(1)}" stroke="#C9BC9F" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  let lastIdx = values.length - 1;
+  while (lastIdx >= 0 && values[lastIdx] == null) lastIdx--;
+  const dot = lastIdx >= 0 ? `<circle cx="${x(lastIdx).toFixed(1)}" cy="${y(values[lastIdx]).toFixed(1)}" r="3" fill="${col}"/>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${ref}<path d="${d.trim()}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dot}</svg>`;
+}
+
+// =============================================================================
+// KHSX (kế hoạch) tổng theo ngày — Đúc: duc_khsx_tuan_plan (tổng mọi máy/SP).
+// Ngoài Đúc: cd_khsx_tuan_plan (tổng mọi SP, theo đúng công đoạn).
+// =============================================================================
+async function loadKhsxByDay(dates){
+  const mondays = [...new Set(dates.map(d => fmtDate(mondayOf(d))))];
+  const [ducRes, cdRes] = await Promise.all([
+    sb.from('duc_khsx_tuan_plan').select('tuan_bat_dau,t2,t3,t4,t5,t6,t7,cn').in('tuan_bat_dau', mondays),
+    sb.from('cd_khsx_tuan_plan').select('tuan_bat_dau,cong_doan,t2,t3,t4,t5,t6,t7,cn').in('tuan_bat_dau', mondays),
+  ]);
+  const ducRows = ducRes.data || [];
+  const cdRows = cdRes.data || [];
+  // { 'YYYY-MM-DD': { 'Đúc': n, 'Bavia': n, ... } }
+  const out = {};
+  dates.forEach(d => {
+    const key = fmtDate(d);
+    const mondayKey = fmtDate(mondayOf(d));
+    const col = dayColOf(d);
+    let ducSum = 0;
+    ducRows.filter(r => r.tuan_bat_dau === mondayKey).forEach(r => { ducSum += Number(r[col]) || 0; });
+    const rowOut = { 'Đúc': ducSum };
+    NON_DUC.forEach(c => {
+      let sum = 0;
+      cdRows.filter(r => r.tuan_bat_dau === mondayKey && r.cong_doan === c.key).forEach(r => { sum += Number(r[col]) || 0; });
+      rowOut[c.key] = sum;
+    });
+    out[key] = rowOut;
+  });
+  return out;
+}
+
+// =============================================================================
+// Sản lượng THỰC TẾ theo ngày (KH đọc riêng ở loadKhsxByDay) — Đúc:
+// duc_bao_cao_ca (mọi ca đã kết trong khoảng ngày). Ngoài Đúc: cd_bao_cao_ca.
+// =============================================================================
+async function loadActualByDay(dateFrom, dateTo){
+  const [ducRes, cdRes] = await Promise.all([
+    sb.from('duc_bao_cao_ca').select('ngay,tong_kh_ca,tong_tt_ca,tong_ng_ca').gte('ngay', dateFrom).lte('ngay', dateTo),
+    sb.from('cd_bao_cao_ca').select('ngay,cong_doan,so_luong_ok,so_luong_ng').gte('ngay', dateFrom).lte('ngay', dateTo),
+  ]);
+  return { duc: ducRes.data || [], cd: cdRes.data || [] };
+}
+
+// =============================================================================
+// "Hôm nay" — cộng dữ liệu đã chốt (bao_cao_ca) VỚI dữ liệu đang sống (ca_hien_tai
+// / tram_hien_tai), vì ca hiện tại chưa kết ca sẽ không có trong bao_cao_ca.
+// =============================================================================
+async function loadTodaySnapshot(){
+  const today = fmtDate(todayDate());
+  const [ducBcRes, ducChtRes, cdBcRes, cdTramRes] = await Promise.all([
+    sb.from('duc_bao_cao_ca').select('tong_kh_ca,tong_tt_ca,tong_ng_ca').eq('ngay', today),
+    sb.from('duc_ca_hien_tai').select('kh_ca,tt_ca,so_luong_ng').eq('ngay', today),
+    sb.from('cd_bao_cao_ca').select('cong_doan,so_luong_ok,so_luong_ng').eq('ngay', today),
+    sb.from('cd_tram_hien_tai').select('cong_doan,so_luong_ok,so_luong_ng').eq('ngay', today),
+  ]);
+  const out = {};
+  const ducBc = ducBcRes.data || [], ducCht = ducChtRes.data || [];
+  out['Đúc'] = {
+    kh: ducBc.reduce((s,r)=>s+(Number(r.tong_kh_ca)||0),0) + ducCht.reduce((s,r)=>s+(Number(r.kh_ca)||0),0),
+    tt: ducBc.reduce((s,r)=>s+(Number(r.tong_tt_ca)||0),0) + ducCht.reduce((s,r)=>s+(Number(r.tt_ca)||0),0),
+    ng: ducBc.reduce((s,r)=>s+(Number(r.tong_ng_ca)||0),0) + ducCht.reduce((s,r)=>s+(Number(r.so_luong_ng)||0),0),
+  };
+  const cdBc = cdBcRes.data || [], cdTram = cdTramRes.data || [];
+  NON_DUC.forEach(c => {
+    const bcRows = cdBc.filter(r => r.cong_doan === c.key);
+    const tramRows = cdTram.filter(r => r.cong_doan === c.key);
+    out[c.key] = {
+      kh: 0, // điền ở dưới từ loadKhsxByDay(hôm nay)
+      tt: bcRows.reduce((s,r)=>s+(Number(r.so_luong_ok)||0),0) + tramRows.reduce((s,r)=>s+(Number(r.so_luong_ok)||0),0),
+      ng: bcRows.reduce((s,r)=>s+(Number(r.so_luong_ng)||0),0) + tramRows.reduce((s,r)=>s+(Number(r.so_luong_ng)||0),0),
+    };
+  });
+  const khToday = await loadKhsxByDay([todayDate()]);
+  const khMap = khToday[today];
+  NON_DUC.forEach(c => { out[c.key].kh = khMap[c.key]; });
+  return out;
+}
+
+// =============================================================================
+// Máy Đúc đang chạy X/Y — cùng logic "còn hoạt động" dùng ở duc-dashboard.html
+// (dòng mới nhất mỗi máy có sự cố mở, hoặc ca của chính nó chưa được kết ca).
+// =============================================================================
+async function loadDucMachinesRunning(){
+  const [machinesRes, chtRes, bcRes] = await Promise.all([
+    sb.from('master_machines').select('ma_may'),
+    sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,row_seq,ngay,ca,open_gio_phat_sinh'),
+    sb.from('duc_bao_cao_ca').select('ngay,ca'),
+  ]);
+  const total = (machinesRes.data || []).length;
+  const ketCaSet = new Set((bcRes.data || []).map(r => r.ngay + '|' + r.ca));
+  const latestByMachine = {};
+  (chtRes.data || []).forEach(r => {
+    if (!r.ma_may) return;
+    if (!latestByMachine[r.ma_may] || r.row_seq > latestByMachine[r.ma_may].row_seq) latestByMachine[r.ma_may] = r;
+  });
+  let running = 0;
+  Object.values(latestByMachine).forEach(r => {
+    if (!r.ma_sp) return;
+    const conLai = r.open_gio_phat_sinh ? true : !ketCaSet.has(r.ngay + '|' + r.ca);
+    if (conLai && !r.open_gio_phat_sinh) running++;
+  });
+  return { running, total };
+}
+
+// =============================================================================
+// KHỞI TẠO
+// =============================================================================
+async function init(){
+  const dates = last10Dates();
+  const dateFrom = fmtDate(dates[0]), dateTo = fmtDate(dates[9]);
+
+  const [khByDay, actualByDay, snapshotToday, machinesInfo] = await Promise.all([
+    loadKhsxByDay(dates).catch(() => null),
+    loadActualByDay(dateFrom, dateTo).catch(() => null),
+    loadTodaySnapshot().catch(() => null),
+    loadDucMachinesRunning().catch(() => null),
+  ]);
+
+  renderSlTrend(dates, khByDay, actualByDay);
+  renderClTrend(dates, actualByDay);
+  renderTodayBars(snapshotToday);
+  renderNgBars(snapshotToday);
+  renderHeaderStats(snapshotToday, machinesInfo);
+
+  loadDowntimeIssues();
+  loadWipStage();
+  loadStockFG();
+  loadQualityIssues();
+  loadNcpStatus();
+}
+
+// ---- Header KPI ----
+function renderHeaderStats(snap, machinesInfo){
+  if (snap) {
+    let tt = 0, kh = 0, ng = 0;
+    CD.forEach(c => { const s = snap[c.key]; if (s) { tt += s.tt; kh += s.kh; ng += s.ng; } });
+    const pctKh = kh > 0 ? Math.round(tt/kh*100) : null;
+    const pctNg = (tt+ng) > 0 ? (ng/(tt+ng)*100) : null;
+    document.getElementById('slHeaderStats').innerHTML = `
+      <div class="gstat"><div class="lbl">Sản lượng hôm nay</div><div class="val">${fmtNum(tt)}</div></div>
+      <div class="gstat"><div class="lbl">Hoàn thành KH</div><div class="val ${pctKh==null?'':(pctKh>=90?'good':pctKh>=70?'warn':'crit')}">${pctKh==null?'—':pctKh+'%'}</div></div>
+      <div class="gstat"><div class="lbl">Máy Đúc chạy</div><div class="val">${machinesInfo ? machinesInfo.running+'/'+machinesInfo.total : '—'}</div></div>
+    `;
+    document.getElementById('clHeaderStats').innerHTML = `
+      <div class="gstat"><div class="lbl">Tỷ lệ NG hôm nay</div><div class="val ${pctNg==null?'':(pctNg<=1.5?'good':pctNg<=3?'warn':'crit')}">${pctNg==null?'—':pctNg.toFixed(2)+'%'}</div></div>
+      <div class="gstat"><div class="lbl">NCP đang mở</div><div class="val" id="hsNcpOpen">…</div></div>
+      <div class="gstat"><div class="lbl">IPQC chờ kiểm</div><div class="val" id="hsIpqcCho">…</div></div>
+    `;
+  } else {
+    document.getElementById('slHeaderStats').innerHTML = '';
+    document.getElementById('clHeaderStats').innerHTML = '';
+  }
+  sb.from('duc_ncp').select('id_ncp', { count: 'exact', head: true }).neq('trang_thai', 'dong')
+    .then(({count}) => { const el = document.getElementById('hsNcpOpen'); if (el) el.textContent = count ?? '—'; });
+  sb.from('duc_ipqc_checkpoint').select('id_checkpoint', { count: 'exact', head: true }).eq('trang_thai', 'cho_kiem')
+    .then(({count}) => { const el = document.getElementById('hsIpqcCho'); if (el) el.textContent = count ?? '—'; });
+}
+
+// ---- Xu hướng % hoàn thành KH, 10 ngày ----
+function renderSlTrend(dates, khByDay, actualByDay){
+  const el = document.getElementById('slTrendMulti');
+  if (!khByDay || !actualByDay) { showMsg('slTrendMulti', 'Không tải được dữ liệu xu hướng.'); return; }
+
+  const actualDucByDate = {};
+  actualByDay.duc.forEach(r => {
+    if (!actualDucByDate[r.ngay]) actualDucByDate[r.ngay] = { kh:0, tt:0, ng:0 };
+    actualDucByDate[r.ngay].kh += Number(r.tong_kh_ca)||0;
+    actualDucByDate[r.ngay].tt += Number(r.tong_tt_ca)||0;
+    actualDucByDate[r.ngay].ng += Number(r.tong_ng_ca)||0;
+  });
+  const actualCdByDate = {}; // date -> cong_doan -> {tt, ng}
+  actualByDay.cd.forEach(r => {
+    if (!actualCdByDate[r.ngay]) actualCdByDate[r.ngay] = {};
+    if (!actualCdByDate[r.ngay][r.cong_doan]) actualCdByDate[r.ngay][r.cong_doan] = { tt:0, ng:0 };
+    actualCdByDate[r.ngay][r.cong_doan].tt += Number(r.so_luong_ok)||0;
+    actualCdByDate[r.ngay][r.cong_doan].ng += Number(r.so_luong_ng)||0;
+  });
+
+  el.innerHTML = CD.map(c => {
+    const vals = dates.map(d => {
+      const key = fmtDate(d);
+      const kh = (khByDay[key] || {})[c.key];
+      let tt;
+      if (c.key === 'Đúc') tt = actualDucByDate[key] ? actualDucByDate[key].tt : (key === fmtDate(todayDate()) ? undefined : 0);
+      else tt = (actualCdByDate[key] && actualCdByDate[key][c.key]) ? actualCdByDate[key][c.key].tt : (key === fmtDate(todayDate()) ? undefined : 0);
+      if (tt === undefined || !kh) return null; // chưa có báo cáo hôm đó, hoặc chưa có KH → bỏ điểm
+      return Math.round(tt/kh*100);
+    });
+    const known = vals.filter(v => v != null);
+    const svg = miniTrendSVG(vals, c.color, 100);
+    const cur = known.length ? known[known.length-1] : null;
+    const prev = known.length > 1 ? known[known.length-2] : null;
+    const delta = (cur != null && prev != null) ? cur - prev : null;
+    return `<div class="trend-panel">
+      <div class="hd"><span class="sw" style="background:${c.color}"></span>${c.name}</div>
+      <div class="cur">${cur != null ? cur : '—'}<span class="u">${cur != null ? '%' : ''}</span></div>
+      <div class="delta ${delta==null?'flat':(delta>=0?'up':'down')}">${delta==null?'&nbsp;':(delta>=0?'▲':'▼')+' '+Math.abs(delta)+' điểm so ngày trước'}</div>
+      ${svg || '<div class="nodata">Chưa đủ dữ liệu 2 ngày để vẽ xu hướng</div>'}
+    </div>`;
+  }).join('');
+}
+
+// ---- Xu hướng % NG, 10 ngày ----
+function renderClTrend(dates, actualByDay){
+  const el = document.getElementById('clTrendMulti');
+  if (!actualByDay) { showMsg('clTrendMulti', 'Không tải được dữ liệu xu hướng.'); return; }
+
+  const ducByDate = {};
+  actualByDay.duc.forEach(r => {
+    if (!ducByDate[r.ngay]) ducByDate[r.ngay] = { tt:0, ng:0 };
+    ducByDate[r.ngay].tt += Number(r.tong_tt_ca)||0;
+    ducByDate[r.ngay].ng += Number(r.tong_ng_ca)||0;
+  });
+  const cdByDate = {};
+  actualByDay.cd.forEach(r => {
+    if (!cdByDate[r.ngay]) cdByDate[r.ngay] = {};
+    if (!cdByDate[r.ngay][r.cong_doan]) cdByDate[r.ngay][r.cong_doan] = { tt:0, ng:0 };
+    cdByDate[r.ngay][r.cong_doan].tt += Number(r.so_luong_ok)||0;
+    cdByDate[r.ngay][r.cong_doan].ng += Number(r.so_luong_ng)||0;
+  });
+
+  el.innerHTML = CD.map(c => {
+    const vals = dates.map(d => {
+      const key = fmtDate(d);
+      const src = c.key === 'Đúc' ? ducByDate[key] : (cdByDate[key] || {})[c.key];
+      if (!src || (src.tt + src.ng) === 0) return null;
+      return +(src.ng/(src.tt+src.ng)*100).toFixed(1);
+    });
+    const known = vals.filter(v => v != null);
+    const svg = miniTrendSVG(vals, c.color);
+    const cur = known.length ? known[known.length-1] : null;
+    const prev = known.length > 1 ? known[known.length-2] : null;
+    const delta = (cur != null && prev != null) ? +(cur - prev).toFixed(1) : null;
+    return `<div class="trend-panel">
+      <div class="hd"><span class="sw" style="background:${c.color}"></span>${c.name}</div>
+      <div class="cur">${cur != null ? cur.toFixed(1) : '—'}<span class="u">${cur != null ? '%' : ''}</span></div>
+      <div class="delta ${delta==null?'flat':(delta<=0?'up':'down')}">${delta==null?'&nbsp;':(delta<=0?'▼':'▲')+' '+Math.abs(delta).toFixed(1)+' điểm so ngày trước'}</div>
+      ${svg || '<div class="nodata">Chưa đủ dữ liệu 2 ngày để vẽ xu hướng</div>'}
+    </div>`;
+  }).join('');
+}
+
+// ---- Tiến độ hoàn thành KH hôm nay ----
+function renderTodayBars(snap){
+  const el = document.getElementById('barsCongDoan');
+  if (!snap) { showMsg('barsCongDoan', 'Không tải được dữ liệu hôm nay.'); return; }
+  const maxV = Math.max(...CD.map(c => Math.max(snap[c.key].kh||0, snap[c.key].tt||0)), 1) * 1.08;
+  el.innerHTML = CD.map(c => {
+    const s = snap[c.key];
+    const pctTt = (s.tt / maxV * 100).toFixed(1);
+    const pctKh = (s.kh / maxV * 100).toFixed(1);
+    const rate = s.kh > 0 ? Math.round(s.tt / s.kh * 100) : null;
+    return `<div class="bar-row">
+      <div class="name"><span class="swatch" style="background:${c.color}"></span>${c.name}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pctTt}%;background:${c.color}"></div>
+        ${s.kh > 0 ? `<div class="bar-kh-mark" style="left:${pctKh}%"></div>` : ''}
+      </div>
+      <div class="nums"><b>${fmtNum(s.tt)}</b> / ${fmtNum(s.kh)}${rate!=null?' · '+rate+'%':''}</div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Tình trạng NG hôm nay ----
+function renderNgBars(snap){
+  const el = document.getElementById('ngBars');
+  if (!snap) { showMsg('ngBars', 'Không tải được dữ liệu hôm nay.'); return; }
+  const rows = CD.map(c => {
+    const s = snap[c.key];
+    const total = s.tt + s.ng;
+    return { name: c.name, color: c.color, pct: total > 0 ? s.ng/total*100 : 0 };
+  }).sort((a,b) => b.pct - a.pct);
+  const maxV = Math.max(...rows.map(d=>d.pct), 1) * 1.15;
+  el.innerHTML = rows.map(d => `
+    <div class="hbar-row">
+      <span>${d.name}</span>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${(d.pct/maxV*100).toFixed(1)}%;background:${d.color}"></div></div>
+      <span class="pct">${d.pct.toFixed(1)}%</span>
+    </div>`).join('');
+}
+
+// ---- 5 vấn đề dừng máy hôm nay (Đúc — duc_su_co_log) ----
+async function loadDowntimeIssues(){
+  const today = fmtDate(todayDate());
+  const { data, error } = await sb.from('duc_su_co_log').select('ma_may,loai_su_co,van_de,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut').eq('ngay', today);
+  if (error) { showMsg('downtimeList', 'Lỗi tải dữ liệu: ' + error.message); return; }
+  const now = Date.now();
+  const items = (data || []).map(r => ({
+    may: r.ma_may,
+    loai: r.loai_su_co,
+    mota: r.van_de,
+    phut: r.gio_tro_lai ? Math.round(Number(r.thoi_gian_dung_phut)||0) : Math.round((now - new Date(r.gio_phat_sinh))/60000),
+    dangMo: !r.gio_tro_lai,
+  })).sort((a,b) => b.phut - a.phut).slice(0,5);
+  if (!items.length) { showMsg('downtimeList', 'Không có sự cố nào ghi nhận hôm nay.'); return; }
+  document.getElementById('downtimeList').innerHTML = items.map((it,i) => `
+    <div class="rank-item ${i===0?'r1':i===1?'r2':''}">
+      <div class="no">${i+1}</div>
+      <div class="txt"><b>${escapeHtml(it.may)}</b> ${it.dangMo ? '<span class="pill crit" style="margin-left:4px">Đang mở</span>' : ''}
+        <div class="meta">${escapeHtml(it.loai || '')}${it.mota ? ' — ' + escapeHtml(it.mota) : ''}</div>
+      </div>
+      <div class="metric">${it.phut}<span class="u">phút</span></div>
+    </div>`).join('');
+}
+
+// ---- Tồn kho bán thành phẩm theo công đoạn ----
+async function loadWipStage(){
+  const [temRes, posRes] = await Promise.all([
+    sb.from('duc_tem').select('tag_no,so_luong').gt('so_luong', 0),
+    sb.from('cd_v_vi_tri_hien_tai').select('tag_no,vi_tri_hien_tai'),
+  ]);
+  if (temRes.error) { showMsg('wipStage', 'Lỗi tải dữ liệu: ' + temRes.error.message); return; }
+  const posMap = {};
+  (posRes.data || []).forEach(p => { posMap[p.tag_no] = p.vi_tri_hien_tai; });
+  const sums = {}; CD.forEach(c => sums[c.key] = 0);
+  (temRes.data || []).forEach(t => {
+    const vt = posMap[t.tag_no] || 'Đúc';
+    if (vt === 'Nhập kho' || vt === 'Xuất hàng') return; // đã tính ở "tồn kho thành phẩm"
+    if (sums[vt] == null) return;
+    sums[vt] += Number(t.so_luong) || 0;
+  });
+  const maxV = Math.max(...Object.values(sums), 1);
+  document.getElementById('wipStage').innerHTML = CD.map(c => `
+    <div class="wip-row">
+      <div class="name"><span class="swatch" style="background:${c.color}"></span>${c.name}</div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${(sums[c.key]/maxV*100).toFixed(0)}%;background:${c.color}"></div></div>
+      <div class="qty">${fmtNum(sums[c.key])}<span class="u"> pcs</span></div>
+    </div>`).join('');
+}
+
+// ---- Tồn kho thành phẩm top mã SP (cùng cách tính kho-thanh-pham.html) ----
+async function loadStockFG(){
+  const [palletRes, posRes] = await Promise.all([
+    sb.from('oqc_pallet').select('id_pallet,tong_so_luong').eq('trang_thai', 'da_nhap_kho'),
+    sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', 'Nhập kho'),
+  ]);
+  if (palletRes.error) { showMsg('stockFG', 'Lỗi tải dữ liệu: ' + palletRes.error.message); return; }
+  const pallets = palletRes.data || [];
+  const palletIds = pallets.map(p => p.id_pallet);
+  const temTags = (posRes.data || []).map(p => p.tag_no);
+
+  const [palletItemsRes, temRes] = await Promise.all([
+    palletIds.length ? sb.from('oqc_pallet_item').select('id_pallet,tag_no,so_luong').in('id_pallet', palletIds) : Promise.resolve({ data: [] }),
+    temTags.length ? sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong').in('tag_no', temTags).gt('so_luong', 0) : Promise.resolve({ data: [] }),
+  ]);
+  const palletTemTags = [...new Set((palletItemsRes.data || []).map(it => it.tag_no))];
+  const { data: palletTemInfo } = palletTemTags.length
+    ? await sb.from('duc_tem').select('tag_no,ma_sp,ten_sp').in('tag_no', palletTemTags)
+    : { data: [] };
+  const temInfoMap = {};
+  (palletTemInfo || []).forEach(t => { temInfoMap[t.tag_no] = t; });
+
+  const bySp = {};
+  (palletItemsRes.data || []).forEach(it => {
+    const info = temInfoMap[it.tag_no];
+    const ma = info ? info.ma_sp : '(không rõ)';
+    if (!bySp[ma]) bySp[ma] = { ten_sp: info ? info.ten_sp : '', tong: 0 };
+    bySp[ma].tong += Number(it.so_luong) || 0;
+  });
+  (temRes.data || []).forEach(t => {
+    if (!bySp[t.ma_sp]) bySp[t.ma_sp] = { ten_sp: t.ten_sp, tong: 0 };
+    bySp[t.ma_sp].tong += Number(t.so_luong) || 0;
+  });
+
+  const rows = Object.entries(bySp).sort((a,b) => b[1].tong - a[1].tong).slice(0,5);
+  if (!rows.length) { showMsg('stockFG', 'Kho thành phẩm đang trống.'); return; }
+  const maxV = Math.max(...rows.map(([,v]) => v.tong));
+  document.getElementById('stockFG').innerHTML = rows.map(([ma, info]) => `
+    <div class="stock-row">
+      <div>
+        <span class="sp">${escapeHtml(ma)}</span><span class="ten">${escapeHtml(info.ten_sp || '')}</span>
+        <div class="hbar-track" style="margin-top:4px"><div class="hbar-fill" style="width:${(info.tong/maxV*100).toFixed(0)}%;background:var(--tk-orange)"></div></div>
+      </div>
+      <div class="qty">${fmtNum(info.tong)} pcs</div>
+    </div>`).join('');
+}
+
+// ---- 5 vấn đề chất lượng nổi cộm hôm nay (NCP mới + IPQC NG/Cảnh báo) ----
+async function loadQualityIssues(){
+  const today = fmtDate(todayDate());
+  const [ncpRes, ipqcRes] = await Promise.all([
+    sb.from('duc_ncp').select('ma_sp,ma_may,so_luong_nghi_van,mo_ta_loi,ngay_tao,last_updated_at').eq('ngay_tao', today),
+    sb.from('duc_ipqc_checkpoint').select('ma_sp,ma_may,ket_qua,ghi_chu,thoi_diem_kiem_thuc_te').in('ket_qua', ['NG','CANH_BAO']).gte('thoi_diem_kiem_thuc_te', today + 'T00:00:00'),
+  ]);
+  if (ncpRes.error && ipqcRes.error) { showMsg('qualityIssueList', 'Lỗi tải dữ liệu.'); return; }
+  const items = [];
+  (ncpRes.data || []).forEach(r => items.push({
+    tag: 'NCP mới', sp: r.ma_sp, may: r.ma_may, mota: r.mo_ta_loi, metric: r.so_luong_nghi_van, unit: 'pcs',
+    time: r.last_updated_at || r.ngay_tao,
+  }));
+  (ipqcRes.data || []).forEach(r => items.push({
+    tag: r.ket_qua === 'NG' ? 'IPQC NG' : 'IPQC Cảnh báo', sp: r.ma_sp, may: r.ma_may, mota: r.ghi_chu, metric: null, unit: '',
+    time: r.thoi_diem_kiem_thuc_te,
+  }));
+  items.sort((a,b) => new Date(b.time) - new Date(a.time));
+  const top = items.slice(0,5);
+  if (!top.length) { showMsg('qualityIssueList', 'Chưa ghi nhận vấn đề chất lượng nào hôm nay.'); return; }
+  document.getElementById('qualityIssueList').innerHTML = top.map((it,i) => `
+    <div class="rank-item ${i===0?'r1':i===1?'r2':''}">
+      <div class="no">${i+1}</div>
+      <div class="txt"><b>${escapeHtml(it.sp || '—')}</b> — ${escapeHtml(it.may || '')}
+        <div class="meta">${escapeHtml(it.tag)}${it.mota ? ' — ' + escapeHtml(it.mota) : ''}</div>
+      </div>
+      <div class="metric">${it.metric != null ? fmtNum(it.metric) : ''}<span class="u">${it.unit}</span></div>
+    </div>`).join('');
+}
+
+// ---- Tình trạng trả lời NCP ----
+async function loadNcpStatus(){
+  const { data, error } = await sb.from('duc_ncp').select('id_ncp,ma_sp,trang_thai,ngay_tao').neq('trang_thai', 'dong').order('ngay_tao');
+  if (error) { showMsg('ncpStatusRow', 'Lỗi tải dữ liệu: ' + error.message); return; }
+  const rows = data || [];
+  const STATUS_LABEL = { da_cach_ly:'Đã cách ly', dang_loc:'Đang lọc', cho_quyet_dinh:'Chờ quyết định', dang_sua:'Đang sửa', cho_duyet_phe:'Chờ duyệt phế' };
+  const counts = {};
+  rows.forEach(r => { counts[r.trang_thai] = (counts[r.trang_thai]||0) + 1; });
+  const stats = [
+    { lbl:'Tổng đang mở', val: rows.length, cls:'' },
+    { lbl:'Chờ xử lý', val: (counts['da_cach_ly']||0) + (counts['cho_quyet_dinh']||0), cls:'crit' },
+    { lbl:'Đang xử lý', val: (counts['dang_loc']||0) + (counts['dang_sua']||0), cls:'warn' },
+    { lbl:'Chờ duyệt phế', val: counts['cho_duyet_phe']||0, cls:'good' },
+  ];
+  document.getElementById('ncpStatusRow').innerHTML = stats.map(s => `
+    <div class="ncp-stat ${s.cls}"><div class="lbl">${s.lbl}</div><div class="val">${s.val}</div></div>`).join('');
+
+  const now = Date.now();
+  const overdue = rows.slice(0, 8).map(r => {
+    const openedMs = new Date(r.ngay_tao + 'T00:00:00').getTime();
+    const days = Math.floor((now - openedMs) / 86400000);
+    const level = days >= 2 ? 'crit' : days >= 1 ? 'warn' : 'good';
+    return `<tr>
+      <td><b>${escapeHtml(r.id_ncp)}</b></td>
+      <td>${escapeHtml(r.ma_sp)}</td>
+      <td><span class="pill ${level}">${STATUS_LABEL[r.trang_thai] || escapeHtml(r.trang_thai)}</span></td>
+      <td>${r.ngay_tao}</td>
+      <td>${days} ngày</td>
+    </tr>`;
+  });
+  document.getElementById('ncpOverdueTable').innerHTML = overdue.length ? overdue.join('') : '<tr><td colspan="5" style="color:var(--tk-muted);font-style:italic">Không có NCP nào đang mở.</td></tr>';
+}
+
+init();
+</script>
 </body>
 </html>
