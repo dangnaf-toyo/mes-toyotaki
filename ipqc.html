@@ -283,10 +283,29 @@ function fmtDateTime24(iso){
   return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// "Người kiểm" lưu vào duc_ipqc_checkpoint dạng "MãNV_TênNV" (Mã nhân viên =
+// user_roles.username, đã có sẵn ở form tạo tài khoản "Mã nhân viên (dùng để
+// đăng nhập)" — KHÔNG phải thêm cột mới). Trước đây dùng thẳng email đăng
+// nhập, không phải ai cũng nhớ được ai đã kiểm chỉ qua email nội bộ dạng
+// nvXXX@mes.local. Cache theo user_id trong 1 phiên trang để khỏi query lại.
+let nguoiKiemCache = null; // { userId, text }
+async function getNguoiKiemIdentity(){
+  const session = await MesAuth.getSession();
+  if (!session) return null;
+  if (nguoiKiemCache && nguoiKiemCache.userId === session.user.id) return nguoiKiemCache.text;
+  const { data } = await sb.from('user_roles').select('username,full_name,email').eq('user_id', session.user.id).maybeSingle();
+  const username = data && data.username ? data.username.trim() : '';
+  const fullName = data && data.full_name ? data.full_name.trim() : '';
+  const text = (username && fullName) ? (username + '_' + fullName)
+    : (username || fullName || (data && data.email) || session.user.email);
+  nguoiKiemCache = { userId: session.user.id, text };
+  return text;
+}
+
 async function updateUserLabel(){
-  const email = await MesAuth.getCurrentUserEmail();
-  document.getElementById('queue-user-label').innerHTML = email
-    ? 'Người kiểm: ' + escapeHtml(email) + ' · <a href="#" id="ipqcSignOut">đăng xuất</a>'
+  const identity = await getNguoiKiemIdentity();
+  document.getElementById('queue-user-label').innerHTML = identity
+    ? 'Người kiểm: ' + escapeHtml(identity) + ' · <a href="#" id="ipqcSignOut">đăng xuất</a>'
     : 'Chưa đăng nhập — <a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">đăng nhập</a> để nộp kết quả';
   const so = document.getElementById('ipqcSignOut');
   if (so) so.addEventListener('click', e => { e.preventDefault(); MesAuth.signOut(); });
@@ -671,7 +690,7 @@ async function submitCheck(ketQua){
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
     return;
   }
-  const nguoiKiem = session.user.email;
+  const nguoiKiem = await getNguoiKiemIdentity() || session.user.email;
 
   if (!state.photos.length) return showToast('Vui lòng chụp ít nhất 1 ảnh bằng chứng trước khi lưu', true);
 
