@@ -2361,7 +2361,7 @@ async function openKhsxBatchModal(){
     !(rowsByMachine[m] && rowsByMachine[m].some(r => r.ma_sp)));
 
   const candidates = machinesNoPlan
-    .filter(m => state.weeklyPlanSuggestions[m] && !state.weeklyPlanSuggestions[m].conflict)
+    .filter(m => state.weeklyPlanSuggestions[m])
     .sort(naturalCompare);
 
   const list = document.getElementById('kb-list');
@@ -2376,17 +2376,39 @@ async function openKhsxBatchModal(){
     empty.style.display = 'none';
     candidates.forEach(m => {
       const sug = state.weeklyPlanSuggestions[m];
+      const opts = sug.conflict ? sug.options : [sug];
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px';
+
+      const optionsHtml = opts.map((o, i) =>
+        '<option value="' + i + '">' + escapeHtml(o.ma_sp) + ' (KH ngày ' + fmtNum(o.kh_ngay) + ')</option>'
+      ).join('');
+
       row.innerHTML =
         '<input type="checkbox" class="kb-check" data-ma-may="' + escapeHtml(m) + '" checked style="width:16px;height:16px;flex:none">'
         + '<div style="flex:1;min-width:0">'
-        + '<div style="font-weight:600;font-size:12.5px">' + escapeHtml(m) + ' — ' + escapeHtml(sug.ma_sp) + '</div>'
-        + '<div style="font-size:10.5px;color:var(--text-muted)">' + escapeHtml(sug.ten_sp || '')
-        + (sug.so_khuon ? ' · Khuôn ' + escapeHtml(sug.so_khuon) : '') + '</div>'
+        + '<div style="font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        + escapeHtml(m) + ' — '
+        + (sug.conflict
+            ? '<select class="kb-ma-sp-select" style="font-size:12px;padding:1px 4px">' + optionsHtml + '</select><span style="font-size:10px;color:var(--warn-fg)">⚠️ đổi mã trong ngày, chọn mã nạp trước</span>'
+            : escapeHtml(sug.ma_sp))
         + '</div>'
-        + '<div style="width:90px;flex:none"><input type="number" class="kb-kh-ca" min="0" value="' + sug.kh_ca + '" style="width:100%"></div>';
+        + '<div class="kb-sub-info" style="font-size:10.5px;color:var(--text-muted)">' + escapeHtml(opts[0].ten_sp || '')
+        + (opts[0].so_khuon ? ' · Khuôn ' + escapeHtml(opts[0].so_khuon) : '') + '</div>'
+        + '</div>'
+        + '<div style="width:90px;flex:none"><input type="number" class="kb-kh-ca" min="0" value="' + (sug.conflict ? Math.round((opts[0].kh_ngay || 0) / 2) : sug.kh_ca) + '" style="width:100%"></div>';
       list.appendChild(row);
+
+      if (sug.conflict) {
+        const selEl = row.querySelector('.kb-ma-sp-select');
+        const subInfo = row.querySelector('.kb-sub-info');
+        const khInput = row.querySelector('.kb-kh-ca');
+        selEl.addEventListener('change', () => {
+          const o = opts[Number(selEl.value)];
+          subInfo.textContent = (o.ten_sp || '') + (o.so_khuon ? ' · Khuôn ' + o.so_khuon : '');
+          khInput.value = Math.round((o.kh_ngay || 0) / 2);
+        });
+      }
     });
   }
 
@@ -2408,8 +2430,10 @@ async function submitKhsxBatch(){
   const items = checks.map(chk => {
     const maMay = chk.dataset.maMay;
     const sug = state.weeklyPlanSuggestions[maMay];
-    const khCaInput = chk.closest('div').querySelector('.kb-kh-ca');
-    return { maMay, sug, khCa: Number(khCaInput.value) || sug.kh_ca };
+    const row = chk.closest('div');
+    const chosen = sug.conflict ? sug.options[Number(row.querySelector('.kb-ma-sp-select').value)] : sug;
+    const khCaInput = row.querySelector('.kb-kh-ca');
+    return { maMay, sug: chosen, khCa: Number(khCaInput.value) || Math.round((chosen.kh_ngay || 0) / 2) };
   });
 
   const btn = document.getElementById('kb-btn-save');
