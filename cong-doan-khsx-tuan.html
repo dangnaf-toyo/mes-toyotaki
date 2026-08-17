@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kế hoạch sản xuất tuần — Ngoài Đúc — TOYOTAKI</title>
+<!--
+  cong-doan-khsx-tuan.html — kế hoạch sản xuất tuần cho Bavia/Gia công/Sơn/OQC,
+  mô hình theo khsx-tuan.html (Đúc) nhưng khoá theo (tuần, công đoạn, mã SP) —
+  KHÔNG có cột máy/trạm/khuôn vì 4 công đoạn này không có danh mục máy/trạm cố
+  định (trạm ở cong-doan-dashboard.html là tên tự do, tạo tạm mỗi ca — quyết
+  định kiến trúc ở migration_phase_T3, không đổi). Trang này CHƯA liên kết vào
+  cong-doan-dashboard.html (chưa có nút "nạp gợi ý" như bên Đúc) — độc lập.
+  Chạy trước: supabase/migration_phase_T8_cong_doan_khsx_tuan.sql
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+.wrap{max-width:1180px;margin:0 auto}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.week-nav{display:flex;align-items:center;gap:6px}
+.week-nav button{border:1.5px solid #ddd;background:#fff;border-radius:7px;padding:7px 10px;font-size:13px;cursor:pointer;font-weight:700;color:#555}
+.week-nav button:hover{border-color:#C87941;color:#C87941}
+.week-label{font-size:13px;font-weight:700;min-width:150px;text-align:center}
+.cd-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.cd-tab{border:1.5px solid #ddd;background:#fff;border-radius:7px;padding:7px 12px;font-size:12.5px;cursor:pointer;font-weight:700;color:#666}
+.cd-tab:hover{border-color:#C87941;color:#C87941}
+.cd-tab.active{background:#C87941;border-color:#C87941;color:#fff}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#C87941;color:#fff}
+.btn:hover{background:#a85e2a}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
+.btn-danger{background:#fff;border:1.5px solid #c00;color:#c00;padding:5px 9px;font-size:11.5px}
+.btn-danger:hover{background:#fff0f0}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12px;min-width:820px}
+th,td{border:1px solid #e5e5e5;padding:6px 7px;text-align:left;white-space:nowrap}
+th{background:#faf5f0;color:#8a5a30;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+td.num{text-align:right}
+tr:hover td{background:#fffaf5}
+.empty-row td{text-align:center;color:#999;padding:24px;font-style:italic}
+.day-hdr{background:#f5e6d7!important}
+.tong{font-weight:700}
+#msg{max-width:1180px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
+.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+/* modal */
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);align-items:center;justify-content:center;z-index:50;padding:14px}
+.modal-mask.open{display:flex}
+.modal{background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:92vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #eee}
+.modal-title{font-size:14.5px;font-weight:700}
+.modal-close{border:none;background:none;font-size:18px;cursor:pointer;color:#999}
+.modal-body{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-body .full{grid-column:1/-1}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid #eee}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%}
+.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
+.days-grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.days-grid .fg label{text-align:center}
+.days-grid .fg input{text-align:center}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="toolbar">
+      <div class="week-nav">
+        <button type="button" id="btnPrevWeek">‹ Tuần trước</button>
+        <div class="week-label" id="weekLabel">—</div>
+        <button type="button" id="btnNextWeek">Tuần sau ›</button>
+      </div>
+      <button type="button" class="btn-outline btn" id="btnThisWeek">Tuần này</button>
+      <div class="cd-tabs" id="cdTabs"></div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn" id="btnAddRow">+ Thêm dòng kế hoạch</button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mã SP</th><th>Tên SP</th>
+            <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
+            <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
+            <th>Tổng KH tuần</th><th>Ghi chú</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr class="empty-row"><td colspan="11">Đang tải…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: thêm/sửa dòng kế hoạch -->
+<div class="modal-mask" id="modalRow">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">Thêm dòng kế hoạch</div>
+      <button class="modal-close" onclick="closeRowModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg full"><label>Công đoạn *</label><input id="f-cong-doan" disabled style="background:#faf5f0"></div>
+      <div class="fg"><label>Mã SP *</label><select id="f-ma-sp" onchange="onMaSpChange()"><option value="">— Chọn mã SP —</option></select></div>
+      <div class="fg"><label>Tên SP</label><input id="f-ten-sp" disabled style="background:#faf5f0"></div>
+      <div class="days-grid">
+        <div class="fg"><label>T2</label><input id="f-t2" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T3</label><input id="f-t3" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T4</label><input id="f-t4" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T5</label><input id="f-t5" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T6</label><input id="f-t6" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T7</label><input id="f-t7" type="number" min="0" value="0"></div>
+        <div class="fg"><label>CN</label><input id="f-cn" type="number" min="0" value="0"></div>
+      </div>
+      <div class="fg full"><label>Tổng kế hoạch tuần</label><input id="f-tong-tuan" value="0" disabled style="font-weight:700;color:#C87941;background:#faf5f0"></div>
+      <div class="fg full"><label>Ghi chú</label><input id="f-ghi-chu"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline btn" onclick="closeRowModal()">Huỷ</button>
+      <button class="btn" id="btnSaveRow">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+const CONG_DOAN_LIST = ['Bavia', 'Gia Công', 'Sơn', 'OQC'];
+
+let weekMonday = mondayOf(new Date());
+let congDoan = (new URLSearchParams(location.search).get('cd') || '').trim();
+if (CONG_DOAN_LIST.indexOf(congDoan) === -1) congDoan = CONG_DOAN_LIST[0];
+let rows = [];
+let editingId = null;
+
+function mondayOf(d){
+  const x = new Date(d);
+  const day = x.getDay();               // 0=CN..6=T7
+  const diff = day === 0 ? -6 : 1 - day; // lùi về T2
+  x.setDate(x.getDate() + diff);
+  x.setHours(0,0,0,0);
+  return x;
+}
+function fmtDate(d){
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function fmtDateVN(d){
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+}
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderCdTabs(){
+  document.getElementById('cdTabs').innerHTML = CONG_DOAN_LIST.map(cd =>
+    '<button type="button" class="cd-tab' + (cd === congDoan ? ' active' : '') + '" data-cd="' + escapeHtml(cd) + '">' + escapeHtml(cd) + '</button>'
+  ).join('');
+  document.querySelectorAll('.cd-tab').forEach(btn => btn.addEventListener('click', () => {
+    congDoan = btn.dataset.cd;
+    const url = new URL(location.href);
+    url.searchParams.set('cd', congDoan);
+    history.replaceState(null, '', url);
+    renderCdTabs();
+    if (window.MesNav) MesNav.setTitle('📅 Kế hoạch sản xuất tuần — ' + congDoan, null);
+    loadRows();
+  }));
+}
+
+// =============================================================================
+// Mã SP chọn từ danh mục master (master_products) — không gõ tự do, tránh sai
+// lệch chính tả/không khớp danh mục thật. Tên SP tự điền khi chọn Mã SP.
+// =============================================================================
+let productMap = {}; // ma_sp -> ten_sp
+
+async function loadMasterLists(){
+  const { data } = await sb.from('master_products').select('ma_sp,ten_sp');
+  const products = (data || []).filter(p => p.ma_sp).sort((a,b) => a.ma_sp.localeCompare(b.ma_sp, 'vi', { numeric: true }));
+  productMap = {};
+  products.forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
+
+  const selSp = document.getElementById('f-ma-sp');
+  selSp.innerHTML = '<option value="">— Chọn mã SP —</option>' +
+    products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp) + (p.ten_sp ? ' — ' + escapeHtml(p.ten_sp) : '') + '</option>').join('');
+}
+
+// Dòng cũ có thể tham chiếu 1 SP đã bị xoá khỏi danh mục — vẫn phải hiện đúng
+// giá trị cũ khi mở sửa, nên chèn tạm 1 option nếu danh mục hiện tại không có.
+function ensureOptionExists(selectEl, value){
+  if (!value) return;
+  const has = Array.from(selectEl.options).some(o => o.value === value);
+  if (has) return;
+  const opt = document.createElement('option');
+  opt.value = value;
+  opt.textContent = value + ' (không còn trong danh mục)';
+  selectEl.appendChild(opt);
+}
+
+function onMaSpChange(){
+  const maSp = document.getElementById('f-ma-sp').value;
+  document.getElementById('f-ten-sp').value = productMap[maSp] || '';
+}
+
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  if (ms) setTimeout(() => { el.className = ''; }, ms);
+}
+
+function updateWeekLabel(){
+  const sunday = new Date(weekMonday); sunday.setDate(sunday.getDate()+6);
+  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday) + ' — ' + fmtDateVN(sunday);
+}
+
+async function loadRows(){
+  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải…</td></tr>';
+  const { data, error } = await sb.from('cd_khsx_tuan_plan')
+    .select('*').eq('tuan_bat_dau', fmtDate(weekMonday)).eq('cong_doan', congDoan).order('ma_sp');
+  if (error) { showMsg('Lỗi tải dữ liệu: ' + error.message, 'err'); return; }
+  rows = data || [];
+  renderRows();
+}
+
+function renderRows(){
+  const tbody = document.getElementById('tbody');
+  if (rows.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Chưa có kế hoạch nào cho ' + escapeHtml(congDoan) + ' tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const tong = (Number(r.t2)||0)+(Number(r.t3)||0)+(Number(r.t4)||0)+(Number(r.t5)||0)+(Number(r.t6)||0)+(Number(r.t7)||0)+(Number(r.cn)||0);
+    return '<tr>'
+      + '<td>' + escapeHtml(r.ma_sp) + '</td>'
+      + '<td>' + escapeHtml(r.ten_sp) + '</td>'
+      + '<td class="num">' + fmtNum(r.t2) + '</td>'
+      + '<td class="num">' + fmtNum(r.t3) + '</td>'
+      + '<td class="num">' + fmtNum(r.t4) + '</td>'
+      + '<td class="num">' + fmtNum(r.t5) + '</td>'
+      + '<td class="num">' + fmtNum(r.t6) + '</td>'
+      + '<td class="num">' + fmtNum(r.t7) + '</td>'
+      + '<td class="num">' + fmtNum(r.cn) + '</td>'
+      + '<td class="num tong">' + fmtNum(tong) + '</td>'
+      + '<td>' + escapeHtml(r.ghi_chu) + '</td>'
+      + '<td style="white-space:nowrap">'
+        + '<button class="btn-outline btn" style="padding:5px 9px;font-size:11.5px;margin-right:4px" onclick="openRowModal(' + r.id + ')">Sửa</button>'
+        + '<button class="btn-danger" onclick="deleteRow(' + r.id + ')">Xoá</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+async function requireLoginOrRedirect(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    showMsg('Cần đăng nhập trước khi chỉnh sửa kế hoạch. Đang chuyển sang trang đăng nhập…', 'err');
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return false;
+  }
+  return true;
+}
+
+function openRowModal(id){
+  editingId = id || null;
+  const r = id ? rows.find(x => x.id === id) : null;
+  document.getElementById('modalTitle').textContent = r ? 'Sửa dòng kế hoạch' : 'Thêm dòng kế hoạch';
+  document.getElementById('f-cong-doan').value = congDoan;
+  const selSp = document.getElementById('f-ma-sp');
+  if (r) ensureOptionExists(selSp, r.ma_sp);
+  selSp.value = r ? r.ma_sp : '';
+  document.getElementById('f-ten-sp').value = r ? r.ten_sp : (productMap[selSp.value] || '');
+  document.getElementById('f-ghi-chu').value = r ? r.ghi_chu : '';
+  ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
+    document.getElementById('f-' + d).value = r ? (r[d] || 0) : 0;
+  });
+  // Mã SP không sửa được sau khi tạo (là khoá cùng tuần+công đoạn) — chỉ cho sửa khi thêm mới
+  selSp.disabled = !!r;
+  updateTongTuan();
+  document.getElementById('modalRow').classList.add('open');
+}
+function closeRowModal(){ document.getElementById('modalRow').classList.remove('open'); }
+
+// Tổng kế hoạch tuần = tổng 7 ô ngày — tính lại ngay khi người dùng gõ.
+function updateTongTuan(){
+  const tong = ['t2','t3','t4','t5','t6','t7','cn']
+    .reduce((s, d) => s + (Number(document.getElementById('f-' + d).value) || 0), 0);
+  document.getElementById('f-tong-tuan').value = fmtNum(tong);
+  return tong;
+}
+['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
+  document.getElementById('f-' + d).addEventListener('input', updateTongTuan);
+});
+
+document.getElementById('btnAddRow').addEventListener('click', async () => {
+  if (!(await requireLoginOrRedirect())) return;
+  openRowModal(null);
+});
+
+document.getElementById('btnSaveRow').addEventListener('click', async () => {
+  if (!(await requireLoginOrRedirect())) return;
+  const maSp = document.getElementById('f-ma-sp').value.trim();
+  if (!maSp) return showMsg('Chọn mã SP', 'err', 2500);
+
+  const payload = {
+    tuan_bat_dau: fmtDate(weekMonday),
+    cong_doan: congDoan,
+    ma_sp: maSp,
+    ten_sp: document.getElementById('f-ten-sp').value.trim(),
+    kh_tuan: updateTongTuan(),
+    t2: Number(document.getElementById('f-t2').value) || 0,
+    t3: Number(document.getElementById('f-t3').value) || 0,
+    t4: Number(document.getElementById('f-t4').value) || 0,
+    t5: Number(document.getElementById('f-t5').value) || 0,
+    t6: Number(document.getElementById('f-t6').value) || 0,
+    t7: Number(document.getElementById('f-t7').value) || 0,
+    cn: Number(document.getElementById('f-cn').value) || 0,
+    ghi_chu: document.getElementById('f-ghi-chu').value.trim(),
+    updated_by: await MesAuth.getCurrentUserEmail(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const btn = document.getElementById('btnSaveRow');
+  btn.disabled = true;
+  const { error } = await sb.from('cd_khsx_tuan_plan')
+    .upsert(payload, { onConflict: 'tuan_bat_dau,cong_doan,ma_sp' });
+  btn.disabled = false;
+  if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
+  showMsg('✓ Đã lưu', 'ok', 2000);
+  closeRowModal();
+  loadRows();
+});
+
+async function deleteRow(id){
+  if (!(await requireLoginOrRedirect())) return;
+  if (!confirm('Xoá dòng kế hoạch này?')) return;
+  const { error } = await sb.from('cd_khsx_tuan_plan').delete().eq('id', id);
+  if (error) { showMsg('Lỗi xoá: ' + error.message, 'err'); return; }
+  showMsg('✓ Đã xoá', 'ok', 2000);
+  loadRows();
+}
+
+document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()-7); onWeekChange(); });
+document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()+7); onWeekChange(); });
+document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
+function onWeekChange(){ updateWeekLabel(); loadRows(); }
+
+renderCdTabs();
+if (window.MesNav) MesNav.setTitle('📅 Kế hoạch sản xuất tuần — ' + congDoan, null);
+updateWeekLabel();
+loadRows();
+loadMasterLists();
+</script>
+</body>
+</html>

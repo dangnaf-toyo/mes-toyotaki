@@ -22,7 +22,8 @@
       { label: 'Dashboard Sản lượng', href: 'sanluong-supabase.html' },
       { label: 'Dashboard Chất lượng', href: 'chatluong-supabase.html' },
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
-      { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
+      { label: 'Kế hoạch tuần — Đúc', href: 'khsx-tuan.html' },
+      { label: 'Kế hoạch tuần — Ngoài Đúc', href: 'cong-doan-khsx-tuan.html' },
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
@@ -69,6 +70,7 @@
     'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time' },
     'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Kế Hoạch Bảo Dưỡng Khuôn Tuần', desc: 'Gợi ý tự động theo lịch sản xuất' },
     'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần — Đúc', desc: 'Nhập/sửa kế hoạch theo máy' },
+    'cong-doan-khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần — Ngoài Đúc', desc: 'Bavia / Gia công / Sơn / OQC — theo mã SP' },
     'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất' },
     'intem.html': { icon: '🏷️', title: 'In Tem — Đúc', desc: 'Tạo, tra cứu, sửa, in lại tem' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp' },
