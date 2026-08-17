@@ -108,12 +108,8 @@ td.num{text-align:right;font-weight:700}
     </div>
 
     <div class="card">
-      <h2>📋 Kế hoạch sản xuất hôm nay (theo KHSX tuần)</h2>
-      <div id="khsxTodayList" class="waiting-list"><div class="empty">Đang tải...</div></div>
-    </div>
-
-    <div class="card">
       <h2 id="tramsSectionTitle">🧑‍🏭 Trạm đang hoạt động</h2>
+      <p style="font-size:10.5px;color:#999;margin:-6px 0 10px">Các dòng mờ, chữ nghiêng là kế hoạch tuần chưa tạo trạm — bấm "+ Tạo..." để tạo ngay với Mã SP/KH ca điền sẵn.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người thao tác</th><th>KH ca</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
@@ -196,6 +192,7 @@ const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
 let congDoan = null;
 let productMap = {};
 let trams = [];
+let planToday = [];
 let currentTarget = null;
 const TRAM_LABEL_MAP = { 'Bavia': 'Line', 'Gia Công': 'Máy', 'Sơn': 'Line', 'OQC': 'Bàn kiểm' };
 function tramLabel(){ return TRAM_LABEL_MAP[congDoan] || 'Trạm'; }
@@ -292,8 +289,12 @@ async function loadTrams(){
 function renderTrams(){
   const tbody = document.getElementById('tramTbody');
   const lbl = tramLabel().toLowerCase();
-  if (!trams.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
-  tbody.innerHTML = trams.map(t => `
+  // Kế hoạch tuần (cd_khsx_tuan_plan, nhập ở khsx-tuan.html) hiển thị gộp
+  // ngay trong bảng này — chỉ những mã SP CHƯA có trạm nào đang chạy, để
+  // trưởng ca thấy "còn thiếu trạm cho mã nào" mà không phải xem 2 nơi.
+  const pendingPlan = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp));
+  if (!trams.length && !pendingPlan.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
+  const activeRows = trams.map(t => `
     <tr>
       <td>${escapeHtml(t.ten_tram)}</td>
       <td>${escapeHtml(t.ma_sp)}</td>
@@ -308,6 +309,23 @@ function renderTrams(){
         <button type="button" class="btn-tiny danger" onclick="ketThucTram('${t.id_tram}')">Kết thúc</button>
       </td>
     </tr>`).join('');
+  const planRows = pendingPlan.map(p => `
+    <tr style="opacity:.65;font-style:italic">
+      <td><span style="color:#999">📋 Kế hoạch</span></td>
+      <td>${escapeHtml(p.ma_sp)}</td>
+      <td>${escapeHtml(p.ten_sp) || '<span style="color:#999">—</span>'}</td>
+      <td><span style="color:#999">—</span></td>
+      <td class="num">${fmtNum(p.khCa)}</td>
+      <td class="num"><span style="color:#999">—</span></td>
+      <td class="num"><span style="color:#999">—</span></td>
+      <td style="white-space:nowrap">
+        <button type="button" class="btn-tiny khsx-add-tram-btn" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}" data-kh-ca="${p.khCa}">+ Tạo ${lbl}</button>
+      </td>
+    </tr>`).join('');
+  tbody.innerHTML = activeRows + planRows;
+  tbody.querySelectorAll('.khsx-add-tram-btn').forEach(btn => btn.addEventListener('click', () => {
+    openAddTramFromKhsx(btn.dataset.maSp, btn.dataset.tenSp, Number(btn.dataset.khCa));
+  }));
 }
 
 function findTram(id){ return trams.find(t => t.id_tram === id); }
@@ -457,10 +475,12 @@ async function loadWaiting(){
 }
 
 /* ---------- Kế hoạch sản xuất hôm nay (theo KHSX tuần) — cd_khsx_tuan_plan,
-   nhập/sửa ở khsx-tuan.html (tab theo công đoạn). Chỉ để trưởng ca tham
-   khảo mã SP/số lượng cần làm hôm nay + tạo trạm nhanh, KHÔNG tự tạo trạm
-   thay/không link cứng vào tem — đúng quyết định kiến trúc T3 (2 lớp tách
-   biệt trạm và truy xuất tem). ---------- */
+   nhập/sửa ở khsx-tuan.html (tab theo công đoạn). Gộp thẳng vào bảng
+   "Trạm đang hoạt động" (xem renderTrams — mã SP nào chưa có trạm nào chạy
+   thì hiện dòng "📋 Kế hoạch" tại vị trí cột KH ca, kèm nút tạo trạm nhanh).
+   Chỉ để trưởng ca tham khảo/tạo nhanh, KHÔNG tự tạo trạm thay hay link
+   cứng vào tem — đúng quyết định kiến trúc T3 (2 lớp tách biệt trạm và
+   truy xuất tem). ---------- */
 function mondayOfKhsx(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
   const jsDay = d.getDay();   // 0=CN..6=T7
@@ -469,10 +489,8 @@ function mondayOfKhsx(dateStr){
   return monday.getFullYear() + '-' + String(monday.getMonth() + 1).padStart(2, '0') + '-' + String(monday.getDate()).padStart(2, '0');
 }
 async function loadKhsxToday(){
-  const el = document.getElementById('khsxTodayList');
   const ngay = document.getElementById('ngay').value;
-  if (!ngay){ el.innerHTML = '<div class="empty">Chọn ngày trước.</div>'; return; }
-  el.innerHTML = '<div class="empty">Đang tải...</div>';
+  if (!ngay) return;
   const dayCols = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
   const d = new Date(ngay + 'T00:00:00');
   const jsDay = d.getDay();
@@ -480,17 +498,12 @@ async function loadKhsxToday(){
   const { data, error } = await sb.from('cd_khsx_tuan_plan')
     .select('ma_sp,ten_sp,' + dayCol)
     .eq('tuan_bat_dau', mondayOfKhsx(ngay)).eq('cong_doan', congDoan);
-  if (error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
-  const plan = (data || []).filter(r => Number(r[dayCol]) > 0).sort((a, b) => a.ma_sp.localeCompare(b.ma_sp, 'vi'));
-  if (!plan.length){ el.innerHTML = '<div class="empty">Chưa có kế hoạch tuần cho ' + escapeHtml(congDoan) + ' hôm nay — nhập ở trang "Kế hoạch tuần".</div>'; return; }
-  el.innerHTML = plan.map(r => `
-    <div class="waiting-item">
-      <span><b>${escapeHtml(r.ma_sp)}</b> — ${escapeHtml(r.ten_sp || '')} · KH ngày ${fmtNum(r[dayCol])}</span>
-      <button type="button" class="btn-tiny khsx-add-tram-btn" data-ma-sp="${escapeHtml(r.ma_sp)}" data-ten-sp="${escapeHtml(r.ten_sp || '')}" data-kh-ca="${Math.round(Number(r[dayCol]) / 2)}">+ Tạo ${tramLabel().toLowerCase()}</button>
-    </div>`).join('');
-  el.querySelectorAll('.khsx-add-tram-btn').forEach(btn => btn.addEventListener('click', () => {
-    openAddTramFromKhsx(btn.dataset.maSp, btn.dataset.tenSp, Number(btn.dataset.khCa));
-  }));
+  if (error){ console.error('loadKhsxToday lỗi:', error.message); return; }
+  planToday = (data || [])
+    .filter(r => Number(r[dayCol]) > 0)
+    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, khCa: Math.round(Number(r[dayCol]) / 2) }))
+    .sort((a, b) => a.ma_sp.localeCompare(b.ma_sp, 'vi'));
+  renderTrams();
 }
 function openAddTramFromKhsx(maSp, tenSp, khCa){
   document.getElementById('at-ten').value = '';

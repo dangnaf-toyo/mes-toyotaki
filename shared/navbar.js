@@ -182,6 +182,23 @@ body{padding-top:var(--navbar-h)}
     });
   }
 
+  // Trang gọi MesNav.setTitle() ngay khi script của nó chạy (VD
+  // cong-doan-dashboard.html/khsx-tuan.html) — nhưng lúc đó navbar.js có thể
+  // CHƯA vẽ xong thanh tiêu đề (init() đợi DOMContentLoaded nếu script này
+  // được parse trước khi HTML load xong, tức luôn luôn đúng vì thẻ script
+  // nằm giữa <body>). Định nghĩa MesNav NGAY (không đợi init) và nhớ tạm
+  // tiêu đề nếu gọi sớm — init() sẽ áp dụng lại sau khi tạo xong thanh.
+  let pendingTitle = null;
+  window.MesNav = {
+    setTitle(title, desc) {
+      const t = document.getElementById('mnbPageTitle');
+      const d = document.getElementById('mnbPageDesc');
+      if (!t && !d) { pendingTitle = { title, desc }; return; }
+      if (title != null && t) t.textContent = title;
+      if (desc != null && d) d.textContent = desc;
+    },
+  };
+
   function init() {
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -218,22 +235,13 @@ body{padding-top:var(--navbar-h)}
         '<h1 class="mnb-page-title" id="mnbPageTitle">' + meta.title + '</h1>' +
         '<span class="mnb-page-desc" id="mnbPageDesc">' + (meta.desc || '') + '</span>';
       bar.after(titleBar);
+      if (pendingTitle) { window.MesNav.setTitle(pendingTitle.title, pendingTitle.desc); pendingTitle = null; }
     }
 
     // Tăng cường sau: thêm nhóm "Quản trị" nếu là admin, cập nhật ô đăng nhập
     // — chạy nền, không chặn menu chính.
     enhanceWithAuth(cur);
   }
-
-  // Cho trang tự đổi tiêu đề theo ngữ cảnh (VD cong-doan-dashboard.html theo
-  // công đoạn đang chọn, ncp-detail.html theo mã NCP đang xem). Truyền null
-  // ở tham số nào muốn giữ nguyên.
-  window.MesNav = {
-    setTitle(title, desc) {
-      if (title != null) { const t = document.getElementById('mnbPageTitle'); if (t) t.textContent = title; }
-      if (desc != null) { const d = document.getElementById('mnbPageDesc'); if (d) d.textContent = desc; }
-    },
-  };
 
   async function enhanceWithAuth(cur) {
     let email = null;
