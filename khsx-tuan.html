@@ -3,30 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kế hoạch sản xuất tuần (Đúc) — TOYOTAKI</title>
+<title>Kế hoạch sản xuất tuần — TOYOTAKI</title>
 <!--
-  khsx-tuan.html — trang nhập kế hoạch sản xuất tuần cho khối Đúc, thay thế
-  Google Sheet "Tuan_Hien_Tai" (file KHSX riêng của bộ phận kế hoạch) theo
-  quyết định bỏ hẳn Google. Bộ phận kế hoạch nhập/sửa trực tiếp ở đây; trưởng
-  ca dùng nút "⚡ Nạp kế hoạch từ KHSX tuần" trên duc-dashboard.html để đọc
-  gợi ý từ bảng duc_khsx_tuan_plan (đọc công khai, ghi cần đăng nhập).
-  Chạy trước: supabase/migration_phase4_step10_khsx_tuan.sql
+  khsx-tuan.html — trang nhập kế hoạch sản xuất tuần cho TOÀN bộ nhà máy, 1
+  màn hình chung, chuyển bằng tab:
+  - Tab "Đúc": khoá theo (tuần, mã máy, mã SP) — bảng duc_khsx_tuan_plan, có
+    Mã máy + Số khuôn (khối này có danh mục máy/khuôn cố định). Trưởng ca
+    dùng nút "⚡ Nạp kế hoạch từ KHSX tuần" trên duc-dashboard.html để đọc
+    gợi ý từ bảng này.
+  - Tab "Bavia/Gia Công/Sơn/OQC": khoá theo (tuần, công đoạn, mã SP) — bảng
+    cd_khsx_tuan_plan, KHÔNG có máy/trạm/khuôn vì 4 công đoạn này không có
+    danh mục máy/trạm cố định (trạm ở cong-doan-dashboard.html là tên tự do,
+    tạo tạm mỗi ca — quyết định kiến trúc ở migration_phase_T3, không đổi).
+    CHƯA liên kết tự động vào cong-doan-dashboard.html (chưa có nút "nạp gợi
+    ý" như bên Đúc) — độc lập.
+  Gộp lại từ 2 trang riêng (khsx-tuan.html + cong-doan-khsx-tuan.html) theo
+  yêu cầu người dùng — 1 màn hình chung cho toàn bộ kế hoạch tuần.
+  Chạy trước: supabase/migration_phase4_step10_khsx_tuan.sql,
+              supabase/migration_phase_T8_cong_doan_khsx_tuan.sql
 -->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
 .wrap{max-width:1180px;margin:0 auto}
-.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.hdr h1{font-size:17px;font-weight:700}
-.hdr p{font-size:10px;color:#999;margin-top:2px}
-.auth-info{font-size:11.5px;color:#667}
-.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
 .card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
 .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .week-nav{display:flex;align-items:center;gap:6px}
 .week-nav button{border:1.5px solid #ddd;background:#fff;border-radius:7px;padding:7px 10px;font-size:13px;cursor:pointer;font-weight:700;color:#555}
 .week-nav button:hover{border-color:#C87941;color:#C87941}
 .week-label{font-size:13px;font-weight:700;min-width:150px;text-align:center}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab-btn{border:1.5px solid #ddd;background:#fff;border-radius:7px;padding:7px 12px;font-size:12.5px;cursor:pointer;font-weight:700;color:#666}
+.tab-btn:hover{border-color:#C87941;color:#C87941}
+.tab-btn.active{background:#C87941;border-color:#C87941;color:#fff}
 .btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#C87941;color:#fff}
 .btn:hover{background:#a85e2a}
 .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -34,7 +43,7 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16
 .btn-danger{background:#fff;border:1.5px solid #c00;color:#c00;padding:5px 9px;font-size:11.5px}
 .btn-danger:hover{background:#fff0f0}
 .tbl-wrap{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:12px;min-width:1080px}
+table{border-collapse:collapse;width:100%;font-size:12px}
 th,td{border:1px solid #e5e5e5;padding:6px 7px;text-align:left;white-space:nowrap}
 th{background:#faf5f0;color:#8a5a30;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
 td.num{text-align:right}
@@ -42,6 +51,10 @@ tr:hover td{background:#fffaf5}
 .empty-row td{text-align:center;color:#999;padding:24px;font-style:italic}
 .day-hdr{background:#f5e6d7!important}
 .tong{font-weight:700}
+.panel{display:none}
+.panel.active{display:block}
+#tblDuc{min-width:1080px}
+#tblCd{min-width:820px}
 #msg{max-width:1180px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
 .err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
 .ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
@@ -77,33 +90,56 @@ tr:hover td{background:#fffaf5}
         <button type="button" id="btnNextWeek">Tuần sau ›</button>
       </div>
       <button type="button" class="btn-outline btn" id="btnThisWeek">Tuần này</button>
+      <div class="tabs" id="tabs"></div>
       <div style="flex:1"></div>
       <button type="button" class="btn" id="btnAddRow">+ Thêm dòng kế hoạch</button>
     </div>
 
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Mã máy</th><th>Mã SP</th><th>Tên SP</th><th>Số khuôn</th>
-            <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
-            <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
-            <th>Tổng KH tuần</th><th>Ghi chú</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="tbody">
-          <tr class="empty-row"><td colspan="14">Đang tải…</td></tr>
-        </tbody>
-      </table>
+    <!-- PANEL: Đúc (khoá theo máy) -->
+    <div class="panel" id="panelDuc">
+      <div class="tbl-wrap">
+        <table id="tblDuc">
+          <thead>
+            <tr>
+              <th>Mã máy</th><th>Mã SP</th><th>Tên SP</th><th>Số khuôn</th>
+              <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
+              <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
+              <th>Tổng KH tuần</th><th>Ghi chú</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyDuc">
+            <tr class="empty-row"><td colspan="14">Đang tải…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PANEL: Bavia/Gia Công/Sơn/OQC (khoá theo công đoạn + mã SP) -->
+    <div class="panel" id="panelCd">
+      <div class="tbl-wrap">
+        <table id="tblCd">
+          <thead>
+            <tr>
+              <th>Mã SP</th><th>Tên SP</th>
+              <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
+              <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
+              <th>Tổng KH tuần</th><th>Ghi chú</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyCd">
+            <tr class="empty-row"><td colspan="11">Đang tải…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- MODAL: thêm/sửa dòng kế hoạch -->
-<div class="modal-mask" id="modalRow">
+<!-- MODAL: thêm/sửa dòng kế hoạch — Đúc -->
+<div class="modal-mask" id="modalRowDuc">
   <div class="modal">
     <div class="modal-head">
-      <div class="modal-title" id="modalTitle">Thêm dòng kế hoạch</div>
+      <div class="modal-title" id="modalTitleDuc">Thêm dòng kế hoạch — Đúc</div>
       <button class="modal-close" onclick="closeRowModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -130,7 +166,37 @@ tr:hover td{background:#fffaf5}
     </div>
     <div class="modal-foot">
       <button class="btn-outline btn" onclick="closeRowModal()">Huỷ</button>
-      <button class="btn" id="btnSaveRow">Lưu</button>
+      <button class="btn" id="btnSaveRowDuc">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: thêm/sửa dòng kế hoạch — Ngoài Đúc -->
+<div class="modal-mask" id="modalRowCd">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitleCd">Thêm dòng kế hoạch</div>
+      <button class="modal-close" onclick="closeRowModalCd()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg full"><label>Công đoạn *</label><input id="cf-cong-doan" disabled style="background:#faf5f0"></div>
+      <div class="fg"><label>Mã SP *</label><select id="cf-ma-sp" onchange="onMaSpChangeCd()"><option value="">— Chọn mã SP —</option></select></div>
+      <div class="fg"><label>Tên SP</label><input id="cf-ten-sp" disabled style="background:#faf5f0"></div>
+      <div class="days-grid">
+        <div class="fg"><label>T2</label><input id="cf-t2" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T3</label><input id="cf-t3" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T4</label><input id="cf-t4" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T5</label><input id="cf-t5" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T6</label><input id="cf-t6" type="number" min="0" value="0"></div>
+        <div class="fg"><label>T7</label><input id="cf-t7" type="number" min="0" value="0"></div>
+        <div class="fg"><label>CN</label><input id="cf-cn" type="number" min="0" value="0"></div>
+      </div>
+      <div class="fg full"><label>Tổng kế hoạch tuần</label><input id="cf-tong-tuan" value="0" disabled style="font-weight:700;color:#C87941;background:#faf5f0"></div>
+      <div class="fg full"><label>Ghi chú</label><input id="cf-ghi-chu"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline btn" onclick="closeRowModalCd()">Huỷ</button>
+      <button class="btn" id="btnSaveRowCd">Lưu</button>
     </div>
   </div>
 </div>
@@ -139,8 +205,13 @@ tr:hover td{background:#fffaf5}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
+const CONG_DOAN_LIST = ['Bavia', 'Gia Công', 'Sơn', 'OQC'];
+const TABS = ['Đúc'].concat(CONG_DOAN_LIST);
+
 let weekMonday = mondayOf(new Date());
-let rows = [];
+let activeTab = TABS[0];
+let ducRows = [];
+let cdRows = [];
 let editingId = null;
 
 function mondayOf(d){
@@ -162,10 +233,58 @@ function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // =============================================================================
-// Mã máy / Mã SP chọn từ danh mục master (master_machines/master_products) —
-// không cho gõ tự do nữa, tránh sai lệch chính tả/không khớp danh mục thật.
-// Tên SP tự điền theo đúng master_products khi chọn Mã SP.
+// Tabs — "Đúc" dùng panel/bảng riêng (khoá theo máy), 4 tab còn lại dùng
+// chung 1 panel/bảng (khoá theo công đoạn + mã SP), chỉ đổi cong_doan lọc.
 // =============================================================================
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = TABS.map(t =>
+    '<button type="button" class="tab-btn' + (t === activeTab ? ' active' : '') + '" data-tab="' + escapeHtml(t) + '">' + escapeHtml(t) + '</button>'
+  ).join('');
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    onTabChange();
+  }));
+}
+
+function onTabChange(){
+  renderTabs();
+  const isDuc = activeTab === 'Đúc';
+  document.getElementById('panelDuc').classList.toggle('active', isDuc);
+  document.getElementById('panelCd').classList.toggle('active', !isDuc);
+  if (window.MesNav) MesNav.setTitle('📅 Kế hoạch sản xuất tuần — ' + activeTab, null);
+  loadActivePanel();
+}
+
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  if (ms) setTimeout(() => { el.className = ''; }, ms);
+}
+
+function updateWeekLabel(){
+  const sunday = new Date(weekMonday); sunday.setDate(sunday.getDate()+6);
+  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday) + ' — ' + fmtDateVN(sunday);
+}
+
+async function requireLoginOrRedirect(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    showMsg('Cần đăng nhập trước khi chỉnh sửa kế hoạch. Đang chuyển sang trang đăng nhập…', 'err');
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return false;
+  }
+  return true;
+}
+
+function loadActivePanel(){
+  if (activeTab === 'Đúc') loadDucRows(); else loadCdRows();
+}
+
+// =============================================================================
+// Danh mục dùng chung — Mã máy/Mã SP (master_machines/master_products), Số
+// khuôn theo Mã SP (duc_shot_khuon), Tên SP tự điền khi chọn Mã SP.
+// =============================================================================
+let machineList = [];
 let productMap = {}; // ma_sp -> ten_sp
 
 async function loadMasterLists(){
@@ -173,23 +292,21 @@ async function loadMasterLists(){
     sb.from('master_machines').select('ma_may'),
     sb.from('master_products').select('ma_sp,ten_sp'),
   ]);
-  const machines = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+  machineList = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
   const products = (mProducts.data || []).filter(p => p.ma_sp).sort((a,b) => a.ma_sp.localeCompare(b.ma_sp, 'vi', { numeric: true }));
   productMap = {};
   products.forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
 
   const selMay = document.getElementById('f-ma-may');
   selMay.innerHTML = '<option value="">— Chọn máy —</option>' +
-    machines.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+    machineList.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
 
-  const selSp = document.getElementById('f-ma-sp');
-  selSp.innerHTML = '<option value="">— Chọn mã SP —</option>' +
+  const productOptionsHtml = '<option value="">— Chọn mã SP —</option>' +
     products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp) + (p.ten_sp ? ' — ' + escapeHtml(p.ten_sp) : '') + '</option>').join('');
+  document.getElementById('f-ma-sp').innerHTML = productOptionsHtml;
+  document.getElementById('cf-ma-sp').innerHTML = productOptionsHtml;
 }
 
-// Dòng cũ có thể tham chiếu 1 máy/SP đã bị xoá khỏi danh mục — vẫn phải hiện
-// đúng giá trị cũ khi mở sửa, nên chèn tạm 1 option cho giá trị đó nếu danh
-// mục hiện tại không có (đánh dấu rõ "không còn trong danh mục").
 function ensureOptionExists(selectEl, value, labelSuffix){
   if (!value) return;
   const has = Array.from(selectEl.options).some(o => o.value === value);
@@ -205,12 +322,14 @@ function onMaSpChange(){
   document.getElementById('f-ten-sp').value = productMap[maSp] || '';
   populateSoKhuonField(maSp, '');
 }
+function onMaSpChangeCd(){
+  const maSp = document.getElementById('cf-ma-sp').value;
+  document.getElementById('cf-ten-sp').value = productMap[maSp] || '';
+}
 
 // =============================================================================
-// Điền tự động Số khuôn theo Mã SP — mapping (ma_sp → [ma_khuon]) đọc từ
-// duc_shot_khuon (cùng nguồn/logic populateSoKhuonField() bên duc-dashboard.html).
-// SP chạy nhiều khuôn thì cho chọn 1 trong các khuôn đó; SP chưa khai báo khuôn
-// nào thì để nhập tay.
+// Điền tự động Số khuôn theo Mã SP (chỉ dùng ở tab Đúc) — mapping
+// (ma_sp → [ma_khuon]) đọc từ duc_shot_khuon.
 // =============================================================================
 let moldsByProduct = {};
 async function loadMoldsByProduct(){
@@ -282,33 +401,25 @@ function onSoKhuonSelectChange(){
   }
 }
 
-function showMsg(text, cls, ms){
-  const el = document.getElementById('msg');
-  el.textContent = text; el.className = cls;
-  if (ms) setTimeout(() => { el.className = ''; }, ms);
-}
-
-function updateWeekLabel(){
-  const sunday = new Date(weekMonday); sunday.setDate(sunday.getDate()+6);
-  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday) + ' — ' + fmtDateVN(sunday);
-}
-
-async function loadRows(){
-  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="14">Đang tải…</td></tr>';
+// =============================================================================
+// Tab "Đúc" — bảng duc_khsx_tuan_plan, khoá (tuần, mã máy, mã SP)
+// =============================================================================
+async function loadDucRows(){
+  document.getElementById('tbodyDuc').innerHTML = '<tr class="empty-row"><td colspan="14">Đang tải…</td></tr>';
   const { data, error } = await sb.from('duc_khsx_tuan_plan')
     .select('*').eq('tuan_bat_dau', fmtDate(weekMonday)).order('ma_may');
   if (error) { showMsg('Lỗi tải dữ liệu: ' + error.message, 'err'); return; }
-  rows = data || [];
-  renderRows();
+  ducRows = data || [];
+  renderDucRows();
 }
 
-function renderRows(){
-  const tbody = document.getElementById('tbody');
-  if (rows.length === 0){
+function renderDucRows(){
+  const tbody = document.getElementById('tbodyDuc');
+  if (ducRows.length === 0){
     tbody.innerHTML = '<tr class="empty-row"><td colspan="14">Chưa có kế hoạch nào cho tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
     return;
   }
-  tbody.innerHTML = rows.map(r => {
+  tbody.innerHTML = ducRows.map(r => {
     const tong = (Number(r.t2)||0)+(Number(r.t3)||0)+(Number(r.t4)||0)+(Number(r.t5)||0)+(Number(r.t6)||0)+(Number(r.t7)||0)+(Number(r.cn)||0);
     return '<tr>'
       + '<td>' + escapeHtml(r.ma_may) + '</td>'
@@ -326,26 +437,16 @@ function renderRows(){
       + '<td>' + escapeHtml(r.ghi_chu) + '</td>'
       + '<td style="white-space:nowrap">'
         + '<button class="btn-outline btn" style="padding:5px 9px;font-size:11.5px;margin-right:4px" onclick="openRowModal(' + r.id + ')">Sửa</button>'
-        + '<button class="btn-danger" onclick="deleteRow(' + r.id + ')">Xoá</button>'
+        + '<button class="btn-danger" onclick="deleteRowDuc(' + r.id + ')">Xoá</button>'
       + '</td>'
       + '</tr>';
   }).join('');
 }
 
-async function requireLoginOrRedirect(){
-  const session = await MesAuth.getSession();
-  if (!session){
-    showMsg('Cần đăng nhập trước khi chỉnh sửa kế hoạch. Đang chuyển sang trang đăng nhập…', 'err');
-    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
-    return false;
-  }
-  return true;
-}
-
 function openRowModal(id){
   editingId = id || null;
-  const r = id ? rows.find(x => x.id === id) : null;
-  document.getElementById('modalTitle').textContent = r ? 'Sửa dòng kế hoạch' : 'Thêm dòng kế hoạch';
+  const r = id ? ducRows.find(x => x.id === id) : null;
+  document.getElementById('modalTitleDuc').textContent = r ? 'Sửa dòng kế hoạch — Đúc' : 'Thêm dòng kế hoạch — Đúc';
   const selMay = document.getElementById('f-ma-may'), selSp = document.getElementById('f-ma-sp');
   if (r) { ensureOptionExists(selMay, r.ma_may); ensureOptionExists(selSp, r.ma_sp); }
   selMay.value = r ? r.ma_may : '';
@@ -359,29 +460,28 @@ function openRowModal(id){
   // Mã máy/SP không sửa được sau khi tạo (là khoá cùng tuần) — chỉ cho sửa khi thêm mới
   document.getElementById('f-ma-may').disabled = !!r;
   document.getElementById('f-ma-sp').disabled = !!r;
-  updateTongTuan();
-  document.getElementById('modalRow').classList.add('open');
+  updateTongTuan('f-', 'f-tong-tuan');
+  document.getElementById('modalRowDuc').classList.add('open');
 }
-function closeRowModal(){ document.getElementById('modalRow').classList.remove('open'); }
+function closeRowModal(){ document.getElementById('modalRowDuc').classList.remove('open'); }
 
-// Tổng kế hoạch tuần = tổng 7 ô ngày — tính lại ngay khi người dùng gõ, thay
-// cho việc phải tự cộng tay và nhập riêng vào ô "KH tuần" như trước.
-function updateTongTuan(){
+function updateTongTuan(prefix, outId){
   const tong = ['t2','t3','t4','t5','t6','t7','cn']
-    .reduce((s, d) => s + (Number(document.getElementById('f-' + d).value) || 0), 0);
-  document.getElementById('f-tong-tuan').value = fmtNum(tong);
+    .reduce((s, d) => s + (Number(document.getElementById(prefix + d).value) || 0), 0);
+  document.getElementById(outId).value = fmtNum(tong);
   return tong;
 }
 ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
-  document.getElementById('f-' + d).addEventListener('input', updateTongTuan);
+  document.getElementById('f-' + d).addEventListener('input', () => updateTongTuan('f-', 'f-tong-tuan'));
+  document.getElementById('cf-' + d).addEventListener('input', () => updateTongTuan('cf-', 'cf-tong-tuan'));
 });
 
 document.getElementById('btnAddRow').addEventListener('click', async () => {
   if (!(await requireLoginOrRedirect())) return;
-  openRowModal(null);
+  if (activeTab === 'Đúc') openRowModal(null); else openRowModalCd(null);
 });
 
-document.getElementById('btnSaveRow').addEventListener('click', async () => {
+document.getElementById('btnSaveRowDuc').addEventListener('click', async () => {
   if (!(await requireLoginOrRedirect())) return;
   const maMay = document.getElementById('f-ma-may').value.trim();
   const maSp = document.getElementById('f-ma-sp').value.trim();
@@ -396,7 +496,7 @@ document.getElementById('btnSaveRow').addEventListener('click', async () => {
     so_khuon: document.getElementById('f-so-khuon').value.trim(),
     // kh_tuan vẫn ghi vào cột cũ (duc-dashboard.html đọc cột này để gợi ý khi
     // "Nạp kế hoạch từ KHSX tuần") — nay tự tính từ tổng 7 ngày thay vì gõ tay.
-    kh_tuan: updateTongTuan(),
+    kh_tuan: updateTongTuan('f-', 'f-tong-tuan'),
     t2: Number(document.getElementById('f-t2').value) || 0,
     t3: Number(document.getElementById('f-t3').value) || 0,
     t4: Number(document.getElementById('f-t4').value) || 0,
@@ -409,7 +509,7 @@ document.getElementById('btnSaveRow').addEventListener('click', async () => {
     updated_at: new Date().toISOString(),
   };
 
-  const btn = document.getElementById('btnSaveRow');
+  const btn = document.getElementById('btnSaveRowDuc');
   btn.disabled = true;
   const { error } = await sb.from('duc_khsx_tuan_plan')
     .upsert(payload, { onConflict: 'tuan_bat_dau,ma_may,ma_sp' });
@@ -417,25 +517,131 @@ document.getElementById('btnSaveRow').addEventListener('click', async () => {
   if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
   showMsg('✓ Đã lưu', 'ok', 2000);
   closeRowModal();
-  loadRows();
+  loadDucRows();
 });
 
-async function deleteRow(id){
+async function deleteRowDuc(id){
   if (!(await requireLoginOrRedirect())) return;
   if (!confirm('Xoá dòng kế hoạch này?')) return;
   const { error } = await sb.from('duc_khsx_tuan_plan').delete().eq('id', id);
   if (error) { showMsg('Lỗi xoá: ' + error.message, 'err'); return; }
   showMsg('✓ Đã xoá', 'ok', 2000);
-  loadRows();
+  loadDucRows();
+}
+
+// =============================================================================
+// Tab "Bavia/Gia Công/Sơn/OQC" — bảng cd_khsx_tuan_plan, khoá (tuần, công
+// đoạn, mã SP)
+// =============================================================================
+async function loadCdRows(){
+  document.getElementById('tbodyCd').innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải…</td></tr>';
+  const { data, error } = await sb.from('cd_khsx_tuan_plan')
+    .select('*').eq('tuan_bat_dau', fmtDate(weekMonday)).eq('cong_doan', activeTab).order('ma_sp');
+  if (error) { showMsg('Lỗi tải dữ liệu: ' + error.message, 'err'); return; }
+  cdRows = data || [];
+  renderCdRows();
+}
+
+function renderCdRows(){
+  const tbody = document.getElementById('tbodyCd');
+  if (cdRows.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Chưa có kế hoạch nào cho ' + escapeHtml(activeTab) + ' tuần này. Bấm "+ Thêm dòng kế hoạch" để bắt đầu.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = cdRows.map(r => {
+    const tong = (Number(r.t2)||0)+(Number(r.t3)||0)+(Number(r.t4)||0)+(Number(r.t5)||0)+(Number(r.t6)||0)+(Number(r.t7)||0)+(Number(r.cn)||0);
+    return '<tr>'
+      + '<td>' + escapeHtml(r.ma_sp) + '</td>'
+      + '<td>' + escapeHtml(r.ten_sp) + '</td>'
+      + '<td class="num">' + fmtNum(r.t2) + '</td>'
+      + '<td class="num">' + fmtNum(r.t3) + '</td>'
+      + '<td class="num">' + fmtNum(r.t4) + '</td>'
+      + '<td class="num">' + fmtNum(r.t5) + '</td>'
+      + '<td class="num">' + fmtNum(r.t6) + '</td>'
+      + '<td class="num">' + fmtNum(r.t7) + '</td>'
+      + '<td class="num">' + fmtNum(r.cn) + '</td>'
+      + '<td class="num tong">' + fmtNum(tong) + '</td>'
+      + '<td>' + escapeHtml(r.ghi_chu) + '</td>'
+      + '<td style="white-space:nowrap">'
+        + '<button class="btn-outline btn" style="padding:5px 9px;font-size:11.5px;margin-right:4px" onclick="openRowModalCd(' + r.id + ')">Sửa</button>'
+        + '<button class="btn-danger" onclick="deleteRowCd(' + r.id + ')">Xoá</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function openRowModalCd(id){
+  editingId = id || null;
+  const r = id ? cdRows.find(x => x.id === id) : null;
+  document.getElementById('modalTitleCd').textContent = r ? 'Sửa dòng kế hoạch' : 'Thêm dòng kế hoạch';
+  document.getElementById('cf-cong-doan').value = activeTab;
+  const selSp = document.getElementById('cf-ma-sp');
+  if (r) ensureOptionExists(selSp, r.ma_sp);
+  selSp.value = r ? r.ma_sp : '';
+  document.getElementById('cf-ten-sp').value = r ? r.ten_sp : (productMap[selSp.value] || '');
+  document.getElementById('cf-ghi-chu').value = r ? r.ghi_chu : '';
+  ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
+    document.getElementById('cf-' + d).value = r ? (r[d] || 0) : 0;
+  });
+  // Mã SP không sửa được sau khi tạo (là khoá cùng tuần+công đoạn) — chỉ cho sửa khi thêm mới
+  selSp.disabled = !!r;
+  updateTongTuan('cf-', 'cf-tong-tuan');
+  document.getElementById('modalRowCd').classList.add('open');
+}
+function closeRowModalCd(){ document.getElementById('modalRowCd').classList.remove('open'); }
+
+document.getElementById('btnSaveRowCd').addEventListener('click', async () => {
+  if (!(await requireLoginOrRedirect())) return;
+  const maSp = document.getElementById('cf-ma-sp').value.trim();
+  if (!maSp) return showMsg('Chọn mã SP', 'err', 2500);
+
+  const payload = {
+    tuan_bat_dau: fmtDate(weekMonday),
+    cong_doan: activeTab,
+    ma_sp: maSp,
+    ten_sp: document.getElementById('cf-ten-sp').value.trim(),
+    kh_tuan: updateTongTuan('cf-', 'cf-tong-tuan'),
+    t2: Number(document.getElementById('cf-t2').value) || 0,
+    t3: Number(document.getElementById('cf-t3').value) || 0,
+    t4: Number(document.getElementById('cf-t4').value) || 0,
+    t5: Number(document.getElementById('cf-t5').value) || 0,
+    t6: Number(document.getElementById('cf-t6').value) || 0,
+    t7: Number(document.getElementById('cf-t7').value) || 0,
+    cn: Number(document.getElementById('cf-cn').value) || 0,
+    ghi_chu: document.getElementById('cf-ghi-chu').value.trim(),
+    updated_by: await MesAuth.getCurrentUserEmail(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const btn = document.getElementById('btnSaveRowCd');
+  btn.disabled = true;
+  const { error } = await sb.from('cd_khsx_tuan_plan')
+    .upsert(payload, { onConflict: 'tuan_bat_dau,cong_doan,ma_sp' });
+  btn.disabled = false;
+  if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
+  showMsg('✓ Đã lưu', 'ok', 2000);
+  closeRowModalCd();
+  loadCdRows();
+});
+
+async function deleteRowCd(id){
+  if (!(await requireLoginOrRedirect())) return;
+  if (!confirm('Xoá dòng kế hoạch này?')) return;
+  const { error } = await sb.from('cd_khsx_tuan_plan').delete().eq('id', id);
+  if (error) { showMsg('Lỗi xoá: ' + error.message, 'err'); return; }
+  showMsg('✓ Đã xoá', 'ok', 2000);
+  loadCdRows();
 }
 
 document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()-7); onWeekChange(); });
 document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()+7); onWeekChange(); });
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
-function onWeekChange(){ updateWeekLabel(); loadRows(); }
+function onWeekChange(){ updateWeekLabel(); loadActivePanel(); }
 
+renderTabs();
+document.getElementById('panelDuc').classList.add('active');
 updateWeekLabel();
-loadRows();
+loadDucRows();
 loadMasterLists();
 loadMoldsByProduct();
 </script>
