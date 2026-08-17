@@ -234,22 +234,23 @@ function showScreen(id){
   if (id === 'scr-queue') startPolling(); else stopPolling();
 }
 
-// Cuộn xuống → ẩn thanh appbar (nhường chỗ xem list); cuộn lên → hiện lại.
+// Cuộn xuống quá 1 chút → ẩn thanh appbar (nhường chỗ xem list);
+// cuộn lại gần đầu trang → hiện lại. Không xét hướng cuộn (tránh
+// nhấp nháy khi trình duyệt mobile báo scrollY không đơn điệu lúc
+// nảy/bounce) — chỉ so vị trí hiện tại với ngưỡng.
 (function(){
-  let lastY = window.scrollY, ticking = false;
+  let ticking = false;
+  function scrollY(){ return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0; }
   function onScroll(){
-    const y = window.scrollY;
     const bar = document.querySelector('.screen.active .appbar');
-    if (bar) {
-      if (y > lastY && y > 56) bar.classList.add('appbar-hide');
-      else bar.classList.remove('appbar-hide');
-    }
-    lastY = y;
+    if (bar) bar.classList.toggle('appbar-hide', scrollY() > 40);
     ticking = false;
   }
-  window.addEventListener('scroll', function(){
-    if (!ticking) { requestAnimationFrame(onScroll); ticking = true; }
-  }, { passive: true });
+  function requestTick(){
+    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
+  }
+  window.addEventListener('scroll', requestTick, { passive: true });
+  document.addEventListener('touchmove', requestTick, { passive: true });
 })();
 
 function showOverlay(text){ document.getElementById('overlay-text').textContent = text || 'Đang tải...'; document.getElementById('overlay').classList.add('show'); }
