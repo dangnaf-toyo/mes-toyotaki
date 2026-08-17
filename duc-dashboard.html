@@ -1694,18 +1694,17 @@ async function loadWeeklyPlanSuggestions(){
 async function loadShiftState(showLoader){
   if (!state.ngay || !state.ca) return;
 
-  state.rows = []; state.incidents = [];
-  renderTable(); updateSummary();
-
+  // KHÔNG reset state.rows về rỗng trước khi tải — bảng chính không còn phụ
+  // thuộc Ngày/Ca đang chọn (xem fetchShiftState), nên đổi header không được
+  // phép làm danh sách máy đang chạy nháy tắt/hiện lại.
   const requestId = ++state.requestCounter;
   state.currentRequestId = requestId;
 
   if (showLoader) showOverlay('Đang tải dữ liệu ca...');
   updateLiveStatus('Đang tải...');
 
-  const ngay = state.ngay, ca = state.ca;
   try {
-    const data = await fetchShiftState(ngay, ca);
+    const data = await fetchShiftState();
     if (requestId !== state.currentRequestId) return;   // response cũ đến muộn — bỏ
     hideOverlay();
     state.rows = data.rows;
@@ -1719,21 +1718,52 @@ async function loadShiftState(showLoader){
   }
 }
 
-async function fetchShiftState(ngay, ca){
-  const [qRows, qInc, qMolds, qIssues, qIpqc] = await Promise.all([
-    sb.from('duc_ca_hien_tai').select('*').eq('ngay', ngay).eq('ca', ca),
-    sb.from('duc_su_co_log').select('*').eq('ngay', ngay).eq('ca', ca),
+// Bảng chính (state.rows) PHẢI độc lập với Ngày/Ca/Phương án đang chọn ở
+// header — 4 ô đó (Ngày, Phương án, Ca, Trưởng ca) chỉ dùng để (a) gán KẾ
+// HOẠCH MỚI cho máy chưa chạy gì, và (b) tạo báo cáo khi bấm KẾT CA. Máy nào
+// đang thực sự chạy thì luôn phải hiện, bất kể header đang chọn ngày/ca nào
+// (xem ghi chú đầy đủ ở loadLiveMachineStatus() — cùng logic "còn hoạt động").
+// Cách làm: dò dòng mới nhất mỗi máy để biết máy đó (nếu còn hoạt động) đang
+// thuộc CA THẬT nào của chính nó, rồi lấy TOÀN BỘ dòng của đúng (máy, ca thật
+// đó) — không chỉ dòng mới nhất — để giữ lịch sử đổi SP/khuôn kép trong cùng
+// ca (trước đây lọc theo ngay/ca của header nên vô tình làm luôn việc này).
+async function fetchShiftState(){
+  const [liteRes, baoCaoRes, qMolds, qIssues, qIpqc] = await Promise.all([
+    sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,row_seq,ngay,ca,open_gio_phat_sinh'),
+    sb.from('duc_bao_cao_ca').select('ngay,ca'),
     sb.from('duc_shot_khuon').select('*'),
     sb.from('duc_van_de_khuon').select('*').neq('trang_thai', 'Đã đóng'),
     sb.rpc('duc_get_ipqc_due_by_id_dong'),
   ]);
-  for (const r of [qRows, qInc, qMolds, qIssues]) {
+  for (const r of [liteRes, baoCaoRes, qMolds, qIssues]) {
     if (r.error) throw new Error(r.error.message);
   }
   // Hàng đợi IPQC chỉ là badge phụ trợ — lỗi ở đây không được chặn cả dashboard.
   const ipqcDue = qIpqc.error ? [] : (qIpqc.data || []);
 
   applyMoldList(qMolds.data || []);
+
+  const ketCaSet = new Set((baoCaoRes.data || []).map(r => r.ngay + '|' + r.ca));
+  const latestByMachine = {};
+  (liteRes.data || []).forEach(r => {
+    if (!r.ma_may) return;
+    if (!latestByMachine[r.ma_may] || r.row_seq > latestByMachine[r.ma_may].row_seq) latestByMachine[r.ma_may] = r;
+  });
+  const activeTriples = [];
+  Object.keys(latestByMachine).forEach(m => {
+    const r = latestByMachine[m];
+    if (!r.ma_sp) return;
+    const conLai = r.open_gio_phat_sinh ? true : !ketCaSet.has(r.ngay + '|' + r.ca);
+    if (conLai) activeTriples.push({ ma_may: m, ngay: r.ngay, ca: r.ca });
+  });
+
+  let rawRows = [];
+  if (activeTriples.length) {
+    const orRows = activeTriples.map(t => `and(ma_may.eq.${t.ma_may},ngay.eq.${t.ngay},ca.eq.${t.ca})`).join(',');
+    const { data, error } = await sb.from('duc_ca_hien_tai').select('*').or(orRows);
+    if (error) throw new Error(error.message);
+    rawRows = data || [];
+  }
 
   const issuesByMold = {};
   (qIssues.data || []).forEach(x => {
@@ -1755,7 +1785,7 @@ async function fetchShiftState(ngay, ca){
   const ipqcById = {};
   ipqcDue.forEach(x => { ipqcById[x.id_dong] = x; });
 
-  const rows = (qRows.data || []).map(r => {
+  const rows = rawRows.map(r => {
     const out = Object.assign({}, r);
     // row_seq (migration bước 3) thay vai trò "row index" của Google Sheet:
     // dòng chèn SAU CÙNG trên 1 máy = dòng SP đang chạy.
@@ -1795,7 +1825,18 @@ async function fetchShiftState(ngay, ca){
     return out;
   });
 
-  const incidents = (qInc.data || []).map(i => Object.assign({}, i, {
+  // Sự cố (log) lấy đúng theo (ngay, ca) THẬT của từng dòng đang hoạt động —
+  // không dùng ngay/ca đang chọn ở header (có thể lệch nếu ca đang chạy
+  // overrun qua lúc trưởng ca đã đổi header sang ca kế tiếp).
+  let incRaw = [];
+  const shiftPairs = Array.from(new Set(activeTriples.map(t => t.ngay + '|' + t.ca)));
+  if (shiftPairs.length) {
+    const orInc = shiftPairs.map(p => { const [ngay, ca] = p.split('|'); return `and(ngay.eq.${ngay},ca.eq.${ca})`; }).join(',');
+    const { data, error } = await sb.from('duc_su_co_log').select('*').or(orInc);
+    if (error) throw new Error(error.message);
+    incRaw = data || [];
+  }
+  const incidents = incRaw.map(i => Object.assign({}, i, {
     thoi_gian_dung_phut: Math.round(Number(i.thoi_gian_dung_phut) || 0),
     van_de_edited: String(i.van_de_edited || 'No'),
   }));
@@ -1807,12 +1848,11 @@ function startPolling(){
   if (state.pollTimer) clearInterval(state.pollTimer);
   state.pollTimer = setInterval(async () => {
     loadLiveMachineStatus();   // độc lập ngày/ca — poll riêng, không phụ thuộc state.ngay/ca
-    if (!state.ngay || !state.ca) return;
-    const pollNgay = state.ngay, pollCa = state.ca;
     updateLiveStatus('Đang poll...');
     try {
-      const data = await fetchShiftState(pollNgay, pollCa);
-      if (state.ngay !== pollNgay || state.ca !== pollCa) return;   // user đã chuyển ca
+      // fetchShiftState() độc lập ngày/ca đang chọn ở header — không cần bỏ
+      // qua kết quả dù người dùng có đổi header trong lúc chờ.
+      const data = await fetchShiftState();
       state.rows = data.rows;
       state.incidents = data.incidents;
       renderTable();       // renderTable tự bảo toàn ô người dùng đang gõ dở
@@ -1896,7 +1936,7 @@ function renderTable(){
   });
 
   if (machinesNoPlan.length > 0) {
-    html.push('<div class="row divider-noplan"><div class="divider-label">Máy không có kế hoạch sản xuất trong ca (' + machinesNoPlan.length + ')</div></div>');
+    html.push('<div class="row divider-noplan"><div class="divider-label">Máy chưa có kế hoạch đang chạy (' + machinesNoPlan.length + ') — bấm + để gán kế hoạch mới theo Ngày/Ca đang chọn ở trên</div></div>');
     machinesNoPlan.forEach(m => html.push(makeNoPlanRowHTML(m)));
   }
 
@@ -2528,10 +2568,18 @@ async function submitPlan(){
   const nvNgay = document.getElementById('mp-nv-ngay').value;
   const nvDem = document.getElementById('mp-nv-dem').value;
 
+  // Sửa dòng đã tồn tại → PHẢI dùng đúng ngày/ca THẬT của chính dòng đó (id_dong
+  // được tính từ ngày+ca+máy+SP — dùng ngày/ca đang chọn ở header nếu khác sẽ
+  // tạo nhầm dòng mới thay vì cập nhật, vì bảng chính nay độc lập header).
+  // Chỉ dòng MỚI (chưa có idDong) mới dùng ngày/ca đang chọn ở header.
+  const existingForSave = state.currentTarget.id_dong ? state.rows.find(r => r.id_dong === state.currentTarget.id_dong) : null;
+  const planNgay = existingForSave ? existingForSave.ngay : state.ngay;
+  const planCa = existingForSave ? existingForSave.ca : state.ca;
+
   showOverlay('Đang lưu kế hoạch...');
   try {
     await rpcWrite('duc_upsert_plan', {
-      p_ngay: state.ngay, p_ca: state.ca, p_phuong_an_ca: state.phuongAnCa,
+      p_ngay: planNgay, p_ca: planCa, p_phuong_an_ca: state.phuongAnCa,
       p_ma_may: state.currentTarget.ma_may, p_ma_sp: maSp,
       p_ten_sp: document.getElementById('mp-ten-sp').value,
       p_so_khuon: soKhuon, p_kh_ca: khCa,
@@ -3836,9 +3884,9 @@ async function submitExtendShift(){
  * Dòng SP ĐANG chạy trên mỗi máy (dòng mới nhất theo row_seq); cặp khuôn kép
  * trả về CẢ 2 dòng (cả 2 active song song).
  */
-function getActiveMachineRows(){
+function getActiveMachineRows(rows){
   const rowsByMachine = {};
-  state.rows.forEach(r => {
+  (rows || state.rows).forEach(r => {
     if (!r.ma_sp) return;
     if (!rowsByMachine[r.ma_may]) rowsByMachine[r.ma_may] = [];
     rowsByMachine[r.ma_may].push(r);
@@ -3872,9 +3920,14 @@ async function endShift(){
   if (!truongCa) return showToast('Chọn trưởng ca trước khi kết ca', true);
   if (!(await ensureAuth())) return;
 
-  const withPlan = getActiveMachineRows();
-  const allWithPlan = state.rows.filter(r => r.ma_sp);
-  if (allWithPlan.length === 0 && state.incidents.length === 0) {
+  // Kết ca chỉ áp dụng cho đúng ngày/ca ĐANG CHỌN ở header — bảng chính
+  // (state.rows) nay có thể chứa cả máy thuộc ca khác (đang chạy overrun,
+  // chưa kết ca) nên phải lọc lại đúng phạm vi trước khi tổng hợp báo cáo.
+  const shiftRows = state.rows.filter(r => r.ngay === state.ngay && r.ca === state.ca);
+  const shiftIncidents = state.incidents.filter(i => i.ngay === state.ngay && i.ca === state.ca);
+  const withPlan = getActiveMachineRows(shiftRows);
+  const allWithPlan = shiftRows.filter(r => r.ma_sp);
+  if (allWithPlan.length === 0 && shiftIncidents.length === 0) {
     return showToast('Không có bản ghi đầy đủ thông tin để lưu', true);
   }
 
@@ -3882,7 +3935,7 @@ async function endShift(){
   document.getElementById('es-next-text').textContent = nextShift
     ? nextShift.ca + ' — ' + formatDateShort(nextShift.ngay) : '(không xác định)';
 
-  const openRows = state.rows.filter(r => r.open_gio_phat_sinh);
+  const openRows = shiftRows.filter(r => r.open_gio_phat_sinh);
   const warn = document.getElementById('es-warning');
   if (openRows.length > 0) {
     warn.style.display = 'block';
@@ -4110,7 +4163,10 @@ async function submitEndShift(){
   // để còn dựng báo cáo chi tiết từng máy.
   const snapshot = {
     ngay: state.ngay, ca: state.ca, phuongAnCa: state.phuongAnCa, truongCa: truongCa,
-    rows: state.rows.slice(), incidents: state.incidents.slice(),
+    // Chỉ đúng ngày/ca đang kết — state.rows/incidents nay có thể lẫn máy
+    // thuộc ca khác (đang chạy overrun, chưa kết ca).
+    rows: state.rows.filter(r => r.ngay === state.ngay && r.ca === state.ca),
+    incidents: state.incidents.filter(i => i.ngay === state.ngay && i.ca === state.ca),
     comment: (document.getElementById('es-comment-truong-ca').value || '').trim(),
   };
 
