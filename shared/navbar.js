@@ -126,6 +126,21 @@ body{padding-top:var(--navbar-h)}
   .mnb-page-title{font-size:14px}
   .mnb-page-desc{width:100%}
 }
+.mnb-pw-mask{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);align-items:center;justify-content:center;z-index:6000;padding:14px;font-family:Arial,Helvetica,sans-serif}
+.mnb-pw-mask.open{display:flex}
+.mnb-pw-modal{background:#fff;border-radius:12px;max-width:360px;width:100%;padding:20px}
+.mnb-pw-modal h3{font-size:15px;margin-bottom:14px;color:#211a15}
+.mnb-pw-modal label{display:block;font-size:11.5px;font-weight:700;color:#666;margin:10px 0 4px}
+.mnb-pw-modal input{width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13.5px;font-family:inherit;box-sizing:border-box}
+.mnb-pw-modal input:focus{outline:none;border-color:#C87941}
+.mnb-pw-msg{font-size:12px;margin-top:10px;display:none;padding:8px 10px;border-radius:7px}
+.mnb-pw-msg.err{display:block;background:#fbe9e7;color:#c0392b}
+.mnb-pw-msg.ok{display:block;background:#e7f5ea;color:#1a7a3a}
+.mnb-pw-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.mnb-pw-actions button{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.mnb-pw-cancel{background:#fff;border:1.5px solid #ddd!important;color:#555}
+.mnb-pw-submit{background:#C87941;color:#fff}
+.mnb-pw-submit:disabled{opacity:.6;cursor:default}
 `;
 
   function currentFile() {
@@ -153,10 +168,12 @@ body{padding-top:var(--navbar-h)}
     const el = document.getElementById(containerId);
     if (!el) return;
     el.innerHTML = email
-      ? ('👤 ' + escapeHtmlAttr(displayText || email) + ' · <a href="#" class="mnb-signout">Đăng xuất</a>')
+      ? ('👤 ' + escapeHtmlAttr(displayText || email) + ' · <a href="#" class="mnb-changepw">Đổi mật khẩu</a> · <a href="#" class="mnb-signout">Đăng xuất</a>')
       : '<a href="shared/login.html">Đăng nhập</a>';
     const so = el.querySelector('.mnb-signout');
     if (so) so.addEventListener('click', (e) => { e.preventDefault(); MesAuth.signOut(); });
+    const cp = el.querySelector('.mnb-changepw');
+    if (cp) cp.addEventListener('click', (e) => { e.preventDefault(); openChangePasswordModal(); });
   }
   function escapeHtmlAttr(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -217,6 +234,29 @@ body{padding-top:var(--navbar-h)}
       '<div class="mnb-auth" id="mnbAuth">…</div>';
     document.body.insertBefore(bar, document.body.firstChild);
 
+    const pwMask = document.createElement('div');
+    pwMask.className = 'mnb-pw-mask';
+    pwMask.id = 'mnbPwMask';
+    pwMask.innerHTML =
+      '<div class="mnb-pw-modal">' +
+        '<h3>🔑 Đổi mật khẩu</h3>' +
+        '<label for="mnbPwOld">Mật khẩu hiện tại</label>' +
+        '<input type="password" id="mnbPwOld" autocomplete="current-password">' +
+        '<label for="mnbPwNew">Mật khẩu mới (tối thiểu 6 ký tự)</label>' +
+        '<input type="password" id="mnbPwNew" autocomplete="new-password" minlength="6">' +
+        '<label for="mnbPwNew2">Nhập lại mật khẩu mới</label>' +
+        '<input type="password" id="mnbPwNew2" autocomplete="new-password" minlength="6">' +
+        '<div class="mnb-pw-msg" id="mnbPwMsg"></div>' +
+        '<div class="mnb-pw-actions">' +
+          '<button type="button" class="mnb-pw-cancel" id="mnbPwCancel">Huỷ</button>' +
+          '<button type="button" class="mnb-pw-submit" id="mnbPwSubmit">Đổi mật khẩu</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(pwMask);
+    document.getElementById('mnbPwCancel').addEventListener('click', closeChangePasswordModal);
+    pwMask.addEventListener('click', (e) => { if (e.target === pwMask) closeChangePasswordModal(); });
+    document.getElementById('mnbPwSubmit').addEventListener('click', submitChangePassword);
+
     // Vẽ menu + gắn sự kiện click NGAY — không đợi mạng/đăng nhập, để menu
     // luôn bấm được dù kiểm tra quyền admin bên dưới chậm hoặc treo (kiểm tra
     // quyền chỉ ảnh hưởng việc CÓ THÊM nhóm "Quản trị" hay không, không phải
@@ -268,6 +308,38 @@ body{padding-top:var(--navbar-h)}
     } catch (e) { /* không chặn menu nếu lỗi tra quyền — chỉ không thêm nhóm Quản trị */ }
     renderAuthInto('mnbAuth', email, identity);
     renderAuthInto('mnbAuthMobile', email, identity);
+  }
+
+  function openChangePasswordModal(){
+    ['mnbPwOld', 'mnbPwNew', 'mnbPwNew2'].forEach(id => { document.getElementById(id).value = ''; });
+    const msg = document.getElementById('mnbPwMsg');
+    msg.className = 'mnb-pw-msg'; msg.textContent = '';
+    document.getElementById('mnbPwMask').classList.add('open');
+    setTimeout(() => document.getElementById('mnbPwOld').focus(), 50);
+  }
+  function closeChangePasswordModal(){
+    document.getElementById('mnbPwMask').classList.remove('open');
+  }
+  async function submitChangePassword(){
+    const oldPw = document.getElementById('mnbPwOld').value;
+    const newPw = document.getElementById('mnbPwNew').value;
+    const newPw2 = document.getElementById('mnbPwNew2').value;
+    const msg = document.getElementById('mnbPwMsg');
+    const btn = document.getElementById('mnbPwSubmit');
+    if (!oldPw || !newPw) { msg.className = 'mnb-pw-msg err'; msg.textContent = 'Nhập đủ mật khẩu hiện tại và mật khẩu mới.'; return; }
+    if (newPw.length < 6) { msg.className = 'mnb-pw-msg err'; msg.textContent = 'Mật khẩu mới cần tối thiểu 6 ký tự.'; return; }
+    if (newPw !== newPw2) { msg.className = 'mnb-pw-msg err'; msg.textContent = 'Mật khẩu mới nhập lại không khớp.'; return; }
+    btn.disabled = true;
+    msg.className = 'mnb-pw-msg'; msg.textContent = '';
+    try {
+      await MesAuth.changePassword(oldPw, newPw);
+      msg.className = 'mnb-pw-msg ok'; msg.textContent = '✓ Đã đổi mật khẩu.';
+      setTimeout(closeChangePasswordModal, 1200);
+    } catch (e) {
+      msg.className = 'mnb-pw-msg err'; msg.textContent = 'Lỗi: ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   if (document.readyState === 'loading') {

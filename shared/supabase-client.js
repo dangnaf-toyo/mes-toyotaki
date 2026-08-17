@@ -49,4 +49,19 @@ const MesAuth = {
     const session = await this.getSession();
     return session ? session.user.email : null;
   },
+
+  /**
+   * Tự đổi mật khẩu của tài khoản đang đăng nhập — xác minh mật khẩu cũ bằng
+   * cách đăng nhập lại (Supabase không có API kiểm mật khẩu riêng), rồi cập
+   * nhật mật khẩu mới. Ném lỗi (throw) nếu mật khẩu cũ sai hoặc mật khẩu mới
+   * không hợp lệ — gọi nơi dùng tự bắt try/catch để hiện thông báo.
+   */
+  async changePassword(oldPassword, newPassword) {
+    const session = await this.getSession();
+    if (!session) throw new Error('Chưa đăng nhập');
+    const { error: verifyErr } = await sb.auth.signInWithPassword({ email: session.user.email, password: oldPassword });
+    if (verifyErr) throw new Error('Mật khẩu hiện tại không đúng');
+    const { error: updErr } = await sb.auth.updateUser({ password: newPassword });
+    if (updErr) throw new Error(updErr.message);
+  },
 };

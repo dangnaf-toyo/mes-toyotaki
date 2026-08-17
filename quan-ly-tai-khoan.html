@@ -54,6 +54,14 @@
   .role-save{padding:6px 12px;font-size:12px;margin-left:8px;}
   .muted{color:var(--tk-muted);font-size:12px;}
   .empty{padding:20px;text-align:center;color:var(--tk-muted);font-size:13px;}
+  .reset-pw-btn{padding:6px 10px;font-size:12px;background:var(--tk-navy);margin-left:6px}
+  .reset-pw-btn:hover{background:#243347}
+  .modal-mask{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);align-items:center;justify-content:center;z-index:100;padding:14px}
+  .modal-mask.open{display:flex}
+  .modal{background:var(--tk-card);border-radius:12px;max-width:380px;width:100%;padding:22px}
+  .modal h3{font-size:15px;margin:0 0 14px;font-family:'Zilla Slab',serif}
+  .modal .form-actions{display:flex;justify-content:flex-end;gap:8px}
+  .modal button.btn-outline{background:#fff;border:1.5px solid var(--tk-line);color:#445}
 </style>
 </head>
 <body>
@@ -109,6 +117,20 @@
         <tbody id="userTbody"></tbody>
       </table>
       <div class="empty" id="userEmpty" style="display:none">Chưa có tài khoản nào được gán vai trò.</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: admin đặt lại mật khẩu cho 1 tài khoản -->
+<div class="modal-mask" id="resetPwMask">
+  <div class="modal">
+    <h3>🔑 Đặt lại mật khẩu — <span id="resetPwWho"></span></h3>
+    <label for="resetPwNew">Mật khẩu mới (tối thiểu 6 ký tự)</label>
+    <input type="text" id="resetPwNew" minlength="6" autocomplete="off">
+    <div class="msg" id="resetPwMsg"></div>
+    <div class="form-actions">
+      <button type="button" class="btn-outline" id="resetPwCancel" style="border-radius:8px;padding:9px 16px;font-size:13.5px;cursor:pointer">Huỷ</button>
+      <button type="button" id="resetPwSubmit" style="margin-top:0">Đặt lại</button>
     </div>
   </div>
 </div>
@@ -240,6 +262,13 @@ async function loadUsers(){
       }
     });
     actionTd.appendChild(saveBtn);
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'reset-pw-btn';
+    resetBtn.textContent = 'Đặt lại MK';
+    resetBtn.addEventListener('click', () => openResetPwModal(row.user_id, idLabel));
+    actionTd.appendChild(resetBtn);
+
     tbody.appendChild(tr);
   }
 }
@@ -302,6 +331,47 @@ async function handleCreate(e){
   }
 }
 
+let resetPwTargetId = null;
+function openResetPwModal(userId, label){
+  resetPwTargetId = userId;
+  document.getElementById('resetPwWho').textContent = label;
+  document.getElementById('resetPwNew').value = '';
+  const msg = document.getElementById('resetPwMsg');
+  msg.className = 'msg'; msg.textContent = '';
+  document.getElementById('resetPwMask').classList.add('open');
+}
+function closeResetPwModal(){ document.getElementById('resetPwMask').classList.remove('open'); }
+
+async function submitResetPw(){
+  const newPassword = document.getElementById('resetPwNew').value;
+  const msg = document.getElementById('resetPwMsg');
+  const btn = document.getElementById('resetPwSubmit');
+  if (!newPassword || newPassword.length < 6){
+    msg.className = 'msg error'; msg.textContent = 'Mật khẩu mới tối thiểu 6 ký tự.';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/admin-reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + currentSession.access_token,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ user_id: resetPwTargetId, new_password: newPassword }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || ('Lỗi HTTP ' + resp.status));
+    msg.className = 'msg ok'; msg.textContent = '✓ Đã đặt lại mật khẩu.';
+    setTimeout(closeResetPwModal, 1200);
+  } catch (err){
+    msg.className = 'msg error'; msg.textContent = 'Lỗi: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function main(){
   currentSession = await MesAuth.requireAuth();
 
@@ -328,6 +398,11 @@ async function main(){
     document.getElementById('cBoPhanWrap').style.display = e.target.value === 'quan_ly_bo_phan' ? '' : 'none';
   });
   document.getElementById('createForm').addEventListener('submit', handleCreate);
+  document.getElementById('resetPwCancel').addEventListener('click', closeResetPwModal);
+  document.getElementById('resetPwSubmit').addEventListener('click', submitResetPw);
+  document.getElementById('resetPwMask').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('resetPwMask')) closeResetPwModal();
+  });
   await loadUsers();
 }
 
