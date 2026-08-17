@@ -57,7 +57,8 @@ button{cursor:pointer;font-family:inherit}
 
 .screen{display:none;min-height:calc(100vh - 3.5rem);padding-bottom:1.5rem;overflow-anchor:none}
 .screen.active{display:block}
-.appbar{position:sticky;top:var(--navbar-h,0);z-index:20;background:var(--bg-header);color:#fff;padding:.65rem .75rem;display:flex;align-items:center;gap:.5rem;box-shadow:var(--shadow-md)}
+.appbar{position:sticky;top:var(--navbar-h,0);z-index:20;background:var(--bg-header);color:#fff;padding:.65rem .75rem;display:flex;align-items:center;gap:.5rem;box-shadow:var(--shadow-md);transition:transform .22s ease}
+.appbar.appbar-hide{transform:translateY(-100%)}
 .appbar .back{width:2.4rem;height:2.4rem;border-radius:.5rem;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:1.15rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .appbar .title{font-size:1.05rem;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .appbar .sub{font-size:.7rem;color:#94A3B8;font-weight:500}
@@ -229,8 +230,27 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0,0);
+  document.querySelectorAll('.appbar').forEach(b => b.classList.remove('appbar-hide'));
   if (id === 'scr-queue') startPolling(); else stopPolling();
 }
+
+// Cuộn xuống → ẩn thanh appbar (nhường chỗ xem list); cuộn lên → hiện lại.
+(function(){
+  let lastY = window.scrollY, ticking = false;
+  function onScroll(){
+    const y = window.scrollY;
+    const bar = document.querySelector('.screen.active .appbar');
+    if (bar) {
+      if (y > lastY && y > 56) bar.classList.add('appbar-hide');
+      else bar.classList.remove('appbar-hide');
+    }
+    lastY = y;
+    ticking = false;
+  }
+  window.addEventListener('scroll', function(){
+    if (!ticking) { requestAnimationFrame(onScroll); ticking = true; }
+  }, { passive: true });
+})();
 
 function showOverlay(text){ document.getElementById('overlay-text').textContent = text || 'Đang tải...'; document.getElementById('overlay').classList.add('show'); }
 function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
