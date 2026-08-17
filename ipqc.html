@@ -662,17 +662,26 @@ function renderPhotoGrid(){
 
 function pad2(n){ return String(n).padStart(2,'0'); }
 
+// Tên file trước đây chỉ có độ phân giải theo PHÚT (không có giây) và không
+// gắn với id_checkpoint — 2 lượt kiểm KHÁC NHAU cho cùng 1 máy/mã SP/kết quả
+// trong cùng 1 phút (VD kiểm định kỳ NG tự sinh ngay checkpoint sau_sự_cố,
+// người kiểm làm tiếp luôn) trùng path → upload lỗi "The resource already
+// exists" vì dùng upsert:false. Thêm id_checkpoint (đã là khoá chính, luôn
+// duy nhất) + mili-giây vào tên file để không bao giờ trùng nữa, kể cả khi
+// thử lại đúng checkpoint đó sau 1 lần lỗi giữa chừng.
 async function uploadEvidencePhotos(maMay, maSp, ketQua){
   const now = new Date();
   const dateFolder = now.getFullYear()+'-'+pad2(now.getMonth()+1)+'-'+pad2(now.getDate());
   const stamp = pad2(now.getDate())+pad2(now.getMonth()+1)+now.getFullYear()+'_'+pad2(now.getHours())+pad2(now.getMinutes());
   const safeMay = String(maMay||'').replace(/[^a-zA-Z0-9_-]/g,'');
   const safeSp = String(maSp||'').replace(/[^a-zA-Z0-9_-]/g,'');
+  const safeCheckpoint = String((state.current && state.current.id_checkpoint) || '').replace(/[^a-zA-Z0-9_-]/g,'');
+  const uniq = now.getTime().toString(36);
   const urls = [];
   for (let i = 0; i < state.photos.length; i++) {
     const p = state.photos[i];
     const idxPart = state.photos.length > 1 ? ('_' + (i+1)) : '';
-    const path = dateFolder + '/' + stamp + '_' + safeMay + '_' + safeSp + '_' + ketQua + idxPart + '.jpg';
+    const path = dateFolder + '/' + stamp + '_' + safeMay + '_' + safeSp + '_' + ketQua + '_' + safeCheckpoint + '_' + uniq + idxPart + '.jpg';
     const { error } = await sb.storage.from('ipqc-evidence').upload(path, p.blob, { contentType: p.mime, upsert: false });
     if (error) throw new Error('Lỗi tải ảnh lên: ' + error.message);
     const { data } = sb.storage.from('ipqc-evidence').getPublicUrl(path);
