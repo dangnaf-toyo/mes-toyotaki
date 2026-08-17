@@ -108,6 +108,11 @@ td.num{text-align:right;font-weight:700}
     </div>
 
     <div class="card">
+      <h2>📋 Kế hoạch sản xuất hôm nay (theo KHSX tuần)</h2>
+      <div id="khsxTodayList" class="waiting-list"><div class="empty">Đang tải...</div></div>
+    </div>
+
+    <div class="card">
       <h2 id="tramsSectionTitle">🧑‍🏭 Trạm đang hoạt động</h2>
       <div class="tbl-wrap">
         <table>
@@ -259,6 +264,7 @@ function reloadAll(){
   if (!document.getElementById('ca').value) return;
   loadTrams();
   loadWaiting();
+  loadKhsxToday();
 }
 
 function applyTramLabel(){
@@ -448,6 +454,52 @@ async function loadWaiting(){
       <span><b>${escapeHtml(t.tag_no)}</b> — ${escapeHtml(t.ma_sp)} ${escapeHtml(t.ten_sp || '')}</span>
       <span>${fmtNum(t.so_luong)} sp · ${t.ngay ? String(t.ngay).split('-').reverse().join('/') : ''}</span>
     </div>`).join('');
+}
+
+/* ---------- Kế hoạch sản xuất hôm nay (theo KHSX tuần) — cd_khsx_tuan_plan,
+   nhập/sửa ở khsx-tuan.html (tab theo công đoạn). Chỉ để trưởng ca tham
+   khảo mã SP/số lượng cần làm hôm nay + tạo trạm nhanh, KHÔNG tự tạo trạm
+   thay/không link cứng vào tem — đúng quyết định kiến trúc T3 (2 lớp tách
+   biệt trạm và truy xuất tem). ---------- */
+function mondayOfKhsx(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const jsDay = d.getDay();   // 0=CN..6=T7
+  const monday = new Date(d);
+  monday.setDate(monday.getDate() + (jsDay === 0 ? -6 : 1 - jsDay));
+  return monday.getFullYear() + '-' + String(monday.getMonth() + 1).padStart(2, '0') + '-' + String(monday.getDate()).padStart(2, '0');
+}
+async function loadKhsxToday(){
+  const el = document.getElementById('khsxTodayList');
+  const ngay = document.getElementById('ngay').value;
+  if (!ngay){ el.innerHTML = '<div class="empty">Chọn ngày trước.</div>'; return; }
+  el.innerHTML = '<div class="empty">Đang tải...</div>';
+  const dayCols = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
+  const d = new Date(ngay + 'T00:00:00');
+  const jsDay = d.getDay();
+  const dayCol = dayCols[jsDay === 0 ? 6 : jsDay - 1];
+  const { data, error } = await sb.from('cd_khsx_tuan_plan')
+    .select('ma_sp,ten_sp,' + dayCol)
+    .eq('tuan_bat_dau', mondayOfKhsx(ngay)).eq('cong_doan', congDoan);
+  if (error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
+  const plan = (data || []).filter(r => Number(r[dayCol]) > 0).sort((a, b) => a.ma_sp.localeCompare(b.ma_sp, 'vi'));
+  if (!plan.length){ el.innerHTML = '<div class="empty">Chưa có kế hoạch tuần cho ' + escapeHtml(congDoan) + ' hôm nay — nhập ở trang "Kế hoạch tuần".</div>'; return; }
+  el.innerHTML = plan.map(r => `
+    <div class="waiting-item">
+      <span><b>${escapeHtml(r.ma_sp)}</b> — ${escapeHtml(r.ten_sp || '')} · KH ngày ${fmtNum(r[dayCol])}</span>
+      <button type="button" class="btn-tiny khsx-add-tram-btn" data-ma-sp="${escapeHtml(r.ma_sp)}" data-ten-sp="${escapeHtml(r.ten_sp || '')}" data-kh-ca="${Math.round(Number(r[dayCol]) / 2)}">+ Tạo ${tramLabel().toLowerCase()}</button>
+    </div>`).join('');
+  el.querySelectorAll('.khsx-add-tram-btn').forEach(btn => btn.addEventListener('click', () => {
+    openAddTramFromKhsx(btn.dataset.maSp, btn.dataset.tenSp, Number(btn.dataset.khCa));
+  }));
+}
+function openAddTramFromKhsx(maSp, tenSp, khCa){
+  document.getElementById('at-ten').value = '';
+  document.getElementById('at-masp').value = maSp;
+  document.getElementById('at-tensp').value = tenSp;
+  document.getElementById('at-khca').value = khCa || '';
+  document.getElementById('at-nguoi').value = '';
+  openModal('modalAddTram');
+  document.getElementById('at-ten').focus();
 }
 
 function requireLogin(){
