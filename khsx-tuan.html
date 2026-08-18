@@ -548,12 +548,13 @@ let productMap = {}; // ma_sp -> ten_sp
 async function loadMasterLists(){
   const [mMachines, mProducts] = await Promise.all([
     sb.from('master_machines').select('ma_may'),
-    sb.from('master_products').select('ma_sp,ten_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,so_khuon'),
   ]);
   machineList = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
   const products = (mProducts.data || []).filter(p => p.ma_sp).sort((a,b) => a.ma_sp.localeCompare(b.ma_sp, 'vi', { numeric: true }));
   productMap = {};
   products.forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
+  buildMoldsByProduct(products);
 
   const selMay = document.getElementById('f-ma-may');
   selMay.innerHTML = '<option value="">— Chọn máy —</option>' +
@@ -587,19 +588,20 @@ function onMaSpChangeCd(){
 
 // =============================================================================
 // Điền tự động Số khuôn theo Mã SP (chỉ dùng ở tab Đúc) — mapping
-// (ma_sp → [ma_khuon]) đọc từ duc_shot_khuon.
+// (ma_sp → [ma_khuon]) đọc từ master_products.so_khuon (khai báo thủ công,
+// hỗ trợ nhiều mã SP dùng chung 1 khuôn — chỉ đổi insert). KHÔNG dùng
+// duc_shot_khuon.ten_sp_gan_nhat vì mỗi khuôn ở đó chỉ lưu ĐÚNG MỘT mã SP
+// gắn gần nhất — nếu nhiều mã SP dùng chung khuôn thì các mã sau (không phải
+// mã gắn gần nhất) sẽ bị mất khỏi map.
 // =============================================================================
 let moldsByProduct = {};
-async function loadMoldsByProduct(){
-  const { data, error } = await sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat');
-  if (error) return;
+function buildMoldsByProduct(products){
   moldsByProduct = {};
-  (data || []).forEach(m => {
-    const maSp = String(m.ten_sp_gan_nhat || '').split(' (')[0].trim();
-    const maKhuon = String(m.ma_khuon || '').trim();
-    if (!maSp || !maKhuon) return;
-    if (!moldsByProduct[maSp]) moldsByProduct[maSp] = [];
-    if (moldsByProduct[maSp].indexOf(maKhuon) === -1) moldsByProduct[maSp].push(maKhuon);
+  (products || []).forEach(p => {
+    const maSp = String(p.ma_sp || '').trim();
+    if (!maSp) return;
+    const molds = String(p.so_khuon || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (molds.length) moldsByProduct[maSp] = molds;
   });
 }
 
@@ -929,7 +931,6 @@ document.getElementById('panelDuc').classList.add('active');
 updateWeekLabel();
 loadDucRows();
 loadMasterLists();
-loadMoldsByProduct();
 loadMyRoleInfo();
 loadDuyetInfo();
 loadChangeLog();
