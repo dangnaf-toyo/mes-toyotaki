@@ -81,6 +81,10 @@ button{cursor:pointer;font-family:inherit}
 .loai-tag{display:inline-block;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:1rem;background:var(--bg-sunken);color:var(--text-muted);margin-top:.2rem}
 .empty-note{text-align:center;color:var(--text-muted);font-size:.95rem;padding:3rem 1rem}
 
+.daynight-btn{flex-shrink:0;padding:.5rem .7rem;border:none;border-radius:.5rem;background:rgba(255,255,255,.12);color:#fff;font-size:.78rem;font-weight:700}
+.daynight-banner{margin:.7rem .75rem 0;padding:.8rem .9rem;border-radius:.7rem;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A5F;display:flex;flex-direction:column;gap:.55rem;font-size:.85rem}
+.daynight-banner button{padding:.7rem;border:none;border-radius:.5rem;background:var(--accent);color:#fff;font-weight:700;font-size:.9rem}
+
 .detail-info{background:var(--bg-panel);margin:.75rem;padding:.9rem;border-radius:.7rem;box-shadow:var(--shadow-sm)}
 .detail-sp{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:700}
 .detail-name{font-size:.9rem;color:var(--text-muted);margin-top:.15rem}
@@ -142,10 +146,15 @@ button{cursor:pointer;font-family:inherit}
 <!-- ============ SCREEN: Hàng đợi ============ -->
 <div class="screen active" id="scr-queue">
   <div class="appbar">
-    <div>
+    <div style="flex:1;min-width:0">
       <div class="title">🔍 IPQC — Hàng đợi kiểm tra</div>
       <div class="sub" id="queue-user-label">…</div>
     </div>
+    <button class="daynight-btn hidden" id="btn-ket-thuc-ngay" onclick="onKetThucNgay()">🌙 Kết thúc ngày</button>
+  </div>
+  <div class="daynight-banner hidden" id="daynight-banner">
+    <div id="daynight-banner-text">—</div>
+    <button id="btn-bat-dau-ngay" onclick="onBatDauNgay()">☀️ Bắt đầu ngày làm việc</button>
   </div>
   <div class="list" id="queue-list"></div>
 </div>
@@ -362,6 +371,24 @@ function ipqcDueInfo(loaiKiem, phutDaTroi){
   };
 }
 
+// Trạng thái "tạm dừng ngày làm việc" (migration_phase_D16) — lưới an toàn
+// thủ công cho các khoảng nghỉ dài (cuối tuần trước kỳ nghỉ lễ...) mà tín
+// hiệu "Kết ca" tự động (migration_phase_D8) không phủ hết. Đọc dòng mới
+// nhất: nếu thoi_diem_bat_dau còn trống → đang tạm dừng; nếu có giá trị →
+// đó là mốc "Bắt đầu ngày làm việc" gần nhất, dùng làm sàn tối thiểu cho
+// mốc tính giờ chờ của các checkpoint thật (sau_su_co/doi_khuon) để không
+// cộng dồn khoảng tạm dừng vào thời gian chờ hiển thị.
+async function getTamDungStatus(){
+  const { data, error } = await sb.from('duc_ipqc_tam_dung')
+    .select('thoi_diem_ket_thuc,thoi_diem_bat_dau,nguoi_ket_thuc,nguoi_bat_dau')
+    .order('id', { ascending: false }).limit(1);
+  if (error) throw new Error('Không đọc được trạng thái tạm dừng: ' + error.message);
+  const row = (data || [])[0];
+  if (!row) return { paused: false, resumeFloorMs: -Infinity };
+  if (row.thoi_diem_bat_dau == null) return { paused: true, pausedAt: row.thoi_diem_ket_thuc, pausedBy: row.nguoi_ket_thuc };
+  return { paused: false, resumeFloorMs: new Date(row.thoi_diem_bat_dau).getTime() };
+}
+
 // Port getIpqcQueue_ (IpqcCheckpoint.js) — đọc thẳng bảng, lọc + tính toán ở client.
 // "Định kỳ" KHÔNG còn đọc từ dòng đã lưu sẵn (trước đây do trigger quét bên
 // Apps Script tạo) — tính trực tiếp qua RPC duc_get_ipqc_periodic_due() mỗi
@@ -369,6 +396,10 @@ function ipqcDueInfo(loaiKiem, phutDaTroi){
 // thật), đếm giờ từ lần kiểm hoàn thành gần nhất của máy đó. Dòng checkpoint
 // thật chỉ được tạo khi IPQC bấm vào kiểm (xem openCheck → materializeVirtual).
 async function loadQueue(){
+  const tamDung = await getTamDungStatus();
+  state.tamDung = tamDung;
+  if (tamDung.paused) return [];
+
   const [activeSet, cpRes, dinhKyRes] = await Promise.all([
     getActiveIdDongSet(),
     sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'cho_kiem'),
@@ -385,7 +416,8 @@ async function loadQueue(){
   const fromCheckpoints = (cpRes.data || [])
     .filter(r => r.id_checkpoint && activeSet.has(r.id_dong))
     .map(r => {
-      const phutDaTroi = r.han_kiem ? Math.round((now - new Date(r.han_kiem).getTime()) / 60000) : 0;
+      const hanKiemMs = r.han_kiem ? new Date(r.han_kiem).getTime() : now;
+      const phutDaTroi = Math.round((now - Math.max(hanKiemMs, tamDung.resumeFloorMs)) / 60000);
       return Object.assign({
         id_checkpoint: r.id_checkpoint, id_dong: r.id_dong, ma_may: r.ma_may, ma_sp: r.ma_sp,
         ngay: r.ngay, ca: r.ca, loai_kiem: r.loai_kiem, thoi_diem_tao: r.thoi_diem_tao,
@@ -438,6 +470,21 @@ function levelForMinutes(m){
 
 function renderQueue(){
   const list = document.getElementById('queue-list');
+  const banner = document.getElementById('daynight-banner');
+  const btnKetThuc = document.getElementById('btn-ket-thuc-ngay');
+  const paused = state.tamDung && state.tamDung.paused;
+
+  btnKetThuc.classList.toggle('hidden', !!paused);
+  banner.classList.toggle('hidden', !paused);
+  if (paused){
+    document.getElementById('daynight-banner-text').textContent =
+      '🌙 Đã kết thúc ngày làm việc lúc ' + fmtDateTime24(state.tamDung.pausedAt)
+      + (state.tamDung.pausedBy ? ' (' + state.tamDung.pausedBy + ')' : '')
+      + ' — hàng đợi tạm dừng đếm giờ, không hiện điểm kiểm mới.';
+    list.innerHTML = '';
+    return;
+  }
+
   if (!state.queue.length) {
     list.innerHTML = '<div class="empty-note">✅ Không có điểm kiểm nào đang chờ.<br>Hàng đợi sẽ tự cập nhật khi có yêu cầu mới.</div>';
     return;
@@ -461,6 +508,55 @@ function renderQueue(){
         <div class="qcard-arrow">›</div>
       </div>`;
   }).join('');
+}
+
+async function onKetThucNgay(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    showToast('Cần đăng nhập trước khi thao tác. Đang chuyển sang trang đăng nhập…', true);
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return;
+  }
+  if (!confirm('Kết thúc ngày làm việc? Hàng đợi IPQC sẽ tạm dừng đếm giờ chờ kiểm cho đến khi bấm "Bắt đầu ngày làm việc".')) return;
+  showOverlay('Đang kết thúc ngày làm việc...');
+  try {
+    const nguoi = await getNguoiKiemIdentity();
+    const { data, error } = await sb.rpc('duc_ipqc_ket_thuc_ngay', { p_nguoi: nguoi });
+    if (error) throw new Error(error.message);
+    if (!data || data.ok !== true){
+      hideOverlay();
+      onError(new Error(data && data.reason === 'da_tam_dung_roi' ? 'Đã kết thúc ngày làm việc từ trước rồi.' : 'Không thực hiện được.'));
+      return;
+    }
+    state.queue = await loadQueue();
+    hideOverlay();
+    renderQueue();
+    showToast('Đã kết thúc ngày làm việc.');
+  } catch (e) { onError(e); }
+}
+
+async function onBatDauNgay(){
+  const session = await MesAuth.getSession();
+  if (!session){
+    showToast('Cần đăng nhập trước khi thao tác. Đang chuyển sang trang đăng nhập…', true);
+    setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+    return;
+  }
+  showOverlay('Đang bắt đầu ngày làm việc...');
+  try {
+    const nguoi = await getNguoiKiemIdentity();
+    const { data, error } = await sb.rpc('duc_ipqc_bat_dau_ngay', { p_nguoi: nguoi });
+    if (error) throw new Error(error.message);
+    if (!data || data.ok !== true){
+      hideOverlay();
+      onError(new Error('Không thực hiện được — có thể chưa ở trạng thái tạm dừng.'));
+      return;
+    }
+    state.queue = await loadQueue();
+    hideOverlay();
+    renderQueue();
+    showToast('Đã bắt đầu ngày làm việc — đồng hồ chờ kiểm reset về 0 cho các dòng đang chạy.');
+  } catch (e) { onError(e); }
 }
 
 async function openCheck(idCheckpoint){
