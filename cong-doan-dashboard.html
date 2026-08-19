@@ -510,6 +510,16 @@ async function loadWaiting(){
    Chỉ để trưởng ca tham khảo/tạo nhanh, KHÔNG tự tạo trạm thay hay link
    cứng vào tem — đúng quyết định kiến trúc T3 (2 lớp tách biệt trạm và
    truy xuất tem). ---------- */
+// Bavia/Sơn/OQC hiện chỉ tổ chức làm "Ca ngày" (+ tăng ca/OT gộp luôn vào
+// ca ngày đó) — CHƯA bố trí ca đêm. Nên KH ngày của kế hoạch tuần phải đổ
+// nguyên vẹn vào "Ca ngày" (không chia đôi như công đoạn chạy đủ 2 ca), và
+// không gợi ý kế hoạch nào cho "Ca đêm" (chưa có ai làm ca đó, gợi ý sẽ sai).
+// Gia Công hiện vẫn tổ chức đủ 2 ca nên giữ nguyên cách chia đôi cũ.
+// Khi công ty mở rộng, bố trí thêm ca đêm cho Bavia/Sơn/OQC — chỉ cần bỏ
+// công đoạn đó khỏi CONG_DOAN_MOT_CA để quay lại chia đôi theo 2 ca như
+// Gia Công, KHÔNG cần đổi gì khác ở cd_khsx_tuan_plan/khsx-tuan.html.
+const CONG_DOAN_MOT_CA = ['Bavia', 'Sơn', 'OQC'];
+
 function mondayOfKhsx(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
   const jsDay = d.getDay();   // 0=CN..6=T7
@@ -519,7 +529,17 @@ function mondayOfKhsx(dateStr){
 }
 async function loadKhsxToday(){
   const ngay = document.getElementById('ngay').value;
+  const ca = document.getElementById('ca').value;
   if (!ngay) return;
+
+  const motCa = CONG_DOAN_MOT_CA.includes(congDoan);
+  if (motCa && ca && ca !== 'Ca ngày'){
+    // Công đoạn này chưa bố trí ca đêm/ca khác — không có kế hoạch để gợi ý.
+    planToday = [];
+    renderTrams();
+    return;
+  }
+
   const dayCols = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
   const d = new Date(ngay + 'T00:00:00');
   const jsDay = d.getDay();
@@ -530,7 +550,7 @@ async function loadKhsxToday(){
   if (error){ console.error('loadKhsxToday lỗi:', error.message); return; }
   planToday = (data || [])
     .filter(r => Number(r[dayCol]) > 0)
-    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, khCa: Math.round(Number(r[dayCol]) / 2) }))
+    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, khCa: motCa ? Number(r[dayCol]) : Math.round(Number(r[dayCol]) / 2) }))
     .sort((a, b) => a.ma_sp.localeCompare(b.ma_sp, 'vi'));
   renderTrams();
 }
