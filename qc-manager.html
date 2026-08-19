@@ -497,6 +497,7 @@ function mapIpqcDoneRow(r){
     thoi_diem_kiem_thuc_te: r.thoi_diem_kiem_thuc_te, phut_phan_hoi: phutPhanHoi,
     anh_bang_chung_urls: parsePhotoUrls(r.anh_bang_chung_url), ghi_chu: r.ghi_chu || '',
     id_van_de_lien_quan: r.id_van_de_lien_quan || '', thoi_gian_kiem_giay: Number(r.thoi_gian_kiem_giay) || null,
+    id_su_co_goc: r.id_su_co_goc || '',
   };
 }
 
@@ -581,8 +582,9 @@ function doneRowHtml(d){
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
       ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+      ${d.id_su_co_goc ? '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(d.id_su_co_goc) + '">SC: ' + escapeHtml(d.id_su_co_goc) + '</span>' : ''}
       ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
-      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan ? '—' : ''}
+      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc ? '—' : ''}
     </td>
   </tr>`;
 }
