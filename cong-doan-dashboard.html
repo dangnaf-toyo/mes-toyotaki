@@ -178,6 +178,19 @@ td.num{text-align:right;font-weight:700}
   </div>
 </div>
 
+<!-- MODAL: Sửa trạm (người thao tác / KH ca) -->
+<div class="modal-mask" id="modalSuaTram">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">✏️ Sửa <span id="st-tram-label"></span></div><button class="modal-close" onclick="closeModal('modalSuaTram')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:11.5px;color:#999">Chỉ sửa người thao tác/KH ca — không đụng mã SP hay sản lượng OK/NG đang đếm.</p>
+      <div class="fg"><label>Người thao tác</label><input type="text" id="st-nguoi" list="dlNhanVien"></div>
+      <div class="fg"><label>KH ca (pcs)</label><input type="number" min="0" id="st-khca"></div>
+    </div>
+    <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalSuaTram')">Huỷ</button><button class="btn" id="btnSubmitSuaTram">Lưu</button></div>
+  </div>
+</div>
+
 <!-- MODAL: Đổi mã SP -->
 <div class="modal-mask" id="modalDoiMa">
   <div class="modal">
@@ -343,6 +356,7 @@ function renderTrams(){
       <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
       <td style="white-space:nowrap">
         <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
+        <button type="button" class="btn-tiny" onclick="openSuaTram('${t.id_tram}')">Sửa</button>
         <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi mã</button>
         <button type="button" class="btn-tiny danger" onclick="ketThucTram('${t.id_tram}')">Kết thúc</button>
       </td>
@@ -421,6 +435,29 @@ document.getElementById('btnSubmitNhapSL').addEventListener('click', async () =>
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalNhapSL');
   showMsg('✅ Đã nhập sản lượng', 'ok');
+  loadTrams();
+});
+
+/* ---------- Sửa (người thao tác / KH ca) ---------- */
+function openSuaTram(id){
+  currentTarget = id;
+  const t = findTram(id);
+  document.getElementById('st-tram-label').textContent = t ? '(' + t.ten_tram + ' — ' + t.ma_sp + ')' : '';
+  document.getElementById('st-nguoi').value = t ? (t.nguoi_thao_tac || '') : '';
+  document.getElementById('st-khca').value = t && t.kh_ca != null ? t.kh_ca : '';
+  openModal('modalSuaTram');
+}
+document.getElementById('btnSubmitSuaTram').addEventListener('click', async () => {
+  const nguoi = document.getElementById('st-nguoi').value.trim();
+  const khCaRaw = document.getElementById('st-khca').value;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('cd_tram_sua', {
+    p_id_tram: currentTarget, p_nguoi_moi: nguoi, p_kh_ca_moi: khCaRaw === '' ? null : Number(khCaRaw), p_user: session.user.email,
+  });
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  closeModal('modalSuaTram');
+  showMsg('✅ Đã lưu', 'ok');
   loadTrams();
 });
 
