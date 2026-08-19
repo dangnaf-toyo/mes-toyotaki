@@ -432,10 +432,22 @@ async function loadQueue(){
       phut_da_troi: r.phut_da_troi, virtual: true,
     }, ipqcDueInfo('dinh_ky', r.phut_da_troi)));
 
-  const queue = fromCheckpoints.concat(fromDinhKy)
+  const priorityOf = cp => PRIORITY[cp.loai_kiem] != null ? PRIORITY[cp.loai_kiem] : 2;
+
+  // 1 máy (id_dong) có thể đến hạn nhiều loại kiểm cùng lúc (VD vừa đổi
+  // khuôn/SP mới lại vừa đến hạn định kỳ) — chỉ hiện 1 thẻ ưu tiên cao nhất
+  // cho mỗi id_dong, tránh IPQC thấy 2 thẻ trùng máy gây rối. Loại bỏ vẫn
+  // còn nguyên trong DB, chỉ ẩn bớt ở danh sách hiển thị — khi kiểm xong thẻ
+  // ưu tiên cao, thẻ còn lại (nếu vẫn đến hạn) sẽ tự hiện ra ở lần tải sau.
+  const byIdDong = new Map();
+  fromCheckpoints.concat(fromDinhKy).forEach(cp => {
+    const existing = byIdDong.get(cp.id_dong);
+    if (!existing || priorityOf(cp) < priorityOf(existing)) byIdDong.set(cp.id_dong, cp);
+  });
+
+  const queue = [...byIdDong.values()]
     .sort((a, b) => {
-      const pa = PRIORITY[a.loai_kiem] != null ? PRIORITY[a.loai_kiem] : 2;
-      const pb = PRIORITY[b.loai_kiem] != null ? PRIORITY[b.loai_kiem] : 2;
+      const pa = priorityOf(a), pb = priorityOf(b);
       if (pa !== pb) return pa - pb;
       if (a.da_den_han !== b.da_den_han) return a.da_den_han ? -1 : 1;
       return b.phut_da_troi - a.phut_da_troi;
