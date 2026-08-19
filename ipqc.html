@@ -434,18 +434,26 @@ async function loadQueue(){
 
   const priorityOf = cp => PRIORITY[cp.loai_kiem] != null ? PRIORITY[cp.loai_kiem] : 2;
 
-  // 1 máy (id_dong) có thể đến hạn nhiều loại kiểm cùng lúc (VD vừa đổi
-  // khuôn/SP mới lại vừa đến hạn định kỳ) — chỉ hiện 1 thẻ ưu tiên cao nhất
-  // cho mỗi id_dong, tránh IPQC thấy 2 thẻ trùng máy gây rối. Loại bỏ vẫn
-  // còn nguyên trong DB, chỉ ẩn bớt ở danh sách hiển thị — khi kiểm xong thẻ
-  // ưu tiên cao, thẻ còn lại (nếu vẫn đến hạn) sẽ tự hiện ra ở lần tải sau.
+  // 1 máy (id_dong) có thể đến hạn nhiều loại kiểm cùng lúc. "Định kỳ" chỉ
+  // là gợi ý theo thời gian — nếu máy đó đã có sự cố/đổi khuôn thật (ưu tiên
+  // cao) đang chờ thì ẩn bớt "định kỳ" trùng, đỡ rối. NHƯNG sự cố/đổi khuôn
+  // thật với nhau thì KHÔNG ẩn lẫn nhau — mỗi cái là 1 sự kiện riêng biệt
+  // (VD vừa đổi khuôn lúc 10h, lại có sự cố khác lúc 14h) đều cần kiểm độc
+  // lập, gộp/ẩn bớt sẽ làm mất việc thật. Loại bỏ vẫn còn nguyên trong DB,
+  // chỉ ẩn bớt ở danh sách hiển thị — khi kiểm xong, thẻ còn lại (nếu vẫn
+  // đến hạn) sẽ tự hiện ra ở lần tải sau.
   const byIdDong = new Map();
   fromCheckpoints.concat(fromDinhKy).forEach(cp => {
-    const existing = byIdDong.get(cp.id_dong);
-    if (!existing || priorityOf(cp) < priorityOf(existing)) byIdDong.set(cp.id_dong, cp);
+    if (!byIdDong.has(cp.id_dong)) byIdDong.set(cp.id_dong, []);
+    byIdDong.get(cp.id_dong).push(cp);
+  });
+  const deduped = [];
+  byIdDong.forEach(items => {
+    const uuTienCao = items.filter(cp => priorityOf(cp) === 0);
+    deduped.push(...(uuTienCao.length ? uuTienCao : items));
   });
 
-  const queue = [...byIdDong.values()]
+  const queue = deduped
     .sort((a, b) => {
       const pa = priorityOf(a), pb = priorityOf(b);
       if (pa !== pb) return pa - pb;
