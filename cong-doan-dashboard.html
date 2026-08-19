@@ -269,8 +269,17 @@ async function startDashboard(){
   applyTramLabel();
   document.getElementById('ngay').value = getTodayString();
   fillSelect('ca', CA_LIST, '-- Chọn ca --');
+  // Công đoạn chỉ chạy 1 ca (CONG_DOAN_MOT_CA) — mặc định sẵn "Ca ngày", khoá
+  // lại vì hiện chưa có lựa chọn nào khác hợp lệ, khỏi bắt chọn lại mỗi lần
+  // vào trang. Bỏ công đoạn khỏi CONG_DOAN_MOT_CA (khi mở ca đêm) sẽ tự mở
+  // khoá lại, không cần sửa đoạn này.
+  const caSel = document.getElementById('ca');
+  if (CONG_DOAN_MOT_CA.includes(congDoan)){
+    caSel.value = 'Ca ngày';
+    caSel.disabled = true;
+  }
   document.getElementById('ngay').addEventListener('change', reloadAll);
-  document.getElementById('ca').addEventListener('change', reloadAll);
+  caSel.addEventListener('change', reloadAll);
 
   await loadDanhMuc();
   reloadAll();
