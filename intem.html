@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
-    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon').order('ma_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,ma_khach_hang,ten_khach_hang').order('ma_sp'),
     sb.from('master_machines').select('ma_may').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
@@ -327,7 +327,7 @@ async function loadMaster(){
   if (may.error) throw new Error('Không tải được danh mục máy: ' + may.error.message);
   if (nv.error) throw new Error('Không tải được danh mục nhân sự: ' + nv.error.message);
 
-  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '' }));
+  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '', maKhachHang: r.ma_khach_hang || '', tenKhachHang: r.ten_khach_hang || '' }));
   masterMap = {};
   masterData.forEach(m => { masterMap[m.ma] = m; });
   buildSelects(masterData, (may.data||[]).map(r=>r.ma_may), (nv.data||[]).map(r=>r.ten_nhan_vien));
@@ -515,11 +515,13 @@ async function tachTem(){
     var ngayQR = parts.length === 3 ? (parts[0]+"/"+parts[1]+"/"+parts[2]) : ngayISO;
     var ngayHienThi = parts.length === 3 ? (parts[2]+"/"+parts[1]+"/"+parts[0]) : ngayISO;
     var qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, r.lot || ngayHienThi, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join(">\n");
+    var khMasterTach = masterMap[r.ma_sp] || {};
     openPrint({
       ok: true, tagNo: r.tag_no, qr: qr, ngay: ngayHienThi, tenSP: r.ten_sp, maSP: r.ma_sp,
       soLuong: r.so_luong, lotNo: r.lot || ngayHienThi, soKhuon: r.so_khuon || "", nguyenLieu: r.nguyen_lieu || "",
       mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || "", ghiChu: r.ghi_chu || "",
       loaiSP: loaiSpFromTagNo(r.tag_no),
+      maKhachHang: khMasterTach.maKhachHang || "", tenKhachHang: khMasterTach.tenKhachHang || "",
     });
   }
   findTem();
@@ -539,6 +541,7 @@ async function reprintTem(){
   var ngayHienThi = parts.length === 3 ? (parts[2]+"/"+parts[1]+"/"+parts[0]) : ngayISO;
   var lotNo = r.lot || ngayHienThi;
   var qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, lotNo, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join(">\n");
+  var khMasterReprint = masterMap[r.ma_sp] || {};
 
   var d = {
     ok: true, tagNo: r.tag_no, qr: qr, ngay: ngayHienThi,
@@ -548,6 +551,7 @@ async function reprintTem(){
     // Dùng giá trị đang hiển thị trên form (cho phép đổi kiểu in khi In lại)
     // thay vì suy ra lại từ Tag No, để người dùng chủ động chọn nếu cần.
     loaiSP: document.getElementById("s_loaiSP").value || loaiSpFromTagNo(r.tag_no),
+    maKhachHang: khMasterReprint.maKhachHang || "", tenKhachHang: khMasterReprint.tenKhachHang || "",
   };
   showMsg("✅ Đang in lại tem " + r.tag_no, "ok", 3000);
   openPrint(d);
@@ -717,9 +721,11 @@ async function inTem(){
     if (error) { err("Lỗi server: " + error.message); return; }
 
     var qr = [tagNo, tenSP, ma, sl, ngayQR, lotNoInput || ngay, soKhuon, nguyenLieu, may].join(">\n");
+    var khMaster = masterMap[ma] || {};
     var d = { tagNo: tagNo, qr: qr, ngay: ngay, tenSP: tenSP, maSP: ma, soLuong: sl,
               lotNo: lotNoInput || ngay, soKhuon: soKhuon, nguyenLieu: nguyenLieu,
-              mayDuc: may, nguoiTT: nguoi, ghiChu: ghiChu, loaiSP: loai };
+              mayDuc: may, nguoiTT: nguoi, ghiChu: ghiChu, loaiSP: loai,
+              maKhachHang: khMaster.maKhachHang || '', tenKhachHang: khMaster.tenKhachHang || '' };
     showMsg("✅ " + tagNo + " — đang mở cửa sổ in...", "ok", 5000);
     openPrint(d);
   } catch (e) {
@@ -799,10 +805,16 @@ function buildLabelSvg(d){
     {lbl:"Máy đúc", val:d.mayDuc},
     {lbl:"Ghi chú", val:d.ghiChu}
   ];
+  // Chỉ thêm dòng khách hàng nếu mã SP có khai báo — SP chỉ dùng nội bộ
+  // (chưa gắn khách hàng nào) thì không hiện dòng trống trên tem.
+  if (d.maKhachHang) rows.push({lbl:"Mã khách hàng", val:d.maKhachHang});
+  if (d.tenKhachHang) rows.push({lbl:"Khách hàng", val:d.tenKhachHang});
   var logoX=4, logoY=4, logoW=8, logoH=7.2;
   var titleX=logoX+logoW+3, titleY=9.6, titleSize=6.2;
   var dividerY=13.5;
-  var rowStartY=17.5, rowH=3.9;
+  // rowH co lại khi có thêm dòng khách hàng (12 dòng thay vì 10 mặc định) để
+  // khối dòng + QR + footer vẫn vừa trong khổ tem 100mm cao, không bị tràn.
+  var rowStartY=17.5, rowH=Math.min(3.9, 35.7/(rows.length-1));
   var rowsEndY = rowStartY + (rows.length-1)*rowH;
   var qrSize=34, qrX=(W-qrSize)/2, qrY=rowsEndY+5;
   var ftrLineY=qrY+qrSize+2, ftrTextY=ftrLineY+2.8, ftrSize=2.4;
