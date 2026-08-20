@@ -76,10 +76,7 @@ tr:last-child td{border-bottom:none}
 .pill.ng{background:var(--alarm-bg);color:var(--alarm-fg)}
 .pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
 .pill.neutral{background:var(--bg-sunken);color:var(--text-muted)}
-.link-list{display:flex;flex-direction:column;gap:4px}
-.link-row{display:flex;gap:8px;flex-wrap:wrap}
-.ipqc-note{font-size:11px;line-height:1.5;color:var(--text-muted)}
-.ipqc-note b{color:var(--text)}
+.link-list{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row-alarm{background:var(--alarm-bg)}
 .row-warn{background:var(--warn-bg)}
 .empty-note{text-align:center;color:var(--text-muted);padding:20px;font-size:12px}
@@ -580,11 +577,14 @@ function doneRowHtml(d){
   // cột "Liên kết" (thay vì tách dòng riêng), để không phải mở lại từng bản
   // ghi mới xem được.
   const failed = (d.checklist || []).filter(c => c && c.dat === false).map(c => c.muc);
-  const ipqcNote = (d.ket_qua !== 'OK' && (failed.length || d.ghi_chu))
-    ? '<div class="ipqc-note">'
-      + (failed.length ? '<div><b>🔻 Không đạt:</b> ' + failed.map(escapeHtml).join('; ') + '</div>' : '')
-      + (d.ghi_chu ? '<div><b>📝 Ghi chú:</b> ' + escapeHtml(d.ghi_chu) + '</div>' : '')
-      + '</div>'
+  const ipqcNoteParts = [];
+  if (failed.length) ipqcNoteParts.push('Không đạt: ' + failed.join('; '));
+  if (d.ghi_chu) ipqcNoteParts.push('Ghi chú: ' + d.ghi_chu);
+  // Gộp thành 1 badge duy nhất trong cột "Liên kết" (title = tooltip hover
+  // xem đầy đủ) — trước đó hiện thẳng text nhiều dòng làm bảng bị lệch
+  // chiều cao dòng, khó xem.
+  const ipqcNote = (d.ket_qua !== 'OK' && ipqcNoteParts.length)
+    ? '<span class="pill warn" title="' + escapeHtml(ipqcNoteParts.join(' — ')) + '">🔻 Chi tiết</span>'
     : '';
   return `<tr>
     <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
@@ -596,13 +596,11 @@ function doneRowHtml(d){
     <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
-      <div class="link-row">
-        ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
-        ${d.id_su_co_goc ? '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(d.id_su_co_goc) + '">SC: ' + escapeHtml(d.id_su_co_goc) + '</span>' : ''}
-        ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
-        ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc && !ipqcNote ? '—' : ''}
-      </div>
+      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+      ${d.id_su_co_goc ? '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(d.id_su_co_goc) + '">SC: ' + escapeHtml(d.id_su_co_goc) + '</span>' : ''}
+      ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
       ${ipqcNote}
+      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc && !ipqcNote ? '—' : ''}
     </td>
   </tr>`;
 }
