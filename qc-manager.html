@@ -76,12 +76,14 @@ tr:last-child td{border-bottom:none}
 .pill.ng{background:var(--alarm-bg);color:var(--alarm-fg)}
 .pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
 .pill.neutral{background:var(--bg-sunken);color:var(--text-muted)}
-.link-list{display:flex;gap:8px}
+.link-list{display:flex;flex-direction:column;gap:4px}
+.link-row{display:flex;gap:8px;flex-wrap:wrap}
+.ipqc-note{font-size:11px;line-height:1.5;color:var(--text-muted)}
+.ipqc-note b{color:var(--text)}
 .row-alarm{background:var(--alarm-bg)}
 .row-warn{background:var(--warn-bg)}
 .empty-note{text-align:center;color:var(--text-muted);padding:20px;font-size:12px}
 .muted{color:var(--text-muted)}
-.ipqc-detail-row td{background:var(--bg-sunken);font-size:11px;line-height:1.6;padding:6px 8px 8px 24px}
 .link-btn{color:var(--accent);font-weight:600;text-decoration:none;font-size:11px}
 .link-btn:hover{text-decoration:underline}
 
@@ -574,7 +576,17 @@ function levelForMinutes(m){
 }
 
 function doneRowHtml(d){
-  const row = `<tr>
+  // NG/Cảnh báo — hạng mục checklist không đạt + ghi chú IPQC ghép ngay vào
+  // cột "Liên kết" (thay vì tách dòng riêng), để không phải mở lại từng bản
+  // ghi mới xem được.
+  const failed = (d.checklist || []).filter(c => c && c.dat === false).map(c => c.muc);
+  const ipqcNote = (d.ket_qua !== 'OK' && (failed.length || d.ghi_chu))
+    ? '<div class="ipqc-note">'
+      + (failed.length ? '<div><b>🔻 Không đạt:</b> ' + failed.map(escapeHtml).join('; ') + '</div>' : '')
+      + (d.ghi_chu ? '<div><b>📝 Ghi chú:</b> ' + escapeHtml(d.ghi_chu) + '</div>' : '')
+      + '</div>'
+    : '';
+  return `<tr>
     <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
     <td><b>${escapeHtml(d.ma_may)}</b></td>
     <td class="mono">${escapeHtml(d.ma_sp)}</td>
@@ -584,26 +596,15 @@ function doneRowHtml(d){
     <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
-      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
-      ${d.id_su_co_goc ? '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(d.id_su_co_goc) + '">SC: ' + escapeHtml(d.id_su_co_goc) + '</span>' : ''}
-      ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
-      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc ? '—' : ''}
+      <div class="link-row">
+        ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+        ${d.id_su_co_goc ? '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(d.id_su_co_goc) + '">SC: ' + escapeHtml(d.id_su_co_goc) + '</span>' : ''}
+        ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
+        ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc && !ipqcNote ? '—' : ''}
+      </div>
+      ${ipqcNote}
     </td>
   </tr>`;
-  // NG/Cảnh báo — thêm dòng chi tiết ngay dưới: hạng mục checklist không đạt
-  // + ghi chú nhân viên IPQC, để không phải mở lại từng bản ghi mới xem được.
-  if (d.ket_qua !== 'OK') {
-    const failed = (d.checklist || []).filter(c => c && c.dat === false).map(c => c.muc);
-    const detail = `<tr class="ipqc-detail-row">
-      <td colspan="9">
-        ${failed.length ? '<div><b>🔻 Hạng mục không đạt:</b> ' + failed.map(escapeHtml).join('; ') + '</div>' : ''}
-        ${d.ghi_chu ? '<div><b>📝 Ghi chú:</b> ' + escapeHtml(d.ghi_chu) + '</div>' : ''}
-        ${!failed.length && !d.ghi_chu ? '<span class="muted">Không có chi tiết hạng mục/ghi chú.</span>' : ''}
-      </td>
-    </tr>`;
-    return row + detail;
-  }
-  return row;
 }
 
 function renderBoard(b){
