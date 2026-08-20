@@ -179,15 +179,10 @@ body{padding-top:var(--navbar-h)}
   }
   function escapeHtmlAttr(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  function wireInteractions() {
-    document.getElementById('mnbBurger').addEventListener('click', () => {
-      document.getElementById('mnbGroups').classList.toggle('open');
-    });
-    // Bấm để mở/đóng dropdown — không chỉ dựa vào hover (chuột không rê qua,
-    // trackpad, hoặc bấm thẳng vào nút đều phải mở được). Trên desktop dùng
-    // class "open" (đè lên nội dung trang, đóng khi bấm ra ngoài); trên mobile
-    // dùng "mobile-open" (kiểu accordion, xổ ngay dưới nút, không cần đóng ra
-    // ngoài vì đã ở trong lớp phủ toàn màn hình riêng).
+  // Gắn cho các nút nhóm (.mnb-group-btn) — hàm này được gọi LẠI mỗi khi menu
+  // được vẽ lại (VD thêm nhóm "Quản trị" cho admin ở enhanceWithAuth), vì các
+  // nút đó bị tạo mới (innerHTML replace) nên cần gắn listener lại từ đầu.
+  function wireGroupButtons() {
     document.querySelectorAll('.mnb-group-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -199,6 +194,18 @@ body{padding-top:var(--navbar-h)}
         });
         group.classList.toggle(cls, !wasOpen);
       });
+    });
+  }
+
+  // Nút ☰ và listener đóng-khi-bấm-ra-ngoài gắn vào phần tử CỐ ĐỊNH (không
+  // bị vẽ lại khi menu cập nhật cho admin) — chỉ gọi 1 LẦN DUY NHẤT ở init().
+  // Gọi lại (như trước đây do dùng chung wireInteractions() cho cả 2 việc) sẽ
+  // gắn trùng listener lên #mnbBurger → mỗi lần bấm bật rồi tắt ngay trong
+  // cùng 1 sự kiện, nhìn như nút không phản ứng gì (chỉ lộ ra với tài khoản
+  // admin, vì chỉ nhánh đó gọi lại hàm gắn sự kiện).
+  function wireStaticInteractions() {
+    document.getElementById('mnbBurger').addEventListener('click', () => {
+      document.getElementById('mnbGroups').classList.toggle('open');
     });
     document.addEventListener('click', () => {
       document.querySelectorAll('.mnb-group.open').forEach(g => g.classList.remove('open'));
@@ -267,7 +274,8 @@ body{padding-top:var(--navbar-h)}
     document.getElementById('mnbGroups').innerHTML = groupsHtml(MENU, cur) + '<div class="mnb-auth-mobile" id="mnbAuthMobile"></div>';
     renderAuthInto('mnbAuth', null);
     renderAuthInto('mnbAuthMobile', null);
-    wireInteractions();
+    wireGroupButtons();
+    wireStaticInteractions();
 
     // Thanh tiêu đề chuẩn hoá — thay header tự viết riêng (không đồng nhất)
     // ở từng trang. Trang không có trong PAGE_META (hiếm) thì không vẽ gì,
@@ -303,7 +311,7 @@ body{padding-top:var(--navbar-h)}
           identity = (username && fullName) ? (username + '_' + fullName) : (username || fullName || null);
           if (myRow.role === 'admin') {
             document.getElementById('mnbGroups').innerHTML = groupsHtml(MENU.concat([ADMIN_MENU]), cur) + '<div class="mnb-auth-mobile" id="mnbAuthMobile"></div>';
-            wireInteractions();
+            wireGroupButtons();
           }
         }
       }
