@@ -831,8 +831,16 @@ function getActiveRowForMachine(maMay){
 function renderMachineList(){
   const wrap = document.getElementById('machine-list');
   const q = (document.getElementById('search-machine').value || '').trim().toLowerCase();
-  const machines = state.machines.slice().sort((a,b) => a.localeCompare(b, 'vi', {numeric:true}))
-    .filter(m => !q || m.toLowerCase().includes(q));
+  // Máy có kế hoạch (đang chạy/sự cố) hiện trước, máy chưa có kế hoạch xuống
+  // dưới cùng — trong mỗi nhóm vẫn sắp theo tên máy như cũ.
+  const machines = state.machines.slice()
+    .filter(m => !q || m.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const hasA = !!(getActiveRowForMachine(a) && getActiveRowForMachine(a).ma_sp);
+      const hasB = !!(getActiveRowForMachine(b) && getActiveRowForMachine(b).ma_sp);
+      if (hasA !== hasB) return hasA ? -1 : 1;
+      return a.localeCompare(b, 'vi', {numeric:true});
+    });
 
   if (machines.length === 0) { wrap.innerHTML = '<div class="empty-note">Không tìm thấy máy nào.</div>'; return; }
 
