@@ -694,7 +694,7 @@ function updateCtxSummaryLine(){
   const tc = document.getElementById('sel-truong-ca').value;
   const d = state.ngay ? new Date(state.ngay + 'T00:00:00') : null;
   document.getElementById('ctx-summary-line').textContent = (state.ca || '—') + (d ? ' · ' + formatDateDisplayMobile(d) : '');
-  const rowCount = state.rows ? state.rows.length : 0;
+  const rowCount = state.rows ? state.rows.filter(r => r.ngay === state.ngay && r.ca === state.ca).length : 0;
   document.getElementById('ctx-hint').textContent = 'TC: ' + (tc || 'chưa chọn') + ' · ' + rowCount + ' dòng KH';
 }
 
@@ -733,28 +733,69 @@ function onCtxChange(){
 // LOAD SHIFT STATE — thay api_getShiftState. Cùng cách join client-side với
 // duc-dashboard.html (đọc duc_ca_hien_tai + badge IPQC), nhưng KHÔNG cần join
 // mold_status/mold_issue (bản mobile gốc không hiển thị 2 mục đó).
+//
+// state.rows PHẢI độc lập với Ngày/Ca/Phương án đang chọn ở header — y hệt
+// duc-dashboard.html (xem ghi chú ở fetchShiftState() bên đó). Header chỉ
+// dùng để (a) gán KẾ HOẠCH MỚI cho máy chưa chạy gì và (b) tạo báo cáo khi
+// KẾT CA. Máy nào đang thực sự chạy phải luôn hiện trong "Danh sách máy",
+// bất kể header đang chọn ngày/ca nào — trước đây lọc cứng theo header nên
+// nếu header đoán sai ca (VD ca đang chạy overrun qua giờ ca kế tiếp) thì
+// toàn bộ máy hiện "Trống" dù dashboard Đúc vẫn thấy chúng đang chạy.
 // =============================================================================
 async function loadShiftState(){
   showOverlay('Đang tải dữ liệu ca...');
   try {
-    const [qRows, qInc, qIpqc] = await Promise.all([
-      sb.from('duc_ca_hien_tai').select('*').eq('ngay', state.ngay).eq('ca', state.ca),
-      sb.from('duc_su_co_log').select('*').eq('ngay', state.ngay).eq('ca', state.ca),
+    const [liteRes, baoCaoRes, qIpqc] = await Promise.all([
+      sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,row_seq,ngay,ca,open_gio_phat_sinh'),
+      sb.from('duc_bao_cao_ca').select('ngay,ca'),
       sb.rpc('duc_get_ipqc_due_by_id_dong'),
     ]);
-    if (qRows.error) throw new Error(qRows.error.message);
-    if (qInc.error) throw new Error(qInc.error.message);
+    if (liteRes.error) throw new Error(liteRes.error.message);
+    if (baoCaoRes.error) throw new Error(baoCaoRes.error.message);
     const ipqcById = {};
     (qIpqc.error ? [] : (qIpqc.data || [])).forEach(x => { ipqcById[x.id_dong] = x; });
 
-    state.rows = (qRows.data || []).map(r => {
+    const ketCaSet = new Set((baoCaoRes.data || []).map(r => r.ngay + '|' + r.ca));
+    const latestByMachine = {};
+    (liteRes.data || []).forEach(r => {
+      if (!r.ma_may) return;
+      if (!latestByMachine[r.ma_may] || r.row_seq > latestByMachine[r.ma_may].row_seq) latestByMachine[r.ma_may] = r;
+    });
+    const activeTriples = [];
+    Object.keys(latestByMachine).forEach(m => {
+      const r = latestByMachine[m];
+      if (!r.ma_sp) return;
+      const conLai = r.open_gio_phat_sinh ? true : !ketCaSet.has(r.ngay + '|' + r.ca);
+      if (conLai) activeTriples.push({ ma_may: m, ngay: r.ngay, ca: r.ca });
+    });
+
+    let rawRows = [];
+    if (activeTriples.length) {
+      const orRows = activeTriples.map(t => `and(ma_may.eq.${t.ma_may},ngay.eq.${t.ngay},ca.eq.${t.ca})`).join(',');
+      const { data, error } = await sb.from('duc_ca_hien_tai').select('*').or(orRows);
+      if (error) throw new Error(error.message);
+      rawRows = data || [];
+    }
+
+    state.rows = rawRows.map(r => {
       const out = Object.assign({}, r);
       out._rowIndex = Number(r.row_seq) || 0;
       const ipqc = ipqcById[r.id_dong];
       if (ipqc) { out.ipqc_cho_kiem = true; out.ipqc_loai_kiem = ipqc.loai_kiem; out.ipqc_phut_cho = Number(ipqc.phut_da_troi) || 0; }
       return out;
     });
-    state.incidents = qInc.data || [];
+
+    // Sự cố (log) lấy đúng theo (ngay, ca) THẬT của từng máy đang hoạt động —
+    // không dùng ngay/ca header (có thể lệch nếu ca đang chạy overrun).
+    let incRows = [];
+    const shiftPairs = Array.from(new Set(activeTriples.map(t => t.ngay + '|' + t.ca)));
+    if (shiftPairs.length) {
+      const orInc = shiftPairs.map(p => { const [ng, ca] = p.split('|'); return `and(ngay.eq.${ng},ca.eq.${ca})`; }).join(',');
+      const { data, error } = await sb.from('duc_su_co_log').select('*').or(orInc);
+      if (error) throw new Error(error.message);
+      incRows = data || [];
+    }
+    state.incidents = incRows;
 
     hideOverlay();
     updateCtxSummaryLine();
@@ -1139,8 +1180,11 @@ async function openEndShiftScreen(){
   if (!truongCa) return showToast('Chọn trưởng ca trước khi kết ca', true);
   if (!(await ensureAuth())) return;
 
+  // Kết ca chỉ gộp đúng máy thuộc (ngày, ca) đang chọn ở header — state.rows
+  // giờ chứa CẢ máy đang chạy overrun ở ca/ngày khác (xem loadShiftState()).
+  const shiftRows = state.rows.filter(r => r.ngay === state.ngay && r.ca === state.ca);
   const byMachine = {};
-  state.rows.forEach(r => { if (!r.ma_sp) return; if (!byMachine[r.ma_may]) byMachine[r.ma_may] = []; byMachine[r.ma_may].push(r); });
+  shiftRows.forEach(r => { if (!r.ma_sp) return; if (!byMachine[r.ma_may]) byMachine[r.ma_may] = []; byMachine[r.ma_may].push(r); });
   const activeRows = [];
   Object.keys(byMachine).forEach(m => {
     const rows = byMachine[m].sort((a,b) => (b._rowIndex||0) - (a._rowIndex||0));
