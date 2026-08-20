@@ -246,7 +246,7 @@ async function nhapKho(code){
   showMsg("⏳ Đang nhập kho " + code + "...", "ok");
   const isPallet = code.startsWith("PLT");
   const fn = isPallet ? "oqc_pallet_nhap_kho" : "kho_nhap_kho_tem";
-  const params = isPallet ? { p_id_pallet: code, p_nguoi: session.user.email } : { p_tag_no: code, p_nguoi: session.user.email };
+  const params = isPallet ? { p_id_pallet: code, p_nguoi: await MesAuth.getCurrentUserIdentity() } : { p_tag_no: code, p_nguoi: await MesAuth.getCurrentUserIdentity() };
   const { data, error } = await sb.rpc(fn, params);
   if (error){ err("Lỗi nhập kho " + code + ": " + error.message); return; }
   showMsg("✅ Đã nhập kho " + code, "ok", 5000);
@@ -272,7 +272,7 @@ document.getElementById("btnTaoPhieuXuat").addEventListener("click", async () =>
   const khach = document.getElementById("xh-khach").value.trim();
   const sodon = document.getElementById("xh-sodon").value.trim();
   showMsg("⏳ Đang tạo phiếu xuất...", "ok");
-  const { data, error } = await sb.rpc("kho_tao_phieu_xuat", { p_khach_hang: khach, p_so_don_hang: sodon, p_nguoi: session.user.email });
+  const { data, error } = await sb.rpc("kho_tao_phieu_xuat", { p_khach_hang: khach, p_so_don_hang: sodon, p_nguoi: await MesAuth.getCurrentUserIdentity() });
   if (error){ err("Lỗi tạo phiếu: " + error.message); return; }
   openPhieuXuat(data, khach, sodon);
   showMsg("✅ Đã tạo phiếu " + data, "ok", 4000);
@@ -309,7 +309,7 @@ async function addToPhieuXuat(code){
   if (!code || !currentPhieuXuat) return;
   const session = await requireLogin(); if (!session) return;
   showMsg("⏳ Đang thêm " + code + "...", "ok");
-  const { data, error } = await sb.rpc("kho_them_vao_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_ma: code, p_nguoi: session.user.email });
+  const { data, error } = await sb.rpc("kho_them_vao_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_ma: code, p_nguoi: await MesAuth.getCurrentUserIdentity() });
   if (error){ err("Lỗi thêm " + code + ": " + error.message); return; }
   showMsg("✅ Đã thêm " + code, "ok", 3000);
   loadPhieuItems();
@@ -338,7 +338,7 @@ document.getElementById("btnDongPhieuXuat").addEventListener("click", async () =
   if (!confirm("Đóng phiếu " + currentPhieuXuat.id_phieu + " và xuất kho " + phieuItems.length + " mục? Không hoàn tác được.")) return;
   const session = await requireLogin(); if (!session) return;
   showMsg("⏳ Đang đóng phiếu...", "ok");
-  const { data, error } = await sb.rpc("kho_dong_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_nguoi: session.user.email });
+  const { data, error } = await sb.rpc("kho_dong_phieu_xuat", { p_id_phieu: currentPhieuXuat.id_phieu, p_nguoi: await MesAuth.getCurrentUserIdentity() });
   if (error){ err("Lỗi đóng phiếu: " + error.message); return; }
   showMsg("✅ Đã xuất kho " + data.so_muc + " mục — phiếu " + currentPhieuXuat.id_phieu, "ok", 8000);
   currentPhieuXuat = null; phieuItems = [];

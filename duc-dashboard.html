@@ -1219,8 +1219,7 @@ const DRAFT_KEY = 'ducdash_draft_v1';
 // mọi trang — hàm này chỉ còn giữ lại phần đồng bộ state.user (dùng khi ghi
 // last_updated_by ở các RPC ghi dữ liệu).
 async function initAuthStatus(){
-  const email = await MesAuth.getCurrentUserEmail();
-  state.user = email || '';
+  state.user = (await MesAuth.getCurrentUserIdentity()) || '';
 }
 
 function gotoLogin(){
@@ -1235,7 +1234,7 @@ async function ensureAuth(){
     setTimeout(gotoLogin, 1200);
     return false;
   }
-  state.user = session.user.email;
+  state.user = await MesAuth.getCurrentUserIdentity();
   return true;
 }
 
@@ -1248,7 +1247,7 @@ async function ensureAuthOnSubmit(modalId){
     setTimeout(gotoLogin, 1500);
     return false;
   }
-  state.user = session.user.email;
+  state.user = await MesAuth.getCurrentUserIdentity();
   return true;
 }
 
@@ -3122,7 +3121,7 @@ async function saveShiftInputs(idDong){
     setTimeout(gotoLogin, 1500);
     return;
   }
-  state.user = session.user.email;
+  state.user = await MesAuth.getCurrentUserIdentity();
 
   const params = {
     p_id_dong: idDong,
@@ -4124,7 +4123,7 @@ function scheduleUpdateShiftInputsFromReview(idDong, listEl){
       setTimeout(gotoLogin, 1500);
       return;
     }
-    state.user = session.user.email;
+    state.user = await MesAuth.getCurrentUserIdentity();
 
     const params = {
       p_id_dong: idDong,

@@ -292,23 +292,11 @@ function fmtDateTime24(iso){
   return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// "Người kiểm" lưu vào duc_ipqc_checkpoint dạng "MãNV_TênNV" (Mã nhân viên =
-// user_roles.username, đã có sẵn ở form tạo tài khoản "Mã nhân viên (dùng để
-// đăng nhập)" — KHÔNG phải thêm cột mới). Trước đây dùng thẳng email đăng
-// nhập, không phải ai cũng nhớ được ai đã kiểm chỉ qua email nội bộ dạng
-// nvXXX@mes.local. Cache theo user_id trong 1 phiên trang để khỏi query lại.
-let nguoiKiemCache = null; // { userId, text }
+// "Người kiểm" lưu vào duc_ipqc_checkpoint dạng "MãNV_TênNV" — dùng chung
+// MesAuth.getCurrentUserIdentity() (shared/supabase-client.js) thay vì tự
+// query/cache riêng ở đây.
 async function getNguoiKiemIdentity(){
-  const session = await MesAuth.getSession();
-  if (!session) return null;
-  if (nguoiKiemCache && nguoiKiemCache.userId === session.user.id) return nguoiKiemCache.text;
-  const { data } = await sb.from('user_roles').select('username,full_name,email').eq('user_id', session.user.id).maybeSingle();
-  const username = data && data.username ? data.username.trim() : '';
-  const fullName = data && data.full_name ? data.full_name.trim() : '';
-  const text = (username && fullName) ? (username + '_' + fullName)
-    : (username || fullName || (data && data.email) || session.user.email);
-  nguoiKiemCache = { userId: session.user.id, text };
-  return text;
+  return MesAuth.getCurrentUserIdentity();
 }
 
 async function updateUserLabel(){

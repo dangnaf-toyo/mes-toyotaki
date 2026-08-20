@@ -403,7 +403,7 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
     p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoan,
     p_ten_tram: ten, p_ma_sp: masp, p_ten_sp: document.getElementById('at-tensp').value.trim(),
     p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
-    p_nguoi: document.getElementById('at-nguoi').value.trim(), p_user: session.user.email,
+    p_nguoi: document.getElementById('at-nguoi').value.trim(), p_user: await MesAuth.getCurrentUserIdentity(),
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalAddTram');
@@ -430,7 +430,7 @@ document.getElementById('btnSubmitNhapSL').addEventListener('click', async () =>
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_nhap_sanluong', {
-    p_id_tram: currentTarget, p_them_ok: ok, p_them_ng: ng, p_ghi_chu: ghiChu, p_user: session.user.email,
+    p_id_tram: currentTarget, p_them_ok: ok, p_them_ng: ng, p_ghi_chu: ghiChu, p_user: await MesAuth.getCurrentUserIdentity(),
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalNhapSL');
@@ -453,7 +453,7 @@ document.getElementById('btnSubmitSuaTram').addEventListener('click', async () =
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_sua', {
-    p_id_tram: currentTarget, p_nguoi_moi: nguoi, p_kh_ca_moi: khCaRaw === '' ? null : Number(khCaRaw), p_user: session.user.email,
+    p_id_tram: currentTarget, p_nguoi_moi: nguoi, p_kh_ca_moi: khCaRaw === '' ? null : Number(khCaRaw), p_user: await MesAuth.getCurrentUserIdentity(),
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalSuaTram');
@@ -481,7 +481,7 @@ document.getElementById('btnSubmitDoiMa').addEventListener('click', async () => 
   const { error } = await sb.rpc('cd_tram_doi_ma_sp', {
     p_id_tram: currentTarget, p_ma_sp_moi: masp, p_ten_sp_moi: document.getElementById('dm-tensp').value.trim(),
     p_kh_ca_moi: khCaRaw === '' ? null : Number(khCaRaw),
-    p_nguoi_moi: document.getElementById('dm-nguoi').value.trim(), p_user: session.user.email,
+    p_nguoi_moi: document.getElementById('dm-nguoi').value.trim(), p_user: await MesAuth.getCurrentUserIdentity(),
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalDoiMa');
@@ -495,7 +495,7 @@ async function ketThucTram(id){
   if (!confirm('Kết thúc "' + (t ? t.ten_tram : id) + '"? Sản lượng hiện tại sẽ được gộp vào báo cáo.')) return;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
-  const { error } = await sb.rpc('cd_tram_ket_thuc', { p_id_tram: id, p_user: session.user.email });
+  const { error } = await sb.rpc('cd_tram_ket_thuc', { p_id_tram: id, p_user: await MesAuth.getCurrentUserIdentity() });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   showMsg('✅ Đã kết thúc ' + (t ? t.ten_tram : ''), 'ok');
   loadTrams();
@@ -508,7 +508,7 @@ document.getElementById('btnKetCa').addEventListener('click', async () => {
   if (!confirm('Kết ca ' + ca + ' ngày ' + ngay.split('-').reverse().join('/') + ' cho ' + congDoan + '? Toàn bộ ' + tramLabel().toLowerCase() + ' đang hoạt động sẽ được gộp vào báo cáo và xoá khỏi màn hình.')) return;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
-  const { data, error } = await sb.rpc('cd_ket_ca_cong_doan', { p_ngay: ngay, p_ca: ca, p_cong_doan: congDoan, p_user: session.user.email });
+  const { data, error } = await sb.rpc('cd_ket_ca_cong_doan', { p_ngay: ngay, p_ca: ca, p_cong_doan: congDoan, p_user: await MesAuth.getCurrentUserIdentity() });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   showReport(data || []);
   loadTrams();
@@ -674,7 +674,7 @@ document.getElementById('btnSubmitKhsxBatch').addEventListener('click', async ()
       p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoan,
       p_ten_tram: ten, p_ma_sp: r.dataset.maSp, p_ten_sp: r.dataset.tenSp,
       p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
-      p_nguoi: '', p_user: session.user.email,
+      p_nguoi: '', p_user: await MesAuth.getCurrentUserIdentity(),
     });
     if (error) fail.push(ten + ': ' + error.message); else ok++;
   }

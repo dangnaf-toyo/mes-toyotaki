@@ -409,8 +409,7 @@ document.addEventListener('focusin', e => {
 // Hiển thị đăng nhập/đăng xuất giờ do shared/navbar.js đảm nhiệm chung — hàm
 // này chỉ còn đồng bộ state.user (dùng khi ghi last_updated_by).
 async function initAuthStatus(){
-  const email = await MesAuth.getCurrentUserEmail();
-  state.user = email || '';
+  state.user = (await MesAuth.getCurrentUserIdentity()) || '';
 }
 function gotoLogin(){ window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }
 async function ensureAuth(){
@@ -420,7 +419,7 @@ async function ensureAuth(){
     setTimeout(gotoLogin, 1200);
     return false;
   }
-  state.user = session.user.email;
+  state.user = await MesAuth.getCurrentUserIdentity();
   return true;
 }
 async function rpcWrite(fn, params){

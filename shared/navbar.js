@@ -303,12 +303,10 @@ body{padding-top:var(--navbar-h)}
     try {
       email = await MesAuth.getCurrentUserEmail();
       if (email) {
+        identity = await MesAuth.getCurrentUserIdentity();
         const session = await MesAuth.getSession();
-        const { data: myRow } = await sb.from('user_roles').select('role,username,full_name').eq('user_id', session.user.id).maybeSingle();
+        const { data: myRow } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
         if (myRow) {
-          const username = (myRow.username || '').trim();
-          const fullName = (myRow.full_name || '').trim();
-          identity = (username && fullName) ? (username + '_' + fullName) : (username || fullName || null);
           if (myRow.role === 'admin') {
             document.getElementById('mnbGroups').innerHTML = groupsHtml(MENU.concat([ADMIN_MENU]), cur) + '<div class="mnb-auth-mobile" id="mnbAuthMobile"></div>';
             wireGroupButtons();

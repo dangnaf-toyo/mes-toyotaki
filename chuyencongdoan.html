@@ -824,8 +824,7 @@ async function requireNguoiXacNhanAndAuth(){
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
     return null;
   }
-  const { data } = await sb.from('user_roles').select('full_name,email').eq('user_id', session.user.id).maybeSingle();
-  return (data && (data.full_name || data.email)) || session.user.email;
+  return (await MesAuth.getCurrentUserIdentity()) || '';
 }
 
 async function confirmOne(idPhieu, btn){

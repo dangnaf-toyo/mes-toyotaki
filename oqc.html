@@ -165,9 +165,8 @@ function showMsg(text, cls, autoHideMs){
 }
 
 async function init(){
-  const session = await MesAuth.requireAuth();
-  const { data } = await sb.from('user_roles').select('full_name,email').eq('user_id', session.user.id).maybeSingle();
-  currentNguoi = (data && (data.full_name || data.email)) || session.user.email;
+  await MesAuth.requireAuth();
+  currentNguoi = (await MesAuth.getCurrentUserIdentity()) || '';
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('mainWrap').style.display = 'block';

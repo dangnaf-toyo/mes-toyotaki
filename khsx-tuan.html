@@ -386,7 +386,7 @@ function renderDuyetBar(){
 
 async function onGuiDuyet(){
   if (!(await requireLoginOrRedirect())) return;
-  const user = await MesAuth.getCurrentUserEmail();
+  const user = await MesAuth.getCurrentUserIdentity();
   const { data, error } = await sb.rpc('khsx_gui_duyet', { p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_user: user });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   if (data && data.ok === false) return showMsg(data.error, 'err');
@@ -396,7 +396,7 @@ async function onGuiDuyet(){
 
 async function onDuyet(){
   if (!(await requireLoginOrRedirect())) return;
-  const user = await MesAuth.getCurrentUserEmail();
+  const user = await MesAuth.getCurrentUserIdentity();
   const { data, error } = await sb.rpc('khsx_duyet', { p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_user: user });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   if (data && data.ok === false) return showMsg(data.error, 'err');
@@ -408,7 +408,7 @@ async function onTuChoi(){
   if (!(await requireLoginOrRedirect())) return;
   const lyDo = await openLyDoModal('Từ chối kế hoạch', 'Kế hoạch sẽ quay về trạng thái Nháp để nhân viên QLSX sửa lại.');
   if (lyDo === null) return;
-  const user = await MesAuth.getCurrentUserEmail();
+  const user = await MesAuth.getCurrentUserIdentity();
   const { data, error } = await sb.rpc('khsx_tu_choi', { p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_ly_do: lyDo, p_user: user });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   if (data && data.ok === false) return showMsg(data.error, 'err');
@@ -463,7 +463,7 @@ async function ghiLogVaXinLyDoNeuCan(loai, viTri, giaTriCu, giaTriMoi){
     );
     if (lyDo === null) return false;
   }
-  const user = await MesAuth.getCurrentUserEmail();
+  const user = await MesAuth.getCurrentUserIdentity();
   const { data, error } = await sb.rpc('khsx_ghi_log_sua', {
     p_tuan: fmtDate(weekMonday), p_cong_doan: activeTab, p_loai: loai, p_vi_tri: viTri,
     p_gia_tri_cu: giaTriCu, p_gia_tri_moi: giaTriMoi, p_ly_do: lyDo, p_user: user,
@@ -765,7 +765,7 @@ document.getElementById('btnSaveRowDuc').addEventListener('click', async () => {
     t7: Number(document.getElementById('f-t7').value) || 0,
     cn: Number(document.getElementById('f-cn').value) || 0,
     ghi_chu: document.getElementById('f-ghi-chu').value.trim(),
-    updated_by: await MesAuth.getCurrentUserEmail(),
+    updated_by: await MesAuth.getCurrentUserIdentity(),
     updated_at: new Date().toISOString(),
   };
 
@@ -883,7 +883,7 @@ document.getElementById('btnSaveRowCd').addEventListener('click', async () => {
     t7: Number(document.getElementById('cf-t7').value) || 0,
     cn: Number(document.getElementById('cf-cn').value) || 0,
     ghi_chu: document.getElementById('cf-ghi-chu').value.trim(),
-    updated_by: await MesAuth.getCurrentUserEmail(),
+    updated_by: await MesAuth.getCurrentUserIdentity(),
     updated_at: new Date().toISOString(),
   };
 

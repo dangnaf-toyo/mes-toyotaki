@@ -51,6 +51,28 @@ const MesAuth = {
   },
 
   /**
+   * "Mã NV_Tên NV" của user hiện tại — dùng ở MỌI nơi hiển thị/ghi "ai đã
+   * thao tác" (last_updated_by, người kiểm IPQC, người duyệt KHSX...) THAY
+   * VÌ email — tài khoản công nhân đăng nhập bằng mã NV có email nội bộ tự
+   * sinh dạng nvXXX@mes.local, không có ý nghĩa để hiển thị. Trả về null
+   * nếu chưa đăng nhập; fallback về username/full_name riêng lẻ hoặc email
+   * nếu tài khoản chưa khai đủ 2 trường. Cache theo user_id trong phiên
+   * trang để khỏi query lại mỗi lần gọi.
+   */
+  async getCurrentUserIdentity() {
+    const session = await this.getSession();
+    if (!session) return null;
+    if (this._identityCache && this._identityCache.userId === session.user.id) return this._identityCache.text;
+    const { data } = await sb.from('user_roles').select('username,full_name,email').eq('user_id', session.user.id).maybeSingle();
+    const username = data && data.username ? data.username.trim() : '';
+    const fullName = data && data.full_name ? data.full_name.trim() : '';
+    const text = (username && fullName) ? (username + '_' + fullName)
+      : (username || fullName || (data && data.email) || session.user.email);
+    this._identityCache = { userId: session.user.id, text };
+    return text;
+  },
+
+  /**
    * Tự đổi mật khẩu của tài khoản đang đăng nhập — xác minh mật khẩu cũ bằng
    * cách đăng nhập lại (Supabase không có API kiểm mật khẩu riêng), rồi cập
    * nhật mật khẩu mới. Ném lỗi (throw) nếu mật khẩu cũ sai hoặc mật khẩu mới
