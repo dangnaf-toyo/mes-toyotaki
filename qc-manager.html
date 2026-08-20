@@ -80,6 +80,8 @@ tr:last-child td{border-bottom:none}
 .row-alarm{background:var(--alarm-bg)}
 .row-warn{background:var(--warn-bg)}
 .empty-note{text-align:center;color:var(--text-muted);padding:20px;font-size:12px}
+.muted{color:var(--text-muted)}
+.ipqc-detail-row td{background:var(--bg-sunken);font-size:11px;line-height:1.6;padding:6px 8px 8px 24px}
 .link-btn{color:var(--accent);font-weight:600;text-decoration:none;font-size:11px}
 .link-btn:hover{text-decoration:underline}
 
@@ -496,6 +498,7 @@ function mapIpqcDoneRow(r){
     loai_kiem: r.loai_kiem, ket_qua: r.ket_qua, nguoi_kiem: r.nguoi_kiem || '(không rõ)',
     thoi_diem_kiem_thuc_te: r.thoi_diem_kiem_thuc_te, phut_phan_hoi: phutPhanHoi,
     anh_bang_chung_urls: parsePhotoUrls(r.anh_bang_chung_url), ghi_chu: r.ghi_chu || '',
+    checklist: Array.isArray(r.checklist_json) ? r.checklist_json : [],
     id_van_de_lien_quan: r.id_van_de_lien_quan || '', thoi_gian_kiem_giay: Number(r.thoi_gian_kiem_giay) || null,
     id_su_co_goc: r.id_su_co_goc || '',
   };
@@ -571,7 +574,7 @@ function levelForMinutes(m){
 }
 
 function doneRowHtml(d){
-  return `<tr>
+  const row = `<tr>
     <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
     <td><b>${escapeHtml(d.ma_may)}</b></td>
     <td class="mono">${escapeHtml(d.ma_sp)}</td>
@@ -587,6 +590,20 @@ function doneRowHtml(d){
       ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc ? '—' : ''}
     </td>
   </tr>`;
+  // NG/Cảnh báo — thêm dòng chi tiết ngay dưới: hạng mục checklist không đạt
+  // + ghi chú nhân viên IPQC, để không phải mở lại từng bản ghi mới xem được.
+  if (d.ket_qua !== 'OK') {
+    const failed = (d.checklist || []).filter(c => c && c.dat === false).map(c => c.muc);
+    const detail = `<tr class="ipqc-detail-row">
+      <td colspan="9">
+        ${failed.length ? '<div><b>🔻 Hạng mục không đạt:</b> ' + failed.map(escapeHtml).join('; ') + '</div>' : ''}
+        ${d.ghi_chu ? '<div><b>📝 Ghi chú:</b> ' + escapeHtml(d.ghi_chu) + '</div>' : ''}
+        ${!failed.length && !d.ghi_chu ? '<span class="muted">Không có chi tiết hạng mục/ghi chú.</span>' : ''}
+      </td>
+    </tr>`;
+    return row + detail;
+  }
+  return row;
 }
 
 function renderBoard(b){
