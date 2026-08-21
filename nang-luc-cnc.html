@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Năng Lực Máy Gia Công CNC — MES Toyotaki</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet"></noscript>
+<style>
+  :root{
+    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
+    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-navy:#33465C; --tk-good:#1a7a3a; --tk-bad:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',sans-serif;color:var(--tk-black);-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Zilla Slab',serif;}
+
+  .wrap{max-width:1400px;margin:0 auto;padding:32px 28px 60px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+  .tab-btn{padding:9px 18px;border:1px solid var(--tk-line);border-radius:100px;background:var(--tk-card);color:var(--tk-black);font-size:13px;font-weight:600;cursor:pointer;}
+  .tab-btn.active{background:var(--tk-orange);color:#fff;border-color:var(--tk-orange);}
+
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:22px 24px;margin-bottom:24px;}
+  .card h2{font-size:16px;margin:0 0 16px;font-weight:600;border-bottom:1px solid var(--tk-line);padding-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .card h2 .cancel-edit{font-size:12px;font-weight:600;color:var(--tk-navy);cursor:pointer;}
+  .card p.muted{margin:-8px 0 14px;}
+
+  .msg{padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;}
+  .msg.error{display:block;background:#fbe9e7;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .msg.ok{display:block;background:#e7f5ea;color:var(--tk-good);border:1px solid #bfe3c8;}
+  .msg.info{display:block;background:#eef2f6;color:var(--tk-navy);border:1px solid #cfd9e3;}
+
+  .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media (max-width:800px){.form-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:480px){.form-grid{grid-template-columns:1fr;}}
+  label{display:block;font-size:12.5px;font-weight:600;color:#445;margin-bottom:5px;}
+  input,select{width:100%;padding:9px 11px;border:1px solid #ccd;border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff;}
+  input:disabled{background:#f1efe9;color:#88806f;}
+  input:focus,select:focus{outline:none;border-color:var(--tk-orange);}
+  button{padding:10px 20px;border:none;border-radius:8px;background:var(--tk-orange);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;}
+  button:hover:not(:disabled){background:var(--tk-orange-deep);}
+  button:disabled{opacity:.6;cursor:default;}
+  button.outline{background:#fff;color:var(--tk-orange-deep);border:1.5px solid var(--tk-orange);}
+  .form-actions{margin-top:16px;display:flex;gap:10px;align-items:center;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--tk-line);white-space:normal;word-break:break-word;}
+  th{color:var(--tk-muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+  td.num,th.num{text-align:right;font-family:'IBM Plex Mono',monospace;}
+  td.row-actions, th.col-actions{white-space:nowrap;text-align:right;position:sticky;right:0;background:var(--tk-card);}
+  .row-actions button{padding:5px 12px;font-size:12px;margin-left:6px;}
+  .row-actions .del{background:transparent;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .row-actions .del:hover{background:#fbe9e7;}
+  .muted{color:var(--tk-muted);font-size:12px;}
+  .empty{padding:20px;text-align:center;color:var(--tk-muted);font-size:13px;}
+  .table-wrap{overflow-x:auto;}
+
+  .fc-input{width:78px;padding:6px 7px;font-size:12.5px;text-align:right;}
+  .fc-cell-dirty{background:#FFF7ED;}
+
+  .cap-result-table td.gap-ok{color:var(--tk-good);font-weight:600;}
+  .cap-result-table td.gap-bad{color:var(--tk-bad);font-weight:700;background:#fbe9e7;}
+  .cap-result-table td.loai-label{font-weight:700;}
+  .cap-summary{font-size:13px;line-height:1.7;}
+  .cap-summary b.bad{color:var(--tk-bad);}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div id="gate"></div>
+
+  <div id="adminArea" style="display:none">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="routing">1. Quy trình CNC theo SP</button>
+      <button class="tab-btn" data-tab="forecast">2. Forecast sản lượng theo tháng</button>
+      <button class="tab-btn" data-tab="capacity">3. Năng lực &amp; kết quả tính toán</button>
+    </div>
+
+    <!-- ── Tab 1: Quy trình CNC theo SP ─────────────────────────────────── -->
+    <section id="tab-routing" class="tab-pane">
+      <div class="card">
+        <h2>
+          <span id="rt-form-title">Thêm bước gia công CNC</span>
+          <span class="cancel-edit" id="rt-cancel" style="display:none">Huỷ sửa ✕</span>
+        </h2>
+        <p class="muted">Mỗi mã SP có thể qua nhiều bước tuần tự (VD: phay rồi tiện) — mỗi bước 1 loại máy + 1 cycle time riêng.</p>
+        <div class="msg" id="rt-msg"></div>
+        <form id="rt-form">
+          <div class="form-grid">
+            <div><label for="rt-ma-sp">Mã SP</label><input type="text" autocomplete="off" id="rt-ma-sp" list="rt-sp-list" required></div>
+            <div><label for="rt-buoc">Bước số</label><input type="number" step="1" min="1" id="rt-buoc" value="1" required></div>
+            <div><label for="rt-loai-may">Loại máy</label>
+              <select id="rt-loai-may" required>
+                <option value="phay_3_truc">Phay 3 trục</option>
+                <option value="phay_4_truc">Phay 4 trục</option>
+                <option value="tien">Tiện</option>
+              </select>
+            </div>
+            <div><label for="rt-ct">Cycle time (giây/pcs)</label><input type="number" step="any" min="0" id="rt-ct" required></div>
+            <div style="grid-column:1/-1"><label for="rt-ghichu">Ghi chú</label><input type="text" autocomplete="off" id="rt-ghichu" placeholder="VD: jig riêng, gá 2 lần..."></div>
+          </div>
+          <div class="form-actions"><button type="submit" id="rt-submit">Thêm bước</button></div>
+        </form>
+        <datalist id="rt-sp-list"></datalist>
+      </div>
+      <div class="card">
+        <h2>Danh sách quy trình CNC đã khai báo</h2>
+        <div class="table-wrap">
+          <table id="rt-table" style="display:none">
+            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Bước</th><th>Loại máy</th><th class="num">Cycle time (s)</th><th>Ghi chú</th><th class="col-actions"></th></tr></thead>
+            <tbody id="rt-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="rt-empty" style="display:none">Chưa khai báo quy trình CNC cho mã SP nào.</div>
+      </div>
+    </section>
+
+    <!-- ── Tab 2: Forecast sản lượng theo tháng ─────────────────────────── -->
+    <section id="tab-forecast" class="tab-pane" style="display:none">
+      <div class="card">
+        <h2>
+          Forecast sản lượng theo tháng
+          <span style="display:flex;gap:8px;align-items:center">
+            <label style="margin:0" for="fc-nam">Năm</label>
+            <input type="number" id="fc-nam" style="width:100px" step="1">
+          </span>
+        </h2>
+        <p class="muted">Chỉ hiện các mã SP đã khai báo quy trình CNC ở tab 1 (mã chưa khai báo thì chưa tính được năng lực). Nhập số lượng dự báo từng tháng rồi bấm Lưu.</p>
+        <div class="msg" id="fc-msg"></div>
+        <div class="table-wrap">
+          <table id="fc-table" style="display:none">
+            <thead><tr id="fc-thead-row"><th>Mã SP</th><th>Tên SP</th></tr></thead>
+            <tbody id="fc-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="fc-empty" style="display:none">Chưa có mã SP nào khai báo quy trình CNC — sang tab 1 để khai báo trước.</div>
+        <div class="form-actions"><button type="button" id="fc-save">Lưu forecast</button></div>
+      </div>
+    </section>
+
+    <!-- ── Tab 3: Năng lực & kết quả ─────────────────────────────────────── -->
+    <section id="tab-capacity" class="tab-pane" style="display:none">
+      <div class="card">
+        <h2>Giả định năng lực</h2>
+        <p class="muted">Số giờ khả dụng của 1 máy/tháng = Số ca/ngày × Giờ/ca × Ngày làm/tháng × Hiệu suất.</p>
+        <div class="msg" id="cfg-msg"></div>
+        <form id="cfg-form">
+          <div class="form-grid">
+            <div><label for="cfg-ca">Số ca/ngày</label><input type="number" step="any" min="0" id="cfg-ca"></div>
+            <div><label for="cfg-gio">Giờ/ca</label><input type="number" step="any" min="0" id="cfg-gio"></div>
+            <div><label for="cfg-ngay">Ngày làm/tháng</label><input type="number" step="any" min="0" id="cfg-ngay"></div>
+            <div><label for="cfg-hieusuat">Hiệu suất (%)</label><input type="number" step="any" min="0" max="100" id="cfg-hieusuat"></div>
+            <div><label for="cfg-p3">Số máy phay 3 trục hiện có</label><input type="number" step="any" min="0" id="cfg-p3"></div>
+            <div><label for="cfg-p4">Số máy phay 4 trục hiện có</label><input type="number" step="any" min="0" id="cfg-p4"></div>
+            <div><label for="cfg-tien">Số máy tiện hiện có</label><input type="number" step="any" min="0" id="cfg-tien"></div>
+          </div>
+          <div class="form-actions"><button type="submit">Lưu giả định</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Kết quả tính toán năm <span id="cap-nam-label">—</span></h2>
+        <div class="msg" id="cap-msg"></div>
+        <div class="table-wrap">
+          <table class="cap-result-table" id="cap-table" style="display:none"></table>
+        </div>
+        <div class="empty" id="cap-empty" style="display:none">Chưa có đủ dữ liệu quy trình CNC + forecast để tính.</div>
+        <div class="cap-summary" id="cap-summary" style="margin-top:14px"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+const LOAI_MAY_LABELS = { phay_3_truc: 'Phay 3 trục', phay_4_truc: 'Phay 4 trục', tien: 'Tiện' };
+const LOAI_MAY_ORDER = ['phay_3_truc', 'phay_4_truc', 'tien'];
+const THANG_LABELS = ['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'];
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
+function showMsg(id, cls, text){
+  const el = document.getElementById(id);
+  el.className = 'msg ' + cls;
+  el.textContent = text;
+}
+function clearMsg(id){
+  const el = document.getElementById(id);
+  el.className = 'msg';
+  el.textContent = '';
+}
+
+let productMap = {}; // ma_sp -> ten_sp
+
+// ── Tabs ─────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).style.display = 'block';
+    if (btn.dataset.tab === 'forecast' && !Object.keys(forecastDirty).length) loadForecastTable();
+    if (btn.dataset.tab === 'capacity') computeAndRenderCapacity();
+  });
+});
+
+// ── Tab 1: Quy trình CNC ─────────────────────────────────────────────────
+let rtEditingId = null;
+function rtResetForm(){
+  rtEditingId = null;
+  document.getElementById('rt-form').reset();
+  document.getElementById('rt-buoc').value = 1;
+  document.getElementById('rt-ma-sp').disabled = false;
+  document.getElementById('rt-form-title').textContent = 'Thêm bước gia công CNC';
+  document.getElementById('rt-submit').textContent = 'Thêm bước';
+  document.getElementById('rt-cancel').style.display = 'none';
+}
+document.getElementById('rt-cancel').addEventListener('click', rtResetForm);
+
+async function loadRouting(){
+  const { data, error } = await sb.from('master_cnc_routing')
+    .select('id, ma_sp, buoc, loai_may, cycle_time_s, ghi_chu')
+    .order('ma_sp').order('buoc');
+  if (error){ showMsg('rt-msg', 'error', 'Không tải được: ' + error.message); return; }
+  clearMsg('rt-msg');
+  const table = document.getElementById('rt-table'), tbody = document.getElementById('rt-tbody'), empty = document.getElementById('rt-empty');
+  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${escapeHtml(r.ma_sp)}</td>
+      <td>${escapeHtml(productMap[r.ma_sp]) || '<span class="muted">—</span>'}</td>
+      <td>${r.buoc}</td>
+      <td>${LOAI_MAY_LABELS[r.loai_may] || escapeHtml(r.loai_may)}</td>
+      <td class="num">${fmtNum(r.cycle_time_s)}</td>
+      <td>${escapeHtml(r.ghi_chu) || '<span class="muted">—</span>'}</td>
+      <td class="row-actions">
+        <button type="button" class="outline edit" data-id="${r.id}">Sửa</button>
+        <button type="button" class="del" data-id="${r.id}">Xoá</button>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('.edit').forEach(b => b.addEventListener('click', () => {
+    const row = data.find(x => String(x.id) === b.dataset.id);
+    if (!row) return;
+    rtEditingId = row.id;
+    document.getElementById('rt-ma-sp').value = row.ma_sp;
+    document.getElementById('rt-ma-sp').disabled = true;
+    document.getElementById('rt-buoc').value = row.buoc;
+    document.getElementById('rt-loai-may').value = row.loai_may;
+    document.getElementById('rt-ct').value = row.cycle_time_s;
+    document.getElementById('rt-ghichu').value = row.ghi_chu || '';
+    document.getElementById('rt-form-title').textContent = 'Sửa bước — ' + row.ma_sp + ' (bước ' + row.buoc + ')';
+    document.getElementById('rt-submit').textContent = 'Lưu chỉnh sửa';
+    document.getElementById('rt-cancel').style.display = 'inline-block';
+    document.getElementById('rt-form').scrollIntoView({ behavior: 'smooth' });
+  }));
+  tbody.querySelectorAll('.del').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Xoá bước gia công CNC này?')) return;
+    const { error: delErr } = await sb.from('master_cnc_routing').delete().eq('id', b.dataset.id);
+    if (delErr) return alert('Lỗi xoá: ' + delErr.message);
+    if (rtEditingId != null && String(rtEditingId) === b.dataset.id) rtResetForm();
+    loadRouting();
+  }));
+}
+
+document.getElementById('rt-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ma_sp = document.getElementById('rt-ma-sp').value.trim();
+  const buoc = Number(document.getElementById('rt-buoc').value);
+  const loai_may = document.getElementById('rt-loai-may').value;
+  const cycle_time_s = Number(document.getElementById('rt-ct').value);
+  const ghi_chu = document.getElementById('rt-ghichu').value.trim() || null;
+  if (!ma_sp || !buoc || !cycle_time_s) return showMsg('rt-msg', 'error', 'Nhập đủ Mã SP / Bước số / Cycle time.');
+  if (!productMap.hasOwnProperty(ma_sp)) return showMsg('rt-msg', 'error', 'Mã SP "' + ma_sp + '" chưa có trong danh mục sản phẩm — thêm ở trang Quản lý danh mục trước.');
+
+  let error;
+  if (rtEditingId != null) {
+    ({ error } = await sb.from('master_cnc_routing').update({ buoc, loai_may, cycle_time_s, ghi_chu }).eq('id', rtEditingId));
+  } else {
+    ({ error } = await sb.from('master_cnc_routing').insert({ ma_sp, buoc, loai_may, cycle_time_s, ghi_chu }));
+  }
+  if (error) return showMsg('rt-msg', 'error', 'Lỗi: ' + error.message + (error.message.includes('duplicate') ? ' (SP này đã có bước số đó — đổi số bước khác)' : ''));
+  showMsg('rt-msg', 'ok', rtEditingId != null ? 'Đã lưu.' : 'Đã thêm bước cho ' + ma_sp + '.');
+  rtResetForm();
+  loadRouting();
+});
+
+// ── Tab 2: Forecast sản lượng theo tháng ─────────────────────────────────
+let forecastDirty = {}; // "ma_sp|thang" -> so_luong
+function fcYear(){
+  const v = Number(document.getElementById('fc-nam').value);
+  return v || new Date().getFullYear();
+}
+document.getElementById('fc-nam').addEventListener('change', () => { forecastDirty = {}; loadForecastTable(); });
+
+async function loadForecastTable(){
+  const nam = fcYear();
+  document.getElementById('cap-nam-label').textContent = nam;
+  const { data: routingSp, error: rErr } = await sb.from('master_cnc_routing').select('ma_sp').order('ma_sp');
+  if (rErr){ showMsg('fc-msg', 'error', 'Không tải được: ' + rErr.message); return; }
+  const spList = [...new Set((routingSp || []).map(r => r.ma_sp))].sort((a,b) => a.localeCompare(b, 'vi', {numeric:true}));
+
+  const table = document.getElementById('fc-table'), tbody = document.getElementById('fc-tbody'), empty = document.getElementById('fc-empty');
+  if (!spList.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+
+  const theadRow = document.getElementById('fc-thead-row');
+  theadRow.innerHTML = '<th>Mã SP</th><th>Tên SP</th>' + THANG_LABELS.map(l => '<th class="num">' + l + '</th>').join('');
+
+  const { data: fcRows, error: fErr } = await sb.from('cnc_forecast').select('ma_sp, thang, so_luong').eq('nam', nam);
+  if (fErr){ showMsg('fc-msg', 'error', 'Không tải được forecast: ' + fErr.message); return; }
+  clearMsg('fc-msg');
+  const fcMap = {};
+  (fcRows || []).forEach(r => { fcMap[r.ma_sp + '|' + r.thang] = r.so_luong; });
+
+  tbody.innerHTML = spList.map(sp => {
+    const cells = THANG_LABELS.map((_, i) => {
+      const thang = i + 1;
+      const key = sp + '|' + thang;
+      const val = fcMap[key] ?? '';
+      return '<td><input type="number" step="any" min="0" class="fc-input" data-sp="' + escapeHtml(sp) + '" data-thang="' + thang + '" value="' + val + '"></td>';
+    }).join('');
+    return '<tr><td>' + escapeHtml(sp) + '</td><td>' + (escapeHtml(productMap[sp]) || '<span class="muted">—</span>') + '</td>' + cells + '</tr>';
+  }).join('');
+
+  tbody.querySelectorAll('.fc-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      inp.classList.add('fc-cell-dirty');
+      forecastDirty[inp.dataset.sp + '|' + inp.dataset.thang] = inp.value === '' ? 0 : Number(inp.value);
+    });
+  });
+}
+
+document.getElementById('fc-save').addEventListener('click', async () => {
+  const nam = fcYear();
+  const keys = Object.keys(forecastDirty);
+  if (!keys.length) return showMsg('fc-msg', 'info', 'Chưa có thay đổi nào để lưu.');
+  const rows = keys.map(k => {
+    const [ma_sp, thangStr] = k.split('|');
+    return { ma_sp, nam, thang: Number(thangStr), so_luong: forecastDirty[k] || 0 };
+  });
+  const { error } = await sb.from('cnc_forecast').upsert(rows, { onConflict: 'ma_sp,nam,thang' });
+  if (error) return showMsg('fc-msg', 'error', 'Lỗi lưu: ' + error.message);
+  showMsg('fc-msg', 'ok', '✓ Đã lưu forecast năm ' + nam + ' (' + rows.length + ' ô).');
+  forecastDirty = {};
+  document.querySelectorAll('.fc-cell-dirty').forEach(el => el.classList.remove('fc-cell-dirty'));
+});
+
+// ── Tab 3: Giả định năng lực & kết quả ───────────────────────────────────
+let capacityConfig = null;
+async function loadCapacityConfig(){
+  const { data, error } = await sb.from('cnc_capacity_config').select('*').eq('id', 1).maybeSingle();
+  if (error){ showMsg('cfg-msg', 'error', 'Không tải được: ' + error.message); return; }
+  capacityConfig = data || { so_ca_ngay: 2, gio_ca: 8, ngay_lam_thang: 26, hieu_suat: 0.85, so_may_phay_3_truc: 14, so_may_phay_4_truc: 2, so_may_tien: 14 };
+  document.getElementById('cfg-ca').value = capacityConfig.so_ca_ngay;
+  document.getElementById('cfg-gio').value = capacityConfig.gio_ca;
+  document.getElementById('cfg-ngay').value = capacityConfig.ngay_lam_thang;
+  document.getElementById('cfg-hieusuat').value = Math.round((capacityConfig.hieu_suat || 0) * 100);
+  document.getElementById('cfg-p3').value = capacityConfig.so_may_phay_3_truc;
+  document.getElementById('cfg-p4').value = capacityConfig.so_may_phay_4_truc;
+  document.getElementById('cfg-tien').value = capacityConfig.so_may_tien;
+}
+
+document.getElementById('cfg-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    id: 1,
+    so_ca_ngay: Number(document.getElementById('cfg-ca').value) || 0,
+    gio_ca: Number(document.getElementById('cfg-gio').value) || 0,
+    ngay_lam_thang: Number(document.getElementById('cfg-ngay').value) || 0,
+    hieu_suat: (Number(document.getElementById('cfg-hieusuat').value) || 0) / 100,
+    so_may_phay_3_truc: Number(document.getElementById('cfg-p3').value) || 0,
+    so_may_phay_4_truc: Number(document.getElementById('cfg-p4').value) || 0,
+    so_may_tien: Number(document.getElementById('cfg-tien').value) || 0,
+  };
+  const { error } = await sb.from('cnc_capacity_config').upsert(payload, { onConflict: 'id' });
+  if (error) return showMsg('cfg-msg', 'error', 'Lỗi lưu: ' + error.message);
+  showMsg('cfg-msg', 'ok', '✓ Đã lưu giả định năng lực.');
+  capacityConfig = payload;
+  computeAndRenderCapacity();
+});
+
+async function computeAndRenderCapacity(){
+  const nam = fcYear();
+  document.getElementById('cap-nam-label').textContent = nam;
+  if (!capacityConfig) await loadCapacityConfig();
+
+  const [{ data: routing, error: rErr }, { data: fcRows, error: fErr }] = await Promise.all([
+    sb.from('master_cnc_routing').select('ma_sp, loai_may, cycle_time_s'),
+    sb.from('cnc_forecast').select('ma_sp, thang, so_luong').eq('nam', nam),
+  ]);
+  if (rErr || fErr){ showMsg('cap-msg', 'error', 'Lỗi tải dữ liệu: ' + ((rErr || fErr).message)); return; }
+
+  const table = document.getElementById('cap-table'), empty = document.getElementById('cap-empty');
+  if (!routing.length || !fcRows.length){
+    table.style.display = 'none'; empty.style.display = 'block';
+    document.getElementById('cap-summary').innerHTML = '';
+    return;
+  }
+  clearMsg('cap-msg'); empty.style.display = 'none'; table.style.display = 'table';
+
+  const routingBySp = {};
+  routing.forEach(r => { (routingBySp[r.ma_sp] = routingBySp[r.ma_sp] || []).push(r); });
+  const fcMap = {};
+  fcRows.forEach(r => { fcMap[r.ma_sp + '|' + r.thang] = Number(r.so_luong) || 0; });
+
+  const availHoursPerMachine = (capacityConfig.so_ca_ngay || 0) * (capacityConfig.gio_ca || 0) * (capacityConfig.ngay_lam_thang || 0) * (capacityConfig.hieu_suat || 0);
+  const soMayHienCo = {
+    phay_3_truc: capacityConfig.so_may_phay_3_truc || 0,
+    phay_4_truc: capacityConfig.so_may_phay_4_truc || 0,
+    tien: capacityConfig.so_may_tien || 0,
+  };
+
+  // requiredHours[loai_may][thang]
+  const requiredHours = { phay_3_truc: Array(12).fill(0), phay_4_truc: Array(12).fill(0), tien: Array(12).fill(0) };
+  Object.keys(routingBySp).forEach(sp => {
+    for (let thang = 1; thang <= 12; thang++){
+      const qty = fcMap[sp + '|' + thang] || 0;
+      if (!qty) continue;
+      routingBySp[sp].forEach(step => {
+        requiredHours[step.loai_may][thang - 1] += (qty * step.cycle_time_s) / 3600;
+      });
+    }
+  });
+
+  const shortages = []; // {loai_may, thang, gap}
+  let theadHtml = '<thead><tr><th>Loại máy</th>' + THANG_LABELS.map(l => '<th class="num">' + l + '</th>').join('') + '</tr></thead>';
+  let bodyHtml = '<tbody>';
+  LOAI_MAY_ORDER.forEach(loai => {
+    const hienCo = soMayHienCo[loai];
+    bodyHtml += '<tr><td class="loai-label">' + LOAI_MAY_LABELS[loai] + '<br><span class="muted">Hiện có: ' + fmtNum(hienCo) + ' máy</span></td>';
+    for (let i = 0; i < 12; i++){
+      const reqH = requiredHours[loai][i];
+      const soMayCan = availHoursPerMachine > 0 ? Math.ceil(reqH / availHoursPerMachine) : 0;
+      const gap = soMayCan - hienCo;
+      if (gap > 0) shortages.push({ loai, thang: i + 1, gap, soMayCan });
+      bodyHtml += '<td class="num ' + (gap > 0 ? 'gap-bad' : 'gap-ok') + '" title="Giờ máy cần: ' + reqH.toFixed(1) + 'h">' + soMayCan + (gap > 0 ? ' (+' + gap + ')' : '') + '</td>';
+    }
+    bodyHtml += '</tr>';
+  });
+  bodyHtml += '</tbody>';
+  table.innerHTML = theadHtml + bodyHtml;
+
+  const summaryEl = document.getElementById('cap-summary');
+  if (!shortages.length){
+    summaryEl.innerHTML = '<b style="color:var(--tk-good)">✓ Năng lực hiện tại đủ đáp ứng forecast năm ' + nam + '</b> — không tháng nào thiếu máy.';
+  } else {
+    const maxGapByLoai = {};
+    shortages.forEach(s => { maxGapByLoai[s.loai] = Math.max(maxGapByLoai[s.loai] || 0, s.gap); });
+    const lines = Object.keys(maxGapByLoai).map(loai =>
+      '<div>⚠ <b class="bad">' + LOAI_MAY_LABELS[loai] + '</b>: thiếu tối đa <b class="bad">' + maxGapByLoai[loai] + ' máy</b> vào tháng cao điểm trong năm ' + nam + ' — cân nhắc đầu tư thêm.</div>'
+    ).join('');
+    summaryEl.innerHTML = lines + '<div class="muted" style="margin-top:6px">Số trong ngoặc (+n) ở bảng trên = số máy còn thiếu so với hiện có trong tháng đó.</div>';
+  }
+}
+
+// ── Gate + khởi động ────────────────────────────────────────────────────
+async function main(){
+  const session = await MesAuth.requireAuth();
+
+  const gate = document.getElementById('gate');
+  const { data: myRole, error } = await sb
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', session.user.id)
+    .maybeSingle();
+
+  if (error){
+    gate.innerHTML = '<div class="msg error" style="display:block">Không kiểm tra được quyền: ' + error.message + '</div>';
+    return;
+  }
+  if (!myRole || myRole.role !== 'admin'){
+    gate.innerHTML = '<div class="msg error" style="display:block">Bạn không có quyền admin để vào trang này.</div>';
+    return;
+  }
+
+  document.getElementById('adminArea').style.display = 'block';
+  document.getElementById('fc-nam').value = new Date().getFullYear();
+
+  const { data: products } = await sb.from('master_products').select('ma_sp, ten_sp');
+  (products || []).forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
+  document.getElementById('rt-sp-list').innerHTML = (products || [])
+    .map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ten_sp || '') + '</option>').join('');
+
+  await loadCapacityConfig();
+  loadRouting();
+}
+
+main();
+</script>
+</body>
+</html>

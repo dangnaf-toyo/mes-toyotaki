@@ -51,6 +51,7 @@
   const ADMIN_MENU = { label: 'Quản trị', items: [
     { label: 'Tài khoản', href: 'quan-ly-tai-khoan.html' },
     { label: 'Danh mục', href: 'quan-ly-danh-muc.html' },
+    { label: 'Năng lực máy CNC', href: 'nang-luc-cnc.html' },
   ] };
 
   // Tiêu đề chuẩn hoá cho từng trang — 1 nguồn duy nhất, thay cho header tự
@@ -75,6 +76,7 @@
     'intem.html': { icon: '🏷️', title: 'In Tem — Đúc', desc: 'Tạo, tra cứu, sửa, in lại tem' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp' },
     'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin' },
+    'nang-luc-cnc.html': { icon: '🛠️', title: 'Năng Lực Máy Gia Công CNC', desc: 'Quy trình CNC theo SP, forecast tháng, tính số máy cần — chỉ Admin' },
     'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin' },
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách' },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca' },
