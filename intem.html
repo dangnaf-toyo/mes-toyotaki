@@ -246,6 +246,7 @@ textarea{resize:vertical;min-height:48px}
         <button class="btn btn-s" type="button" onclick="saveTemEdit()">💾 Lưu thay đổi</button>
         <button class="btn btn-s" type="button" onclick="reprintTem()">🖨 In lại</button>
         <button class="btn btn-s" type="button" onclick="deleteTem()">🗑 Xóa tem</button>
+        <button class="btn btn-s" type="button" id="btnHoanTacTach" style="display:none" onclick="hoanTacTachTem()">↩ Hoàn tác tách (gộp về tem cha)</button>
       </div>
     </div>
 
@@ -453,6 +454,12 @@ async function findTem(){
     ? "Đã tách: " + children.map(c => c.tag_no_con + " (" + c.so_luong_con + ")").join(", ")
     : "";
 
+  const { data: parentTach } = await sb.from('duc_tem_tach').select('tag_no_cha,so_luong_con').eq('tag_no_con', realTagNo).maybeSingle();
+  document.getElementById("btnHoanTacTach").style.display = parentTach ? "inline-block" : "none";
+  document.getElementById("btnHoanTacTach").title = parentTach
+    ? "Xoá tem này, cộng trả lại " + parentTach.so_luong_con + " pcs về tem cha " + parentTach.tag_no_cha
+    : "";
+
   showMsg("✅ Đã tìm thấy tem " + data[0].tag_no, "ok", 3000);
 }
 
@@ -565,11 +572,24 @@ async function deleteTem(){
   showMsg("✅ Đã xóa tem " + deletedTagNo, "ok", 3000);
 }
 
+async function hoanTacTachTem(){
+  if(!currentTagNo) return err("Tìm tem trước khi hoàn tác");
+  if(!window.confirm("Xoá tem "+currentTagNo+" và cộng trả số lượng về tem cha?\nKhông thể hoàn tác lại thao tác này.")) return;
+  if (!(await requireLoginOrRedirect())) return;
+  showMsg("⏳ Đang hoàn tác tách tem...","wait");
+  const nguoi = g("s_nguoiTT") || (await MesAuth.getSession())?.user?.email || "";
+  const { data: tagCha, error } = await sb.rpc('duc_hoan_tac_tach_tem', { p_tag_no_con: currentTagNo, p_nguoi: nguoi });
+  if (error) return err("Lỗi hoàn tác: " + error.message);
+  showMsg("✅ Đã hoàn tác — cộng trả số lượng về tem cha " + tagCha, "ok", 4000);
+  clearSearch();
+}
+
 function clearSearch(){
   currentTagNo = "";
   document.getElementById("searchTag").value = "";
   document.getElementById("searchResultCard").style.display = "none";
   document.getElementById("tachTemCard").style.display = "none";
+  document.getElementById("btnHoanTacTach").style.display = "none";
 }
 
 // ─── Quét QR trực tiếp qua camera — dùng thư viện html5-qrcode (mebjas), tự
