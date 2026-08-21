@@ -1036,6 +1036,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <div class="modal-foot">
       <span class="hint" id="ei-hint">Mọi thay đổi sẽ được đánh dấu ✎ và log kèm ai + khi nào</span>
       <div class="modal-actions">
+        <button class="btn-outline" style="color:#B91C1C;border-color:#FCA5A5" onclick="deleteIncidentFromEditModal()">🗑 Xoá sự cố</button>
         <button class="btn-outline" onclick="closeModal()">Huỷ</button>
         <button class="btn btn-primary" onclick="submitEditIncident()">Lưu chỉnh sửa</button>
       </div>
@@ -3076,6 +3077,23 @@ async function submitEditIncident(){
       loadShiftState(false);
     } catch (e) { onError(e); }
   }
+}
+
+async function deleteIncidentFromEditModal(){
+  const t = state.currentTarget;
+  if (!t || !t.mode) return;
+  const tag = document.getElementById('ei-tag').textContent;
+  if (!confirm('Xoá hẳn sự cố này của máy ' + tag + '?\nDùng khi nhập nhầm sự cố sang máy khác — không thể hoàn tác.')) return;
+  if (!(await ensureAuthOnSubmit('modal-edit-incident'))) return;
+  showOverlay('Đang xoá sự cố...');
+  try {
+    await rpcWrite('duc_delete_incident', {
+      p_mode: t.mode, p_id_dong: t.id_dong || null, p_id_ban_ghi: t.id_ban_ghi || null, p_user: state.user,
+    });
+    hideOverlay(); closeModal();
+    showToast('✓ Đã xoá sự cố');
+    loadShiftState(false);
+  } catch (e) { onError(e); }
 }
 // =============================================================================
 // Debounce lưu Shot đầu/cuối ca · Shot nóng khuôn · NG · Phân loại NG
