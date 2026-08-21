@@ -8,7 +8,7 @@
   bao-cao-ca.html — tra cứu + in lại báo cáo kết ca của khối Đúc cho 1 ngày/ca
   bất kỳ trong quá khứ. duc-dashboard.html chỉ hiện báo cáo NGAY LÚC kết ca
   (dữ liệu trả về từ RPC duc_end_shift, không lưu lại ở đâu) — nếu trưởng ca
-  quên bấm "In / Lưu PDF" lúc đó thì mất, dù dữ liệu thô vẫn còn trong DB.
+  quên bấm "In" hoặc "Xuất PDF" lúc đó thì mất, dù dữ liệu thô vẫn còn trong DB.
   Trang này dựng lại báo cáo từ dữ liệu ĐÃ LƯU (duc_bao_cao_ca +
   duc_lich_su_san_xuat + duc_su_co_log).
 
@@ -117,13 +117,15 @@
   <div id="reportWrap">
     <div class="top-actions">
       <button type="button" class="outline" onclick="document.getElementById('reportWrap').style.display='none'">✕ Đóng</button>
-      <button type="button" onclick="window.print()">🖨 In / Lưu PDF</button>
+      <button type="button" class="outline" onclick="window.print()">🖨 In</button>
+      <button type="button" onclick="exportReportPdf()">⬇ Xuất PDF</button>
     </div>
     <div class="rpt" id="reportBody"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
@@ -242,6 +244,20 @@ function renderReport(s, lichSuRows, incidents){
     '<div class="note">' + (s.comment_truong_ca ? escapeHtml(s.comment_truong_ca) : '(không có ghi chú)') + '</div>';
 
   document.getElementById('reportBody').innerHTML = html;
+  lastReportName = 'BaoCaoKetCa_' + s.ngay + '_' + String(s.ca).replace(/\s+/g, '') + '.pdf';
+}
+
+let lastReportName = 'BaoCaoKetCa.pdf';
+function exportReportPdf(){
+  const el = document.getElementById('reportBody');
+  html2pdf().set({
+    filename: lastReportName,
+    margin: 10,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] },
+  }).from(el).save();
 }
 
 (function init(){

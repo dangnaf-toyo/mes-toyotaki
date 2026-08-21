@@ -560,10 +560,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div id="wr-result" style="display:none"></div>
     </div>
     <div class="modal-foot">
-      <span class="hint">Sau khi tạo xong, bấm "🖨 In / Lưu PDF" để xuất file gửi kế toán.</span>
+      <span class="hint">Sau khi tạo xong, có thể in trực tiếp hoặc xuất file PDF gửi kế toán.</span>
       <div class="modal-actions">
         <button class="btn-outline" onclick="closeModal()">Đóng</button>
-        <button class="btn-outline" id="wr-btn-print" style="display:none" onclick="window.print()">🖨 In / Lưu PDF</button>
+        <button class="btn-outline" id="wr-btn-print" style="display:none" onclick="window.print()">🖨 In</button>
+        <button class="btn-outline" id="wr-btn-pdf" style="display:none" onclick="exportReportPdf(state.lastWeeklyReportName || 'BaoCaoTuan.pdf', 'wr-result')">⬇ Xuất PDF</button>
         <button class="btn btn-primary" id="wr-btn-generate" onclick="submitWeeklyReport()">Tạo báo cáo</button>
       </div>
     </div>
@@ -721,10 +722,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     </div>
     <div class="modal-body" id="report-preview"></div>
     <div class="modal-foot">
-      <span class="hint">Bấm "🖨 In / Lưu PDF" rồi chọn "Save as PDF" trong hộp thoại in của trình duyệt.</span>
+      <span class="hint">In trực tiếp hoặc xuất file PDF để gửi kế toán.</span>
       <div class="modal-actions">
         <button class="btn-outline" onclick="closeModal()">Đóng</button>
-        <button class="btn btn-primary" onclick="window.print()">🖨 In / Lưu PDF</button>
+        <button class="btn-outline" onclick="window.print()">🖨 In</button>
+        <button class="btn btn-primary" onclick="exportReportPdf(state.lastShiftReportName || 'BaoCaoKetCa.pdf')">⬇ Xuất PDF</button>
       </div>
     </div>
   </div>
@@ -1055,6 +1057,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <div id="print-root"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
@@ -4228,6 +4231,19 @@ async function submitEndShift(){
 // Dữ liệu lấy từ duc_end_shift: {summary, oee_rows, mold_update, carry_over,
 // history_rows} + snapshot dòng/sự cố chụp ngay trước khi gọi RPC.
 // =============================================================================
+function exportReportPdf(filename, sourceElId){
+  const el = document.getElementById(sourceElId || 'report-preview');
+  showOverlay('Đang xuất PDF...');
+  html2pdf().set({
+    filename: filename,
+    margin: 10,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] },
+  }).from(el).save().then(hideOverlay).catch(e => { hideOverlay(); onError(e); });
+}
+
 function renderShiftReport(d, snap){
   const s = d.summary || {};
   const oeeByIdDong = {};
@@ -4334,6 +4350,7 @@ function renderShiftReport(d, snap){
 
   document.getElementById('print-root').innerHTML = html;
   document.getElementById('report-preview').innerHTML = html;
+  state.lastShiftReportName = 'BaoCaoKetCa_' + snap.ngay + '_' + snap.ca.replace(/\s+/g, '') + '.pdf';
 }
 
 // =============================================================================
@@ -4438,6 +4455,8 @@ async function submitWeeklyReport(){
     document.getElementById('wr-result').style.display = '';
     document.getElementById('print-root').innerHTML = html;
     document.getElementById('wr-btn-print').style.display = '';
+    document.getElementById('wr-btn-pdf').style.display = '';
+    state.lastWeeklyReportName = 'BaoCaoTuan_' + tuanSx.replace(/\s+/g, '') + '.pdf';
     showToast('✓ Đã tổng hợp báo cáo tuần ' + tuanSx + ' (' + list.length + ' mã SP)');
   } catch (e) { btn.disabled = false; onError(e); }
 }
