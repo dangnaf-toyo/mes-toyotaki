@@ -125,13 +125,22 @@
   section{margin-bottom:22px;}
   .sec-note{font-size:11.5px;color:var(--tk-muted);margin-top:-8px;margin-bottom:12px;display:block;}
 
-  /* ── Bảng vấn đề & hành động đối ứng ── */
-  #actionTbl input, #actionTbl textarea{width:100%;padding:5px 7px;font-size:12.5px;border:1px solid #ddd0ba;border-radius:5px;}
+  /* ── Bảng vấn đề & hành động đối ứng — dạng lưới kiểu Excel, sát ô ── */
+  #actionTbl{table-layout:fixed;border:1px solid #cbbfa6;}
+  #actionTbl th, #actionTbl td{border:1px solid #ddd0ba;padding:0;}
+  #actionTbl th{padding:5px 6px;white-space:normal;line-height:1.25;}
+  #actionTbl tbody tr:nth-child(even){background:#FBF6EE;}
+  #actionTbl input, #actionTbl textarea{
+    width:100%;height:100%;padding:5px 6px;font-size:12.5px;font-family:inherit;
+    border:none;border-radius:0;background:transparent;display:block;resize:none;line-height:1.3;
+  }
+  #actionTbl textarea{min-height:30px;}
+  #actionTbl input:focus, #actionTbl textarea:focus{outline:2px solid var(--tk-orange);outline-offset:-2px;background:#fff;position:relative;z-index:1;}
   #actionTbl input[type=number]{text-align:right;}
-  #actionTbl td{vertical-align:top;padding:5px 6px;}
-  #actionTbl th{white-space:normal;}
-  .stt-cell{text-align:center;font-weight:700;color:var(--tk-muted);padding-top:10px !important;}
-  .del-btn{background:none;border:none;color:var(--tk-bad);font-size:16px;cursor:pointer;padding:4px 6px;}
+  #actionTbl input[type=date]{padding:4px 4px;}
+  .stt-cell{text-align:center;font-weight:700;color:var(--tk-muted);padding:5px !important;}
+  .del-cell{text-align:center;padding:0 !important;}
+  .del-btn{background:none;border:none;color:var(--tk-bad);font-size:15px;cursor:pointer;padding:5px 6px;line-height:1;}
   .draft-badge{display:inline-block;background:#fbf0d9;color:var(--tk-warn);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
   .saved-badge{display:inline-block;background:#e7f5ea;color:var(--tk-good);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
   .action-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:10px;}
@@ -500,10 +509,10 @@ function renderReport(ctx){
   actionCard.id = 'actionCard';
   actionCard.innerHTML = '<h2>📋 Tổng hợp vấn đề và hành động đối ứng</h2>' +
     '<div id="actionBadge"></div>' +
-    '<div class="tbl-wrap"><table><thead><tr>' +
-    '<th style="width:34px">Stt</th><th style="min-width:150px">Vấn đề</th><th style="width:90px">Số phút dừng</th>' +
-    '<th style="width:80px">%/tổng số</th><th style="min-width:150px">Nguyên nhân</th><th style="min-width:150px">Đối sách</th>' +
-    '<th style="width:120px">Đảm nhiệm</th><th style="width:120px">Thời hạn</th><th style="width:30px"></th>' +
+    '<div class="tbl-wrap"><table id="actionTbl"><thead><tr>' +
+    '<th style="width:32px">Stt</th><th style="width:160px">Vấn đề</th><th style="width:78px">Số phút dừng</th>' +
+    '<th style="width:68px">%/tổng số</th><th style="width:220px">Nguyên nhân</th><th style="width:220px">Đối sách</th>' +
+    '<th style="width:110px">Đảm nhiệm</th><th style="width:106px">Thời hạn</th><th style="width:26px"></th>' +
     '</tr></thead><tbody id="actionTblBody"></tbody></table></div>' +
     '<div class="action-actions">' +
     '<button type="button" class="outline small" id="btnAddRow">+ Thêm dòng</button>' +
@@ -598,11 +607,11 @@ function actionRowHtml(r,i){
     '<td><input type="text" data-f="van_de" value="' + escapeHtml(r.van_de||'') + '"></td>' +
     '<td><input type="number" data-f="so_phut_dung" value="' + (r.so_phut_dung||0) + '"></td>' +
     '<td><input type="number" step="0.1" data-f="ty_le_phan_tram" value="' + (r.ty_le_phan_tram||0) + '"></td>' +
-    '<td><textarea rows="2" data-f="nguyen_nhan">' + escapeHtml(r.nguyen_nhan||'') + '</textarea></td>' +
-    '<td><textarea rows="2" data-f="doi_sach">' + escapeHtml(r.doi_sach||'') + '</textarea></td>' +
+    '<td><textarea rows="1" data-f="nguyen_nhan">' + escapeHtml(r.nguyen_nhan||'') + '</textarea></td>' +
+    '<td><textarea rows="1" data-f="doi_sach">' + escapeHtml(r.doi_sach||'') + '</textarea></td>' +
     '<td><input type="text" data-f="dam_nhiem" value="' + escapeHtml(r.dam_nhiem||'') + '"></td>' +
     '<td><input type="date" data-f="thoi_han" value="' + escapeHtml(r.thoi_han||'') + '"></td>' +
-    '<td><button type="button" class="del-btn" data-del="' + i + '" title="Xoá dòng">✕</button></td>' +
+    '<td class="del-cell"><button type="button" class="del-btn" data-del="' + i + '" title="Xoá dòng">✕</button></td>' +
     '</tr>';
 }
 function bindActionRow(i){
