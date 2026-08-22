@@ -22,6 +22,7 @@
       { label: 'Dashboard Sản lượng', href: 'sanluong-supabase.html' },
       { label: 'Dashboard Chất lượng', href: 'chatluong-supabase.html' },
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
+      { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
     ] },
     { label: 'Sản xuất', items: [
@@ -80,6 +81,7 @@
     'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin' },
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách' },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca' },
+    'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ' },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast' },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng' },
   };

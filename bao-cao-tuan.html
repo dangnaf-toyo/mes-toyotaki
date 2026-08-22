@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo Cáo Sản Xuất Tuần — MES Toyotaki</title>
+<!--
+  bao-cao-tuan.html — báo cáo sản xuất tuần khối Đúc, tự tính TRỰC TIẾP từ
+  duc_bao_cao_ca/duc_su_co_log/duc_lich_su_san_xuat mỗi khi mở (không lưu lại
+  các số này ở đâu — xem tuần nào tính lại tuần đó, luôn khớp dữ liệu gốc).
+
+  Phương án hiện tại chỉ chạy 2 ca 8 tiếng (Ca 1 + Ca 2) — MỌI truy vấn ở đây
+  cố định lọc .in('ca', ['Ca 1','Ca 2']), loại các ca không chuẩn (Ca ngày/Ca
+  đêm) nếu phát sinh trong dữ liệu lịch sử.
+
+  Bảng "Tổng hợp vấn đề và hành động đối ứng" ở cuối trang là phần DUY NHẤT
+  được lưu lại (bảng duc_bao_cao_tuan_van_de, migration T20) — gợi ý tự động
+  từ top mã lỗi của đúng tuần đang xem nếu chưa có bản lưu, biên tập rồi bấm
+  Lưu để giữ lại, xem lại tuần đó sau này sẽ hiện đúng bản đã lưu.
+-->
+<style>
+  :root{
+    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
+    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
+    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-good:#1a7a3a; --tk-warn:#b8862a; --tk-bad:#c0392b;
+    --ca1:#C87941; --ca2:#3E7692;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--tk-black);}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 70px;}
+
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:20px 22px;margin-bottom:22px;}
+  .card h2{font-size:16px;margin:0 0 14px;font-weight:700;border-bottom:1px solid var(--tk-line);padding-bottom:9px;}
+  .card h3{font-size:13.5px;margin:0 0 10px;font-weight:700;color:var(--tk-black);}
+
+  .picker-row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;}
+  .fg{display:flex;flex-direction:column;gap:5px;}
+  label{font-size:11.5px;font-weight:700;color:#5a4c3e;}
+  input,select,textarea{padding:8px 10px;border:1px solid #ccc0aa;border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--tk-black);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--tk-orange);}
+  button{padding:9px 16px;border:none;border-radius:7px;background:var(--tk-orange);color:#fff;font-size:13px;font-weight:700;cursor:pointer;}
+  button:hover:not(:disabled){background:var(--tk-orange-deep);}
+  button:disabled{opacity:.55;cursor:default;}
+  button.outline{background:#fff;color:var(--tk-orange-deep);border:1.5px solid var(--tk-orange);}
+  button.small{padding:5px 10px;font-size:12px;}
+  .week-badge{font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;}
+  .week-badge.live{background:#fbe8cf;color:var(--tk-warn);}
+  .week-badge.done{background:#e7f5ea;color:var(--tk-good);}
+
+  .msg{padding:11px 13px;border-radius:8px;font-size:13px;margin-top:10px;}
+  .msg.error{background:#fbe9e7;color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .msg.info{background:#eef2f6;color:#33465C;border:1px solid #cfd9e3;}
+  .msg.ok{background:#e7f5ea;color:var(--tk-good);border:1px solid #c3e3cc;}
+
+  #reportBody{display:none;}
+
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:20px;}
+  .kpi{background:#fff;border:1px solid var(--tk-line);border-radius:9px;padding:11px 12px;}
+  .kpi .k{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tk-muted);}
+  .kpi .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;font-weight:700;margin-top:3px;}
+  .kpi .s{font-size:11px;color:#6b5c4b;margin-top:2px;}
+  .kpi.bad .v{color:var(--tk-bad);}
+  @media (max-width:820px){ .kpis{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:520px){ .kpis{grid-template-columns:repeat(2,1fr);} }
+
+  .num{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  .tbl-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tk-muted);
+    padding:8px 10px;border-bottom:1px solid var(--tk-line);white-space:nowrap;background:#FBF6EE;}
+  tbody td{padding:7px 10px;border-bottom:1px solid #EFE5D3;vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.num,th.num{text-align:right;}
+  .rowname{font-weight:700;}
+  .rowsub{color:var(--tk-muted);font-size:11.5px;}
+
+  .barcell{display:flex;align-items:center;gap:8px;min-width:160px;}
+  .bartrack{flex:1;height:7px;background:#EFE2CE;border-radius:4px;overflow:hidden;}
+  .barfill{height:100%;border-radius:4px;background:var(--tk-orange);}
+  .barfill.bad{background:var(--tk-bad);}
+  .barval{font-size:12px;color:#6b5c4b;white-space:nowrap;min-width:48px;text-align:right;}
+
+  .pct-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:700;}
+  .pct-good{background:#e7f5ea;color:var(--tk-good);}
+  .pct-warn{background:#fbf0d9;color:var(--tk-warn);}
+  .pct-bad{background:#fbe9e7;color:var(--tk-bad);}
+
+  .priority-box{background:#FBF0E2;border:1px solid var(--tk-orange);border-radius:9px;padding:14px 16px 12px;margin-top:14px;}
+  .priority-box .ph{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tk-orange-deep);margin-bottom:9px;}
+  .priority-box ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .priority-box li{display:flex;gap:10px;align-items:flex-start;font-size:13px;}
+  .prank{flex:none;width:20px;height:20px;border-radius:50%;background:var(--tk-orange);color:#fff;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;font-family:'JetBrains Mono',monospace;}
+  .priority-box b{color:var(--tk-black);}
+  .priority-box .pm{color:#6b5c4b;font-size:12px;}
+
+  .daytrend{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+  .day{border:1px solid var(--tk-line);border-radius:8px;padding:10px 10px 12px;background:#fff;}
+  .day.today{border-color:var(--tk-warn);background:#FEF8EC;}
+  .day-date{font-size:11.5px;font-weight:700;color:#4a3f33;}
+  .day-wd{font-size:10.5px;color:var(--tk-muted);text-transform:uppercase;}
+  .day-bars{display:flex;align-items:flex-end;gap:4px;height:60px;margin:8px 0 6px;}
+  .day-bar{flex:1;border-radius:3px 3px 0 0;}
+  .day-bar.kh{background:#EFE2CE;}
+  .day-bar.tt{background:var(--tk-orange);}
+  .day-ht{font-size:10.5px;color:var(--tk-muted);}
+  .day-ht b{color:#4a3f33;}
+  @media (max-width:820px){ .daytrend{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:520px){ .daytrend{grid-template-columns:repeat(2,1fr);} }
+
+  .ca-legend{display:flex;gap:18px;font-size:12px;color:#5a4c3e;margin-bottom:12px;}
+  .sw{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:-1px;}
+  .ca-row{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid #EFE5D3;}
+  .ca-row:last-child{border-bottom:none;}
+  .ca-metric{font-size:12px;font-weight:700;color:#5a4c3e;}
+  .ca-bar-line{display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+  .ca-bar-line:last-child{margin-bottom:0;}
+  .ca-tag{width:44px;font-size:10.5px;font-weight:700;text-align:right;font-family:'JetBrains Mono',monospace;}
+  .ca-tag.c1{color:var(--ca1);} .ca-tag.c2{color:var(--ca2);}
+  .ca-track{flex:1;height:12px;background:#EFE2CE;border-radius:4px;overflow:hidden;}
+  .ca-fill{height:100%;border-radius:4px;}
+  .ca-fill.c1{background:var(--ca1);} .ca-fill.c2{background:var(--ca2);}
+  .ca-val{width:88px;font-size:12px;text-align:right;}
+
+  section{margin-bottom:22px;}
+  .sec-note{font-size:11.5px;color:var(--tk-muted);margin-top:-8px;margin-bottom:12px;display:block;}
+
+  /* ── Bảng vấn đề & hành động đối ứng ── */
+  #actionTbl input, #actionTbl textarea{width:100%;padding:5px 7px;font-size:12.5px;border:1px solid #ddd0ba;border-radius:5px;}
+  #actionTbl input[type=number]{text-align:right;}
+  #actionTbl td{vertical-align:top;padding:5px 6px;}
+  #actionTbl th{white-space:normal;}
+  .stt-cell{text-align:center;font-weight:700;color:var(--tk-muted);padding-top:10px !important;}
+  .del-btn{background:none;border:none;color:var(--tk-bad);font-size:16px;cursor:pointer;padding:4px 6px;}
+  .draft-badge{display:inline-block;background:#fbf0d9;color:var(--tk-warn);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
+  .saved-badge{display:inline-block;background:#e7f5ea;color:var(--tk-good);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
+  .action-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:10px;}
+
+  footer.note{margin-top:26px;padding-top:14px;border-top:1px solid var(--tk-line);font-size:11.5px;color:var(--tk-muted);line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="card" id="pickerCard">
+    <h2>Chọn tuần</h2>
+    <div class="picker-row">
+      <div class="fg">
+        <label for="fMonday">Chọn 1 ngày trong tuần cần xem</label>
+        <input type="date" id="fMonday">
+      </div>
+      <button type="button" class="outline" id="btnPrevWeek">◀ Tuần trước</button>
+      <button type="button" class="outline" id="btnThisWeek">Tuần này</button>
+      <button type="button" class="outline" id="btnNextWeek">Tuần sau ▶</button>
+      <span id="weekBadge"></span>
+    </div>
+    <div class="msg" id="pageMsg" style="display:none"></div>
+  </div>
+
+  <div id="reportBody"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function fmtVN(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); }
+function addDays(d,n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function mondayOf(d){ const r = new Date(d); const wd = (r.getDay()+6)%7; return addDays(r,-wd); }
+function fmtNum(n){ return Math.round(Number(n)||0).toLocaleString('vi-VN'); }
+function fmtPct(n){ return (Number(n)||0).toFixed(1).replace('.',',')+'%'; }
+function escapeHtml(s){
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function pctPillClass(p){ return p >= 80 ? 'pct-good' : (p >= 65 ? 'pct-warn' : 'pct-bad'); }
+function normLoai(s){ return (s||'').replace(/\s*[-—–]\s*/g, ' - ').trim(); }
+function issueCode(s){ const m = normLoai(s).match(/^([A-Za-z]\d+)/); return m ? m[1] : (normLoai(s) || '(không rõ)'); }
+function isoWeekNum(d){
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (t.getUTCDay() + 6) % 7;
+  t.setUTCDate(t.getUTCDate() - dayNum + 3);
+  const firstThu = new Date(Date.UTC(t.getUTCFullYear(),0,4));
+  return 1 + Math.round(((t - firstThu) / 86400000 - 3 + (firstThu.getUTCDay()+6)%7) / 7);
+}
+function sumBy(arr, f){ return arr.reduce((s,r) => s + (f(r) || 0), 0); }
+function groupBy(arr, keyFn){
+  const m = new Map();
+  for (const r of arr){ const k = keyFn(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); }
+  return m;
+}
+function top3VanDe(rows){
+  const g = groupBy(rows, r => (r.van_de && r.van_de.trim()) || '(không ghi nội dung xử lý)');
+  const items = [...g.entries()].map(([label, rs]) => ({ label, phut: sumBy(rs, r=>r.thoi_gian_dung_phut), count: rs.length }));
+  items.sort((a,b) => b.phut - a.phut);
+  return items.slice(0,3);
+}
+
+// ── State ────────────────────────────────────────────────────────────────
+let currentMonday = null;
+let actionRows = [];      // dòng bảng hành động đang hiển thị (chỉnh sửa được)
+let actionRowsSaved = false; // đã có bản lưu trong Supabase cho tuần này chưa
+
+// ── Load & compute ──────────────────────────────────────────────────────
+async function loadWeek(monday){
+  currentMonday = monday;
+  const saturday = addDays(monday, 5);
+  const from = fmtISO(monday), to = fmtISO(saturday);
+  const todayISO = fmtISO(new Date());
+  const isCurrentWeek = todayISO >= from && todayISO <= to;
+
+  document.getElementById('fMonday').value = from;
+  document.getElementById('weekBadge').innerHTML = isCurrentWeek
+    ? '<span class="week-badge live">Tuần hiện tại — đang chạy</span>'
+    : '<span class="week-badge done">Đã hoàn tất</span>';
+  showMsg('info', '⏳ Đang tải dữ liệu tuần ' + fmtVN(monday) + ' – ' + fmtVN(saturday) + '…');
+  document.getElementById('reportBody').style.display = 'none';
+
+  const [bccRes, sucoRes, lssxRes, chtRes, actionRes] = await Promise.all([
+    sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
+      .gte('ngay', from).lte('ngay', to).in('ca', ['Ca 1','Ca 2']),
+    sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,van_de,truong_ca')
+      .gte('ngay', from).lte('ngay', to).in('ca', ['Ca 1','Ca 2']),
+    sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
+      .gte('ngay', from).lte('ngay', to).in('ca', ['Ca 1','Ca 2']),
+    isCurrentWeek
+      ? sb.from('duc_ca_hien_tai').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
+          .eq('ngay', todayISO).in('ca', ['Ca 1','Ca 2'])
+      : Promise.resolve({ data: [] }),
+    sb.from('duc_bao_cao_tuan_van_de').select('*').eq('tuan_bat_dau', from).order('stt'),
+  ]);
+
+  if (bccRes.error || sucoRes.error || lssxRes.error) {
+    showMsg('error', 'Lỗi tải dữ liệu: ' + (bccRes.error || sucoRes.error || lssxRes.error).message);
+    return;
+  }
+
+  const bcc = bccRes.data || [];
+  const suco = sucoRes.data || [];
+  const lssx = lssxRes.data || [];
+  let cht = chtRes.data || [];
+  // tránh đếm trùng: chỉ lấy phần Ca đang chạy dở HÔM NAY (ca chưa có bản ghi kết ca)
+  const closedCaToday = new Set(bcc.filter(r => r.ngay === todayISO).map(r => r.ca));
+  cht = cht.filter(r => !closedCaToday.has(r.ca));
+
+  renderReport({ monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht });
+
+  actionRows = (actionRes.data || []).map(r => ({ ...r }));
+  actionRowsSaved = actionRows.length > 0;
+  if (!actionRowsSaved) actionRows = suggestActionRows(suco);
+  renderActionTable();
+
+  hideMsg();
+  document.getElementById('reportBody').style.display = 'block';
+}
+
+function computeAll(ctx){
+  const { monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht } = ctx;
+
+  // ── theo ngày ──
+  const days = [];
+  for (let i = 0; i < 6; i++){
+    const d = addDays(monday, i);
+    const iso = fmtISO(d);
+    const rowsBcc = bcc.filter(r => r.ngay === iso);
+    let kh = sumBy(rowsBcc, r => r.tong_kh_ca), tt = sumBy(rowsBcc, r => r.tong_tt_ca);
+    let sc = sumBy(rowsBcc, r => r.so_su_co_ca), phut = sumBy(rowsBcc, r => r.tong_phut_dung_ca), ng = sumBy(rowsBcc, r => r.tong_ng_ca);
+    const isToday = isCurrentWeek && iso === todayISO;
+    if (isToday){
+      const chtDay = cht.filter(r => r.ngay === iso);
+      kh += sumBy(chtDay, r => r.kh_ca); tt += sumBy(chtDay, r => r.tt_ca);
+    }
+    const isFuture = iso > todayISO;
+    days.push({ date: d, iso, kh, tt, htPct: kh > 0 ? tt/kh*100 : 0, sc, phut, ng, isToday, isFuture });
+  }
+  const maxKh = Math.max(1, ...days.filter(d=>!d.isFuture).map(d => d.kh));
+
+  // ── KPI tuần (chỉ ca đã kết ca) ──
+  const totalKh = sumBy(bcc, r=>r.tong_kh_ca), totalTt = sumBy(bcc, r=>r.tong_tt_ca);
+  const totalSc = sumBy(bcc, r=>r.so_su_co_ca), totalPhut = sumBy(bcc, r=>r.tong_phut_dung_ca), totalNg = sumBy(bcc, r=>r.tong_ng_ca);
+  const shiftHtList = bcc.filter(r=>r.tong_kh_ca>0).map(r=>r.tong_tt_ca/r.tong_kh_ca*100);
+  const avgHt = shiftHtList.length ? sumBy(shiftHtList.map(v=>({v})), r=>r.v)/shiftHtList.length : 0;
+  const nDaysClosed = new Set(bcc.map(r=>r.ngay)).size;
+
+  // ── 3 ca yếu nhất ──
+  const worstShifts = bcc.filter(r=>r.tong_kh_ca>0)
+    .map(r => ({ ...r, ht: r.tong_tt_ca/r.tong_kh_ca*100 }))
+    .sort((a,b) => a.ht - b.ht).slice(0,3);
+
+  // ── Ca 1 vs Ca 2 ──
+  const caGroups = groupBy(bcc, r=>r.ca);
+  function caStat(ca){
+    const rs = caGroups.get(ca) || [];
+    const kh = sumBy(rs,r=>r.tong_kh_ca), tt = sumBy(rs,r=>r.tong_tt_ca);
+    return { n: rs.length, kh, tt, ht: kh>0?tt/kh*100:0, phut: sumBy(rs,r=>r.tong_phut_dung_ca),
+      sc: sumBy(rs,r=>r.so_su_co_ca), scPerCa: rs.length? sumBy(rs,r=>r.so_su_co_ca)/rs.length:0, ng: sumBy(rs,r=>r.tong_ng_ca) };
+  }
+  const ca1 = caStat('Ca 1'), ca2 = caStat('Ca 2');
+
+  // ── Đổi khuôn theo trưởng ca ──
+  const c3rows = suco.filter(r => issueCode(r.loai_su_co) === 'C3');
+  const c3ByLead = groupBy(c3rows, r => r.truong_ca || '(không rõ)');
+  const changeover = [...c3ByLead.entries()].map(([lead, rs]) => ({
+    lead, count: rs.length, phut: sumBy(rs, r=>r.thoi_gian_dung_phut), avg: rs.length? sumBy(rs,r=>r.thoi_gian_dung_phut)/rs.length : 0,
+    rows: rs.slice().sort((a,b)=> a.ngay.localeCompare(b.ngay)),
+  })).sort((a,b)=> b.phut - a.phut);
+
+  // ── Dừng máy theo máy ──
+  const byMay = groupBy(suco, r=>r.ma_may);
+  const downtimeMachine = [...byMay.entries()].map(([ma_may, rs]) => ({
+    ma_may, phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs),
+  })).sort((a,b)=> b.phut - a.phut);
+  const totalDowntimeSuco = sumBy(suco, r=>r.thoi_gian_dung_phut);
+
+  // ── Dừng máy theo loại vấn đề (gộp mã trùng, ưu tiên nhãn có mô tả dài nhất) ──
+  const byIssue = groupBy(suco, r=>issueCode(r.loai_su_co));
+  const downtimeIssue = [...byIssue.entries()].map(([code, rs]) => {
+    let label = code;
+    for (const r of rs){ const l = normLoai(r.loai_su_co); if (l.length > label.length) label = l; }
+    return { code, label, phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs) };
+  }).sort((a,b)=> b.phut - a.phut);
+
+  // ── Dừng máy theo mã SP ──
+  const bySp = groupBy(suco, r=>r.ma_sp || '(không rõ)');
+  const downtimeProduct = [...bySp.entries()].map(([ma_sp, rs]) => ({
+    ma_sp, ten_sp: rs[0].ten_sp || '', phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs),
+  })).sort((a,b)=> b.phut - a.phut);
+
+  // ── Sản lượng theo máy / mã SP (lssx + cht hôm nay) ──
+  const prodRows = lssx.concat(cht);
+  const prodByMay = groupBy(prodRows, r=>r.ma_may);
+  const prodMachine = [...prodByMay.entries()].map(([ma_may, rs]) => {
+    const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
+    return { ma_may, kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
+  }).sort((a,b)=> b.kh - a.kh);
+  const prodBySp = groupBy(prodRows, r=>r.ma_sp);
+  const prodProduct = [...prodBySp.entries()].map(([ma_sp, rs]) => {
+    const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
+    return { ma_sp, ten_sp: rs[0].ten_sp || '', kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
+  }).sort((a,b)=> b.kh - a.kh);
+
+  return { days, maxKh, totalKh, totalTt, totalSc, totalPhut, totalNg, avgHt, nDaysClosed, worstShifts,
+    ca1, ca2, changeover, downtimeMachine, downtimeIssue, downtimeProduct, totalDowntimeSuco, prodMachine, prodProduct };
+}
+
+// ── Render ───────────────────────────────────────────────────────────────
+function renderReport(ctx){
+  const c = computeAll(ctx);
+  const weekNo = isoWeekNum(ctx.monday);
+
+  let html = '';
+  html += '<div class="card"><h2>Tuần ' + weekNo + ' — ' + escapeHtml(fmtVN(ctx.monday)) + ' đến ' + escapeHtml(fmtVN(ctx.saturday)) + '</h2>';
+  html += '<div class="kpis">' +
+    kpi('Kế hoạch tuần', fmtNum(c.totalKh), c.nDaysClosed + ' ngày đã kết ca', '') +
+    kpi('Thực tế tuần', fmtNum(c.totalTt), fmtPct(c.totalKh>0?c.totalTt/c.totalKh*100:0) + ' kế hoạch', '') +
+    kpi('Hoàn thành KH bình quân', fmtPct(c.avgHt), 'trung bình mỗi ca', '') +
+    kpi('Thời gian dừng', fmtNum(c.totalPhut) + "'", (c.totalPhut/60).toFixed(1) + ' giờ · ' + fmtNum(c.totalSc) + ' sự cố', 'bad') +
+    kpi('Sản phẩm lỗi (NG)', fmtNum(c.totalNg), '', '') +
+    kpi('Sự cố / ngày', c.nDaysClosed ? (c.totalSc/c.nDaysClosed).toFixed(1).replace('.',',') : '0', 'trung bình ' + c.nDaysClosed + ' ngày', '') +
+  '</div></div>';
+
+  // Diễn biến theo ngày
+  html += '<div class="card"><h3>Diễn biến theo ngày</h3><span class="sec-note">Kế hoạch so với thực tế, chỉ Ca 1 + Ca 2</span>';
+  html += '<div class="daytrend">' + c.days.map(d => {
+    const khH = Math.round(d.kh/c.maxKh*100), ttH = Math.round(d.tt/c.maxKh*100);
+    const wd = ['Chủ Nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'][d.date.getDay()];
+    if (d.isFuture) return '<div class="day"><div class="day-date">' + pad(d.date.getDate())+'/'+pad(d.date.getMonth()+1) + '</div><div class="day-wd">' + wd + '</div><div style="height:60px;margin:8px 0 6px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:11px">chưa tới</div></div>';
+    return '<div class="day' + (d.isToday?' today':'') + '"><div class="day-date">' + pad(d.date.getDate())+'/'+pad(d.date.getMonth()+1) + '</div><div class="day-wd">' + wd + (d.isToday?' · đang chạy':'') + '</div>' +
+      '<div class="day-bars"><div class="day-bar kh" style="height:' + khH + '%"></div><div class="day-bar tt" style="height:' + ttH + '%"></div></div>' +
+      '<div class="day-ht">' + (d.isToday ? 'tạm tính' : 'HT <b>' + fmtPct(d.htPct) + '</b>') + '</div></div>';
+  }).join('') + '</div>';
+  if (c.worstShifts.length) {
+    html += priorityBox('3 ca yếu nhất tuần — ưu tiên xem lại', c.worstShifts.map(s =>
+      '<b>' + escapeHtml(s.ca) + ' · ' + escapeHtml(fmtVN(new Date(s.ngay+'T00:00:00'))) + '</b> (' + escapeHtml(s.truong_ca||'—') + ')' +
+      ' <span class="pm">— hoàn thành ' + fmtPct(s.ht) + ' KH, ' + fmtNum(s.so_su_co_ca) + ' sự cố, ' + fmtNum(s.tong_phut_dung_ca) + "' dừng máy</span>"));
+  }
+  html += '</div>';
+
+  // Sản lượng theo mã SP
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2</span>';
+  html += tableWrap(['Mã SP','Tên sản phẩm','Kế hoạch','Thực tế','Hoàn thành'],
+    c.prodProduct.slice(0,12).map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
+      '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
+      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>').join(''));
+  const spByShort = c.prodProduct.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
+  if (spByShort.length) html += priorityBox('3 mã sản phẩm ưu tiên xử lý — theo sản lượng thiếu hụt', spByShort.map(p =>
+    '<b>' + escapeHtml(p.ma_sp) + ' · ' + escapeHtml(p.ten_sp) + '</b> <span class="pm">— thiếu ' + fmtNum(p.shortfall) + ' sản phẩm, đạt ' + fmtPct(p.ht) + ' KH</span>'));
+  html += '</div>';
+
+  // Sản lượng theo máy
+  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2</span>';
+  html += tableWrap(['Máy','Kế hoạch','Thực tế','Hoàn thành','NG'],
+    c.prodMachine.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_may) + '</td>' +
+      '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
+      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td><td class="num">' + fmtNum(p.ng) + '</td></tr>').join(''));
+  const maByShort = c.prodMachine.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
+  if (maByShort.length) html += priorityBox('3 máy ưu tiên xử lý — theo sản lượng thiếu hụt', maByShort.map(p =>
+    '<b>' + escapeHtml(p.ma_may) + '</b> <span class="pm">— thiếu ' + fmtNum(p.shortfall) + ' sản phẩm, đạt ' + fmtPct(p.ht) + ' KH</span>'));
+  html += '</div>';
+
+  // So sánh Ca 1 / Ca 2
+  html += '<div class="card"><h3>So sánh hiệu suất Ca 1 và Ca 2</h3><span class="sec-note">' + c.ca1.n + ' ca Ca 1, ' + c.ca2.n + ' ca Ca 2 — chỉ ca đã kết ca</span>';
+  html += '<div class="ca-legend"><span><span class="sw" style="background:var(--ca1)"></span><b>Ca 1</b> — ' + fmtNum(c.ca1.kh) + ' KH</span>' +
+    '<span><span class="sw" style="background:var(--ca2)"></span><b>Ca 2</b> — ' + fmtNum(c.ca2.kh) + ' KH</span></div>';
+  const maxHt = Math.max(c.ca1.ht, c.ca2.ht, 1), maxPhut = Math.max(c.ca1.phut, c.ca2.phut, 1), maxSc = Math.max(c.ca1.scPerCa, c.ca2.scPerCa, .1);
+  html += caRow('Hoàn thành KH', c.ca1.ht/maxHt*100, fmtPct(c.ca1.ht), c.ca2.ht/maxHt*100, fmtPct(c.ca2.ht));
+  html += caRow('Phút dừng máy', c.ca1.phut/maxPhut*100, fmtNum(c.ca1.phut)+"'", c.ca2.phut/maxPhut*100, fmtNum(c.ca2.phut)+"'");
+  html += caRow('Số sự cố / ca', c.ca1.scPerCa/maxSc*100, c.ca1.scPerCa.toFixed(1).replace('.',',')+' lượt', c.ca2.scPerCa/maxSc*100, c.ca2.scPerCa.toFixed(1).replace('.',',')+' lượt');
+  html += caRow('NG (sản phẩm)', c.ca1.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca1.ng), c.ca2.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca2.ng));
+  html += '</div>';
+
+  // Đổi khuôn theo trưởng ca
+  html += '<div class="card"><h3>Thời gian đổi khuôn trung bình theo trưởng ca</h3><span class="sec-note">Mã lỗi C3 — Đổi khuôn, gộp theo người ghi nhận trong nhật ký sự cố</span>';
+  if (c.changeover.length === 0) {
+    html += '<div class="rowsub">Không có lượt đổi khuôn nào trong tuần.</div>';
+  } else {
+    html += tableWrap(['Trưởng ca','Số lần','Tổng phút','TB mỗi lần'],
+      c.changeover.map(x => '<tr><td class="rowname">' + escapeHtml(x.lead) + '</td><td class="num">' + x.count + '</td>' +
+        '<td class="num">' + fmtNum(x.phut) + "'</td><td class=\"num\">" + x.avg.toFixed(1).replace('.',',') + "'</td></tr>").join(''));
+  }
+  html += '</div>';
+
+  // Dừng máy theo máy
+  html += '<div class="card"><h3>Thời gian dừng theo máy</h3><span class="sec-note">Tổng ' + fmtNum(c.totalDowntimeSuco) + " phút · " + fmtNum(sumBy(c.downtimeMachine,x=>x.count)) + ' lượt sự cố</span>';
+  const maxMachinePhut = Math.max(1, ...c.downtimeMachine.map(x=>x.phut));
+  html += tableWrap(['Máy','Phút dừng','Lượt','Tỉ trọng'], c.downtimeMachine.map(x =>
+    '<tr><td class="rowname">' + escapeHtml(x.ma_may) + '</td><td>' + barCell(x.phut, maxMachinePhut) + '</td>' +
+    '<td class="num">' + x.count + '</td><td class="num">' + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + '</td></tr>').join(''));
+  if (c.downtimeMachine.length) html += priorityBox('3 máy ưu tiên xử lý', c.downtimeMachine.slice(0,3).map(x =>
+    '<b>' + escapeHtml(x.ma_may) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + x.count + ' lượt), nguyên nhân hàng đầu: ' + escapeHtml(x.top3[0]?.label||'—') + ' (' + fmtNum(x.top3[0]?.phut||0) + "')</span>"));
+  html += '</div>';
+
+  // Dừng máy theo loại vấn đề
+  html += '<div class="card"><h3>Thời gian dừng theo chủng loại vấn đề</h3><span class="sec-note">Xếp theo tổng phút dừng</span>';
+  const maxIssuePhut = Math.max(1, ...c.downtimeIssue.map(x=>x.phut));
+  html += tableWrap(['Mã lỗi','Phút dừng','Lượt','Tỉ trọng'], c.downtimeIssue.map(x =>
+    '<tr><td class="rowname">' + escapeHtml(x.label) + '</td><td>' + barCell(x.phut, maxIssuePhut) + '</td>' +
+    '<td class="num">' + x.count + '</td><td class="num">' + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + '</td></tr>').join(''));
+  if (c.downtimeIssue.length) html += priorityBox('3 loại vấn đề ưu tiên xử lý', c.downtimeIssue.slice(0,3).map(x =>
+    '<b>' + escapeHtml(x.label) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + '), nguyên nhân hàng đầu: ' + escapeHtml(x.top3[0]?.label||'—') + '</span>'));
+  html += '</div>';
+
+  // Dừng máy theo mã SP
+  html += '<div class="card"><h3>Thời gian dừng theo mã sản phẩm</h3><span class="sec-note">10 mã có phút dừng cao nhất tuần</span>';
+  const maxProdPhut = Math.max(1, ...c.downtimeProduct.map(x=>x.phut));
+  html += tableWrap(['Mã SP','Tên sản phẩm','Phút dừng','Lượt'], c.downtimeProduct.slice(0,10).map(x =>
+    '<tr><td class="rowname">' + escapeHtml(x.ma_sp) + '</td><td class="rowsub">' + escapeHtml(x.ten_sp) + '</td>' +
+    '<td>' + barCell(x.phut, maxProdPhut) + '</td><td class="num">' + x.count + '</td></tr>').join(''));
+  if (c.downtimeProduct.length) html += priorityBox('3 mã sản phẩm ưu tiên xử lý', c.downtimeProduct.slice(0,3).map(x =>
+    '<b>' + escapeHtml(x.ma_sp) + ' · ' + escapeHtml(x.ten_sp) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + x.count + ' lượt)</span>'));
+  html += '</div>';
+
+  document.getElementById('reportBody').innerHTML = html;
+
+  // gắn lại footer + bảng hành động (được render riêng, ngoài innerHTML này)
+  const foot = document.createElement('footer');
+  foot.className = 'note';
+  foot.innerHTML = 'Nguồn: duc_bao_cao_ca · duc_su_co_log · duc_lich_su_san_xuat' + (ctx.isCurrentWeek ? ' · duc_ca_hien_tai (phần đang chạy hôm nay, tạm tính)' : '') +
+    '. Chỉ tính Ca 1 + Ca 2 theo phương án 2 ca 8 tiếng hiện tại. KPI đầu trang chỉ gồm các ca đã kết ca; bảng dừng máy chi tiết dùng nhật ký sự cố nên có thể bao gồm cả sự cố của ca đang chạy hôm nay.';
+
+  const actionCard = document.createElement('div');
+  actionCard.className = 'card';
+  actionCard.id = 'actionCard';
+  actionCard.innerHTML = '<h2>📋 Tổng hợp vấn đề và hành động đối ứng</h2>' +
+    '<div id="actionBadge"></div>' +
+    '<div class="tbl-wrap"><table><thead><tr>' +
+    '<th style="width:34px">Stt</th><th style="min-width:150px">Vấn đề</th><th style="width:90px">Số phút dừng</th>' +
+    '<th style="width:80px">%/tổng số</th><th style="min-width:150px">Nguyên nhân</th><th style="min-width:150px">Đối sách</th>' +
+    '<th style="width:120px">Đảm nhiệm</th><th style="width:120px">Thời hạn</th><th style="width:30px"></th>' +
+    '</tr></thead><tbody id="actionTblBody"></tbody></table></div>' +
+    '<div class="action-actions">' +
+    '<button type="button" class="outline small" id="btnAddRow">+ Thêm dòng</button>' +
+    '<button type="button" id="btnSaveAction">💾 Lưu vào Supabase</button>' +
+    '</div><div class="msg" id="actionMsg" style="display:none"></div>';
+
+  document.getElementById('reportBody').appendChild(actionCard);
+  document.getElementById('reportBody').appendChild(foot);
+
+  document.getElementById('btnAddRow').onclick = () => { actionRows.push(blankActionRow()); renderActionTable(); };
+  document.getElementById('btnSaveAction').onclick = saveActionRows;
+}
+
+function kpi(label, val, sub, cls){
+  return '<div class="kpi' + (cls?(' '+cls):'') + '"><div class="k">' + escapeHtml(label) + '</div><div class="v num">' + val + '</div><div class="s">' + escapeHtml(sub) + '</div></div>';
+}
+function tableWrap(headers, rowsHtml){
+  return '<div class="tbl-wrap"><table><thead><tr>' + headers.map((h,i) => '<th' + (i>1?' class="num"':'') + '>' + h + '</th>').join('') +
+    '</tr></thead><tbody>' + (rowsHtml || '<tr><td colspan="' + headers.length + '" class="rowsub" style="font-style:italic">Không có dữ liệu.</td></tr>') + '</tbody></table></div>';
+}
+function barCell(val, max){
+  const w = Math.max(2, Math.round(val/max*100));
+  return '<div class="barcell"><div class="bartrack"><div class="barfill" style="width:' + w + '%"></div></div><span class="barval num">' + fmtNum(val) + "'</span></div>";
+}
+function priorityBox(title, itemsHtml){
+  return '<div class="priority-box"><div class="ph">🎯 ' + escapeHtml(title) + '</div><ol>' +
+    itemsHtml.map((h,i) => '<li><span class="prank">' + (i+1) + '</span><div>' + h + '</div></li>').join('') + '</ol></div>';
+}
+function caRow(label, w1, v1, w2, v2){
+  return '<div class="ca-row"><div class="ca-metric">' + escapeHtml(label) + '</div><div>' +
+    '<div class="ca-bar-line"><span class="ca-tag c1">Ca 1</span><div class="ca-track"><div class="ca-fill c1" style="width:' + Math.max(2,w1) + '%"></div></div><span class="ca-val num">' + v1 + '</span></div>' +
+    '<div class="ca-bar-line"><span class="ca-tag c2">Ca 2</span><div class="ca-track"><div class="ca-fill c2" style="width:' + Math.max(2,w2) + '%"></div></div><span class="ca-val num">' + v2 + '</span></div>' +
+    '</div></div>';
+}
+
+// ── Bảng vấn đề & hành động đối ứng ─────────────────────────────────────
+const COUNTERMEASURE_HINT = {
+  'B1': ['Rà soát nhiệt độ khuôn / vệ sinh khuôn định kỳ, kiểm tra quy trình đúc', 'Tổ trưởng Đúc / QC'],
+  'C3': ['Chuẩn hoá quy trình chuẩn bị khuôn trước khi đổi ca, kiểm tra sẵn khuôn kế tiếp', 'Tổ trưởng Đúc / Kỹ thuật khuôn'],
+  'A2': ['Kiểm tra bảo trì khuôn định kỳ, xử lý dứt điểm lỗi cơ khí khuôn', 'Bảo trì khuôn'],
+  'A1': ['Bảo trì phòng ngừa máy đúc theo lịch, kiểm tra thiết bị trước ca', 'Bảo trì máy'],
+  'C2': ['Rà soát kế hoạch tiếp liệu, phối hợp kho NVL để tránh gián đoạn', 'Kho NVL / Điều độ'],
+  'C1': ['Xem xét ổn định kế hoạch sản xuất, hạn chế thay đổi đột xuất giữa ca', 'Kế hoạch sản xuất'],
+  'D1': ['Rà soát định biên nhân sự theo ca, có phương án dự phòng nghỉ đột xuất', 'Quản lý nhân sự / Tổ trưởng ca'],
+  'E2': ['Sắp xếp vệ sinh vào thời điểm ít ảnh hưởng kế hoạch, rút ngắn thời gian vệ sinh', 'Tổ trưởng ca'],
+  'F1': ['Phối hợp IPQC xử lý dứt điểm hạng mục không đạt, xem lại checklist tuần kiểm', 'QC / IPQC'],
+};
+function suggestActionRows(suco){
+  const byIssue = groupBy(suco, r=>issueCode(r.loai_su_co));
+  const total = sumBy(suco, r=>r.thoi_gian_dung_phut) || 1;
+  const items = [...byIssue.entries()].map(([code, rs]) => {
+    let label = code;
+    for (const r of rs){ const l = normLoai(r.loai_su_co); if (l.length > label.length) label = l; }
+    const phut = sumBy(rs, r=>r.thoi_gian_dung_phut);
+    const top1 = top3VanDe(rs)[0];
+    const hint = COUNTERMEASURE_HINT[code] || ['Xác định nguyên nhân gốc, đề xuất đối sách phù hợp', 'Tổ trưởng ca'];
+    const deadline = addDays(currentMonday, 7);
+    return {
+      id: null, tuan_bat_dau: fmtISO(currentMonday), stt: 0, van_de: label,
+      so_phut_dung: phut, ty_le_phan_tram: Math.round(phut/total*1000)/10,
+      nguyen_nhan: top1 ? (top1.label + ' (' + fmtNum(top1.phut) + "', " + top1.count + ' lượt)') : '',
+      doi_sach: hint[0], dam_nhiem: hint[1], thoi_han: fmtISO(deadline),
+    };
+  }).sort((a,b) => b.so_phut_dung - a.so_phut_dung);
+  items.forEach((r,i) => r.stt = i+1);
+  return items;
+}
+function blankActionRow(){
+  return { id: null, tuan_bat_dau: fmtISO(currentMonday), stt: actionRows.length+1, van_de: '', so_phut_dung: 0,
+    ty_le_phan_tram: 0, nguyen_nhan: '', doi_sach: '', dam_nhiem: '', thoi_han: '' };
+}
+function renderActionTable(){
+  const badge = document.getElementById('actionBadge');
+  badge.innerHTML = actionRowsSaved
+    ? '<span class="saved-badge">✓ Đã lưu — dữ liệu này là bản đã chỉnh sửa/lưu cho tuần này</span>'
+    : '<span class="draft-badge">✎ Gợi ý tự động — chưa lưu, hãy chỉnh sửa rồi bấm Lưu</span>';
+  const tbody = document.getElementById('actionTblBody');
+  tbody.innerHTML = actionRows.map((r,i) => actionRowHtml(r,i)).join('') ||
+    '<tr><td colspan="9" class="rowsub" style="font-style:italic;text-align:center;padding:14px">Chưa có dòng nào — bấm "+ Thêm dòng" để bắt đầu.</td></tr>';
+  actionRows.forEach((r,i) => bindActionRow(i));
+}
+function actionRowHtml(r,i){
+  return '<tr data-i="' + i + '">' +
+    '<td class="stt-cell">' + (i+1) + '</td>' +
+    '<td><input type="text" data-f="van_de" value="' + escapeHtml(r.van_de||'') + '"></td>' +
+    '<td><input type="number" data-f="so_phut_dung" value="' + (r.so_phut_dung||0) + '"></td>' +
+    '<td><input type="number" step="0.1" data-f="ty_le_phan_tram" value="' + (r.ty_le_phan_tram||0) + '"></td>' +
+    '<td><textarea rows="2" data-f="nguyen_nhan">' + escapeHtml(r.nguyen_nhan||'') + '</textarea></td>' +
+    '<td><textarea rows="2" data-f="doi_sach">' + escapeHtml(r.doi_sach||'') + '</textarea></td>' +
+    '<td><input type="text" data-f="dam_nhiem" value="' + escapeHtml(r.dam_nhiem||'') + '"></td>' +
+    '<td><input type="date" data-f="thoi_han" value="' + escapeHtml(r.thoi_han||'') + '"></td>' +
+    '<td><button type="button" class="del-btn" data-del="' + i + '" title="Xoá dòng">✕</button></td>' +
+    '</tr>';
+}
+function bindActionRow(i){
+  const tr = document.querySelector('#actionTblBody tr[data-i="' + i + '"]');
+  if (!tr) return;
+  tr.querySelectorAll('[data-f]').forEach(el => {
+    el.addEventListener('input', () => { actionRows[i][el.dataset.f] = el.type === 'number' ? Number(el.value) : el.value; });
+  });
+  const delBtn = tr.querySelector('[data-del]');
+  if (delBtn) delBtn.addEventListener('click', () => { actionRows.splice(i,1); actionRows.forEach((r,j)=>r.stt=j+1); renderActionTable(); });
+}
+async function saveActionRows(){
+  const session = await MesAuth.getSession();
+  if (!session) {
+    const returnTo = encodeURIComponent(window.location.href);
+    window.location.href = 'shared/login.html?returnTo=' + returnTo;
+    return;
+  }
+  const btn = document.getElementById('btnSaveAction');
+  btn.disabled = true;
+  showActionMsg('info', '⏳ Đang lưu…');
+  const identity = await MesAuth.getCurrentUserIdentity();
+  const tuan = fmtISO(currentMonday);
+  const payload = actionRows.map((r,i) => ({
+    tuan_bat_dau: tuan, stt: i+1, van_de: r.van_de||'', so_phut_dung: r.so_phut_dung||0,
+    ty_le_phan_tram: r.ty_le_phan_tram||0, nguyen_nhan: r.nguyen_nhan||'', doi_sach: r.doi_sach||'',
+    dam_nhiem: r.dam_nhiem||'', thoi_han: r.thoi_han || null, updated_by: identity, updated_at: new Date().toISOString(),
+  }));
+  const delRes = await sb.from('duc_bao_cao_tuan_van_de').delete().eq('tuan_bat_dau', tuan);
+  if (delRes.error) { btn.disabled = false; return showActionMsg('error', 'Lỗi khi lưu: ' + delRes.error.message); }
+  if (payload.length){
+    const insRes = await sb.from('duc_bao_cao_tuan_van_de').insert(payload);
+    if (insRes.error) { btn.disabled = false; return showActionMsg('error', 'Lỗi khi lưu: ' + insRes.error.message); }
+  }
+  actionRowsSaved = true;
+  btn.disabled = false;
+  showActionMsg('ok', '✓ Đã lưu ' + payload.length + ' dòng.');
+  renderActionTable();
+}
+function showActionMsg(cls, text){
+  const el = document.getElementById('actionMsg');
+  el.className = 'msg ' + cls; el.style.display = 'block'; el.textContent = text;
+}
+
+// ── Trang / điều hướng tuần ──────────────────────────────────────────────
+function showMsg(cls, text){ const el = document.getElementById('pageMsg'); el.className='msg '+cls; el.style.display='block'; el.textContent = text; }
+function hideMsg(){ const el = document.getElementById('pageMsg'); el.style.display='none'; }
+
+function goToMonday(monday){ loadWeek(monday).catch(err => showMsg('error', 'Lỗi: ' + err.message)); }
+
+document.getElementById('fMonday').addEventListener('change', (e) => {
+  const d = new Date(e.target.value + 'T00:00:00');
+  goToMonday(mondayOf(d));
+});
+document.getElementById('btnPrevWeek').addEventListener('click', () => goToMonday(addDays(currentMonday, -7)));
+document.getElementById('btnNextWeek').addEventListener('click', () => goToMonday(addDays(currentMonday, 7)));
+document.getElementById('btnThisWeek').addEventListener('click', () => goToMonday(mondayOf(new Date())));
+
+(function init(){
+  goToMonday(mondayOf(new Date()));
+})();
+</script>
+</body>
+</html>
