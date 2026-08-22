@@ -445,7 +445,7 @@ function evalPointsBadge(v, reportIdx){
 }
 function custLabel(k){ return k === 'KHAC' ? 'KHÁC' : k; }
 function procLabel(k){ return ({'Duc (tat ca KH)':'Đúc (tất cả KH)','Gia cong (CNC)':'Gia công (CNC)','Son':'Sơn'})[k] || k; }
-function processCommentKey(k){ return ({'Duc (tat ca KH)':'process_Duc','Bavia':'process_Bavia','Gia cong (CNC)':'process_GiaCong','Son':'process_Son'})[k]; }
+function processCommentKey(k){ return ({'Duc (tat ca KH)':'process_Duc','Bavia':'process_Bavia','Gia cong (CNC)':'process_GiaCong','Cắt viền (CNC)':'process_CatVien','Son':'process_Son'})[k]; }
 function customerCommentKey(k, type){ return `customer_${type}_${k==='KHAC' ? 'KHAC' : k.replace(/\s*\(.*\)/,'').trim()}`; }
 
 /* ---------- Demo data (used until a Google Sheet is connected, or if a fetch fails) ---------- */
@@ -471,6 +471,7 @@ const DEMO_DATA = (function(){
     'Duc (tat ca KH)': {prod:internalTotal.prod, ng:internalTotal.ng, target:2.00},
     'Bavia':           {prod:pad12([550566,350071,523916,504208,421596,349331]), ng:pad12([50,30,164,154,90,105]), target:0.05},
     'Gia cong (CNC)':  {prod:pad12([292222,205737,338085,220124,162883,158918]), ng:pad12([609,229,1283,834,364,538]), target:0.40},
+    'Cắt viền (CNC)':  {prod:Array(12).fill(null), ng:Array(12).fill(null), target:0.40},
     'Son':             {prod:pad12([4738,732,13486,9016,3254,3690]), ng:pad12([0,0,0,0,0,0]), target:0.80},
   };
   const returnNotTracked = ['FOMECO','EXEDY'];
@@ -663,7 +664,7 @@ function buildDataModel(raw){
   // Nhãn hiển thị trong dashboard này ("Gia cong (CNC)", "Son"...) khác đúng
   // chữ cong_doan lưu trong cd_bao_cao_ca ("Gia Công", "Sơn" — theo
   // CONG_DOAN_LIST của chuyencongdoan.html/cong-doan-dashboard.html) — map lại.
-  const CD_LABEL_TO_CONG_DOAN = { 'Bavia': 'Bavia', 'Gia cong (CNC)': 'Gia Công', 'Son': 'Sơn' };
+  const CD_LABEL_TO_CONG_DOAN = { 'Bavia': 'Bavia', 'Gia cong (CNC)': 'Gia Công', 'Cắt viền (CNC)': 'Cắt viền', 'Son': 'Sơn' };
   Object.keys(CD_LABEL_TO_CONG_DOAN).forEach(k=>{
     const t = targetsByName[k] || {};
     const congDoan = CD_LABEL_TO_CONG_DOAN[k];
