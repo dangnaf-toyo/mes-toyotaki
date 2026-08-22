@@ -49,7 +49,15 @@ Tất cả số liệu phải tính từ dữ liệu vừa lấy, không hard-co
 - Nếu sau khi lọc, một máy/loại vấn đề/mã SP nào đó chỉ còn <3 mục `van_de` khác nhau, card vẫn hiển thị bình thường với số mục thực có (ghi chú "(chỉ có N vấn đề)"), không bịa thêm cho đủ 3.
 - Nếu lọc Ca 1/Ca 2 làm một mã SP/máy nào đó KHÔNG còn bản ghi dừng máy nào (toàn bộ downtime của nó nằm ở ca bị loại) → bỏ hẳn khỏi phần "3 vấn đề lớn nhất", cập nhật đúng số đếm "(N/N mã có phát sinh...)".
 
-## 5. Thiết kế / định dạng — LUÔN theo đúng `template.html` trong cùng thư mục skill này
+## 5. Trang thật đã có — `bao-cao-tuan.html`
+
+Kể từ 2026-08-22, báo cáo tuần có **trang thật trong app**: `bao-cao-tuan.html` (đã đẩy lên repo, có trong navbar "Điều hành & Báo cáo" → "Báo cáo sản xuất tuần"). Trang này **tự tính lại 100% nội dung trực tiếp từ Supabase mỗi khi mở** — không cache, không lưu số liệu report ở đâu — nên **KHÔNG BAO GIỜ cần "cập nhật" nội dung báo cáo bằng tay hay bằng migration**. Xem tuần nào, trang tự tính đúng tuần đó.
+
+- Truy cập 1 tuần cụ thể qua query param: `bao-cao-tuan.html?monday=YYYY-MM-DD` (YYYY-MM-DD là Thứ Hai của tuần cần xem — trang tự chuẩn hoá về đúng Thứ Hai nếu lỡ truyền ngày khác).
+- Trang gồm đủ các phần: KPI tuần, diễn biến theo ngày (+3 ca yếu nhất), sản lượng theo mã SP/máy (+ ưu tiên theo thiếu hụt), so sánh Ca 1/Ca 2, đổi khuôn theo trưởng ca, dừng máy theo máy/loại vấn đề/mã SP (+ ưu tiên), **3 vấn đề lớn nhất bên trong từng máy/loại/mã SP** (dạng card, y hệt logic mục 3 ở trên), và bảng "Tổng hợp vấn đề và hành động đối ứng" (lưu vào `duc_bao_cao_tuan_van_de`, chỉ ghi được khi đã đăng nhập — cloud routine KHÔNG ghi được bảng này, đây là việc con người làm thủ công trên trang).
+- **`template.html` trong thư mục skill này CHỈ còn dùng khi user yêu cầu rõ ràng 1 bản Artifact rời (vd để chia sẻ nhanh qua link không cần đăng nhập, hoặc xem trên điện thoại không vào được app)** — không dùng cho việc chạy định kỳ nữa, xem mục 7.
+
+## 5b. Thiết kế / định dạng khi vẫn cần tạo Artifact rời — LUÔN theo đúng `template.html` trong cùng thư mục skill này
 
 `template.html` là bản báo cáo mẫu đầy đủ (CSS + cấu trúc HTML) đã được user duyệt qua nhiều vòng chỉnh sửa. Khi tạo báo cáo mới:
 
@@ -69,7 +77,14 @@ Tất cả số liệu phải tính từ dữ liệu vừa lấy, không hard-co
 - **Nếu user yêu cầu sửa/cập nhật báo cáo đã có trong phiên này** → publish lại đúng `file_path` đó để giữ nguyên URL (không tạo artifact mới).
 - Trả lời user: link Artifact + tóm tắt 3-5 gạch đầu dòng những điểm nổi bật nhất tuần (không liệt kê lại toàn bộ số liệu đã có trong báo cáo).
 
-## 7. Khi chạy như routine định kỳ (cloud, không có phiên trò chuyện)
+## 7. Khi chạy như routine định kỳ sáng Thứ Hai (cloud, không có phiên trò chuyện)
 
-- Không có ai để hỏi lại — nếu dữ liệu tuần trước thiếu/bất thường (vd thiếu hẳn 1 ngày không có `duc_bao_cao_ca` nào), vẫn tạo báo cáo với dữ liệu đang có, ghi chú rõ trong footer là ngày/ca đó không có dữ liệu, không suy diễn số liệu.
-- Publish Artifact xong, kết thúc bằng 1 dòng text rõ ràng có link Artifact — đây là thứ user sẽ thấy khi họ mở lại phiên/routine đó.
+**KHÔNG tạo Artifact nữa.** Việc của routine chỉ là: tính nhanh dữ liệu tuần vừa kết thúc (đọc trực tiếp Supabase REST, y như mục 2-3) để rút ra vài điểm nổi bật, rồi trỏ user sang trang thật kèm đúng tuần:
+
+1. Tính ngày Thứ Hai của tuần vừa kết thúc (tuần trước tuần hiện tại) bằng lệnh ngày thực tế, không đoán.
+2. Lấy dữ liệu Supabase (đọc thôi, không ghi — cloud routine không có phiên đăng nhập nên không ghi được bảng `duc_bao_cao_tuan_van_de`, việc đó để user tự làm trên trang).
+3. Rút ra 3-5 điểm nổi bật nhất tuần (vd ca yếu nhất, máy/mã SP thiếu hụt nhiều nhất, vấn đề lặp lại nhiều nhất) — dùng đúng logic mục 3.
+4. Kết thúc bằng 1 tin nhắn ngắn gồm: link trực tiếp đến đúng tuần đó —
+   `https://dangnaf-toyo.github.io/mes-toyotaki/bao-cao-tuan.html?monday=<Thứ Hai tuần đó, YYYY-MM-DD>`
+   — và danh sách 3-5 gạch đầu dòng điểm nổi bật. Không liệt lại toàn bộ số liệu (trang đã có đủ).
+- Không có ai để hỏi lại — nếu dữ liệu tuần đó thiếu/bất thường (vd thiếu hẳn 1 ngày không có `duc_bao_cao_ca` nào), vẫn nêu điểm nổi bật với dữ liệu đang có, ghi chú rõ chỗ thiếu, không suy diễn số liệu.
