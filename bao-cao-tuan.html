@@ -134,7 +134,7 @@
     width:100%;height:100%;padding:5px 6px;font-size:12.5px;font-family:inherit;
     border:none;border-radius:0;background:transparent;display:block;resize:none;line-height:1.3;
   }
-  #actionTbl textarea{min-height:30px;}
+  #actionTbl textarea{min-height:30px;overflow:hidden;}
   #actionTbl input:focus, #actionTbl textarea:focus{outline:2px solid var(--tk-orange);outline-offset:-2px;background:#fff;position:relative;z-index:1;}
   #actionTbl input[type=number]{text-align:right;}
   #actionTbl input[type=date]{padding:4px 4px;}
@@ -614,12 +614,24 @@ function actionRowHtml(r,i){
     '<td class="del-cell"><button type="button" class="del-btn" data-del="' + i + '" title="Xoá dòng">✕</button></td>' +
     '</tr>';
 }
+function syncRowHeight(tr){
+  // các ô textarea trong cùng 1 dòng phải cao bằng nhau (dòng cao nhất) để giữ đúng lưới bảng
+  const areas = tr.querySelectorAll('textarea');
+  if (!areas.length) return;
+  let max = 30;
+  areas.forEach(a => { a.style.height = 'auto'; max = Math.max(max, a.scrollHeight); });
+  areas.forEach(a => { a.style.height = max + 'px'; });
+}
 function bindActionRow(i){
   const tr = document.querySelector('#actionTblBody tr[data-i="' + i + '"]');
   if (!tr) return;
   tr.querySelectorAll('[data-f]').forEach(el => {
-    el.addEventListener('input', () => { actionRows[i][el.dataset.f] = el.type === 'number' ? Number(el.value) : el.value; });
+    el.addEventListener('input', () => {
+      actionRows[i][el.dataset.f] = el.type === 'number' ? Number(el.value) : el.value;
+      if (el.tagName === 'TEXTAREA') syncRowHeight(tr);
+    });
   });
+  syncRowHeight(tr);
   const delBtn = tr.querySelector('[data-del]');
   if (delBtn) delBtn.addEventListener('click', () => { actionRows.splice(i,1); actionRows.forEach((r,j)=>r.stt=j+1); renderActionTable(); });
 }
