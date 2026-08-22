@@ -1,0 +1,926 @@
+<title>Đúc Tuần 34</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600;700&display=swap">
+<style>
+  :root{
+    --surface:#F5F2ED;
+    --surface-panel:#FFFFFF;
+    --surface-alt:#EAE3D7;
+    --surface-alt-2:#E0D7C8;
+    --border:#DCD2C0;
+    --ink:#221B15;
+    --ink-2:#5C5044;
+    --muted:#8B7E70;
+    --accent:#C8703A;
+    --accent-ink:#FFFFFF;
+    --accent-soft:#EFDCCB;
+    --good:#3F7D53;
+    --good-soft:#DDEBE1;
+    --warn:#B8842A;
+    --warn-soft:#F1E6D2;
+    --crit:#B3402F;
+    --crit-soft:#F3DDD7;
+    --shadow: 0 1px 2px rgba(34,27,21,.06), 0 6px 16px rgba(34,27,21,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --surface:#161210;
+      --surface-panel:#1F1915;
+      --surface-alt:#28211A;
+      --surface-alt-2:#332A21;
+      --border:#3B3126;
+      --ink:#F1E8DC;
+      --ink-2:#C9BBAA;
+      --muted:#94856F;
+      --accent:#E28A4C;
+      --accent-ink:#211205;
+      --accent-soft:#3A2618;
+      --good:#5FAE7C;
+      --good-soft:#1E2B21;
+      --warn:#D9A94E;
+      --warn-soft:#332A18;
+      --crit:#DD7A66;
+      --crit-soft:#37211C;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --surface:#161210;
+    --surface-panel:#1F1915;
+    --surface-alt:#28211A;
+    --surface-alt-2:#332A21;
+    --border:#3B3126;
+    --ink:#F1E8DC;
+    --ink-2:#C9BBAA;
+    --muted:#94856F;
+    --accent:#E28A4C;
+    --accent-ink:#211205;
+    --accent-soft:#3A2618;
+    --good:#5FAE7C;
+    --good-soft:#1E2B21;
+    --warn:#D9A94E;
+    --warn-soft:#332A18;
+    --crit:#DD7A66;
+    --crit-soft:#37211C;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--surface); color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    font-size:15px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .num{ font-family:'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  h1,h2,h3{ font-family:'Archivo', system-ui, sans-serif; letter-spacing:-0.01em; text-wrap:balance; margin:0; }
+
+  .wrap{ max-width:1080px; margin:0 auto; padding:40px 28px 80px; }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .head{
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
+    padding-bottom:20px; border-bottom:3px solid var(--ink); margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  .head-eyebrow{
+    font-size:12px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:6px;
+  }
+  .head h1{ font-size:34px; font-weight:800; color:var(--ink); }
+  .head-meta{ text-align:right; font-size:13px; color:var(--muted); line-height:1.7; }
+  .head-meta b{ color:var(--ink-2); font-weight:600; }
+  .live-pill{
+    display:inline-flex; align-items:center; gap:6px; margin-top:6px;
+    background:var(--warn-soft); color:var(--warn); border:1px solid var(--warn);
+    padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;
+  }
+  .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--warn); animation:pulse 1.8s infinite; }
+  @media (prefers-reduced-motion: reduce){ .live-dot{ animation:none; } }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  /* ── KPI strip ──────────────────────────────────────── */
+  .kpis{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:36px; }
+  .kpi{
+    background:var(--surface-panel); border:1px solid var(--border); border-radius:8px;
+    padding:14px 14px 12px; box-shadow:var(--shadow);
+  }
+  .kpi-label{ font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .kpi-val{ font-size:24px; font-weight:600; margin-top:4px; color:var(--ink); }
+  .kpi-sub{ font-size:12px; color:var(--ink-2); margin-top:2px; }
+  .kpi.accent .kpi-val{ color:var(--accent); }
+  .kpi.crit .kpi-val{ color:var(--crit); }
+
+  /* ── Section shell ──────────────────────────────────── */
+  section{ margin-bottom:40px; }
+  .sec-head{
+    display:flex; align-items:baseline; gap:10px; margin-bottom:14px;
+    padding-left:12px; border-left:4px solid var(--accent);
+  }
+  .sec-head h2{ font-size:19px; font-weight:700; }
+  .sec-head .sec-note{ font-size:12.5px; color:var(--muted); }
+  .panel{
+    background:var(--surface-panel); border:1px solid var(--border); border-radius:10px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .panel-pad{ padding:20px 22px; }
+
+  /* ── Tables ─────────────────────────────────────────── */
+  .tbl-wrap{ overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  thead th{
+    text-align:left; font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--muted); padding:10px 14px; border-bottom:1px solid var(--border); white-space:nowrap;
+    background:var(--surface-alt);
+  }
+  tbody td{ padding:9px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover td{ background:var(--surface-alt); }
+  td.num, th.num{ text-align:right; }
+  .rowname{ font-weight:600; color:var(--ink); }
+  .rowsub{ color:var(--muted); font-size:12px; }
+
+  /* bar-in-cell */
+  .barcell{ display:flex; align-items:center; gap:10px; min-width:180px; }
+  .bartrack{ flex:1; height:8px; background:var(--surface-alt-2); border-radius:4px; overflow:hidden; }
+  .barfill{ height:100%; border-radius:4px; background:var(--accent); }
+  .barfill.crit{ background:var(--crit); }
+  .barval{ font-size:12.5px; color:var(--ink-2); white-space:nowrap; min-width:52px; text-align:right; }
+
+  .pct-pill{
+    display:inline-block; padding:2px 8px; border-radius:20px; font-size:12px; font-weight:600;
+  }
+  .pct-good{ background:var(--good-soft); color:var(--good); }
+  .pct-warn{ background:var(--warn-soft); color:var(--warn); }
+  .pct-crit{ background:var(--crit-soft); color:var(--crit); }
+
+  /* daily trend */
+  .daytrend{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; padding:20px 22px; }
+  .day{
+    border:1px solid var(--border); border-radius:8px; padding:12px 12px 14px; background:var(--surface);
+  }
+  .day.today{ border-color:var(--warn); background:var(--warn-soft); }
+  .day-date{ font-size:12px; font-weight:600; color:var(--ink-2); }
+  .day-wd{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .day-bars{ display:flex; align-items:flex-end; gap:4px; height:70px; margin:10px 0 8px; }
+  .day-bar{ flex:1; border-radius:3px 3px 0 0; position:relative; }
+  .day-bar.kh{ background:var(--surface-alt-2); }
+  .day-bar.tt{ background:var(--accent); }
+  .day-oee{ font-size:11px; color:var(--muted); }
+  .day-oee b{ color:var(--ink-2); }
+  .legend{ display:flex; gap:16px; align-items:center; padding:0 22px 18px; font-size:12px; color:var(--ink-2); }
+  .legend-swatch{ width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:-1px; }
+
+  .callout{
+    display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:8px;
+    background:var(--warn-soft); border:1px solid var(--warn); font-size:13px; color:var(--ink-2); margin-top:14px;
+  }
+  .callout b{ color:var(--ink); }
+  .callout.crit{ background:var(--crit-soft); border-color:var(--crit); }
+
+  /* ── Ca1 vs Ca2 comparison ─────────────────────────── */
+  :root{ --ca1:#C8703A; --ca2:#3E7692; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --ca1:#E28A4C; --ca2:#6FB2D6; } }
+  :root[data-theme="dark"]{ --ca1:#E28A4C; --ca2:#6FB2D6; }
+  .cacompare{ padding:20px 22px; }
+  .ca-legend{ display:flex; gap:20px; font-size:12.5px; color:var(--ink-2); margin-bottom:16px; }
+  .ca-legend b{ font-weight:600; }
+  .ca-row{ display:grid; grid-template-columns:150px 1fr; gap:14px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+  .ca-row:last-child{ border-bottom:none; }
+  .ca-metric{ font-size:12.5px; font-weight:600; color:var(--ink-2); }
+  .ca-bars{ display:flex; flex-direction:column; gap:5px; }
+  .ca-bar-line{ display:flex; align-items:center; gap:8px; }
+  .ca-bar-tag{ width:38px; font-size:11px; font-weight:700; text-align:right; font-family:'IBM Plex Mono',monospace; }
+  .ca-bar-tag.c1{ color:var(--ca1); }
+  .ca-bar-tag.c2{ color:var(--ca2); }
+  .ca-bar-track{ flex:1; height:14px; background:var(--surface-alt-2); border-radius:4px; overflow:hidden; }
+  .ca-bar-fill{ height:100%; border-radius:4px; }
+  .ca-bar-fill.c1{ background:var(--ca1); }
+  .ca-bar-fill.c2{ background:var(--ca2); }
+  .ca-bar-val{ width:96px; font-size:12.5px; text-align:right; color:var(--ink); }
+
+  /* ── Problem cards ──────────────────────────────────── */
+  .cardgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .pcard{
+    background:var(--surface-panel); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px 16px; box-shadow:var(--shadow);
+  }
+  .pcard-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:2px; }
+  .pcard-title{ font-weight:700; font-size:14.5px; color:var(--ink); }
+  .pcard-sub{ font-size:11.5px; color:var(--muted); margin-bottom:10px; }
+  .pcard-total{ font-size:11.5px; font-weight:600; color:var(--accent); white-space:nowrap; }
+  .pcard ol{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
+  .pcard li{ display:flex; gap:8px; align-items:flex-start; font-size:12.5px; line-height:1.4; }
+  .rank{
+    flex:none; width:18px; height:18px; border-radius:50%; background:var(--surface-alt-2); color:var(--ink-2);
+    font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .pcard li:nth-child(1) .rank{ background:var(--crit-soft); color:var(--crit); }
+  .pcard li:nth-child(2) .rank{ background:var(--warn-soft); color:var(--warn); }
+  .problem-txt{ color:var(--ink-2); flex:1; }
+  .problem-meta{ color:var(--muted); font-size:11px; white-space:nowrap; }
+
+  .subhead{ font-size:14px; font-weight:700; color:var(--ink); margin:26px 0 12px; padding-top:2px; }
+  .subhead:first-of-type{ margin-top:0; }
+
+  /* ── Priority box (3 ưu tiên mỗi phần) ─────────────── */
+  .priority-box{
+    background:var(--accent-soft); border:1px solid var(--accent); border-radius:10px;
+    padding:16px 18px 14px; margin-bottom:16px;
+  }
+  .priority-box-head{
+    display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700;
+    letter-spacing:.05em; text-transform:uppercase; color:var(--accent); margin-bottom:10px;
+  }
+  .priority-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  .priority-list li{ display:flex; gap:11px; align-items:flex-start; }
+  .priority-rank{
+    flex:none; width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--accent-ink);
+    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .priority-body{ font-size:13.5px; line-height:1.45; color:var(--ink); }
+  .priority-body b{ font-weight:700; }
+  .priority-body .priority-metric{ color:var(--ink-2); font-size:12.5px; }
+
+  footer{
+    margin-top:48px; padding-top:18px; border-top:1px solid var(--border);
+    font-size:12px; color:var(--muted); line-height:1.7;
+  }
+
+  @media (max-width: 860px){
+    .kpis{ grid-template-columns:repeat(3,1fr); }
+    .daytrend{ grid-template-columns:repeat(3,1fr); }
+    .head{ flex-direction:column; align-items:flex-start; }
+    .head-meta{ text-align:left; }
+    .cardgrid{ grid-template-columns:repeat(2,1fr); }
+    .ca-row{ grid-template-columns:1fr; gap:4px; }
+  }
+  @media (max-width: 520px){
+    .kpis{ grid-template-columns:repeat(2,1fr); }
+    .daytrend{ grid-template-columns:repeat(2,1fr); }
+    .cardgrid{ grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <div class="head-eyebrow">Khối Đúc · MES Toyotaki</div>
+      <h1>Báo cáo Sản xuất Tuần 34</h1>
+      <span class="live-pill"><span class="live-dot"></span> Ca 1 · 22/08 đang chạy — số liệu hôm nay là tạm tính</span>
+    </div>
+    <div class="head-meta">
+      Kỳ báo cáo: <b>Thứ Hai 17/08 – Thứ Bảy 22/08/2026</b><br>
+      Dữ liệu đầy đủ: 17/08 – 21/08 (5 ngày đã kết ca)<br>
+      Phương án tuần: 2 ca 8 tiếng (Ca 1 + Ca 2) — đã loại dữ liệu Ca ngày 17/08<br>
+      Nguồn: duc_bao_cao_ca · duc_su_co_log · duc_lich_su_san_xuat
+    </div>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="kpis">
+    <div class="kpi accent">
+      <div class="kpi-label">Kế hoạch tuần</div>
+      <div class="kpi-val num">81.128</div>
+      <div class="kpi-sub">sản phẩm · 5 ngày kết ca, Ca 1+2</div>
+    </div>
+    <div class="kpi accent">
+      <div class="kpi-label">Thực tế tuần</div>
+      <div class="kpi-val num">61.012</div>
+      <div class="kpi-sub">75,2% kế hoạch</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Hoàn thành KH bình quân</div>
+      <div class="kpi-val num">76,2%</div>
+      <div class="kpi-sub">trung bình 10 ca</div>
+    </div>
+    <div class="kpi crit">
+      <div class="kpi-label">Thời gian dừng</div>
+      <div class="kpi-val num">131,0 giờ</div>
+      <div class="kpi-sub">7.857 phút · 104 sự cố</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Sản phẩm lỗi (NG)</div>
+      <div class="kpi-val num">614</div>
+      <div class="kpi-sub">chủ yếu 17/08 &amp; 21/08</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Sự cố / ngày</div>
+      <div class="kpi-val num">20,8</div>
+      <div class="kpi-sub">trung bình 5 ngày</div>
+    </div>
+  </div>
+
+  <!-- DAILY TREND -->
+  <section>
+    <div class="sec-head">
+      <h2>Diễn biến theo ngày</h2>
+      <span class="sec-note">Kế hoạch so với thực tế, chỉ Ca 1 + Ca 2 — chiều cao cột theo tỉ lệ trong tuần</span>
+    </div>
+    <div class="panel">
+      <div class="daytrend">
+        <div class="day"><div class="day-date">17/08</div><div class="day-wd">Thứ Hai</div>
+          <div class="day-bars"><div class="day-bar kh" style="height:100%"></div><div class="day-bar tt" style="height:75%"></div></div>
+          <div class="day-oee">HT <b>75,0%</b></div>
+        </div>
+        <div class="day"><div class="day-date">18/08</div><div class="day-wd">Thứ Ba</div>
+          <div class="day-bars"><div class="day-bar kh" style="height:63%"></div><div class="day-bar tt" style="height:57%"></div></div>
+          <div class="day-oee">HT <b>91,0%</b></div>
+        </div>
+        <div class="day"><div class="day-date">19/08</div><div class="day-wd">Thứ Tư</div>
+          <div class="day-bars"><div class="day-bar kh" style="height:66%"></div><div class="day-bar tt" style="height:49%"></div></div>
+          <div class="day-oee">HT <b>74,5%</b></div>
+        </div>
+        <div class="day"><div class="day-date">20/08</div><div class="day-wd">Thứ Năm</div>
+          <div class="day-bars"><div class="day-bar kh" style="height:98%"></div><div class="day-bar tt" style="height:70%"></div></div>
+          <div class="day-oee">HT <b>71,2%</b></div>
+        </div>
+        <div class="day"><div class="day-date">21/08</div><div class="day-wd">Thứ Sáu</div>
+          <div class="day-bars"><div class="day-bar kh" style="height:97%"></div><div class="day-bar tt" style="height:68%"></div></div>
+          <div class="day-oee">HT <b>69,7%</b></div>
+        </div>
+        <div class="day today"><div class="day-date">22/08</div><div class="day-wd">Thứ Bảy · Ca 1</div>
+          <div class="day-bars"><div class="day-bar kh" style="height:55%"></div><div class="day-bar tt" style="height:20%"></div></div>
+          <div class="day-oee">đang chạy</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="legend-swatch" style="background:var(--surface-alt-2)"></span>Kế hoạch (KH)</span>
+        <span><span class="legend-swatch" style="background:var(--accent)"></span>Thực tế (TT)</span>
+      </div>
+    </div>
+    <div class="priority-box">
+      <div class="priority-box-head">🎯 3 ca yếu nhất tuần — ưu tiên xem lại</div>
+      <ol class="priority-list">
+        <li><span class="priority-rank">1</span><div class="priority-body"><b>Ca 1 · 21/08</b> (Trần Thanh Liêm) <span class="priority-metric">— hoàn thành 58,4% KH, 12 sự cố; trùng ngày phát sinh 314 NG</span></div></li>
+        <li><span class="priority-rank">2</span><div class="priority-body"><b>Ca 2 · 20/08</b> (Đinh Xuân Mẫn) <span class="priority-metric">— hoàn thành 69,8% KH, 10 sự cố, 1.390' dừng máy</span></div></li>
+        <li><span class="priority-rank">3</span><div class="priority-body"><b>Ca 1 · 20/08</b> (Trần Thanh Liêm) <span class="priority-metric">— hoàn thành 72,5% KH, 13 sự cố, 1.418' dừng máy — nhiều sự cố nhất tuần</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- PRODUCTION BY PRODUCT -->
+  <section>
+    <div class="sec-head">
+      <h2>Sản lượng theo mã sản phẩm</h2>
+      <span class="sec-note">10/16 mã có kế hoạch trong tuần, chỉ Ca 1 + Ca 2, xếp theo kế hoạch giảm dần</span>
+    </div>
+    <div class="panel">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Mã SP</th><th>Tên sản phẩm</th><th class="num">Kế hoạch</th><th class="num">Thực tế</th><th class="num">Hoàn thành</th></tr></thead>
+        <tbody>
+          <tr><td class="rowname">FCC-OUT-01</td><td class="rowsub">Outer K09</td><td class="num num">16.000</td><td class="num">13.558</td><td class="num"><span class="pct-pill pct-good">84,7%</span></td></tr>
+          <tr><td class="rowname">FCC-KFM-01</td><td class="rowsub">KFM</td><td class="num">14.600</td><td class="num">10.072</td><td class="num"><span class="pct-pill pct-warn">69,0%</span></td></tr>
+          <tr><td class="rowname">EXE-PLT-01</td><td class="rowsub">CL PR PLAT</td><td class="num">8.400</td><td class="num">5.358</td><td class="num"><span class="pct-pill pct-crit">63,8%</span></td></tr>
+          <tr><td class="rowname">EXE-PLY-01</td><td class="rowsub">P PLLY SLD - BJJ</td><td class="num">8.028</td><td class="num">4.850</td><td class="num"><span class="pct-pill pct-crit">60,4%</span></td></tr>
+          <tr><td class="rowname">AST-PAN-01</td><td class="rowsub">Panel FR</td><td class="num">7.920</td><td class="num">7.544</td><td class="num"><span class="pct-pill pct-good">95,3%</span></td></tr>
+          <tr><td class="rowname">EXE-OUT-01</td><td class="rowsub">CL OUTER</td><td class="num">7.850</td><td class="num">4.870</td><td class="num"><span class="pct-pill pct-crit">62,0%</span></td></tr>
+          <tr><td class="rowname">FCC-KPH-02</td><td class="rowsub">KPH-9001</td><td class="num">7.500</td><td class="num">6.236</td><td class="num"><span class="pct-pill pct-good">83,1%</span></td></tr>
+          <tr><td class="rowname">TTI-MOT-02</td><td class="rowsub">MOTOR 9002</td><td class="num">5.900</td><td class="num">4.382</td><td class="num"><span class="pct-pill pct-warn">74,3%</span></td></tr>
+          <tr><td class="rowname">TTI-MOT-05</td><td class="rowsub">MOTOR 8002</td><td class="num">5.600</td><td class="num">1.754</td><td class="num"><span class="pct-pill pct-crit">31,3%</span></td></tr>
+          <tr><td class="rowname">BPH-SHO-01</td><td class="rowsub">CL SHOE 3B54</td><td class="num">4.800</td><td class="num">2.640</td><td class="num"><span class="pct-pill pct-crit">55,0%</span></td></tr>
+        </tbody>
+      </table></div>
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 3 mã sản phẩm ưu tiên xử lý — theo sản lượng thiếu hụt</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>FCC-KFM-01 · KFM</b> <span class="priority-metric">— thiếu 4.528 sản phẩm, chỉ đạt 69,0% KH — mức thiếu hụt lớn nhất tuần</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>TTI-MOT-05 · MOTOR 8002</b> <span class="priority-metric">— thiếu 3.846 sản phẩm, chỉ đạt 31,3% KH</span></div></li>
+            <li><span class="priority-rank">3</span><div class="priority-body"><b>EXE-PLY-01 · P PLLY SLD - BJJ</b> <span class="priority-metric">— thiếu 3.178 sản phẩm (60,4%)</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCTION BY MACHINE -->
+  <section>
+    <div class="sec-head">
+      <h2>Sản lượng theo máy</h2>
+      <span class="sec-note">Kế hoạch / thực tế cộng dồn cả tuần, chỉ Ca 1 + Ca 2 (gồm Ca 1 hôm nay đang chạy)</span>
+    </div>
+    <div class="panel">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Máy</th><th class="num">Kế hoạch</th><th class="num">Thực tế</th><th class="num">Hoàn thành</th><th class="num">NG</th></tr></thead>
+        <tbody>
+          <tr><td class="rowname">DC 8</td><td class="num num">20.200</td><td class="num">11.826</td><td class="num"><span class="pct-pill pct-crit">58,5%</span></td><td class="num">136</td></tr>
+          <tr><td class="rowname">DC 6</td><td class="num">16.250</td><td class="num">10.228</td><td class="num"><span class="pct-pill pct-crit">62,9%</span></td><td class="num">0</td></tr>
+          <tr><td class="rowname">DC 7</td><td class="num">16.000</td><td class="num">13.558</td><td class="num"><span class="pct-pill pct-good">84,7%</span></td><td class="num">0</td></tr>
+          <tr><td class="rowname">DC 11</td><td class="num">15.528</td><td class="num">11.086</td><td class="num"><span class="pct-pill pct-warn">71,4%</span></td><td class="num">260</td></tr>
+          <tr><td class="rowname">DC 4</td><td class="num">11.300</td><td class="num">7.499</td><td class="num"><span class="pct-pill pct-warn">66,4%</span></td><td class="num">214</td></tr>
+          <tr><td class="rowname">DC 5</td><td class="num">7.920</td><td class="num">7.544</td><td class="num"><span class="pct-pill pct-good">95,3%</span></td><td class="num">4</td></tr>
+          <tr><td class="rowname">Kẽm 190T</td><td class="num">6.200</td><td class="num">4.140</td><td class="num"><span class="pct-pill pct-warn">66,8%</span></td><td class="num">0</td></tr>
+          <tr><td class="rowname">DC 10</td><td class="num">950</td><td class="num">165</td><td class="num"><span class="pct-pill pct-crit">17,4%</span></td><td class="num">0</td></tr>
+        </tbody>
+      </table></div>
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 3 máy ưu tiên xử lý — theo sản lượng thiếu hụt</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>DC 8</b> <span class="priority-metric">— thiếu 8.374 sản phẩm so với KH (chỉ đạt 58,5%) — mức thiếu hụt lớn nhất tuần</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>DC 6</b> <span class="priority-metric">— thiếu 6.022 sản phẩm (62,9%)</span></div></li>
+            <li><span class="priority-rank">3</span><div class="priority-body"><b>DC 11</b> <span class="priority-metric">— thiếu 4.442 sản phẩm (71,4%), riêng máy này có 260 NG</span></div></li>
+          </ol>
+          <div style="font-size:12px; color:var(--ink-2); margin-top:10px; padding-top:10px; border-top:1px solid var(--border)">Riêng <b>DC 10</b> hoàn thành thấp bất thường (17,4%) nhưng kế hoạch quá nhỏ (950) nên số tuyệt đối thiếu hụt không lớn — vẫn đáng kiểm tra vì trùng với máy có phút dừng dài mỗi lượt ở phần dưới.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CA1 VS CA2 -->
+  <section>
+    <div class="sec-head">
+      <h2>So sánh hiệu suất Ca 1 và Ca 2</h2>
+      <span class="sec-note">5 ca mỗi bên (17–21/08, đã kết ca) — cùng số ca nên so sánh trực tiếp được</span>
+    </div>
+    <div class="panel">
+      <div class="cacompare">
+        <div class="ca-legend">
+          <span><span class="legend-swatch" style="background:var(--ca1)"></span><b>Ca 1</b> — 41.900 KH, Trần Thanh Liêm</span>
+          <span><span class="legend-swatch" style="background:var(--ca2)"></span><b>Ca 2</b> — 39.228 KH, Đinh Xuân Mẫn</span>
+        </div>
+
+        <div class="ca-row"><div class="ca-metric">Hoàn thành KH</div><div class="ca-bars">
+          <div class="ca-bar-line"><span class="ca-bar-tag c1">C1</span><div class="ca-bar-track"><div class="ca-bar-fill c1" style="width:92.6%"></div></div><span class="ca-bar-val num">72,4%</span></div>
+          <div class="ca-bar-line"><span class="ca-bar-tag c2">C2</span><div class="ca-bar-track"><div class="ca-bar-fill c2" style="width:100%"></div></div><span class="ca-bar-val num">78,2%</span></div>
+        </div></div>
+
+        <div class="ca-row"><div class="ca-metric">Phút dừng máy</div><div class="ca-bars">
+          <div class="ca-bar-line"><span class="ca-bar-tag c1">C1</span><div class="ca-bar-track"><div class="ca-bar-fill c1" style="width:100%"></div></div><span class="ca-bar-val num">4.664'</span></div>
+          <div class="ca-bar-line"><span class="ca-bar-tag c2">C2</span><div class="ca-bar-track"><div class="ca-bar-fill c2" style="width:68.5%"></div></div><span class="ca-bar-val num">3.193'</span></div>
+        </div></div>
+
+        <div class="ca-row"><div class="ca-metric">Số sự cố / ca</div><div class="ca-bars">
+          <div class="ca-bar-line"><span class="ca-bar-tag c1">C1</span><div class="ca-bar-track"><div class="ca-bar-fill c1" style="width:100%"></div></div><span class="ca-bar-val num">13,2 lượt</span></div>
+          <div class="ca-bar-line"><span class="ca-bar-tag c2">C2</span><div class="ca-bar-track"><div class="ca-bar-fill c2" style="width:57.6%"></div></div><span class="ca-bar-val num">7,6 lượt</span></div>
+        </div></div>
+
+        <div class="ca-row"><div class="ca-metric">NG (sản phẩm)</div><div class="ca-bars">
+          <div class="ca-bar-line"><span class="ca-bar-tag c1">C1</span><div class="ca-bar-track"><div class="ca-bar-fill c1" style="width:0%"></div></div><span class="ca-bar-val num">0</span></div>
+          <div class="ca-bar-line"><span class="ca-bar-tag c2">C2</span><div class="ca-bar-track"><div class="ca-bar-fill c2" style="width:100%"></div></div><span class="ca-bar-val num">614</span></div>
+        </div></div>
+      </div>
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 3 điểm ưu tiên xử lý — Ca 1 so với Ca 2</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>Số sự cố/ca của Ca 1 gần gấp đôi Ca 2</b> <span class="priority-metric">— 13,2 so với 7,6 lượt/ca, dù kế hoạch giao gần bằng nhau — đây là nguyên nhân chính kéo tỉ lệ hoàn thành xuống</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>% hoàn thành KH của Ca 1 thấp hơn Ca 2</b> <span class="priority-metric">— 72,4% so với 78,2%, dù kế hoạch giao gần bằng nhau (41.900 so với 39.228)</span></div></li>
+            <li><span class="priority-rank">3</span><div class="priority-body"><b>Toàn bộ 614 NG tuần này chỉ ghi nhận ở Ca 2, Ca 1 báo 0</b> <span class="priority-metric">— trong khi Ca 1 có nhiều sự cố chất lượng (B1) hơn — cần xác minh Ca 1 có bỏ sót nhập liệu NG khi kết ca hay không</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHANGEOVER TIME BY SHIFT LEAD -->
+  <section>
+    <div class="sec-head">
+      <h2>Thời gian đổi khuôn trung bình theo trưởng ca</h2>
+      <span class="sec-note">Mã lỗi C3 — Đổi khuôn, gộp theo người ghi nhận trong nhật ký sự cố, 17–21/08 (đã loại Ca ngày)</span>
+    </div>
+    <div class="panel">
+      <div class="cacompare">
+        <div class="ca-legend">
+          <span><span class="legend-swatch" style="background:var(--ca1)"></span><b>Trần Thanh Liêm</b> — 6 lần đổi khuôn</span>
+          <span><span class="legend-swatch" style="background:var(--ca2)"></span><b>Đinh Xuân Mẫn</b> — 7 lần đổi khuôn</span>
+        </div>
+        <div class="ca-row"><div class="ca-metric">TB mỗi lần đổi khuôn</div><div class="ca-bars">
+          <div class="ca-bar-line"><span class="ca-bar-tag c1">Liêm</span><div class="ca-bar-track"><div class="ca-bar-fill c1" style="width:100%"></div></div><span class="ca-bar-val num">157,5'</span></div>
+          <div class="ca-bar-line"><span class="ca-bar-tag c2">Mẫn</span><div class="ca-bar-track"><div class="ca-bar-fill c2" style="width:83.6%"></div></div><span class="ca-bar-val num">131,7'</span></div>
+        </div></div>
+        <div class="ca-row"><div class="ca-metric">Tổng phút đổi khuôn</div><div class="ca-bars">
+          <div class="ca-bar-line"><span class="ca-bar-tag c1">Liêm</span><div class="ca-bar-track"><div class="ca-bar-fill c1" style="width:100%"></div></div><span class="ca-bar-val num">945'</span></div>
+          <div class="ca-bar-line"><span class="ca-bar-tag c2">Mẫn</span><div class="ca-bar-track"><div class="ca-bar-fill c2" style="width:97.6%"></div></div><span class="ca-bar-val num">922'</span></div>
+        </div></div>
+      </div>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Ngày</th><th>Trưởng ca</th><th>Máy</th><th>Nội dung</th><th class="num">Phút</th></tr></thead>
+        <tbody>
+          <tr><td class="rowname">17/08</td><td>Trần Thanh Liêm</td><td>DC 11</td><td class="rowsub">Đúc mẫu</td><td class="num num">300'</td></tr>
+          <tr><td class="rowname">20/08</td><td>Trần Thanh Liêm</td><td>DC 11</td><td class="rowsub">Thay khuôn</td><td class="num">180'</td></tr>
+          <tr><td class="rowname">17/08</td><td>Trần Thanh Liêm</td><td>DC 4</td><td class="rowsub">Thay khuôn</td><td class="num">220'</td></tr>
+          <tr><td class="rowname">17/08</td><td>Trần Thanh Liêm</td><td>Kẽm 190T</td><td class="rowsub">Lên khuân</td><td class="num">110'</td></tr>
+          <tr><td class="rowname">18/08</td><td>Trần Thanh Liêm</td><td>DC 4</td><td class="rowsub">Đổi khuôn từ TTI-MOT-03</td><td class="num">75'</td></tr>
+          <tr><td class="rowname">20/08</td><td>Trần Thanh Liêm</td><td>DC 6</td><td class="rowsub">Thay khuôn</td><td class="num">60'</td></tr>
+          <tr><td class="rowname">20/08</td><td>Đinh Xuân Mẫn</td><td>DC 8</td><td class="rowsub">Đúc mẫu</td><td class="num">313'</td></tr>
+          <tr><td class="rowname">20/08</td><td>Đinh Xuân Mẫn</td><td>DC 4</td><td class="rowsub">Đổi khuôn từ TTI-PUM-02, chờ hoàn thiện + lên khuôn</td><td class="num">144'</td></tr>
+          <tr><td class="rowname">17/08</td><td>Đinh Xuân Mẫn</td><td>DC 6</td><td class="rowsub">Đổi khuôn từ EXE-PLT-01</td><td class="num">105'</td></tr>
+          <tr><td class="rowname">17/08</td><td>Đinh Xuân Mẫn</td><td>DC 6</td><td class="rowsub">(không ghi)</td><td class="num">105'</td></tr>
+          <tr><td class="rowname">21/08</td><td>Đinh Xuân Mẫn</td><td>DC 6</td><td class="rowsub">Đổi khuôn từ EXE-PLT-01</td><td class="num">90'</td></tr>
+          <tr><td class="rowname">20/08</td><td>Đinh Xuân Mẫn</td><td>DC 8</td><td class="rowsub">Đổi khuôn từ TTI-MOT-05</td><td class="num">75'</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 Nhận xét</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>Ca Liêm đổi khuôn chậm hơn ca Mẫn ~26'/lần (157,5' so với 131,7', +20%)</b> <span class="priority-metric">— nhưng chênh lệch chủ yếu do 1 lần bất thường: DC 11 "đúc mẫu" 300' ngày 17/08. Bỏ lần này, TB của Liêm còn ~129'/lần, gần bằng Mẫn.</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>Tổng phút đổi khuôn gần bằng nhau</b> <span class="priority-metric">— 945' (Liêm, 6 lần) so với 922' (Mẫn, 7 lần) — khác biệt chủ yếu nằm ở số lần và độ dài từng lần, không phải một bên chậm đều đặn hơn</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNTIME BY MACHINE -->
+  <section>
+    <div class="sec-head">
+      <h2>Thời gian dừng theo máy</h2>
+      <span class="sec-note">Tổng 8.496 phút · 117 lượt sự cố · 17/08–22/08, chỉ Ca 1 + Ca 2</span>
+    </div>
+    <div class="panel">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Máy</th><th>Phút dừng</th><th class="num">Lượt sự cố</th><th class="num">Tỉ trọng</th></tr></thead>
+        <tbody>
+          <tr><td class="rowname">DC 4</td><td><div class="barcell"><div class="bartrack"><div class="barfill crit" style="width:100%"></div></div><span class="barval num">1.607'</span></div></td><td class="num num">18</td><td class="num">18,9%</td></tr>
+          <tr><td class="rowname">DC 8</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:88%"></div></div><span class="barval num">1.409'</span></div></td><td class="num">25</td><td class="num">16,6%</td></tr>
+          <tr><td class="rowname">DC 11</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:83%"></div></div><span class="barval num">1.331'</span></div></td><td class="num">15</td><td class="num">15,7%</td></tr>
+          <tr><td class="rowname">DC 6</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:82%"></div></div><span class="barval num">1.312'</span></div></td><td class="num">24</td><td class="num">15,4%</td></tr>
+          <tr><td class="rowname">DC 5</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:69%"></div></div><span class="barval num">1.114'</span></div></td><td class="num">16</td><td class="num">13,1%</td></tr>
+          <tr><td class="rowname">DC 10</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:60%"></div></div><span class="barval num">957'</span></div></td><td class="num">5</td><td class="num">11,3%</td></tr>
+          <tr><td class="rowname">DC 7</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:36%"></div></div><span class="barval num">586'</span></div></td><td class="num">12</td><td class="num">6,9%</td></tr>
+          <tr><td class="rowname">Kẽm 190T</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:11%"></div></div><span class="barval num">180'</span></div></td><td class="num">2</td><td class="num">2,1%</td></tr>
+        </tbody>
+      </table></div>
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 3 máy ưu tiên xử lý</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>DC 4</b> <span class="priority-metric">— 1.607' (18 lượt); riêng 2 sự cố khuôn "gãy chốt dẫn hướng" + "cong chốt slider" đã chiếm 644'</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>DC 8</b> <span class="priority-metric">— 1.409' nhưng nhiều lượt nhất tuần (25 lượt) — mỗi lượt ngắn, rải rác nhiều nguyên nhân khác nhau (đúc mẫu, nghỉ làm, bã trầu)</span></div></li>
+            <li><span class="priority-rank">3</span><div class="priority-body"><b>DC 11</b> <span class="priority-metric">— 1.331' (15 lượt)</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNTIME BY ISSUE TYPE -->
+  <section>
+    <div class="sec-head">
+      <h2>Thời gian dừng theo chủng loại vấn đề</h2>
+      <span class="sec-note">Xếp theo tổng phút dừng, chỉ Ca 1 + Ca 2 — B1 (chất lượng) và C3 (đổi khuôn) chiếm hơn 1/2 toàn tuần</span>
+    </div>
+    <div class="panel">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Mã lỗi</th><th>Phút dừng</th><th class="num">Lượt</th><th class="num">Tỉ trọng</th></tr></thead>
+        <tbody>
+          <tr><td class="rowname">B1 — Sự cố chất lượng sản phẩm</td><td><div class="barcell"><div class="bartrack"><div class="barfill crit" style="width:100%"></div></div><span class="barval num">2.547'</span></div></td><td class="num">49</td><td class="num">30,0%</td></tr>
+          <tr><td class="rowname">C3 — Đổi khuôn</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:73%"></div></div><span class="barval num">1.867'</span></div></td><td class="num">13</td><td class="num">22,0%</td></tr>
+          <tr><td class="rowname">A2 — Sự cố khuôn</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:50%"></div></div><span class="barval num">1.271'</span></div></td><td class="num">13</td><td class="num">15,0%</td></tr>
+          <tr><td><div class="rowname">F1 — Chất lượng, IPQC phát hiện NG</div><div class="rowsub">19/20 lượt chỉ ghi mã ngắn "F1", thiếu mô tả chi tiết</div></td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:36%"></div></div><span class="barval num">912'</span></div></td><td class="num">20</td><td class="num">10,7%</td></tr>
+          <tr><td class="rowname">D1 — Thiếu nhân lực</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:26%"></div></div><span class="barval num">658'</span></div></td><td class="num">4</td><td class="num">7,7%</td></tr>
+          <tr><td class="rowname">C2 — Hết nguyên liệu</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:16%"></div></div><span class="barval num">415'</span></div></td><td class="num">8</td><td class="num">4,9%</td></tr>
+          <tr><td class="rowname">A1 — Sự cố máy đúc</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:15%"></div></div><span class="barval num">373'</span></div></td><td class="num">7</td><td class="num">4,4%</td></tr>
+          <tr><td class="rowname">C1 — Thay đổi KHSX</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:9%"></div></div><span class="barval num">234'</span></div></td><td class="num">1</td><td class="num">2,8%</td></tr>
+          <tr><td class="rowname">E2 — Vệ sinh theo kế hoạch</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:9%"></div></div><span class="barval num">219'</span></div></td><td class="num">2</td><td class="num">2,6%</td></tr>
+        </tbody>
+      </table></div>
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 3 loại vấn đề ưu tiên xử lý</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>B1 — Sự cố chất lượng sản phẩm</b> <span class="priority-metric">— 2.547' (30,0%, 49 lượt), phần lớn từ 1 nguyên nhân lặp lại: "bã trầu" (612')</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>C3 — Đổi khuôn</b> <span class="priority-metric">— 1.867' (22,0%, 13 lượt), trung bình ~144'/lượt — quy trình chuẩn bị khuôn đáng xem lại</span></div></li>
+            <li><span class="priority-rank">3</span><div class="priority-body"><b>A2 — Sự cố khuôn</b> <span class="priority-metric">— 1.271' (15,0%, 13 lượt), tập trung ở DC 4 (644')</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNTIME BY PRODUCT -->
+  <section>
+    <div class="sec-head">
+      <h2>Thời gian dừng theo mã sản phẩm</h2>
+      <span class="sec-note">10/14 mã có phút dừng trong tuần, chỉ Ca 1 + Ca 2</span>
+    </div>
+    <div class="panel">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Mã SP</th><th>Tên sản phẩm</th><th>Phút dừng</th><th class="num">Lượt</th></tr></thead>
+        <tbody>
+          <tr><td class="rowname">AST-PAN-01</td><td class="rowsub">Panel FR</td><td><div class="barcell"><div class="bartrack"><div class="barfill crit" style="width:100%"></div></div><span class="barval num">1.114'</span></div></td><td class="num">16</td></tr>
+          <tr><td class="rowname">EXE-PLY-01</td><td class="rowsub">P PLLY SLD - BJJ</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:91%"></div></div><span class="barval num">1.016'</span></div></td><td class="num">12</td></tr>
+          <tr><td class="rowname">EXE-OUT-01</td><td class="rowsub">CL OUTER</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:76%"></div></div><span class="barval num">852'</span></div></td><td class="num">17</td></tr>
+          <tr><td class="rowname">TTI-PUM-02</td><td class="rowsub">PUMP 1014</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:76%"></div></div><span class="barval num">851'</span></div></td><td class="num">6</td></tr>
+          <tr><td class="rowname">FCC-KFM-01</td><td class="rowsub">KFM</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:63%"></div></div><span class="barval num">707'</span></div></td><td class="num">16</td></tr>
+          <tr><td class="rowname">TTI-MOT-05</td><td class="rowsub">MOTOR 8002</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:63%"></div></div><span class="barval num">702'</span></div></td><td class="num">9</td></tr>
+          <tr><td class="rowname">OKA-GJT-06</td><td class="rowsub">Ghế JUST ĐM Size L</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:53%"></div></div><span class="barval num">587'</span></div></td><td class="num">4</td></tr>
+          <tr><td class="rowname">FCC-OUT-01</td><td class="rowsub">Outer K09</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:53%"></div></div><span class="barval num">586'</span></div></td><td class="num">12</td></tr>
+          <tr><td class="rowname">EXE-PLT-01</td><td class="rowsub">CL PR PLAT</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:41%"></div></div><span class="barval num">460'</span></div></td><td class="num">7</td></tr>
+          <tr><td class="rowname">TTI-MOT-02</td><td class="rowsub">MOTOR 9002</td><td><div class="barcell"><div class="bartrack"><div class="barfill" style="width:40%"></div></div><span class="barval num">446'</span></div></td><td class="num">9</td></tr>
+        </tbody>
+      </table></div>
+      <div class="panel-pad" style="padding-top:0">
+        <div class="priority-box" style="margin-bottom:0">
+          <div class="priority-box-head">🎯 3 mã sản phẩm ưu tiên xử lý</div>
+          <ol class="priority-list">
+            <li><span class="priority-rank">1</span><div class="priority-body"><b>AST-PAN-01 · Panel FR</b> <span class="priority-metric">— 1.114' (16 lượt), riêng "đánh bã trầu, kéo xước thao" + "bã trầu" chiếm 660'</span></div></li>
+            <li><span class="priority-rank">2</span><div class="priority-body"><b>EXE-PLY-01 · P PLLY SLD - BJJ</b> <span class="priority-metric">— 1.016' (12 lượt)</span></div></li>
+            <li><span class="priority-rank">3</span><div class="priority-body"><b>EXE-OUT-01 · CL OUTER</b> <span class="priority-metric">— 852' (17 lượt), nhiều lượt nhất trong nhóm dẫn đầu</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOP 3 PROBLEMS -->
+  <section>
+    <div class="sec-head">
+      <h2>3 vấn đề lớn nhất bên trong từng máy / loại vấn đề / mã sản phẩm</h2>
+      <span class="sec-note">Xếp theo phút dừng cộng dồn của đúng nội dung "vấn đề" ghi trong nhật ký sự cố, 17/08–22/08, chỉ Ca 1 + Ca 2</span>
+    </div>
+
+    <div class="subhead">Theo máy (8/8 máy có dừng máy trong tuần)</div>
+    <div class="cardgrid">
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 4</span><span class="pcard-total">1.607' · 18 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Gãy chốt dẫn hướng</span><span class="problem-meta">360'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Cong chốt slider</span><span class="problem-meta">284'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Thay khuôn</span><span class="problem-meta">220'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 8</span><span class="pcard-total">1.409' · 25 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đúc mẫu (không rõ khuôn)</span><span class="problem-meta">403' · 2 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Phương nghỉ làm</span><span class="problem-meta">238'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Bã trầu</span><span class="problem-meta">205' · 9 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 11</span><span class="pcard-total">1.331' · 15 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đúc mẫu (không rõ khuôn)</span><span class="problem-meta">300'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Không ghi nội dung xử lý</span><span class="problem-meta">200' · 2 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Thay khuôn</span><span class="problem-meta">180'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 6</span><span class="pcard-total">1.312' · 24 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đổi khuôn từ EXE-PLT-01</span><span class="problem-meta">195' · 2 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Không ghi nội dung xử lý</span><span class="problem-meta">175' · 2 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Kẹt pin đẩy sản phẩm</span><span class="problem-meta">110' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 5</span><span class="pcard-total">1.114' · 16 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đánh bã trầu, kéo xước thao</span><span class="problem-meta">480'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Nhân viên xin nghỉ</span><span class="problem-meta">240'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Bã trầu</span><span class="problem-meta">180' · 8 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 10</span><span class="pcard-total">957' · 5 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Trật jic chân ghế</span><span class="problem-meta">370'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">NG lotmax</span><span class="problem-meta">270' · 2 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Máy sản xuất đến 18h00 (thay đổi KHSX)</span><span class="problem-meta">234'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">DC 7</span><span class="pcard-total">586' · 12 lượt</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">IPQC định kỳ NG: cào xước, dính nhôm</span><span class="problem-meta">127'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Gãy chốt phi 4</span><span class="problem-meta">90'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">NG nốt max</span><span class="problem-meta">80'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">Kẽm 190T</span><span class="pcard-total">180' · 2 lượt (chỉ có 2 vấn đề)</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Lên khuôn</span><span class="problem-meta">110'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Rò nước</span><span class="problem-meta">70'</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="subhead">Theo loại vấn đề (9/9 mã lỗi phát sinh trong tuần)</div>
+    <div class="cardgrid">
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">B1 — Sự cố CL sản phẩm</span></div>
+        <div class="pcard-sub">2.547' · 49 lượt</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Bã trầu</span><span class="problem-meta">612' · 26 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Đánh bã trầu, kéo xước thao (DC5)</span><span class="problem-meta">480'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Trật jic chân ghế (DC10)</span><span class="problem-meta">370'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">C3 — Đổi khuôn</span></div>
+        <div class="pcard-sub">1.867' · 13 lượt</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đúc mẫu</span><span class="problem-meta">703' · 3 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Thay khuôn</span><span class="problem-meta">460' · 3 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Đổi khuôn từ EXE-PLT-01 (DC6)</span><span class="problem-meta">195' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">A2 — Sự cố khuôn</span></div>
+        <div class="pcard-sub">1.271' · 13 lượt</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Gãy chốt dẫn hướng (DC4)</span><span class="problem-meta">360'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Cong chốt slider (DC4)</span><span class="problem-meta">284'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Lỗi limit ben dầu</span><span class="problem-meta">150' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">F1 — CL / IPQC phát hiện NG</span></div>
+        <div class="pcard-sub">912' · 20 lượt <span style="color:var(--muted)">(gộp 2 nhãn trùng "F1")</span></div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">IPQC định kỳ NG: cào xước, dính nhôm</span><span class="problem-meta">127'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">IPQC định kỳ NG: cào xước/nhăn, bong nhôm</span><span class="problem-meta">126'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">IPQC định kỳ NG: cào xước/nhăn, bong nhôm (biến thể khác)</span><span class="problem-meta">78'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">D1 — Thiếu nhân lực</span></div>
+        <div class="pcard-sub">658' · 4 lượt</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Nhân viên xin nghỉ (DC5)</span><span class="problem-meta">240'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Phương nghỉ làm (FCC-KFM-01)</span><span class="problem-meta">238'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Thiếu nhân viên vận hành máy</span><span class="problem-meta">120'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">C2 — Hết nguyên liệu</span></div>
+        <div class="pcard-sub">415' · 8 lượt</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Lò ủ hết nhôm — xe vận chuyển không tiếp liệu kịp</span><span class="problem-meta">235' · 4 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Hết Al</span><span class="problem-meta">110' · 3 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Không ghi nội dung xử lý</span><span class="problem-meta">70'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">A1 — Sự cố máy đúc</span></div>
+        <div class="pcard-sub">373' · 7 lượt</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đồng hồ áp lực dầu báo không đúng</span><span class="problem-meta">90'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Tay gắp bị vênh, SP NG chân ghế</span><span class="problem-meta">83'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Kẹt đầu típ</span><span class="problem-meta">60'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">C1 — Thay đổi KHSX</span></div>
+        <div class="pcard-sub">234' · 1 lượt (chỉ có 1 vấn đề)</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Máy sản xuất đến 18h00 (DC10)</span><span class="problem-meta">234'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">E2 — Vệ sinh theo KH</span></div>
+        <div class="pcard-sub">219' · 2 lượt (chỉ có 2 vấn đề)</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Không ghi nội dung xử lý</span><span class="problem-meta">120'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Vệ sinh lò theo kế hoạch (EXE-OUT-01)</span><span class="problem-meta">99'</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="subhead">Theo mã sản phẩm (14/14 mã có phát sinh dừng máy trong tuần)</div>
+    <div class="cardgrid">
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">AST-PAN-01</span><span class="pcard-total">1.114' · 16 lượt</span></div>
+        <div class="pcard-sub">Panel FR</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đánh bã trầu, kéo xước thao</span><span class="problem-meta">480'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Nhân viên xin nghỉ</span><span class="problem-meta">240'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Bã trầu</span><span class="problem-meta">180' · 8 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">EXE-PLY-01</span><span class="pcard-total">1.016' · 12 lượt</span></div>
+        <div class="pcard-sub">P PLLY SLD - BJJ</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đúc mẫu (không rõ khuôn)</span><span class="problem-meta">300'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Không ghi nội dung xử lý</span><span class="problem-meta">200' · 2 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">IPQC định kỳ NG: cào xước/nhăn, bong nhôm</span><span class="problem-meta">126'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">EXE-OUT-01</span><span class="pcard-total">852' · 17 lượt</span></div>
+        <div class="pcard-sub">CL OUTER</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đổi khuôn từ EXE-PLT-01</span><span class="problem-meta">195' · 2 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Vệ sinh lò theo kế hoạch</span><span class="problem-meta">99'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Bã trầu</span><span class="problem-meta">97' · 3 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">TTI-PUM-02</span><span class="pcard-total">851' · 6 lượt</span></div>
+        <div class="pcard-sub">PUMP 1014</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Gãy chốt dẫn hướng</span><span class="problem-meta">360'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Cong chốt slider</span><span class="problem-meta">284'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Lỗi limit ben dầu</span><span class="problem-meta">150' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">FCC-KFM-01</span><span class="pcard-total">707' · 16 lượt</span></div>
+        <div class="pcard-sub">KFM</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Phương nghỉ làm</span><span class="problem-meta">238'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Bã trầu</span><span class="problem-meta">185' · 8 lượt</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Bã trầu, kéo xước răng</span><span class="problem-meta">105' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">TTI-MOT-05</span><span class="pcard-total">702' · 9 lượt</span></div>
+        <div class="pcard-sub">MOTOR 8002</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đúc mẫu (không rõ khuôn)</span><span class="problem-meta">403' · 2 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">IPQC định kỳ NG: cào xước/nhăn, bong nhôm</span><span class="problem-meta">78'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Kẹt đầu típ</span><span class="problem-meta">60'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">OKA-GJT-06</span><span class="pcard-total">587' · 4 lượt</span></div>
+        <div class="pcard-sub">Ghế JUST ĐM Size L</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">NG lotmax</span><span class="problem-meta">270' · 2 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Máy sản xuất đến 18h00</span><span class="problem-meta">234'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Tay gắp bị vênh, SP NG chân ghế</span><span class="problem-meta">83'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">FCC-OUT-01</span><span class="pcard-total">586' · 12 lượt</span></div>
+        <div class="pcard-sub">Outer K09</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">IPQC định kỳ NG: cào xước, dính nhôm</span><span class="problem-meta">127'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Gãy chốt phi 4</span><span class="problem-meta">90'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">NG nốt max</span><span class="problem-meta">80'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">EXE-PLT-01</span><span class="pcard-total">460' · 7 lượt</span></div>
+        <div class="pcard-sub">CL PR PLAT</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Kẹt pin đẩy sản phẩm</span><span class="problem-meta">110' · 2 lượt</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Không ghi nội dung xử lý</span><span class="problem-meta">105'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Đồng hồ áp lực dầu báo không đúng</span><span class="problem-meta">90'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">TTI-MOT-02</span><span class="pcard-total">446' · 9 lượt</span></div>
+        <div class="pcard-sub">MOTOR 9002</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Đổi khuôn từ TTI-PUM-02, chờ hoàn thiện + lên khuôn</span><span class="problem-meta">144'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Đổi khuôn từ TTI-MOT-03</span><span class="problem-meta">75'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Hàng nhăn đen</span><span class="problem-meta">60' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">OKA-GJT-07</span><span class="pcard-total">370' · 1 lượt</span></div>
+        <div class="pcard-sub">Ghế JUST CT Size LL</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Trật jic chân ghế</span><span class="problem-meta">370'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">FCC-KPH-02</span><span class="pcard-total">315' · 3 lượt (chỉ có 2 vấn đề)</span></div>
+        <div class="pcard-sub">KPH-9001</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Thay khuôn</span><span class="problem-meta">180'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Gãy chốt phi 6</span><span class="problem-meta">135' · 2 lượt</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">TTI-MOT-03</span><span class="pcard-total">310' · 3 lượt</span></div>
+        <div class="pcard-sub">MOTOR 9003</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Thay khuôn</span><span class="problem-meta">220'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Lõm pin đẩy sp</span><span class="problem-meta">50'</span></li>
+          <li><span class="rank">3</span><span class="problem-txt">Kiểm tra hàng sau đúc</span><span class="problem-meta">40'</span></li>
+        </ol>
+      </div>
+      <div class="pcard">
+        <div class="pcard-head"><span class="pcard-title">BPH-SHO-03</span><span class="pcard-total">180' · 2 lượt (chỉ có 2 vấn đề)</span></div>
+        <div class="pcard-sub">CL SHOE 3B69</div>
+        <ol>
+          <li><span class="rank">1</span><span class="problem-txt">Lên khuôn</span><span class="problem-meta">110'</span></li>
+          <li><span class="rank">2</span><span class="problem-txt">Rò nước</span><span class="problem-meta">70'</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:20px">
+      <span>ⓘ</span>
+      <div><b>Vấn đề lặp lại rõ nhất tuần này: "bã trầu"</b> (cặn/xỉ nhôm bám khuôn) — xuất hiện đơn lẻ 26 lượt (612') trong mã lỗi B1, cộng thêm các lượt mô tả chi tiết hơn ("đánh bã trầu, kéo xước thao"...) tổng cộng gần 1.000 phút, trải trên ít nhất 4 máy (DC5, DC8, DC6, EXE-OUT-01/EXE-PLT-01) và nhiều mã SP khác nhau — đây là vấn đề công nghệ/khuôn lặp lại, không phải sự cố đơn lẻ của 1 máy. Đứng thứ 2 là cụm "đúc mẫu / thay khuôn" khi đổi SP (C3), tổng gần 1.900 phút chỉ từ 13 lượt — mỗi lượt đổi khuôn trung bình mất ~144 phút, đáng để xem lại quy trình chuẩn bị khuôn trước khi đổi ca.</div>
+    </div>
+  </section>
+
+  <footer>
+    <div><b style="color:var(--ink-2)">Ghi chú số liệu:</b> Toàn bộ báo cáo đã loại dữ liệu <b>Ca ngày 17/08</b> (KH 8.770, TT 6.960, 1.181' dừng máy, 10 sự cố) — phương án tuần này chỉ chạy 2 ca 8 tiếng (Ca 1 + Ca 2). Kế hoạch/thực tế và % hoàn thành lấy từ báo cáo kết ca (duc_bao_cao_ca), chỉ gồm 5 ngày đã kết ca (17–21/08). Các bảng phút dừng theo máy/vấn đề/mã SP lấy từ nhật ký sự cố chi tiết (duc_su_co_log), phạm vi 17–22/08 nên bao gồm cả sự cố đã đóng trong Ca 1 hôm nay — vì vậy tổng phút dừng ở các bảng chi tiết (8.496') cao hơn tổng ở khối KPI đầu trang (7.857', chỉ tính 5 ngày kết ca). Sản lượng theo máy/mã SP cộng thêm số liệu Ca 1 hôm nay (đang chạy, chưa kết ca) nên tỉ lệ hoàn thành trong ca này chưa phản ánh đầy đủ.</div>
+    <div style="margin-top:6px">Xuất lúc báo cáo được tạo · mes-toyotaki · dữ liệu Supabase, không có số liệu giả định.</div>
+  </footer>
+
+</div>
