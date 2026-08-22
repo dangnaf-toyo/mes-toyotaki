@@ -279,13 +279,16 @@ async function loadWeek(monday){
 
   renderReport({ monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht });
 
+  // Hiện khối báo cáo TRƯỚC khi dựng bảng hành động — syncRowHeight() cần đo
+  // scrollHeight thật của các ô textarea, mà phần tử display:none luôn báo
+  // scrollHeight = 0, khiến chiều cao dòng bị "đóng băng" ở mức tối thiểu.
+  hideMsg();
+  document.getElementById('reportBody').style.display = 'block';
+
   actionRows = (actionRes.data || []).map(r => ({ ...r }));
   actionRowsSaved = actionRows.length > 0;
   if (!actionRowsSaved) actionRows = suggestActionRows(suco);
   renderActionTable();
-
-  hideMsg();
-  document.getElementById('reportBody').style.display = 'block';
 }
 
 function computeAll(ctx){
