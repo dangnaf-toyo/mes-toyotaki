@@ -369,12 +369,12 @@ function computeAll(ctx){
   const prodMachine = [...prodByMay.entries()].map(([ma_may, rs]) => {
     const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
     return { ma_may, kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
-  }).sort((a,b)=> b.kh - a.kh);
+  }).sort((a,b)=> b.ht - a.ht);
   const prodBySp = groupBy(prodRows, r=>r.ma_sp);
   const prodProduct = [...prodBySp.entries()].map(([ma_sp, rs]) => {
     const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
     return { ma_sp, ten_sp: rs[0].ten_sp || '', kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
-  }).sort((a,b)=> b.kh - a.kh);
+  }).sort((a,b)=> b.ht - a.ht);
 
   return { days, maxKh, totalKh, totalTt, totalSc, totalPhut, totalNg, avgHt, nDaysClosed, worstShifts,
     ca1, ca2, changeover, downtimeMachine, downtimeIssue, downtimeProduct, totalDowntimeSuco, prodMachine, prodProduct };
@@ -414,9 +414,9 @@ function renderReport(ctx){
   html += '</div>';
 
   // Sản lượng theo mã SP
-  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2</span>';
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần</span>';
   html += tableWrap(['Mã SP','Tên sản phẩm','Kế hoạch','Thực tế','Hoàn thành'],
-    c.prodProduct.slice(0,12).map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
+    c.prodProduct.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
       '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>').join(''));
   const spByShort = c.prodProduct.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
@@ -425,7 +425,7 @@ function renderReport(ctx){
   html += '</div>';
 
   // Sản lượng theo máy
-  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2</span>';
+  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần</span>';
   html += tableWrap(['Máy','Kế hoạch','Thực tế','Hoàn thành','NG'],
     c.prodMachine.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_may) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
