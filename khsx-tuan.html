@@ -206,7 +206,7 @@ tr:hover td{background:var(--bg-sunken)}
       <div class="fg"><label>Mã SP *</label><select id="f-ma-sp" onchange="onMaSpChange()"><option value="">— Chọn mã SP —</option></select></div>
       <div class="fg full"><label>Tên SP</label><input id="f-ten-sp" disabled style="background:var(--bg-sunken)"></div>
       <div class="fg full">
-        <label>Số khuôn</label>
+        <label>Số khuôn *</label>
         <select id="f-so-khuon-select" onchange="onSoKhuonSelectChange()" style="display:none"></select>
         <input id="f-so-khuon">
         <div style="font-size:10.5px;color:var(--text-dim);margin-top:2px" id="f-so-khuon-hint"></div>
@@ -312,7 +312,7 @@ function fmtDateVN(d){
 }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 // Ô ngày = 0 (không có kế hoạch) hiện dấu "—" cho dễ đọc thay vì số 0 lặp lại.
-function fmtDayNum(n){ return (Number(n)||0) === 0 ? '—' : fmtNum(n); }
+function fmtDayNum(n){ return (Number(n)||0) === 0 ? '' : fmtNum(n); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // =============================================================================
@@ -796,6 +796,8 @@ document.getElementById('btnSaveRowDuc').addEventListener('click', async () => {
   const maSp = document.getElementById('f-ma-sp').value.trim();
   if (!maMay) return showMsg('Nhập mã máy', 'err', 2500);
   if (!maSp) return showMsg('Nhập mã SP', 'err', 2500);
+  const soKhuonVal = document.getElementById('f-so-khuon').value.trim();
+  if (!soKhuonVal) return showMsg('Công đoạn Đúc bắt buộc phải nhập Số khuôn', 'err', 3000);
 
   const payload = {
     tuan_bat_dau: fmtDate(weekMonday),
@@ -1045,10 +1047,20 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
       return showMsg('Dòng ' + (r+1) + ': thiếu Mã SP', 'err', 4000);
     }
     const days = iDays.map(ci => ci === -1 ? 0 : (Number(row[ci]) || 0));
+    let soKhuon = iKhuon === -1 ? '' : String(row[iKhuon] ?? '').trim();
+    // Đúc bắt buộc phải có số khuôn — nếu file không ghi (hoặc để trống), tự
+    // điền theo khuôn đã khai báo cho mã SP (master_products.so_khuon), kể cả
+    // trường hợp nhiều mã SP dùng chung 1 khuôn (chỉ tự điền khi mã SP đó có
+    // ĐÚNG 1 khuôn — nhiều khuôn thì bắt buộc người dùng tự ghi rõ trong file).
+    if (activeTab === 'Đúc' && !soKhuon) {
+      const molds = moldsByProduct[maSp] || [];
+      if (molds.length === 1) soKhuon = molds[0];
+      else return showMsg('Dòng ' + (r+1) + ' (mã SP ' + maSp + '): thiếu Số khuôn — công đoạn Đúc bắt buộc phải có số khuôn' + (molds.length > 1 ? ' (SP này có ' + molds.length + ' khuôn, phải ghi rõ khuôn nào trong file)' : ''), 'err', 5000);
+    }
     parsed.push({
       ma_may: maMay, ma_sp: maSp,
       ten_sp: productMap[maSp] || '',
-      so_khuon: iKhuon === -1 ? '' : String(row[iKhuon] ?? '').trim(),
+      so_khuon: soKhuon,
       days, ghi_chu: iGhiChu === -1 ? '' : String(row[iGhiChu] ?? '').trim(),
     });
   }
