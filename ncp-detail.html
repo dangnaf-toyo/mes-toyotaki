@@ -72,20 +72,26 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 .ds-group{display:flex;flex-direction:column;gap:8px}
 .ds-group-head{display:flex;align-items:center;justify-content:space-between}
 .ds-group-head .h{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:6px}
-.ds-empty{font-size:12px;color:var(--text-dim);padding:10px;text-align:center;background:var(--bg-sunken);border-radius:7px}
 
 .ds-table-wrap{overflow-x:auto}
-.ds-row-head,.ds-row{display:grid;grid-template-columns:1.8fr 1.3fr 1fr 1fr 1.8fr 30px;gap:10px;min-width:860px}
-.ds-row-head{padding:0 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted)}
-.ds-list{display:flex;flex-direction:column;gap:8px}
-.ds-row{border:1px solid var(--border);border-radius:9px;padding:10px;background:#fff;align-items:start}
-.ds-row textarea{min-height:60px;width:100%}
-.ds-row input[type=text],.ds-row input[type=date]{width:100%}
+.ds-table{width:100%;border-collapse:collapse;min-width:860px;font-family:inherit;font-size:13px;color:var(--text)}
+.ds-table th{text-align:left;padding:6px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);border-bottom:2px solid var(--border)}
+.ds-table td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.ds-table tr:last-child td{border-bottom:none}
+.ds-table col.col-noidung{width:26%}
+.ds-table col.col-img{width:16%}
+.ds-table col.col-nguoi{width:14%}
+.ds-table col.col-han{width:12%}
+.ds-table col.col-danhgia{width:26%}
+.ds-table col.col-remove{width:30px}
+.ds-row textarea{min-height:56px;width:100%;font-family:inherit;font-size:13px}
+.ds-row input[type=text],.ds-row input[type=date]{width:100%;font-family:inherit;font-size:13px}
 .ds-row-img{display:flex;flex-wrap:wrap;gap:5px;align-items:flex-start}
 .ds-row-img .img-thumb{width:40px;height:40px}
 .ds-row-img .img-upload-btn{width:40px;height:40px;padding:0;justify-content:center;font-size:15px}
 .ds-row-img .img-upload-btn span{display:none}
 .ds-row .btn-remove{padding:4px 6px;font-size:11px;width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+.ds-empty-cell{text-align:center;color:var(--text-dim);padding:14px;font-size:12px}
 
 .btn{padding:9px 16px;border-radius:8px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
 .btn-primary{background:var(--accent);color:#fff}
@@ -157,15 +163,21 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
     <div class="ds-group">
       <div class="ds-group-head"><span class="h">⏱ Đối sách tạm thời</span><button type="button" class="btn btn-add" id="add-btn-ps_tam_thoi" onclick="addDoiSach('ps_tam_thoi')">+ Thêm đối sách</button></div>
       <div class="ds-table-wrap">
-        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
-        <div class="ds-list" id="ds-ps_tam_thoi-list"></div>
+        <table class="ds-table">
+          <colgroup><col class="col-noidung"><col class="col-img"><col class="col-nguoi"><col class="col-han"><col class="col-danhgia"><col class="col-remove"></colgroup>
+          <thead><tr><th>Nội dung đối sách</th><th>Hình ảnh minh hoạ</th><th>Người thực hiện</th><th>Thời hạn</th><th>Đánh giá hiệu quả</th><th></th></tr></thead>
+          <tbody id="ds-ps_tam_thoi-list"></tbody>
+        </table>
       </div>
     </div>
     <div class="ds-group">
       <div class="ds-group-head"><span class="h">🏗 Đối sách lâu dài</span><button type="button" class="btn btn-add" id="add-btn-ps_lau_dai" onclick="addDoiSach('ps_lau_dai')">+ Thêm đối sách</button></div>
       <div class="ds-table-wrap">
-        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
-        <div class="ds-list" id="ds-ps_lau_dai-list"></div>
+        <table class="ds-table">
+          <colgroup><col class="col-noidung"><col class="col-img"><col class="col-nguoi"><col class="col-han"><col class="col-danhgia"><col class="col-remove"></colgroup>
+          <thead><tr><th>Nội dung đối sách</th><th>Hình ảnh minh hoạ</th><th>Người thực hiện</th><th>Thời hạn</th><th>Đánh giá hiệu quả</th><th></th></tr></thead>
+          <tbody id="ds-ps_lau_dai-list"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -182,15 +194,21 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
     <div class="ds-group">
       <div class="ds-group-head"><span class="h">⏱ Đối sách tạm thời</span><button type="button" class="btn btn-add" id="add-btn-lx_tam_thoi" onclick="addDoiSach('lx_tam_thoi')">+ Thêm đối sách</button></div>
       <div class="ds-table-wrap">
-        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
-        <div class="ds-list" id="ds-lx_tam_thoi-list"></div>
+        <table class="ds-table">
+          <colgroup><col class="col-noidung"><col class="col-img"><col class="col-nguoi"><col class="col-han"><col class="col-danhgia"><col class="col-remove"></colgroup>
+          <thead><tr><th>Nội dung đối sách</th><th>Hình ảnh minh hoạ</th><th>Người thực hiện</th><th>Thời hạn</th><th>Đánh giá hiệu quả</th><th></th></tr></thead>
+          <tbody id="ds-lx_tam_thoi-list"></tbody>
+        </table>
       </div>
     </div>
     <div class="ds-group">
       <div class="ds-group-head"><span class="h">🏗 Đối sách lâu dài</span><button type="button" class="btn btn-add" id="add-btn-lx_lau_dai" onclick="addDoiSach('lx_lau_dai')">+ Thêm đối sách</button></div>
       <div class="ds-table-wrap">
-        <div class="ds-row-head"><div>Nội dung đối sách</div><div>Hình ảnh minh hoạ</div><div>Người thực hiện</div><div>Thời hạn</div><div>Đánh giá hiệu quả</div><div></div></div>
-        <div class="ds-list" id="ds-lx_lau_dai-list"></div>
+        <table class="ds-table">
+          <colgroup><col class="col-noidung"><col class="col-img"><col class="col-nguoi"><col class="col-han"><col class="col-danhgia"><col class="col-remove"></colgroup>
+          <thead><tr><th>Nội dung đối sách</th><th>Hình ảnh minh hoạ</th><th>Người thực hiện</th><th>Thời hạn</th><th>Đánh giá hiệu quả</th><th></th></tr></thead>
+          <tbody id="ds-lx_lau_dai-list"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -375,24 +393,24 @@ function updateDoiSachField(key, idx, field, value){ state.doiSach[key][idx][fie
 function renderDoiSachList(key){
   const list = state.doiSach[key];
   const container = document.getElementById('ds-' + key + '-list');
-  if (!list.length) { container.innerHTML = '<div class="ds-empty">Chưa có đối sách nào.</div>'; return; }
+  if (!list.length) { container.innerHTML = '<tr><td class="ds-empty-cell" colspan="6">Chưa có đối sách nào.</td></tr>'; return; }
   container.innerHTML = list.map((item, idx) => dsCardHtml(key, idx, item)).join('');
 }
 
 function dsCardHtml(key, idx, item){
   const dis = state.locked ? 'disabled' : '';
   const ro = state.locked ? 'readonly' : '';
-  return `<div class="ds-row">
-    <textarea ${ro} placeholder="Nội dung đối sách..." oninput="updateDoiSachField('${key}',${idx},'noi_dung',this.value)">${escapeHtml(item.noi_dung)}</textarea>
-    <div class="ds-row-img">
+  return `<tr class="ds-row">
+    <td><textarea ${ro} placeholder="Nội dung đối sách..." oninput="updateDoiSachField('${key}',${idx},'noi_dung',this.value)">${escapeHtml(item.noi_dung)}</textarea></td>
+    <td><div class="ds-row-img">
       ${dsImgThumbsHtml(item.hinh_anh, key, idx)}
       ${state.locked ? '' : `<label class="img-upload-btn" title="Thêm ảnh">📷<span>Thêm ảnh</span><input type="file" accept="image/*" class="hidden" onchange="onDsImageSelected(event,'${key}',${idx})"></label>`}
-    </div>
-    <input type="text" autocomplete="off" ${ro} placeholder="Người thực hiện" value="${escapeHtml(item.nguoi_thuc_hien)}" oninput="updateDoiSachField('${key}',${idx},'nguoi_thuc_hien',this.value)">
-    <input type="date" ${dis} value="${item.thoi_han ? String(item.thoi_han).slice(0, 10) : ''}" onchange="updateDoiSachField('${key}',${idx},'thoi_han',this.value)">
-    <textarea ${ro} placeholder="Đánh giá hiệu quả..." oninput="updateDoiSachField('${key}',${idx},'danh_gia',this.value)">${escapeHtml(item.danh_gia)}</textarea>
-    ${state.locked ? '<div></div>' : `<button type="button" class="btn-remove" onclick="removeDoiSach('${key}',${idx})" title="Xoá">✕</button>`}
-  </div>`;
+    </div></td>
+    <td><input type="text" autocomplete="off" ${ro} placeholder="Người thực hiện" value="${escapeHtml(item.nguoi_thuc_hien)}" oninput="updateDoiSachField('${key}',${idx},'nguoi_thuc_hien',this.value)"></td>
+    <td><input type="date" ${dis} value="${item.thoi_han ? String(item.thoi_han).slice(0, 10) : ''}" onchange="updateDoiSachField('${key}',${idx},'thoi_han',this.value)"></td>
+    <td><textarea ${ro} placeholder="Đánh giá hiệu quả..." oninput="updateDoiSachField('${key}',${idx},'danh_gia',this.value)">${escapeHtml(item.danh_gia)}</textarea></td>
+    <td>${state.locked ? '' : `<button type="button" class="btn-remove" onclick="removeDoiSach('${key}',${idx})" title="Xoá">✕</button>`}</td>
+  </tr>`;
 }
 
 function dsImgThumbsHtml(urls, key, idx){
