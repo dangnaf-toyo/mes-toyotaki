@@ -73,6 +73,8 @@
   td.num,th.num{text-align:right;}
   .rowname{font-weight:700;}
   .rowsub{color:var(--tk-muted);font-size:11.5px;}
+  .sp-row-kh td{border-bottom:none;padding-bottom:2px;}
+  .sp-row-tt td{padding-top:2px;}
 
   .barcell{display:flex;align-items:center;gap:8px;min-width:160px;}
   .bartrack{flex:1;height:7px;background:#EFE2CE;border-radius:4px;overflow:hidden;}
@@ -425,12 +427,15 @@ function renderReport(ctx){
   // Sản lượng theo mã SP
   const dayNamesShort = ['T2','T3','T4','T5','T6','T7'];
   const dayHeaders = c.days.map((d,i) => dayNamesShort[i] + '<br><span style="font-weight:400;font-size:9px;color:var(--tk-muted)">' + pad(d.date.getDate()) + '/' + pad(d.date.getMonth()+1) + '</span>');
-  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần. Mỗi ngày hiển thị Kế hoạch/Thực tế.</span>';
-  html += tableWrap(['Mã SP','Tên sản phẩm', ...dayHeaders, 'Kế hoạch','Thực tế','Hoàn thành'],
-    c.prodProduct.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
-      p.byDay.map(d => '<td class="num">' + (d.kh || d.tt ? fmtNum(d.kh) + '/' + fmtNum(d.tt) : '–') + '</td>').join('') +
-      '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
-      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>').join(''));
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần. Mỗi mã SP có 2 dòng: KH ở trên, TT ở dưới.</span>';
+  html += tableWrap(['Mã SP','Tên sản phẩm','', ...dayHeaders, 'Tổng','Hoàn thành'],
+    c.prodProduct.map(p =>
+      '<tr class="sp-row-kh"><td class="rowname" rowspan="2">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub" rowspan="2">' + escapeHtml(p.ten_sp) + '</td>' +
+      '<td class="rowsub">KH</td>' + p.byDay.map(d => '<td class="num">' + fmtNum(d.kh) + '</td>').join('') +
+      '<td class="num">' + fmtNum(p.kh) + '</td>' +
+      '<td class="num" rowspan="2"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>' +
+      '<tr class="sp-row-tt"><td class="rowsub">TT</td>' + p.byDay.map(d => '<td class="num">' + fmtNum(d.tt) + '</td>').join('') +
+      '<td class="num">' + fmtNum(p.tt) + '</td></tr>').join(''));
   const downtimeBySp = new Map(c.downtimeProduct.map(x=>[x.ma_sp,x]));
   const spKemNhat = c.prodProduct.filter(p=>p.kh>0).slice().sort((a,b)=>a.ht-b.ht).slice(0,3);
   if (spKemNhat.length) html += priorityBox('3 mã sản phẩm không đạt nhiều nhất (theo % hoàn thành kế hoạch)', spKemNhat.map(p =>
