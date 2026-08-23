@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Truy xuất nguồn gốc — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
   truy-xuat-nguon-goc.html — nhập/quét 1 Tag No, hiện toàn bộ phả hệ:
   - "Nguồn gốc" (ngược): tem này được TÁCH TỪ hoặc GỘP TỪ những tem nào.
@@ -14,47 +18,48 @@
   Đọc công khai, không có thao tác ghi nào ở trang này.
 -->
 <style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;padding:16px 12px 60px;color:var(--text)}
 .wrap{max-width:820px;margin:0 auto}
 .hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .hdr h1{font-size:17px;font-weight:700}
-.hdr p{font-size:10px;color:#999;margin-top:2px}
-.auth-info{font-size:11.5px;color:#667}
-.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
-.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
-.card h2{font-size:13px;font-weight:700;color:#8a5a30;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f5e6d7;display:flex;align-items:center;gap:8px}
+.hdr p{font-size:10px;color:var(--text-dim);margin-top:2px}
+.auth-info{font-size:11.5px;color:var(--text-muted)}
+.auth-info a{color:var(--accent);text-decoration:none;font-weight:600}
+.card{background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-sm);padding:16px;margin-bottom:14px}
+.card h2{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
 .fg{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
-.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
-.fg input{border:1.5px solid #ddd;border-radius:7px;padding:9px 11px;font-size:14.5px;font-family:inherit;width:100%}
-.fg input:focus{outline:none;border-color:#C87941}
-.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;background:#C87941;color:#fff;width:100%}
-.btn:hover{background:#a85e2a}
-.sr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;font-size:13px;gap:10px}
+.fg label{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px}
+.fg input{border:1.5px solid var(--border);border-radius:7px;padding:9px 11px;font-size:14.5px;font-family:inherit;width:100%;background:var(--bg-panel);color:var(--text)}
+.fg input:focus{outline:none;border-color:var(--accent)}
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;width:100%;font-family:inherit}
+.btn:hover{background:var(--accent-hover)}
+.sr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--border);font-size:13px;gap:10px}
 .sr:last-child{border-bottom:none}
-.sr .k{color:#777;font-weight:700;flex-shrink:0}
-.sr .v{text-align:right;font-weight:700}
-.badge-loc{display:inline-block;background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;border-radius:100px;padding:2px 9px;font-size:11px;font-weight:700}
-ul.tree{list-style:none;margin-left:16px;padding-left:14px;border-left:2px solid #f0e0cc}
+.sr .k{color:var(--text-muted);font-weight:700;flex-shrink:0}
+.sr .v{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
+.badge-loc{display:inline-block;background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;border-radius:100px;padding:2px 9px;font-size:11px;font-weight:700}
+ul.tree{list-style:none;margin-left:16px;padding-left:14px;border-left:2px solid var(--border)}
 ul.tree.root{margin-left:0;padding-left:0;border-left:none}
 ul.tree li{margin:6px 0;font-size:12.5px}
-.tag-chip{font-family:monospace;font-weight:700;background:#faf5f0;border-radius:5px;padding:1px 6px}
-.rel-tach{color:#8a5a30}
-.rel-dong_goi{color:#1a7a3a}
-.node-meta{color:#999;font-size:11px}
-.empty{color:#999;font-style:italic;font-size:12.5px;padding:6px 0}
+.tag-chip{font-family:'JetBrains Mono',monospace;font-weight:700;background:var(--bg-sunken);border-radius:5px;padding:1px 6px}
+.rel-tach{color:var(--warn-fg)}
+.rel-dong_goi{color:var(--run-fg)}
+.node-meta{color:var(--text-dim);font-size:11px}
+.empty{color:var(--text-dim);font-style:italic;font-size:12.5px;padding:6px 0}
 #msg{max-width:820px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
-.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
-.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FECACA;display:block!important}
+.ok{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
 .qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
 .qr-modal.show{display:flex}
 .qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(0,0,0,.7);flex-shrink:0}
 .qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
-.qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
 #qrReaderDiv{position:relative;flex:1;overflow:hidden}
 #qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
-.hist-item{font-size:12px;padding:5px 0;border-bottom:1px dashed #eee}
-.hist-note{color:#888;margin-top:2px;font-style:italic}
+.hist-item{font-size:12px;padding:5px 0;border-bottom:1px dashed var(--border)}
+.hist-note{color:var(--text-muted);margin-top:2px;font-style:italic}
 </style>
 </head>
 <body>
@@ -70,7 +75,7 @@ ul.tree li{margin:6px 0;font-size:12.5px}
     </div>
     <div style="display:flex;gap:8px">
       <button type="button" class="btn" id="btnSearch" style="flex:1">🔎 Tra cứu</button>
-      <button type="button" class="btn" id="btnScan" style="flex:1;background:#fff;border:1.5px solid #C87941;color:#C87941">📷 Quét QR</button>
+      <button type="button" class="btn" id="btnScan" style="flex:1;background:var(--bg-panel);border:1.5px solid var(--accent);color:var(--accent)">📷 Quét QR</button>
     </div>
     <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
   </div>

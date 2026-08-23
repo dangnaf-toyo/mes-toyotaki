@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Kho Thành Phẩm — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
   kho-thanh-pham.html — quản lý kho thành phẩm bằng QR: Nhập kho (quét pallet
   OQC hoặc tem lẻ), Xuất hàng (tạo phiếu xuất — khách hàng/số đơn hàng, quét
@@ -21,46 +25,47 @@
   kho_xoa_khoi_phieu_xuat/kho_dong_phieu_xuat).
 -->
 <style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;padding:16px 12px 60px;color:var(--text);-webkit-font-smoothing:antialiased}
 .wrap{max-width:640px;margin:0 auto}
 .hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .hdr h1{font-size:17px;font-weight:700}
-.hdr p{font-size:10px;color:#999;margin-top:2px}
-.auth-info{font-size:11.5px;color:#667}
-.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
+.hdr p{font-size:10px;color:var(--text-dim);margin-top:2px}
+.auth-info{font-size:11.5px;color:var(--text-muted)}
+.auth-info a{color:var(--accent);text-decoration:none;font-weight:600}
 .tabs-wrap{display:flex;gap:8px;margin-bottom:14px}
-.tab-btn{flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;color:#555;font-size:12.5px;font-weight:700;cursor:pointer}
-.tab-btn.active{background:#C87941;border-color:#C87941;color:#fff}
-.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
-.card h2{font-size:13px;font-weight:700;color:#8a5a30;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f5e6d7}
+.tab-btn{flex:1;padding:10px;border:1.5px solid var(--border-strong);border-radius:10px;background:var(--bg-panel);color:var(--text-muted);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.card{background:var(--bg-panel);border-radius:10px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:16px;margin-bottom:14px}
+.card h2{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .fg{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
-.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
-.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:9px 11px;font-size:14px;font-family:inherit;width:100%}
-.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
-.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;background:#C87941;color:#fff;width:100%}
-.btn:hover{background:#a85e2a}
-.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
-.btn-danger{border:1.5px solid #c00;color:#c00;background:#fff;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
-.item-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed #eee;padding:8px 0;font-size:12.5px}
-.item-row .tag{font-family:monospace;font-weight:700}
-.item-row .meta{color:#888;font-size:11px}
-.empty{color:#999;font-style:italic;font-size:12.5px;padding:10px 0}
+.fg label{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select{border:1.5px solid var(--border-strong);border-radius:7px;padding:9px 11px;font-size:14px;font-family:inherit;width:100%;color:var(--text);background:#fff}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;width:100%;font-family:inherit;transition:background .12s}
+.btn:hover{background:var(--accent-hover)}
+.btn-outline{background:var(--bg-panel);border:1.5px solid var(--accent);color:var(--accent)}
+.btn-danger{border:1.5px solid #F87171;color:var(--alarm-fg);background:var(--bg-panel);border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.item-row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed var(--border);padding:8px 0;font-size:12.5px}
+.item-row .tag{font-family:'JetBrains Mono',monospace;font-weight:700}
+.item-row .meta{color:var(--text-muted);font-size:11px}
+.empty{color:var(--text-dim);font-style:italic;font-size:12.5px;padding:10px 0}
 #msg{max-width:640px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
-.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
-.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
-.phieu-hdr{background:#faf5f0;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.ok{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+.phieu-hdr{background:var(--bg-sunken);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;border:1px solid var(--border)}
 .phieu-hdr b{font-size:14px}
 .qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
 .qr-modal.show{display:flex}
 .qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(0,0,0,.7);flex-shrink:0}
 .qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
-.qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 #qrReaderDiv{position:relative;flex:1;overflow:hidden}
 #qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
 .stock-group{margin-bottom:10px}
 .stock-group .sp{font-weight:700;font-size:13px}
-.stock-group .tong{color:#1a7a3a;font-weight:700}
+.stock-group .tong{color:var(--run-fg);font-weight:700;font-family:'JetBrains Mono',monospace}
 </style>
 </head>
 <body>
@@ -120,7 +125,7 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16
         <div id="xuatItemList"><div class="empty">Chưa quét gì.</div></div>
       </div>
       <div class="card">
-        <button class="btn" id="btnDongPhieuXuat" style="background:#1a7a3a">🚚 Đóng phiếu &amp; Xuất kho</button>
+        <button class="btn" id="btnDongPhieuXuat" style="background:var(--run-fg)">🚚 Đóng phiếu &amp; Xuất kho</button>
       </div>
     </div>
   </div>
@@ -397,7 +402,7 @@ async function loadTonKho(){
         <div class="tong">${fmtNum(info.tong)} sp</div>
       </div>
     </div>`).join("") +
-    '<p style="font-size:11px;color:#999;margin-top:8px">' + pallets.length + ' pallet đã nhập kho, ' + temTags.length + ' tem lẻ đang trong kho.</p>';
+    '<p style="font-size:11px;color:var(--text-dim);margin-top:8px">' + pallets.length + ' pallet đã nhập kho, ' + temTags.length + ' tem lẻ đang trong kho.</p>';
 }
 
 </script>

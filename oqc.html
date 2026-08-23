@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,interactive-widget=resizes-content">
 <title>OQC — Đóng gói Pallet — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
   oqc.html — màn hình mới, đóng khoảng trống "pallet/thành phẩm" trong chuỗi
   liên kết truy xuất lệnh SX → ca/máy/khuôn → lot NVL → sọt/pallet → công
@@ -24,53 +28,55 @@
   nhập kho khi đóng pallet ở đây nữa.
 -->
 <style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f2f5;
-  min-height:100vh;display:flex;flex-direction:column;
-  align-items:center;padding:16px 12px 40px}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);
+  min-height:100vh;display:flex;flex-direction:column;color:var(--text);
+  align-items:center;padding:16px 12px 40px;-webkit-font-smoothing:antialiased}
 .hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;
   margin-bottom:16px;width:100%;max-width:500px}
-.hdr h1{font-size:16px;font-weight:700;color:#1a1a2e;line-height:1.2}
-.hdr p{font-size:10px;color:#999;margin-top:2px}
-.auth-info{font-size:11px;color:#667}
-.auth-info a{color:#2a7a4f;text-decoration:none;font-weight:600}
-.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);
+.hdr h1{font-size:16px;font-weight:700;color:var(--text);line-height:1.2}
+.hdr p{font-size:10px;color:var(--text-dim);margin-top:2px}
+.auth-info{font-size:11px;color:var(--text-muted)}
+.auth-info a{color:var(--accent);text-decoration:none;font-weight:600}
+.card{background:var(--bg-panel);border-radius:10px;box-shadow:var(--shadow-sm);border:1px solid var(--border);
   padding:20px 18px;width:100%;max-width:500px;margin-bottom:14px}
-.card-ttl{font-size:12px;font-weight:700;color:#2a7a4f;text-transform:uppercase;
-  letter-spacing:.5px;margin-bottom:14px;padding-bottom:9px;border-bottom:2px solid #dcefe3}
+.card-ttl{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:14px;padding-bottom:9px;border-bottom:2px solid var(--border)}
 .fg{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
-label{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.4px}
-input,select{border:1.5px solid #ddd;border-radius:7px;padding:8px 10px;font-size:13px;
-  color:#1a1a2e;width:100%;font-family:inherit;background:#fff}
-input:focus,select:focus{outline:none;border-color:#2a7a4f;box-shadow:0 0 0 3px rgba(42,122,79,.12)}
+label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px}
+input,select{border:1.5px solid var(--border-strong);border-radius:7px;padding:8px 10px;font-size:13px;
+  color:var(--text);width:100%;font-family:inherit;background:var(--bg-panel)}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,95,165,.12)}
 .btn{padding:12px;border:none;border-radius:9px;font-size:14px;font-weight:700;
-  cursor:pointer;width:100%;margin-top:6px}
-.btn-p{background:#2a7a4f;color:#fff}
-.btn-p:hover:not(:disabled){background:#1f5c3b}
+  cursor:pointer;width:100%;margin-top:6px;font-family:inherit}
+.btn-p{background:var(--accent);color:#fff}
+.btn-p:hover:not(:disabled){background:var(--accent-hover)}
 .btn-p:disabled{opacity:.5;cursor:not-allowed}
-.btn-s{background:#f0f2f5;color:#555}
-.btn-danger{background:#fff0f0;color:#c00}
-.scan-btn{width:100%;padding:14px;border:none;border-radius:10px;background:#2a7a4f;
-  color:#fff;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;
+.btn-s{background:var(--bg-sunken);color:var(--text-muted);border:1px solid var(--border)}
+.btn-danger{background:var(--alarm-bg);color:var(--alarm-fg)}
+.scan-btn{width:100%;padding:14px;border:none;border-radius:10px;background:var(--accent);
+  color:#fff;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;font-family:inherit;
   align-items:center;justify-content:center;gap:8px}
+.scan-btn:hover{background:var(--accent-hover)}
 .pallet-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
-.pallet-id{font-size:15px;font-weight:800;color:#1a1a2e}
-.pallet-total{font-size:13px;color:#2a7a4f;font-weight:700}
+.pallet-id{font-size:15px;font-weight:800;color:var(--text)}
+.pallet-total{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);font-weight:700}
 .item-row{display:flex;justify-content:space-between;align-items:center;
-  padding:9px 4px;border-bottom:1px solid #eee;font-size:13px}
+  padding:9px 4px;border-bottom:1px solid var(--border);font-size:13px}
 .item-row:last-child{border-bottom:none}
-.item-row .tag{font-weight:700;color:#1a1a2e}
-.item-row .meta{color:#888;font-size:11px}
-.item-row .sl{font-weight:700;color:#2a7a4f}
-.empty-hint{font-size:12px;color:#999;text-align:center;padding:14px 4px}
-#msg{margin-top:4px;padding:11px 14px;border-radius:7px;font-size:13px;
+.item-row .tag{font-weight:700;color:var(--text)}
+.item-row .meta{color:var(--text-muted);font-size:11px}
+.item-row .sl{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)}
+.empty-hint{font-size:12px;color:var(--text-dim);text-align:center;padding:14px 4px}
+#msg{margin-top:4px;padding:11px 14px;border-radius:7px;font-size:13px;font-weight:600;
   display:none;width:100%;max-width:500px}
-.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
-.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
-.wait{background:#fff8f0;color:#C87941;border:1px solid #f5e6d7;display:block!important}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.ok{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+.wait{background:var(--warn-bg);color:var(--warn-fg);border:1px solid #FDE68A;display:block!important}
 .loading-overlay{display:flex;align-items:center;justify-content:center;padding:30px;
-  color:#2a7a4f;font-size:14px;gap:10px;width:100%;max-width:500px}
-.spin{width:20px;height:20px;border:3px solid #dcefe3;border-top-color:#2a7a4f;
+  color:var(--accent);font-size:14px;gap:10px;width:100%;max-width:500px}
+.spin{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--accent);
   border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
@@ -78,12 +84,12 @@ input:focus,select:focus{outline:none;border-color:#2a7a4f;box-shadow:0 0 0 3px 
 .qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;
   padding:12px 14px;background:rgba(0,0,0,.7);flex-shrink:0}
 .qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
-.qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;
-  padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:8px;
+  padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 #qrReaderDiv{position:relative;flex:1;overflow:hidden}
 #qrReaderDiv video{position:absolute!important;inset:0!important;
   width:100%!important;height:100%!important;object-fit:cover!important}
-.pending-box{background:#fafdfb;border:1.5px solid #dcefe3;border-radius:10px;padding:14px;margin-bottom:10px}
+.pending-box{background:var(--bg-sunken);border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px}
 </style>
 </head>
 <body>

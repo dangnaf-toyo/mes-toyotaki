@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Báo Cáo Sản Xuất Tuần — MES Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
   bao-cao-tuan.html — báo cáo sản xuất tuần khối Đúc, tự tính TRỰC TIẾP từ
   duc_bao_cao_ca/duc_su_co_log/duc_lich_su_san_xuat mỗi khi mở (không lưu lại
@@ -20,23 +24,29 @@
 -->
 <style>
   :root{
-    --tk-black:#211a15; --tk-cream:#F7F1E7; --tk-cream-2:#EFE5D3;
-    --tk-orange:#C87941; --tk-orange-deep:#A25A2A; --tk-line:#DCCFB6;
-    --tk-muted:#8A7C68; --tk-card:#FFFDF9; --tk-good:#1a7a3a; --tk-warn:#b8862a; --tk-bad:#c0392b;
-    --ca1:#C87941; --ca2:#3E7692;
+    --bg-page:#EEF1F5; --bg-panel:#FFFFFF; --bg-sunken:#F5F7FA; --bg-header:#1E293B;
+    --border:#D9DFE5; --border-strong:#B8C1CC; --text:#0F172A; --text-muted:#64748B; --text-dim:#94A3B8;
+    --accent:#0F5FA5; --accent-hover:#0A4681;
+    --run-fg:#047857; --run-bg:#ECFDF5; --warn-fg:#B45309; --warn-bg:#FFFBEB; --alarm-fg:#B91C1C; --alarm-bg:#FEF2F2;
+    --shadow-sm:0 1px 2px rgba(15,23,42,0.04); --shadow-md:0 4px 12px rgba(15,23,42,0.08); --shadow-lg:0 12px 32px rgba(15,23,42,0.16);
+    /* aliases giữ nguyên tên biến cũ trong toàn bộ CSS bên dưới, trỏ sang bộ token mới */
+    --tk-black:var(--text); --tk-cream:var(--bg-page); --tk-cream-2:var(--bg-sunken);
+    --tk-orange:var(--accent); --tk-orange-deep:var(--accent-hover); --tk-line:var(--border);
+    --tk-muted:var(--text-muted); --tk-card:var(--bg-panel); --tk-good:var(--run-fg); --tk-warn:var(--warn-fg); --tk-bad:var(--alarm-fg);
+    --ca1:var(--accent); --ca2:#3E7692;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--tk-cream);font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--tk-black);}
-  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 70px;}
+  body{margin:0;background:var(--tk-cream);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--tk-black);}
+  .wrap{padding:20px 20px 70px;}
 
-  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:20px 22px;margin-bottom:22px;}
+  .card{background:var(--tk-card);border:1px solid var(--tk-line);border-radius:12px;padding:20px 22px;margin-bottom:22px;box-shadow:var(--shadow-sm);}
   .card h2{font-size:16px;margin:0 0 14px;font-weight:700;border-bottom:1px solid var(--tk-line);padding-bottom:9px;}
   .card h3{font-size:13.5px;margin:0 0 10px;font-weight:700;color:var(--tk-black);}
 
   .picker-row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;}
   .fg{display:flex;flex-direction:column;gap:5px;}
-  label{font-size:11.5px;font-weight:700;color:#5a4c3e;}
-  input,select,textarea{padding:8px 10px;border:1px solid #ccc0aa;border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--tk-black);}
+  label{font-size:11.5px;font-weight:700;color:var(--text-muted);}
+  input,select,textarea{padding:8px 10px;border:1px solid var(--border-strong);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--tk-black);}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--tk-orange);}
   button{padding:9px 16px;border:none;border-radius:7px;background:var(--tk-orange);color:#fff;font-size:13px;font-weight:700;cursor:pointer;}
   button:hover:not(:disabled){background:var(--tk-orange-deep);}
@@ -48,9 +58,9 @@
   .week-badge.done{background:#e7f5ea;color:var(--tk-good);}
 
   .msg{padding:11px 13px;border-radius:8px;font-size:13px;margin-top:10px;}
-  .msg.error{background:#fbe9e7;color:var(--tk-bad);border:1px solid #f0c4bd;}
-  .msg.info{background:#eef2f6;color:#33465C;border:1px solid #cfd9e3;}
-  .msg.ok{background:#e7f5ea;color:var(--tk-good);border:1px solid #c3e3cc;}
+  .msg.error{background:var(--alarm-bg);color:var(--tk-bad);border:1px solid #f0c4bd;}
+  .msg.info{background:var(--bg-sunken);color:var(--text);border:1px solid var(--border);}
+  .msg.ok{background:var(--run-bg);color:var(--tk-good);border:1px solid #c3e3cc;}
 
   #reportBody{display:none;}
 
@@ -67,8 +77,8 @@
   .tbl-wrap{overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   thead th{text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tk-muted);
-    padding:8px 10px;border-bottom:1px solid var(--tk-line);white-space:nowrap;background:#FBF6EE;}
-  tbody td{padding:7px 10px;border-bottom:1px solid #EFE5D3;vertical-align:middle;}
+    padding:8px 10px;border-bottom:1px solid var(--tk-line);white-space:nowrap;background:var(--bg-sunken);}
+  tbody td{padding:7px 10px;border-bottom:1px solid var(--tk-line);vertical-align:middle;}
   tbody tr:last-child td{border-bottom:none;}
   td.num,th.num{text-align:right;}
   .rowname{font-weight:700;}

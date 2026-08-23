@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kế hoạch bảo dưỡng khuôn tuần — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
   bao-duong-khuon-tuan.html — trang tổng hợp, KHÔNG phải nơi ghi nhận bảo
   dưỡng (việc ghi nhận thực tế vẫn làm ở duc-dashboard.html → Quản lý khuôn,
@@ -20,60 +24,68 @@
   Đọc công khai (giống các trang report khác) — không có thao tác ghi ở đây.
 -->
 <style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
-.wrap{max-width:1280px;margin:0 auto}
-.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.hdr h1{font-size:17px;font-weight:700}
-.hdr p{font-size:10px;color:#999;margin-top:2px}
-.auth-info{font-size:11.5px;color:#667}
-.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
-.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
-.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#FFF;letter-spacing:-.02em}
 .week-nav{display:flex;align-items:center;gap:6px}
-.week-nav button{border:1.5px solid #ddd;background:#fff;border-radius:7px;padding:7px 10px;font-size:13px;cursor:pointer;font-weight:700;color:#555}
-.week-nav button:hover{border-color:#C87941;color:#C87941}
-.week-label{font-size:13px;font-weight:700;min-width:150px;text-align:center}
-.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer}
-.btn-outline:hover{background:#fff6ee}
-.summary-bar{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 4px;font-size:12px;color:#556}
-.summary-bar b{font-size:15px}
-.empty-note{padding:28px;text-align:center;color:#1a7a3a;font-weight:600;font-size:13px}
+.week-nav button{border:1px solid #475569;background:#334155;border-radius:6px;padding:6px 10px;font-family:inherit;font-size:12.5px;cursor:pointer;font-weight:600;color:#F1F5F9}
+.week-nav button:hover{background:#3F5266;border-color:#93C5FD}
+.week-label{font-size:12.5px;font-weight:700;min-width:150px;text-align:center;color:#F1F5F9}
+.btn{border:none;border-radius:6px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff}
+.btn:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;border:1.5px solid var(--accent);color:var(--accent);border-radius:6px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-outline:hover{background:var(--bg-sunken)}
+header .btn-outline{border-color:#475569;color:#F1F5F9}
+header .btn-outline:hover{background:#334155}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:14px 16px}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.summary-bar{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 4px;font-size:12px;color:var(--text-muted)}
+.summary-bar b{font-size:15px;font-family:'JetBrains Mono',monospace}
+.empty-note{padding:28px;text-align:center;color:var(--run-fg);font-weight:600;font-size:13px}
 
-.mold-list{display:flex;flex-direction:column;gap:10px;margin-top:10px}
-.mold-card{border:1px solid #e5e5e5;border-radius:10px;padding:12px 14px;border-left-width:5px}
+.mold-list{display:flex;flex-direction:column;gap:10px}
+.mold-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-left-width:5px;background:var(--bg-panel);box-shadow:var(--shadow-sm)}
 .mold-card.sev-lammoi{border-left-color:#9F1239;background:#FCE7F3}
-.mold-card.sev-baoduong{border-left-color:#B91C1C;background:#FEF2F2}
-.mold-card.sev-sap{border-left-color:#B45309;background:#FFFBEB}
+.mold-card.sev-baoduong{border-left-color:var(--alarm-fg);background:var(--alarm-bg)}
+.mold-card.sev-sap{border-left-color:var(--warn-fg);background:var(--warn-bg)}
 .mold-card.sev-vande{border-left-color:#C2410C;background:#FFF7ED}
 .mold-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
 .mold-head .ma{font-size:15px;font-weight:800}
 .mold-head .ly-do{font-size:12px;font-weight:700}
 .mold-head .ly-do.lammoi{color:#9F1239}
-.mold-head .ly-do.baoduong{color:#B91C1C}
-.mold-head .ly-do.sap{color:#B45309}
+.mold-head .ly-do.baoduong{color:var(--alarm-fg)}
+.mold-head .ly-do.sap{color:var(--warn-fg)}
 .mold-head .ly-do.vande{color:#C2410C}
-.mold-meta{font-size:11.5px;color:#667;margin-bottom:8px}
+.mold-meta{font-size:11.5px;color:var(--text-muted);margin-bottom:8px}
 .mold-suggest{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:7px;display:inline-block;margin-bottom:8px}
-.mold-suggest.ok{background:#D1FAE5;color:#065F46}
-.mold-suggest.warn{background:#FEE2E2;color:#B91C1C}
-.mold-suggest.none{background:#E5E7EB;color:#444}
-.mold-usage{font-size:11.5px;color:#556;margin-bottom:6px}
-.mold-usage code{background:#f0f0f0;padding:1px 5px;border-radius:4px}
-.attention-list{font-size:12px;background:#fff;border:1px dashed #ddd;border-radius:8px;padding:8px 10px}
-.attention-list .no-issue{color:#999;font-style:italic}
-.attention-item{padding:4px 0;border-bottom:1px solid #f0f0f0}
+.mold-suggest.ok{background:var(--run-bg);color:var(--run-fg)}
+.mold-suggest.warn{background:var(--alarm-bg);color:var(--alarm-fg)}
+.mold-suggest.none{background:var(--bg-sunken);color:var(--text-muted)}
+.mold-usage{font-size:11.5px;color:var(--text-muted);margin-bottom:6px}
+.mold-usage code{background:var(--bg-sunken);padding:1px 5px;border-radius:4px}
+.attention-list{font-size:12px;background:var(--bg-panel);border:1px dashed var(--border);border-radius:8px;padding:8px 10px}
+.attention-list .no-issue{color:var(--text-dim);font-style:italic}
+.attention-item{padding:4px 0;border-bottom:1px solid var(--bg-sunken)}
 .attention-item:last-child{border-bottom:none}
 .attention-item .tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-right:6px}
-.attention-item .tag.mo{background:#FEE2E2;color:#B91C1C}
-.attention-item .tag.cho{background:#FEF3C7;color:#B45309}
-.attention-item .tag.dong{background:#E5E7EB;color:#555}
+.attention-item .tag.mo{background:var(--alarm-bg);color:var(--alarm-fg)}
+.attention-item .tag.cho{background:var(--warn-bg);color:var(--warn-fg)}
+.attention-item .tag.dong{background:var(--bg-sunken);color:var(--text-muted)}
 .day-chips{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
-.day-chip{font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;background:#eee;color:#888}
-.day-chip.busy{background:#FEE2E2;color:#9F1239}
-.day-chip.free{background:#D1FAE5;color:#065F46}
-#msg{max-width:1280px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
-.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
+.day-chip{font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--bg-sunken);color:var(--text-dim)}
+.day-chip.busy{background:var(--alarm-bg);color:#9F1239}
+.day-chip.free{background:var(--run-bg);color:var(--run-fg)}
+#msg{max-width:1280px;margin:0 auto 12px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
 </style>
 </head>
 <body>
@@ -81,18 +93,27 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16
 <div id="msg"></div>
 
 <div class="wrap">
-  <div class="card">
-    <div class="toolbar">
-      <div class="week-nav">
-        <button type="button" id="btnPrevWeek">‹ Tuần trước</button>
-        <div class="week-label" id="weekLabel">—</div>
-        <button type="button" id="btnNextWeek">Tuần sau ›</button>
-      </div>
-      <button type="button" class="btn-outline" id="btnThisWeek">Tuần này</button>
-      <button type="button" class="btn-outline" id="btnNextWeekQuick">Tuần sau</button>
-      <div style="flex:1"></div>
-      <a class="btn-outline" href="duc-dashboard.html" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">🔧 Mở Quản lý khuôn (ghi nhận) →</a>
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Kế hoạch bảo dưỡng khuôn tuần</div>
     </div>
+    <div class="week-nav">
+      <button type="button" id="btnPrevWeek">‹ Tuần trước</button>
+      <div class="week-label" id="weekLabel">—</div>
+      <button type="button" id="btnNextWeek">Tuần sau ›</button>
+    </div>
+    <button type="button" class="btn-outline" id="btnThisWeek">Tuần này</button>
+    <button type="button" class="btn-outline" id="btnNextWeekQuick">Tuần sau</button>
+    <div style="flex:1"></div>
+    <a class="btn-outline" href="duc-dashboard.html" target="_blank" rel="noopener">🔧 Mở Quản lý khuôn (ghi nhận) →</a>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <div class="card">
     <div class="summary-bar" id="summaryBar"></div>
   </div>
 
@@ -134,6 +155,16 @@ document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMon
 document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday = addDays(weekMonday, 7); onWeekChange(); });
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
 document.getElementById('btnNextWeekQuick').addEventListener('click', () => { weekMonday = addDays(mondayOf(new Date()), 7); onWeekChange(); });
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
 
 // CONFIG.MOLD mặc định — khớp duc-dashboard.html khi khuôn chưa tự set ngưỡng riêng.
 const MOLD_DEFAULT = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000 };
@@ -302,6 +333,7 @@ function renderList(items){
   }).join('');
 }
 
+startHeaderClock();
 updateWeekLabel();
 loadAndRender();
 </script>
