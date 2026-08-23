@@ -24,16 +24,18 @@
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased}
-.app{max-width:980px;margin:0 auto;padding:12px 12px 60px;display:flex;flex-direction:column;gap:14px}
-header{background:var(--bg-header);color:#F1F5F9;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm)}
-header .back{background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:8px;font-size:16px;cursor:pointer;flex-shrink:0}
-header .titles{display:flex;flex-direction:column;line-height:1.3;min-width:0}
-header .co{font-size:10px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
-header .title{font-size:17px;font-weight:700}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{max-width:980px;margin:6px auto 0;padding:0 12px 60px;display:flex;flex-direction:column;gap:14px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
 header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
-header .auth-info{margin-left:auto;font-size:11px;color:#94A3B8}
-header .auth-info a{color:#93C5FD;text-decoration:none;font-weight:600}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:6px 12px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.btn-ghost:hover{background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
 
 .banner{border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
 .banner.nhap{background:var(--bg-sunken);color:var(--text-muted);border:1px solid var(--border)}
@@ -52,7 +54,7 @@ header .auth-info a{color:#93C5FD;text-decoration:none;font-weight:600}
 .info-item .v.mono{font-family:'JetBrains Mono',monospace}
 
 .cause-section{display:flex;flex-direction:column;gap:14px}
-.cause-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.cause-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--border)}
 
 .field-row{display:flex;flex-direction:column;gap:5px}
 .field-row label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em}
@@ -109,9 +111,14 @@ header .auth-info a{color:#93C5FD;text-decoration:none;font-weight:600}
 
 <div class="app">
   <header>
-    <button class="back" onclick="window.close()">←</button>
-    <div class="titles">
-      <div class="sub" id="h-id-ncp">—</div>
+    <div class="brand">
+      <span class="co">Toyotaki</span>
+      <span class="title">Chi Tiết NCP <span class="sub" id="h-id-ncp" style="margin-left:6px">—</span></span>
+    </div>
+    <button type="button" class="btn btn-ghost" onclick="window.close()">← Đóng</button>
+    <div class="header-clock">
+      <div class="date" id="header-date">—</div>
+      <div class="time" id="header-time">—</div>
     </div>
   </header>
 
@@ -220,6 +227,14 @@ async function ensureAuth(){
 }
 
 function jsonArr(v){ return Array.isArray(v) ? v : []; }
+
+function tickClock(){
+  const now = new Date();
+  document.getElementById('header-date').textContent = now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  document.getElementById('header-time').textContent = now.toLocaleTimeString('vi-VN', { hour12: false });
+}
+tickClock();
+setInterval(tickClock, 1000);
 
 async function load(){
   state.id = new URLSearchParams(location.search).get('id');

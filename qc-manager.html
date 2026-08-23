@@ -39,16 +39,23 @@
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--run-stripe:#10B981;--warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-stripe:#F59E0B;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--alarm-stripe:#EF4444;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
-.app{display:flex;flex-direction:column;min-height:100vh;padding:8px;gap:8px}
-header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:10px 18px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px 8px 8px;gap:8px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
 .brand{display:flex;flex-direction:column;line-height:1.2}
 .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
-.brand .title{font-size:16px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none}
+.header-select:hover{background:#3F5266}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
 .tabs{display:flex;gap:6px;margin-left:8px;flex-wrap:wrap}
 .tab-btn{background:transparent;border:1px solid #475569;color:#CBD5E1;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
 .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
-.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#FFF}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
 .live-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#94A3B8}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--run-stripe);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -155,9 +162,10 @@ tr:last-child td{border-bottom:none}
       <button class="tab-btn" id="tab-btn-ncp" onclick="switchTab('ncp')">Xử lý sản phẩm không phù hợp</button>
       <button class="tab-btn" id="tab-btn-tieuchuan" onclick="switchTab('tieuchuan')">Quản lý tiêu chuẩn</button>
     </div>
+    <div class="live-badge"><span class="live-dot"></span><span id="live-status">Đang tải...</span></div>
     <div class="header-clock">
-      <div class="live-badge"><span class="live-dot"></span><span id="live-status">Đang tải...</span></div>
-      <div class="time" id="clock-time">--:--:--</div>
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
     </div>
   </header>
 
@@ -450,7 +458,20 @@ async function ensureAuth(){
 
 const LOAI_LABEL = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Lên khuôn/SP mới' };
 
-function startClock(){ setInterval(() => { document.getElementById('clock-time').textContent = fmtTime(new Date()); }, 1000); }
+function fmtDate(d){
+  const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const p = n => String(n).padStart(2, '0');
+  return dayNames[d.getDay()] + ', ' + p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+function startClock(){
+  const tick = () => {
+    const now = new Date();
+    document.getElementById('clock-time').textContent = fmtTime(now);
+    document.getElementById('clock-date').textContent = fmtDate(now);
+  };
+  tick();
+  setInterval(tick, 1000);
+}
 
 // =============================================================================
 // Active id_dong set — cùng logic với ipqc.html (xem comment ở đó).

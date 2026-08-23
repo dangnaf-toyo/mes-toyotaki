@@ -78,21 +78,28 @@
   --gray: var(--text-muted); --success: var(--run-fg); --warning: var(--warn-fg);
   --danger: var(--alarm-fg); --blue: var(--accent);
 }
-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: var(--bg-page); color: var(--text); }
-.header { background: var(--bg-header); color: white; padding: 1.2rem 2rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; box-shadow: var(--shadow-sm); }
-.header-left { display: flex; align-items: center; gap: 1rem; }
-.header-logo { width: 52px; height: 52px; flex-shrink: 0; background: white; border-radius: 6px; padding: 4px; display: flex; align-items: center; justify-content: center; }
-.header-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.header-title { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.3px; }
-.header-brand { font-size: 0.72rem; color: var(--primary); font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
-.header-right { text-align: right; }
-.sync-status { font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 20px; background: rgba(255,255,255,0.1); display: inline-block; }
-.sync-status.ok { color: #4CAF50; }
-.sync-status.error { color: #f44336; }
-.sync-status.loading { color: #FFC107; }
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app { display: flex; flex-direction: column; padding: 6px; gap: 6px; }
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none}
+.header-select:hover{background:#3F5266}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;padding:6px 12px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s}
+.btn-ghost:hover{background:#334155}
+.sync-status { font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 20px; background: var(--bg-sunken); display: inline-block; color: var(--text-muted); }
+.sync-status.ok { color: var(--run-fg); background: var(--run-bg); }
+.sync-status.error { color: var(--alarm-fg); background: var(--alarm-bg); }
+.sync-status.loading { color: var(--warn-fg); background: var(--warn-bg); }
 .auth-info { font-size: 0.72rem; color: #bbb; margin-top: 6px; }
 .auth-info a { color: var(--primary); text-decoration: none; font-weight: 600; }
-.container { width: 100%; margin: 0 auto; padding: 1.5rem; }
+.container { width: 100%; margin: 0 auto; padding: 0; }
 .tabs { display: flex; gap: 0.3rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); overflow-x: auto; flex-wrap: wrap; }
 .tab-btn { background: none; border: none; padding: 0.8rem 1.2rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--gray); border-bottom: 3px solid transparent; white-space: nowrap; font-family: inherit; }
 .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
@@ -236,10 +243,6 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
   .form-row { grid-template-columns: 1fr; }
   .chart-container { height: 300px; }
   #overview-grid { grid-template-columns: 1fr; }
-  .header { padding: 0.8rem 1rem; }
-  .header-logo { width: 40px; height: 40px; padding: 3px; }
-  .header-title { font-size: 0.95rem; line-height: 1.15; }
-  .header-brand { font-size: 0.6rem; }
   .sync-status { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
 }
 </style>
@@ -251,15 +254,17 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
   <p style="margin-top: 1rem; color: var(--gray);">Đang tải...</p>
 </div>
 
-<div class="header">
-  <div class="header-left">
-    <div class="header-brand">Toyotaki</div>
-    <div class="header-title">Quản Lý Tồn Kho NVL</div>
+<div class="app">
+<header>
+  <div class="brand">
+    <div class="co">Toyotaki</div>
+    <div class="title">Quản Lý Tồn Kho NVL</div>
   </div>
-  <div class="header-right">
-    <span class="sync-status" id="syncStatus">⏳ Đang kết nối...</span>
+  <div class="header-clock">
+    <span class="date" id="clock-date">—</span>
+    <span class="time" id="clock-time">--:--:--</span>
   </div>
-</div>
+</header>
 
 <div class="container">
   <div class="tabs">
@@ -276,8 +281,9 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
 
   <!-- Tab 1: Tổng Quan -->
   <div id="overview" class="tab-content active">
-    <div class="btn-group" style="margin-bottom: 1rem;">
+    <div class="btn-group" style="margin-bottom: 1rem; align-items: center;">
       <button class="btn-primary" id="btnReload">🔄 Đồng Bộ Dữ Liệu</button>
+      <span class="sync-status" id="syncStatus">⏳ Đang kết nối...</span>
     </div>
     <div id="overview-grid"></div>
   </div>
@@ -565,6 +571,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <!-- Print Area (con trực tiếp của body để CSS print hoạt động đúng) -->
@@ -2019,9 +2026,27 @@ $('btnResetPlan').addEventListener('click', resetPlanNhap);
 $('btnRecalcPlan').addEventListener('click', recalcAllPlanStock);
 $('btnUpsertMaterial').addEventListener('click', upsertMaterial);
 
+/* ---------- Đồng hồ sống trên header ---------- */
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtClockTime(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function fmtClockDate(d) {
+  const dayNames = ['CN','T2','T3','T4','T5','T6','T7'];
+  return dayNames[d.getDay()] + ', ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+function startClock() {
+  function tick() {
+    const now = new Date();
+    $('clock-time').textContent = fmtClockTime(now);
+    $('clock-date').textContent = fmtClockDate(now);
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
 (async function init() {
   $('temDate').value = todayISO();
   $('manNgay').value = todayISO();
+  startClock();
   await loadAllData();
   rerenderTemQtyTable();
   renderCart();

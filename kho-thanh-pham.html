@@ -27,14 +27,25 @@
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;padding:16px 12px 60px;color:var(--text);-webkit-font-smoothing:antialiased}
-.wrap{max-width:640px;margin:0 auto}
-.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.hdr h1{font-size:17px;font-weight:700}
-.hdr p{font-size:10px;color:var(--text-dim);margin-top:2px}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;padding:0 12px 60px}
+.wrap{max-width:640px;margin:0 auto;margin-top:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;max-width:640px;margin:6px auto 0}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none}
+.header-select:hover{background:#3F5266}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 10px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.btn-ghost:hover{background:#334155}
 .auth-info{font-size:11.5px;color:var(--text-muted)}
 .auth-info a{color:var(--accent);text-decoration:none;font-weight:600}
-.tabs-wrap{display:flex;gap:8px;margin-bottom:14px}
+.tabs-wrap{display:flex;gap:8px;margin:14px auto;max-width:640px}
 .tab-btn{flex:1;padding:10px;border:1.5px solid var(--border-strong);border-radius:10px;background:var(--bg-panel);color:var(--text-muted);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .card{background:var(--bg-panel);border-radius:10px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:16px;margin-bottom:14px}
@@ -69,6 +80,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Aria
 </style>
 </head>
 <body>
+
+<header>
+  <div class="brand"><span class="co">Toyotaki</span><span class="title">Kho Thành Phẩm</span></div>
+  <div class="header-clock"><span class="date" id="hdrDate"></span><span class="time" id="hdrTime"></span></div>
+</header>
 
 <div class="tabs-wrap">
   <button type="button" class="tab-btn active" id="tabBtnNhap">📥 Nhập kho</button>
@@ -170,6 +186,17 @@ function parseCode(raw){
   if (!s) return "";
   return s.includes(">") ? s.split(">")[0].trim() : s;
 }
+
+/* ---------- Đồng hồ header ---------- */
+function tickClock(){
+  const now = new Date();
+  const d = document.getElementById("hdrDate");
+  const t = document.getElementById("hdrTime");
+  if (d) d.textContent = now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (t) t.textContent = now.toLocaleTimeString('vi-VN', { hour12: false });
+}
+tickClock();
+setInterval(tickClock, 1000);
 
 async function requireLogin(){
   const session = await MesAuth.getSession();

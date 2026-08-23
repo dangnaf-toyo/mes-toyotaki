@@ -17,20 +17,19 @@
     --shadow-sm:0 1px 2px rgba(15,23,42,0.04); --shadow-md:0 4px 12px rgba(15,23,42,0.08); --shadow-lg:0 12px 32px rgba(15,23,42,0.16);
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:'Inter',sans-serif;}
 
-  header.top{background:var(--bg-panel);color:var(--text);padding:22px 0;border-bottom:1px solid var(--border);}
-  header.top .inner{max-width:1040px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
-  .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--accent);font-weight:600;margin-bottom:8px;}
-  header.top h1{font-size:21px;margin:0 0 6px;font-weight:700;color:var(--text);letter-spacing:-.01em;}
-  header.top .sub{font-size:13px;color:var(--text-muted);}
-  .auth-bar{font-size:12px;color:var(--text-muted);margin-top:4px}
-  .auth-bar a{color:var(--accent);text-decoration:none;font-weight:600}
-  header.top .back{font-size:12px;}
-  header.top .back a{color:var(--accent);text-decoration:none;font-weight:600}
+  .hdr-wrap{max-width:1040px;margin:6px auto 0;padding:0 28px;}
+  header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;}
+  .brand{display:flex;flex-direction:column;line-height:1.2;}
+  .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
+  .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF;}
+  .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15;}
+  .header-clock .date{font-size:10px;color:#94A3B8;}
+  .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
 
-  .wrap{max-width:1040px;margin:0 auto;padding:32px 28px 60px;}
+  .wrap{max-width:1040px;margin:0 auto;padding:20px 28px 60px;}
 
   .card{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:22px 24px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
   .card h2{font-size:15px;margin:0 0 16px;font-weight:700;border-bottom:1px solid var(--border);padding-bottom:10px;}
@@ -71,6 +70,19 @@
 </style>
 </head>
 <body>
+
+<div class="hdr-wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Quản Lý Tài Khoản</div>
+    </div>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+</div>
 
 <div class="wrap">
   <div id="gate"></div>
@@ -422,6 +434,17 @@ async function main(){
   });
   await loadUsers();
 }
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+startHeaderClock();
 
 main();
 </script>

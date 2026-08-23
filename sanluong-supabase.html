@@ -20,12 +20,26 @@
     --shadow-sm:0 1px 2px rgba(15,23,42,0.04); --shadow-md:0 4px 12px rgba(15,23,42,0.08); --shadow-lg:0 12px 32px rgba(15,23,42,0.16);
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;}
   .wrap{max-width:1240px;margin:0 auto;padding:0 28px 60px;}
+  .hdr-wrap{max-width:1240px;margin:6px auto 0;padding:0 28px;}
 
-  header.top{background:var(--bg-panel);color:var(--text);padding:16px 0;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);}
-  header.top .inner{max-width:1240px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;}
+  header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;}
+  .brand{display:flex;flex-direction:column;line-height:1.2;}
+  .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
+  .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF;}
+  .header-group{display:flex;align-items:center;gap:6px;}
+  .header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
+  .header-select{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none;}
+  .header-select:hover{background:#3F5266;}
+  .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15;}
+  .header-clock .date{font-size:10px;color:#94A3B8;}
+  .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
+  .btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;}
+  .btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;}
+  .btn-ghost:hover:not(:disabled){background:#334155;}
+  .btn-ghost:disabled{opacity:.5;cursor:wait;}
   .title-block .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11.5px;color:var(--accent);font-weight:600;margin-bottom:8px;}
   .title-block h1{font-size:25px;margin:0 0 6px;font-weight:600;color:var(--text);letter-spacing:.01em;}
   .title-block .sub{font-size:13px;color:var(--text-muted);}
@@ -166,7 +180,7 @@
   @media print{
     .tabnav{display:none;}
     .tab-content{display:block !important;page-break-after:always;}
-    .print-btn,.refresh-btn,.sync-banner,details.setup-guide{display:none;}
+    .hdr-wrap,.print-btn,.refresh-btn,.sync-banner,details.setup-guide{display:none;}
     body{background:#fff;}
   }
   @media (max-width:900px){
@@ -176,17 +190,20 @@
 </head>
 <body>
 
-<header class="top">
-  <div class="inner" style="justify-content:flex-end;">
-    <div class="meta">
-      Đơn vị báo cáo: <b>QLSX</b><br>
-      <div class="btn-row">
-        <button class="refresh-btn" id="btnRefresh" onclick="loadData()">🔄 Làm mới</button>
-        <button class="print-btn" onclick="window.print()">🖨️ In / PDF</button>
-      </div>
+<div class="hdr-wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Dashboard Sản Lượng &amp; Giao Hàng</div>
     </div>
-  </div>
-</header>
+    <button type="button" class="btn btn-ghost" id="btnRefresh" onclick="loadData()">🔄 Làm mới</button>
+    <button type="button" class="btn btn-ghost" onclick="window.print()">🖨️ In / PDF</button>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+</div>
 
 <div class="sync-banner demo" id="syncBanner">
   <span class="dot"></span>
@@ -1080,6 +1097,17 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 });
 
 /* ---------- Init ---------- */
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+startHeaderClock();
+
 renderAll(DEMO_DATA);
 loadData();
 setInterval(loadData, AUTO_REFRESH_MS);

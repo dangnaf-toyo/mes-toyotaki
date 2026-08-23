@@ -17,10 +17,17 @@
     --shadow-sm:0 1px 2px rgba(15,23,42,0.04); --shadow-md:0 4px 12px rgba(15,23,42,0.08); --shadow-lg:0 12px 32px rgba(15,23,42,0.16);
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:inherit;}
 
-  .wrap{max-width:none;margin:0;padding:20px 24px 48px;}
+  .wrap{max-width:none;margin:0;padding:6px 24px 48px;}
+  header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;margin-bottom:20px;}
+  .brand{display:flex;flex-direction:column;line-height:1.2;}
+  .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
+  .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF;}
+  .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15;}
+  .header-clock .date{font-size:10px;color:#94A3B8;}
+  .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
 
   .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
   .tab-btn{padding:9px 18px;border:1px solid var(--border);border-radius:100px;background:var(--bg-panel);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
@@ -74,6 +81,17 @@
 <body>
 
 <div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Năng Lực Máy Gia Công CNC</div>
+    </div>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
   <div id="gate"></div>
 
   <div id="adminArea" style="display:none">
@@ -496,6 +514,17 @@ async function main(){
   await loadCapacityConfig();
   loadRouting();
 }
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+startHeaderClock();
 
 main();
 </script>

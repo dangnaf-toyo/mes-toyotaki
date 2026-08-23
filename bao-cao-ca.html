@@ -36,18 +36,33 @@
     --shadow-sm:0 1px 2px rgba(15,23,42,0.04); --shadow-md:0 4px 12px rgba(15,23,42,0.08); --shadow-lg:0 12px 32px rgba(15,23,42,0.16);
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg-page);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;}
+  html,body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased;}
 
-  .wrap{max-width:1000px;margin:0 auto;padding:32px 28px 60px;}
+  header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;margin:6px 6px 0;}
+  .brand{display:flex;flex-direction:column;line-height:1.2;}
+  .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
+  .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF;}
+  .header-group{display:flex;align-items:center;gap:6px;}
+  .header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
+  .header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none;}
+  .header-select:hover{background:#3F5266;}
+  .btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;}
+  .btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;}
+  .btn-ghost:hover:not(:disabled){background:#334155;}
+  .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15;}
+  .header-clock .date{font-size:10px;color:#94A3B8;}
+  .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:6px 28px 60px;}
   .card{background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
-  .card h2{font-size:16px;margin:0 0 16px;font-weight:700;border-bottom:1px solid var(--border);padding-bottom:10px;}
+  .card h2{font-size:13px;margin:0 0 16px;font-weight:700;border-bottom:1px solid var(--border);padding-bottom:10px;}
 
   .form-row{display:flex;gap:14px;flex-wrap:wrap;align-items:end;}
   .fg{display:flex;flex-direction:column;gap:5px;}
   label{font-size:12px;font-weight:600;color:var(--text-muted);}
-  input,select{padding:9px 11px;border:1.5px solid var(--border-strong);border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--text);}
+  input,select{padding:9px 11px;border:1.5px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--text);}
   input:focus,select:focus{outline:none;border-color:var(--accent);}
-  button{padding:10px 20px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+  button{padding:10px 20px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
   button:hover:not(:disabled){background:var(--accent-hover);}
   button.outline{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
   button.outline:hover:not(:disabled){background:var(--bg-sunken);}
@@ -87,26 +102,35 @@
 </head>
 <body>
 
+<header>
+  <div class="brand">
+    <div class="co">Toyotaki</div>
+    <div class="title">Xem Lại Báo Cáo Kết Ca</div>
+  </div>
+  <div class="header-group">
+    <span class="header-label">Ngày</span>
+    <input type="date" id="fNgay" class="header-input">
+  </div>
+  <div class="header-group">
+    <span class="header-label">Ca</span>
+    <select id="fCa" class="header-select">
+      <option value="Ca ngày">Ca ngày</option>
+      <option value="Ca đêm">Ca đêm</option>
+      <option value="Ca 1">Ca 1</option>
+      <option value="Ca 2">Ca 2</option>
+    </select>
+  </div>
+  <button type="button" class="btn btn-ghost" onclick="searchReport()">🔎 Tìm báo cáo</button>
+  <div class="header-clock">
+    <div class="date" id="hdrDate">—</div>
+    <div class="time" id="hdrTime">--:--:--</div>
+  </div>
+</header>
+
 <div class="wrap">
   <div class="card">
     <h2>Tra cứu</h2>
     <div class="msg" id="searchMsg"></div>
-    <div class="form-row">
-      <div class="fg">
-        <label for="fNgay">Ngày</label>
-        <input type="date" id="fNgay">
-      </div>
-      <div class="fg">
-        <label for="fCa">Ca</label>
-        <select id="fCa">
-          <option value="Ca ngày">Ca ngày</option>
-          <option value="Ca đêm">Ca đêm</option>
-          <option value="Ca 1">Ca 1</option>
-          <option value="Ca 2">Ca 2</option>
-        </select>
-      </div>
-      <button type="button" onclick="searchReport()">🔎 Tìm báo cáo</button>
-    </div>
     <div class="limits-note">
       Lưu ý: bảng "Sản lượng từng máy" ở đây chỉ có Máy/SP/KH/TT/%HT/NG — OEE, shot nóng khuôn, số khuôn,
       phân loại NG theo từng dòng chỉ có ngay lúc kết ca (không được lưu lại), nên không hiện được khi tra cứu sau.
@@ -260,9 +284,19 @@ function exportReportPdf(){
   }).from(el).save();
 }
 
+function tickClock(){
+  const now = new Date();
+  const d = document.getElementById('hdrDate');
+  const t = document.getElementById('hdrTime');
+  if (d) d.textContent = formatDateShort(now);
+  if (t) t.textContent = now.toLocaleTimeString('vi-VN', { hour12: false });
+}
+
 (function init(){
   const today = new Date();
   document.getElementById('fNgay').value = today.getFullYear() + '-' + pad(today.getMonth()+1) + '-' + pad(today.getDate());
+  tickClock();
+  setInterval(tickClock, 1000);
 })();
 </script>
 </body>
