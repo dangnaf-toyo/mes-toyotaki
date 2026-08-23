@@ -609,11 +609,15 @@ async function onQrDecoded(text){
   document.getElementById("msg").style.display = "none";
   renderScanned();
 
-  // Gợi ý sẵn "Công đoạn giao" theo vị trí hiện tại của tem (nếu đã từng chuyển trước đó).
+  // Tự chọn sẵn "Công đoạn giao" theo vị trí hiện tại của tem — người dùng
+  // không cần bấm chọn nữa. Nếu tem chưa từng chuyển (chưa có bản ghi vị trí),
+  // mặc định "Đúc" vì mọi tem đều được in ra từ công đoạn Đúc.
+  let viTriHienTai = "Đúc";
   try {
     const { data: pos } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', scannedData.tagNo).maybeSingle();
-    if (pos && pos.vi_tri_hien_tai) document.getElementById("congDoanGiao").value = pos.vi_tri_hien_tai;
+    if (pos && pos.vi_tri_hien_tai) viTriHienTai = pos.vi_tri_hien_tai;
   } catch(e){ /* không chặn luồng chính nếu lỗi */ }
+  document.getElementById("congDoanGiao").value = viTriHienTai;
   applyRoutingHint();
   checkReady();
 }
