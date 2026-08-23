@@ -1155,8 +1155,22 @@ function printNewTem(t, congDoan){
   w.document.open(); w.document.write(popupHtml); w.document.close();
 }
 
+// Mở thẳng tab "Xác nhận đã giao hàng" đã chọn sẵn bộ phận qua URL, VD link
+// tắt từ duc-dashboard.html: chuyencongdoan.html?tab=confirm&dept=Đúc
+function applyInitParams(){
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('tab') !== 'confirm') return;
+  switchTab('confirm');
+  const dept = params.get('dept');
+  if (dept){
+    document.getElementById('confirmCongDoan').value = dept;
+    loadPendingList();
+  }
+}
+
 loadDanhMuc();
 loadConfirmDanhMuc();
+applyInitParams();
 </script>
 </body>
 </html>
