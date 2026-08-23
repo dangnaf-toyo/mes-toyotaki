@@ -93,6 +93,7 @@
     display:flex;align-items:center;justify-content:center;margin-top:1px;font-family:'JetBrains Mono',monospace;}
   .priority-box b{color:var(--tk-black);}
   .priority-box .pm{color:#6b5c4b;font-size:12px;}
+  .priority-box .lydo{color:#6b5c4b;font-size:12px;margin-top:3px;}
 
   .daytrend{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
   .day{border:1px solid var(--tk-line);border-radius:8px;padding:10px 10px 12px;background:#fff;}
@@ -419,9 +420,11 @@ function renderReport(ctx){
     c.prodProduct.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
       '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>').join(''));
-  const spByShort = c.prodProduct.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
-  if (spByShort.length) html += priorityBox('3 mã sản phẩm ưu tiên xử lý — theo sản lượng thiếu hụt', spByShort.map(p =>
-    '<b>' + escapeHtml(p.ma_sp) + ' · ' + escapeHtml(p.ten_sp) + '</b> <span class="pm">— thiếu ' + fmtNum(p.shortfall) + ' sản phẩm, đạt ' + fmtPct(p.ht) + ' KH</span>'));
+  const downtimeBySp = new Map(c.downtimeProduct.map(x=>[x.ma_sp,x]));
+  const spKemNhat = c.prodProduct.filter(p=>p.kh>0).slice().sort((a,b)=>a.ht-b.ht).slice(0,3);
+  if (spKemNhat.length) html += priorityBox('3 mã sản phẩm không đạt nhiều nhất (theo % hoàn thành kế hoạch)', spKemNhat.map(p =>
+    '<b>Mã ' + escapeHtml(p.ma_sp) + (p.ten_sp?(' · '+escapeHtml(p.ten_sp)):'') + '</b> <span class="pm">— đạt ' + fmtPct(p.ht) + ' KH (' + fmtNum(p.tt) + '/' + fmtNum(p.kh) + ')</span>' +
+    '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(downtimeBySp.get(p.ma_sp)) + '</div>'));
   html += '</div>';
 
   // Sản lượng theo máy
@@ -430,9 +433,11 @@ function renderReport(ctx){
     c.prodMachine.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_may) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
       '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td><td class="num">' + fmtNum(p.ng) + '</td></tr>').join(''));
-  const maByShort = c.prodMachine.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
-  if (maByShort.length) html += priorityBox('3 máy ưu tiên xử lý — theo sản lượng thiếu hụt', maByShort.map(p =>
-    '<b>' + escapeHtml(p.ma_may) + '</b> <span class="pm">— thiếu ' + fmtNum(p.shortfall) + ' sản phẩm, đạt ' + fmtPct(p.ht) + ' KH</span>'));
+  const downtimeByMay = new Map(c.downtimeMachine.map(x=>[x.ma_may,x]));
+  const maKemNhat = c.prodMachine.filter(p=>p.kh>0).slice().sort((a,b)=>a.ht-b.ht).slice(0,3);
+  if (maKemNhat.length) html += priorityBox('3 máy không đạt nhiều nhất (theo % hoàn thành kế hoạch)', maKemNhat.map(p =>
+    '<b>Máy ' + escapeHtml(p.ma_may) + '</b> <span class="pm">— đạt ' + fmtPct(p.ht) + ' KH (' + fmtNum(p.tt) + '/' + fmtNum(p.kh) + ')</span>' +
+    '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(downtimeByMay.get(p.ma_may)) + '</div>'));
   html += '</div>';
 
   // So sánh Ca 1 / Ca 2
@@ -499,21 +504,6 @@ function renderReport(ctx){
   html += (c.downtimeMachine.length===0 && c.downtimeIssue.length===0) ? '<div class="rowsub">Không có sự cố dừng máy nào trong tuần.</div>' : '';
   html += '</div>';
 
-  // Kết luận — 3 hạng mục (mã SP/máy) hoàn thành kế hoạch thấp nhất + 3
-  // nguyên nhân gây dừng máy nhiều nhất (theo dữ liệu sự cố thật của tuần).
-  const hangMucPool = c.prodProduct.filter(p=>p.kh>0).map(p => ({ loai: 'Mã SP', key: p.ma_sp, ten: p.ten_sp, ht: p.ht, kh: p.kh, tt: p.tt }))
-    .concat(c.prodMachine.filter(p=>p.kh>0).map(p => ({ loai: 'Máy', key: p.ma_may, ten: '', ht: p.ht, kh: p.kh, tt: p.tt })));
-  const hangMucToiTe = hangMucPool.sort((a,b)=>a.ht-b.ht).slice(0,3);
-  const nguyenNhanChinh = c.downtimeIssue.slice(0,3);
-  html += '<div class="card"><h3>📌 Kết luận</h3><span class="sec-note">Tổng hợp nhanh — chi tiết xem các bảng phía trên</span>';
-  if (hangMucToiTe.length) html += priorityBox('3 hạng mục không đạt nhiều nhất (theo % hoàn thành kế hoạch)', hangMucToiTe.map(x =>
-    '<b>' + escapeHtml(x.loai) + ' ' + escapeHtml(x.key) + (x.ten?(' · ' + escapeHtml(x.ten)):'') + '</b> <span class="pm">— đạt ' + fmtPct(x.ht) + ' KH (' + fmtNum(x.tt) + '/' + fmtNum(x.kh) + ')</span>'));
-  else html += '<div class="rowsub">Chưa có dữ liệu kế hoạch để tính tỷ lệ hoàn thành.</div>';
-  if (nguyenNhanChinh.length) html += priorityBox('3 nguyên nhân gây ra không đạt', nguyenNhanChinh.map(x =>
-    '<b>' + escapeHtml(x.label) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + ' tổng thời gian dừng), ' + x.count + ' lượt</span>'));
-  else html += '<div class="rowsub">Không có sự cố dừng máy nào trong tuần.</div>';
-  html += '</div>';
-
   document.getElementById('reportBody').innerHTML = html;
 
   // gắn lại footer + bảng hành động (được render riêng, ngoài innerHTML này)
@@ -558,6 +548,16 @@ function barCell(val, max){
 function priorityBox(title, itemsHtml){
   return '<div class="priority-box"><div class="ph">🎯 ' + escapeHtml(title) + '</div><ol>' +
     itemsHtml.map((h,i) => '<li><span class="prank">' + (i+1) + '</span><div>' + h + '</div></li>').join('') + '</ol></div>';
+}
+// Liệt kê a) b) c) nguyên nhân ảnh hưởng nhiều nhất cho 1 mã SP/máy, lấy từ
+// top3VanDe (tổng hợp thật từ trường "van_de" trong nhật ký sự cố của tuần)
+// — không tự bịa lý do khi không có sự cố nào ghi nhận tương ứng.
+function lyDoAnhHuong(entry){
+  if (!entry || !entry.top3 || entry.top3.length === 0) {
+    return '<i>không có sự cố dừng máy ghi nhận tương ứng trong tuần — cần bổ sung giải trình thủ công (thiếu NVL/nhân lực/đổi kế hoạch…)</i>';
+  }
+  const letters = ['a','b','c'];
+  return entry.top3.map((t,i) => letters[i] + ') ' + escapeHtml(t.label) + ' (' + fmtNum(t.phut) + "')").join(' &nbsp;&nbsp; ');
 }
 function pcard(title, sub, phut, count, top3){
   return '<div class="pcard"><div class="pcard-head"><span class="pcard-title">' + escapeHtml(title) + '</span>' +
