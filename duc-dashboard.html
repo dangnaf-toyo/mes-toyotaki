@@ -317,7 +317,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <button class="btn btn-ghost" id="btn-bulk-incident" onclick="openBulkIncidentModal()">⚡ Sự cố nhiều máy</button>
       <button class="btn btn-ghost" id="btn-khuon-manage" onclick="openKhuonManageModal()">🧊 Quản lý khuôn</button>
       <button class="btn btn-ghost" onclick="window.open('bao-duong-khuon-tuan.html','_blank')">🔧 Kế hoạch bảo dưỡng khuôn</button>
-      <button class="btn btn-ghost" id="btn-weekly-report" onclick="openWeeklyReportModal()">📅 Báo cáo tuần</button>
+      <button class="btn btn-ghost" id="btn-weekly-report" onclick="openWeeklyReportFull()">📅 Báo cáo tuần</button>
       <button class="btn btn-ghost" onclick="window.open('bao-cao-ca.html','_blank')">🗂 Xem lại báo cáo ca</button>
       <button class="btn btn-ghost" onclick="window.open('tra-cuu-tem.html','_blank')">🏷 Tra cứu tem đã in</button>
       <button class="btn btn-primary" id="btn-end-shift">Kết ca &amp; xuất báo cáo</button>
@@ -4365,6 +4365,15 @@ function _clientIsoWeekLabel(dateObj){
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   return 'W' + String(weekNum).padStart(2, '0') + '_' + d.getUTCFullYear();
+}
+
+function openWeeklyReportFull(){
+  const d = nowServer();
+  const jsDay = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(monday.getDate() + (jsDay === 0 ? -6 : 1 - jsDay));
+  const mondayStr = monday.getFullYear() + '-' + pad(monday.getMonth() + 1) + '-' + pad(monday.getDate());
+  window.open('bao-cao-tuan.html?monday=' + mondayStr, '_blank');
 }
 
 function openWeeklyReportModal(){
