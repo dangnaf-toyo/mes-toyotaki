@@ -181,14 +181,8 @@
   .save-status{font-size:11.5px;color:var(--muted);}
   .save-status.ok{color:var(--good);}
   .save-status.err{color:var(--bad);}
-  details.setup-guide{margin-top:24px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:4px 0;}
-  details.setup-guide summary{cursor:pointer;padding:14px 18px;font-weight:600;font-size:13.5px;list-style:none;}
-  details.setup-guide summary::-webkit-details-marker{display:none;}
-  details.setup-guide .guide-body{padding:0 20px 18px;font-size:13px;line-height:1.7;color:#4a4438;}
-  details.setup-guide code{background:var(--paper-2);padding:1px 6px;border-radius:4px;font-size:12px;}
-  details.setup-guide ol{padding-left:20px;}
   @media print{
-    .hdr-wrap, nav.tabs, .sync-banner, .cmt-month-bar, .top-actions, details.setup-guide, .comment-save-row{display:none !important;}
+    .hdr-wrap, nav.tabs, .sync-banner, .cmt-month-bar, .top-actions, .comment-save-row{display:none !important;}
     section.view{display:block !important;page-break-after:always;}
   }
 </style>
@@ -392,28 +386,6 @@
     </div>
 
   </section>
-
-  <details class="setup-guide" id="diagPanel">
-    <summary>🔍 Chi tiết kết nối từng Sheet (debug)</summary>
-    <div class="guide-body">
-      <p>Bấm nút bên dưới để kiểm tra riêng từng link CSV — cho biết chính xác sheet nào lỗi và vì sao.</p>
-      <button class="action-btn ghost" style="margin-bottom:14px;" onclick="runDiagnostics()">🔍 Kiểm tra kết nối</button>
-      <div id="diagList" style="font-size:12.5px;"></div>
-    </div>
-  </details>
-
-  <details class="setup-guide">
-    <summary>Cách kết nối dashboard với Google Sheet (cập nhật dữ liệu thời gian thực)</summary>
-    <div class="guide-body">
-      <ol>
-        <li>Upload file mẫu <code>TOYOTAKI_ChatLuong_DuLieu.xlsx</code> lên Google Drive, mở bằng Google Sheets (File → Save as Google Sheets).</li>
-        <li>Cập nhật số liệu các tháng tiếp theo trực tiếp trong Sheet (13 tab: TongHop, TheoKhachHang, TheoCongDoan, QC_DailyNG, QC_Repaint, Targets, Comments, Config, BatThuong_Thang, BatThuong_KH_CongDoan, BatThuong_NB_CongDoan, BatThuong_ChuaTraLoi, NG_Lan1).</li>
-        <li>Vào <b>File → Share → Publish to web</b>. Chọn từng tab (không chọn "Toàn bộ tài liệu"), định dạng chọn <b>CSV</b>, bấm Publish. Lặp lại cho cả 13 tab.</li>
-        <li>Copy 8 đường link, dán vào phần <code>CSV_URLS</code> ở đầu thẻ <code>&lt;script&gt;</code> trong file HTML này.</li>
-        <li><b>Bản này (chatluong-supabase.html) đọc/ghi thẳng Supabase</b> (cấu hình chung trong <code>shared/supabase-client.js</code>) — không còn phụ thuộc CSV_URLS/Google Sheet/Apps Script. Comment yêu cầu đăng nhập (bấm "Đăng nhập" góc trên phải) trước khi lưu được.</li>
-      </ol>
-    </div>
-  </details>
 
   <footer>
     Dữ liệu đồng bộ trực tiếp từ Supabase. Trục thời gian Tháng 1–Tháng 12; các tháng chưa có dữ liệu để trống. Comment được lưu thẳng vào Supabase (cần đăng nhập). Dashboard tạo bởi Claude — chỉ phục vụ mục đích báo cáo nội bộ.
@@ -1292,36 +1264,7 @@ function reapplyAllComments(comments){
   applyCommentValue(box, comments);
 }
 
-/* ---------- Diagnostics ---------- */
-async function runDiagnostics(){
-  const list = document.getElementById('diagList');
-  list.innerHTML = 'Đang kiểm tra…';
-  const allTables = Object.assign({}, CORE_TABLES, EXTRA_TABLES);
-  const entries = Object.entries(allTables);
-  const results = await Promise.allSettled(entries.map(async ([key,table])=>{
-    const t0 = performance.now();
-    const rows = await fetchSupabaseTable(table);
-    return {length: rows.length, ms: Math.round(performance.now()-t0)};
-  }));
-  list.innerHTML = entries.map(([key,table],i)=>{
-    const r = results[i];
-    const linkHtml = `<a href="${SUPABASE_URL}/rest/v1/${table}?select=*" target="_blank" style="color:#33465C;">mở REST API thô ↗</a>`;
-    if (r.status === 'fulfilled'){
-      const v = r.value;
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--line);">
-        ✅ <b>${key}</b> (<code>${table}</code>) — ${v.length} dòng, ${v.ms}ms · ${linkHtml}
-      </div>`;
-    } else {
-      const msg = (r.reason && r.reason.message) ? r.reason.message : String(r.reason);
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--line);">
-        ❌ <b>${key}</b> (<code>${table}</code>) — Lỗi: ${msg}<br>
-        <span style="color:var(--muted);">Kiểm tra SUPABASE_URL/SUPABASE_ANON_KEY và RLS policy "public read" đã bật chưa.</span> · ${linkHtml}
-      </div>`;
-    }
-  }).join('');
-}
-
-/* ---------- Load (from Google Sheets if configured, else demo) ---------- */
+/* ---------- Load ---------- */
 function setBanner(state, text){
   const b = document.getElementById('syncBanner');
   b.className = 'sync-banner ' + state;
@@ -1397,9 +1340,8 @@ async function loadData(){
     const hint = isFetchFail
       ? ' Nguyên nhân thường gặp: (1) đang mở file bằng cách bấm đúp — hãy host file này lên GitHub Pages/Netlify rồi mở bằng https://, (2) chưa bật RLS "public read" trên các bảng cl_*, hoặc (3) trình duyệt chặn do thiếu mạng.'
       : '';
-    setBanner('error', `⚠️ Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu. Mở mục "🔍 Chi tiết kết nối" bên dưới để xem từng bảng.`);
+    setBanner('error', `⚠️ Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu.`);
     renderDashboard(DEMO_DATA);
-    runDiagnostics();
   } finally {
     btn.disabled = false;
   }

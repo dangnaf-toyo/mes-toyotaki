@@ -166,20 +166,12 @@
     font-size:12.5px;color:var(--warn-fg);margin-bottom:16px;
   }
 
-  details.setup-guide{margin-top:30px;border:1px solid var(--border);border-radius:8px;background:var(--bg-panel);padding:4px 0;}
-  details.setup-guide summary{cursor:pointer;padding:14px 18px;font-weight:600;font-size:13.5px;list-style:none;color:var(--text);}
-  details.setup-guide summary::-webkit-details-marker{display:none;}
-  details.setup-guide summary:before{content:"⚙️ "; }
-  details.setup-guide .guide-body{padding:0 22px 20px;font-size:13px;line-height:1.7;color:var(--text-muted);}
-  details.setup-guide code{background:var(--bg-sunken);padding:1px 6px;border-radius:4px;font-size:12px;}
-  details.setup-guide ol{padding-left:20px;}
-
   footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-muted);display:flex;justify-content:space-between;}
 
   @media print{
     .tabnav{display:none;}
     .tab-content{display:block !important;page-break-after:always;}
-    .hdr-wrap,.print-btn,.refresh-btn,.sync-banner,details.setup-guide{display:none;}
+    .hdr-wrap,.print-btn,.refresh-btn,.sync-banner{display:none;}
     body{background:#fff;}
   }
   @media (max-width:900px){
@@ -385,41 +377,6 @@
       </div>
     </section>
   </div>
-
-  <details class="setup-guide" id="diagPanel">
-    <summary>🔍 Chi tiết kết nối từng Sheet (debug)</summary>
-    <div class="guide-body">
-      <p>Bấm nút bên dưới để kiểm tra riêng từng link CSV — cho biết chính xác sheet nào lỗi và vì sao.</p>
-      <button class="refresh-btn" style="margin-bottom:14px;" onclick="runDiagnostics()">🔍 Kiểm tra kết nối</button>
-      <div id="diagList" style="font-size:12.5px;"></div>
-    </div>
-  </details>
-
-  <details class="setup-guide">
-    <summary>Cách kết nối dashboard với Google Sheet (cập nhật dữ liệu thời gian thực)</summary>
-    <div class="guide-body">
-      <ol>
-        <li>Upload file mẫu <code>TOYOTAKI_Dashboard_DuLieu.xlsx</code> lên Google Drive, mở bằng Google Sheets (File → Save as Google Sheets).</li>
-        <li>Cập nhật số liệu các tháng tiếp theo trực tiếp trong Sheet (tab GiaoHang, KHSX, Capacity, Forecast) và nội dung comment trong tab Comments.</li>
-        <li>Vào <b>File → Share → Publish to web</b>. Ở mục đầu tiên chọn từng tab (không chọn "Toàn bộ tài liệu"), định dạng chọn <b>CSV</b>, bấm Publish. Lặp lại cho cả 6 tab: GiaoHang, KHSX, Capacity, Forecast, Comments, Config.</li>
-        <li><b>Trang này đọc/ghi thẳng Supabase</b> (cấu hình chung trong <code>shared/supabase-client.js</code>) — không còn phụ thuộc CSV_URLS/Google Sheet như bản <code>sanluong.html</code> gốc trước đây.</li>
-        <li>Lưu file, upload file HTML này lên GitHub Pages (hoặc Google Sites / Netlify) để có link truy cập từ mọi thiết bị có internet.</li>
-        <li>Dashboard sẽ tự động tải lại dữ liệu mỗi 5 phút, hoặc bấm nút "🔄 Làm mới" để cập nhật ngay lập tức.</li>
-      </ol>
-      <p>Lưu ý: các ô ghi chú (comment) đọc/ghi thẳng bảng <code>sl_comments</code> trên Supabase — không còn qua Google Sheet/Apps Script. Bấm nút <b>"💾 Lưu dữ liệu"</b> dưới mỗi ô để lưu; nếu chưa đăng nhập, trang sẽ tự chuyển sang màn hình đăng nhập (nội dung đang gõ được giữ lại, không mất).</p>
-    </div>
-  </details>
-
-  <details class="setup-guide">
-    <summary>Cách đăng nhập để lưu comment</summary>
-    <div class="guide-body">
-      <ol>
-        <li>Bấm liên kết "Đăng nhập" ở góc trên bên phải màn hình.</li>
-        <li>Nhập email/mật khẩu tài khoản đã được cấp (liên hệ quản trị hệ thống nếu chưa có tài khoản).</li>
-        <li>Sau khi đăng nhập, trang tự quay lại dashboard — nút "💾 Lưu dữ liệu" sẽ hoạt động.</li>
-      </ol>
-    </div>
-  </details>
 
   <footer>
     <span>TOYOTAKI · Công ty Cổ phần Công nghiệp TOYOTAKI — KCN Khai Quang, phường Vĩnh Phúc, tỉnh Phú Thọ</span>
@@ -932,33 +889,6 @@ function nowStr(){
   return d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',hour12:false}) + ' ' + d.toLocaleDateString('vi-VN');
 }
 
-async function runDiagnostics(){
-  const list = document.getElementById('diagList');
-  list.innerHTML = 'Đang kiểm tra…';
-  const tables = ['sl_giao_hang','sl_khsx','sl_capacity','sl_forecast','sl_comments','sl_config'];
-  const results = await Promise.allSettled(tables.map(async (table)=>{
-    const t0 = performance.now();
-    const rows = await fetchSupabaseTable(table);
-    return {length: rows.length, ms: Math.round(performance.now()-t0)};
-  }));
-  list.innerHTML = tables.map((table,i)=>{
-    const r = results[i];
-    const linkHtml = `<a href="${SUPABASE_URL}/rest/v1/${table}?select=*" target="_blank" style="color:var(--accent);">mở REST API thô ↗</a>`;
-    if (r.status === 'fulfilled'){
-      const v = r.value;
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
-        ✅ <b>${table}</b> — ${v.length} dòng, ${v.ms}ms · ${linkHtml}
-      </div>`;
-    } else {
-      const msg = (r.reason && r.reason.message) ? r.reason.message : String(r.reason);
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
-        ❌ <b>${table}</b> — Lỗi: ${msg}<br>
-        <span style="color:var(--text-muted);">Kiểm tra SUPABASE_URL/SUPABASE_ANON_KEY và RLS policy đã bật "public read" chưa.</span> · ${linkHtml}
-      </div>`;
-    }
-  }).join('');
-}
-
 async function loadData(){
   const btn = document.getElementById('btnRefresh');
   btn.disabled = true;
@@ -987,11 +917,10 @@ async function loadData(){
     console.error('Lỗi tải dữ liệu Supabase:', err);
     const isFetchFail = err instanceof TypeError;
     const hint = isFetchFail
-      ? ' Nguyên nhân thường gặp: (1) đang mở file bằng cách bấm đúp — hãy host file này lên GitHub Pages/Netlify rồi mở bằng https://, (2) Sheet chưa "Publish to web" xong, hoặc (3) trình duyệt chặn do thiếu mạng.'
+      ? ' Nguyên nhân thường gặp: (1) đang mở file bằng cách bấm đúp — hãy host file này lên GitHub Pages/Netlify rồi mở bằng https://, hoặc (2) trình duyệt chặn do thiếu mạng.'
       : '';
-    setBanner('error', `⚠️ Không tải được dữ liệu từ Google Sheet (${err.message}).${hint} Đang hiển thị dữ liệu mẫu. Mở mục "🔍 Chi tiết kết nối" bên dưới để xem từng sheet.`);
+    setBanner('error', `⚠️ Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu.`);
     renderAll(DEMO_DATA);
-    runDiagnostics();
   } finally {
     btn.disabled = false;
   }
