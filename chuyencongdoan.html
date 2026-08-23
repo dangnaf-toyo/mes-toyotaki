@@ -46,11 +46,13 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;
 label{font-size:11px;font-weight:700;color:#555;
   text-transform:uppercase;letter-spacing:.4px}
 .req::after{content:" *";color:#e53}
-input,select{border:1.5px solid #ddd;border-radius:7px;
+input,select,textarea{border:1.5px solid #ddd;border-radius:7px;
   padding:10px 11px;font-size:14.5px;color:#1a1a2e;
   width:100%;transition:border-color .2s;font-family:inherit;background:#fff}
-input:focus,select:focus{outline:none;border-color:#C87941;
+textarea{resize:vertical}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#C87941;
   box-shadow:0 0 0 3px rgba(200,121,65,.12)}
+select:disabled{background:#F3F1EC;color:#666;cursor:not-allowed}
 .hint{font-size:11px;color:#999;margin-top:2px}
 .submit-btn{width:100%;padding:15px;border:none;border-radius:12px;
   font-size:16px;font-weight:700;cursor:pointer;
@@ -190,7 +192,13 @@ input:focus,select:focus{outline:none;border-color:#C87941;
 
   <div class="fg">
     <label class="req" for="nguoiNhan">Người nhận</label>
-    <select id="nguoiNhan"></select>
+    <select id="nguoiNhan" disabled></select>
+    <div class="hint">Luôn là tài khoản đang đăng nhập.</div>
+  </div>
+
+  <div class="fg">
+    <label for="ghiChu">Ghi chú</label>
+    <textarea id="ghiChu" rows="2" spellcheck="false" placeholder="Ghi chú thêm nếu cần (không bắt buộc)"></textarea>
   </div>
 
   <button class="submit-btn" id="btnSubmit" disabled>🔀&nbsp; Chuyển Công Đoạn</button>
@@ -367,17 +375,22 @@ async function loadDanhMuc(){
   fillSelect("pkCa", CA_LIST, "-- Chọn ca --");
   document.getElementById("pkNgay").value = getTodayString();
   document.getElementById("pkThoiDiemSX").value = nowForDatetimeLocal();
-  const [empRes, prodRes] = await Promise.all([
+  const [empRes, prodRes, userRes] = await Promise.all([
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
     sb.from('master_products').select('ma_sp,quy_trinh_cong_doan'),
+    sb.rpc('danh_sach_nguoi_dung_he_thong'),
   ]);
   if (empRes.error) { err("Không tải được danh sách nhân viên: " + empRes.error.message); return; }
   const names = (empRes.data || []).map(r => r.ten_nhan_vien);
-  fillSelect("nguoiGiao", names, "-- Chọn người giao (có thể bỏ trống) --");
-  fillSelect("nguoiNhan", names, "-- Chọn người nhận --");
   document.getElementById("dlNhanVienPk").innerHTML = names.map(n => `<option value="${n}">`).join("");
   fillSelect("pkNguoi", names, "-- Chọn người đóng gói --");
-  autoSelectNguoiNhan();
+  // "Người giao" chọn trong danh sách TÀI KHOẢN hệ thống (user_roles), không
+  // phải danh mục nhân viên — vì đây là người xác nhận thao tác, phải có tài
+  // khoản đăng nhập thật.
+  if (userRes.error) { err("Không tải được danh sách tài khoản: " + userRes.error.message); }
+  const userIdentities = (userRes.data || []).map(r => r.identity).filter(Boolean);
+  fillSelect("nguoiGiao", userIdentities, "-- Chọn người giao (có thể bỏ trống) --");
+  lockNguoiNhanToCurrentUser();
   productRoutingMap = {};
   (prodRes.data || []).forEach(p => {
     const route = String(p.quy_trinh_cong_doan || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -385,25 +398,23 @@ async function loadDanhMuc(){
   });
 }
 
-// Tự chọn sẵn "Người nhận" theo tài khoản đang đăng nhập — người dùng không
-// cần bấm chọn nữa. Nếu full_name của tài khoản chưa có trong danh mục nhân
-// viên (master_employees), vẫn thêm tạm 1 lựa chọn để chọn được.
-async function autoSelectNguoiNhan(){
+// "Người nhận" LUÔN là tài khoản đang đăng nhập — khoá cứng (disabled), người
+// dùng không chọn/sửa được, khỏi cần bấm chọn mỗi lần.
+async function lockNguoiNhanToCurrentUser(){
+  const sel = document.getElementById("nguoiNhan");
   try {
-    const session = await MesAuth.getSession();
-    if (!session) return;
-    const { data } = await sb.from('user_roles').select('full_name').eq('user_id', session.user.id).maybeSingle();
-    const fullName = data && data.full_name ? data.full_name.trim() : '';
-    if (!fullName) return;
-    const sel = document.getElementById("nguoiNhan");
-    if (![...sel.options].some(o => o.value === fullName)){
-      const opt = document.createElement('option');
-      opt.value = fullName; opt.textContent = fullName;
-      sel.appendChild(opt);
+    const identity = await MesAuth.getCurrentUserIdentity();
+    if (!identity){
+      sel.innerHTML = '<option value="">-- Cần đăng nhập --</option>';
+      return;
     }
-    sel.value = fullName;
+    sel.innerHTML = '<option value="' + identity.replace(/"/g,'&quot;') + '">' + identity + '</option>';
+    sel.value = identity;
+  } catch(e){
+    sel.innerHTML = '<option value="">-- Cần đăng nhập --</option>';
+  } finally {
     checkReady();
-  } catch(e){ /* không chặn luồng chính nếu lỗi */ }
+  }
 }
 
 // Định tuyến theo mã SP (quy_trinh_cong_doan) — nếu SP đã khai báo quy trình
@@ -704,6 +715,7 @@ function resetForNext(){
   document.getElementById("btnSubmit").disabled = true;
   document.getElementById("tachKhiChuyen").checked = false;
   document.getElementById("tachKhiChuyenWrap").style.display = "none";
+  document.getElementById("ghiChu").value = "";
 }
 
 document.getElementById("btnSubmit").addEventListener("click", submitTransfer);
@@ -761,7 +773,8 @@ async function submitTransfer(){
     p_ngay_duc: scannedData.ngay || '',
     p_cong_doan_giao: congDoanGiao, p_cong_doan_nhan: congDoanNhan,
     p_nguoi_giao: document.getElementById("nguoiGiao").value || '',
-    p_nguoi_nhan: document.getElementById("nguoiNhan").value
+    p_nguoi_nhan: document.getElementById("nguoiNhan").value,
+    p_ghi_chu: document.getElementById("ghiChu").value || ''
   });
 
   btn.textContent = "🔀  Chuyển Công Đoạn";
