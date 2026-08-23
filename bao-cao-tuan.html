@@ -130,14 +130,16 @@
 
   /* ── Bảng vấn đề & hành động đối ứng — dạng lưới kiểu Excel, sát ô ── */
   #actionTbl{table-layout:fixed;border:1px solid #cbbfa6;}
-  #actionTbl th, #actionTbl td{border:1px solid #ddd0ba;padding:0;}
-  #actionTbl th{padding:5px 6px;white-space:normal;line-height:1.25;}
+  #actionTbl th, #actionTbl td{border:1px solid #ddd0ba;padding:0;vertical-align:middle;}
+  #actionTbl th{padding:5px 6px;white-space:normal;line-height:1.25;text-align:center;}
   #actionTbl tbody tr:nth-child(even){background:#FBF6EE;}
   #actionTbl input, #actionTbl textarea{
-    width:100%;height:100%;padding:5px 6px;font-size:12.5px;font-family:inherit;
+    width:100%;padding:5px 6px;font-size:12.5px;font-family:inherit;
     border:none;border-radius:0;background:transparent;display:block;resize:none;line-height:1.3;
   }
-  #actionTbl textarea{min-height:30px;overflow:hidden;}
+  #actionTbl input{height:100%;}
+  #actionTbl textarea{min-height:30px;overflow:hidden;height:auto;}
+  #actionTbl .tacell{display:flex;align-items:center;height:100%;}
   #actionTbl input:focus, #actionTbl textarea:focus{outline:2px solid var(--tk-orange);outline-offset:-2px;background:#fff;position:relative;z-index:1;}
   #actionTbl input[type=number]{text-align:right;}
   #actionTbl input[type=date]{padding:4px 4px;}
@@ -653,12 +655,12 @@ function renderActionTable(){
 function actionRowHtml(r,i){
   return '<tr data-i="' + i + '">' +
     '<td class="stt-cell">' + (i+1) + '</td>' +
-    '<td><textarea rows="1" spellcheck="false" data-f="van_de">' + escapeHtml(r.van_de||'') + '</textarea></td>' +
+    '<td><div class="tacell"><textarea rows="1" spellcheck="false" data-f="van_de">' + escapeHtml(r.van_de||'') + '</textarea></div></td>' +
     '<td><input type="number" spellcheck="false" data-f="so_phut_dung" value="' + (r.so_phut_dung||0) + '"></td>' +
     '<td><input type="number" step="0.1" spellcheck="false" data-f="ty_le_phan_tram" value="' + (r.ty_le_phan_tram||0) + '"></td>' +
-    '<td><textarea rows="1" spellcheck="false" data-f="nguyen_nhan">' + escapeHtml(r.nguyen_nhan||'') + '</textarea></td>' +
-    '<td><textarea rows="1" spellcheck="false" data-f="doi_sach">' + escapeHtml(r.doi_sach||'') + '</textarea></td>' +
-    '<td><textarea rows="1" spellcheck="false" data-f="dam_nhiem">' + escapeHtml(r.dam_nhiem||'') + '</textarea></td>' +
+    '<td><div class="tacell"><textarea rows="1" spellcheck="false" data-f="nguyen_nhan">' + escapeHtml(r.nguyen_nhan||'') + '</textarea></div></td>' +
+    '<td><div class="tacell"><textarea rows="1" spellcheck="false" data-f="doi_sach">' + escapeHtml(r.doi_sach||'') + '</textarea></div></td>' +
+    '<td><div class="tacell"><textarea rows="1" spellcheck="false" data-f="dam_nhiem">' + escapeHtml(r.dam_nhiem||'') + '</textarea></div></td>' +
     '<td><input type="date" spellcheck="false" data-f="thoi_han" value="' + escapeHtml(r.thoi_han||'') + '"></td>' +
     '<td class="del-cell"><button type="button" class="del-btn" data-del="' + i + '" title="Xoá dòng">✕</button></td>' +
     '</tr>';
@@ -669,7 +671,11 @@ function syncRowHeight(tr){
   if (!areas.length) return;
   let max = 30;
   areas.forEach(a => { a.style.height = 'auto'; max = Math.max(max, a.scrollHeight); });
-  areas.forEach(a => { a.style.height = max + 'px'; });
+  areas.forEach(a => {
+    a.style.height = a.scrollHeight + 'px';
+    const wrap = a.closest('.tacell');
+    if (wrap) wrap.style.height = max + 'px';
+  });
 }
 function bindActionRow(i){
   const tr = document.querySelector('#actionTblBody tr[data-i="' + i + '"]');
