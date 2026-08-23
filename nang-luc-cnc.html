@@ -29,8 +29,9 @@
   .header-clock .date{font-size:10px;color:#94A3B8;}
   .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
 
-  .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
-  .tab-btn{padding:9px 18px;border:1px solid var(--border);border-radius:100px;background:var(--bg-panel);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;}
+  .tab-btn{padding:6px 12px;border:1px solid #475569;border-radius:5px;background:transparent;color:#F1F5F9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .tab-btn:hover{background:#334155;}
   .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 
   .card{background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
@@ -86,6 +87,11 @@
       <div class="co">Toyotaki</div>
       <div class="title">Năng Lực Máy Gia Công CNC</div>
     </div>
+    <div class="tabs" id="adminTabs" style="display:none">
+      <button class="tab-btn active" data-tab="routing">1. Quy trình CNC theo SP</button>
+      <button class="tab-btn" data-tab="forecast">2. Forecast sản lượng theo tháng</button>
+      <button class="tab-btn" data-tab="capacity">3. Năng lực &amp; kết quả tính toán</button>
+    </div>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
       <div class="time" id="hdrClockTime"></div>
@@ -95,11 +101,6 @@
   <div id="gate"></div>
 
   <div id="adminArea" style="display:none">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="routing">1. Quy trình CNC theo SP</button>
-      <button class="tab-btn" data-tab="forecast">2. Forecast sản lượng theo tháng</button>
-      <button class="tab-btn" data-tab="capacity">3. Năng lực &amp; kết quả tính toán</button>
-    </div>
 
     <!-- ── Tab 1: Quy trình CNC theo SP ─────────────────────────────────── -->
     <section id="tab-routing" class="tab-pane">
@@ -504,6 +505,7 @@ async function main(){
   }
 
   document.getElementById('adminArea').style.display = 'block';
+  document.getElementById('adminTabs').style.display = 'flex';
   document.getElementById('fc-nam').value = new Date().getFullYear();
 
   const { data: products } = await sb.from('master_products').select('ma_sp, ten_sp');
