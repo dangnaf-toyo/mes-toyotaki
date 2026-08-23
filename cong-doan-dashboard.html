@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard công đoạn — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
   cong-doan-dashboard.html — dashboard dùng CHUNG cho Bavia/Gia công/Sơn/OQC,
   khoá công đoạn qua query param (?cd=Bavia) — mỗi máy tính tại từng công đoạn
@@ -28,56 +32,70 @@
   hạn.
 -->
 <style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f2f5;min-height:100vh;padding:16px 12px 60px;color:#1a1a2e}
-.wrap{max-width:1180px;margin:0 auto}
-.hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.hdr h1{font-size:17px;font-weight:700}
-.hdr p{font-size:10px;color:#999;margin-top:2px}
-.auth-info{font-size:11.5px;color:#667}
-.auth-info a{color:#C87941;text-decoration:none;font-weight:600}
-.card{background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:16px;margin-bottom:14px}
-.card h2{font-size:13px;font-weight:700;color:#8a5a30;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f5e6d7;display:flex;align-items:center;gap:8px}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.auth-info{font-size:10px;color:#94A3B8;display:flex;align-items:center;gap:5px}
+.auth-info a{color:#93C5FD;text-decoration:none;font-weight:600}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:14px 16px;margin-bottom:0}
+.card h2{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
 .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.fg{display:flex;flex-direction:column;gap:4px}
-.fg label{font-size:10.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px}
-.fg input,.fg select{border:1.5px solid #ddd;border-radius:7px;padding:8px 10px;font-size:13.5px;font-family:inherit;min-width:130px}
-.fg input:focus,.fg select:focus{outline:none;border-color:#C87941}
-.btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;background:#C87941;color:#fff}
-.btn:hover{background:#a85e2a}
-.btn-outline{background:#fff;border:1.5px solid #C87941;color:#C87941}
-.btn-good{background:#1a7a3a}
-.btn-good:hover{background:#146030}
-.btn-tiny{border:1.5px solid #ddd;background:#fff;color:#555;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer}
-.btn-tiny:hover{border-color:#C87941;color:#C87941}
-.btn-tiny.danger{border-color:#c00;color:#c00}
-.tbl-wrap{overflow-x:auto}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select{background:#fff;color:var(--text);border:1.5px solid var(--border-strong);border-radius:5px;padding:6px 9px;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;outline:none;min-width:120px}
+.fg input:focus,.fg select:focus{border-color:var(--accent)}
+header .fg label{color:#94A3B8}
+header .fg input,header .fg select{background:#334155;color:#F1F5F9;border:1px solid #475569}
+header .fg input:focus,header .fg select:focus{border-color:#93C5FD}
+.btn{border:none;border-radius:5px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;border:1.5px solid var(--accent);color:var(--accent)}
+.btn-outline:hover{background:var(--bg-sunken)}
+header .btn-outline{border-color:#475569;color:#F1F5F9}
+header .btn-outline:hover{background:#334155}
+.btn-good{background:var(--run-fg);color:#fff}
+.btn-good:hover{background:#036049}
+.btn-tiny{border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text-muted);border-radius:5px;padding:5px 9px;font-size:11px;font-weight:600;cursor:pointer}
+.btn-tiny:hover{border-color:var(--accent);color:var(--accent)}
+.btn-tiny.danger{border-color:#F87171;color:var(--alarm-fg)}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
 table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:760px}
-th,td{border:1px solid #e5e5e5;padding:7px 8px;text-align:left}
-th{background:#faf5f0;color:#8a5a30;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px}
-td.num{text-align:right;font-weight:700}
-.empty-row td,.empty{text-align:center;color:#999;padding:20px;font-style:italic}
-#msg{max-width:1180px;margin:0 auto 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
-.err{background:#fff0f0;color:#c00;border:1px solid #fcc;display:block!important}
-.ok{background:#f0fff4;color:#1a7a3a;border:1px solid #c3e6cb;display:block!important}
+th,td{border-bottom:1px solid var(--border);padding:7px 8px;text-align:left}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
+.empty-row td,.empty{text-align:center;color:var(--text-dim);padding:20px;font-style:italic}
+#msg{max-width:1180px;margin:0 auto 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.ok{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
 .waiting-list{display:flex;flex-direction:column;gap:6px;font-size:12px}
-.waiting-item{display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:5px 0}
+.waiting-item{display:flex;justify-content:space-between;border-bottom:1px dashed var(--border);padding:5px 0}
 .modal-mask{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);align-items:center;justify-content:center;z-index:50;padding:14px}
 .modal-mask.open{display:flex}
-.modal{background:#fff;border-radius:12px;max-width:480px;width:100%;max-height:92vh;overflow-y:auto}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #eee}
-.modal-title{font-size:14.5px;font-weight:700}
-.modal-close{border:none;background:none;font-size:18px;cursor:pointer;color:#999}
+.modal{background:var(--bg-panel);border-radius:10px;max-width:480px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:14.5px;font-weight:700;color:var(--text)}
+.modal-close{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text-dim)}
 .modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
-.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid #eee}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
 .shortcut-row{display:flex;gap:8px;flex-wrap:wrap}
 .shortcut-row a{text-decoration:none}
-.kb-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #eee;border-radius:8px}
+.kb-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px}
 .kb-row .kb-info{flex:1;min-width:0;font-size:12.5px}
-.kb-row .kb-info b{font-family:monospace}
-.kb-row .kb-sub{font-size:10.5px;color:#999;margin-top:1px}
-.kb-row input[type=text]{width:110px;border:1.5px solid #ddd;border-radius:6px;padding:5px 7px;font-size:12px}
-.kb-row input[type=number]{width:70px;border:1.5px solid #ddd;border-radius:6px;padding:5px 7px;font-size:12px}
+.kb-row .kb-info b{font-family:'JetBrains Mono',monospace}
+.kb-row .kb-sub{font-size:10.5px;color:var(--text-dim);margin-top:1px}
+.kb-row input[type=text]{width:110px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px}
+.kb-row input[type=number]{width:70px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px}
+.sub-cd-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--bg-sunken);color:var(--text-muted);border:1px solid var(--border);text-transform:uppercase;letter-spacing:.03em}
 </style>
 </head>
 <body>
@@ -95,18 +113,23 @@ td.num{text-align:right;font-weight:700}
   </div>
 
   <div id="mainArea" style="display:none">
-    <div class="card">
-      <div class="toolbar">
-        <div class="fg"><label>Ngày</label><input type="date" id="ngay"></div>
-        <div class="fg"><label>Ca</label><select id="ca"></select></div>
-        <div style="flex:1"></div>
-        <div class="shortcut-row">
-          <a id="lnkChuyen" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📷 Nhận / Chuyển hàng</button></a>
-          <a id="lnkDongGoi" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📦 Đóng gói / In tem</button></a>
-        </div>
-        <button type="button" class="btn btn-good" id="btnKetCa">🏁 Kết ca &amp; xem báo cáo</button>
+    <header>
+      <div class="brand">
+        <div class="co">Toyotaki</div>
+        <div class="title" id="hdrTitle">Dashboard công đoạn</div>
       </div>
-    </div>
+      <div class="fg"><label>Ngày</label><input type="date" id="ngay"></div>
+      <div class="fg"><label>Ca</label><select id="ca"></select></div>
+      <div class="shortcut-row">
+        <a id="lnkChuyen" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📷 Nhận / Chuyển hàng</button></a>
+        <a id="lnkDongGoi" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📦 Đóng gói / In tem</button></a>
+      </div>
+      <button type="button" class="btn btn-good" id="btnKetCa">🏁 Kết ca &amp; xem báo cáo</button>
+      <div class="header-clock">
+        <div class="date" id="hdrClockDate"></div>
+        <div class="time" id="hdrClockTime"></div>
+      </div>
+    </header>
 
     <div class="card">
       <h2>📥 Hàng đang chờ tại công đoạn này</h2>
@@ -118,8 +141,8 @@ td.num{text-align:right;font-weight:700}
       <p style="font-size:10.5px;color:#999;margin:-6px 0 10px">Các dòng mờ, chữ nghiêng là kế hoạch tuần chưa tạo trạm — bấm "+ Tạo..." để tạo ngay với Mã SP/KH ca điền sẵn.</p>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người thao tác</th><th>KH ca</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
-          <tbody id="tramTbody"><tr class="empty-row"><td colspan="8">Đang tải...</td></tr></tbody>
+          <thead><tr><th id="thCongDoanSub" style="display:none">Công đoạn</th><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người thao tác</th><th>KH ca</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
+          <tbody id="tramTbody"><tr class="empty-row"><td colspan="9">Đang tải...</td></tr></tbody>
         </table>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
@@ -155,6 +178,7 @@ td.num{text-align:right;font-weight:700}
   <div class="modal">
     <div class="modal-head"><div class="modal-title" id="addTramTitle">+ Thêm trạm</div><button class="modal-close" onclick="closeModal('modalAddTram')">✕</button></div>
     <div class="modal-body">
+      <div class="fg" id="at-congdoan-wrap" style="display:none"><label class="req">Công đoạn</label><select id="at-congdoan"></select></div>
       <div class="fg"><label class="req" id="lblTenTram">Tên trạm/tổ</label><input type="text" autocomplete="off" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
       <div class="fg"><label class="req">Mã SP</label><input type="text" autocomplete="off" id="at-masp" list="dlMaSp" oninput="onMaSpPick('at-masp','at-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" autocomplete="off" id="at-tensp"></div>
@@ -229,9 +253,16 @@ td.num{text-align:right;font-weight:700}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
-const CONG_DOAN_LIST = ["Bavia", "Gia Công", "Cắt viền", "Sơn", "OQC"];
+// "Cắt viền" KHÔNG còn là 1 dashboard riêng — coi là 1 công đoạn con của Gia
+// Công (SP có cả 2 vẫn cần 2 nhãn cong_doan riêng trong DB để phân biệt đúng
+// lượt, chỉ gộp lại ở TẦNG HIỂN THỊ dashboard này). CONG_DOAN_SUB_MAP khai
+// báo "trang X hiển thị gộp các cong_doan nào" — trang chính vẫn là 1 giá trị
+// CONG_DOAN_LIST, các giá trị phụ không xuất hiện trong danh mục chọn/menu.
+const CONG_DOAN_LIST = ["Bavia", "Gia Công", "Sơn", "OQC"];
+const CONG_DOAN_SUB_MAP = { 'Gia Công': ['Gia Công', 'Cắt viền'] };
 const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
 let congDoan = null;
+let congDoanGroup = [];
 let productMap = {};
 let trams = [];
 let planToday = [];
@@ -260,7 +291,10 @@ function onMaSpPick(inputId, tenId){
 /* ---------- Khởi tạo công đoạn từ ?cd= ---------- */
 function initCongDoan(){
   const params = new URLSearchParams(location.search);
-  const cd = params.get('cd');
+  let cd = params.get('cd');
+  // Bookmark cũ trỏ thẳng "Cắt viền" (khi nó còn là dashboard riêng) — chuyển
+  // êm sang Gia Công, nơi giờ hiển thị gộp cả 2.
+  if (cd === 'Cắt viền') cd = 'Gia Công';
   if (cd && CONG_DOAN_LIST.includes(cd)){
     congDoan = cd;
     startDashboard();
@@ -276,9 +310,16 @@ function initCongDoan(){
 }
 
 async function startDashboard(){
-  if (window.MesNav) MesNav.setTitle('Dashboard công đoạn — ' + congDoan, null);
+  congDoanGroup = CONG_DOAN_SUB_MAP[congDoan] || [congDoan];
+  const merged = congDoanGroup.length > 1;
+  const titleSuffix = merged ? congDoan + ' (gồm ' + congDoanGroup.slice(1).join(', ') + ')' : congDoan;
+  if (window.MesNav) MesNav.setTitle('Dashboard công đoạn — ' + titleSuffix, null);
   document.title = 'Dashboard ' + congDoan + ' — TOYOTAKI';
+  document.getElementById('hdrTitle').textContent = 'Dashboard ' + titleSuffix;
   document.getElementById('mainArea').style.display = 'block';
+  document.getElementById('thCongDoanSub').style.display = merged ? '' : 'none';
+  document.getElementById('at-congdoan-wrap').style.display = merged ? '' : 'none';
+  if (merged) fillSelect('at-congdoan', congDoanGroup, null);
   applyTramLabel();
   document.getElementById('ngay').value = getTodayString();
   fillSelect('ca', CA_LIST, '-- Chọn ca --');
@@ -294,8 +335,19 @@ async function startDashboard(){
   document.getElementById('ngay').addEventListener('change', reloadAll);
   caSel.addEventListener('change', reloadAll);
 
+  startHeaderClock();
   await loadDanhMuc();
   reloadAll();
+}
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
 }
 
 async function loadDanhMuc(){
@@ -331,8 +383,8 @@ async function loadTrams(){
   const tbody = document.getElementById('tramTbody');
   tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải...</td></tr>';
   const { data, error } = await sb.from('cd_tram_hien_tai')
-    .select('*').eq('cong_doan', congDoan).eq('ngay', ngay).eq('ca', ca).order('ten_tram');
-  if (error){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Lỗi: ' + escapeHtml(error.message) + '</td></tr>'; return; }
+    .select('*').in('cong_doan', congDoanGroup).eq('ngay', ngay).eq('ca', ca).order('ten_tram');
+  if (error){ tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Lỗi: ' + escapeHtml(error.message) + '</td></tr>'; return; }
   trams = data || [];
   renderTrams();
 }
@@ -343,10 +395,14 @@ function renderTrams(){
   // Kế hoạch tuần (cd_khsx_tuan_plan, nhập ở khsx-tuan.html) hiển thị gộp
   // ngay trong bảng này — chỉ những mã SP CHƯA có trạm nào đang chạy, để
   // trưởng ca thấy "còn thiếu trạm cho mã nào" mà không phải xem 2 nơi.
-  const pendingPlan = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp));
-  if (!trams.length && !pendingPlan.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
+  const pendingPlan = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp && t.cong_doan === p.cong_doan));
+  const merged = congDoanGroup.length > 1;
+  const colspan = merged ? 9 : 8;
+  if (!trams.length && !pendingPlan.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="' + colspan + '">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
+  const cdCell = (cd) => merged ? `<td><span class="sub-cd-badge">${escapeHtml(cd)}</span></td>` : '';
   const activeRows = trams.map(t => `
     <tr>
+      ${cdCell(t.cong_doan)}
       <td>${escapeHtml(t.ten_tram)}</td>
       <td>${escapeHtml(t.ma_sp)}</td>
       <td>${escapeHtml(t.ten_sp) || '<span style="color:#999">—</span>'}</td>
@@ -363,6 +419,7 @@ function renderTrams(){
     </tr>`).join('');
   const planRows = pendingPlan.map(p => `
     <tr style="opacity:.65;font-style:italic">
+      ${cdCell(p.cong_doan)}
       <td><span style="color:#999">📋 Kế hoạch</span></td>
       <td>${escapeHtml(p.ma_sp)}</td>
       <td>${escapeHtml(p.ten_sp) || '<span style="color:#999">—</span>'}</td>
@@ -371,12 +428,12 @@ function renderTrams(){
       <td class="num"><span style="color:#999">—</span></td>
       <td class="num"><span style="color:#999">—</span></td>
       <td style="white-space:nowrap">
-        <button type="button" class="btn-tiny khsx-add-tram-btn" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}" data-kh-ca="${p.khCa}">+ Tạo ${lbl}</button>
+        <button type="button" class="btn-tiny khsx-add-tram-btn" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}" data-kh-ca="${p.khCa}" data-cong-doan="${escapeHtml(p.cong_doan)}">+ Tạo ${lbl}</button>
       </td>
     </tr>`).join('');
   tbody.innerHTML = activeRows + planRows;
   tbody.querySelectorAll('.khsx-add-tram-btn').forEach(btn => btn.addEventListener('click', () => {
-    openAddTramFromKhsx(btn.dataset.maSp, btn.dataset.tenSp, Number(btn.dataset.khCa));
+    openAddTramFromKhsx(btn.dataset.maSp, btn.dataset.tenSp, Number(btn.dataset.khCa), btn.dataset.congDoan);
   }));
 }
 
@@ -389,6 +446,7 @@ document.getElementById('btnAddTram').addEventListener('click', () => {
   document.getElementById('at-tensp').value = '';
   document.getElementById('at-khca').value = '';
   document.getElementById('at-nguoi').value = '';
+  if (congDoanGroup.length > 1) document.getElementById('at-congdoan').value = congDoan;
   openModal('modalAddTram');
 });
 document.getElementById('btnSubmitAddTram').addEventListener('click', async () => {
@@ -397,10 +455,11 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
   if (!ten) return showMsg('Chưa nhập tên ' + tramLabel().toLowerCase() + '.', 'err');
   if (!masp) return showMsg('Chưa nhập mã SP.', 'err');
   const khCaRaw = document.getElementById('at-khca').value;
+  const congDoanRow = congDoanGroup.length > 1 ? document.getElementById('at-congdoan').value : congDoan;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_tao', {
-    p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoan,
+    p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoanRow,
     p_ten_tram: ten, p_ma_sp: masp, p_ten_sp: document.getElementById('at-tensp').value.trim(),
     p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
     p_nguoi: document.getElementById('at-nguoi').value.trim(), p_user: await MesAuth.getCurrentUserIdentity(),
@@ -505,12 +564,20 @@ async function ketThucTram(id){
 document.getElementById('btnKetCa').addEventListener('click', async () => {
   const ngay = document.getElementById('ngay').value, ca = document.getElementById('ca').value;
   if (!ngay || !ca) return showMsg('Chọn ngày/ca trước.', 'err');
-  if (!confirm('Kết ca ' + ca + ' ngày ' + ngay.split('-').reverse().join('/') + ' cho ' + congDoan + '? Toàn bộ ' + tramLabel().toLowerCase() + ' đang hoạt động sẽ được gộp vào báo cáo và xoá khỏi màn hình.')) return;
+  const congDoanLabel = congDoanGroup.length > 1 ? congDoan + ' (gồm ' + congDoanGroup.slice(1).join(', ') + ')' : congDoan;
+  if (!confirm('Kết ca ' + ca + ' ngày ' + ngay.split('-').reverse().join('/') + ' cho ' + congDoanLabel + '? Toàn bộ ' + tramLabel().toLowerCase() + ' đang hoạt động sẽ được gộp vào báo cáo và xoá khỏi màn hình.')) return;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
-  const { data, error } = await sb.rpc('cd_ket_ca_cong_doan', { p_ngay: ngay, p_ca: ca, p_cong_doan: congDoan, p_user: await MesAuth.getCurrentUserIdentity() });
-  if (error) return showMsg('Lỗi: ' + error.message, 'err');
-  showReport(data || []);
+  const user = await MesAuth.getCurrentUserIdentity();
+  // Trang gộp nhiều cong_doan (VD Gia Công + Cắt viền) — mỗi cái vẫn là 1
+  // dòng riêng trong DB nên kết ca lần lượt từng cong_doan rồi gộp báo cáo.
+  let allRows = []; const fail = [];
+  for (const cd of congDoanGroup){
+    const { data, error } = await sb.rpc('cd_ket_ca_cong_doan', { p_ngay: ngay, p_ca: ca, p_cong_doan: cd, p_user: user });
+    if (error) fail.push(cd + ': ' + error.message); else allRows = allRows.concat(data || []);
+  }
+  if (fail.length) return showMsg('Lỗi: ' + fail.join('; '), 'err');
+  showReport(allRows);
   loadTrams();
 });
 
@@ -536,7 +603,7 @@ function showReport(rows){
 async function loadWaiting(){
   const el = document.getElementById('waitingList');
   el.innerHTML = '<div class="empty">Đang tải...</div>';
-  const { data: positions, error } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', congDoan);
+  const { data: positions, error } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').in('vi_tri_hien_tai', congDoanGroup);
   if (error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
   if (!positions || !positions.length){ el.innerHTML = '<div class="empty">Chưa có hàng nào chuyển đến công đoạn này.</div>'; return; }
   const tags = positions.map(p => p.tag_no);
@@ -591,21 +658,22 @@ async function loadKhsxToday(){
   const jsDay = d.getDay();
   const dayCol = dayCols[jsDay === 0 ? 6 : jsDay - 1];
   const { data, error } = await sb.from('cd_khsx_tuan_plan')
-    .select('ma_sp,ten_sp,' + dayCol)
-    .eq('tuan_bat_dau', mondayOfKhsx(ngay)).eq('cong_doan', congDoan);
+    .select('ma_sp,ten_sp,cong_doan,' + dayCol)
+    .eq('tuan_bat_dau', mondayOfKhsx(ngay)).in('cong_doan', congDoanGroup);
   if (error){ console.error('loadKhsxToday lỗi:', error.message); return; }
   planToday = (data || [])
     .filter(r => Number(r[dayCol]) > 0)
-    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, khCa: motCa ? Number(r[dayCol]) : Math.round(Number(r[dayCol]) / 2) }))
+    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, cong_doan: r.cong_doan, khCa: motCa ? Number(r[dayCol]) : Math.round(Number(r[dayCol]) / 2) }))
     .sort((a, b) => a.ma_sp.localeCompare(b.ma_sp, 'vi'));
   renderTrams();
 }
-function openAddTramFromKhsx(maSp, tenSp, khCa){
+function openAddTramFromKhsx(maSp, tenSp, khCa, congDoanSub){
   document.getElementById('at-ten').value = '';
   document.getElementById('at-masp').value = maSp;
   document.getElementById('at-tensp').value = tenSp;
   document.getElementById('at-khca').value = khCa || '';
   document.getElementById('at-nguoi').value = '';
+  if (congDoanGroup.length > 1) document.getElementById('at-congdoan').value = congDoanSub || congDoan;
   openModal('modalAddTram');
   document.getElementById('at-ten').focus();
 }
@@ -613,7 +681,8 @@ function openAddTramFromKhsx(maSp, tenSp, khCa){
 /* ---------- Nạp kế hoạch hàng loạt từ KHSX tuần ---------- */
 document.getElementById('btnKhsxBatch').addEventListener('click', () => {
   const lbl = tramLabel();
-  const pendingPlan = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp));
+  const pendingPlan = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp && t.cong_doan === p.cong_doan));
+  const merged = congDoanGroup.length > 1;
   const list = document.getElementById('kbList');
   const empty = document.getElementById('kbEmpty');
 
@@ -633,10 +702,10 @@ document.getElementById('btnKhsxBatch').addEventListener('click', () => {
     list.innerHTML = pendingPlan.map((p, i) => {
       const tenGoiY = lbl + ' ' + (nextNum + i);
       return `
-        <div class="kb-row" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}">
+        <div class="kb-row" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}" data-cong-doan="${escapeHtml(p.cong_doan)}">
           <input type="checkbox" class="kb-check" checked style="width:16px;height:16px;flex:none">
           <div class="kb-info">
-            <div><b>${escapeHtml(p.ma_sp)}</b> — ${escapeHtml(p.ten_sp || '')}</div>
+            <div><b>${escapeHtml(p.ma_sp)}</b> — ${escapeHtml(p.ten_sp || '')} ${merged ? `<span class="sub-cd-badge">${escapeHtml(p.cong_doan)}</span>` : ''}</div>
             <div class="kb-sub">Tên ${lbl.toLowerCase()} · KH ca (pcs)</div>
           </div>
           <input type="text" autocomplete="off" class="kb-ten-tram" value="${escapeHtml(tenGoiY)}">
@@ -671,7 +740,7 @@ document.getElementById('btnSubmitKhsxBatch').addEventListener('click', async ()
     const ten = r.querySelector('.kb-ten-tram').value.trim();
     const khCaRaw = r.querySelector('.kb-kh-ca').value;
     const { error } = await sb.rpc('cd_tram_tao', {
-      p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoan,
+      p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: r.dataset.congDoan || congDoan,
       p_ten_tram: ten, p_ma_sp: r.dataset.maSp, p_ten_sp: r.dataset.tenSp,
       p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
       p_nguoi: '', p_user: await MesAuth.getCurrentUserIdentity(),
