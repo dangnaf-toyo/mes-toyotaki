@@ -408,9 +408,12 @@ function renderReport(ctx){
       '<div class="day-ht">' + (d.isToday ? 'tạm tính' : 'HT <b>' + fmtPct(d.htPct) + '</b>') + '</div></div>';
   }).join('') + '</div>';
   if (c.worstShifts.length) {
-    html += priorityBox('3 ca yếu nhất tuần — ưu tiên xem lại', c.worstShifts.map(s =>
-      '<b>' + escapeHtml(s.ca) + ' · ' + escapeHtml(fmtVN(new Date(s.ngay+'T00:00:00'))) + '</b> (' + escapeHtml(s.truong_ca||'—') + ')' +
-      ' <span class="pm">— hoàn thành ' + fmtPct(s.ht) + ' KH, ' + fmtNum(s.so_su_co_ca) + ' sự cố, ' + fmtNum(s.tong_phut_dung_ca) + "' dừng máy</span>"));
+    html += priorityBox('3 ca yếu nhất tuần — ưu tiên xem lại', c.worstShifts.map(s => {
+      const top3 = top3VanDe(ctx.suco.filter(r => r.ngay === s.ngay && r.ca === s.ca));
+      return '<b>' + escapeHtml(s.ca) + ' · ' + escapeHtml(fmtVN(new Date(s.ngay+'T00:00:00'))) + '</b> (' + escapeHtml(s.truong_ca||'—') + ')' +
+        ' <span class="pm">— hoàn thành ' + fmtPct(s.ht) + ' KH, ' + fmtNum(s.so_su_co_ca) + ' sự cố, ' + fmtNum(s.tong_phut_dung_ca) + "' dừng máy</span>" +
+        '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong({ top3 }) + '</div>';
+    }));
   }
   html += '</div>';
 
@@ -449,6 +452,16 @@ function renderReport(ctx){
   html += caRow('Phút dừng máy', c.ca1.phut/maxPhut*100, fmtNum(c.ca1.phut)+"'", c.ca2.phut/maxPhut*100, fmtNum(c.ca2.phut)+"'");
   html += caRow('Số sự cố / ca', c.ca1.scPerCa/maxSc*100, c.ca1.scPerCa.toFixed(1).replace('.',',')+' lượt', c.ca2.scPerCa/maxSc*100, c.ca2.scPerCa.toFixed(1).replace('.',',')+' lượt');
   html += caRow('NG (sản phẩm)', c.ca1.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca1.ng), c.ca2.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca2.ng));
+  if (c.ca1.n > 0 && c.ca2.n > 0 && c.ca1.ht !== c.ca2.ht) {
+    const caKemHon = c.ca1.ht <= c.ca2.ht ? 'Ca 1' : 'Ca 2';
+    const caTotHon = caKemHon === 'Ca 1' ? 'Ca 2' : 'Ca 1';
+    const statKem = caKemHon === 'Ca 1' ? c.ca1 : c.ca2, statTot = caKemHon === 'Ca 1' ? c.ca2 : c.ca1;
+    const top3CaKem = top3VanDe(ctx.suco.filter(r => r.ca === caKemHon));
+    html += priorityBox(caKemHon + ' đang hoàn thành kế hoạch thấp hơn ' + caTotHon, [
+      '<span class="pm">' + caKemHon + ' đạt ' + fmtPct(statKem.ht) + ' KH so với ' + fmtPct(statTot.ht) + ' KH của ' + caTotHon + '</span>' +
+      '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong({ top3: top3CaKem }) + '</div>'
+    ]);
+  }
   html += '</div>';
 
   // Đổi khuôn theo trưởng ca
@@ -459,6 +472,8 @@ function renderReport(ctx){
     html += tableWrap(['Trưởng ca','Số lần','Tổng phút','TB mỗi lần'],
       c.changeover.map(x => '<tr><td class="rowname">' + escapeHtml(x.lead) + '</td><td class="num">' + x.count + '</td>' +
         '<td class="num">' + fmtNum(x.phut) + "'</td><td class=\"num\">" + x.avg.toFixed(1).replace('.',',') + "'</td></tr>").join(''));
+    html += priorityBox('3 trưởng ca có thời gian đổi khuôn nhiều nhất', c.changeover.slice(0,3).map(x =>
+      '<b>' + escapeHtml(x.lead) + '</b> <span class="pm">— tổng ' + fmtNum(x.phut) + "' (" + x.count + ' lần), trung bình ' + x.avg.toFixed(1).replace('.',',') + "'/lần</span>"));
   }
   html += '</div>';
 
@@ -469,7 +484,8 @@ function renderReport(ctx){
     '<tr><td class="rowname">' + escapeHtml(x.ma_may) + '</td><td>' + barCell(x.phut, maxMachinePhut) + '</td>' +
     '<td class="num">' + x.count + '</td><td class="num">' + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + '</td></tr>').join(''));
   if (c.downtimeMachine.length) html += priorityBox('3 máy ưu tiên xử lý', c.downtimeMachine.slice(0,3).map(x =>
-    '<b>' + escapeHtml(x.ma_may) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + x.count + ' lượt), nguyên nhân hàng đầu: ' + escapeHtml(x.top3[0]?.label||'—') + ' (' + fmtNum(x.top3[0]?.phut||0) + "')</span>"));
+    '<b>' + escapeHtml(x.ma_may) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + x.count + ' lượt)</span>' +
+    '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(x) + '</div>'));
   html += '</div>';
 
   // Dừng máy theo loại vấn đề
@@ -479,7 +495,8 @@ function renderReport(ctx){
     '<tr><td class="rowname">' + escapeHtml(x.label) + '</td><td>' + barCell(x.phut, maxIssuePhut) + '</td>' +
     '<td class="num">' + x.count + '</td><td class="num">' + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + '</td></tr>').join(''));
   if (c.downtimeIssue.length) html += priorityBox('3 loại vấn đề ưu tiên xử lý', c.downtimeIssue.slice(0,3).map(x =>
-    '<b>' + escapeHtml(x.label) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + '), nguyên nhân hàng đầu: ' + escapeHtml(x.top3[0]?.label||'—') + '</span>'));
+    '<b>' + escapeHtml(x.label) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + ')</span>' +
+    '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(x) + '</div>'));
   html += '</div>';
 
   // Dừng máy theo mã SP
@@ -489,7 +506,8 @@ function renderReport(ctx){
     '<tr><td class="rowname">' + escapeHtml(x.ma_sp) + '</td><td class="rowsub">' + escapeHtml(x.ten_sp) + '</td>' +
     '<td>' + barCell(x.phut, maxProdPhut) + '</td><td class="num">' + x.count + '</td></tr>').join(''));
   if (c.downtimeProduct.length) html += priorityBox('3 mã sản phẩm ưu tiên xử lý', c.downtimeProduct.slice(0,3).map(x =>
-    '<b>' + escapeHtml(x.ma_sp) + ' · ' + escapeHtml(x.ten_sp) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + x.count + ' lượt)</span>'));
+    '<b>' + escapeHtml(x.ma_sp) + ' · ' + escapeHtml(x.ten_sp) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + x.count + ' lượt)</span>' +
+    '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(x) + '</div>'));
   html += '</div>';
 
   // 3 vấn đề lớn nhất bên trong từng máy / loại vấn đề / mã SP
