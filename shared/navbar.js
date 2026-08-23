@@ -73,7 +73,7 @@
     'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time', noTitleBar: true },
     'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Kế Hoạch Bảo Dưỡng Khuôn Tuần', desc: 'Gợi ý tự động theo lịch sản xuất', noTitleBar: true },
     'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
-    'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất' },
+    'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
     'intem.html': { icon: '🏷️', title: 'In Tem — Đúc', desc: 'Tạo, tra cứu, sửa, in lại tem' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
     'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin' },
