@@ -309,6 +309,14 @@ input:focus,select:focus{outline:none;border-color:#C87941;
  * ============================================================================ */
 
 const CONG_DOAN_LIST = ["Đúc", "Bavia", "Gia Công", "Cắt viền", "Sơn", "OQC", "Nhập kho", "Xuất hàng"];
+// "Lọc hàng" KHÔNG phải công đoạn sản xuất thật (không đưa vào CONG_DOAN_LIST
+// dùng chung toàn hệ thống — dashboard/KHSX tuần/danh mục...) — chỉ là lựa
+// chọn thêm riêng ở "Công đoạn nhận" của màn hình này, cho trường hợp nghi
+// ngờ hàng NG cần tách đi kiểm/lọc lại trước khi về đúng quy trình.
+const CONG_DOAN_LOC_HANG = "Lọc hàng";
+function fillCongDoanNhan(list){
+  fillSelect("congDoanNhan", [...list, CONG_DOAN_LOC_HANG], "-- Chọn công đoạn --");
+}
 // Công đoạn có thể "Đóng gói lại" (gộp tem thành đơn vị mới) — không gồm Đúc
 // (sọt gốc được tạo thẳng ở intem.html, không phải gộp lại).
 const CONG_DOAN_DONG_GOI = ["Bavia", "Gia Công", "Sơn", "OQC"];
@@ -354,7 +362,7 @@ function showMsg(t, cls, autoHideMs){
 
 async function loadDanhMuc(){
   fillSelect("congDoanGiao", CONG_DOAN_LIST, "-- Chọn công đoạn --");
-  fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+  fillCongDoanNhan(CONG_DOAN_LIST);
   fillSelect("pkCongDoan", CONG_DOAN_DONG_GOI, "-- Chọn công đoạn --");
   fillSelect("pkCa", CA_LIST, "-- Chọn ca --");
   document.getElementById("pkNgay").value = getTodayString();
@@ -408,25 +416,25 @@ function applyRoutingHint(){
   const route = scannedData ? productRoutingMap[scannedData.maSP] : null;
   const giaoVal = document.getElementById("congDoanGiao").value;
   if (!route || !route.length){
-    fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+    fillCongDoanNhan(CONG_DOAN_LIST);
     hintEl.classList.remove("show"); hintEl.textContent = "";
     checkReady();
     return;
   }
   const idx = route.indexOf(giaoVal);
   if (idx === -1){
-    fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+    fillCongDoanNhan(CONG_DOAN_LIST);
     hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — công đoạn giao hiện chọn không khớp quy trình, tự chọn công đoạn nhận.";
     hintEl.classList.add("show");
   } else if (idx === route.length - 1){
-    fillSelect("congDoanNhan", CONG_DOAN_LIST, "-- Chọn công đoạn --");
+    fillCongDoanNhan(CONG_DOAN_LIST);
     hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — đã ở bước cuối, tự chọn công đoạn nhận nếu cần.";
     hintEl.classList.add("show");
   } else {
     const next = route[idx + 1];
-    fillSelect("congDoanNhan", [next], "-- Chọn công đoạn --");
+    fillCongDoanNhan([next]);
     document.getElementById("congDoanNhan").value = next;
-    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — bước kế tiếp: " + next;
+    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — bước kế tiếp: " + next + " (hoặc chọn \"" + CONG_DOAN_LOC_HANG + "\" nếu nghi ngờ hàng NG cần kiểm/lọc lại).";
     hintEl.classList.add("show");
   }
   checkReady();
