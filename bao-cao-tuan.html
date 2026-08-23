@@ -73,6 +73,7 @@
   td.num,th.num{text-align:right;}
   .rowname{font-weight:700;}
   .rowsub{color:var(--tk-muted);font-size:11.5px;}
+  .giaitrinh{min-width:260px;font-size:12px;line-height:1.4;color:#5a4a30;}
 
   .barcell{display:flex;align-items:center;gap:8px;min-width:160px;}
   .bartrack{flex:1;height:7px;background:#EFE2CE;border-radius:4px;overflow:hidden;}
@@ -414,23 +415,31 @@ function renderReport(ctx){
   html += '</div>';
 
   // Sản lượng theo mã SP
-  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần</span>';
-  html += tableWrap(['Mã SP','Tên sản phẩm','Kế hoạch','Thực tế','Hoàn thành'],
+  const spByShort = c.prodProduct.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
+  const spWorstSet = new Set(spByShort.filter(p=>p.shortfall>0).map(p=>p.ma_sp));
+  const downtimeBySp = new Map(c.downtimeProduct.map(x=>[x.ma_sp,x]));
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần. Cột giải trình tự động điền theo dữ liệu sự cố cho 3 mã thiếu hụt nhiều nhất.</span>';
+  html += tableWrap(['Mã SP','Tên sản phẩm','Kế hoạch','Thực tế','Hoàn thành','Giải trình lý do không đạt'],
     c.prodProduct.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
-      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>').join(''));
-  const spByShort = c.prodProduct.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
+      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td>' +
+      '<td class="giaitrinh">' + (spWorstSet.has(p.ma_sp) ? giaiTrinhTuDong(downtimeBySp.get(p.ma_sp), p.shortfall) : '—') + '</td></tr>').join(''),
+    [5]);
   if (spByShort.length) html += priorityBox('3 mã sản phẩm ưu tiên xử lý — theo sản lượng thiếu hụt', spByShort.map(p =>
     '<b>' + escapeHtml(p.ma_sp) + ' · ' + escapeHtml(p.ten_sp) + '</b> <span class="pm">— thiếu ' + fmtNum(p.shortfall) + ' sản phẩm, đạt ' + fmtPct(p.ht) + ' KH</span>'));
   html += '</div>';
 
   // Sản lượng theo máy
-  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần</span>';
-  html += tableWrap(['Máy','Kế hoạch','Thực tế','Hoàn thành','NG'],
+  const maByShort = c.prodMachine.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
+  const maWorstSet = new Set(maByShort.filter(p=>p.shortfall>0).map(p=>p.ma_may));
+  const downtimeByMay = new Map(c.downtimeMachine.map(x=>[x.ma_may,x]));
+  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần. Cột giải trình tự động điền theo dữ liệu sự cố cho 3 máy thiếu hụt nhiều nhất.</span>';
+  html += tableWrap(['Máy','Kế hoạch','Thực tế','Hoàn thành','NG','Giải trình lý do không đạt'],
     c.prodMachine.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_may) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
-      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td><td class="num">' + fmtNum(p.ng) + '</td></tr>').join(''));
-  const maByShort = c.prodMachine.slice().sort((a,b)=>b.shortfall-a.shortfall).slice(0,3);
+      '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td><td class="num">' + fmtNum(p.ng) + '</td>' +
+      '<td class="giaitrinh">' + (maWorstSet.has(p.ma_may) ? giaiTrinhTuDong(downtimeByMay.get(p.ma_may), p.shortfall) : '—') + '</td></tr>').join(''),
+    [5]);
   if (maByShort.length) html += priorityBox('3 máy ưu tiên xử lý — theo sản lượng thiếu hụt', maByShort.map(p =>
     '<b>' + escapeHtml(p.ma_may) + '</b> <span class="pm">— thiếu ' + fmtNum(p.shortfall) + ' sản phẩm, đạt ' + fmtPct(p.ht) + ' KH</span>'));
   html += '</div>';
@@ -532,9 +541,20 @@ function renderReport(ctx){
 function kpi(label, val, sub, cls){
   return '<div class="kpi' + (cls?(' '+cls):'') + '"><div class="k">' + escapeHtml(label) + '</div><div class="v num">' + val + '</div><div class="s">' + escapeHtml(sub) + '</div></div>';
 }
-function tableWrap(headers, rowsHtml){
-  return '<div class="tbl-wrap"><table><thead><tr>' + headers.map((h,i) => '<th' + (i>1?' class="num"':'') + '>' + h + '</th>').join('') +
+function tableWrap(headers, rowsHtml, textCols){
+  const tc = new Set(textCols || []);
+  return '<div class="tbl-wrap"><table><thead><tr>' + headers.map((h,i) => '<th' + ((i>1 && !tc.has(i))?' class="num"':'') + '>' + h + '</th>').join('') +
     '</tr></thead><tbody>' + (rowsHtml || '<tr><td colspan="' + headers.length + '" class="rowsub" style="font-style:italic">Không có dữ liệu.</td></tr>') + '</tbody></table></div>';
+}
+// Tự động soạn câu giải trình cho mã SP/máy nằm trong nhóm 3 xấu nhất, dựa
+// trên top3VanDe (đã tổng hợp từ trường "van_de" trong nhật ký sự cố thật
+// của tuần) — không tự bịa lý do khi không có dữ liệu sự cố tương ứng.
+function giaiTrinhTuDong(entry, shortfall){
+  if (!entry || !entry.top3 || entry.top3.length === 0) {
+    return '<span class="rowsub" style="font-style:italic">Không có sự cố dừng máy ghi nhận tương ứng — thiếu ' + fmtNum(shortfall) + ' sản phẩm, cần bổ sung giải trình thủ công (thiếu NVL/nhân lực/đổi kế hoạch…).</span>';
+  }
+  const ly = entry.top3.slice(0,2).map(t => escapeHtml(t.label) + ' (' + fmtNum(t.phut) + "', " + t.count + ' lượt)').join('; ');
+  return 'Do sự cố: ' + ly + ' — tổng ' + fmtNum(entry.phut) + "' dừng máy (" + entry.count + ' lượt sự cố).';
 }
 function barCell(val, max){
   const w = Math.max(2, Math.round(val/max*100));
