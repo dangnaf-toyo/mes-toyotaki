@@ -74,9 +74,11 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 .ds-group-head .h{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:6px}
 
 .ds-table-wrap{overflow-x:auto}
-.ds-table{width:100%;border-collapse:collapse;min-width:860px;font-family:inherit;font-size:13px;color:var(--text)}
-.ds-table th{text-align:left;padding:6px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);border-bottom:2px solid var(--border)}
-.ds-table td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.ds-table{width:100%;border-collapse:collapse;min-width:860px;font-family:inherit;font-size:13px;color:var(--text);border:1px solid var(--border)}
+.ds-table th{text-align:center;vertical-align:middle;padding:6px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);border-bottom:2px solid var(--border);border-right:1px solid var(--border)}
+.ds-table th:last-child{border-right:none}
+.ds-table td{padding:6px 8px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle}
+.ds-table td:last-child{border-right:none}
 .ds-table tr:last-child td{border-bottom:none}
 .ds-table col.col-noidung{width:26%}
 .ds-table col.col-img{width:16%}
@@ -84,9 +86,9 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 .ds-table col.col-han{width:12%}
 .ds-table col.col-danhgia{width:26%}
 .ds-table col.col-remove{width:30px}
-.ds-row textarea{min-height:56px;width:100%;font-family:inherit;font-size:13px}
+.ds-row textarea{width:100%;font-family:inherit;font-size:13px;resize:none;overflow:hidden;display:block;min-height:34px}
 .ds-row input[type=text],.ds-row input[type=date]{width:100%;font-family:inherit;font-size:13px}
-.ds-row-img{display:flex;flex-wrap:wrap;gap:5px;align-items:flex-start}
+.ds-row-img{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .ds-row-img .img-thumb{width:40px;height:40px}
 .ds-row-img .img-upload-btn{width:40px;height:40px;padding:0;justify-content:center;font-size:15px}
 .ds-row-img .img-upload-btn span{display:none}
@@ -395,20 +397,23 @@ function renderDoiSachList(key){
   const container = document.getElementById('ds-' + key + '-list');
   if (!list.length) { container.innerHTML = '<tr><td class="ds-empty-cell" colspan="6">Chưa có đối sách nào.</td></tr>'; return; }
   container.innerHTML = list.map((item, idx) => dsCardHtml(key, idx, item)).join('');
+  container.querySelectorAll('textarea').forEach(autoGrowDs);
 }
+
+function autoGrowDs(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 
 function dsCardHtml(key, idx, item){
   const dis = state.locked ? 'disabled' : '';
   const ro = state.locked ? 'readonly' : '';
   return `<tr class="ds-row">
-    <td><textarea ${ro} placeholder="Nội dung đối sách..." oninput="updateDoiSachField('${key}',${idx},'noi_dung',this.value)">${escapeHtml(item.noi_dung)}</textarea></td>
+    <td><textarea ${ro} placeholder="Nội dung đối sách..." oninput="autoGrowDs(this);updateDoiSachField('${key}',${idx},'noi_dung',this.value)">${escapeHtml(item.noi_dung)}</textarea></td>
     <td><div class="ds-row-img">
       ${dsImgThumbsHtml(item.hinh_anh, key, idx)}
       ${state.locked ? '' : `<label class="img-upload-btn" title="Thêm ảnh">📷<span>Thêm ảnh</span><input type="file" accept="image/*" class="hidden" onchange="onDsImageSelected(event,'${key}',${idx})"></label>`}
     </div></td>
     <td><input type="text" autocomplete="off" ${ro} placeholder="Người thực hiện" value="${escapeHtml(item.nguoi_thuc_hien)}" oninput="updateDoiSachField('${key}',${idx},'nguoi_thuc_hien',this.value)"></td>
     <td><input type="date" ${dis} value="${item.thoi_han ? String(item.thoi_han).slice(0, 10) : ''}" onchange="updateDoiSachField('${key}',${idx},'thoi_han',this.value)"></td>
-    <td><textarea ${ro} placeholder="Đánh giá hiệu quả..." oninput="updateDoiSachField('${key}',${idx},'danh_gia',this.value)">${escapeHtml(item.danh_gia)}</textarea></td>
+    <td><textarea ${ro} placeholder="Đánh giá hiệu quả..." oninput="autoGrowDs(this);updateDoiSachField('${key}',${idx},'danh_gia',this.value)">${escapeHtml(item.danh_gia)}</textarea></td>
     <td>${state.locked ? '' : `<button type="button" class="btn-remove" onclick="removeDoiSach('${key}',${idx})" title="Xoá">✕</button>`}</td>
   </tr>`;
 }
