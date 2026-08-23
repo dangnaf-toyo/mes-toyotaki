@@ -369,11 +369,33 @@ async function loadDanhMuc(){
   fillSelect("nguoiNhan", names, "-- Chọn người nhận --");
   document.getElementById("dlNhanVienPk").innerHTML = names.map(n => `<option value="${n}">`).join("");
   fillSelect("pkNguoi", names, "-- Chọn người đóng gói --");
+  autoSelectNguoiNhan();
   productRoutingMap = {};
   (prodRes.data || []).forEach(p => {
     const route = String(p.quy_trinh_cong_doan || "").split(",").map(s => s.trim()).filter(Boolean);
     if (route.length) productRoutingMap[p.ma_sp] = route;
   });
+}
+
+// Tự chọn sẵn "Người nhận" theo tài khoản đang đăng nhập — người dùng không
+// cần bấm chọn nữa. Nếu full_name của tài khoản chưa có trong danh mục nhân
+// viên (master_employees), vẫn thêm tạm 1 lựa chọn để chọn được.
+async function autoSelectNguoiNhan(){
+  try {
+    const session = await MesAuth.getSession();
+    if (!session) return;
+    const { data } = await sb.from('user_roles').select('full_name').eq('user_id', session.user.id).maybeSingle();
+    const fullName = data && data.full_name ? data.full_name.trim() : '';
+    if (!fullName) return;
+    const sel = document.getElementById("nguoiNhan");
+    if (![...sel.options].some(o => o.value === fullName)){
+      const opt = document.createElement('option');
+      opt.value = fullName; opt.textContent = fullName;
+      sel.appendChild(opt);
+    }
+    sel.value = fullName;
+    checkReady();
+  } catch(e){ /* không chặn luồng chính nếu lỗi */ }
 }
 
 // Định tuyến theo mã SP (quy_trinh_cong_doan) — nếu SP đã khai báo quy trình
