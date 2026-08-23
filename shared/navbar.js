@@ -61,7 +61,7 @@
   // window.MesNav.setTitle(title, desc) — desc truyền null nếu giữ nguyên.
   const PAGE_META = {
     'index.html': { icon: '🏠', title: 'Trang chủ MES', desc: 'Chọn chức năng bạn muốn sử dụng' },
-    'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca' },
+    'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca', noTitleBar: true },
     'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
     'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh' },
     'chuyencongdoan.html': { icon: '🔀', title: 'Chuyển công đoạn & Đóng gói', desc: 'Quét QR chuyển hàng, đóng gói lại, đổi mã SP' },
@@ -70,7 +70,7 @@
     'truy-xuat-nguon-goc.html': { icon: '🔍', title: 'Truy Xuất Nguồn Gốc', desc: 'Phả hệ tem: tách/gộp xuyên công đoạn' },
     'tra-cuu-tem.html': { icon: '🏷️', title: 'Tra Cứu Tem Đã In', desc: 'Danh sách tem — lọc theo ngày in/máy/mã SP' },
     'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo Cáo Cuối Ca — Ngoài Đúc', desc: 'Bavia / Gia công / Cắt viền / Sơn / OQC' },
-    'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time' },
+    'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time', noTitleBar: true },
     'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Kế Hoạch Bảo Dưỡng Khuôn Tuần', desc: 'Gợi ý tự động theo lịch sản xuất' },
     'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Sơn / OQC — 1 màn hình, chuyển tab' },
     'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất' },
@@ -285,7 +285,7 @@ body{padding-top:var(--navbar-h)}
     // ở từng trang. Trang không có trong PAGE_META (hiếm) thì không vẽ gì,
     // giữ nguyên header cũ của trang đó thay vì hiện rỗng.
     const meta = PAGE_META[cur];
-    if (meta) {
+    if (meta && !meta.noTitleBar) {
       const titleBar = document.createElement('div');
       titleBar.className = 'mnb-title-bar';
       titleBar.innerHTML =
