@@ -371,10 +371,15 @@ function computeAll(ctx){
     const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
     return { ma_may, kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
   }).sort((a,b)=> b.ht - a.ht);
+  const dayIsos = days.map(d=>d.iso);
   const prodBySp = groupBy(prodRows, r=>r.ma_sp);
   const prodProduct = [...prodBySp.entries()].map(([ma_sp, rs]) => {
     const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
-    return { ma_sp, ten_sp: rs[0].ten_sp || '', kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
+    const byDay = dayIsos.map(iso => {
+      const dayRs = rs.filter(r=>r.ngay===iso);
+      return { iso, kh: sumBy(dayRs,r=>r.kh_ca), tt: sumBy(dayRs,r=>r.tt_ca) };
+    });
+    return { ma_sp, ten_sp: rs[0].ten_sp || '', kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt, byDay };
   }).sort((a,b)=> b.ht - a.ht);
 
   return { days, maxKh, totalKh, totalTt, totalSc, totalPhut, totalNg, avgHt, nDaysClosed, worstShifts,
@@ -418,9 +423,12 @@ function renderReport(ctx){
   html += '</div>';
 
   // Sản lượng theo mã SP
-  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần</span>';
-  html += tableWrap(['Mã SP','Tên sản phẩm','Kế hoạch','Thực tế','Hoàn thành'],
+  const dayNamesShort = ['T2','T3','T4','T5','T6','T7'];
+  const dayHeaders = c.days.map((d,i) => dayNamesShort[i] + '<br><span style="font-weight:400;font-size:9px;color:var(--tk-muted)">' + pad(d.date.getDate()) + '/' + pad(d.date.getMonth()+1) + '</span>');
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần. Mỗi ngày hiển thị Kế hoạch/Thực tế.</span>';
+  html += tableWrap(['Mã SP','Tên sản phẩm', ...dayHeaders, 'Kế hoạch','Thực tế','Hoàn thành'],
     c.prodProduct.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub">' + escapeHtml(p.ten_sp) + '</td>' +
+      p.byDay.map(d => '<td class="num">' + (d.kh || d.tt ? fmtNum(d.kh) + '/' + fmtNum(d.tt) : '–') + '</td>').join('') +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
       '<td class="num"><span class="pct-pill ' + pctPillClass(p.ht) + '">' + fmtPct(p.ht) + '</span></td></tr>').join(''));
   const downtimeBySp = new Map(c.downtimeProduct.map(x=>[x.ma_sp,x]));
