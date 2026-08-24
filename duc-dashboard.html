@@ -1351,6 +1351,32 @@ function detectCurrentShift(preferredPhuongAn){
   return null;
 }
 
+/**
+ * Sửa lệch ca do cắt cứng theo giờ đồng hồ: nếu ca NGAY TRƯỚC ca gợi ý (cùng
+ * ngày) chưa được kết ca, vẫn coi đó là ca đang chạy — không tự nhảy sang ca
+ * sau chỉ vì đồng hồ đã qua mốc giờ. Nhờ vậy thùng hàng in tem lúc 6:02/14:04
+ * (thực chất sản xuất từ ca trước, chỉ ghi nhận muộn) không bị tính nhầm sang
+ * ca sau nữa — việc chuyển ca giờ gắn với hành động "Kết ca" của trưởng ca,
+ * không phải với đồng hồ.
+ */
+async function adjustSuggestedForOpenShift(suggested, phuongAn){
+  if (!suggested) return suggested;
+  const plans = state.shiftPlans[phuongAn] || [];
+  const idx = plans.findIndex(c => c.ca === suggested.ca);
+  if (idx <= 0) return suggested; // ca đầu ngày (hoặc không xác định) — không có ca trước để lùi về
+  const prevCa = plans[idx - 1].ca;
+  const ngayStr = toDateInputValue(suggested.ngay);
+  try {
+    const { data, error } = await sb.from('duc_bao_cao_ca').select('ca').eq('ngay', ngayStr).eq('ca', prevCa).limit(1);
+    if (error) return suggested; // lỗi mạng — cứ dùng gợi ý theo giờ như cũ, không chặn bootstrap
+    if (!data || !data.length) {
+      // Ca trước trong ngày CHƯA kết ca → vẫn hiển thị ca đó thay vì nhảy sang ca sau
+      return { phuongAnCa: suggested.phuongAnCa, ca: prevCa, ngay: suggested.ngay };
+    }
+  } catch (e) {}
+  return suggested;
+}
+
 /** Chuẩn hoá SHIFT_PLANS thành shape client giống api_bootstrap trả về. */
 function buildShiftPlans(){
   const out = {};
@@ -1382,7 +1408,9 @@ async function bootstrap(){
 
   let savedPhuongAn = null;
   try { savedPhuongAn = localStorage.getItem(LS_KEYS.PHUONG_AN_CA); } catch (e) {}
-  const suggested = detectCurrentShift(savedPhuongAn || '2 ca 12h');
+  const phuongAnBootstrap = savedPhuongAn || '2 ca 12h';
+  let suggested = detectCurrentShift(phuongAnBootstrap);
+  suggested = await adjustSuggestedForOpenShift(suggested, phuongAnBootstrap);
 
   populateHeader(suggested);
   populateDatalists();
