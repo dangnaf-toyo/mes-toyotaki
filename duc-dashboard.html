@@ -2614,11 +2614,17 @@ async function submitPlan(){
   const existingForSave = state.currentTarget.id_dong ? state.rows.find(r => r.id_dong === state.currentTarget.id_dong) : null;
   const planNgay = existingForSave ? existingForSave.ngay : state.ngay;
   const planCa = existingForSave ? existingForSave.ca : state.ca;
+  // Sửa dòng đã tồn tại: phuong_an_ca phải đi cùng đúng ca của CHÍNH dòng đó
+  // (existingForSave.phuong_an_ca), không lấy theo header đang chọn — nếu
+  // không sẽ sinh tổ hợp sai (vd ca="Ca 1" nhưng phuong_an_ca="2 ca 12h",
+  // 2 giá trị không tương thích với nhau) khi header đã đổi phương án khác
+  // trong lúc dòng này còn thuộc phương án cũ.
+  const planPhuongAnCa = existingForSave ? (existingForSave.phuong_an_ca || state.phuongAnCa) : state.phuongAnCa;
 
   showOverlay('Đang lưu kế hoạch...');
   try {
     await rpcWrite('duc_upsert_plan', {
-      p_ngay: planNgay, p_ca: planCa, p_phuong_an_ca: state.phuongAnCa,
+      p_ngay: planNgay, p_ca: planCa, p_phuong_an_ca: planPhuongAnCa,
       p_ma_may: state.currentTarget.ma_may, p_ma_sp: maSp,
       p_ten_sp: document.getElementById('mp-ten-sp').value,
       p_so_khuon: soKhuon, p_kh_ca: khCa,
