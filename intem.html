@@ -799,10 +799,10 @@ function openPrint(d){
   var svg = buildLabelSvg(d);
   var bg = d.loaiSP === 'phattrien' ? '#000' : '#fff';
   var css=[
-    "@page{size:72mm 100mm;margin:0}",
+    "@page{size:105mm 148mm;margin:0}",
     "*{margin:0;padding:0;box-sizing:border-box}",
-    "html,body{width:72mm;height:100mm;background:"+bg+"}",
-    "svg{display:block;width:72mm;height:100mm}",
+    "html,body{width:105mm;height:148mm;background:"+bg+"}",
+    "svg{display:block;width:105mm;height:148mm}",
     ".pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}",
     "@media print{.pbtn{display:none}}"
   ].join("");
@@ -842,7 +842,10 @@ function svgEsc(s){
 }
 
 function buildLabelSvg(d){
-  var W=72, H=100;
+  var W=72, H=100; // toạ độ thiết kế gốc của tem — giữ nguyên layout, chỉ scale khi in ra khổ A6
+  var PW=105, PH=148; // khổ giấy in thực tế — A6
+  var scale = Math.min(PW/W, PH/H);
+  var offX = (PW - W*scale)/2, offY = (PH - H*scale)/2;
   // Sản phẩm đang phát triển -> tem nền đen chữ trắng (dễ phân biệt bằng mắt
   // với tem hàng loạt trên cùng dây chuyền). Mã QR luôn giữ ô nền trắng
   // riêng bên trong (buildQrRects) để đảm bảo máy quét đọc được bất kể nền
@@ -871,8 +874,9 @@ function buildLabelSvg(d){
   var qrSize=34, qrX=(W-qrSize)/2, qrY=rowsEndY+5;
   var ftrLineY=qrY+qrSize+2, ftrTextY=ftrLineY+2.8, ftrSize=2.4;
 
-  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
-  svg += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="'+bg+'"/>';
+  var svg = '<svg viewBox="0 0 '+PW+' '+PH+'" width="'+PW+'mm" height="'+PH+'mm" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect x="0" y="0" width="'+PW+'" height="'+PH+'" fill="'+bg+'"/>';
+  svg += '<g transform="translate('+offX.toFixed(3)+','+offY.toFixed(3)+') scale('+scale.toFixed(4)+')">';
   svg += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'"/>';
   svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="'+fg+'">TEM SẢN PHẨM'+(dark ? ' — ĐANG PHÁT TRIỂN' : '')+'</text>';
   svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="'+fg+'" stroke-width="0.3"/>';
@@ -894,7 +898,7 @@ function buildLabelSvg(d){
   svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
   svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="'+fg+'" stroke-width="0.3"/>';
   svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+ftrSize+'" font-weight="bold" fill="'+fg+'">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
-  svg += "</svg>";
+  svg += "</g></svg>";
   return svg;
 }
 
