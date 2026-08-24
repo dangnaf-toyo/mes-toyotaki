@@ -384,14 +384,6 @@ function computeAll(ctx){
   }
   const ca1 = caStat('Ca 1'), ca2 = caStat('Ca 2');
 
-  // ── Đổi khuôn theo trưởng ca ──
-  const c3rows = suco.filter(r => issueCode(r.loai_su_co) === 'C3');
-  const c3ByLead = groupBy(c3rows, r => r.truong_ca || '(không rõ)');
-  const changeover = [...c3ByLead.entries()].map(([lead, rs]) => ({
-    lead, count: rs.length, phut: sumBy(rs, r=>r.thoi_gian_dung_phut), avg: rs.length? sumBy(rs,r=>r.thoi_gian_dung_phut)/rs.length : 0,
-    rows: rs.slice().sort((a,b)=> a.ngay.localeCompare(b.ngay)),
-  })).sort((a,b)=> b.phut - a.phut);
-
   // ── Dừng máy theo máy ──
   const byMay = groupBy(suco, r=>r.ma_may);
   const downtimeMachine = [...byMay.entries()].map(([ma_may, rs]) => ({
@@ -432,7 +424,7 @@ function computeAll(ctx){
   }).sort((a,b)=> b.ht - a.ht);
 
   return { days, maxKh, totalKh, totalTt, totalSc, totalPhut, totalNg, avgHt, nDaysClosed, worstShifts,
-    ca1, ca2, changeover, downtimeMachine, downtimeIssue, downtimeProduct, totalDowntimeSuco, prodMachine, prodProduct };
+    ca1, ca2, downtimeMachine, downtimeIssue, downtimeProduct, totalDowntimeSuco, prodMachine, prodProduct };
 }
 
 // ── Render ───────────────────────────────────────────────────────────────
@@ -501,19 +493,6 @@ function renderReport(ctx){
   if (maKemNhat.length) html += priorityBox('3 máy không đạt nhiều nhất (theo % hoàn thành kế hoạch)', maKemNhat.map(p =>
     '<b>Máy ' + escapeHtml(p.ma_may) + '</b> <span class="pm">— đạt ' + fmtPct(p.ht) + ' KH (' + fmtNum(p.tt) + '/' + fmtNum(p.kh) + ')</span>' +
     '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(downtimeByMay.get(p.ma_may)) + '</div>'));
-  html += '</div>';
-
-  // Đổi khuôn theo trưởng ca
-  html += '<div class="card"><h3>Thời gian đổi khuôn trung bình theo trưởng ca</h3><span class="sec-note">Mã lỗi C3 — Đổi khuôn, gộp theo người ghi nhận trong nhật ký sự cố</span>';
-  if (c.changeover.length === 0) {
-    html += '<div class="rowsub">Không có lượt đổi khuôn nào trong tuần.</div>';
-  } else {
-    html += tableWrap(['Trưởng ca','Số lần','Tổng phút','TB mỗi lần'],
-      c.changeover.map(x => '<tr><td class="rowname">' + escapeHtml(x.lead) + '</td><td class="num">' + x.count + '</td>' +
-        '<td class="num">' + fmtNum(x.phut) + "'</td><td class=\"num\">" + x.avg.toFixed(1).replace('.',',') + "'</td></tr>").join(''));
-    html += priorityBox('3 trưởng ca có thời gian đổi khuôn nhiều nhất', c.changeover.slice(0,3).map(x =>
-      '<b>' + escapeHtml(x.lead) + '</b> <span class="pm">— tổng ' + fmtNum(x.phut) + "' (" + x.count + ' lần), trung bình ' + x.avg.toFixed(1).replace('.',',') + "'/lần</span>"));
-  }
   html += '</div>';
 
   // Dừng máy theo máy
