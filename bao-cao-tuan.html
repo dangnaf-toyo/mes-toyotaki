@@ -363,11 +363,21 @@ function computeAll(ctx){
 
   // ── Ca 1 vs Ca 2 ──
   const caGroups = groupBy(bcc, r=>r.ca);
+  const sucoByCa = groupBy(suco, r=>r.ca);
+  // B1/B2 = sự cố CL sản phẩm/nguyên liệu, F1 = IPQC phát hiện NG (xem CONFIG.LOAI_SU_CO ở duc-dashboard.html)
+  const QUALITY_CODES = ['B1','B2','F1'];
+  // A2 = Sự cố khuôn (khác C3 "Đổi khuôn" — đó là thời gian chuẩn bị/thay khuôn theo kế hoạch, đã tính riêng)
+  const MOLD_CODES = ['A2'];
+  function sucoDowntimeByCode(ca, codes){
+    const rs = sucoByCa.get(ca) || [];
+    return sumBy(rs.filter(r => codes.includes(issueCode(r.loai_su_co))), r=>r.thoi_gian_dung_phut);
+  }
   function caStat(ca){
     const rs = caGroups.get(ca) || [];
     const kh = sumBy(rs,r=>r.tong_kh_ca), tt = sumBy(rs,r=>r.tong_tt_ca);
     return { n: rs.length, kh, tt, ht: kh>0?tt/kh*100:0, phut: sumBy(rs,r=>r.tong_phut_dung_ca),
-      sc: sumBy(rs,r=>r.so_su_co_ca), scPerCa: rs.length? sumBy(rs,r=>r.so_su_co_ca)/rs.length:0, ng: sumBy(rs,r=>r.tong_ng_ca) };
+      sc: sumBy(rs,r=>r.so_su_co_ca), scPerCa: rs.length? sumBy(rs,r=>r.so_su_co_ca)/rs.length:0, ng: sumBy(rs,r=>r.tong_ng_ca),
+      phutCL: sucoDowntimeByCode(ca, QUALITY_CODES), phutKhuon: sucoDowntimeByCode(ca, MOLD_CODES) };
   }
   const ca1 = caStat('Ca 1'), ca2 = caStat('Ca 2');
 
@@ -490,27 +500,6 @@ function renderReport(ctx){
     '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(downtimeByMay.get(p.ma_may)) + '</div>'));
   html += '</div>';
 
-  // So sánh Ca 1 / Ca 2
-  html += '<div class="card"><h3>So sánh hiệu suất Ca 1 và Ca 2</h3><span class="sec-note">' + c.ca1.n + ' ca Ca 1, ' + c.ca2.n + ' ca Ca 2 — chỉ ca đã kết ca</span>';
-  html += '<div class="ca-legend"><span><span class="sw" style="background:var(--ca1)"></span><b>Ca 1</b> — ' + fmtNum(c.ca1.kh) + ' KH</span>' +
-    '<span><span class="sw" style="background:var(--ca2)"></span><b>Ca 2</b> — ' + fmtNum(c.ca2.kh) + ' KH</span></div>';
-  const maxHt = Math.max(c.ca1.ht, c.ca2.ht, 1), maxPhut = Math.max(c.ca1.phut, c.ca2.phut, 1), maxSc = Math.max(c.ca1.scPerCa, c.ca2.scPerCa, .1);
-  html += caRow('Hoàn thành KH', c.ca1.ht/maxHt*100, fmtPct(c.ca1.ht), c.ca2.ht/maxHt*100, fmtPct(c.ca2.ht));
-  html += caRow('Phút dừng máy', c.ca1.phut/maxPhut*100, fmtNum(c.ca1.phut)+"'", c.ca2.phut/maxPhut*100, fmtNum(c.ca2.phut)+"'");
-  html += caRow('Số sự cố / ca', c.ca1.scPerCa/maxSc*100, c.ca1.scPerCa.toFixed(1).replace('.',',')+' lượt', c.ca2.scPerCa/maxSc*100, c.ca2.scPerCa.toFixed(1).replace('.',',')+' lượt');
-  html += caRow('NG (sản phẩm)', c.ca1.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca1.ng), c.ca2.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca2.ng));
-  if (c.ca1.n > 0 && c.ca2.n > 0 && c.ca1.ht !== c.ca2.ht) {
-    const caKemHon = c.ca1.ht <= c.ca2.ht ? 'Ca 1' : 'Ca 2';
-    const caTotHon = caKemHon === 'Ca 1' ? 'Ca 2' : 'Ca 1';
-    const statKem = caKemHon === 'Ca 1' ? c.ca1 : c.ca2, statTot = caKemHon === 'Ca 1' ? c.ca2 : c.ca1;
-    const top3CaKem = top3VanDe(ctx.suco.filter(r => r.ca === caKemHon));
-    html += priorityBox(caKemHon + ' đang hoàn thành kế hoạch thấp hơn ' + caTotHon, [
-      '<span class="pm">' + caKemHon + ' đạt ' + fmtPct(statKem.ht) + ' KH so với ' + fmtPct(statTot.ht) + ' KH của ' + caTotHon + '</span>' +
-      '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong({ top3: top3CaKem }) + '</div>'
-    ]);
-  }
-  html += '</div>';
-
   // Đổi khuôn theo trưởng ca
   html += '<div class="card"><h3>Thời gian đổi khuôn trung bình theo trưởng ca</h3><span class="sec-note">Mã lỗi C3 — Đổi khuôn, gộp theo người ghi nhận trong nhật ký sự cố</span>';
   if (c.changeover.length === 0) {
@@ -544,6 +533,30 @@ function renderReport(ctx){
   if (c.downtimeIssue.length) html += priorityBox('3 loại vấn đề ưu tiên xử lý', c.downtimeIssue.slice(0,3).map(x =>
     '<b>' + escapeHtml(x.label) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + ')</span>' +
     '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(x) + '</div>'));
+  html += '</div>';
+
+  // So sánh Ca 1 / Ca 2
+  html += '<div class="card"><h3>So sánh hiệu suất Ca 1 và Ca 2</h3><span class="sec-note">' + c.ca1.n + ' ca Ca 1, ' + c.ca2.n + ' ca Ca 2 — chỉ ca đã kết ca</span>';
+  html += '<div class="ca-legend"><span><span class="sw" style="background:var(--ca1)"></span><b>Ca 1</b> — ' + fmtNum(c.ca1.kh) + ' KH</span>' +
+    '<span><span class="sw" style="background:var(--ca2)"></span><b>Ca 2</b> — ' + fmtNum(c.ca2.kh) + ' KH</span></div>';
+  const maxHt = Math.max(c.ca1.ht, c.ca2.ht, 1), maxPhut = Math.max(c.ca1.phut, c.ca2.phut, 1), maxSc = Math.max(c.ca1.scPerCa, c.ca2.scPerCa, .1);
+  const maxPhutCL = Math.max(c.ca1.phutCL, c.ca2.phutCL, 1), maxPhutKhuon = Math.max(c.ca1.phutKhuon, c.ca2.phutKhuon, 1);
+  html += caRow('Hoàn thành KH', c.ca1.ht/maxHt*100, fmtPct(c.ca1.ht), c.ca2.ht/maxHt*100, fmtPct(c.ca2.ht));
+  html += caRow('Phút dừng máy', c.ca1.phut/maxPhut*100, fmtNum(c.ca1.phut)+"'", c.ca2.phut/maxPhut*100, fmtNum(c.ca2.phut)+"'");
+  html += caRow('Số sự cố / ca', c.ca1.scPerCa/maxSc*100, c.ca1.scPerCa.toFixed(1).replace('.',',')+' lượt', c.ca2.scPerCa/maxSc*100, c.ca2.scPerCa.toFixed(1).replace('.',',')+' lượt');
+  html += caRow('Dừng do vấn đề chất lượng', c.ca1.phutCL/maxPhutCL*100, fmtNum(c.ca1.phutCL)+"'", c.ca2.phutCL/maxPhutCL*100, fmtNum(c.ca2.phutCL)+"'");
+  html += caRow('Dừng do sự cố khuôn', c.ca1.phutKhuon/maxPhutKhuon*100, fmtNum(c.ca1.phutKhuon)+"'", c.ca2.phutKhuon/maxPhutKhuon*100, fmtNum(c.ca2.phutKhuon)+"'");
+  html += caRow('NG (sản phẩm)', c.ca1.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca1.ng), c.ca2.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca2.ng));
+  if (c.ca1.n > 0 && c.ca2.n > 0 && c.ca1.ht !== c.ca2.ht) {
+    const caKemHon = c.ca1.ht <= c.ca2.ht ? 'Ca 1' : 'Ca 2';
+    const caTotHon = caKemHon === 'Ca 1' ? 'Ca 2' : 'Ca 1';
+    const statKem = caKemHon === 'Ca 1' ? c.ca1 : c.ca2, statTot = caKemHon === 'Ca 1' ? c.ca2 : c.ca1;
+    const top3CaKem = top3VanDe(ctx.suco.filter(r => r.ca === caKemHon));
+    html += priorityBox(caKemHon + ' đang hoàn thành kế hoạch thấp hơn ' + caTotHon, [
+      '<span class="pm">' + caKemHon + ' đạt ' + fmtPct(statKem.ht) + ' KH so với ' + fmtPct(statTot.ht) + ' KH của ' + caTotHon + '</span>' +
+      '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong({ top3: top3CaKem }) + '</div>'
+    ]);
+  }
   html += '</div>';
 
   // Dừng máy theo mã SP
