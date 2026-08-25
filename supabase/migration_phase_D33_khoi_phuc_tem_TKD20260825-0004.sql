@@ -17,8 +17,7 @@
 -- now() — để tem tính đúng vào Ca đêm, không lệch sang Ca ngày như nếu nhập
 -- lại qua giao diện intem.html (giao diện luôn lấy giờ hiện tại lúc bấm).
 --
--- Chưa biết người thao tác (nguoi_tt) lúc in — để NULL, sửa lại bằng tay
--- trong duc_tem nếu nhớ ra sau (không ảnh hưởng tính tt_ca/tt_tuan).
+-- Người thao tác: Nguyễn Văn Hùng.
 --
 -- Tag No không đụng tới bộ đếm duc_tag_no_counter (bộ đếm không lùi lại khi
 -- tem bị xóa) nên insert thẳng bằng tag_no gốc không gây trùng/lệch số thứ
@@ -33,9 +32,13 @@ insert into duc_tem (
 ) values (
   'TKD20260825-0004', 'Panel FR', 'AST-PAN-01', 384, date '2026-08-25', '2026-08-24', 'PAN #FR25', 'HD2-HDT',
   'DC 5', null, timestamptz '2026-08-25 05:30:00+07', 'PAN #FR25', 384, 'DC 5',
-  null, null, null, 'Đã đúc', null, null, 'Chờ chốt sản lượng'
+  'Nguyễn Văn Hùng', null, null, 'Đã đúc', null, null, 'Chờ chốt sản lượng'
 )
 on conflict (tag_no) do nothing;
+
+-- Phòng trường hợp migration này đã chạy trước đó (thiếu nguoi_tt) — bổ sung lại.
+update duc_tem set nguoi_tt = 'Nguyễn Văn Hùng'
+where tag_no = 'TKD20260825-0004' and nguoi_tt is null;
 
 -- Tính lại tt_ca/tt_tuan của DC 5 / AST-PAN-01 để cộng lại đúng số lượng vừa khôi phục.
 select duc_recompute_tt_ca('DC 5', 'AST-PAN-01');
