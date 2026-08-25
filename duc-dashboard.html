@@ -453,7 +453,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <div class="modal-body">
       <div style="background:var(--bg-sunken);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text-muted);margin-bottom:10px">
         Chỉ liệt kê các máy <b>chưa có kế hoạch</b> trong ca hiện tại và có gợi ý từ KHSX tuần (ngày <span id="kb-ngay-label">—</span>).
-        KH ca được chia đều 50/50 từ KH ngày — có thể sửa trước khi lưu. Bỏ chọn máy nào không muốn nạp.
+        KH ca được gợi ý theo năng lực máy (cycle time × cavity) và phần KH ngày còn lại — có thể sửa trước khi lưu. Bỏ chọn máy nào không muốn nạp.
         Kế hoạch tuần nhập/sửa tại <a href="khsx-tuan.html" target="_blank">khsx-tuan.html</a>.
       </div>
       <div id="kb-list" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
@@ -1132,7 +1132,7 @@ const state = {
   mode: new URLSearchParams(location.search).get('mode') || '',
   user: '',
   ngay: null, ca: null, phuongAnCa: null, truongCa: null,
-  machines: [], products: [], productMap: {}, cavityMap: {},
+  machines: [], products: [], productMap: {}, cavityMap: {}, cycleTimeMap: {},
   personnel: [], shiftLeaders: [],
   loaiSuCo: CONFIG.LOAI_SU_CO,
   shiftPlans: {},
@@ -1443,9 +1443,11 @@ async function loadMasterData(){
   state.products = (mProducts.data || []).filter(p => p.ma_sp);
   state.productMap = {};
   state.cavityMap = {};
+  state.cycleTimeMap = {};
   state.products.forEach(p => {
     state.productMap[p.ma_sp] = p.ten_sp || '';
     if (p.cavity != null && Number(p.cavity) > 0) state.cavityMap[p.ma_sp] = Number(p.cavity);
+    if (p.cycle_time_s != null && Number(p.cycle_time_s) > 0) state.cycleTimeMap[p.ma_sp] = Number(p.cycle_time_s);
   });
   state.products.sort((a, b) => naturalCompare(a.ma_sp, b.ma_sp));
 
@@ -1676,9 +1678,67 @@ function onShiftContextChange(){
 // =============================================================================
 // KHSX TUẦN — thay Google Sheet "Tuan_Hien_Tai" (file KHSX) bằng bảng Supabase
 // duc_khsx_tuan_plan (nhập/sửa qua khsx-tuan.html). Port getWeeklyPlanFromKHSX()/
-// getWeeklyPlanSuggestions_() (MasterData.js): KH ngày chia đều 50/50 cho 2 ca;
-// nếu 1 máy có >1 dòng KH khác 0 cùng ngày → conflict, không tự chọn.
+// getWeeklyPlanSuggestions_() (MasterData.js).
+//
+// LOGIC GÁN KH CA (thay bản cũ "chia đều 50/50 khi 1 máy có 2 mã trong ngày"
+// — sai vì thực tế chạy tuần tự hết mã này mới đổi mã khác, không chạy song
+// song 2 mã trong 2 ca):
+//   1) nangLucCa(mã) = floor(số phút ca × 60 / cycle_time_s) × cavity — sản
+//      lượng tối đa lý thuyết 1 ca đúc được mã đó (dùng master_products).
+//   2) Với mỗi máy có ≥2 mã KH ngày > 0: soi dữ liệu thực tế ĐÃ CHẠY trong
+//      ngày (duc_ca_hien_tai) để tìm mã đang chạy dở (dòng row_seq lớn nhất)
+//      — nếu lũy kế thực tế của mã đó CHƯA đạt KH ngày → tự động tiếp tục
+//      gán mã đó cho ca này (không hỏi lại). Chỉ khi hoàn toàn chưa có lịch
+//      sử chạy trong ngày (vd ca đầu tuần) mới coi là "conflict" thật sự và
+//      cần hỏi người dùng chạy mã nào trước (xem applyWeeklyPlanSuggestion_).
+//   3) KH ca gợi ý = min(phần KH ngày còn lại của mã, nangLucCa) thay vì
+//      luôn chia đôi — nếu mã chỉ cần 1 ca là xong thì cả KH ngày dồn vào ca
+//      đó, ca kia của ngày nhường cho mã tiếp theo (nếu có).
 // =============================================================================
+function getShiftMinutes_(phuongAnCa, ca){
+  const plan = CONFIG.SHIFT_PLANS[phuongAnCa] && CONFIG.SHIFT_PLANS[phuongAnCa][ca];
+  if (!plan) return null;
+  const startMin = plan.start[0] * 60 + plan.start[1];
+  const endMin = plan.end[0] * 60 + plan.end[1];
+  const totalMin = plan.crossMidnight ? (24 * 60 - startMin) + endMin : endMin - startMin;
+  return Math.max(0, totalMin - (plan.break_min || 0));
+}
+
+function nangLucCa_(maSp, phuongAnCa, ca){
+  const cycleTime = state.cycleTimeMap[maSp];
+  const cavity = state.cavityMap[maSp];
+  const shiftMin = getShiftMinutes_(phuongAnCa, ca);
+  if (!cycleTime || !cavity || !shiftMin) return null;   // thiếu dữ liệu — không tính được, để caller fallback
+  return Math.floor((shiftMin * 60) / cycleTime) * cavity;
+}
+
+// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan }, remaining: phần KH ngày còn lại chưa chạy
+function buildKhsxSuggestion_(opt, remaining){
+  const cap = nangLucCa_(opt.ma_sp, state.phuongAnCa, state.ca);
+  const khCa = cap ? Math.min(remaining, cap) : Math.round(remaining / 2);
+  return {
+    conflict: false, ma_sp: opt.ma_sp, ten_sp: opt.ten_sp, so_khuon: opt.so_khuon,
+    kh_ngay: opt.kh_ngay, kh_tuan: opt.kh_tuan, kh_ca: Math.max(0, Math.round(khCa)),
+  };
+}
+
+// Tìm mã đang chạy dở trong ngày (từ dữ liệu thực tế duc_ca_hien_tai) và còn
+// thiếu sản lượng so với KH ngày của chính mã đó. Trả về null nếu chưa có gì
+// chạy trong ngày, hoặc mã chạy gần nhất đã đạt/vượt KH ngày (cần chọn mã kế
+// tiếp — không tự đoán được, để applyWeeklyPlanSuggestion_ hỏi người dùng).
+function resolveContinuingProduct_(todayRows, options){
+  if (!todayRows || !todayRows.length) return null;
+  const latest = todayRows.reduce((a, b) => (Number(b.row_seq) || 0) > (Number(a.row_seq) || 0) ? b : a);
+  const opt = options.find(o => o.ma_sp === latest.ma_sp);
+  if (!opt) return null;
+  const sanXuatLuyKe = todayRows
+    .filter(r => r.ma_sp === opt.ma_sp)
+    .reduce((s, r) => s + (Number(r.tt_ca) || 0), 0);
+  const remaining = opt.kh_ngay - sanXuatLuyKe;
+  if (remaining <= 0) return null;
+  return { opt, remaining };
+}
+
 async function loadWeeklyPlanSuggestions(){
   if (!state.ngay) return;
   const ngayForThisCall = state.ngay;
@@ -1691,27 +1751,47 @@ async function loadWeeklyPlanSuggestions(){
     const mondayStr = monday.getFullYear() + '-' + pad(monday.getMonth() + 1) + '-' + pad(monday.getDate());
     const dayCols = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
 
-    const { data, error } = await sb.from('duc_khsx_tuan_plan').select('*').eq('tuan_bat_dau', mondayStr);
-    if (error) throw error;
+    const [khsxRes, todayRes] = await Promise.all([
+      sb.from('duc_khsx_tuan_plan').select('*').eq('tuan_bat_dau', mondayStr),
+      sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,ca,row_seq,tt_ca').eq('ngay', ngayForThisCall),
+    ]);
+    if (khsxRes.error) throw khsxRes.error;
+    if (todayRes.error) throw todayRes.error;
 
     const byMachine = {};
-    (data || []).forEach(r => {
+    (khsxRes.data || []).forEach(r => {
       const qty = Number(r[dayCols[dayIdx]]) || 0;
       if (qty <= 0) return;
       if (!byMachine[r.ma_may]) byMachine[r.ma_may] = [];
       byMachine[r.ma_may].push({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, so_khuon: r.so_khuon, kh_ngay: qty, kh_tuan: r.kh_tuan });
     });
 
+    const todayByMachine = {};
+    (todayRes.data || []).forEach(r => {
+      if (!r.ma_may) return;
+      if (!todayByMachine[r.ma_may]) todayByMachine[r.ma_may] = [];
+      todayByMachine[r.ma_may].push(r);
+    });
+
     const suggestions = {};
     Object.keys(byMachine).forEach(m => {
       const list = byMachine[m];
+      const todayRows = todayByMachine[m] || [];
+
       if (list.length === 1) {
-        suggestions[m] = {
-          conflict: false, ma_sp: list[0].ma_sp, ten_sp: list[0].ten_sp, so_khuon: list[0].so_khuon,
-          kh_ngay: list[0].kh_ngay, kh_tuan: list[0].kh_tuan, kh_ca: Math.round(list[0].kh_ngay / 2),
-        };
+        const opt = list[0];
+        const sanXuatLuyKe = todayRows
+          .filter(r => r.ma_sp === opt.ma_sp)
+          .reduce((s, r) => s + (Number(r.tt_ca) || 0), 0);
+        suggestions[m] = buildKhsxSuggestion_(opt, Math.max(0, opt.kh_ngay - sanXuatLuyKe));
+        return;
+      }
+
+      const continued = resolveContinuingProduct_(todayRows, list);
+      if (continued) {
+        suggestions[m] = buildKhsxSuggestion_(continued.opt, continued.remaining);
       } else {
-        suggestions[m] = { conflict: true, options: list };
+        suggestions[m] = { conflict: true, options: list };   // cần hỏi người dùng — xem applyWeeklyPlanSuggestion_
       }
     });
 
@@ -2391,7 +2471,8 @@ function onSoKhuonSelectChange(prefix){
 function applyWeeklyPlanSuggestion_(maMay, isEditingExisting){
   const box = document.getElementById('mp-khsx-suggest');
   box.style.display = 'none';
-  box.textContent = '';
+  box.innerHTML = '';
+  state._khsxConflictOptions = null;
 
   if (isEditingExisting) return;   // không ghi đè dòng đang chỉnh sửa
   if (state.weeklyPlanSuggestionsForNgay !== state.ngay) return;   // gợi ý chưa tải xong / lệch ngày
@@ -2399,24 +2480,43 @@ function applyWeeklyPlanSuggestion_(maMay, isEditingExisting){
   if (!sug) return;
 
   if (sug.conflict) {
+    // Chưa có lịch sử chạy trong ngày để tự đoán mã nào trước (thường gặp ở
+    // ca đầu tuần) — hỏi thẳng người dùng thay vì im lặng chia đôi như trước.
+    state._khsxConflictOptions = sug.options;
     box.style.display = '';
     box.style.background = 'var(--warn-bg)'; box.style.color = 'var(--warn-fg)';
-    box.innerHTML = '⚠️ KHSX tuần có <b>' + sug.options.length + ' dòng kế hoạch</b> khác nhau cho máy này trong ngày — '
-      + 'không tự điền, vui lòng chọn/nhập tay: '
-      + sug.options.map(o => escapeHtml(o.ma_sp) + ' (KH ngày ' + fmtNum(o.kh_ngay) + ')').join(', ');
+    box.innerHTML = '❓ Máy <b>' + escapeHtml(maMay) + '</b> hôm nay có kế hoạch sản xuất '
+      + sug.options.map(o => '<b>' + escapeHtml(o.ma_sp) + '</b> (KH ngày ' + fmtNum(o.kh_ngay) + ')').join(' và ')
+      + ' — bạn muốn chạy mã nào trước?'
+      + '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'
+      + sug.options.map((o, i) => '<button type="button" class="btn-outline" style="font-size:11px;padding:3px 10px" onclick="chooseKhsxConflictOption_(' + i + ')">▶ ' + escapeHtml(o.ma_sp) + ' trước</button>').join('')
+      + '</div>';
     return;
   }
 
+  fillPlanFieldsFromKhsxSuggestion_(sug);
+}
+
+function fillPlanFieldsFromKhsxSuggestion_(sug){
   document.getElementById('mp-ma-sp').value = sug.ma_sp;
   document.getElementById('mp-ten-sp').value = sug.ten_sp || state.productMap[sug.ma_sp] || '';
   populateSoKhuonField('mp', sug.ma_sp, sug.so_khuon || null);
   document.getElementById('mp-kh-ca').value = sug.kh_ca;
   document.getElementById('mp-kh-tuan').value = sug.kh_tuan || '';
 
+  const box = document.getElementById('mp-khsx-suggest');
   box.style.display = '';
   box.style.background = 'var(--run-bg)'; box.style.color = 'var(--run-fg)';
   box.innerHTML = '📋 Đã tự điền theo KHSX tuần: <b>' + escapeHtml(sug.ma_sp) + '</b> — KH ngày ' + fmtNum(sug.kh_ngay)
-    + ' → chia 2 ca ≈ <b>' + fmtNum(sug.kh_ca) + '</b>/ca. Kiểm tra lại trước khi Lưu.';
+    + ' → gợi ý ca này ≈ <b>' + fmtNum(sug.kh_ca) + '</b> (theo năng lực máy/phần KH ngày còn lại). Kiểm tra lại trước khi Lưu.';
+}
+
+// Người dùng bấm chọn mã chạy trước ở khung hỏi conflict (đầu ngày, chưa có
+// lịch sử để tự đoán) — điền luôn số liệu như 1 gợi ý bình thường.
+function chooseKhsxConflictOption_(idx){
+  const opt = (state._khsxConflictOptions || [])[idx];
+  if (!opt) return;
+  fillPlanFieldsFromKhsxSuggestion_(buildKhsxSuggestion_(opt, opt.kh_ngay));
 }
 
 // =============================================================================
@@ -2469,13 +2569,14 @@ async function openKhsxBatchModal(){
         + '<div style="font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         + escapeHtml(m) + ' — '
         + (sug.conflict
-            ? '<select class="kb-ma-sp-select" style="font-size:12px;padding:1px 4px">' + optionsHtml + '</select><span style="font-size:10px;color:var(--warn-fg)">⚠️ đổi mã trong ngày, chọn mã nạp trước</span>'
+            ? '❓ Hôm nay có ' + opts.length + ' mã, chạy mã nào trước? '
+              + '<select class="kb-ma-sp-select" style="font-size:12px;padding:1px 4px">' + optionsHtml + '</select>'
             : escapeHtml(sug.ma_sp))
         + '</div>'
         + '<div class="kb-sub-info" style="font-size:10.5px;color:var(--text-muted)">' + escapeHtml(opts[0].ten_sp || '')
         + (opts[0].so_khuon ? ' · Khuôn ' + escapeHtml(opts[0].so_khuon) : '') + '</div>'
         + '</div>'
-        + '<div style="width:90px;flex:none"><input type="number" class="kb-kh-ca" min="0" value="' + (sug.conflict ? Math.round((opts[0].kh_ngay || 0) / 2) : sug.kh_ca) + '" style="width:100%"></div>';
+        + '<div style="width:90px;flex:none"><input type="number" class="kb-kh-ca" min="0" value="' + (sug.conflict ? buildKhsxSuggestion_(opts[0], opts[0].kh_ngay).kh_ca : sug.kh_ca) + '" style="width:100%"></div>';
       list.appendChild(row);
 
       if (sug.conflict) {
@@ -2485,7 +2586,7 @@ async function openKhsxBatchModal(){
         selEl.addEventListener('change', () => {
           const o = opts[Number(selEl.value)];
           subInfo.textContent = (o.ten_sp || '') + (o.so_khuon ? ' · Khuôn ' + o.so_khuon : '');
-          khInput.value = Math.round((o.kh_ngay || 0) / 2);
+          khInput.value = buildKhsxSuggestion_(o, o.kh_ngay).kh_ca;
         });
       }
     });
