@@ -3859,7 +3859,8 @@ function _renderKhuonManageMoldsList(molds, issuesByMold){
             '<td><div style="color:' + (statusColor[m.trang_thai_khuon] || '') + ';font-weight:600">' + escapeHtml(m.trang_thai_khuon) + '</div>' + issueBadge + '</td>' +
             '<td style="white-space:nowrap">' +
               '<button class="btn-tiny" onclick=\'openMoldConfigureModal(' + JSON.stringify(m) + ')\'>✏ Cấu hình</button> ' +
-              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button>' +
+              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button> ' +
+              '<button class="btn-tiny" onclick="renameKhuonPrompt(' + JSON.stringify(m.ma_khuon) + ')">🔤 Đổi tên</button>' +
             '</td>' +
           '</tr>';
       }).join('') +
@@ -3947,6 +3948,30 @@ async function submitMoldConfigure(){
     loadKhuonManageMolds();
     loadShiftState(false);
     document.getElementById('modal-khuon-manage').classList.add('open');
+  } catch (e) { onError(e); }
+}
+
+// Đổi tên khuôn (duc_rename_khuon) — chỉ áp dụng từ nay trở đi: đổi sổ đời
+// khuôn (duc_shot_khuon) + trạm đang chạy + kế hoạch tuần hiện tại/tương lai.
+// KHÔNG sửa lại lịch sử đã có (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã
+// in) — xem migration_phase_D35_doi_ten_khuon.sql.
+async function renameKhuonPrompt(maKhuonCu){
+  if (!(await ensureAuth())) return;
+  const moi = prompt('Đổi tên khuôn "' + maKhuonCu + '" thành mã mới:\n\n' +
+    'Lưu ý: chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai.\n' +
+    'Lịch sử cũ (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in) vẫn giữ mã cũ.');
+  if (!moi || !moi.trim() || moi.trim() === maKhuonCu) return;
+  showOverlay('Đang đổi tên khuôn...');
+  try {
+    const d = await rpcWrite('duc_rename_khuon', {
+      p_ma_khuon_cu: maKhuonCu, p_ma_khuon_moi: moi.trim(), p_user: state.user,
+    });
+    hideOverlay();
+    showToast('✓ Đã đổi "' + d.ma_khuon_cu + '" → "' + d.ma_khuon_moi + '" (' +
+      d.so_dong_ca_hien_tai_da_doi + ' trạm đang chạy, ' + d.so_dong_khsx_da_doi + ' dòng kế hoạch tuần)');
+    state.khuonManageMoldsCache = null;
+    loadKhuonManageMolds();
+    loadShiftState(false);
   } catch (e) { onError(e); }
 }
 
