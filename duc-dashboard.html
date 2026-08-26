@@ -922,12 +922,17 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <div class="modal-mask" id="modal-mold-configure">
   <div class="modal" style="max-width:460px">
     <div class="modal-head">
-      <div class="modal-title">✏ Cấu hình khuôn <span class="machine-tag" id="mc-tag">—</span></div>
+      <div class="modal-title">✏ Sửa khuôn <span class="machine-tag" id="mc-tag">—</span></div>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
       <div style="background:var(--bg-sunken);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text-muted)">
         Để trống ô nào thì giữ nguyên giá trị hiện tại của ô đó. Dùng khi cần khai báo baseline từ Excel hoặc sửa ngưỡng riêng cho khuôn này.
+      </div>
+      <div class="field">
+        <label>Mã khuôn <span class="req">*</span></label>
+        <input type="text" id="mc-ma-khuon" placeholder="VD: K-DC5-01">
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px" id="mc-ma-khuon-hint"></div>
       </div>
       <div class="field">
         <label id="mc-ma-sp-label">Mã sản phẩm <span class="req" id="mc-ma-sp-req" style="display:none">*</span></label>
@@ -3858,9 +3863,8 @@ function _renderKhuonManageMoldsList(molds, issuesByMold){
             '<td>' + moldNextDueDateLabel(m) + '</td>' +
             '<td><div style="color:' + (statusColor[m.trang_thai_khuon] || '') + ';font-weight:600">' + escapeHtml(m.trang_thai_khuon) + '</div>' + issueBadge + '</td>' +
             '<td style="white-space:nowrap">' +
-              '<button class="btn-tiny" onclick=\'openMoldConfigureModal(' + JSON.stringify(m) + ')\'>✏ Cấu hình</button> ' +
-              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button> ' +
-              '<button class="btn-tiny" onclick="renameKhuonPrompt(' + JSON.stringify(m.ma_khuon) + ')">🔤 Đổi tên</button>' +
+              '<button class="btn-tiny" onclick=\'openMoldConfigureModal(' + JSON.stringify(m) + ')\'>✏ Sửa</button> ' +
+              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button>' +
             '</td>' +
           '</tr>';
       }).join('') +
@@ -3904,6 +3908,10 @@ async function openMoldConfigureModal(mold){
   if (!(await ensureAuth())) return;
   state.currentTarget = { ma_khuon: mold ? mold.ma_khuon : null, isNewMold: !mold };
   document.getElementById('mc-tag').textContent = mold ? mold.ma_khuon : '(khuôn mới)';
+  document.getElementById('mc-ma-khuon').value = mold ? mold.ma_khuon : '';
+  document.getElementById('mc-ma-khuon-hint').textContent = mold
+    ? 'Đổi mã ở đây = đổi tên khuôn — chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai, không sửa lại lịch sử (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in).'
+    : '';
   _populateMcMaSpSelect();
   const currentMaSp = mold ? String(mold.ten_sp_gan_nhat || '').split(' (')[0].trim() : '';
   document.getElementById('mc-ma-sp').value = currentMaSp;
@@ -3913,26 +3921,32 @@ async function openMoldConfigureModal(mold){
   document.getElementById('mc-nguong-bd').value = mold ? mold.nguong_bao_duong : '';
   document.getElementById('mc-nguong-lm').value = mold ? mold.nguong_lam_moi : '';
   document.getElementById('mc-ghi-chu').value = '';
-  if (!mold) {
-    const maKhuon = prompt('Nhập mã khuôn cần khai báo:');
-    if (!maKhuon || !maKhuon.trim()) return;
-    state.currentTarget.ma_khuon = maKhuon.trim();
-    document.getElementById('mc-tag').textContent = maKhuon.trim();
-  }
   document.getElementById('modal-mold-configure').classList.add('open');
 }
 
 async function submitMoldConfigure(){
   const t = state.currentTarget;
-  if (!t || !t.ma_khuon) return;
+  if (!t) return;
+  const maKhuonMoi = document.getElementById('mc-ma-khuon').value.trim();
+  if (!maKhuonMoi) return showToast('Cần nhập mã khuôn', true);
   const maSp = document.getElementById('mc-ma-sp').value.trim();
   if (t.isNewMold && !maSp) return showToast('Khuôn mới cần khai báo mã sản phẩm', true);
   if (!(await ensureAuthOnSubmit('modal-mold-configure'))) return;
 
-  showOverlay('Đang lưu cấu hình...');
+  showOverlay(t.isNewMold ? 'Đang tạo khuôn...' : 'Đang lưu...');
   try {
+    // đổi tên khuôn TRƯỚC nếu mã bị sửa (chỉ khi sửa khuôn có sẵn — khuôn mới
+    // thì duc_configure_mold tự insert đúng mã mới nhập, không cần đổi tên)
+    let maKhuonHienTai = t.ma_khuon;
+    if (!t.isNewMold && maKhuonMoi !== t.ma_khuon) {
+      const r = await rpcWrite('duc_rename_khuon', { p_ma_khuon_cu: t.ma_khuon, p_ma_khuon_moi: maKhuonMoi, p_user: state.user });
+      maKhuonHienTai = r.ma_khuon_moi;
+    } else if (t.isNewMold) {
+      maKhuonHienTai = maKhuonMoi;
+    }
+
     const d = await rpcWrite('duc_configure_mold', {
-      p_ma_khuon: t.ma_khuon,
+      p_ma_khuon: maKhuonHienTai,
       p_ma_sp: maSp || null,
       p_tong_shot_luy_ke: numOrNull(document.getElementById('mc-tong-shot').value),
       p_shots_since_maintenance: numOrNull(document.getElementById('mc-shot-since').value),
@@ -3943,35 +3957,11 @@ async function submitMoldConfigure(){
     });
     hideOverlay();
     document.getElementById('modal-mold-configure').classList.remove('open');
-    showToast('✓ Đã lưu cấu hình khuôn ' + d.ma_khuon);
+    showToast('✓ Đã lưu khuôn ' + d.ma_khuon);
     state.khuonManageMoldsCache = null;
     loadKhuonManageMolds();
     loadShiftState(false);
     document.getElementById('modal-khuon-manage').classList.add('open');
-  } catch (e) { onError(e); }
-}
-
-// Đổi tên khuôn (duc_rename_khuon) — chỉ áp dụng từ nay trở đi: đổi sổ đời
-// khuôn (duc_shot_khuon) + trạm đang chạy + kế hoạch tuần hiện tại/tương lai.
-// KHÔNG sửa lại lịch sử đã có (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã
-// in) — xem migration_phase_D35_doi_ten_khuon.sql.
-async function renameKhuonPrompt(maKhuonCu){
-  if (!(await ensureAuth())) return;
-  const moi = prompt('Đổi tên khuôn "' + maKhuonCu + '" thành mã mới:\n\n' +
-    'Lưu ý: chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai.\n' +
-    'Lịch sử cũ (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in) vẫn giữ mã cũ.');
-  if (!moi || !moi.trim() || moi.trim() === maKhuonCu) return;
-  showOverlay('Đang đổi tên khuôn...');
-  try {
-    const d = await rpcWrite('duc_rename_khuon', {
-      p_ma_khuon_cu: maKhuonCu, p_ma_khuon_moi: moi.trim(), p_user: state.user,
-    });
-    hideOverlay();
-    showToast('✓ Đã đổi "' + d.ma_khuon_cu + '" → "' + d.ma_khuon_moi + '" (' +
-      d.so_dong_ca_hien_tai_da_doi + ' trạm đang chạy, ' + d.so_dong_khsx_da_doi + ' dòng kế hoạch tuần)');
-    state.khuonManageMoldsCache = null;
-    loadKhuonManageMolds();
-    loadShiftState(false);
   } catch (e) { onError(e); }
 }
 
