@@ -1949,13 +1949,17 @@ async function fetchShiftState(){
     return out;
   });
 
-  // Sự cố (log) lấy đúng theo (ngay, ca) THẬT của từng dòng đang hoạt động —
-  // không dùng ngay/ca đang chọn ở header (có thể lệch nếu ca đang chạy
-  // overrun qua lúc trưởng ca đã đổi header sang ca kế tiếp).
+  // Sự cố (log) lấy theo (ma_may, ngay) của từng dòng đang hoạt động — KHÔNG
+  // ép thêm đúng ca, vì máy có thể đã sang ca kế tiếp (dòng row_seq mới hơn)
+  // mà ca trước đó CHƯA kết ca chính thức (vd DC 6/DC 11 tự chuyển Ca 1→Ca 2
+  // giữa ngày) — nếu lọc cứng theo ca hiện tại, sự cố ghi ở ca trước trong
+  // cùng ngày sẽ "biến mất" khỏi cột dù dữ liệu gốc vẫn còn nguyên trong
+  // duc_su_co_log. Lọc theo cả ngày của máy đó là đủ an toàn vì chip hiển thị
+  // vẫn tự lọc thêm theo đúng ma_sp của dòng đang xem (xem makeRowHTML).
   let incRaw = [];
-  const shiftPairs = Array.from(new Set(activeTriples.map(t => t.ngay + '|' + t.ca)));
-  if (shiftPairs.length) {
-    const orInc = shiftPairs.map(p => { const [ngay, ca] = p.split('|'); return `and(ngay.eq.${ngay},ca.eq.${ca})`; }).join(',');
+  const shiftDays = Array.from(new Set(activeTriples.map(t => t.ma_may + '|' + t.ngay)));
+  if (shiftDays.length) {
+    const orInc = shiftDays.map(p => { const [ma_may, ngay] = p.split('|'); return `and(ma_may.eq.${ma_may},ngay.eq.${ngay})`; }).join(',');
     const { data, error } = await sb.from('duc_su_co_log').select('*').or(orInc);
     if (error) throw new Error(error.message);
     incRaw = data || [];
