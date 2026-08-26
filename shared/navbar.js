@@ -253,17 +253,27 @@ body{padding-top:var(--navbar-h)}
     pwMask.innerHTML =
       '<div class="mnb-pw-modal">' +
         '<h3>🔑 Đổi mật khẩu</h3>' +
-        '<label for="mnbPwOld">Mật khẩu hiện tại</label>' +
-        '<input type="password" id="mnbPwOld" autocomplete="current-password">' +
-        '<label for="mnbPwNew">Mật khẩu mới (tối thiểu 6 ký tự)</label>' +
-        '<input type="password" id="mnbPwNew" autocomplete="new-password" minlength="6">' +
-        '<label for="mnbPwNew2">Nhập lại mật khẩu mới</label>' +
-        '<input type="password" id="mnbPwNew2" autocomplete="new-password" minlength="6">' +
-        '<div class="mnb-pw-msg" id="mnbPwMsg"></div>' +
-        '<div class="mnb-pw-actions">' +
-          '<button type="button" class="mnb-pw-cancel" id="mnbPwCancel">Huỷ</button>' +
-          '<button type="button" class="mnb-pw-submit" id="mnbPwSubmit">Đổi mật khẩu</button>' +
-        '</div>' +
+        // Bọc trong <form> + 1 ô "username" ẩn cho 3 ô mật khẩu bên dưới —
+        // nếu không, Chrome/Edge (nhất là trên di động) coi 3 ô mật khẩu này
+        // là "mồ côi" (orphan, xem cảnh báo DOM "Password field is not
+        // contained in a form") và tự đoán ô văn bản GẦN NHẤT bất kỳ trên
+        // trang là ô "username" để tự điền mã đăng nhập đã lưu vào đó — từng
+        // gây điền nhầm mã NV vào ô "Tìm máy" ở mobile.html. Form không submit
+        // thật (JS xử lý qua nút bấm), chỉ để khoanh phạm vi autofill.
+        '<form id="mnbPwForm" autocomplete="off" onsubmit="return false">' +
+          '<input type="text" name="username" autocomplete="username" value="" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none" tabindex="-1" aria-hidden="true">' +
+          '<label for="mnbPwOld">Mật khẩu hiện tại</label>' +
+          '<input type="password" id="mnbPwOld" autocomplete="current-password">' +
+          '<label for="mnbPwNew">Mật khẩu mới (tối thiểu 6 ký tự)</label>' +
+          '<input type="password" id="mnbPwNew" autocomplete="new-password" minlength="6">' +
+          '<label for="mnbPwNew2">Nhập lại mật khẩu mới</label>' +
+          '<input type="password" id="mnbPwNew2" autocomplete="new-password" minlength="6">' +
+          '<div class="mnb-pw-msg" id="mnbPwMsg"></div>' +
+          '<div class="mnb-pw-actions">' +
+            '<button type="button" class="mnb-pw-cancel" id="mnbPwCancel">Huỷ</button>' +
+            '<button type="button" class="mnb-pw-submit" id="mnbPwSubmit">Đổi mật khẩu</button>' +
+          '</div>' +
+        '</form>' +
       '</div>';
     document.body.appendChild(pwMask);
     document.getElementById('mnbPwCancel').addEventListener('click', closeChangePasswordModal);
