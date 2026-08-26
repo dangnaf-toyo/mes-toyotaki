@@ -13,9 +13,10 @@
   duc_bao_cao_ca/duc_su_co_log/duc_lich_su_san_xuat mỗi khi mở (không lưu lại
   các số này ở đâu — xem tuần nào tính lại tuần đó, luôn khớp dữ liệu gốc).
 
-  Phương án hiện tại chỉ chạy 2 ca 8 tiếng (Ca 1 + Ca 2) — MỌI truy vấn ở đây
-  cố định lọc .in('ca', ['Ca 1','Ca 2']), loại các ca không chuẩn (Ca ngày/Ca
-  đêm) nếu phát sinh trong dữ liệu lịch sử.
+  Khối Đúc có 2 phương án ca song song tuỳ giai đoạn: "2 ca 8h" (Ca 1/Ca 2)
+  dùng tới 23/08/2026, và "2 ca 12h" (Ca ngày/Ca đêm) là mặc định từ
+  24/08/2026 (xem migration_phase_D30). MỌI truy vấn ở đây lọc
+  .in('ca', CA_HOP_LE) gồm cả 4 tên để không bỏ sót ca nào theo thời gian.
 
   Bảng "Tổng hợp vấn đề và hành động đối ứng" ở cuối trang là phần DUY NHẤT
   được lưu lại (bảng duc_bao_cao_tuan_van_de, migration T20) — gợi ý tự động
@@ -266,6 +267,7 @@ function top3VanDe(rows){
   items.sort((a,b) => b.phut - a.phut);
   return items.slice(0,3);
 }
+const CA_HOP_LE = ['Ca 1','Ca 2','Ca ngày','Ca đêm'];
 
 // ── State ────────────────────────────────────────────────────────────────
 let currentMonday = null;
@@ -289,14 +291,14 @@ async function loadWeek(monday){
 
   const [bccRes, sucoRes, lssxRes, chtRes, actionRes] = await Promise.all([
     sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
-      .gte('ngay', from).lte('ngay', to).in('ca', ['Ca 1','Ca 2']),
+      .gte('ngay', from).lte('ngay', to).in('ca', CA_HOP_LE),
     sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,van_de,truong_ca')
-      .gte('ngay', from).lte('ngay', to).in('ca', ['Ca 1','Ca 2']),
+      .gte('ngay', from).lte('ngay', to).in('ca', CA_HOP_LE),
     sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
-      .gte('ngay', from).lte('ngay', to).in('ca', ['Ca 1','Ca 2']),
+      .gte('ngay', from).lte('ngay', to).in('ca', CA_HOP_LE),
     isCurrentWeek
       ? sb.from('duc_ca_hien_tai').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
-          .eq('ngay', todayISO).in('ca', ['Ca 1','Ca 2'])
+          .eq('ngay', todayISO).in('ca', CA_HOP_LE)
       : Promise.resolve({ data: [] }),
     sb.from('duc_bao_cao_tuan_van_de').select('*').eq('tuan_bat_dau', from).order('stt'),
   ]);
@@ -361,28 +363,30 @@ function computeAll(ctx){
     .map(r => ({ ...r, ht: r.tong_tt_ca/r.tong_kh_ca*100 }))
     .sort((a,b) => a.ht - b.ht).slice(0,3);
 
-  // ── Ca 1 vs Ca 2 ──
-  const caGroups = groupBy(bcc, r=>r.ca);
-  const sucoByCa = groupBy(suco, r=>r.ca);
+  // ── Ca 1 vs Ca 2 — gộp theo cặp tương ứng để so sánh xuyên cả 2 phương án ca
+  // (2 ca 8h: Ca 1/Ca 2; 2 ca 12h từ 24/08/2026: Ca ngày/Ca đêm — xem D30)
+  const CA_NHOM_1 = ['Ca 1','Ca ngày'], CA_NHOM_2 = ['Ca 2','Ca đêm'];
+  const caGroups = groupBy(bcc, r=>CA_NHOM_1.includes(r.ca) ? 1 : 2);
+  const sucoByCa = groupBy(suco, r=>CA_NHOM_1.includes(r.ca) ? 1 : 2);
   // B1/B2 = sự cố CL sản phẩm/nguyên liệu, F1 = IPQC phát hiện NG (xem CONFIG.LOAI_SU_CO ở duc-dashboard.html)
   const QUALITY_CODES = ['B1','B2','F1'];
   // A2 = Sự cố khuôn (khác C3 "Đổi khuôn" — đó là thời gian chuẩn bị/thay khuôn theo kế hoạch, đã tính riêng)
   const MOLD_CODES = ['A2'];
-  function sucoDowntimeByCode(ca, codes){
-    const rs = sucoByCa.get(ca) || [];
+  function sucoDowntimeByCode(nhom, codes){
+    const rs = sucoByCa.get(nhom) || [];
     return sumBy(rs.filter(r => codes.includes(issueCode(r.loai_su_co))), r=>r.thoi_gian_dung_phut);
   }
-  function caStat(ca){
-    const rs = caGroups.get(ca) || [];
+  function caStat(nhom){
+    const rs = caGroups.get(nhom) || [];
     const kh = sumBy(rs,r=>r.tong_kh_ca), tt = sumBy(rs,r=>r.tong_tt_ca);
-    const c3rowsCa = (sucoByCa.get(ca) || []).filter(r => issueCode(r.loai_su_co) === 'C3');
+    const c3rowsCa = (sucoByCa.get(nhom) || []).filter(r => issueCode(r.loai_su_co) === 'C3');
     const phutDoiKhuon = sumBy(c3rowsCa, r=>r.thoi_gian_dung_phut);
     return { n: rs.length, kh, tt, ht: kh>0?tt/kh*100:0, phut: sumBy(rs,r=>r.tong_phut_dung_ca),
       sc: sumBy(rs,r=>r.so_su_co_ca), scPerCa: rs.length? sumBy(rs,r=>r.so_su_co_ca)/rs.length:0, ng: sumBy(rs,r=>r.tong_ng_ca),
-      phutCL: sucoDowntimeByCode(ca, QUALITY_CODES), phutKhuon: sucoDowntimeByCode(ca, MOLD_CODES),
+      phutCL: sucoDowntimeByCode(nhom, QUALITY_CODES), phutKhuon: sucoDowntimeByCode(nhom, MOLD_CODES),
       soLanDoiKhuon: c3rowsCa.length, avgDoiKhuon: c3rowsCa.length ? phutDoiKhuon/c3rowsCa.length : 0 };
   }
-  const ca1 = caStat('Ca 1'), ca2 = caStat('Ca 2');
+  const ca1 = caStat(1), ca2 = caStat(2);
 
   // ── Dừng máy theo máy ──
   const byMay = groupBy(suco, r=>r.ma_may);
@@ -444,7 +448,7 @@ function renderReport(ctx){
   '</div></div>';
 
   // Diễn biến theo ngày
-  html += '<div class="card"><h3>Diễn biến theo ngày</h3><span class="sec-note">Kế hoạch so với thực tế, chỉ Ca 1 + Ca 2</span>';
+  html += '<div class="card"><h3>Diễn biến theo ngày</h3><span class="sec-note">Kế hoạch so với thực tế</span>';
   html += '<div class="daytrend">' + c.days.map(d => {
     const khH = Math.round(d.kh/c.maxKh*100), ttH = Math.round(d.tt/c.maxKh*100);
     const wd = ['Chủ Nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'][d.date.getDay()];
@@ -466,7 +470,7 @@ function renderReport(ctx){
   // Sản lượng theo mã SP
   const dayNamesShort = ['T2','T3','T4','T5','T6','T7'];
   const dayHeaders = c.days.map((d,i) => dayNamesShort[i] + '<br><span style="font-weight:400;font-size:9px;color:var(--tk-muted)">' + pad(d.date.getDate()) + '/' + pad(d.date.getMonth()+1) + '</span>');
-  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần. Mỗi mã SP có 2 dòng: KH ở trên, TT ở dưới.</span>';
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần — xếp theo % hoàn thành giảm dần. Mỗi mã SP có 2 dòng: KH ở trên, TT ở dưới.</span>';
   html += tableWrap(['Mã SP','Tên sản phẩm','', ...dayHeaders, 'Tổng','Hoàn thành'],
     c.prodProduct.map(p =>
       '<tr class="sp-row-kh"><td class="rowname" rowspan="2">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub" rowspan="2">' + escapeHtml(p.ten_sp) + '</td>' +
@@ -483,7 +487,7 @@ function renderReport(ctx){
   html += '</div>';
 
   // Sản lượng theo máy
-  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần, chỉ Ca 1 + Ca 2 — xếp theo % hoàn thành giảm dần</span>';
+  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần — xếp theo % hoàn thành giảm dần</span>';
   html += tableWrap(['Máy','Kế hoạch','Thực tế','Hoàn thành','NG'],
     c.prodMachine.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_may) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
@@ -517,10 +521,11 @@ function renderReport(ctx){
     '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(x) + '</div>'));
   html += '</div>';
 
-  // So sánh Ca 1 / Ca 2
-  html += '<div class="card"><h3>So sánh hiệu suất Ca 1 và Ca 2</h3><span class="sec-note">' + c.ca1.n + ' ca Ca 1, ' + c.ca2.n + ' ca Ca 2 — chỉ ca đã kết ca</span>';
-  html += '<div class="ca-legend"><span><span class="sw" style="background:var(--ca1)"></span><b>Ca 1</b> — ' + fmtNum(c.ca1.kh) + ' KH</span>' +
-    '<span><span class="sw" style="background:var(--ca2)"></span><b>Ca 2</b> — ' + fmtNum(c.ca2.kh) + ' KH</span></div>';
+  // So sánh Ca 1 / Ca 2 (gộp cả tên "Ca ngày"/"Ca đêm" nếu tuần dùng phương án 2 ca 12h)
+  const CA1_LABEL = 'Ca 1/Ngày', CA2_LABEL = 'Ca 2/Đêm';
+  html += '<div class="card"><h3>So sánh hiệu suất ' + CA1_LABEL + ' và ' + CA2_LABEL + '</h3><span class="sec-note">' + c.ca1.n + ' ca ' + CA1_LABEL + ', ' + c.ca2.n + ' ca ' + CA2_LABEL + ' — chỉ ca đã kết ca</span>';
+  html += '<div class="ca-legend"><span><span class="sw" style="background:var(--ca1)"></span><b>' + CA1_LABEL + '</b> — ' + fmtNum(c.ca1.kh) + ' KH</span>' +
+    '<span><span class="sw" style="background:var(--ca2)"></span><b>' + CA2_LABEL + '</b> — ' + fmtNum(c.ca2.kh) + ' KH</span></div>';
   const maxHt = Math.max(c.ca1.ht, c.ca2.ht, 1), maxPhut = Math.max(c.ca1.phut, c.ca2.phut, 1), maxSc = Math.max(c.ca1.scPerCa, c.ca2.scPerCa, .1);
   const maxPhutCL = Math.max(c.ca1.phutCL, c.ca2.phutCL, 1), maxPhutKhuon = Math.max(c.ca1.phutKhuon, c.ca2.phutKhuon, 1);
   const maxAvgDoiKhuon = Math.max(c.ca1.avgDoiKhuon, c.ca2.avgDoiKhuon, 1);
@@ -532,10 +537,11 @@ function renderReport(ctx){
   html += caRow('Đổi khuôn TB/lần', c.ca1.avgDoiKhuon/maxAvgDoiKhuon*100, c.ca1.avgDoiKhuon.toFixed(1).replace('.',',')+"' (" + c.ca1.soLanDoiKhuon + ' lần)', c.ca2.avgDoiKhuon/maxAvgDoiKhuon*100, c.ca2.avgDoiKhuon.toFixed(1).replace('.',',')+"' (" + c.ca2.soLanDoiKhuon + ' lần)');
   html += caRow('NG (sản phẩm)', c.ca1.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca1.ng), c.ca2.ng/Math.max(c.ca1.ng,c.ca2.ng,1)*100, fmtNum(c.ca2.ng));
   if (c.ca1.n > 0 && c.ca2.n > 0 && c.ca1.ht !== c.ca2.ht) {
-    const caKemHon = c.ca1.ht <= c.ca2.ht ? 'Ca 1' : 'Ca 2';
-    const caTotHon = caKemHon === 'Ca 1' ? 'Ca 2' : 'Ca 1';
-    const statKem = caKemHon === 'Ca 1' ? c.ca1 : c.ca2, statTot = caKemHon === 'Ca 1' ? c.ca2 : c.ca1;
-    const top3CaKem = top3VanDe(ctx.suco.filter(r => r.ca === caKemHon));
+    const caKemHon = c.ca1.ht <= c.ca2.ht ? CA1_LABEL : CA2_LABEL;
+    const caTotHon = caKemHon === CA1_LABEL ? CA2_LABEL : CA1_LABEL;
+    const statKem = caKemHon === CA1_LABEL ? c.ca1 : c.ca2, statTot = caKemHon === CA1_LABEL ? c.ca2 : c.ca1;
+    const nhomCaKem = caKemHon === CA1_LABEL ? CA_NHOM_1 : CA_NHOM_2;
+    const top3CaKem = top3VanDe(ctx.suco.filter(r => nhomCaKem.includes(r.ca)));
     html += priorityBox(caKemHon + ' đang hoàn thành kế hoạch thấp hơn ' + caTotHon, [
       '<span class="pm">' + caKemHon + ' đạt ' + fmtPct(statKem.ht) + ' KH so với ' + fmtPct(statTot.ht) + ' KH của ' + caTotHon + '</span>' +
       '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong({ top3: top3CaKem }) + '</div>'
@@ -572,7 +578,7 @@ function renderReport(ctx){
   const foot = document.createElement('footer');
   foot.className = 'note';
   foot.innerHTML = 'Nguồn: duc_bao_cao_ca · duc_su_co_log · duc_lich_su_san_xuat' + (ctx.isCurrentWeek ? ' · duc_ca_hien_tai (phần đang chạy hôm nay, tạm tính)' : '') +
-    '. Chỉ tính Ca 1 + Ca 2 theo phương án 2 ca 8 tiếng hiện tại. KPI đầu trang chỉ gồm các ca đã kết ca; bảng dừng máy chi tiết dùng nhật ký sự cố nên có thể bao gồm cả sự cố của ca đang chạy hôm nay.';
+    '. Gồm các ca chuẩn của cả 2 phương án ca (Ca 1/Ca 2 — 2 ca 8h, hoặc Ca ngày/Ca đêm — 2 ca 12h từ 24/08/2026). KPI đầu trang chỉ gồm các ca đã kết ca; bảng dừng máy chi tiết dùng nhật ký sự cố nên có thể bao gồm cả sự cố của ca đang chạy hôm nay.';
 
   const actionCard = document.createElement('div');
   actionCard.className = 'card';
@@ -630,8 +636,8 @@ function pcard(title, sub, phut, count, top3){
 }
 function caRow(label, w1, v1, w2, v2){
   return '<div class="ca-row"><div class="ca-metric">' + escapeHtml(label) + '</div><div>' +
-    '<div class="ca-bar-line"><span class="ca-tag c1">Ca 1</span><div class="ca-track"><div class="ca-fill c1" style="width:' + Math.max(2,w1) + '%"></div></div><span class="ca-val num">' + v1 + '</span></div>' +
-    '<div class="ca-bar-line"><span class="ca-tag c2">Ca 2</span><div class="ca-track"><div class="ca-fill c2" style="width:' + Math.max(2,w2) + '%"></div></div><span class="ca-val num">' + v2 + '</span></div>' +
+    '<div class="ca-bar-line"><span class="ca-tag c1">Ca 1/Ngày</span><div class="ca-track"><div class="ca-fill c1" style="width:' + Math.max(2,w1) + '%"></div></div><span class="ca-val num">' + v1 + '</span></div>' +
+    '<div class="ca-bar-line"><span class="ca-tag c2">Ca 2/Đêm</span><div class="ca-track"><div class="ca-fill c2" style="width:' + Math.max(2,w2) + '%"></div></div><span class="ca-val num">' + v2 + '</span></div>' +
     '</div></div>';
 }
 
