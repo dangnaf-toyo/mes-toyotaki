@@ -268,6 +268,8 @@ function top3VanDe(rows){
   return items.slice(0,3);
 }
 const CA_HOP_LE = ['Ca 1','Ca 2','Ca ngày','Ca đêm'];
+// gộp theo cặp tương ứng: 2 ca 8h (Ca 1/Ca 2) và 2 ca 12h từ 24/08/2026 (Ca ngày/Ca đêm) — xem D30
+const CA_NHOM_1 = ['Ca 1','Ca ngày'], CA_NHOM_2 = ['Ca 2','Ca đêm'];
 
 // ── State ────────────────────────────────────────────────────────────────
 let currentMonday = null;
@@ -363,9 +365,8 @@ function computeAll(ctx){
     .map(r => ({ ...r, ht: r.tong_tt_ca/r.tong_kh_ca*100 }))
     .sort((a,b) => a.ht - b.ht).slice(0,3);
 
-  // ── Ca 1 vs Ca 2 — gộp theo cặp tương ứng để so sánh xuyên cả 2 phương án ca
-  // (2 ca 8h: Ca 1/Ca 2; 2 ca 12h từ 24/08/2026: Ca ngày/Ca đêm — xem D30)
-  const CA_NHOM_1 = ['Ca 1','Ca ngày'], CA_NHOM_2 = ['Ca 2','Ca đêm'];
+  // ── Ca 1 vs Ca 2 — gộp theo cặp tương ứng (CA_NHOM_1/CA_NHOM_2) để so sánh
+  // xuyên cả 2 phương án ca, xem khai báo global ở trên
   const caGroups = groupBy(bcc, r=>CA_NHOM_1.includes(r.ca) ? 1 : 2);
   const sucoByCa = groupBy(suco, r=>CA_NHOM_1.includes(r.ca) ? 1 : 2);
   // B1/B2 = sự cố CL sản phẩm/nguyên liệu, F1 = IPQC phát hiện NG (xem CONFIG.LOAI_SU_CO ở duc-dashboard.html)
