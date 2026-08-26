@@ -9,9 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
-  bao-cao-tuan.html — báo cáo sản xuất tuần khối Đúc, tự tính TRỰC TIẾP từ
-  duc_bao_cao_ca/duc_su_co_log/duc_lich_su_san_xuat mỗi khi mở (không lưu lại
-  các số này ở đâu — xem tuần nào tính lại tuần đó, luôn khớp dữ liệu gốc).
+  bao-cao-tuan.html — báo cáo sản xuất tuần khối Đúc, tự tính TRỰC TIẾP mỗi
+  khi mở (không lưu lại các số này ở đâu — xem tuần nào tính lại tuần đó,
+  luôn khớp dữ liệu gốc). Số KẾ HOẠCH lấy từ duc_khsx_tuan_plan (kế hoạch
+  tuần đã duyệt, nhập/sửa qua khsx-tuan.html) — CỐ ĐỊNH theo kế hoạch đã
+  duyệt, không đổi dù trưởng ca có sửa KH ca trên duc-dashboard.html trước
+  khi kết ca. Số THỰC TẾ vẫn lấy từ duc_bao_cao_ca/duc_su_co_log/
+  duc_lich_su_san_xuat (chốt lúc kết ca). Riêng khối "So sánh Ca 1/Ca 2"
+  vẫn dùng KH ca đã chốt vì duc_khsx_tuan_plan không chia theo ca.
 
   Khối Đúc có 2 phương án ca song song tuỳ giai đoạn: "2 ca 8h" (Ca 1/Ca 2)
   dùng tới 23/08/2026, và "2 ca 12h" (Ca ngày/Ca đêm) là mặc định từ
@@ -291,7 +296,7 @@ async function loadWeek(monday){
   showMsg('info', '⏳ Đang tải dữ liệu tuần ' + fmtVN(monday) + ' – ' + fmtVN(saturday) + '…');
   document.getElementById('reportBody').style.display = 'none';
 
-  const [bccRes, sucoRes, lssxRes, chtRes, actionRes] = await Promise.all([
+  const [bccRes, sucoRes, lssxRes, chtRes, khsxRes, actionRes] = await Promise.all([
     sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
       .gte('ngay', from).lte('ngay', to).in('ca', CA_HOP_LE),
     sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,van_de,truong_ca')
@@ -302,23 +307,27 @@ async function loadWeek(monday){
       ? sb.from('duc_ca_hien_tai').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
           .eq('ngay', todayISO).in('ca', CA_HOP_LE)
       : Promise.resolve({ data: [] }),
+    // kế hoạch tuần ĐÃ DUYỆT (khsx-tuan.html) — nguồn số "KH" của báo cáo, độc
+    // lập với KH ca trưởng ca có thể sửa tay ở duc-dashboard.html
+    sb.from('duc_khsx_tuan_plan').select('ma_sp,ten_sp,ma_may,t2,t3,t4,t5,t6,t7').eq('tuan_bat_dau', from),
     sb.from('duc_bao_cao_tuan_van_de').select('*').eq('tuan_bat_dau', from).order('stt'),
   ]);
 
-  if (bccRes.error || sucoRes.error || lssxRes.error) {
-    showMsg('error', 'Lỗi tải dữ liệu: ' + (bccRes.error || sucoRes.error || lssxRes.error).message);
+  if (bccRes.error || sucoRes.error || lssxRes.error || khsxRes.error) {
+    showMsg('error', 'Lỗi tải dữ liệu: ' + (bccRes.error || sucoRes.error || lssxRes.error || khsxRes.error).message);
     return;
   }
 
   const bcc = bccRes.data || [];
   const suco = sucoRes.data || [];
   const lssx = lssxRes.data || [];
+  const khsx = khsxRes.data || [];
   let cht = chtRes.data || [];
   // tránh đếm trùng: chỉ lấy phần Ca đang chạy dở HÔM NAY (ca chưa có bản ghi kết ca)
   const closedCaToday = new Set(bcc.filter(r => r.ngay === todayISO).map(r => r.ca));
   cht = cht.filter(r => !closedCaToday.has(r.ca));
 
-  renderReport({ monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht });
+  renderReport({ monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht, khsx });
 
   // Hiện khối báo cáo TRƯỚC khi dựng bảng hành động — syncRowHeight() cần đo
   // scrollHeight thật của các ô textarea, mà phần tử display:none luôn báo
@@ -332,29 +341,38 @@ async function loadWeek(monday){
   renderActionTable();
 }
 
-function computeAll(ctx){
-  const { monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht } = ctx;
+// Tên cột ngày trong duc_khsx_tuan_plan, thứ tự khớp index 0=Thứ 2..5=Thứ 7
+// (giống dayIdx ở duc-dashboard.html loadWeeklyPlanSuggestions).
+const KHSX_DAY_COLS = ['t2','t3','t4','t5','t6','t7'];
+function khsxRowTotal(r){ return KHSX_DAY_COLS.reduce((s,c) => s + (Number(r[c])||0), 0); }
 
-  // ── theo ngày ──
+function computeAll(ctx){
+  const { monday, saturday, from, to, isCurrentWeek, todayISO, bcc, suco, lssx, cht, khsx } = ctx;
+  const khsxByMaSp = groupBy(khsx, r=>r.ma_sp);
+  const khsxByMaMay = groupBy(khsx, r=>r.ma_may);
+  const khByDay = KHSX_DAY_COLS.map(c => sumBy(khsx, r=>r[c]));
+
+  // ── theo ngày (KH lấy từ kế hoạch tuần đã duyệt, TT lấy từ thực tế đã kết ca) ──
   const days = [];
   for (let i = 0; i < 6; i++){
     const d = addDays(monday, i);
     const iso = fmtISO(d);
     const rowsBcc = bcc.filter(r => r.ngay === iso);
-    let kh = sumBy(rowsBcc, r => r.tong_kh_ca), tt = sumBy(rowsBcc, r => r.tong_tt_ca);
+    let kh = khByDay[i], tt = sumBy(rowsBcc, r => r.tong_tt_ca);
     let sc = sumBy(rowsBcc, r => r.so_su_co_ca), phut = sumBy(rowsBcc, r => r.tong_phut_dung_ca), ng = sumBy(rowsBcc, r => r.tong_ng_ca);
     const isToday = isCurrentWeek && iso === todayISO;
     if (isToday){
       const chtDay = cht.filter(r => r.ngay === iso);
-      kh += sumBy(chtDay, r => r.kh_ca); tt += sumBy(chtDay, r => r.tt_ca);
+      tt += sumBy(chtDay, r => r.tt_ca);
     }
     const isFuture = iso > todayISO;
     days.push({ date: d, iso, kh, tt, htPct: kh > 0 ? tt/kh*100 : 0, sc, phut, ng, isToday, isFuture });
   }
-  const maxKh = Math.max(1, ...days.filter(d=>!d.isFuture).map(d => d.kh));
+  const maxKh = Math.max(1, ...days.map(d => d.kh));
 
-  // ── KPI tuần (chỉ ca đã kết ca) ──
-  const totalKh = sumBy(bcc, r=>r.tong_kh_ca), totalTt = sumBy(bcc, r=>r.tong_tt_ca);
+  // ── KPI tuần — KH lấy từ kế hoạch tuần đã duyệt (cả tuần, kể cả ngày chưa
+  // tới); TT/sự cố/dừng máy vẫn chỉ tính ca đã kết ca ──
+  const totalKh = khByDay.reduce((s,v) => s+v, 0), totalTt = sumBy(bcc, r=>r.tong_tt_ca);
   const totalSc = sumBy(bcc, r=>r.so_su_co_ca), totalPhut = sumBy(bcc, r=>r.tong_phut_dung_ca), totalNg = sumBy(bcc, r=>r.tong_ng_ca);
   const shiftHtList = bcc.filter(r=>r.tong_kh_ca>0).map(r=>r.tong_tt_ca/r.tong_kh_ca*100);
   const avgHt = shiftHtList.length ? sumBy(shiftHtList.map(v=>({v})), r=>r.v)/shiftHtList.length : 0;
@@ -410,22 +428,30 @@ function computeAll(ctx){
     ma_sp, ten_sp: rs[0].ten_sp || '', phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs),
   })).sort((a,b)=> b.phut - a.phut);
 
-  // ── Sản lượng theo máy / mã SP (lssx + cht hôm nay) ──
+  // ── Sản lượng theo máy / mã SP — KH từ kế hoạch tuần đã duyệt (duc_khsx_tuan_plan),
+  // TT vẫn từ thực tế đã ghi nhận (lssx + cht hôm nay) ──
   const prodRows = lssx.concat(cht);
   const prodByMay = groupBy(prodRows, r=>r.ma_may);
-  const prodMachine = [...prodByMay.entries()].map(([ma_may, rs]) => {
-    const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
+  const allMachines = new Set([...khsxByMaMay.keys(), ...prodByMay.keys()]);
+  const prodMachine = [...allMachines].map(ma_may => {
+    const kh = sumBy(khsxByMaMay.get(ma_may) || [], khsxRowTotal);
+    const rs = prodByMay.get(ma_may) || [];
+    const tt = sumBy(rs,r=>r.tt_ca);
     return { ma_may, kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt };
   }).sort((a,b)=> b.ht - a.ht);
   const dayIsos = days.map(d=>d.iso);
   const prodBySp = groupBy(prodRows, r=>r.ma_sp);
-  const prodProduct = [...prodBySp.entries()].map(([ma_sp, rs]) => {
-    const kh = sumBy(rs,r=>r.kh_ca), tt = sumBy(rs,r=>r.tt_ca);
-    const byDay = dayIsos.map(iso => {
+  const allProducts = new Set([...khsxByMaSp.keys(), ...prodBySp.keys()]);
+  const prodProduct = [...allProducts].map(ma_sp => {
+    const khsxRs = khsxByMaSp.get(ma_sp) || [];
+    const rs = prodBySp.get(ma_sp) || [];
+    const kh = sumBy(khsxRs, khsxRowTotal), tt = sumBy(rs,r=>r.tt_ca);
+    const byDay = dayIsos.map((iso,i) => {
       const dayRs = rs.filter(r=>r.ngay===iso);
-      return { iso, kh: sumBy(dayRs,r=>r.kh_ca), tt: sumBy(dayRs,r=>r.tt_ca) };
+      return { iso, kh: sumBy(khsxRs, r=>r[KHSX_DAY_COLS[i]]), tt: sumBy(dayRs,r=>r.tt_ca) };
     });
-    return { ma_sp, ten_sp: rs[0].ten_sp || '', kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt, byDay };
+    const ten_sp = (rs[0] && rs[0].ten_sp) || (khsxRs[0] && khsxRs[0].ten_sp) || '';
+    return { ma_sp, ten_sp, kh, tt, ng: sumBy(rs,r=>r.so_luong_ng), ht: kh>0?tt/kh*100:0, shortfall: kh-tt, byDay };
   }).sort((a,b)=> b.ht - a.ht);
 
   return { days, maxKh, totalKh, totalTt, totalSc, totalPhut, totalNg, avgHt, nDaysClosed, worstShifts,
@@ -449,7 +475,7 @@ function renderReport(ctx){
   '</div></div>';
 
   // Diễn biến theo ngày
-  html += '<div class="card"><h3>Diễn biến theo ngày</h3><span class="sec-note">Kế hoạch so với thực tế</span>';
+  html += '<div class="card"><h3>Diễn biến theo ngày</h3><span class="sec-note">KH theo kế hoạch tuần đã duyệt, TT các ca đã kết ca</span>';
   html += '<div class="daytrend">' + c.days.map(d => {
     const khH = Math.round(d.kh/c.maxKh*100), ttH = Math.round(d.tt/c.maxKh*100);
     const wd = ['Chủ Nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'][d.date.getDay()];
@@ -471,7 +497,7 @@ function renderReport(ctx){
   // Sản lượng theo mã SP
   const dayNamesShort = ['T2','T3','T4','T5','T6','T7'];
   const dayHeaders = c.days.map((d,i) => dayNamesShort[i] + '<br><span style="font-weight:400;font-size:9px;color:var(--tk-muted)">' + pad(d.date.getDate()) + '/' + pad(d.date.getMonth()+1) + '</span>');
-  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần — xếp theo % hoàn thành giảm dần. Mỗi mã SP có 2 dòng: KH ở trên, TT ở dưới.</span>';
+  html += '<div class="card"><h3>Sản lượng theo mã sản phẩm</h3><span class="sec-note">KH theo kế hoạch tuần đã duyệt, TT cộng dồn thực tế — xếp theo % hoàn thành giảm dần. Mỗi mã SP có 2 dòng: KH ở trên, TT ở dưới.</span>';
   html += tableWrap(['Mã SP','Tên sản phẩm','', ...dayHeaders, 'Tổng','Hoàn thành'],
     c.prodProduct.map(p =>
       '<tr class="sp-row-kh"><td class="rowname" rowspan="2">' + escapeHtml(p.ma_sp) + '</td><td class="rowsub" rowspan="2">' + escapeHtml(p.ten_sp) + '</td>' +
@@ -488,7 +514,7 @@ function renderReport(ctx){
   html += '</div>';
 
   // Sản lượng theo máy
-  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">Kế hoạch/thực tế cộng dồn tuần — xếp theo % hoàn thành giảm dần</span>';
+  html += '<div class="card"><h3>Sản lượng theo máy</h3><span class="sec-note">KH theo kế hoạch tuần đã duyệt, TT cộng dồn thực tế — xếp theo % hoàn thành giảm dần</span>';
   html += tableWrap(['Máy','Kế hoạch','Thực tế','Hoàn thành','NG'],
     c.prodMachine.map(p => '<tr><td class="rowname">' + escapeHtml(p.ma_may) + '</td>' +
       '<td class="num">' + fmtNum(p.kh) + '</td><td class="num">' + fmtNum(p.tt) + '</td>' +
@@ -578,8 +604,8 @@ function renderReport(ctx){
   // gắn lại footer + bảng hành động (được render riêng, ngoài innerHTML này)
   const foot = document.createElement('footer');
   foot.className = 'note';
-  foot.innerHTML = 'Nguồn: duc_bao_cao_ca · duc_su_co_log · duc_lich_su_san_xuat' + (ctx.isCurrentWeek ? ' · duc_ca_hien_tai (phần đang chạy hôm nay, tạm tính)' : '') +
-    '. Gồm các ca chuẩn của cả 2 phương án ca (Ca 1/Ca 2 — 2 ca 8h, hoặc Ca ngày/Ca đêm — 2 ca 12h từ 24/08/2026). KPI đầu trang chỉ gồm các ca đã kết ca; bảng dừng máy chi tiết dùng nhật ký sự cố nên có thể bao gồm cả sự cố của ca đang chạy hôm nay.';
+  foot.innerHTML = 'Nguồn: duc_khsx_tuan_plan (số KH) · duc_bao_cao_ca · duc_su_co_log · duc_lich_su_san_xuat (số TT)' + (ctx.isCurrentWeek ? ' · duc_ca_hien_tai (phần đang chạy hôm nay, tạm tính)' : '') +
+    '. Gồm các ca chuẩn của cả 2 phương án ca (Ca 1/Ca 2 — 2 ca 8h, hoặc Ca ngày/Ca đêm — 2 ca 12h từ 24/08/2026). Số KH lấy nguyên từ kế hoạch tuần đã duyệt (không đổi dù trưởng ca có sửa KH ca trên dashboard); riêng khối "So sánh Ca 1/Ca 2" dùng KH ca đã chốt lúc kết ca vì kế hoạch tuần không chia theo ca. TT chỉ gồm các ca đã kết ca; bảng dừng máy chi tiết dùng nhật ký sự cố nên có thể bao gồm cả sự cố của ca đang chạy hôm nay.';
 
   const actionCard = document.createElement('div');
   actionCard.className = 'card';
