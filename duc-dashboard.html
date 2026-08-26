@@ -967,6 +967,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <div class="modal-foot">
       <span class="hint">Không reset bộ đếm — dùng nút "🔧 Bảo dưỡng" nếu muốn reset sau khi bảo dưỡng xong.</span>
       <div class="modal-actions">
+        <button class="btn-outline" id="mc-btn-delete" style="color:#B91C1C;border-color:#FCA5A5;display:none" onclick="deleteKhuonPrompt()">🗑 Xoá khuôn</button>
         <button class="btn-outline" onclick="closeModal()">Huỷ</button>
         <button class="btn btn-primary" onclick="submitMoldConfigure()">Lưu cấu hình</button>
       </div>
@@ -3864,8 +3865,7 @@ function _renderKhuonManageMoldsList(molds, issuesByMold){
             '<td><div style="color:' + (statusColor[m.trang_thai_khuon] || '') + ';font-weight:600">' + escapeHtml(m.trang_thai_khuon) + '</div>' + issueBadge + '</td>' +
             '<td style="white-space:nowrap">' +
               '<button class="btn-tiny" onclick=\'openMoldConfigureModal(' + JSON.stringify(m) + ')\'>✏ Sửa</button> ' +
-              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button> ' +
-              '<button class="btn-tiny" style="color:#B91C1C;border-color:#FCA5A5" onclick="deleteKhuonPrompt(' + JSON.stringify(m.ma_khuon) + ')">🗑 Xoá</button>' +
+              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button>' +
             '</td>' +
           '</tr>';
       }).join('') +
@@ -3913,6 +3913,7 @@ async function openMoldConfigureModal(mold){
   document.getElementById('mc-ma-khuon-hint').textContent = mold
     ? 'Đổi mã ở đây = đổi tên khuôn — chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai, không sửa lại lịch sử (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in).'
     : '';
+  document.getElementById('mc-btn-delete').style.display = mold ? '' : 'none';
   _populateMcMaSpSelect();
   const currentMaSp = mold ? String(mold.ten_sp_gan_nhat || '').split(' (')[0].trim() : '';
   document.getElementById('mc-ma-sp').value = currentMaSp;
@@ -3970,7 +3971,9 @@ async function submitMoldConfigure(){
 // danh sách chọn, KHÔNG đụng lịch sử/audit trail đã có (log bảo dưỡng, vấn đề
 // khuôn, hàng NG, tem cũ). Bị chặn nếu khuôn đang gán cho trạm đang chạy hoặc
 // có trong kế hoạch tuần hiện tại/tương lai — xem migration_phase_D36.
-async function deleteKhuonPrompt(maKhuon){
+async function deleteKhuonPrompt(){
+  const maKhuon = state.currentTarget && state.currentTarget.ma_khuon;
+  if (!maKhuon) return;
   if (!(await ensureAuth())) return;
   if (!confirm('Xoá khuôn "' + maKhuon + '" khỏi danh sách chọn?\n\n' +
     'Chỉ xoá được khuôn không đang gán cho trạm nào và không có trong kế hoạch tuần hiện tại/tương lai.\n' +
@@ -3979,10 +3982,12 @@ async function deleteKhuonPrompt(maKhuon){
   try {
     await rpcWrite('duc_xoa_khuon', { p_ma_khuon: maKhuon, p_user: state.user });
     hideOverlay();
+    document.getElementById('modal-mold-configure').classList.remove('open');
     showToast('✓ Đã xoá khuôn ' + maKhuon);
     state.khuonManageMoldsCache = null;
     loadKhuonManageMolds();
     loadShiftState(false);
+    document.getElementById('modal-khuon-manage').classList.add('open');
   } catch (e) { onError(e); }
 }
 
