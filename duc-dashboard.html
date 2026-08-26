@@ -3864,7 +3864,8 @@ function _renderKhuonManageMoldsList(molds, issuesByMold){
             '<td><div style="color:' + (statusColor[m.trang_thai_khuon] || '') + ';font-weight:600">' + escapeHtml(m.trang_thai_khuon) + '</div>' + issueBadge + '</td>' +
             '<td style="white-space:nowrap">' +
               '<button class="btn-tiny" onclick=\'openMoldConfigureModal(' + JSON.stringify(m) + ')\'>✏ Sửa</button> ' +
-              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button>' +
+              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button> ' +
+              '<button class="btn-tiny" style="color:#B91C1C;border-color:#FCA5A5" onclick="deleteKhuonPrompt(' + JSON.stringify(m.ma_khuon) + ')">🗑 Xoá</button>' +
             '</td>' +
           '</tr>';
       }).join('') +
@@ -3962,6 +3963,26 @@ async function submitMoldConfigure(){
     loadKhuonManageMolds();
     loadShiftState(false);
     document.getElementById('modal-khuon-manage').classList.add('open');
+  } catch (e) { onError(e); }
+}
+
+// Xoá khuôn thừa/không dùng khỏi sổ đời khuôn (duc_xoa_khuon) — chỉ xoá khỏi
+// danh sách chọn, KHÔNG đụng lịch sử/audit trail đã có (log bảo dưỡng, vấn đề
+// khuôn, hàng NG, tem cũ). Bị chặn nếu khuôn đang gán cho trạm đang chạy hoặc
+// có trong kế hoạch tuần hiện tại/tương lai — xem migration_phase_D36.
+async function deleteKhuonPrompt(maKhuon){
+  if (!(await ensureAuth())) return;
+  if (!confirm('Xoá khuôn "' + maKhuon + '" khỏi danh sách chọn?\n\n' +
+    'Chỉ xoá được khuôn không đang gán cho trạm nào và không có trong kế hoạch tuần hiện tại/tương lai.\n' +
+    'Lịch sử bảo dưỡng/vấn đề/hàng NG/tem cũ (nếu có) vẫn được giữ nguyên.')) return;
+  showOverlay('Đang xoá khuôn...');
+  try {
+    await rpcWrite('duc_xoa_khuon', { p_ma_khuon: maKhuon, p_user: state.user });
+    hideOverlay();
+    showToast('✓ Đã xoá khuôn ' + maKhuon);
+    state.khuonManageMoldsCache = null;
+    loadKhuonManageMolds();
+    loadShiftState(false);
   } catch (e) { onError(e); }
 }
 
