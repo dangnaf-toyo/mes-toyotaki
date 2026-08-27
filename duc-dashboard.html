@@ -1950,20 +1950,29 @@ async function fetchShiftState(){
     return out;
   });
 
-  // Sự cố (log) lấy theo (ma_may, ngay) của từng dòng đang hoạt động — KHÔNG
-  // ép thêm đúng ca, vì máy có thể đã sang ca kế tiếp (dòng row_seq mới hơn)
-  // mà ca trước đó CHƯA kết ca chính thức (vd DC 6/DC 11 tự chuyển Ca 1→Ca 2
-  // giữa ngày) — nếu lọc cứng theo ca hiện tại, sự cố ghi ở ca trước trong
-  // cùng ngày sẽ "biến mất" khỏi cột dù dữ liệu gốc vẫn còn nguyên trong
-  // duc_su_co_log. Lọc theo cả ngày của máy đó là đủ an toàn vì chip hiển thị
-  // vẫn tự lọc thêm theo đúng ma_sp của dòng đang xem (xem makeRowHTML).
+  // Sự cố (log) lấy theo (ma_may, ngay) của từng dòng đang hoạt động, sau đó
+  // GIỮ 1 sự cố nếu (a) (ngay,ca) của sự cố CHƯA kết ca chính thức — máy có
+  // thể đã tự chuyển sang ca kế tiếp (dòng row_seq mới hơn) mà ca trước đó
+  // CHƯA kết ca (vd DC 6/DC 11 tự chuyển Ca 1→Ca 2 giữa ngày, xem 973336c)
+  // nên sự cố ghi ở ca trước vẫn phải hiện đủ — HOẶC (b) ca của sự cố khớp
+  // đúng ca THẬT hiện tại của máy đó (activeTriples, KHÔNG phải ca chọn ở
+  // header, vì máy có thể đã đổi phương án ca qua duc_doi_phuong_an_ca — D39).
+  // Nếu bỏ điều kiện (b): khi 1 ca ĐÃ kết ca đàng hoàng (đóng sổ) mà máy chạy
+  // tiếp cùng mã SP sang ca mới, sự cố cũ của ca đã đóng vẫn lẫn vào cột "Sự
+  // cố đã xử lý" của ca mới (phát hiện thực tế DC4-DC8 sáng 27/08/2026: Ca
+  // ngày đã kết ca xong mà sự cố vẫn hiện ở dòng Ca đêm).
+  const activeCaByMachine = {};
+  activeTriples.forEach(t => { activeCaByMachine[t.ma_may] = t.ca; });
   let incRaw = [];
   const shiftDays = Array.from(new Set(activeTriples.map(t => t.ma_may + '|' + t.ngay)));
   if (shiftDays.length) {
     const orInc = shiftDays.map(p => { const [ma_may, ngay] = p.split('|'); return `and(ma_may.eq.${ma_may},ngay.eq.${ngay})`; }).join(',');
     const { data, error } = await sb.from('duc_su_co_log').select('*').or(orInc);
     if (error) throw new Error(error.message);
-    incRaw = data || [];
+    incRaw = (data || []).filter(i => {
+      if (!ketCaSet.has(i.ngay + '|' + i.ca)) return true;         // ca chưa kết ca — giữ nguyên (case 973336c)
+      return i.ca === activeCaByMachine[i.ma_may];                  // ca đã kết ca — chỉ giữ nếu đúng ca đang chạy
+    });
   }
   const incidents = incRaw.map(i => Object.assign({}, i, {
     thoi_gian_dung_phut: Math.round(Number(i.thoi_gian_dung_phut) || 0),
