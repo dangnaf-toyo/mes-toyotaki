@@ -551,7 +551,7 @@ async function loadBoard(){
       getActiveIdDongSet(),
       sb.from('duc_ipqc_checkpoint').select('*').gte('thoi_diem_tao', cutoff),
       sb.rpc('duc_get_ipqc_periodic_due'),
-      sb.from('duc_su_co_log').select('id_su_co,van_de,thoi_gian_dung_phut').not('id_su_co', 'is', null),
+      sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,van_de,thoi_gian_dung_phut').gte('gio_phat_sinh', new Date(Date.now() - 3 * 24 * 3600000).toISOString()),
     ]);
     if (cpRes.error) throw new Error(cpRes.error.message);
     if (dinhKyRes.error) throw new Error(dinhKyRes.error.message);
@@ -632,13 +632,21 @@ function incidentIdForRow(d){
   if (d.ket_qua === 'NG') return reconstructIdSuCo(d.ma_may, d.thoi_diem_kiem_thuc_te);
   return '';
 }
-// map { id_su_co -> { phut: tổng phút dừng, mo_ta } } từ duc_su_co_log
+// map { id_su_co -> { phut: tổng phút dừng, mo_ta } } từ duc_su_co_log.
+// ~1/5 dòng F1 (sự cố IPQC tự mở) trong log có id_su_co = null dù đã chốt giờ
+// dừng — dựng lại mã từ (máy, giờ phát sinh) theo đúng công thức
+// duc_make_id_su_co để badge NG vẫn tra được. Sự cố bị cắt qua nhiều ca thì
+// chỉ đoạn đầu (giờ phát sinh gốc) khớp lại được.
 function buildSuCoPhutDungMap(rows){
   const m = {};
+  const add = (key, r) => {
+    if (!key) return;
+    if (!m[key]) m[key] = { phut: 0, mo_ta: r.van_de || '' };
+    m[key].phut += Number(r.thoi_gian_dung_phut) || 0;
+  };
   (rows || []).forEach(r => {
-    if (!r.id_su_co) return;
-    if (!m[r.id_su_co]) m[r.id_su_co] = { phut: 0, mo_ta: r.van_de || '' };
-    m[r.id_su_co].phut += Number(r.thoi_gian_dung_phut) || 0;
+    if (r.id_su_co) add(r.id_su_co, r);
+    else add(reconstructIdSuCo(r.ma_may, r.gio_phat_sinh), r);
   });
   return m;
 }
@@ -813,7 +821,7 @@ async function searchHistory(){
   if (ketQua) q = q.eq('ket_qua', ketQua);
   const [{ data, error }, scRes] = await Promise.all([
     q,
-    sb.from('duc_su_co_log').select('id_su_co,van_de,thoi_gian_dung_phut').not('id_su_co', 'is', null),
+    sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,van_de,thoi_gian_dung_phut'),
   ]);
   if (error) return;
   state.suCoPhutDungMap = buildSuCoPhutDungMap(scRes && scRes.data);
