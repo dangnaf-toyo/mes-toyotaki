@@ -1322,12 +1322,14 @@ const LS_KEYS = {
   PHUONG_AN_CA: 'dashduc_phuong_an_ca',
   CA: 'dashduc_ca',
   TRUONG_CA: 'dashduc_truong_ca',
+  SEL_AT: 'dashduc_sel_at',
 };
 function saveSelection() {
   try {
     localStorage.setItem(LS_KEYS.PHUONG_AN_CA, state.phuongAnCa || '');
     localStorage.setItem(LS_KEYS.CA, state.ca || '');
     localStorage.setItem(LS_KEYS.TRUONG_CA, document.getElementById('sel-truong-ca').value || '');
+    localStorage.setItem(LS_KEYS.SEL_AT, new Date().toISOString());
   } catch (e) {}
 }
 function loadSelection() {
@@ -1336,6 +1338,7 @@ function loadSelection() {
       phuong_an_ca: localStorage.getItem(LS_KEYS.PHUONG_AN_CA) || null,
       ca: localStorage.getItem(LS_KEYS.CA) || null,
       truong_ca: localStorage.getItem(LS_KEYS.TRUONG_CA) || null,
+      saved_at: localStorage.getItem(LS_KEYS.SEL_AT) || null,
     };
   } catch (e) { return {}; }
 }
@@ -1514,10 +1517,17 @@ function populateHeader(suggested){
 
   updateCaDropdown();
   const validCas = (state.shiftPlans[paSel.value] || []).map(c => c.ca);
-  if (saved.ca && validCas.includes(saved.ca)) {
+  // Chỉ khôi phục "ca" đã lưu nếu lưu TRONG NGÀY HÔM NAY — nếu không, ca lưu
+  // từ hôm trước (vd để "Ca đêm" tối qua) sẽ đè lên ca đúng theo đồng hồ và
+  // khiến kế hoạch thêm mới bị gắn nhầm ca (xem migration D46).
+  const savedCaFresh = saved.ca && saved.saved_at &&
+    new Date(saved.saved_at).toDateString() === new Date().toDateString();
+  if (savedCaFresh && validCas.includes(saved.ca)) {
     document.getElementById('sel-ca').value = saved.ca;
   } else if (suggested && validCas.includes(suggested.ca)) {
     document.getElementById('sel-ca').value = suggested.ca;
+  } else if (saved.ca && validCas.includes(saved.ca)) {
+    document.getElementById('sel-ca').value = saved.ca;
   }
 
   const ngayInput = document.getElementById('sel-ngay');
