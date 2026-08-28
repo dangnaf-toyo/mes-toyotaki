@@ -228,6 +228,15 @@ tr:last-child td{border-bottom:none}
             <label>Người kiểm</label>
             <select id="fl-nguoi-kiem" onchange="searchHistory()"><option value="">Tất cả</option></select>
           </div>
+          <div class="filter-field">
+            <label>Kết quả</label>
+            <select id="fl-ket-qua" onchange="searchHistory()">
+              <option value="">Tất cả</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+              <option value="CANH_BAO">Cảnh báo</option>
+            </select>
+          </div>
           <button class="btn btn-primary" onclick="searchHistory()">🔍 Tra cứu</button>
         </div>
       </div>
@@ -421,7 +430,7 @@ tr:last-child td{border-bottom:none}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
-const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
+const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
 
 function switchTab(tab){
   document.getElementById('tab-monitor').classList.toggle('active', tab === 'monitor');
@@ -538,13 +547,15 @@ function mapIpqcDoneRow(r){
 async function loadBoard(){
   try {
     const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
-    const [activeSet, cpRes, dinhKyRes] = await Promise.all([
+    const [activeSet, cpRes, dinhKyRes, scRes] = await Promise.all([
       getActiveIdDongSet(),
       sb.from('duc_ipqc_checkpoint').select('*').gte('thoi_diem_tao', cutoff),
       sb.rpc('duc_get_ipqc_periodic_due'),
+      sb.from('duc_su_co_log').select('id_su_co,van_de,thoi_gian_dung_phut').not('id_su_co', 'is', null),
     ]);
     if (cpRes.error) throw new Error(cpRes.error.message);
     if (dinhKyRes.error) throw new Error(dinhKyRes.error.message);
+    state.suCoPhutDungMap = buildSuCoPhutDungMap(scRes && scRes.data);
 
     const now = Date.now();
     const PRIORITY = { sau_su_co: 0, doi_khuon: 0, dinh_ky: 1 };
@@ -597,6 +608,41 @@ function levelForMinutes(m){
   return '';
 }
 
+// Chuẩn hoá tên máy giống hàm SQL duc_normalize_name (bỏ dấu, đ→d, bỏ khoảng trắng)
+function normNameForId(s){
+  return String(s == null ? '' : s)
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '');
+}
+// Dựng lại mã sự cố "SC-<máy>-<MMDD>-<HH24MI>" (giờ VN) — cùng công thức
+// duc_make_id_su_co: khi IPQC chấm NG cho lần kiểm định kỳ, hệ thống tự mở sự
+// cố F1 với mã sinh từ (máy, thời điểm kiểm) nên tái tạo được từ dòng lịch sử.
+function reconstructIdSuCo(maMay, iso){
+  if (!maMay || !iso) return '';
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(iso));
+  const g = t => (parts.find(p => p.type === t) || {}).value || '';
+  const hh = g('hour') === '24' ? '00' : g('hour');
+  return 'SC-' + normNameForId(maMay) + '-' + g('month') + g('day') + '-' + hh + g('minute');
+}
+// Mã sự cố gắn với 1 lần kiểm: ưu tiên id_su_co_goc (kiểm sau sự cố / đổi
+// khuôn), nếu không có mà kết quả NG thì dựng lại mã sự cố F1 tự mở.
+function incidentIdForRow(d){
+  if (d.id_su_co_goc) return d.id_su_co_goc;
+  if (d.ket_qua === 'NG') return reconstructIdSuCo(d.ma_may, d.thoi_diem_kiem_thuc_te);
+  return '';
+}
+// map { id_su_co -> { phut: tổng phút dừng, mo_ta } } từ duc_su_co_log
+function buildSuCoPhutDungMap(rows){
+  const m = {};
+  (rows || []).forEach(r => {
+    if (!r.id_su_co) return;
+    if (!m[r.id_su_co]) m[r.id_su_co] = { phut: 0, mo_ta: r.van_de || '' };
+    m[r.id_su_co].phut += Number(r.thoi_gian_dung_phut) || 0;
+  });
+  return m;
+}
+
 function doneRowHtml(d){
   // NG/Cảnh báo — hạng mục checklist không đạt + ghi chú IPQC ghép ngay vào
   // cột "Liên kết" (thay vì tách dòng riêng), để không phải mở lại từng bản
@@ -611,6 +657,20 @@ function doneRowHtml(d){
   const ipqcNote = (d.ket_qua !== 'OK' && ipqcNoteParts.length)
     ? '<span class="pill warn" title="' + escapeHtml(ipqcNoteParts.join(' — ')) + '">🔻 Chi tiết</span>'
     : '';
+  // Mã sự cố + số phút dừng chuyền do vấn đề chất lượng này gây ra. Với NG:
+  // tra tổng thời_gian_dừng_phút theo mã sự cố; sự cố chưa kết thúc thì chưa
+  // có bản ghi trong duc_su_co_log nên hiển thị "chưa chốt giờ dừng".
+  const incId = incidentIdForRow(d);
+  let scBadge = '';
+  if (d.ket_qua === 'NG' && incId) {
+    const info = state.suCoPhutDungMap[incId] || null;
+    const dungTxt = !info ? 'chưa chốt giờ dừng'
+      : (info.phut > 0 ? info.phut + ' phút dừng' : 'không phát sinh dừng');
+    const tip = 'Sự cố ' + incId + (info && info.mo_ta ? ' — ' + info.mo_ta : '') + ' · thời gian dừng chuyền do vấn đề chất lượng này';
+    scBadge = '<span class="pill ng" title="' + escapeHtml(tip) + '">⛔ ' + escapeHtml(incId) + ' · ' + escapeHtml(dungTxt) + '</span>';
+  } else if (incId) {
+    scBadge = '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(incId) + '">SC: ' + escapeHtml(incId) + '</span>';
+  }
   return `<tr>
     <td class="mono">${d.thoi_diem_kiem_thuc_te ? new Date(d.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
     <td><b>${escapeHtml(d.ma_may)}</b></td>
@@ -622,10 +682,10 @@ function doneRowHtml(d){
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
       ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
-      ${d.id_su_co_goc ? '<span class="pill neutral" title="Kiểm sau sự cố ' + escapeHtml(d.id_su_co_goc) + '">SC: ' + escapeHtml(d.id_su_co_goc) + '</span>' : ''}
+      ${scBadge}
       ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
       ${ipqcNote}
-      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !d.id_su_co_goc && !ipqcNote ? '—' : ''}
+      ${(!d.anh_bang_chung_urls || !d.anh_bang_chung_urls.length) && !d.id_van_de_lien_quan && !scBadge && !ipqcNote ? '—' : ''}
     </td>
   </tr>`;
 }
@@ -744,13 +804,19 @@ async function searchHistory(){
   const maMay = document.getElementById('fl-ma-may').value;
   const maSp = document.getElementById('fl-ma-sp').value;
   const nguoiKiem = document.getElementById('fl-nguoi-kiem').value;
+  const ketQua = document.getElementById('fl-ket-qua').value;
 
   let q = sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'da_kiem');
   if (maMay) q = q.eq('ma_may', maMay);
   if (maSp) q = q.eq('ma_sp', maSp);
   if (nguoiKiem) q = q.eq('nguoi_kiem', nguoiKiem);
-  const { data, error } = await q;
+  if (ketQua) q = q.eq('ket_qua', ketQua);
+  const [{ data, error }, scRes] = await Promise.all([
+    q,
+    sb.from('duc_su_co_log').select('id_su_co,van_de,thoi_gian_dung_phut').not('id_su_co', 'is', null),
+  ]);
   if (error) return;
+  state.suCoPhutDungMap = buildSuCoPhutDungMap(scRes && scRes.data);
 
   let list = (data || []).map(mapIpqcDoneRow);
   if (!state.dynamicFiltersLoaded) { populateDynamicFilterOptions(list); state.dynamicFiltersLoaded = true; }
