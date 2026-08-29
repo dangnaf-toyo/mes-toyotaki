@@ -1014,6 +1014,7 @@ document.getElementById('btnTaiMauExcel').addEventListener('click', async () => 
 async function buildTemplateExcel(){
   const isDuc = activeTab === 'Đúc';
   const wb = new ExcelJS.Workbook();
+  const guide = wb.addWorksheet('Hướng dẫn sử dụng');
   const ws = wb.addWorksheet(activeTab);
   const dm = wb.addWorksheet('_DM'); dm.state = 'veryHidden';
 
@@ -1056,8 +1057,16 @@ async function buildTemplateExcel(){
   const mayRange = "'_DM'!$A$2:$A$" + (machines.length + 1);
   const spRange  = "'_DM'!$C$2:$C$" + (sps.length + 1);
 
+  const lastColN = isDuc ? 12 : 10;
+
   // map mã SP -> danh sách khuôn, để đặt dropdown khuôn CHÍNH XÁC cho dòng có sẵn
   for (let r = firstData; r <= lastData; r++) {
+    // Mở khoá mọi ô người dùng được sửa; riêng cột "Tên SP" giữ khoá (công
+    // thức VLOOKUP) — bảo vệ sheet phía dưới sẽ chặn xoá/sửa nhầm nó.
+    for (let c = 1; c <= lastColN; c++) {
+      ws.getCell(colLetter(c) + r).protection = { locked: colLetter(c) === tenCol };
+    }
+
     if (isDuc) {
       ws.getCell('A' + r).dataValidation = { type: 'list', allowBlank: true, formulae: [mayRange] };
     }
@@ -1107,6 +1116,19 @@ async function buildTemplateExcel(){
   sps.forEach(sp => ref.addRow([sp, productMap[sp] || '', (moldsByProduct[sp] || []).join(', ')]));
   ref.getColumn(1).width = 16; ref.getColumn(2).width = 28; ref.getColumn(3).width = 20;
 
+  // ── Khoá sheet nhập liệu: chỉ chặn sửa/xoá ô đã khoá (cột Tên SP + tiêu đề),
+  //    mọi ô khác vẫn nhập bình thường. Không đặt mật khẩu → ai cần sửa cứ
+  //    Review ▸ Unprotect Sheet (bỏ trống mật khẩu). ──
+  await ws.protect('', {
+    selectLockedCells: true, selectUnlockedCells: true,
+    formatCells: true, formatColumns: true, formatRows: true,
+    insertRows: true, insertColumns: false, deleteRows: true, deleteColumns: false,
+    sort: true, autoFilter: true, pivotTables: false
+  });
+
+  // ── Sheet "Hướng dẫn sử dụng" ──
+  await buildGuideSheet(guide, isDuc);
+
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
@@ -1115,6 +1137,60 @@ async function buildTemplateExcel(){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   showMsg('✓ Đã tải file mẫu — mở bằng Excel, các ô Mã máy / Mã SP / Số khuôn có sẵn dropdown để chọn.', 'ok', 5000);
+}
+
+async function buildGuideSheet(guide, isDuc){
+  guide.getColumn(1).width = 4;
+  guide.getColumn(2).width = 112;
+  guide.views = [{ showGridLines: false }];
+  const P = (txt, opt) => {
+    const row = guide.addRow(['', txt]);
+    const cell = row.getCell(2);
+    cell.alignment = { wrapText: true, vertical: 'top' };
+    if (opt && opt.bold) cell.font = { bold: true, size: opt.size || 11 };
+    if (opt && opt.title) cell.font = { bold: true, size: 15, color: { argb: 'FF1F5FA5' } };
+    if (opt && opt.head) { cell.font = { bold: true, size: 12 }; }
+    return row;
+  };
+  P('HƯỚNG DẪN NHẬP KẾ HOẠCH SẢN XUẤT TUẦN BẰNG EXCEL', { title: true });
+  P('File tạo cho: tab "' + activeTab + '" · tuần bắt đầu ' + fmtDate(weekMonday) + ' (Thứ Hai).');
+  P('');
+  P('1. CÁCH ĐIỀN', { head: true });
+  P('• Cột "Mã máy"' + (isDuc ? '' : ' (không có ở tab này)') + ' và "Mã SP": bấm vào ô → chọn từ danh sách xổ xuống (dropdown).');
+  P('• Cột "Tên SP (tự điền)": TỰ HIỆN theo Mã SP bằng công thức — không cần gõ. Ô này đã KHOÁ để tránh xoá nhầm công thức.');
+  if (isDuc) {
+    P('• Cột "Số khuôn": chọn từ dropdown.');
+    P('    – Mã SP chỉ có 1 khuôn → ô đã điền sẵn khuôn đó.');
+    P('    – Mã SP có từ 2 khuôn trở lên → dropdown chỉ cho chọn trong đúng các khuôn của SP đó.');
+    P('    – Với dòng trống bạn tự thêm: chọn Mã SP trước, rồi bấm ô Số khuôn — dropdown sẽ lọc theo SP vừa chọn.');
+  }
+  P('• Cột T2…CN: nhập SỐ LƯỢNG kế hoạch từng ngày (số nguyên ≥ 0). Để trống = 0.');
+  P('• Cột "Ghi chú": tuỳ chọn.');
+  P('• KH tuần KHÔNG cần nhập — hệ thống tự cộng T2…CN khi nhập lên web.');
+  P('');
+  P('2. THÊM DÒNG MỚI', { head: true });
+  P('• File đã chừa sẵn 60 dòng trống (đã gắn dropdown) bên dưới phần kế hoạch hiện có — điền tiếp vào đó.');
+  P('• Nếu cần nhiều hơn: copy 1 dòng trống đã có dropdown rồi dán xuống.');
+  P('');
+  P('3. NHỮNG ĐIỀU KHÔNG ĐƯỢC LÀM', { head: true });
+  P('• KHÔNG đổi tên các tiêu đề cột (dòng 1) — hệ thống nhập dữ liệu theo TÊN cột, không theo vị trí.');
+  P('• KHÔNG xoá / đổi tên sheet ẩn "_DM" — nó chứa dữ liệu cho các dropdown.');
+  P('• KHÔNG cần sửa cột "Tên SP" — nếu thật sự cần: Review ▸ Unprotect Sheet (không có mật khẩu, cứ bấm OK).');
+  P('');
+  P('4. LƯU Ý TƯƠNG THÍCH', { head: true });
+  P('• Mở file bằng MICROSOFT EXCEL BẢN MÁY TÍNH. Dropdown "Số khuôn" ở dòng trống dùng hàm INDIRECT — KHÔNG hoạt động trên Google Sheets, LibreOffice hay trình xem online.');
+  P('• Các dropdown Mã máy / Mã SP và dropdown khuôn ở dòng có sẵn thì chạy ở mọi nơi.');
+  P('');
+  P('5. NHẬP LÊN HỆ THỐNG', { head: true });
+  P('• Lưu file (giữ định dạng .xlsx).');
+  P('• Vào web "Kế hoạch tuần" → chọn đúng TUẦN cần nhập (thanh chọn tuần ở đầu trang) → mở đúng TAB (' + activeTab + ') → bấm "📥 Nhập từ Excel" → chọn file.');
+  P('• Tuần áp dụng lấy theo tuần đang chọn TRÊN WEB, không lấy từ file.');
+  P('• Dòng trùng (cùng Mã máy + Mã SP' + (isDuc ? '' : ' / cùng Mã SP') + ') sẽ GHI ĐÈ kế hoạch cũ của tuần đó.');
+  P('• Nếu kế hoạch tuần đã gửi duyệt / đã duyệt: nhập Excel sẽ hỏi lý do và đưa kế hoạch quay lại quy trình duyệt từ đầu.');
+  P('• Kiểm tra khi nhập: Mã SP phải có trong danh mục; Số khuôn (nếu ghi) phải đúng khuôn khai báo của Mã SP; thiếu Số khuôn mà SP nhiều khuôn → báo lỗi dòng đó.');
+
+  // giữ nguyên khoá mặc định (locked) cho toàn sheet hướng dẫn
+  await guide.protect('', { selectLockedCells: true, selectUnlockedCells: true });
 }
 
 document.getElementById('btnNhapExcel').addEventListener('click', async () => {
