@@ -424,9 +424,20 @@ function wire(){
   document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
   document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
   document.getElementById('tagInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); ghiNhan(e.target.value); }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var v = e.target.value;
+    e.target.value = '';               // xoá ngay: ký tự còn lại của chuỗi QR
+                                        // (máy quét gõ tiếp sau Enter) không dồn vào
+    if (!v.replace(/\s+/g, '')) return;
+    var now = Date.now();
+    if (now - lastScanSubmitAt < 1500) return;  // gộp nhiều Enter máy quét gửi liền
+                                                 // nhau (QR có \n giữa các trường)
+    lastScanSubmitAt = now;
+    ghiNhan(v);
   });
 }
+var lastScanSubmitAt = 0;
 
 boot();
 </script>
