@@ -274,8 +274,12 @@ function refreshDoiMayIndicator(){
 }
 
 // ── Ghi nhận 1 tem ─────────────────────────────────────────────────────────
-async function ghiNhan(tagNo){
-  tagNo = String(tagNo || '').trim();
+async function ghiNhan(raw){
+  // Chấp nhận cả CHUỖI QR ĐẦY ĐỦ (tag_no>ten_sp>ma_sp>…) lẫn Tag No trần:
+  // máy quét QR cắm rời (keyboard-wedge) "gõ" nguyên payload vào ô nhập tay,
+  // thường kèm ký tự '>' và xuống dòng → phải cắt lấy token đầu, bỏ mọi
+  // khoảng trắng/xuống dòng. (Giống bước xử lý ở onScanSuccess.)
+  var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
   if (busy) return;
   busy = true;
