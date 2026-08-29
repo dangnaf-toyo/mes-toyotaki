@@ -237,15 +237,6 @@ textarea{resize:vertical;min-height:48px}
           <input id="k_ngay" type="date" onchange="onKanbanKhsx()">
         </div>
         <div class="fg">
-          <label class="req" for="k_ca">Ca</label>
-          <select id="k_ca">
-            <option value="Ca ngày">Ca ngày</option>
-            <option value="Ca đêm">Ca đêm</option>
-            <option value="Ca 1">Ca 1</option>
-            <option value="Ca 2">Ca 2</option>
-          </select>
-        </div>
-        <div class="fg">
           <label for="k_slChuan">Số lượng / thùng (theo danh mục)</label>
           <input id="k_slChuan" type="text" placeholder="Chọn mã SP — tự lấy theo danh mục" disabled>
         </div>
@@ -931,7 +922,7 @@ function clearKanban(){
 
 async function taoLoKanban(){
   if (!(await requireLoginOrRedirect())) return;
-  var may = g('k_mayDuc'), ma = g('k_maSP'), ngay = g('k_ngay'), ca = g('k_ca');
+  var may = g('k_mayDuc'), ma = g('k_maSP'), ngay = g('k_ngay');
   var soThung = g('k_soThung'), slCuoi = g('k_slThungCuoi');
   var soKhuon = g('k_soKhuon'), nguyenLieu = g('k_nguyenLieu');
   var slThung = kanbanSlThung();
@@ -952,7 +943,7 @@ async function taoLoKanban(){
   showMsg('⏳ Đang sinh ' + soThung + ' tem chỉ thị…', 'wait');
   try {
     var res = await sb.rpc('duc_tao_lo_kanban', {
-      p_ma_may: may, p_ma_sp: ma, p_ngay: ngay, p_ca: ca,
+      p_ma_may: may, p_ma_sp: ma, p_ngay: ngay, p_ca: null,
       p_so_thung: Number(soThung), p_sl_thung: slThung || null,
       p_sl_thung_cuoi: slCuoi ? Number(slCuoi) : null,
       p_so_khuon: soKhuon || null, p_nguyen_lieu: nguyenLieu || null, p_nguoi: nguoi,
@@ -1102,8 +1093,6 @@ function openPrintMulti(dList){
 document.addEventListener('DOMContentLoaded', () => {
   var kn = document.getElementById('k_ngay');
   if (kn && !kn.value) kn.value = getTodayString();
-  var kca = document.getElementById('k_ca');
-  if (kca){ var h = new Date().getHours(); kca.value = (h >= 6 && h < 18) ? 'Ca ngày' : 'Ca đêm'; }
 });
 
 // =============================================================================
