@@ -989,8 +989,8 @@ async function deleteRowCd(id){
 // =============================================================================
 const DAY_COLS = ['T2','T3','T4','T5','T6','T7','CN'];
 
-function buildTemplateHeader(){
-  return activeTab === 'Đúc'
+function buildTemplateHeader(isDuc){
+  return isDuc
     ? ['Mã máy', 'Mã SP', 'Tên SP (tự điền)', 'Số khuôn', ...DAY_COLS, 'Ghi chú']
     : ['Mã SP', 'Tên SP (tự điền)', ...DAY_COLS, 'Ghi chú'];
 }
@@ -1012,16 +1012,14 @@ document.getElementById('btnTaiMauExcel').addEventListener('click', async () => 
 });
 
 async function buildTemplateExcel(){
-  const isDuc = activeTab === 'Đúc';
   const wb = new ExcelJS.Workbook();
   const guide = wb.addWorksheet('Hướng dẫn sử dụng');
-  const ws = wb.addWorksheet(activeTab);
   const dm = wb.addWorksheet('_DM'); dm.state = 'veryHidden';
 
   const machines = machineList.slice();
   const sps = Object.keys(productMap).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
 
-  // ── _DM: A = máy · C/D = mã SP / tên SP · F = mã SP, G.. = các khuôn của SP đó ──
+  // ── _DM (dùng chung mọi sheet): A = máy · C/D = mã SP / tên SP · F = mã SP, G.. = khuôn ──
   dm.getCell('A1').value = 'MÁY';
   machines.forEach((m, i) => dm.getCell('A' + (i + 2)).value = m);
   dm.getCell('C1').value = 'MÃ SP'; dm.getCell('D1').value = 'TÊN SP';
@@ -1037,12 +1035,38 @@ async function buildTemplateExcel(){
     mr++;
   });
 
-  // ── Sheet nhập liệu — ĐỂ TRỐNG, chỉ 1 dòng VÍ DỤ (bôi mờ) ở trên cùng ──
-  ws.addRow(buildTemplateHeader());
+  // ── 1 sheet cho MỖI bộ phận, cùng format ──
+  for (const tab of TABS) {
+    await buildDeptSheet(wb, wb.addWorksheet(tab), tab, machines, sps);
+  }
+
+  // Sheet tham khảo cho người không mở được dropdown
+  const ref = wb.addWorksheet('Danh mục (tham khảo)');
+  ref.addRow(['Mã máy']); machines.forEach(m => ref.addRow([m]));
+  ref.addRow([]); ref.addRow(['Mã SP', 'Tên SP', 'Khuôn hợp lệ']);
+  sps.forEach(sp => ref.addRow([sp, productMap[sp] || '', (moldsByProduct[sp] || []).join(', ')]));
+  ref.getColumn(1).width = 16; ref.getColumn(2).width = 28; ref.getColumn(3).width = 20;
+
+  await buildGuideSheet(guide);
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mau-khsx-tuan-' + fmtDate(weekMonday) + '.xlsx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  showMsg('✓ Đã tải file mẫu (có sheet riêng cho từng bộ phận) — mở bằng Excel, chọn sheet của bộ phận bạn, các ô Mã máy / Mã SP / Số khuôn có sẵn dropdown.', 'ok', 6000);
+}
+
+// Dựng 1 sheet nhập liệu (cùng format) cho 1 bộ phận. Đúc có thêm cột Mã máy +
+// Số khuôn; các bộ phận khác chỉ Mã SP + sản lượng.
+async function buildDeptSheet(wb, ws, tab, machines, sps){
+  const isDuc = tab === 'Đúc';
+  ws.addRow(buildTemplateHeader(isDuc));
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).alignment = { vertical: 'middle' };
 
-  // dòng ví dụ: chọn 1 mã SP có khuôn (ưu tiên SP đúng 1 khuôn) để minh hoạ
   const exSp = Object.keys(moldsByProduct).find(sp => moldsByProduct[sp].length === 1)
     || Object.keys(moldsByProduct)[0] || sps[0] || '';
   const exMold = (moldsByProduct[exSp] || [])[0] || '';
@@ -1053,30 +1077,21 @@ async function buildTemplateExcel(){
     : [exSp, null, 200, 200, 200, 200, 200, 0, 0, EXAMPLE_MARK];
   ws.addRow(exRow);
 
-  const firstData = 2;
-  const exampleRow = 2;
+  const firstData = 2, exampleRow = 2;
   const lastData = firstData + 1 + 60 - 1; // 1 dòng ví dụ + 60 dòng trống
-
-  const spCol   = isDuc ? 'B' : 'A';
-  const tenCol  = isDuc ? 'C' : 'B';
-  const khuonCol = 'D';
-  const dayStartCol = isDuc ? 5 : 3; // E.. / C..
+  const spCol = isDuc ? 'B' : 'A';
+  const tenCol = isDuc ? 'C' : 'B';
+  const dayStartCol = isDuc ? 5 : 3;
+  const lastColN = isDuc ? 12 : 10;
   const mayRange = "'_DM'!$A$2:$A$" + (machines.length + 1);
   const spRange  = "'_DM'!$C$2:$C$" + (sps.length + 1);
 
-  const lastColN = isDuc ? 12 : 10;
-
-  // map mã SP -> danh sách khuôn, để đặt dropdown khuôn CHÍNH XÁC cho dòng có sẵn
   for (let r = firstData; r <= lastData; r++) {
-    // Mở khoá mọi ô người dùng được sửa; riêng cột "Tên SP" giữ khoá (công
-    // thức VLOOKUP) — bảo vệ sheet phía dưới sẽ chặn xoá/sửa nhầm nó.
+    // mở khoá mọi ô trừ cột "Tên SP" (giữ công thức VLOOKUP khỏi bị xoá nhầm)
     for (let c = 1; c <= lastColN; c++) {
       ws.getCell(colLetter(c) + r).protection = { locked: colLetter(c) === tenCol };
     }
-
-    if (isDuc) {
-      ws.getCell('A' + r).dataValidation = { type: 'list', allowBlank: true, formulae: [mayRange] };
-    }
+    if (isDuc) ws.getCell('A' + r).dataValidation = { type: 'list', allowBlank: true, formulae: [mayRange] };
     ws.getCell(spCol + r).dataValidation = { type: 'list', allowBlank: true, formulae: [spRange] };
     ws.getCell(tenCol + r).value = { formula: 'IFERROR(VLOOKUP(' + spCol + r + ",'_DM'!$C:$D,2,FALSE),\"\")" };
 
@@ -1084,17 +1099,14 @@ async function buildTemplateExcel(){
       const spVal = ws.getCell('B' + r).value;
       const molds = (typeof spVal === 'string' && moldsByProduct[spVal]) || null;
       if (molds && molds.length === 1) {
-        // 1 khuôn → điền sẵn mặc định
         if (ws.getCell('D' + r).value == null) ws.getCell('D' + r).value = molds[0];
         ws.getCell('D' + r).dataValidation = { type: 'list', allowBlank: true, formulae: ['"' + molds.join(',') + '"'] };
       } else if (molds && molds.length > 1) {
-        // ≥2 khuôn → chỉ chọn trong các khuôn đó (danh sách cố định cho dòng này)
         ws.getCell('D' + r).dataValidation = {
           type: 'list', allowBlank: true, formulae: ['"' + molds.join(',') + '"'],
           showErrorMessage: true, errorTitle: 'Sai khuôn', error: 'Chỉ chọn khuôn thuộc mã SP ở cột B'
         };
       } else {
-        // dòng trống (chưa chọn SP) → dropdown khuôn phụ thuộc SP qua INDIRECT
         ws.getCell('D' + r).dataValidation = {
           type: 'list', allowBlank: true,
           formulae: ['INDIRECT("k_"&SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(' + 'B' + r + ',"-","_")," ","_"),".","_"),"/","_"))'],
@@ -1102,8 +1114,6 @@ async function buildTemplateExcel(){
         };
       }
     }
-
-    // T2..CN: số nguyên ≥ 0
     for (let c = 0; c < DAY_COLS.length; c++) {
       ws.getCell(colLetter(dayStartCol + c) + r).dataValidation = {
         type: 'whole', operator: 'greaterThanOrEqual', allowBlank: true, formulae: [0]
@@ -1111,49 +1121,25 @@ async function buildTemplateExcel(){
     }
   }
 
-  // Bôi mờ dòng ví dụ (chữ xám nhạt + nghiêng, nền xám nhạt)
   for (let c = 1; c <= lastColN; c++) {
     const cell = ws.getCell(colLetter(c) + exampleRow);
     cell.font = { color: { argb: 'FF9AA0A6' }, italic: true, size: 10 };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F4' } };
   }
 
-  // Độ rộng cột cho dễ nhìn
   const widths = isDuc ? [12, 16, 26, 12, 7, 7, 7, 7, 7, 7, 7, 24] : [16, 26, 7, 7, 7, 7, 7, 7, 7, 24];
   widths.forEach((w, i) => ws.getColumn(i + 1).width = w);
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-  // Sheet tham khảo cho người không mở được dropdown
-  const ref = wb.addWorksheet('Danh mục (tham khảo)');
-  ref.addRow(['Mã máy']); machines.forEach(m => ref.addRow([m]));
-  ref.addRow([]); ref.addRow(['Mã SP', 'Tên SP', 'Khuôn hợp lệ']);
-  sps.forEach(sp => ref.addRow([sp, productMap[sp] || '', (moldsByProduct[sp] || []).join(', ')]));
-  ref.getColumn(1).width = 16; ref.getColumn(2).width = 28; ref.getColumn(3).width = 20;
-
-  // ── Khoá sheet nhập liệu: chỉ chặn sửa/xoá ô đã khoá (cột Tên SP + tiêu đề),
-  //    mọi ô khác vẫn nhập bình thường. Không đặt mật khẩu → ai cần sửa cứ
-  //    Review ▸ Unprotect Sheet (bỏ trống mật khẩu). ──
   await ws.protect('', {
     selectLockedCells: true, selectUnlockedCells: true,
     formatCells: true, formatColumns: true, formatRows: true,
     insertRows: true, insertColumns: false, deleteRows: true, deleteColumns: false,
     sort: true, autoFilter: true, pivotTables: false
   });
-
-  // ── Sheet "Hướng dẫn sử dụng" ──
-  await buildGuideSheet(guide, isDuc);
-
-  const buf = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'mau-khsx-tuan-' + activeTab.replace(/\s+/g, '') + '-' + fmtDate(weekMonday) + '.xlsx';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  showMsg('✓ Đã tải file mẫu — mở bằng Excel, các ô Mã máy / Mã SP / Số khuôn có sẵn dropdown để chọn.', 'ok', 5000);
 }
 
-async function buildGuideSheet(guide, isDuc){
+async function buildGuideSheet(guide){
   guide.getColumn(1).width = 4;
   guide.getColumn(2).width = 112;
   guide.views = [{ showGridLines: false }];
@@ -1161,34 +1147,34 @@ async function buildGuideSheet(guide, isDuc){
     const row = guide.addRow(['', txt]);
     const cell = row.getCell(2);
     cell.alignment = { wrapText: true, vertical: 'top' };
-    if (opt && opt.bold) cell.font = { bold: true, size: opt.size || 11 };
     if (opt && opt.title) cell.font = { bold: true, size: 15, color: { argb: 'FF1F5FA5' } };
-    if (opt && opt.head) { cell.font = { bold: true, size: 12 }; }
+    if (opt && opt.head) cell.font = { bold: true, size: 12 };
     return row;
   };
   P('HƯỚNG DẪN NHẬP KẾ HOẠCH SẢN XUẤT TUẦN BẰNG EXCEL', { title: true });
-  P('File tạo cho: tab "' + activeTab + '" · tuần bắt đầu ' + fmtDate(weekMonday) + ' (Thứ Hai).');
+  P('Tuần bắt đầu ' + fmtDate(weekMonday) + ' (Thứ Hai).');
+  P('File có SHEET RIÊNG cho từng bộ phận: ' + TABS.join(' · ') + '. Mở đúng sheet của bộ phận bạn phụ trách rồi điền.');
   P('');
   P('1. CÁCH ĐIỀN', { head: true });
-  P('• Cột "Mã máy"' + (isDuc ? '' : ' (không có ở tab này)') + ' và "Mã SP": bấm vào ô → chọn từ danh sách xổ xuống (dropdown).');
+  P('• Sheet "Đúc" có cột "Mã máy" và "Số khuôn"; các sheet khác chỉ có "Mã SP" và sản lượng.');
+  P('• Cột "Mã máy" / "Mã SP": bấm vào ô → chọn từ danh sách xổ xuống (dropdown).');
   P('• Cột "Tên SP (tự điền)": TỰ HIỆN theo Mã SP bằng công thức — không cần gõ. Ô này đã KHOÁ để tránh xoá nhầm công thức.');
-  if (isDuc) {
-    P('• Cột "Số khuôn": chọn từ dropdown.');
-    P('    – Mã SP chỉ có 1 khuôn → ô đã điền sẵn khuôn đó.');
-    P('    – Mã SP có từ 2 khuôn trở lên → dropdown chỉ cho chọn trong đúng các khuôn của SP đó.');
-    P('    – Với dòng trống bạn tự thêm: chọn Mã SP trước, rồi bấm ô Số khuôn — dropdown sẽ lọc theo SP vừa chọn.');
-  }
+  P('• Cột "Số khuôn" (chỉ sheet Đúc): chọn từ dropdown.');
+  P('    – Mã SP chỉ có 1 khuôn → ô đã điền sẵn khuôn đó.');
+  P('    – Mã SP có từ 2 khuôn trở lên → dropdown chỉ cho chọn trong đúng các khuôn của SP đó.');
+  P('    – Dòng trống bạn tự thêm: chọn Mã SP trước, rồi bấm ô Số khuôn — dropdown lọc theo SP vừa chọn.');
   P('• Cột T2…CN: nhập SỐ LƯỢNG kế hoạch từng ngày (số nguyên ≥ 0). Để trống = 0.');
   P('• Cột "Ghi chú": tuỳ chọn.');
   P('• KH tuần KHÔNG cần nhập — hệ thống tự cộng T2…CN khi nhập lên web.');
   P('');
   P('2. DÒNG VÍ DỤ & THÊM DÒNG', { head: true });
-  P('• Dòng 2 (chữ xám mờ) là DÒNG VÍ DỤ minh hoạ cách điền — bạn có thể xoá, hoặc để nguyên: hệ thống tự bỏ qua khi nhập (nhận biết qua chữ "DÒNG VÍ DỤ" ở cột Ghi chú).');
-  P('• Sheet để TRỐNG sẵn ~60 dòng (đã gắn dropdown) — điền dữ liệu thật từ dòng 3 trở xuống.');
+  P('• Dòng 2 (chữ xám mờ) trong mỗi sheet là DÒNG VÍ DỤ minh hoạ cách điền — có thể xoá, hoặc để nguyên: hệ thống tự bỏ qua khi nhập (nhận biết qua chữ "DÒNG VÍ DỤ" ở cột Ghi chú).');
+  P('• Mỗi sheet để TRỐNG sẵn ~60 dòng (đã gắn dropdown) — điền dữ liệu thật từ dòng 3 trở xuống.');
   P('• Cần nhiều hơn: copy 1 dòng trống đã có dropdown rồi dán xuống.');
   P('');
   P('3. NHỮNG ĐIỀU KHÔNG ĐƯỢC LÀM', { head: true });
-  P('• KHÔNG đổi tên các tiêu đề cột (dòng 1) — hệ thống nhập dữ liệu theo TÊN cột, không theo vị trí.');
+  P('• KHÔNG đổi tên các tiêu đề cột (dòng 1) — hệ thống nhập theo TÊN cột, không theo vị trí.');
+  P('• KHÔNG đổi tên các sheet bộ phận (Đúc / Bavia / …) — khi nhập, hệ thống tìm sheet theo đúng tên tab.');
   P('• KHÔNG xoá / đổi tên sheet ẩn "_DM" — nó chứa dữ liệu cho các dropdown.');
   P('• KHÔNG cần sửa cột "Tên SP" — nếu thật sự cần: Review ▸ Unprotect Sheet (không có mật khẩu, cứ bấm OK).');
   P('');
@@ -1198,13 +1184,13 @@ async function buildGuideSheet(guide, isDuc){
   P('');
   P('5. NHẬP LÊN HỆ THỐNG', { head: true });
   P('• Lưu file (giữ định dạng .xlsx).');
-  P('• Vào web "Kế hoạch tuần" → chọn đúng TUẦN cần nhập (thanh chọn tuần ở đầu trang) → mở đúng TAB (' + activeTab + ') → bấm "📥 Nhập từ Excel" → chọn file.');
+  P('• Vào web "Kế hoạch tuần" → chọn đúng TUẦN cần nhập (thanh chọn tuần đầu trang) → mở TAB của bộ phận cần nhập → bấm "📥 Nhập từ Excel" → chọn file.');
+  P('• Hệ thống chỉ đọc SHEET trùng tên với tab đang mở. Muốn nhập bộ phận nào thì mở tab đó rồi nhập (nhập lần lượt từng bộ phận, cùng 1 file).');
   P('• Tuần áp dụng lấy theo tuần đang chọn TRÊN WEB, không lấy từ file.');
-  P('• Dòng trùng (cùng Mã máy + Mã SP' + (isDuc ? '' : ' / cùng Mã SP') + ') sẽ GHI ĐÈ kế hoạch cũ của tuần đó.');
+  P('• Dòng trùng (Đúc: cùng Mã máy + Mã SP · bộ phận khác: cùng Mã SP) sẽ GHI ĐÈ kế hoạch cũ của tuần đó.');
   P('• Nếu kế hoạch tuần đã gửi duyệt / đã duyệt: nhập Excel sẽ hỏi lý do và đưa kế hoạch quay lại quy trình duyệt từ đầu.');
   P('• Kiểm tra khi nhập: Mã SP phải có trong danh mục; Số khuôn (nếu ghi) phải đúng khuôn khai báo của Mã SP; thiếu Số khuôn mà SP nhiều khuôn → báo lỗi dòng đó.');
 
-  // giữ nguyên khoá mặc định (locked) cho toàn sheet hướng dẫn
   await guide.protect('', { selectLockedCells: true, selectUnlockedCells: true });
 }
 
@@ -1220,9 +1206,16 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
 
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
+  // File mẫu mới có 1 sheet / bộ phận — đọc đúng sheet trùng tên TAB đang mở.
+  // File cũ (1 sheet): lấy sheet đầu tiên không phải sheet phụ trợ.
+  const SKIP_SHEETS = ['Hướng dẫn sử dụng', '_DM', 'Danh mục (tham khảo)'];
+  const sheetName = wb.SheetNames.includes(activeTab)
+    ? activeTab
+    : (wb.SheetNames.find(n => !SKIP_SHEETS.includes(n)) || wb.SheetNames[0]);
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return showMsg('File không có sheet "' + activeTab + '" — tải lại file mẫu mới nhất', 'err', 5000);
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  if (aoa.length < 2) return showMsg('File không có dòng dữ liệu nào', 'err', 3000);
+  if (aoa.length < 2) return showMsg('Sheet "' + sheetName + '" không có dòng dữ liệu nào', 'err', 3000);
 
   const header = aoa[0].map(h => String(h || '').trim().toLowerCase());
   const idx = name => header.indexOf(name);
