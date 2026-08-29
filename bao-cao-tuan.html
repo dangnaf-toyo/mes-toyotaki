@@ -374,9 +374,13 @@ function computeAll(ctx){
   // tới); TT/sự cố/dừng máy vẫn chỉ tính ca đã kết ca ──
   const totalKh = khByDay.reduce((s,v) => s+v, 0), totalTt = sumBy(bcc, r=>r.tong_tt_ca);
   const totalSc = sumBy(bcc, r=>r.so_su_co_ca), totalPhut = sumBy(bcc, r=>r.tong_phut_dung_ca), totalNg = sumBy(bcc, r=>r.tong_ng_ca);
-  const shiftHtList = bcc.filter(r=>r.tong_kh_ca>0).map(r=>r.tong_tt_ca/r.tong_kh_ca*100);
-  const avgHt = shiftHtList.length ? sumBy(shiftHtList.map(v=>({v})), r=>r.v)/shiftHtList.length : 0;
-  const nDaysClosed = new Set(bcc.map(r=>r.ngay)).size;
+  // Hoàn thành KH = tổng TT các ca đã kết ca ÷ tổng KH (theo KHSX tuần đã
+  // duyệt, cột t2..t7) của những NGÀY đã có ít nhất 1 ca kết ca — không tính
+  // ngày chưa kết ca nào. Tỷ lệ gộp có trọng số, không phải trung bình các %.
+  const closedDayIsos = new Set(bcc.map(r=>r.ngay));
+  const nDaysClosed = closedDayIsos.size;
+  const khClosedDays = days.filter(d => closedDayIsos.has(d.iso)).reduce((s,d) => s + d.kh, 0);
+  const avgHt = khClosedDays > 0 ? totalTt / khClosedDays * 100 : 0;
 
   // ── 3 ca yếu nhất ──
   const worstShifts = bcc.filter(r=>r.tong_kh_ca>0)
@@ -468,7 +472,7 @@ function renderReport(ctx){
   html += '<div class="kpis">' +
     kpi('Kế hoạch tuần', fmtNum(c.totalKh), c.nDaysClosed + ' ngày đã kết ca', '') +
     kpi('Thực tế tuần', fmtNum(c.totalTt), fmtPct(c.totalKh>0?c.totalTt/c.totalKh*100:0) + ' kế hoạch', '') +
-    kpi('Hoàn thành KH bình quân', fmtPct(c.avgHt), 'trung bình mỗi ca', '') +
+    kpi('Hoàn thành KH', fmtPct(c.avgHt), 'TT ÷ KH tuần · ' + c.nDaysClosed + ' ngày đã kết ca', '') +
     kpi('Thời gian dừng', fmtNum(c.totalPhut) + "'", (c.totalPhut/60).toFixed(1) + ' giờ · ' + fmtNum(c.totalSc) + ' sự cố', 'bad') +
     kpi('Sản phẩm lỗi (NG)', fmtNum(c.totalNg), '', '') +
     kpi('Sự cố / ngày', c.nDaysClosed ? (c.totalSc/c.nDaysClosed).toFixed(1).replace('.',',') : '0', 'trung bình ' + c.nDaysClosed + ' ngày', '') +
