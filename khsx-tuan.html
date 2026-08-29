@@ -1037,18 +1037,25 @@ async function buildTemplateExcel(){
     mr++;
   });
 
-  // ── Sheet nhập liệu ──
+  // ── Sheet nhập liệu — ĐỂ TRỐNG, chỉ 1 dòng VÍ DỤ (bôi mờ) ở trên cùng ──
   ws.addRow(buildTemplateHeader());
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).alignment = { vertical: 'middle' };
 
-  const existing = isDuc
-    ? ducRows.map(r => [r.ma_may, r.ma_sp, null, r.so_khuon, r.t2, r.t3, r.t4, r.t5, r.t6, r.t7, r.cn, r.ghi_chu])
-    : cdRows.map(r => [r.ma_sp, null, r.t2, r.t3, r.t4, r.t5, r.t6, r.t7, r.cn, r.ghi_chu]);
-  existing.forEach(v => ws.addRow(v));
+  // dòng ví dụ: chọn 1 mã SP có khuôn (ưu tiên SP đúng 1 khuôn) để minh hoạ
+  const exSp = Object.keys(moldsByProduct).find(sp => moldsByProduct[sp].length === 1)
+    || Object.keys(moldsByProduct)[0] || sps[0] || '';
+  const exMold = (moldsByProduct[exSp] || [])[0] || '';
+  const exMay = machines[0] || '';
+  const EXAMPLE_MARK = '◀ DÒNG VÍ DỤ — có thể xoá, hệ thống tự bỏ qua khi nhập';
+  const exRow = isDuc
+    ? [exMay, exSp, null, exMold, 200, 200, 200, 200, 200, 0, 0, EXAMPLE_MARK]
+    : [exSp, null, 200, 200, 200, 200, 200, 0, 0, EXAMPLE_MARK];
+  ws.addRow(exRow);
 
   const firstData = 2;
-  const lastData = firstData + existing.length + 60 - 1; // + 60 dòng trống để thêm mới
+  const exampleRow = 2;
+  const lastData = firstData + 1 + 60 - 1; // 1 dòng ví dụ + 60 dòng trống
 
   const spCol   = isDuc ? 'B' : 'A';
   const tenCol  = isDuc ? 'C' : 'B';
@@ -1102,6 +1109,13 @@ async function buildTemplateExcel(){
         type: 'whole', operator: 'greaterThanOrEqual', allowBlank: true, formulae: [0]
       };
     }
+  }
+
+  // Bôi mờ dòng ví dụ (chữ xám nhạt + nghiêng, nền xám nhạt)
+  for (let c = 1; c <= lastColN; c++) {
+    const cell = ws.getCell(colLetter(c) + exampleRow);
+    cell.font = { color: { argb: 'FF9AA0A6' }, italic: true, size: 10 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F4' } };
   }
 
   // Độ rộng cột cho dễ nhìn
@@ -1168,9 +1182,10 @@ async function buildGuideSheet(guide, isDuc){
   P('• Cột "Ghi chú": tuỳ chọn.');
   P('• KH tuần KHÔNG cần nhập — hệ thống tự cộng T2…CN khi nhập lên web.');
   P('');
-  P('2. THÊM DÒNG MỚI', { head: true });
-  P('• File đã chừa sẵn 60 dòng trống (đã gắn dropdown) bên dưới phần kế hoạch hiện có — điền tiếp vào đó.');
-  P('• Nếu cần nhiều hơn: copy 1 dòng trống đã có dropdown rồi dán xuống.');
+  P('2. DÒNG VÍ DỤ & THÊM DÒNG', { head: true });
+  P('• Dòng 2 (chữ xám mờ) là DÒNG VÍ DỤ minh hoạ cách điền — bạn có thể xoá, hoặc để nguyên: hệ thống tự bỏ qua khi nhập (nhận biết qua chữ "DÒNG VÍ DỤ" ở cột Ghi chú).');
+  P('• Sheet để TRỐNG sẵn ~60 dòng (đã gắn dropdown) — điền dữ liệu thật từ dòng 3 trở xuống.');
+  P('• Cần nhiều hơn: copy 1 dòng trống đã có dropdown rồi dán xuống.');
   P('');
   P('3. NHỮNG ĐIỀU KHÔNG ĐƯỢC LÀM', { head: true });
   P('• KHÔNG đổi tên các tiêu đề cột (dòng 1) — hệ thống nhập dữ liệu theo TÊN cột, không theo vị trí.');
@@ -1227,6 +1242,7 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
     const maSp = String(row[iSp] ?? '').trim();
     const maMay = activeTab === 'Đúc' ? String(row[iMay] ?? '').trim() : '';
     if (!maSp && !maMay) continue; // dòng trống, bỏ qua
+    if (iGhiChu !== -1 && String(row[iGhiChu] ?? '').toUpperCase().includes('DÒNG VÍ DỤ')) continue; // dòng ví dụ trong file mẫu
     if (activeTab === 'Đúc' && (!maMay || !maSp)) {
       return showMsg('Dòng ' + (r+1) + ': thiếu Mã máy hoặc Mã SP', 'err', 4000);
     }
