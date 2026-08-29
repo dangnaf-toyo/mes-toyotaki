@@ -233,7 +233,7 @@ textarea{resize:vertical;min-height:48px}
           <input id="k_soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
         </div>
         <div class="fg">
-          <label class="req" for="k_ngay">Ngày sản xuất</label>
+          <label class="req" for="k_ngay">Ngày chỉ thị</label>
           <input id="k_ngay" type="date" onchange="onKanbanKhsx()">
         </div>
         <div class="fg">
@@ -246,12 +246,8 @@ textarea{resize:vertical;min-height:48px}
           </select>
         </div>
         <div class="fg">
-          <label for="k_slChuan">SL đóng gói chuẩn</label>
-          <input id="k_slChuan" type="text" placeholder="Theo danh mục SP" disabled>
-        </div>
-        <div class="fg">
-          <label class="req" for="k_slThung">Số lượng / thùng</label>
-          <input id="k_slThung" type="number" placeholder="Pcs" min="1" oninput="onKanbanRecalc()">
+          <label for="k_slChuan">Số lượng / thùng (theo danh mục)</label>
+          <input id="k_slChuan" type="text" placeholder="Chọn mã SP — tự lấy theo danh mục" disabled>
         </div>
         <div class="fg">
           <label class="req" for="k_soThung">Số thùng</label>
@@ -862,9 +858,12 @@ function onKanbanMaChange(){
   document.getElementById('k_tenSP').value = item ? item.ten : '';
   document.getElementById('k_nguyenLieu').value = item ? item.nguyenLieu : '';
   populateSoKhuonChips('k_', item ? item.soKhuon : '');
-  var slc = item && item.slDongGoiChuan ? item.slDongGoiChuan : '';
-  document.getElementById('k_slChuan').value = slc || '';
-  if (slc && !document.getElementById('k_slThung').value) document.getElementById('k_slThung').value = slc;
+  // Số lượng / thùng LẤY THEO danh mục (master_products.sl_dong_goi_chuan) —
+  // không nhập tay. Chưa khai thì cảnh báo, chặn tạo lô.
+  var slc = item && item.slDongGoiChuan ? Number(item.slDongGoiChuan) : 0;
+  var el = document.getElementById('k_slChuan');
+  el.value = slc > 0 ? fmtInt(slc) + ' pcs' : '';
+  el.placeholder = slc > 0 ? '' : '⚠ Mã SP chưa khai "SL đóng gói chuẩn" trong Quản lý danh mục';
   onKanbanKhsx();
 }
 
@@ -891,7 +890,7 @@ async function onKanbanKhsx(){
   }
   var khNgay = data.reduce(function(s, r){ return s + (Number(r[dowCol]) || 0); }, 0);
   kanbanKhNgay = khNgay;
-  var slThung = Number(document.getElementById('k_slThung').value) || 0;
+  var slThung = kanbanSlThung();
   var goiY = slThung > 0 ? Math.ceil(khNgay / slThung) : 0;
   hintEl.textContent = 'KH ngày ' + ngay.split('-').reverse().join('/') + ': ' + fmtInt(khNgay) + ' pcs'
     + (goiY ? ('   →   gợi ý ' + goiY + ' thùng') : '');
@@ -899,9 +898,15 @@ async function onKanbanKhsx(){
   onKanbanRecalc();
 }
 
+// Số lượng / thùng hiện hành = theo danh mục của mã SP đang chọn (không nhập tay).
+function kanbanSlThung(){
+  var item = masterMap[document.getElementById('k_maSP').value];
+  return item && item.slDongGoiChuan ? Number(item.slDongGoiChuan) || 0 : 0;
+}
+
 function onKanbanRecalc(){
   var kh = kanbanKhNgay || 0;
-  var slThung = Number(document.getElementById('k_slThung').value) || 0;
+  var slThung = kanbanSlThung();
   var soThung = Number(document.getElementById('k_soThung').value) || 0;
   var el = document.getElementById('k_slThungCuoi');
   if (kh > 0 && slThung > 0 && soThung > 0){
@@ -914,7 +919,7 @@ function onKanbanRecalc(){
 
 function clearKanban(){
   ['k_maSP', 'k_mayDuc'].forEach(function(i){ document.getElementById(i).value = ''; });
-  ['k_tenSP', 'k_nguyenLieu', 'k_soKhuon', 'k_slChuan', 'k_slThung', 'k_soThung', 'k_slThungCuoi']
+  ['k_tenSP', 'k_nguyenLieu', 'k_soKhuon', 'k_slChuan', 'k_soThung', 'k_slThungCuoi']
     .forEach(function(i){ document.getElementById(i).value = ''; });
   document.getElementById('k_soKhuon-chips').innerHTML = '';
   document.getElementById('k_khsxHint').textContent = '';
@@ -927,12 +932,13 @@ function clearKanban(){
 async function taoLoKanban(){
   if (!(await requireLoginOrRedirect())) return;
   var may = g('k_mayDuc'), ma = g('k_maSP'), ngay = g('k_ngay'), ca = g('k_ca');
-  var slThung = g('k_slThung'), soThung = g('k_soThung'), slCuoi = g('k_slThungCuoi');
+  var soThung = g('k_soThung'), slCuoi = g('k_slThungCuoi');
   var soKhuon = g('k_soKhuon'), nguyenLieu = g('k_nguyenLieu');
+  var slThung = kanbanSlThung();
   if (!may) return err('Chọn Máy đúc');
   if (!ma) return err('Chọn Mã sản phẩm');
-  if (!ngay) return err('Chọn Ngày sản xuất');
-  if (!slThung || isNaN(slThung) || +slThung <= 0) return err('Số lượng / thùng phải > 0');
+  if (!ngay) return err('Chọn Ngày chỉ thị');
+  if (slThung <= 0) return err('Mã SP "' + ma + '" chưa khai "SL đóng gói chuẩn" trong Quản lý danh mục — cập nhật trước');
   if (!soThung || isNaN(soThung) || +soThung <= 0 || +soThung % 1 !== 0) return err('Số thùng phải là số nguyên > 0');
   if (+soThung > 500) return err('Tối đa 500 tem / lô');
   if (slCuoi && (isNaN(slCuoi) || +slCuoi <= 0)) return err('SL thùng cuối không hợp lệ');
@@ -947,7 +953,7 @@ async function taoLoKanban(){
   try {
     var res = await sb.rpc('duc_tao_lo_kanban', {
       p_ma_may: may, p_ma_sp: ma, p_ngay: ngay, p_ca: ca,
-      p_so_thung: Number(soThung), p_sl_thung: Number(slThung),
+      p_so_thung: Number(soThung), p_sl_thung: slThung || null,
       p_sl_thung_cuoi: slCuoi ? Number(slCuoi) : null,
       p_so_khuon: soKhuon || null, p_nguyen_lieu: nguyenLieu || null, p_nguoi: nguoi,
     });
@@ -970,8 +976,7 @@ function renderKanbanBatch(lo, tems){
   document.getElementById('k_batchList').innerHTML = tems.map(function(t, i){
     return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
       + 'padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px">'
-      + '<span><b>' + svgEsc(t.tag_no) + '</b> · Thùng ' + t.so_thung_stt + '/' + t.tong_so_thung
-      + ' · ' + fmtInt(t.so_luong) + ' pcs</span>'
+      + '<span><b>' + svgEsc(t.tag_no) + '</b> · ' + fmtInt(t.so_luong) + ' pcs</span>'
       + '<button class="btn btn-s" type="button" style="flex:none;padding:5px 10px;min-width:0" '
       + 'onclick="printKanbanOne(' + i + ')">🖨 In lại</button>'
       + '</div>';
@@ -979,7 +984,7 @@ function renderKanbanBatch(lo, tems){
   document.getElementById('k_batchCard').style.display = 'block';
 }
 
-/** 1 phần tử tems (từ duc_tao_lo_kanban) -> object cho buildLabelSvg / openPrint.
+/** 1 phần tử tems (từ duc_tao_lo_kanban) -> object cho buildKanbanLabelSvg.
     Chuỗi QR giữ đúng format hiện hành: tag_no>ten_sp>ma_sp>so_luong>YYYY/MM/DD>lot>
     so_khuon>nguyen_lieu>may_duc_chi_thi ; lot = chuỗi ngày "YYYY-MM-DD" (khớp
     duc_tao_lo_kanban: lot = p_ngay::text). */
@@ -990,18 +995,17 @@ function kanbanTemToPrintData(t){
   var ngayHienThi = p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : ngayISO;
   var qr = [t.tag_no, t.ten_sp, t.ma_sp, t.so_luong, ngayQR, ngayISO, t.so_khuon, t.nguyen_lieu, t.may_duc_chi_thi].join('>\n');
   return {
-    ok: true, tagNo: t.tag_no, qr: qr, ngay: ngayHienThi,
+    ok: true, tagNo: t.tag_no, qr: qr, ngayChiThi: ngayHienThi,
     tenSP: t.ten_sp, maSP: t.ma_sp, soLuong: t.so_luong,
-    lotNo: ngayHienThi, soKhuon: t.so_khuon || '', nguyenLieu: t.nguyen_lieu || '',
-    mayDuc: t.may_duc_chi_thi, nguoiTT: '', ghiChu: '',
+    soKhuon: t.so_khuon || '', nguyenLieu: t.nguyen_lieu || '',
+    mayDuc: t.may_duc_chi_thi,
     loaiSP: loaiSpFromTagNo(t.tag_no),
-    kanbanThung: t.so_thung_stt + ' / ' + t.tong_so_thung,
   };
 }
 
 function printKanbanOne(i){
   if (!lastKanbanBatch || !lastKanbanBatch[i]) return;
-  openPrint(kanbanTemToPrintData(lastKanbanBatch[i]));
+  openPrintMulti([kanbanTemToPrintData(lastKanbanBatch[i])]);
 }
 
 function printKanbanBatch(){
@@ -1009,17 +1013,62 @@ function printKanbanBatch(){
   openPrintMulti(lastKanbanBatch.map(kanbanTemToPrintData));
 }
 
-/** Như openPrint nhưng gộp nhiều tem — mỗi tem 1 trang 105×148mm trong cùng 1
-    cửa sổ in (giống hệt kết quả bấm "In" từng tem, chỉ 1 hộp thoại in). */
-// In gộp lô tem Kanban: 8 tem / 1 tờ A4 NGANG (lưới 4 cột × 2 hàng), có viền
-// nét đứt để cắt. Mỗi ô ~69×97mm giữ đúng tỉ lệ tem gốc (105:148) — SVG tự
-// co giãn theo viewBox. Quá 8 tem thì tự sang tờ mới.
+// Tem chỉ thị Kanban — bố cục NGANG: thông tin bên trái, QR bên phải.
+// Không có "thùng X/Y", không có người thao tác. Vùng thiết kế 100×48.
+function buildKanbanLabelSvg(d){
+  var W = 100, H = 48;
+  var dark = d.loaiSP === 'phattrien';
+  var bg = dark ? '#000000' : '#ffffff';
+  var fg = dark ? '#ffffff' : '#000000';
+  var logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPC9zdmc+Cg==";
+  var rows = [
+    {lbl:"Mã SP",        val:d.maSP,       big:true},
+    {lbl:"Tên SP",       val:d.tenSP,      big:true},
+    {lbl:"SL / thùng",   val:(d.soLuong != null ? fmtInt(d.soLuong) + " pcs" : ""), big:true},
+    {lbl:"Máy đúc",      val:d.mayDuc},
+    {lbl:"Ngày chỉ thị", val:d.ngayChiThi},
+    {lbl:"Số khuôn",     val:d.soKhuon},
+    {lbl:"Nguyên liệu",  val:d.nguyenLieu},
+    {lbl:"Tag No",       val:d.tagNo}
+  ];
+  var divX = 63;            // vạch ngăn dọc info | QR
+  var rowStartY = 15, rowH = 3.85;
+
+  var s = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
+  s += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="'+bg+'"/>';
+  s += '<image x="3" y="2.6" width="7.6" height="7" href="'+logoUri+'"/>';
+  s += '<text x="12.5" y="8" font-family="Arial,Helvetica,sans-serif" font-size="4" font-weight="bold" fill="'+fg+'">TEM CHỈ THỊ SẢN XUẤT'+(dark ? ' — PHÁT TRIỂN' : '')+'</text>';
+  s += '<line x1="3" y1="11.4" x2="'+(divX-2)+'" y2="11.4" stroke="'+fg+'" stroke-width="0.3"/>';
+  rows.forEach(function(r, i){
+    var y = rowStartY + i*rowH;
+    var lblSize = r.big ? 2.8 : 2.5;
+    var valSize = r.big ? 3.7 : 2.9;
+    var vLen = String(r.val||"").length;
+    if (vLen > 20) valSize -= 0.5;
+    if (vLen > 30) valSize -= 0.5;
+    s += '<text x="4" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.lbl)+'</text>';
+    s += '<text x="22" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
+  });
+  s += '<line x1="'+divX+'" y1="3" x2="'+divX+'" y2="'+(H-3)+'" stroke="'+fg+'" stroke-width="0.3"/>';
+  var qrSize = 29, qrX = divX + (W - divX - qrSize)/2, qrY = 6.5;
+  if (dark){
+    s += '<rect x="'+(qrX-1.5)+'" y="'+(qrY-1.5)+'" width="'+(qrSize+3)+'" height="'+(qrSize+3)+'" fill="#ffffff"/>';
+  }
+  s += '<g transform="translate('+qrX.toFixed(2)+','+qrY+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
+  s += '<text x="'+(divX + (W-divX)/2).toFixed(2)+'" y="'+(qrY+qrSize+3.6)+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.7" font-weight="bold" fill="'+fg+'">'+svgEsc(d.tagNo)+'</text>';
+  s += '<text x="'+(divX + (W-divX)/2).toFixed(2)+'" y="'+(qrY+qrSize+6.6)+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="1.9" fill="'+fg+'">TOYOTAKI</text>';
+  s += '</svg>';
+  return s;
+}
+
+// In gộp lô tem Kanban NGANG: 10 tem / 1 tờ A4 DỌC (lưới 2 cột × 5 hàng), viền
+// nét đứt để cắt. Ô 98×47.5mm giữ tỉ lệ tem 100:48. Quá 10 tem tự sang tờ mới.
 function openPrintMulti(dList){
   if (!dList || !dList.length){ err('Không có tem để in'); return; }
-  var PER_PAGE = 8;
+  var PER_PAGE = 10;
   var cells = dList.map(function(d){
     var dark = d.loaiSP === 'phattrien';
-    return '<div class="cell"' + (dark ? ' style="background:#000"' : '') + '>' + buildLabelSvg(d) + '</div>';
+    return '<div class="cell"' + (dark ? ' style="background:#000"' : '') + '>' + buildKanbanLabelSvg(d) + '</div>';
   });
   var pages = '';
   for (var i = 0; i < cells.length; i += PER_PAGE){
@@ -1027,10 +1076,10 @@ function openPrintMulti(dList){
   }
   var nPages = Math.ceil(cells.length / PER_PAGE);
   var css = [
-    "@page{size:A4 landscape;margin:6mm}",
+    "@page{size:A4 portrait;margin:6mm}",
     "*{margin:0;padding:0;box-sizing:border-box}",
     "body{font-family:Arial,Helvetica,sans-serif;background:#fff}",
-    ".pg{width:282mm;display:grid;grid-template-columns:repeat(4,69mm);grid-auto-rows:97mm;gap:2mm;align-content:start;page-break-after:always}",
+    ".pg{width:198mm;display:grid;grid-template-columns:repeat(2,98mm);grid-auto-rows:47.5mm;gap:2mm;align-content:start;page-break-after:always}",
     ".pg:last-child{page-break-after:auto}",
     ".cell{border:0.3mm dashed #999;overflow:hidden;background:#fff}",
     ".cell svg{display:block;width:100%;height:100%}",
@@ -1045,7 +1094,7 @@ function openPrintMulti(dList){
     + '<button class="pbtn" onclick="window.print()">🖨 In ngay (' + dList.length + ' tem · ' + nPages + ' tờ)</button>'
     + '<script>setTimeout(function(){window.print();},200);<\/script>'
     + "</body></html>";
-  var w = window.open("", "_blank", "width=1000,height=720,scrollbars=yes");
+  var w = window.open("", "_blank", "width=820,height=920,scrollbars=yes");
   if (!w){ err("Trình duyệt chặn popup — cho phép popup rồi thử lại"); return; }
   w.document.open(); w.document.write(popupHtml); w.document.close();
 }
@@ -1177,10 +1226,6 @@ function buildLabelSvg(d){
     {lbl:"Máy đúc", val:d.mayDuc},
     {lbl:"Ghi chú", val:d.ghiChu}
   ];
-  // Tem chỉ thị Kanban — chèn dòng "Thùng X / Y" nổi bật ngay dưới Tên SP.
-  if (d.kanbanThung){
-    rows.splice(2, 0, {lbl:"Thùng", val:d.kanbanThung + "   ·   KANBAN", big:true});
-  }
   var logoX=4, logoY=4, logoW=8, logoH=7.2;
   var titleX=logoX+logoW+3, titleY=9.6, titleSize=6.2;
   var dividerY=13.5;
