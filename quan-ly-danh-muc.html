@@ -98,20 +98,29 @@
     <!-- ── Tab Máy ─────────────────────────────────────────────────────── -->
     <section id="tab-may" class="tab-pane">
       <div class="card">
-        <h2>Thêm máy</h2>
+        <h2>
+          <span id="may-form-title">Thêm máy</span>
+          <span class="cancel-edit" id="may-cancel">Huỷ sửa ✕</span>
+        </h2>
         <div class="msg" id="may-msg"></div>
         <form id="may-form">
           <div class="form-grid">
             <div><label for="may-ma">Mã máy</label><input type="text" autocomplete="off" id="may-ma" required></div>
+            <div>
+              <label for="may-kanban">Chạy theo Kanban</label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:9px 0">
+                <input type="checkbox" id="may-kanban" style="width:auto"> In tem chỉ thị trước, quét QR ghi nhận
+              </label>
+            </div>
           </div>
-          <div class="form-actions"><button type="submit">Thêm máy</button></div>
+          <div class="form-actions"><button type="submit" id="may-submit">Thêm máy</button></div>
         </form>
       </div>
       <div class="card">
         <h2>Danh sách máy</h2>
         <div class="table-wrap">
           <table id="may-table" style="display:none">
-            <thead><tr><th>Mã máy</th><th class="col-actions"></th></tr></thead>
+            <thead><tr><th>Mã máy</th><th>Kanban</th><th class="col-actions"></th></tr></thead>
             <tbody id="may-tbody"></tbody>
           </table>
         </div>
@@ -137,6 +146,7 @@
             <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
             <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
             <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
+            <div><label for="sp-sldonggoi">SL đóng gói chuẩn (pcs/thùng)</label><input type="number" step="any" id="sp-sldonggoi" placeholder="Dùng cho tem chỉ thị Kanban"></div>
             <div style="grid-column:1/-1">
               <label>Quy trình công đoạn (chọn theo đúng thứ tự — để trống bước nào thì dừng ở đó)</label>
               <div id="sp-quytrinh-steps" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -159,7 +169,7 @@
         <h2>Danh sách sản phẩm</h2>
         <div class="table-wrap">
           <table id="sp-table" style="display:none">
-            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Mã KH — Tên khách hàng</th><th>Cavity</th><th>Cycle time (s)</th><th>Nguyên liệu</th><th>Số khuôn</th><th>Quy trình công đoạn</th><th class="col-actions"></th></tr></thead>
+            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Mã KH — Tên khách hàng</th><th>Cavity</th><th>Cycle time (s)</th><th>Nguyên liệu</th><th>Số khuôn</th><th>SL đ.gói/thùng</th><th>Quy trình công đoạn</th><th class="col-actions"></th></tr></thead>
             <tbody id="sp-tbody"></tbody>
           </table>
         </div>
@@ -281,8 +291,19 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ── Tab Máy ──────────────────────────────────────────────────────────────
+let mayEditing = null;
+function mayResetForm(){
+  mayEditing = null;
+  document.getElementById('may-form').reset();
+  document.getElementById('may-ma').disabled = false;
+  document.getElementById('may-form-title').textContent = 'Thêm máy';
+  document.getElementById('may-submit').textContent = 'Thêm máy';
+  document.getElementById('may-cancel').style.display = 'none';
+}
+document.getElementById('may-cancel').addEventListener('click', mayResetForm);
+
 async function loadMay(){
-  const { data, error } = await sb.from('master_machines').select('ma_may').order('ma_may');
+  const { data, error } = await sb.from('master_machines').select('ma_may, kanban').order('ma_may');
   if (error){ showMsg('may-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('may-msg');
   const table = document.getElementById('may-table'), tbody = document.getElementById('may-tbody'), empty = document.getElementById('may-empty');
@@ -291,24 +312,48 @@ async function loadMay(){
   tbody.innerHTML = data.map(r => `
     <tr>
       <td>${escapeHtml(r.ma_may)}</td>
-      <td class="row-actions"><button type="button" class="del" data-ma="${escapeHtml(r.ma_may)}">Xoá</button></td>
+      <td>${r.kanban ? '<span style="color:var(--run-fg);font-weight:600">✔ Kanban</span>' : '<span class="muted">—</span>'}</td>
+      <td class="row-actions">
+        <button type="button" class="edit">Sửa</button>
+        <button type="button" class="del">Xoá</button>
+      </td>
     </tr>
   `).join('');
-  tbody.querySelectorAll('.del').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Xoá máy "' + b.dataset.ma + '"?')) return;
-    const { error: delErr } = await sb.from('master_machines').delete().eq('ma_may', b.dataset.ma);
-    if (delErr) return alert('Lỗi xoá: ' + delErr.message + (delErr.message.includes('foreign key') ? ' (máy này đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
-    loadMay();
-  }));
+  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
+    const r = data[i];
+    tr.querySelector('.edit').addEventListener('click', () => {
+      mayEditing = r.ma_may;
+      document.getElementById('may-ma').value = r.ma_may;
+      document.getElementById('may-ma').disabled = true;
+      document.getElementById('may-kanban').checked = !!r.kanban;
+      document.getElementById('may-form-title').textContent = 'Sửa máy: ' + r.ma_may;
+      document.getElementById('may-submit').textContent = 'Lưu thay đổi';
+      document.getElementById('may-cancel').style.display = 'inline';
+      window.scrollTo({ top: document.getElementById('may-form').offsetTop - 20, behavior: 'smooth' });
+    });
+    tr.querySelector('.del').addEventListener('click', async () => {
+      if (!confirm('Xoá máy "' + r.ma_may + '"?')) return;
+      const { error: delErr } = await sb.from('master_machines').delete().eq('ma_may', r.ma_may);
+      if (delErr) return alert('Lỗi xoá: ' + delErr.message + (delErr.message.includes('foreign key') ? ' (máy này đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
+      loadMay();
+    });
+  });
 }
 document.getElementById('may-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const ma_may = document.getElementById('may-ma').value.trim();
+  const kanban = document.getElementById('may-kanban').checked;
   if (!ma_may) return;
-  const { error } = await sb.from('master_machines').insert({ ma_may });
+
+  let error;
+  if (mayEditing){
+    ({ error } = await sb.from('master_machines').update({ kanban }).eq('ma_may', mayEditing));
+  } else {
+    ({ error } = await sb.from('master_machines').insert({ ma_may, kanban }));
+  }
   if (error) return showMsg('may-msg', 'error', 'Lỗi: ' + error.message);
-  showMsg('may-msg', 'ok', 'Đã thêm máy ' + ma_may + '.');
-  document.getElementById('may-form').reset();
+  showMsg('may-msg', 'ok', mayEditing ? 'Đã lưu ' + ma_may + '.' : 'Đã thêm máy ' + ma_may + '.');
+  mayResetForm();
   loadMay();
 });
 
@@ -343,7 +388,7 @@ function spResetForm(){
 document.getElementById('sp-cancel').addEventListener('click', spResetForm);
 
 async function loadSp(){
-  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, quy_trinh_cong_doan').order('ma_sp');
+  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan').order('ma_sp');
   if (error){ showMsg('sp-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('sp-msg');
   const table = document.getElementById('sp-table'), tbody = document.getElementById('sp-tbody'), empty = document.getElementById('sp-empty');
@@ -358,6 +403,7 @@ async function loadSp(){
       <td>${r.cycle_time_s ?? '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(r.nguyen_lieu) || '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(r.so_khuon) || '<span class="muted">—</span>'}</td>
+      <td>${r.sl_dong_goi_chuan ?? '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(r.quy_trinh_cong_doan) || '<span class="muted">—</span>'}</td>
       <td class="row-actions">
         <button type="button" class="edit">Sửa</button>
@@ -378,6 +424,7 @@ async function loadSp(){
       document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
       document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
       document.getElementById('sp-sokhuon').value = r.so_khuon || '';
+      document.getElementById('sp-sldonggoi').value = r.sl_dong_goi_chuan ?? '';
       setQuyTrinhValue(r.quy_trinh_cong_doan);
       document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
       document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
@@ -404,14 +451,16 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const cycle_time_s = ctRaw === '' ? null : Number(ctRaw);
   const nguyen_lieu = document.getElementById('sp-nguyenlieu').value.trim() || null;
   const so_khuon = document.getElementById('sp-sokhuon').value.trim() || null;
+  const slRaw = document.getElementById('sp-sldonggoi').value;
+  const sl_dong_goi_chuan = slRaw === '' ? null : Number(slRaw);
   const quy_trinh_cong_doan = getQuyTrinhValue() || null;
   if (!ma_sp) return;
 
   let error;
   if (spEditing){
-    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
+    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
   } else {
-    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, quy_trinh_cong_doan }));
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
   showMsg('sp-msg', 'ok', spEditing ? 'Đã lưu ' + ma_sp + '.' : 'Đã thêm ' + ma_sp + '.');

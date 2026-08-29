@@ -326,6 +326,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <button class="btn btn-ghost" onclick="window.open('chuyencongdoan.html?tab=confirm&dept=' + encodeURIComponent('Đúc'),'_blank')">✅ Xác nhận giao hàng</button>
       <button class="btn btn-ghost" onclick="window.open('bao-cao-ca.html','_blank')">🗂 Xem lại báo cáo ca</button>
       <button class="btn btn-ghost" onclick="window.open('tra-cuu-tem.html','_blank')">🏷 Tra cứu tem đã in</button>
+      <button class="btn btn-ghost" onclick="window.open('ghi-nhan-kanban.html','_blank')">📥 Ghi nhận Kanban</button>
       <button class="btn btn-primary" id="btn-end-shift">Kết ca &amp; xuất báo cáo</button>
     </div>
   </header>
@@ -680,6 +681,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
       <div id="es-extend-warning" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;color:#B45309;border-radius:6px;padding:8px 12px;font-size:12px"></div>
       <div id="es-mold-issue-warning" style="display:none;background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;border-radius:6px;padding:8px 12px;font-size:12px"></div>
+      <div id="es-kanban-warning" style="display:none;background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;border-radius:6px;padding:8px 12px;font-size:12px"></div>
 
       <div class="field">
         <label style="display:flex;justify-content:space-between;align-items:center">
@@ -1438,7 +1440,7 @@ async function bootstrap(){
  */
 async function loadMasterData(){
   const [mMachines, mProducts, mEmployees, mMolds] = await Promise.all([
-    sb.from('master_machines').select('ma_may'),
+    sb.from('master_machines').select('ma_may,kanban'),
     sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s'),
     sb.from('master_employees').select('ten_nhan_vien,vai_tro'),
     sb.from('duc_shot_khuon').select('*'),
@@ -1448,6 +1450,7 @@ async function loadMasterData(){
   }
 
   state.machines = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort(naturalCompare);
+  state.kanbanMachines = new Set((mMachines.data || []).filter(r => r.kanban && r.ma_may).map(r => r.ma_may));
 
   state.products = (mProducts.data || []).filter(p => p.ma_sp);
   state.productMap = {};
@@ -1845,6 +1848,7 @@ async function loadShiftState(showLoader){
     state.incidents = data.incidents;
     state.warnings = data.warnings;
     renderTable(); updateSummary(); renderOpsWarnings();
+    loadKanbanProgress();
     updateLiveStatus('OK — poll ' + (CONFIG.POLL_MS / 1000) + 's');
     startPolling();
   } catch (e) {
@@ -2041,11 +2045,39 @@ function startPolling(){
       renderTable();       // renderTable tự bảo toàn ô người dùng đang gõ dở
       updateSummary();
       renderOpsWarnings();
+      loadKanbanProgress();
       updateLiveStatus('OK — cập nhật ' + fmtTime(new Date()));
     } catch (e) {
       updateLiveStatus('Mất kết nối');
     }
   }, CONFIG.POLL_MS);
+}
+
+// Tiến độ tem chỉ thị Kanban theo máy — chỉ áp dụng cho máy master_machines.kanban=true.
+// Cửa sổ ngày: từ HÔM QUA trở đi (tem 'Chờ sản xuất' còn sót được quét bù ngày
+// hôm sau là hành vi mong muốn — xem D48), khớp theo may_duc_chi_thi (máy được
+// chỉ thị), không theo may_tt (có thể đã đổi khi máy hỏng).
+async function loadKanbanProgress(){
+  if (!state.kanbanMachines || state.kanbanMachines.size === 0) return;
+  const yest = new Date(); yest.setDate(yest.getDate() - 1);
+  const fromNgay = toDateInputValue(yest);
+  const { data, error } = await sb.from('duc_tem')
+    .select('trang_thai,so_luong_tt,may_duc_chi_thi,ngay')
+    .not('id_lo_chi_thi', 'is', null)
+    .in('may_duc_chi_thi', [...state.kanbanMachines])
+    .gte('ngay', fromNgay);
+  if (error) return;
+  const prog = {};
+  (data || []).forEach(t => {
+    const m = t.may_duc_chi_thi;
+    if (!m) return;
+    if (!prog[m]) prog[m] = { done: 0, pending: 0, pcs: 0 };
+    if (t.trang_thai === 'Đã sản xuất') { prog[m].done++; prog[m].pcs += Number(t.so_luong_tt) || 0; }
+    else if (t.trang_thai === 'Chờ sản xuất') { prog[m].pending++; }
+  });
+  const changed = JSON.stringify(prog) !== JSON.stringify(state.kanbanProgress || {});
+  state.kanbanProgress = prog;
+  if (changed) renderTable();
 }
 
 function computeState(row){
@@ -2203,7 +2235,15 @@ function makeRowHTML(row, stateClass, isActive){
       ' phút">🔍 IPQC ' + row.ipqc_phut_cho + 'p</span>';
   }
 
-  const machineHTML = '<span class="name">' + escapeHtml(row.ma_may) + '</span>' + swapBtn + closedBadge + extendBadge + ipqcBadge;
+  let kanbanNoteHTML = '';
+  const kb = state.kanbanMachines && state.kanbanMachines.has(row.ma_may) && (state.kanbanProgress || {})[row.ma_may];
+  if (kb) {
+    kanbanNoteHTML = '<span style="display:block;font-size:10px;color:var(--text-muted);margin-top:2px" ' +
+      'title="Tem chỉ thị Kanban đã ghi nhận / tổng đã in (gồm cả tem tồn từ hôm trước)">' +
+      '📥 Kanban: ' + kb.done + '/' + (kb.done + kb.pending) + ' thùng · ' + fmtNum(kb.pcs) + ' pcs</span>';
+  }
+
+  const machineHTML = '<span class="name">' + escapeHtml(row.ma_may) + '</span>' + swapBtn + closedBadge + extendBadge + ipqcBadge + kanbanNoteHTML;
 
   const moldBadge = _renderMoldBadge(row);
   const moldIssueBadge = _renderMoldIssueBadge(row);
@@ -2328,9 +2368,16 @@ function openTemPrint(idDong){
 }
 
 function makeNoPlanRowHTML(maMay){
+  let kanbanNoteHTML = '';
+  const kb = state.kanbanMachines && state.kanbanMachines.has(maMay) && (state.kanbanProgress || {})[maMay];
+  if (kb && (kb.done || kb.pending)) {
+    kanbanNoteHTML = '<span style="display:block;font-size:10px;color:var(--text-muted);margin-top:2px" ' +
+      'title="Tem chỉ thị Kanban đã ghi nhận / tổng đã in (gồm cả tem tồn từ hôm trước)">' +
+      '📥 Kanban: ' + kb.done + '/' + (kb.done + kb.pending) + ' thùng · ' + fmtNum(kb.pcs) + ' pcs</span>';
+  }
   return '<div class="row" data-state="no-plan" data-ma-may="' + escapeHtml(maMay) + '">' +
       '<div class="stripe"></div>' +
-      '<div class="col-machine"><span class="name">' + escapeHtml(maMay) + '</span></div>' +
+      '<div class="col-machine"><span class="name">' + escapeHtml(maMay) + '</span>' + kanbanNoteHTML + '</div>' +
       '<div class="col-product empty">Không có kế hoạch</div>' +
       '<div class="col-mold"><span class="no-plan-note">—</span></div>' +
       '<div class="col-prod"><span class="no-plan-note">—</span></div>' +
@@ -4258,6 +4305,21 @@ async function endShift(){
       '<span style="font-size:11px">Không chặn kết ca — nhưng nhớ xử lý/xác nhận trước khi khuôn xuống, tránh quên hoặc tái phát ở lần lên khuôn sau. ' +
       'Bấm badge ⚠/❓ cạnh số khuôn trên dòng máy để xử lý.</span>';
   } else miWarn.style.display = 'none';
+
+  // Máy Kanban trong ca này còn tem chỉ thị chưa ghi nhận — chỉ nhắc, KHÔNG chặn.
+  const kbWarn = document.getElementById('es-kanban-warning');
+  const kbPending = (state.kanbanMachines && state.kanbanProgress)
+    ? allWithPlan
+        .filter(r => state.kanbanMachines.has(r.ma_may))
+        .map(r => ({ ma_may: r.ma_may, n: ((state.kanbanProgress[r.ma_may] || {}).pending) || 0 }))
+        .filter((v, i, arr) => v.n > 0 && arr.findIndex(x => x.ma_may === v.ma_may) === i)
+    : [];
+  if (kbPending.length > 0) {
+    kbWarn.style.display = 'block';
+    kbWarn.innerHTML = '📥 <b>Còn tem chỉ thị Kanban chưa ghi nhận</b>: ' +
+      kbPending.map(v => escapeHtml(v.ma_may) + ' (' + v.n + ' thùng)').join(', ') + '.<br>' +
+      '<span style="font-size:11px">Không chặn kết ca — số thùng chưa quét sẽ được <b>sản xuất bù ca sau</b> (quét lúc đó tính vào ca sau).</span>';
+  } else kbWarn.style.display = 'none';
 
   const list = document.getElementById('es-machine-list');
   list.innerHTML = '';

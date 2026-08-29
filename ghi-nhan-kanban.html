@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ghi nhận thùng (Kanban) — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  ghi-nhan-kanban.html — màn quét ghi nhận thùng SP đã sản xuất, cho các máy
+  chạy theo TEM CHỈ THỊ Kanban (Kẽm 190T / 160T — xem migration
+  supabase/migration_phase_D48_tem_chi_thi_kanban_kem.sql).
+
+  Luồng: tem chỉ thị được IN TRƯỚC theo KH ca (intem.html tab "Chỉ thị SX").
+  Mỗi thùng SP xong, người thao tác quét QR trên tem tại đây → RPC
+  duc_ghi_nhan_tem_kanban điền so_luong_tt / may_tt / nguoi_tt /
+  ngay_gio_ghi_nhan, chuyển trạng thái 'Chờ sản xuất' → 'Đã sản xuất'.
+  CHỈ KHI quét thì sản lượng mới cộng vào tt_ca trên Bảng điều khiển Đúc
+  (trigger trg_duc_tem_sync_actuals tự chạy). Kết ca chốt theo số đã quét.
+
+  Cho phép ĐỔI MÁY ĐÚC lúc quét (máy hỏng phải chuyển máy). NG không nhập ở
+  đây — hàng đã vào thùng coi như đã kiểm OK, NG chỉ ghi nhận lúc kết ca.
+-->
+<style>
+:root{
+  --bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--border:#D9DFE5;--border-strong:#B8C1CC;
+  --text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;
+  --accent:#0F5FA5;--accent-hover:#0A4681;
+  --ok-fg:#047857;--ok-bg:#ECFDF5;--ok-bd:#A7E3C6;
+  --warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-bd:#F5DFB0;
+  --alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--alarm-bd:#FCA5A5;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.05);--shadow-md:0 4px 14px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+body{padding:10px 10px 60px}
+.wrap{max-width:600px;margin:12px auto 0;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--bg-panel);border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:16px}
+.card h2{font-size:14px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--text-muted);margin-bottom:5px}
+select,input[type=text]{width:100%;padding:12px 12px;border:1.5px solid var(--border-strong);border-radius:9px;
+  font-family:inherit;font-size:16px;font-weight:600;background:#fff;color:var(--text);outline:none}
+select:focus,input[type=text]:focus{border-color:var(--accent)}
+.field+.field{margin-top:12px}
+.btn{width:100%;border:none;border-radius:11px;padding:16px;font-family:inherit;font-size:17px;font-weight:800;
+  cursor:pointer;transition:background .12s;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn:active{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.secondary{background:#fff;color:var(--accent);border:1.5px solid var(--accent);font-size:14px;padding:12px}
+.btn.mini{padding:10px 14px;font-size:13px;width:auto;border-radius:9px}
+.row{display:flex;gap:8px;align-items:center}
+.row input[type=text]{flex:1;width:auto;min-width:0}
+.muted{font-size:12.5px;color:var(--text-muted)}
+.hint{font-size:12px;color:var(--text-dim);margin-top:6px}
+
+/* ── Khối trạng thái đổi máy ── */
+#doiMayBox{display:none;margin-top:12px;padding:12px;border:1.5px dashed var(--warn-bd);border-radius:10px;background:var(--warn-bg)}
+#doiMayBox.show{display:block}
+.doimay-active{margin-top:10px;padding:9px 12px;border-radius:9px;background:var(--warn-bg);border:1px solid var(--warn-bd);
+  color:var(--warn-fg);font-size:13px;font-weight:700;display:none}
+.doimay-active.show{display:block}
+
+/* ── Thẻ xác nhận sau khi quét ── */
+#result{display:none}
+#result.show{display:block}
+.res-card{border-radius:12px;padding:18px;border:2px solid}
+.res-card.ok{background:var(--ok-bg);border-color:var(--ok-bd)}
+.res-card.warn{background:var(--warn-bg);border-color:var(--warn-bd)}
+.res-card.err{background:var(--alarm-bg);border-color:var(--alarm-bd)}
+.res-icon{font-size:34px;line-height:1}
+.res-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+.res-card.ok .res-title{color:var(--ok-fg)}
+.res-card.warn .res-title{color:var(--warn-fg)}
+.res-card.err .res-title{color:var(--alarm-fg)}
+.res-lines{margin-top:10px;font-size:15px}
+.res-lines div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px dashed rgba(0,0,0,.10)}
+.res-lines div:first-child{border-top:none}
+.res-lines .k{color:var(--text-muted);font-weight:600}
+.res-lines .v{font-weight:800;text-align:right}
+.res-flag{margin-top:10px;font-size:13.5px;font-weight:800;color:var(--warn-fg)}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ── Lũy kế phiên ── */
+.tally{display:flex;gap:10px;flex-wrap:wrap}
+.tally .stat{flex:1;min-width:130px;background:var(--bg-sunken);border-radius:10px;padding:12px;text-align:center}
+.tally .stat .n{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--accent)}
+.tally .stat .l{font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:2px}
+#phienLog{margin-top:12px;max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:9px}
+#phienLog .li{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;font-size:13px;border-top:1px solid var(--border)}
+#phienLog .li:first-child{border-top:none}
+#phienLog .li .mono{font-size:12px;color:var(--text-muted)}
+#phienLog .li.doi{background:var(--warn-bg)}
+.empty{padding:18px;text-align:center;color:var(--text-dim);font-style:italic;font-size:13px}
+
+/* ── Chặn khi chưa đăng nhập ── */
+#authGate{display:none;text-align:center;padding:28px 16px}
+#authGate.show{display:block}
+#authGate .btn{margin-top:16px}
+
+/* ── Modal quét QR (theo intem.html) ── */
+.qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
+.qr-modal.show{display:flex}
+.qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px;background:rgba(0,0,0,.7);flex-shrink:0}
+.qr-modal-hdr span{color:#fff;font-size:14px;font-weight:700}
+.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:9px;font-family:inherit;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer}
+#qrReaderDiv{position:relative;flex:1;overflow:hidden}
+#qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+
+#msg{padding:12px 14px;border-radius:9px;font-size:14px;font-weight:600;display:none}
+#msg.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-bd);display:block}
+#msg.ok{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-bd);display:block}
+#msg.wait{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);display:block}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div id="msg"></div>
+
+  <!-- Chưa đăng nhập -->
+  <div class="card" id="authGate">
+    <div style="font-size:32px">🔒</div>
+    <h2 style="margin-top:8px">Cần đăng nhập</h2>
+    <p class="muted">Trang ghi nhận sản xuất yêu cầu đăng nhập bằng tài khoản hệ thống.</p>
+    <button type="button" class="btn" id="btnGoLogin">Đến trang đăng nhập</button>
+  </div>
+
+  <!-- Nội dung chính -->
+  <div id="mainUI" style="display:none;flex-direction:column;gap:12px">
+
+    <div class="card">
+      <h2>Người thao tác</h2>
+      <div class="field">
+        <label for="nguoiThaoTac">Ai đang ghi nhận thùng này</label>
+        <select id="nguoiThaoTac"></select>
+        <div class="hint">Mặc định là tài khoản đang đăng nhập. Chọn tên khác nếu người đứng máy không phải bạn.</div>
+      </div>
+
+      <button type="button" class="btn secondary" id="btnToggleDoiMay" style="margin-top:12px">🔧 Đổi máy đúc (khi máy chỉ thị bị hỏng)</button>
+      <div id="doiMayBox">
+        <label for="doiMay">Máy đúc thực tế</label>
+        <select id="doiMay"><option value="">— Đúng máy trên tem chỉ thị —</option></select>
+        <div class="hint">Chọn máy khác nếu thùng này được đúc ở máy không đúng chỉ thị. Áp dụng cho mọi lần quét tiếp theo tới khi bạn đổi lại.</div>
+      </div>
+      <div class="doimay-active" id="doiMayActive"></div>
+    </div>
+
+    <div class="card">
+      <h2>Quét tem chỉ thị</h2>
+      <button type="button" class="btn" id="btnScan">📷 Quét QR trên tem</button>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+      <div class="field" style="margin-top:14px">
+        <label for="tagInput">…hoặc nhập Tag No thủ công</label>
+        <div class="row">
+          <input type="text" id="tagInput" placeholder="VD: TKD20260829-0012" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button type="button" class="btn mini" id="btnGhiNhan">Ghi nhận</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="result">
+      <div class="res-card" id="resCard">
+        <div class="res-icon" id="resIcon"></div>
+        <div class="res-title" id="resTitle"></div>
+        <div class="res-lines" id="resLines"></div>
+        <div class="res-flag" id="resFlag" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Phiên làm việc này</h2>
+      <div class="tally">
+        <div class="stat"><div class="n" id="tallyThung">0</div><div class="l">Thùng đã ghi nhận</div></div>
+        <div class="stat"><div class="n" id="tallyPcs">0</div><div class="l">Tổng pcs</div></div>
+      </div>
+      <div id="phienLog"><div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div></div>
+      <div class="hint">Số liệu phiên chỉ tính trên máy này, mất khi tải lại trang. Sản lượng thật đã lưu trên Bảng điều khiển Đúc.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal camera quét QR -->
+<div class="qr-modal" id="qrModal">
+  <div class="qr-modal-hdr">
+    <span>📷 Đưa mã QR trên tem vào khung</span>
+    <button type="button" class="qr-modal-close" id="btnCloseQrModal">✖ Đóng</button>
+  </div>
+  <div id="qrReaderDiv"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function fmtTime(iso){
+  const d = iso ? new Date(iso) : new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+}
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls || '';
+  if (ms) setTimeout(() => { if (el.textContent === text) el.className = ''; }, ms);
+}
+function beep(okTone){
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.frequency.value = okTone ? 880 : 320;
+    g.gain.setValueAtTime(0.14, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.22);
+    o.start(); o.stop(ac.currentTime + 0.22);
+  } catch (e) { /* thiết bị không cho phát âm — bỏ qua */ }
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+let myIdentity = '';
+let busy = false;
+const phien = []; // { tag_no, ma_sp, so_thung_stt, so_luong, may_tt, doi_may, at }
+
+// ── Auth gate ──────────────────────────────────────────────────────────────
+async function boot(){
+  const session = await MesAuth.getSession();
+  if (!session) {
+    document.getElementById('authGate').classList.add('show');
+    return;
+  }
+  document.getElementById('mainUI').style.display = 'flex';
+  myIdentity = (await MesAuth.getCurrentUserIdentity()) || 'Không rõ';
+  await Promise.all([loadNguoiThaoTac(), loadMayList()]);
+  wire();
+}
+document.getElementById('btnGoLogin').addEventListener('click', () => {
+  window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
+});
+
+// ── Nạp danh sách ──────────────────────────────────────────────────────────
+async function loadNguoiThaoTac(){
+  const sel = document.getElementById('nguoiThaoTac');
+  sel.innerHTML = '<option value="' + escapeHtml(myIdentity) + '">Tôi — ' + escapeHtml(myIdentity) + '</option>';
+  const { data } = await sb.from('master_employees').select('ten_nhan_vien,vai_tro').order('ten_nhan_vien');
+  const rows = (data || []).filter(r => r.ten_nhan_vien);
+  // ưu tiên vai_tro = 'nhan_vien' lên đầu, phần còn lại sau
+  rows.sort((a, b) => (a.vai_tro === 'nhan_vien' ? 0 : 1) - (b.vai_tro === 'nhan_vien' ? 0 : 1));
+  rows.forEach(r => {
+    sel.innerHTML += '<option value="' + escapeHtml(r.ten_nhan_vien) + '">' + escapeHtml(r.ten_nhan_vien)
+      + (r.vai_tro && r.vai_tro !== 'nhan_vien' ? ' (' + escapeHtml(r.vai_tro) + ')' : '') + '</option>';
+  });
+}
+async function loadMayList(){
+  const sel = document.getElementById('doiMay');
+  const { data } = await sb.from('master_machines').select('ma_may').order('ma_may');
+  (data || []).forEach(r => {
+    if (!r.ma_may) return;
+    sel.innerHTML += '<option value="' + escapeHtml(r.ma_may) + '">' + escapeHtml(r.ma_may) + '</option>';
+  });
+}
+
+// ── Đổi máy ────────────────────────────────────────────────────────────────
+function refreshDoiMayIndicator(){
+  const may = document.getElementById('doiMay').value;
+  const ind = document.getElementById('doiMayActive');
+  if (may) { ind.textContent = '⚠ Đang ghi nhận sản lượng về máy: ' + may + ' (khác máy trên tem chỉ thị)'; ind.classList.add('show'); }
+  else { ind.classList.remove('show'); }
+}
+
+// ── Ghi nhận 1 tem ─────────────────────────────────────────────────────────
+async function ghiNhan(tagNo){
+  tagNo = String(tagNo || '').trim();
+  if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
+  if (busy) return;
+  busy = true;
+  document.getElementById('btnGhiNhan').disabled = true;
+  showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
+
+  const p_may_tt = document.getElementById('doiMay').value || null;
+  const p_nguoi_tt = document.getElementById('nguoiThaoTac').value || myIdentity;
+
+  try {
+    const { data, error } = await sb.rpc('duc_ghi_nhan_tem_kanban', { p_tag_no: tagNo, p_may_tt, p_nguoi_tt });
+    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', error.message || String(error)]]); beep(false); return; }
+    if (!data || data.ok === false) {
+      const isDup = data && data.da_ghi_nhan;
+      renderResult(isDup ? 'warn' : 'err', isDup ? 'Tem đã được ghi nhận' : 'Không ghi nhận được',
+        [['Thông báo', (data && data.error) || 'Lỗi không xác định']]);
+      beep(false);
+      showMsg('', '');
+      return;
+    }
+    // Thành công
+    const lines = [
+      ['Mã SP', data.ma_sp + (data.ten_sp ? ' — ' + data.ten_sp : '')],
+      ['Thùng', 'số ' + (data.so_thung_stt ?? '?')],
+      ['Số lượng', fmtNum(data.so_luong) + ' pcs'],
+      ['Máy đúc', data.may_tt],
+      ['Lúc', fmtTime(data.ngay_gio_ghi_nhan)],
+    ];
+    renderResult('ok', '✓ Đã ghi nhận thùng', lines, data.doi_may ? ('⚠ Đúc ở máy ' + data.may_tt + ' — khác máy trên tem chỉ thị') : '');
+    beep(true);
+    showMsg('', '');
+
+    phien.unshift({
+      tag_no: data.tag_no, ma_sp: data.ma_sp, so_thung_stt: data.so_thung_stt,
+      so_luong: Number(data.so_luong) || 0, may_tt: data.may_tt, doi_may: !!data.doi_may,
+      at: data.ngay_gio_ghi_nhan,
+    });
+    renderPhien();
+  } catch (e) {
+    renderResult('err', 'Lỗi', [['Chi tiết', e && e.message ? e.message : String(e)]]);
+    beep(false);
+    showMsg('', '');
+  } finally {
+    busy = false;
+    document.getElementById('btnGhiNhan').disabled = false;
+    document.getElementById('tagInput').value = '';
+  }
+}
+
+function renderResult(kind, title, lines, flag){
+  document.getElementById('resCard').className = 'res-card ' + kind;
+  document.getElementById('resIcon').textContent = kind === 'ok' ? '✅' : (kind === 'warn' ? '⚠️' : '⛔');
+  document.getElementById('resTitle').textContent = title;
+  document.getElementById('resLines').innerHTML = lines.map(([k, v]) =>
+    '<div><span class="k">' + escapeHtml(k) + '</span><span class="v">' + escapeHtml(v) + '</span></div>').join('');
+  const f = document.getElementById('resFlag');
+  if (flag) { f.textContent = flag; f.style.display = 'block'; } else { f.style.display = 'none'; }
+  document.getElementById('result').classList.add('show');
+}
+
+function renderPhien(){
+  document.getElementById('tallyThung').textContent = fmtNum(phien.length);
+  document.getElementById('tallyPcs').textContent = fmtNum(phien.reduce((s, r) => s + r.so_luong, 0));
+  const box = document.getElementById('phienLog');
+  if (!phien.length) { box.innerHTML = '<div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div>'; return; }
+  box.innerHTML = phien.map(r =>
+    '<div class="li' + (r.doi_may ? ' doi' : '') + '">' +
+      '<span><b>' + escapeHtml(r.ma_sp) + '</b> · thùng ' + (r.so_thung_stt ?? '?') + ' · ' + fmtNum(r.so_luong) + ' pcs' +
+        (r.doi_may ? ' · ⚠ ' + escapeHtml(r.may_tt) : '') + '</span>' +
+      '<span class="mono">' + escapeHtml(r.tag_no) + ' · ' + fmtTime(r.at) + '</span>' +
+    '</div>').join('');
+}
+
+// ── Quét QR (theo pattern intem.html — 1 instance duy nhất) ────────────────
+let html5QrCode = null, scanningActive = false;
+function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode('qrReaderDiv'); return html5QrCode; }
+
+async function openCamera(){
+  showMsg('', '');
+  if (typeof Html5Qrcode !== 'function') {
+    showMsg('Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang. Có thể nhập Tag No thủ công.', 'err');
+    return;
+  }
+  document.getElementById('qrModal').classList.add('show');
+  const scanner = getScanner();
+  scanningActive = true;
+  try {
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 8, qrbox: { width: 260, height: 260 } },
+      onScanSuccess,
+      () => { /* frame chưa thấy mã — bỏ qua */ }
+    );
+  } catch (e) {
+    scanningActive = false;
+    await closeQrModal();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showMsg('📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…', 'wait');
+      document.getElementById('qrFileInput').click();
+      return;
+    }
+    showMsg('Không mở được camera: ' + e + '. Kiểm tra quyền Camera cho trang này.', 'err');
+  }
+}
+async function closeQrModal(){
+  document.getElementById('qrModal').classList.remove('show');
+  scanningActive = false;
+  if (html5QrCode && html5QrCode.isScanning) {
+    try { await html5QrCode.stop(); } catch (e) { /* đã dừng — bỏ qua */ }
+  }
+}
+async function onScanSuccess(decodedText){
+  if (!scanningActive) return;
+  scanningActive = false;
+  await closeQrModal();
+  const tagNo = String(decodedText).split('>')[0].trim();
+  if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
+  ghiNhan(tagNo);
+}
+function onFileChosen(evt){
+  const file = evt.target.files && evt.target.files[0];
+  evt.target.value = '';
+  if (!file) { showMsg('Không nhận được ảnh (có thể bạn đã huỷ chụp).', 'err', 4000); return; }
+  showMsg('⏳ Đang đọc mã QR trong ảnh…', 'wait');
+  getScanner().scanFile(file, false)
+    .then(decodedText => {
+      const tagNo = String(decodedText).split('>')[0].trim();
+      if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
+      ghiNhan(tagNo);
+    })
+    .catch(() => showMsg('Không đọc được mã QR trong ảnh — chụp lại, để mã QR rõ nét và nằm giữa khung.', 'err', 5000));
+}
+
+// ── Wire ───────────────────────────────────────────────────────────────────
+function wire(){
+  document.getElementById('btnToggleDoiMay').addEventListener('click', () => {
+    document.getElementById('doiMayBox').classList.toggle('show');
+  });
+  document.getElementById('doiMay').addEventListener('change', refreshDoiMayIndicator);
+  document.getElementById('btnScan').addEventListener('click', openCamera);
+  document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
+  document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
+  document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
+  document.getElementById('tagInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); ghiNhan(e.target.value); }
+  });
+}
+
+boot();
+</script>
+</body>
+</html>
