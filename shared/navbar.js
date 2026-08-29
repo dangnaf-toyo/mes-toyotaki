@@ -76,7 +76,7 @@
     'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
     'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
     'intem.html': { icon: '🏷️', title: 'In Tem — Đúc', desc: 'Tạo, tra cứu, sửa, in lại tem', noTitleBar: true },
-    'ghi-nhan-kanban.html': { icon: '📥', title: 'Ghi nhận thùng (Kanban)', desc: 'Quét QR ghi nhận thùng sản phẩm đã sản xuất — máy Kẽm chạy theo tem chỉ thị' },
+    'ghi-nhan-kanban.html': { icon: '📥', title: 'Ghi nhận thùng (Kanban)', desc: 'Quét QR ghi nhận thùng sản phẩm đã sản xuất — máy chạy theo tem chỉ thị in trước' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
     'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin', noTitleBar: true },
     'nang-luc-cnc.html': { icon: '🛠️', title: 'Năng Lực Máy Gia Công CNC', desc: 'Quy trình CNC theo SP, forecast tháng, tính số máy cần — chỉ Admin', noTitleBar: true },
