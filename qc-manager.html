@@ -187,7 +187,7 @@ tr:last-child td{border-bottom:none}
         <div class="panel-head">👤 Tuân thủ theo IPQC (24h gần nhất)</div>
         <div class="panel-body table-wrap">
           <table>
-            <thead><tr><th>IPQC</th><th>Tổng</th><th>Đúng hạn</th><th>Trễ</th><th>OK</th><th>NG</th><th>Cảnh báo</th><th>Tổng thời gian kiểm</th></tr></thead>
+            <thead><tr><th>IPQC</th><th>Tổng</th><th title="Định kỳ: kiểm trong vòng chu kỳ 120 phút + ân hạn 30 phút kể từ lần kiểm trước. Sau sự cố / Đổi khuôn: kiểm trong vòng 30 phút kể từ khi phát sinh.">Đúng hạn</th><th title="Quá hạn nói trên, hoặc thiếu mốc thời gian.">Trễ</th><th>OK</th><th>NG</th><th>Cảnh báo</th><th>Tổng thời gian kiểm</th></tr></thead>
             <tbody id="nguoi-tbody"></tbody>
           </table>
           <div class="empty-note hidden" id="nguoi-empty">Chưa có dữ liệu kiểm tra.</div>
@@ -199,7 +199,7 @@ tr:last-child td{border-bottom:none}
       <div class="panel-head">📋 Kết quả kiểm tra gần đây <span class="count" id="done-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th>Phản hồi (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
           <tbody id="done-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="done-empty">Chưa có kết quả kiểm tra nào.</div>
@@ -246,7 +246,7 @@ tr:last-child td{border-bottom:none}
       <div class="panel-head">📋 Kết quả tra cứu <span class="count" id="history-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th>Phản hồi (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
           <tbody id="history-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="history-empty">Không tìm thấy kết quả nào khớp bộ lọc.</div>
@@ -512,10 +512,25 @@ async function getActiveIdDongSet(){
   };
   return new Set([...active].filter(conLai));
 }
+// Chu kỳ kiểm định kỳ (phút) + ân hạn dùng để xét "đúng hạn / trễ".
+const IPQC_INTERVAL_MIN = 120;
+const IPQC_GRACE_MIN = 30;
+
 function ipqcDueInfo(loaiKiem, phutDaTroi){
-  const dueAfter = loaiKiem === 'dinh_ky' ? 120 : 0;
+  const dueAfter = loaiKiem === 'dinh_ky' ? IPQC_INTERVAL_MIN : 0;
   const daDenHan = phutDaTroi >= dueAfter;
   return { da_den_han: daDenHan, phut_con_lai: daDenHan ? 0 : (dueAfter - phutDaTroi), phut_qua_han: daDenHan ? (phutDaTroi - dueAfter) : 0 };
+}
+
+// Số phút TRỄ của 1 lần kiểm đã hoàn thành so với hạn phải kiểm.
+// - sau_su_co / doi_khuon: han_kiem = giờ phát sinh → trễ = đúng phut_phan_hoi.
+// - dinh_ky: han_kiem = giờ lần kiểm TRƯỚC của máy (không cộng chu kỳ), nên
+//   phut_phan_hoi là khoảng cách giữa 2 lần kiểm; hạn thực = lần trước + 120′
+//   → trễ = phut_phan_hoi − 120 (kẹp về 0). Không đủ mốc → null.
+function ipqcTreMinutes(loaiKiem, phutPhanHoi){
+  if (phutPhanHoi == null) return null;
+  const base = loaiKiem === 'dinh_ky' ? IPQC_INTERVAL_MIN : 0;
+  return Math.max(0, phutPhanHoi - base);
 }
 function parsePhotoUrls(raw){
   if (!raw) return [];
@@ -526,10 +541,12 @@ function mapIpqcDoneRow(r){
   const mocCho = r.han_kiem ? new Date(r.han_kiem) : null;
   const thoiDiemKiem = r.thoi_diem_kiem_thuc_te ? new Date(r.thoi_diem_kiem_thuc_te) : null;
   const phutPhanHoi = (thoiDiemKiem && mocCho) ? Math.round((thoiDiemKiem - mocCho) / 60000) : null;
+  const trePhut = ipqcTreMinutes(r.loai_kiem, phutPhanHoi);
   return {
     id_checkpoint: r.id_checkpoint, ma_may: r.ma_may, ma_sp: r.ma_sp, ngay: r.ngay, ca: r.ca,
     loai_kiem: r.loai_kiem, ket_qua: r.ket_qua, nguoi_kiem: r.nguoi_kiem || '(không rõ)',
     thoi_diem_kiem_thuc_te: r.thoi_diem_kiem_thuc_te, phut_phan_hoi: phutPhanHoi,
+    tre_phut: trePhut, dung_han: (trePhut != null && trePhut < IPQC_GRACE_MIN),
     anh_bang_chung_urls: parsePhotoUrls(r.anh_bang_chung_url), ghi_chu: r.ghi_chu || '',
     checklist: Array.isArray(r.checklist_json) ? r.checklist_json : [],
     id_van_de_lien_quan: r.id_van_de_lien_quan || '', thoi_gian_kiem_giay: Number(r.thoi_gian_kiem_giay) || null,
@@ -578,7 +595,7 @@ async function loadBoard(){
         const mapped = mapIpqcDoneRow(r);
         done.push(mapped);
         const nguoiKiem = mapped.nguoi_kiem;
-        const dungHan = mapped.phut_phan_hoi != null && mapped.phut_phan_hoi < 30;
+        const dungHan = mapped.dung_han;
         if (!byNguoiKiem[nguoiKiem]) byNguoiKiem[nguoiKiem] = { nguoi_kiem: nguoiKiem, dung_han: 0, tre: 0, tong: 0, so_ok: 0, so_ng: 0, so_canh_bao: 0, tong_thoi_gian_kiem_giay: 0 };
         byNguoiKiem[nguoiKiem].tong++;
         if (dungHan) byNguoiKiem[nguoiKiem].dung_han++; else byNguoiKiem[nguoiKiem].tre++;
@@ -718,7 +735,9 @@ function doneRowHtml(d){
     <td class="mono">${escapeHtml(d.ma_sp)}</td>
     <td>${escapeHtml(LOAI_LABEL[d.loai_kiem] || d.loai_kiem)}</td>
     <td>${escapeHtml(d.nguoi_kiem)}</td>
-    <td class="mono">${d.phut_phan_hoi != null ? d.phut_phan_hoi : '—'}</td>
+    <td class="mono"${d.loai_kiem === 'dinh_ky' && d.phut_phan_hoi != null
+      ? ' title="Khoảng cách 2 lần kiểm định kỳ: ' + d.phut_phan_hoi + ' phút — chu kỳ chuẩn ' + IPQC_INTERVAL_MIN + ' phút, ân hạn ' + IPQC_GRACE_MIN + ' phút"'
+      : ''}>${d.tre_phut != null ? d.tre_phut : '—'}</td>
     <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
