@@ -253,6 +253,22 @@ function escapeHtml(s){
 function pctPillClass(p){ return p >= 80 ? 'pct-good' : (p >= 65 ? 'pct-warn' : 'pct-bad'); }
 function normLoai(s){ return (s||'').replace(/\s*[-—–]\s*/g, ' - ').trim(); }
 function issueCode(s){ const m = normLoai(s).match(/^([A-Za-z]\d+)/); return m ? m[1] : (normLoai(s) || '(không rõ)'); }
+// Tên chuẩn theo mã lỗi — khớp CONFIG.LOAI_SU_CO ở duc-dashboard.html. Dùng làm
+// nhãn dự phòng khi duc_su_co_log.loai_su_co chỉ ghi trần mã, không kèm mô tả
+// (vd F1 do IPQC tự mở sự cố khi phát hiện NG).
+const SU_CO_TEN = {
+  A1:'Sự cố máy đúc', A2:'Sự cố khuôn', A3:'Sự cố hạ tầng (Điện, khí nén, nước...)',
+  B1:'Sự cố CL sản phẩm', B2:'Sự cố CL nguyên liệu',
+  C1:'Thay đổi KHSX', C2:'Hết nguyên liệu', C3:'Đổi khuôn',
+  D1:'Thiếu nhân lực', D2:'Đào tạo / Người mới',
+  E1:'Bảo dưỡng khuôn KH', E2:'Vệ sinh theo KH', E3:'Kiểm kê định kỳ',
+  F1:'Chất lượng - IPQC phát hiện NG',
+};
+function issueLabel(code, rows){
+  let label = SU_CO_TEN[code] ? (code + ' - ' + SU_CO_TEN[code]) : code;
+  for (const r of (rows || [])){ const l = normLoai(r.loai_su_co); if (l.length > label.length) label = l; }
+  return label;
+}
 function isoWeekNum(d){
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = (t.getUTCDay() + 6) % 7;
@@ -420,11 +436,9 @@ function computeAll(ctx){
 
   // ── Dừng máy theo loại vấn đề (gộp mã trùng, ưu tiên nhãn có mô tả dài nhất) ──
   const byIssue = groupBy(suco, r=>issueCode(r.loai_su_co));
-  const downtimeIssue = [...byIssue.entries()].map(([code, rs]) => {
-    let label = code;
-    for (const r of rs){ const l = normLoai(r.loai_su_co); if (l.length > label.length) label = l; }
-    return { code, label, phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs) };
-  }).sort((a,b)=> b.phut - a.phut);
+  const downtimeIssue = [...byIssue.entries()].map(([code, rs]) => (
+    { code, label: issueLabel(code, rs), phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs) }
+  )).sort((a,b)=> b.phut - a.phut);
 
   // ── Dừng máy theo mã SP ──
   const bySp = groupBy(suco, r=>r.ma_sp || '(không rõ)');
@@ -688,8 +702,7 @@ function suggestActionRows(suco){
   const byIssue = groupBy(suco, r=>issueCode(r.loai_su_co));
   const total = sumBy(suco, r=>r.thoi_gian_dung_phut) || 1;
   const items = [...byIssue.entries()].map(([code, rs]) => {
-    let label = code;
-    for (const r of rs){ const l = normLoai(r.loai_su_co); if (l.length > label.length) label = l; }
+    const label = issueLabel(code, rs);
     const phut = sumBy(rs, r=>r.thoi_gian_dung_phut);
     const top1 = top3VanDe(rs)[0];
     const hint = COUNTERMEASURE_HINT[code] || ['Xác định nguyên nhân gốc, đề xuất đối sách phù hợp', 'Tổ trưởng ca'];
