@@ -1011,31 +1011,41 @@ function printKanbanBatch(){
 
 /** Như openPrint nhưng gộp nhiều tem — mỗi tem 1 trang 105×148mm trong cùng 1
     cửa sổ in (giống hệt kết quả bấm "In" từng tem, chỉ 1 hộp thoại in). */
+// In gộp lô tem Kanban: 8 tem / 1 tờ A4 NGANG (lưới 4 cột × 2 hàng), có viền
+// nét đứt để cắt. Mỗi ô ~69×97mm giữ đúng tỉ lệ tem gốc (105:148) — SVG tự
+// co giãn theo viewBox. Quá 8 tem thì tự sang tờ mới.
 function openPrintMulti(dList){
   if (!dList || !dList.length){ err('Không có tem để in'); return; }
-  var pages = dList.map(function(d){
-    var bg = d.loaiSP === 'phattrien' ? '#000' : '#fff';
-    return '<div class="pg" style="background:' + bg + '">' + buildLabelSvg(d) + '</div>';
-  }).join('');
+  var PER_PAGE = 8;
+  var cells = dList.map(function(d){
+    var dark = d.loaiSP === 'phattrien';
+    return '<div class="cell"' + (dark ? ' style="background:#000"' : '') + '>' + buildLabelSvg(d) + '</div>';
+  });
+  var pages = '';
+  for (var i = 0; i < cells.length; i += PER_PAGE){
+    pages += '<div class="pg">' + cells.slice(i, i + PER_PAGE).join('') + '</div>';
+  }
+  var nPages = Math.ceil(cells.length / PER_PAGE);
   var css = [
-    "@page{size:105mm 148mm;margin:0}",
+    "@page{size:A4 landscape;margin:6mm}",
     "*{margin:0;padding:0;box-sizing:border-box}",
-    "html,body{width:105mm}",
-    ".pg{width:105mm;height:148mm;page-break-after:always;overflow:hidden}",
+    "body{font-family:Arial,Helvetica,sans-serif;background:#fff}",
+    ".pg{width:282mm;display:grid;grid-template-columns:repeat(4,69mm);grid-auto-rows:97mm;gap:2mm;align-content:start;page-break-after:always}",
     ".pg:last-child{page-break-after:auto}",
-    ".pg svg{display:block;width:105mm;height:148mm}",
+    ".cell{border:0.3mm dashed #999;overflow:hidden;background:#fff}",
+    ".cell svg{display:block;width:100%;height:100%}",
     ".pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:9}",
     "@media print{.pbtn{display:none}}"
   ].join("");
   var popupHtml =
     "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"UTF-8\">"
-    + "<title>Lô tem Kanban (" + dList.length + ")</title>"
+    + "<title>Lô tem Kanban (" + dList.length + " tem · " + nPages + " tờ A4)</title>"
     + "<style>" + css + "</style></head><body>"
     + pages
-    + '<button class="pbtn" onclick="window.print()">🖨 In ngay (' + dList.length + ' tem)</button>'
+    + '<button class="pbtn" onclick="window.print()">🖨 In ngay (' + dList.length + ' tem · ' + nPages + ' tờ)</button>'
     + '<script>setTimeout(function(){window.print();},200);<\/script>'
     + "</body></html>";
-  var w = window.open("", "_blank", "width=460,height=760,scrollbars=yes");
+  var w = window.open("", "_blank", "width=1000,height=720,scrollbars=yes");
   if (!w){ err("Trình duyệt chặn popup — cho phép popup rồi thử lại"); return; }
   w.document.open(); w.document.write(popupHtml); w.document.close();
 }
