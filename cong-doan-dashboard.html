@@ -65,6 +65,9 @@ header .btn-outline{border-color:#475569;color:#F1F5F9}
 header .btn-outline:hover{background:#334155}
 .btn-good{background:var(--run-fg);color:#fff}
 .btn-good:hover{background:#036049}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.tram-divider td{background:var(--bg-sunken);font-weight:700;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;padding:6px 10px}
 .btn-tiny{border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text-muted);border-radius:5px;padding:5px 9px;font-size:11px;font-weight:600;cursor:pointer}
 .btn-tiny:hover{border-color:var(--accent);color:var(--accent)}
 .btn-tiny.danger{border-color:#F87171;color:var(--alarm-fg)}
@@ -125,7 +128,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <a id="lnkDongGoi" href="chuyencongdoan.html" target="_blank" rel="noopener"><button type="button" class="btn-outline btn">📦 Đóng gói / In tem</button></a>
       </div>
       <button type="button" class="btn-outline btn" id="btnKhsxBatch">⚡ Nạp kế hoạch từ KHSX tuần</button>
-      <button type="button" class="btn btn-good" id="btnKetCa">🏁 Kết ca &amp; xem báo cáo</button>
+      <button type="button" class="btn btn-primary" id="btnKetCa">Kết ca &amp; xuất báo cáo</button>
       <div class="header-clock">
         <div class="date" id="hdrClockDate"></div>
         <div class="time" id="hdrClockTime"></div>
@@ -133,13 +136,8 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     </header>
 
     <div class="card">
-      <h2>📥 Hàng đang chờ tại công đoạn này</h2>
-      <div id="waitingList" class="waiting-list"><div class="empty">Đang tải...</div></div>
-    </div>
-
-    <div class="card">
       <h2 id="tramsSectionTitle">🧑‍🏭 Trạm đang hoạt động</h2>
-      <p style="font-size:10.5px;color:#999;margin:-6px 0 10px">Các dòng mờ, chữ nghiêng là kế hoạch tuần chưa tạo trạm — bấm "+ Tạo..." để tạo ngay với Mã SP/KH ca điền sẵn.</p>
+      <p id="tramsSectionNote" style="font-size:10.5px;color:#999;margin:-6px 0 10px">Các dòng mờ, chữ nghiêng là kế hoạch tuần chưa tạo trạm — bấm "+ Tạo..." để tạo ngay với Mã SP/KH ca điền sẵn.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th id="thCongDoanSub" style="display:none">Công đoạn</th><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người kiểm tra</th><th>KH ca</th><th>KH tuần</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
@@ -388,8 +386,9 @@ async function loadDanhMuc(){
   if (isLineMode()){
     document.getElementById('btnAddTram').style.display = 'none';
     document.getElementById('btnKhsxBatch').style.display = 'none';
-    const note = document.querySelector('#tramsSectionTitle + p');
-    if (note) note.textContent = 'Danh sách Line theo danh mục. Bấm "Gán kế hoạch" ở Line trống để chọn mã SP từ KHSX tuần.';
+    document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' theo danh mục';
+    const note = document.getElementById('tramsSectionNote');
+    if (note) note.textContent = tramLabel() + ' lấy từ danh mục Máy-Line. Line chưa có kế hoạch xếp riêng bên dưới — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần.';
   }
   document.getElementById('dlNhanVien').innerHTML = (empRes.data || []).map(e => `<option value="${escapeHtml(e.ten_nhan_vien)}">`).join('');
 }
@@ -397,7 +396,8 @@ async function loadDanhMuc(){
 function reloadAll(){
   if (!document.getElementById('ca').value) return;
   loadTrams();
-  loadWaiting();
+  // "Hàng đang chờ tại công đoạn" tạm ẩn khỏi dashboard (loadWaiting giữ lại
+  // để đưa vào sau) — không gọi ở đây nữa.
   loadKhsxToday();
 }
 
@@ -448,12 +448,14 @@ function activeTramRowHtml(t, merged){
 
 function renderTramsLineMode(){
   const tbody = document.getElementById('tramTbody');
-  const rows = [];
+  const lbl = tramLabel();
+  const activeHtml = [];
+  const emptyHtml = [];
   const seen = new Set();
   lineCatalog.forEach(line => {
     const t = trams.find(x => x.ten_tram === line);
-    if (t){ seen.add(t.id_tram); rows.push(activeTramRowHtml(t, false)); return; }
-    rows.push(`
+    if (t){ seen.add(t.id_tram); activeHtml.push(activeTramRowHtml(t, false)); return; }
+    emptyHtml.push(`
       <tr>
         <td><b>${escapeHtml(line)}</b></td>
         <td colspan="7"><span style="color:#999">Chưa gán kế hoạch</span></td>
@@ -461,8 +463,16 @@ function renderTramsLineMode(){
       </tr>`);
   });
   // Trạm không nằm trong danh mục line (dữ liệu cũ / tạo tay) — vẫn hiển thị để không mất.
-  trams.filter(t => !seen.has(t.id_tram)).forEach(t => rows.push(activeTramRowHtml(t, false)));
-  tbody.innerHTML = rows.join('');
+  trams.filter(t => !seen.has(t.id_tram)).forEach(t => activeHtml.push(activeTramRowHtml(t, false)));
+
+  const parts = [];
+  parts.push(`<tr class="tram-divider"><td colspan="10">${lbl} đang hoạt động (${activeHtml.length})</td></tr>`);
+  parts.push(activeHtml.length ? activeHtml.join('') : `<tr><td colspan="10" style="color:#999">Chưa có ${lbl.toLowerCase()} nào có kế hoạch trong ca này.</td></tr>`);
+  if (emptyHtml.length){
+    parts.push(`<tr class="tram-divider"><td colspan="10">${lbl} chưa có kế hoạch (${emptyHtml.length}) — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần</td></tr>`);
+    parts.push(emptyHtml.join(''));
+  }
+  tbody.innerHTML = parts.join('');
   tbody.querySelectorAll('.gan-kh-btn').forEach(btn => btn.addEventListener('click', () => openGanKeHoach(btn.dataset.line)));
 }
 
