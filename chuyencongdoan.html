@@ -1192,7 +1192,7 @@ function printNewTem(t, congDoan){
 
 // Mở thẳng tab "Xác nhận đã giao hàng" đã chọn sẵn bộ phận qua URL, VD link
 // tắt từ duc-dashboard.html: chuyencongdoan.html?tab=confirm&dept=Đúc
-function applyInitParams(){
+async function applyInitParams(){
   const params = new URLSearchParams(window.location.search);
   const tab = params.get('tab');
   const dept = params.get('dept');
@@ -1203,13 +1203,26 @@ function applyInitParams(){
     return;
   }
 
-  // Link tắt từ cong-doan-dashboard.html: ?tab=pack&dept=Bavia&ngay=..&ca=..&masp=..
+  // Link tắt "In tem" từ cong-doan-dashboard.html:
+  //   ?tab=pack&dept=Bavia&ngay=..&ca=..&tram=<id_tram>&masp=..&nguoi=..
   if (tab === 'pack'){
     switchTab('pack');
     if (dept) document.getElementById('pkCongDoan').value = dept;
     if (params.get('ngay')) document.getElementById('pkNgay').value = params.get('ngay');
     if (params.get('ca')) document.getElementById('pkCa').value = params.get('ca');
-    if (dept || params.get('ngay') || params.get('ca')) loadPkTrams();
+    if (dept || params.get('ngay') || params.get('ca')) await loadPkTrams();
+    // Chọn sẵn đúng trạm/line → onPkTramChange tự điền Người thao tác.
+    const tram = params.get('tram');
+    if (tram){
+      const sel = document.getElementById('pkTram');
+      if ([...sel.options].some(o => o.value === tram)){
+        sel.value = tram;
+        onPkTramChange();
+      }
+    }
+    if (params.get('nguoi') && !document.getElementById('pkNguoiThaoTac').value){
+      document.getElementById('pkNguoiThaoTac').value = params.get('nguoi');
+    }
   }
 }
 
