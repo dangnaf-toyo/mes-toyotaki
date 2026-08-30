@@ -233,7 +233,7 @@
               </datalist>
             </div>
             <div style="grid-column:1/-1">
-              <label>Line (Máy) — nhân sự này thao tác được ở những máy / line nào</label>
+              <label>Line (Máy) — nhân sự này thao tác được ở những máy / line nào (lọc theo Bộ phận đã chọn ở trên)</label>
               <div id="ns-linemay" class="chk-grid"><span class="empty-hint">Đang tải danh mục máy…</span></div>
             </div>
           </div>
@@ -519,27 +519,53 @@ const NS_ROLE_LABELS = {
   bao_duong_khuon: 'Bảo dưỡng khuôn', thong_ke: 'Thống kê', kho: 'Kho',
 };
 
-// ── Line (Máy): danh sách checkbox từ danh mục máy ──────────────────────
+// ── Line (Máy): checkbox lọc theo Bộ phận đang chọn của nhân sự ─────────
+// nsMayAll = toàn bộ danh mục máy-line; nsLineMaySel = tập mã máy đang chọn
+// (nguồn sự thật, không phụ thuộc checkbox nào đang render).
+let nsMayAll = [];
+let nsLineMaySel = new Set();
+
 async function loadNsLineMayOptions(){
   const box = document.getElementById('ns-linemay');
   const { data, error } = await sb.from('master_machines').select('ma_may, bo_phan').order('bo_phan').order('ma_may');
   if (error){ box.innerHTML = '<span class="empty-hint">Không tải được danh mục máy: ' + escapeHtml(error.message) + '</span>'; return; }
-  if (!data || !data.length){ box.innerHTML = '<span class="empty-hint">Chưa có máy-line nào trong danh mục.</span>'; return; }
+  nsMayAll = (data || []).map(r => ({ ma_may: r.ma_may, bo_phan: (r.bo_phan || '(chưa gán bộ phận)') }));
+  renderNsLineMay();
+}
+function renderNsLineMay(){
+  const box = document.getElementById('ns-linemay');
+  if (!nsMayAll.length){ box.innerHTML = '<span class="empty-hint">Chưa có máy-line nào trong danh mục.</span>'; return; }
+
+  const boPhan = document.getElementById('ns-bophan').value.trim();
+  // Bộ phận có máy khớp -> chỉ hiện nhóm đó. Ngoài ra luôn hiện thêm nhóm nào
+  // đang chứa máy đã chọn (tránh mất lựa chọn khi đổi bộ phận).
+  const matched = boPhan ? nsMayAll.some(m => m.bo_phan === boPhan) : false;
+  let hint = '';
+  let visible;
+  if (matched){
+    visible = nsMayAll.filter(m => m.bo_phan === boPhan || nsLineMaySel.has(m.ma_may));
+  } else {
+    visible = nsMayAll.slice();
+    if (boPhan) hint = `<div class="empty-hint" style="margin-bottom:8px">Bộ phận “${escapeHtml(boPhan)}” chưa có máy-line riêng — hiện tất cả.</div>`;
+  }
+
   const groups = {};
-  data.forEach(r => { const k = r.bo_phan || '(chưa gán bộ phận)'; (groups[k] = groups[k] || []).push(r.ma_may); });
-  box.innerHTML = Object.entries(groups).map(([bp, mays]) =>
+  visible.forEach(m => { (groups[m.bo_phan] = groups[m.bo_phan] || []).push(m.ma_may); });
+  box.innerHTML = hint + Object.entries(groups).map(([bp, mays]) =>
     `<div class="chk-group"><div class="chk-group-head">${escapeHtml(bp)}</div><div class="chk-group-items">` +
-    mays.map(m => `<label><input type="checkbox" value="${escapeHtml(m)}"> ${escapeHtml(m)}</label>`).join('') +
+    mays.map(m => `<label><input type="checkbox" value="${escapeHtml(m)}"${nsLineMaySel.has(m) ? ' checked' : ''}> ${escapeHtml(m)}</label>`).join('') +
     `</div></div>`
   ).join('');
 }
-function getNsLineMay(){
-  return [...document.querySelectorAll('#ns-linemay input[type="checkbox"]:checked')].map(c => c.value);
-}
-function setNsLineMay(arr){
-  const set = new Set(arr || []);
-  document.querySelectorAll('#ns-linemay input[type="checkbox"]').forEach(c => { c.checked = set.has(c.value); });
-}
+function getNsLineMay(){ return [...nsLineMaySel]; }
+function setNsLineMay(arr){ nsLineMaySel = new Set(arr || []); renderNsLineMay(); }
+
+document.getElementById('ns-linemay').addEventListener('change', (e) => {
+  const cb = e.target;
+  if (!cb || cb.type !== 'checkbox') return;
+  if (cb.checked) nsLineMaySel.add(cb.value); else nsLineMaySel.delete(cb.value);
+});
+document.getElementById('ns-bophan').addEventListener('input', renderNsLineMay);
 
 async function loadNs(){
   const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro, bo_phan, line_may').order('ten_nhan_vien');
