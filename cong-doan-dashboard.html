@@ -179,6 +179,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="modal-head"><div class="modal-title" id="addTramTitle">+ Thêm trạm</div><button class="modal-close" onclick="closeModal('modalAddTram')">✕</button></div>
     <div class="modal-body">
       <div class="fg" id="at-congdoan-wrap" style="display:none"><label class="req">Công đoạn</label><select id="at-congdoan"></select></div>
+      <div class="fg" id="at-khsx-wrap" style="display:none"><label>Chọn mã SP từ KHSX tuần</label><select id="at-khsx-pick"></select></div>
       <div class="fg"><label class="req" id="lblTenTram">Tên trạm/tổ</label><input type="text" autocomplete="off" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
       <div class="fg"><label class="req">Mã SP</label><input type="text" autocomplete="off" id="at-masp" list="dlMaSp" oninput="onMaSpPick('at-masp','at-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" autocomplete="off" id="at-tensp"></div>
@@ -270,6 +271,14 @@ let currentTarget = null;
 const TRAM_LABEL_MAP = { 'Bavia': 'Line', 'Gia Công': 'Máy', 'Cắt viền': 'Máy', 'Sơn': 'Line', 'OQC': 'Bàn kiểm' };
 function tramLabel(){ return TRAM_LABEL_MAP[congDoan] || 'Trạm'; }
 
+// Công đoạn có danh mục Line/Máy CỐ ĐỊNH trong master_machines (theo bo_phan) →
+// dashboard chạy "kiểu Đúc": bảng luôn liệt kê sẵn line, bấm vào line trống để
+// gán kế hoạch (từ KHSX tuần), có nút Đổi SP và In tem (tách/gộp). Công đoạn
+// không map → giữ nguyên mô hình trạm tự do như cũ.
+const CD_TO_BO_PHAN = { 'Bavia': 'Bavia' };
+let lineCatalog = [];   // [ma_may] — rỗng nghĩa là dùng mô hình trạm tự do
+function isLineMode(){ return lineCatalog.length > 0; }
+
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
 function showMsg(text, cls){ const el = document.getElementById('msg'); el.textContent = text; el.className = cls; }
@@ -357,6 +366,18 @@ async function loadDanhMuc(){
   ]);
   (prodRes.data || []).forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
   document.getElementById('dlMaSp').innerHTML = Object.keys(productMap).sort().map(ma => `<option value="${escapeHtml(ma)}">`).join('');
+
+  const boPhan = CD_TO_BO_PHAN[congDoan];
+  if (boPhan){
+    const { data: mm } = await sb.from('master_machines').select('ma_may').eq('bo_phan', boPhan).order('ma_may');
+    lineCatalog = (mm || []).map(r => r.ma_may).filter(Boolean).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
+  }
+  if (isLineMode()){
+    document.getElementById('btnAddTram').style.display = 'none';
+    document.getElementById('btnKhsxBatch').style.display = 'none';
+    const note = document.querySelector('#tramsSectionTitle + p');
+    if (note) note.textContent = 'Danh sách Line theo danh mục. Bấm "Gán kế hoạch" ở Line trống để chọn mã SP từ KHSX tuần.';
+  }
   document.getElementById('dlNhanVien').innerHTML = (empRes.data || []).map(e => `<option value="${escapeHtml(e.ten_nhan_vien)}">`).join('');
 }
 
@@ -389,7 +410,50 @@ async function loadTrams(){
   renderTrams();
 }
 
+function activeTramRowHtml(t, merged){
+  const cdCell = merged ? `<td><span class="sub-cd-badge">${escapeHtml(t.cong_doan)}</span></td>` : '';
+  return `
+    <tr>
+      ${cdCell}
+      <td><b>${escapeHtml(t.ten_tram)}</b></td>
+      <td>${escapeHtml(t.ma_sp)}</td>
+      <td>${escapeHtml(t.ten_sp) || '<span style="color:#999">—</span>'}</td>
+      <td>${escapeHtml(t.nguoi_thao_tac) || '<span style="color:#999">—</span>'}</td>
+      <td class="num">${t.kh_ca != null ? fmtNum(t.kh_ca) : '<span style="color:#999">—</span>'}</td>
+      <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
+      <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
+      <td style="white-space:nowrap">
+        <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
+        <button type="button" class="btn-tiny" onclick="openSuaTram('${t.id_tram}')">Sửa</button>
+        <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi SP</button>
+        <button type="button" class="btn-tiny" onclick="openInTem('${t.id_tram}')">In tem</button>
+        <button type="button" class="btn-tiny danger" onclick="ketThucTram('${t.id_tram}')">Kết thúc</button>
+      </td>
+    </tr>`;
+}
+
+function renderTramsLineMode(){
+  const tbody = document.getElementById('tramTbody');
+  const rows = [];
+  const seen = new Set();
+  lineCatalog.forEach(line => {
+    const t = trams.find(x => x.ten_tram === line);
+    if (t){ seen.add(t.id_tram); rows.push(activeTramRowHtml(t, false)); return; }
+    rows.push(`
+      <tr>
+        <td><b>${escapeHtml(line)}</b></td>
+        <td colspan="6"><span style="color:#999">Chưa gán kế hoạch</span></td>
+        <td style="white-space:nowrap"><button type="button" class="btn-tiny gan-kh-btn" data-line="${escapeHtml(line)}">+ Gán kế hoạch</button></td>
+      </tr>`);
+  });
+  // Trạm không nằm trong danh mục line (dữ liệu cũ / tạo tay) — vẫn hiển thị để không mất.
+  trams.filter(t => !seen.has(t.id_tram)).forEach(t => rows.push(activeTramRowHtml(t, false)));
+  tbody.innerHTML = rows.join('');
+  tbody.querySelectorAll('.gan-kh-btn').forEach(btn => btn.addEventListener('click', () => openGanKeHoach(btn.dataset.line)));
+}
+
 function renderTrams(){
+  if (isLineMode()) return renderTramsLineMode();
   const tbody = document.getElementById('tramTbody');
   const lbl = tramLabel().toLowerCase();
   // Kế hoạch tuần (cd_khsx_tuan_plan, nhập ở khsx-tuan.html) hiển thị gộp
@@ -400,23 +464,7 @@ function renderTrams(){
   const colspan = merged ? 9 : 8;
   if (!trams.length && !pendingPlan.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="' + colspan + '">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
   const cdCell = (cd) => merged ? `<td><span class="sub-cd-badge">${escapeHtml(cd)}</span></td>` : '';
-  const activeRows = trams.map(t => `
-    <tr>
-      ${cdCell(t.cong_doan)}
-      <td>${escapeHtml(t.ten_tram)}</td>
-      <td>${escapeHtml(t.ma_sp)}</td>
-      <td>${escapeHtml(t.ten_sp) || '<span style="color:#999">—</span>'}</td>
-      <td>${escapeHtml(t.nguoi_thao_tac) || '<span style="color:#999">—</span>'}</td>
-      <td class="num">${t.kh_ca != null ? fmtNum(t.kh_ca) : '<span style="color:#999">—</span>'}</td>
-      <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
-      <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
-      <td style="white-space:nowrap">
-        <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
-        <button type="button" class="btn-tiny" onclick="openSuaTram('${t.id_tram}')">Sửa</button>
-        <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi mã</button>
-        <button type="button" class="btn-tiny danger" onclick="ketThucTram('${t.id_tram}')">Kết thúc</button>
-      </td>
-    </tr>`).join('');
+  const activeRows = trams.map(t => activeTramRowHtml(t, merged)).join('');
   const planRows = pendingPlan.map(p => `
     <tr style="opacity:.65;font-style:italic">
       ${cdCell(p.cong_doan)}
@@ -441,6 +489,9 @@ function findTram(id){ return trams.find(t => t.id_tram === id); }
 
 /* ---------- + Thêm trạm/line/máy/bàn kiểm ---------- */
 document.getElementById('btnAddTram').addEventListener('click', () => {
+  document.getElementById('at-khsx-wrap').style.display = 'none';
+  document.getElementById('at-ten').readOnly = false;
+  document.getElementById('addTramTitle').textContent = '+ Thêm ' + tramLabel();
   document.getElementById('at-ten').value = '';
   document.getElementById('at-masp').value = '';
   document.getElementById('at-tensp').value = '';
@@ -668,6 +719,9 @@ async function loadKhsxToday(){
   renderTrams();
 }
 function openAddTramFromKhsx(maSp, tenSp, khCa, congDoanSub){
+  document.getElementById('at-khsx-wrap').style.display = 'none';
+  document.getElementById('at-ten').readOnly = false;
+  document.getElementById('addTramTitle').textContent = '+ Thêm ' + tramLabel();
   document.getElementById('at-ten').value = '';
   document.getElementById('at-masp').value = maSp;
   document.getElementById('at-tensp').value = tenSp;
@@ -676,6 +730,49 @@ function openAddTramFromKhsx(maSp, tenSp, khCa, congDoanSub){
   if (congDoanGroup.length > 1) document.getElementById('at-congdoan').value = congDoanSub || congDoan;
   openModal('modalAddTram');
   document.getElementById('at-ten').focus();
+}
+
+// Line mode: bấm "Gán kế hoạch" ở 1 Line trống — chọn mã SP từ KHSX tuần hôm nay
+// (hoặc nhập tay), tên Line khoá theo danh mục.
+function openGanKeHoach(line){
+  document.getElementById('addTramTitle').textContent = 'Gán kế hoạch cho ' + line;
+  document.getElementById('at-ten').value = line;
+  document.getElementById('at-ten').readOnly = true;
+  document.getElementById('at-masp').value = '';
+  document.getElementById('at-tensp').value = '';
+  document.getElementById('at-khca').value = '';
+  document.getElementById('at-nguoi').value = '';
+
+  const wrap = document.getElementById('at-khsx-wrap');
+  const sel = document.getElementById('at-khsx-pick');
+  const avail = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp));
+  sel.innerHTML = '<option value="">— Nhập tay —</option>' +
+    avail.map((p, i) => `<option value="${i}">${escapeHtml(p.ma_sp)} — ${escapeHtml(p.ten_sp || '')} · KH ${fmtNum(p.khCa)}</option>`).join('');
+  sel._avail = avail;
+  wrap.style.display = avail.length ? '' : 'none';
+
+  openModal('modalAddTram');
+}
+document.getElementById('at-khsx-pick').addEventListener('change', (e) => {
+  const avail = e.target._avail || [];
+  const p = avail[Number(e.target.value)];
+  if (!p) return;
+  document.getElementById('at-masp').value = p.ma_sp;
+  document.getElementById('at-tensp').value = p.ten_sp || '';
+  document.getElementById('at-khca').value = p.khCa || '';
+});
+
+// In tem = mở luồng "Đóng gói lại" (tách / gộp tem đang sản xuất) ở
+// chuyencongdoan.html, đã chọn sẵn công đoạn + ngày/ca.
+function openInTem(idTram){
+  const t = findTram(idTram);
+  const p = new URLSearchParams({
+    tab: 'pack', dept: congDoan,
+    ngay: document.getElementById('ngay').value,
+    ca: document.getElementById('ca').value,
+  });
+  if (t) p.set('masp', t.ma_sp);
+  window.open('chuyencongdoan.html?' + p.toString(), '_blank', 'noopener');
 }
 
 /* ---------- Nạp kế hoạch hàng loạt từ KHSX tuần ---------- */

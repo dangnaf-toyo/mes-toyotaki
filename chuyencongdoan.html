@@ -1194,12 +1194,22 @@ function printNewTem(t, congDoan){
 // tắt từ duc-dashboard.html: chuyencongdoan.html?tab=confirm&dept=Đúc
 function applyInitParams(){
   const params = new URLSearchParams(window.location.search);
-  if (params.get('tab') !== 'confirm') return;
-  switchTab('confirm');
+  const tab = params.get('tab');
   const dept = params.get('dept');
-  if (dept){
-    document.getElementById('confirmCongDoan').value = dept;
-    loadPendingList();
+
+  if (tab === 'confirm'){
+    switchTab('confirm');
+    if (dept){ document.getElementById('confirmCongDoan').value = dept; loadPendingList(); }
+    return;
+  }
+
+  // Link tắt từ cong-doan-dashboard.html: ?tab=pack&dept=Bavia&ngay=..&ca=..&masp=..
+  if (tab === 'pack'){
+    switchTab('pack');
+    if (dept) document.getElementById('pkCongDoan').value = dept;
+    if (params.get('ngay')) document.getElementById('pkNgay').value = params.get('ngay');
+    if (params.get('ca')) document.getElementById('pkCa').value = params.get('ca');
+    if (dept || params.get('ngay') || params.get('ca')) loadPkTrams();
   }
 }
 
