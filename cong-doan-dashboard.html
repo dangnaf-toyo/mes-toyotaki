@@ -1088,15 +1088,23 @@ async function printTkbTems(tags){
     '.pbtn{position:fixed;bottom:14px;right:14px;background:#0F5FA5;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer}',
     '@media print{.pbtn{display:none}}',
   ].join('');
-  const w = window.open('', '_blank', 'width=460,height=760,scrollbars=yes');
-  if (!w) return showMsg('Trình duyệt chặn popup — cho phép popup rồi in lại.', 'err');
-  w.document.open();
-  w.document.write('<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Tem TKB (' + tags.length + ')</title><style>' + css + '</style></head><body>'
+  const html = '<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Tem TKB (' + tags.length + ')</title><style>' + css + '</style></head><body>'
     + pages.join('')
     + '<button class="pbtn" onclick="window.print()">🖨 In ngay</button>'
     + '<' + 'script>setTimeout(function(){window.print();},250);<' + '/script>'
-    + '</body></html>');
-  w.document.close();
+    + '</body></html>';
+  // Mở qua <a target=_blank> từ chính user-gesture → ít bị chặn popup hơn window.open.
+  try {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    const w = window.open('', '_blank', 'width=460,height=760,scrollbars=yes');
+    if (!w) return showMsg('Trình duyệt chặn cửa sổ in — cho phép popup cho trang này rồi bấm "In" lại.', 'err');
+    w.document.open(); w.document.write(html); w.document.close();
+  }
 }
 
 /* ========== Bộ mã lỗi NG (khai báo chủng loại) ========================== */
@@ -1143,7 +1151,7 @@ let xlt = { idTram: null, tram: null, sources: [] };
 async function openXuLyThung(idTram){
   const t = findTram(idTram);
   if (!t) return;
-  xlt = { idTram, tram: t, sources: [] };
+  xlt = { idTram, tram: t, sources: [], clientKey: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) };
   document.getElementById('xlt-line-label').textContent = '(' + t.ten_tram + ' — ' + t.ma_sp + ')';
   document.getElementById('xlt-scan').value = '';
   document.getElementById('xlt-ok').value = 0;
@@ -1258,6 +1266,7 @@ document.getElementById('btnSubmitXuLyThung').addEventListener('click', async ()
     p_tag_gop: cach === 'gop' ? tagGop : null,
     p_nguoi: document.getElementById('xlt-nguoi').value.trim(),
     p_user: await MesAuth.getCurrentUserIdentity(),
+    p_client_key: xlt.clientKey,
   });
   btn.disabled = false;
   if (error) return cb.textContent = 'Lỗi: ' + error.message;
@@ -1316,6 +1325,7 @@ async function loadDangDo(){
 
 /* ========== Hàng NG chờ sửa (GĐ3) ====================================== */
 let suaHangTem = null;
+let suaHangKey = null;
 async function loadNgChoSua(){
   const card = document.getElementById('ngChoSuaCard');
   const tbody = document.getElementById('ngChoSuaTbody');
@@ -1338,6 +1348,7 @@ async function loadNgChoSua(){
 
 async function openSuaHang(t){
   suaHangTem = t;
+  suaHangKey = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
   document.getElementById('sh-tag-label').textContent = '(' + t.tag_no + ' — ' + t.ma_sp + ', còn ' + fmtNum(t.so_luong) + ')';
   document.getElementById('sh-ok').value = 0;
   document.getElementById('sh-ngphe').value = 0;
@@ -1391,6 +1402,7 @@ document.getElementById('btnSubmitSuaHang').addEventListener('click', async () =
     p_tag_gop: cach === 'gop' ? tagGop : null,
     p_nguoi: document.getElementById('sh-nguoi').value.trim(),
     p_user: await MesAuth.getCurrentUserIdentity(),
+    p_client_key: suaHangKey,
   });
   btn.disabled = false;
   if (error) return cb.textContent = 'Lỗi: ' + error.message;
