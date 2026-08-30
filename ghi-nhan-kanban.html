@@ -258,7 +258,8 @@ async function loadNguoiThaoTac(){
 }
 async function loadMayList(){
   const sel = document.getElementById('doiMay');
-  const { data } = await sb.from('master_machines').select('ma_may').order('ma_may');
+  // Chỉ máy bộ phận Đúc (bo_phan null = máy cũ chưa gán) — loại LINE bộ phận khác.
+  const { data } = await sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may');
   (data || []).forEach(r => {
     if (!r.ma_may) return;
     sel.innerHTML += '<option value="' + escapeHtml(r.ma_may) + '">' + escapeHtml(r.ma_may) + '</option>';

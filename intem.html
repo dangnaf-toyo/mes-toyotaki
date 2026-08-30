@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
     sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan').order('ma_sp'),
-    sb.from('master_machines').select('ma_may,kanban').order('ma_may'),
+    sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
   if (prod.error) throw new Error('Không tải được danh mục SP: ' + prod.error.message);

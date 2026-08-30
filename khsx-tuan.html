@@ -596,7 +596,10 @@ let productMap = {}; // ma_sp -> ten_sp
 
 async function loadMasterLists(){
   const [mMachines, mProducts] = await Promise.all([
-    sb.from('master_machines').select('ma_may'),
+    // Ô "Mã máy" chỉ dùng ở tab Đúc → chỉ lấy máy bộ phận Đúc (bo_phan null =
+    // máy cũ chưa gán). Các tab công đoạn khác lập KH theo (công đoạn, mã SP),
+    // không gắn máy nên không cần danh sách này.
+    sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('master_products').select('ma_sp,ten_sp,so_khuon'),
   ]);
   machineList = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));

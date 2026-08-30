@@ -794,7 +794,7 @@ function fillSelect(id, values){
 async function loadQcFilters(){
   const [mProd, mMachines, mMolds] = await Promise.all([
     sb.from('master_products').select('ma_sp,ten_sp'),
-    sb.from('master_machines').select('ma_may'),
+    sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat'),
   ]);
   state.machines = (mMachines.data || []).map(r => r.ma_may).filter(Boolean);
