@@ -14,7 +14,15 @@
 
 alter table bavia_xu_ly   add column if not exists client_key text;
 alter table bavia_sua_log add column if not exists client_key text;
-create unique index if not exists ux_bavia_xu_ly_ckey   on bavia_xu_ly(client_key)   where client_key is not null;
+-- LƯU Ý: ux_bavia_xu_ly_ckey PHẢI là ràng buộc unique thường (không partial).
+-- bavia_xu_ly_thung dùng `on conflict (client_key) do nothing` — Postgres không
+-- suy luận được partial unique index (where client_key is not null) cho ON CONFLICT
+-- nếu không kèm đúng WHERE đó → lỗi "no unique or exclusion constraint matching".
+-- Cột nullable nên unique thường vẫn cho nhiều NULL, chỉ chặn trùng non-null.
+drop index if exists ux_bavia_xu_ly_ckey;
+alter table bavia_xu_ly drop constraint if exists ux_bavia_xu_ly_ckey;
+alter table bavia_xu_ly add constraint ux_bavia_xu_ly_ckey unique (client_key);
+-- bavia_sua_log dùng guard SELECT (không ON CONFLICT) nên partial index vẫn ổn.
 create unique index if not exists ux_bavia_sua_log_ckey on bavia_sua_log(client_key) where client_key is not null;
 
 -- ── bavia_xu_ly_thung — + p_client_key, dedup ────────────────────────────
