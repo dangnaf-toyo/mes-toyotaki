@@ -229,6 +229,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="modal-head"><div class="modal-title" id="addTramTitle">+ Thêm trạm</div><button class="modal-close" onclick="closeModal('modalAddTram')">✕</button></div>
     <div class="modal-body">
       <div class="fg" id="at-congdoan-wrap" style="display:none"><label class="req">Công đoạn</label><select id="at-congdoan"></select></div>
+      <div class="fg" id="at-khsx-wrap" style="display:none"><label>Chọn mã SP từ KHSX tuần</label><select id="at-khsx-pick"></select></div>
       <div class="fg"><label class="req" id="lblTenTram">Tên trạm/tổ</label><input type="text" autocomplete="off" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
       <div class="fg"><label class="req">Mã SP</label><input type="text" autocomplete="off" id="at-masp" list="dlMaSp" oninput="onMaSpPick('at-masp','at-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" autocomplete="off" id="at-tensp"></div>
@@ -679,6 +680,8 @@ function findTram(id){ return trams.find(t => t.id_tram === id); }
 
 /* ---------- + Thêm trạm/line/máy/bàn kiểm ---------- */
 function resetAddTramExtras(){
+  ganKeHoachLine = null;
+  document.getElementById('at-khsx-wrap').style.display = 'none';
   document.getElementById('at-khtuan-wrap').style.display = 'none';
   document.getElementById('at-khtuan').value = '';
   document.getElementById('at-ten').readOnly = false;
@@ -704,6 +707,7 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
   if (!masp) return showMsg('Chưa nhập mã SP.', 'err');
   const khCaRaw = document.getElementById('at-khca').value;
   const khTuanRaw = document.getElementById('at-khtuan').value;
+  if (ganKeHoachLine && khCaRaw === '') return showMsg('KH ca là bắt buộc khi gán kế hoạch cho line.', 'err');
   const congDoanRow = congDoanGroup.length > 1 ? document.getElementById('at-congdoan').value : congDoan;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
@@ -716,7 +720,7 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalAddTram');
-  showMsg('✅ Đã thêm ' + ten, 'ok');
+  showMsg('✅ Đã ' + (ganKeHoachLine ? 'gán kế hoạch cho ' : 'thêm ') + ten, 'ok');
   loadTrams();
 });
 
@@ -981,6 +985,60 @@ function openAddTramFromKhsx(maSp, tenSp, khCa, congDoanSub){
   openModal('modalAddTram');
   document.getElementById('at-ten').focus();
 }
+
+// Line mode: bấm "Gán kế hoạch" ở 1 Line trống. KH ca + KH tuần link tự động
+// từ KHSX tuần của bộ phận; người kiểm tra chỉ chọn trong nhân viên bộ phận
+// này được phép thao tác trên đúng line đó.
+let ganKeHoachLine = null;
+function openGanKeHoach(line){
+  ganKeHoachLine = line;
+  document.getElementById('addTramTitle').textContent = 'Gán kế hoạch cho ' + line;
+  document.getElementById('at-ten').value = line;
+  document.getElementById('at-ten').readOnly = true;
+  document.getElementById('at-masp').value = '';
+  document.getElementById('at-tensp').value = '';
+  document.getElementById('at-khca').value = '';
+  document.getElementById('at-khtuan').value = '';
+  document.getElementById('at-nguoi').value = '';
+  document.getElementById('at-khtuan-wrap').style.display = '';
+  document.getElementById('lbl-at-khca').textContent = 'KH ca (pcs) — bắt buộc';
+
+  // Người kiểm tra: lọc theo line
+  const ds = nguoiChoLine(line);
+  document.getElementById('at-nguoi').setAttribute('list', 'dlNguoiLine');
+  document.getElementById('dlNguoiLine').innerHTML = ds.map(n => `<option value="${escapeHtml(n)}">`).join('');
+  document.getElementById('at-nguoi-hint').textContent = ds.length
+    ? ' (' + ds.length + ' người được phép thao tác ' + line + ')'
+    : ' Chưa gán nhân viên nào cho ' + line + ' — khai ở Danh mục nhân sự.';
+
+  const wrap = document.getElementById('at-khsx-wrap');
+  const sel = document.getElementById('at-khsx-pick');
+  const avail = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp));
+  sel.innerHTML = '<option value="">— Nhập tay —</option>' +
+    avail.map((p, i) => `<option value="${i}">${escapeHtml(p.ma_sp)} — ${escapeHtml(p.ten_sp || '')} · KH ca ${fmtNum(p.khCa)} · KH tuần ${fmtNum(p.khTuan)}</option>`).join('');
+  sel._avail = avail;
+  wrap.style.display = avail.length ? '' : 'none';
+
+  openModal('modalAddTram');
+}
+document.getElementById('at-khsx-pick').addEventListener('change', (e) => {
+  const avail = e.target._avail || [];
+  const p = avail[Number(e.target.value)];
+  if (!p) return;
+  document.getElementById('at-masp').value = p.ma_sp;
+  document.getElementById('at-tensp').value = p.ten_sp || '';
+  document.getElementById('at-khca').value = p.khCa || '';
+  document.getElementById('at-khtuan').value = p.khTuan || '';
+});
+// Khi gõ/đổi mã SP trong modal gán kế hoạch: tự khớp KH ca/KH tuần từ KHSX tuần.
+document.getElementById('at-masp').addEventListener('input', () => {
+  if (!ganKeHoachLine) return;
+  const p = planToday.find(x => x.ma_sp === document.getElementById('at-masp').value.trim());
+  if (p){
+    document.getElementById('at-khca').value = p.khCa || '';
+    document.getElementById('at-khtuan').value = p.khTuan || '';
+  }
+});
 
 // In tem = mở luồng "Đóng gói lại" (tách / gộp tem đang sản xuất) ở
 // chuyencongdoan.html, đã chọn sẵn công đoạn + ngày/ca.
