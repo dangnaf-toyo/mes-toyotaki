@@ -142,8 +142,8 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
       <p style="font-size:10.5px;color:#999;margin:-6px 0 10px">Các dòng mờ, chữ nghiêng là kế hoạch tuần chưa tạo trạm — bấm "+ Tạo..." để tạo ngay với Mã SP/KH ca điền sẵn.</p>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th id="thCongDoanSub" style="display:none">Công đoạn</th><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người kiểm tra</th><th>KH ca</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
-          <tbody id="tramTbody"><tr class="empty-row"><td colspan="9">Đang tải...</td></tr></tbody>
+          <thead><tr><th id="thCongDoanSub" style="display:none">Công đoạn</th><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người kiểm tra</th><th>KH ca</th><th>KH tuần</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
+          <tbody id="tramTbody"><tr class="empty-row"><td colspan="10">Đang tải...</td></tr></tbody>
         </table>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
@@ -183,8 +183,9 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
       <div class="fg"><label class="req" id="lblTenTram">Tên trạm/tổ</label><input type="text" autocomplete="off" id="at-ten" placeholder="VD: Tổ 1, Bàn 3..."></div>
       <div class="fg"><label class="req">Mã SP</label><input type="text" autocomplete="off" id="at-masp" list="dlMaSp" oninput="onMaSpPick('at-masp','at-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" autocomplete="off" id="at-tensp"></div>
-      <div class="fg"><label>KH ca (pcs) — mốc tham khảo tiến độ, không bắt buộc</label><input type="number" min="0" id="at-khca"></div>
-      <div class="fg"><label>Người kiểm tra</label><input type="text" autocomplete="off" id="at-nguoi" list="dlNhanVien"></div>
+      <div class="fg"><label id="lbl-at-khca">KH ca (pcs) — mốc tham khảo tiến độ, không bắt buộc</label><input type="number" min="0" id="at-khca"></div>
+      <div class="fg" id="at-khtuan-wrap" style="display:none"><label>KH tuần (pcs)</label><input type="number" min="0" id="at-khtuan"></div>
+      <div class="fg"><label>Người kiểm tra</label><input type="text" autocomplete="off" id="at-nguoi" list="dlNhanVien"><span id="at-nguoi-hint" style="font-size:11px;color:#999"></span></div>
     </div>
     <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalAddTram')">Huỷ</button><button class="btn" id="btnSubmitAddTram">Thêm</button></div>
   </div>
@@ -222,10 +223,12 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="modal-head"><div class="modal-title">🔄 Đổi mã SP <span id="dm-tram-label"></span></div><button class="modal-close" onclick="closeModal('modalDoiMa')">✕</button></div>
     <div class="modal-body">
       <p style="font-size:11.5px;color:#999" id="dm-desc">Sản lượng OK/NG hiện tại sẽ được cộng vào báo cáo cho đúng mã SP cũ, sau đó reset về 0 với mã mới.</p>
+      <div class="fg" id="dm-khsx-wrap" style="display:none"><label>Chọn mã SP từ KHSX tuần</label><select id="dm-khsx-pick"></select></div>
       <div class="fg"><label class="req">Mã SP mới</label><input type="text" autocomplete="off" id="dm-masp" list="dlMaSp" oninput="onMaSpPick('dm-masp','dm-tensp')"></div>
       <div class="fg"><label>Tên SP</label><input type="text" autocomplete="off" id="dm-tensp"></div>
-      <div class="fg"><label>KH ca (pcs) — không bắt buộc</label><input type="number" min="0" id="dm-khca"></div>
-      <div class="fg"><label>Người kiểm tra mới (để trống nếu giữ nguyên)</label><input type="text" autocomplete="off" id="dm-nguoi" list="dlNhanVien"></div>
+      <div class="fg"><label id="lbl-dm-khca">KH ca (pcs) — không bắt buộc</label><input type="number" min="0" id="dm-khca"></div>
+      <div class="fg" id="dm-khtuan-wrap" style="display:none"><label>KH tuần (pcs)</label><input type="number" min="0" id="dm-khtuan"></div>
+      <div class="fg"><label>Người kiểm tra mới (để trống nếu giữ nguyên)</label><input type="text" autocomplete="off" id="dm-nguoi" list="dlNhanVien"><span id="dm-nguoi-hint" style="font-size:11px;color:#999"></span></div>
     </div>
     <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalDoiMa')">Huỷ</button><button class="btn" id="btnSubmitDoiMa">Xác nhận đổi</button></div>
   </div>
@@ -249,6 +252,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
 
 <datalist id="dlMaSp"></datalist>
 <datalist id="dlNhanVien"></datalist>
+<datalist id="dlNguoiLine"></datalist>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
@@ -277,7 +281,15 @@ function tramLabel(){ return TRAM_LABEL_MAP[congDoan] || 'Trạm'; }
 // không map → giữ nguyên mô hình trạm tự do như cũ.
 const CD_TO_BO_PHAN = { 'Bavia': 'Bavia' };
 let lineCatalog = [];   // [ma_may] — rỗng nghĩa là dùng mô hình trạm tự do
+let empList = [];        // master_employees {ten_nhan_vien,vai_tro,bo_phan,line_may}
 function isLineMode(){ return lineCatalog.length > 0; }
+// Người được phép thao tác trên 1 line: nhân viên bộ phận này + line_may chứa line.
+function nguoiChoLine(line){
+  const bp = CD_TO_BO_PHAN[congDoan];
+  return empList
+    .filter(e => e.vai_tro === 'nhan_vien' && e.bo_phan === bp && (e.line_may || []).includes(line))
+    .map(e => e.ten_nhan_vien);
+}
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
@@ -362,10 +374,11 @@ function startHeaderClock(){
 async function loadDanhMuc(){
   const [prodRes, empRes] = await Promise.all([
     sb.from('master_products').select('ma_sp,ten_sp'),
-    sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
+    sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan,line_may').order('ten_nhan_vien'),
   ]);
   (prodRes.data || []).forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
   document.getElementById('dlMaSp').innerHTML = Object.keys(productMap).sort().map(ma => `<option value="${escapeHtml(ma)}">`).join('');
+  empList = empRes.data || [];
 
   const boPhan = CD_TO_BO_PHAN[congDoan];
   if (boPhan){
@@ -420,6 +433,7 @@ function activeTramRowHtml(t, merged){
       <td>${escapeHtml(t.ten_sp) || '<span style="color:#999">—</span>'}</td>
       <td>${escapeHtml(t.nguoi_thao_tac) || '<span style="color:#999">—</span>'}</td>
       <td class="num">${t.kh_ca != null ? fmtNum(t.kh_ca) : '<span style="color:#999">—</span>'}</td>
+      <td class="num">${t.kh_tuan != null ? fmtNum(t.kh_tuan) : '<span style="color:#999">—</span>'}</td>
       <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
       <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
       <td style="white-space:nowrap">
@@ -442,7 +456,7 @@ function renderTramsLineMode(){
     rows.push(`
       <tr>
         <td><b>${escapeHtml(line)}</b></td>
-        <td colspan="6"><span style="color:#999">Chưa gán kế hoạch</span></td>
+        <td colspan="7"><span style="color:#999">Chưa gán kế hoạch</span></td>
         <td style="white-space:nowrap"><button type="button" class="btn-tiny gan-kh-btn" data-line="${escapeHtml(line)}">+ Gán kế hoạch</button></td>
       </tr>`);
   });
@@ -461,7 +475,7 @@ function renderTrams(){
   // trưởng ca thấy "còn thiếu trạm cho mã nào" mà không phải xem 2 nơi.
   const pendingPlan = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp && t.cong_doan === p.cong_doan));
   const merged = congDoanGroup.length > 1;
-  const colspan = merged ? 9 : 8;
+  const colspan = merged ? 10 : 9;
   if (!trams.length && !pendingPlan.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="' + colspan + '">Chưa có ' + lbl + ' nào hoạt động trong ca này — bấm "+ Thêm ' + lbl + '".</td></tr>'; return; }
   const cdCell = (cd) => merged ? `<td><span class="sub-cd-badge">${escapeHtml(cd)}</span></td>` : '';
   const activeRows = trams.map(t => activeTramRowHtml(t, merged)).join('');
@@ -473,6 +487,7 @@ function renderTrams(){
       <td>${escapeHtml(p.ten_sp) || '<span style="color:#999">—</span>'}</td>
       <td><span style="color:#999">—</span></td>
       <td class="num">${fmtNum(p.khCa)}</td>
+      <td class="num">${fmtNum(p.khTuan)}</td>
       <td class="num"><span style="color:#999">—</span></td>
       <td class="num"><span style="color:#999">—</span></td>
       <td style="white-space:nowrap">
@@ -488,9 +503,18 @@ function renderTrams(){
 function findTram(id){ return trams.find(t => t.id_tram === id); }
 
 /* ---------- + Thêm trạm/line/máy/bàn kiểm ---------- */
-document.getElementById('btnAddTram').addEventListener('click', () => {
+function resetAddTramExtras(){
+  ganKeHoachLine = null;
   document.getElementById('at-khsx-wrap').style.display = 'none';
+  document.getElementById('at-khtuan-wrap').style.display = 'none';
+  document.getElementById('at-khtuan').value = '';
   document.getElementById('at-ten').readOnly = false;
+  document.getElementById('at-nguoi').setAttribute('list', 'dlNhanVien');
+  document.getElementById('at-nguoi-hint').textContent = '';
+  document.getElementById('lbl-at-khca').textContent = 'KH ca (pcs) — mốc tham khảo tiến độ, không bắt buộc';
+}
+document.getElementById('btnAddTram').addEventListener('click', () => {
+  resetAddTramExtras();
   document.getElementById('addTramTitle').textContent = '+ Thêm ' + tramLabel();
   document.getElementById('at-ten').value = '';
   document.getElementById('at-masp').value = '';
@@ -506,6 +530,8 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
   if (!ten) return showMsg('Chưa nhập tên ' + tramLabel().toLowerCase() + '.', 'err');
   if (!masp) return showMsg('Chưa nhập mã SP.', 'err');
   const khCaRaw = document.getElementById('at-khca').value;
+  const khTuanRaw = document.getElementById('at-khtuan').value;
+  if (ganKeHoachLine && khCaRaw === '') return showMsg('KH ca là bắt buộc khi gán kế hoạch cho line.', 'err');
   const congDoanRow = congDoanGroup.length > 1 ? document.getElementById('at-congdoan').value : congDoan;
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
@@ -513,11 +539,12 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
     p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: congDoanRow,
     p_ten_tram: ten, p_ma_sp: masp, p_ten_sp: document.getElementById('at-tensp').value.trim(),
     p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
+    p_kh_tuan: khTuanRaw === '' ? null : Number(khTuanRaw),
     p_nguoi: document.getElementById('at-nguoi').value.trim(), p_user: await MesAuth.getCurrentUserIdentity(),
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalAddTram');
-  showMsg('✅ Đã thêm ' + ten, 'ok');
+  showMsg('✅ Đã ' + (ganKeHoachLine ? 'gán kế hoạch cho ' : 'thêm ') + ten, 'ok');
   loadTrams();
 });
 
@@ -579,18 +606,54 @@ function openDoiMa(id){
   document.getElementById('dm-masp').value = '';
   document.getElementById('dm-tensp').value = '';
   document.getElementById('dm-khca').value = t && t.kh_ca != null ? t.kh_ca : '';
+  document.getElementById('dm-khtuan').value = t && t.kh_tuan != null ? t.kh_tuan : '';
   document.getElementById('dm-nguoi').value = '';
+
+  const lineMode = isLineMode() && t && lineCatalog.includes(t.ten_tram);
+  document.getElementById('dm-khtuan-wrap').style.display = lineMode ? '' : 'none';
+  document.getElementById('lbl-dm-khca').textContent = lineMode ? 'KH ca (pcs) — bắt buộc' : 'KH ca (pcs) — không bắt buộc';
+
+  const pickWrap = document.getElementById('dm-khsx-wrap');
+  const pick = document.getElementById('dm-khsx-pick');
+  if (lineMode){
+    const avail = planToday.filter(p => !trams.some(x => x.id_tram !== currentTarget && x.ma_sp === p.ma_sp));
+    pick.innerHTML = '<option value="">— Nhập tay —</option>' +
+      avail.map((p, i) => `<option value="${i}">${escapeHtml(p.ma_sp)} — ${escapeHtml(p.ten_sp || '')} · KH ca ${fmtNum(p.khCa)} · KH tuần ${fmtNum(p.khTuan)}</option>`).join('');
+    pick._avail = avail;
+    pickWrap.style.display = avail.length ? '' : 'none';
+    const ds = nguoiChoLine(t.ten_tram);
+    document.getElementById('dm-nguoi').setAttribute('list', 'dlNguoiLine');
+    document.getElementById('dlNguoiLine').innerHTML = ds.map(n => `<option value="${escapeHtml(n)}">`).join('');
+    document.getElementById('dm-nguoi-hint').textContent = ds.length ? ' (' + ds.length + ' người được phép thao tác ' + t.ten_tram + ')' : '';
+  } else {
+    pickWrap.style.display = 'none';
+    document.getElementById('dm-nguoi').setAttribute('list', 'dlNhanVien');
+    document.getElementById('dm-nguoi-hint').textContent = '';
+  }
   openModal('modalDoiMa');
 }
+document.getElementById('dm-khsx-pick').addEventListener('change', (e) => {
+  const p = (e.target._avail || [])[Number(e.target.value)];
+  if (!p) return;
+  document.getElementById('dm-masp').value = p.ma_sp;
+  document.getElementById('dm-tensp').value = p.ten_sp || '';
+  document.getElementById('dm-khca').value = p.khCa || '';
+  document.getElementById('dm-khtuan').value = p.khTuan || '';
+});
 document.getElementById('btnSubmitDoiMa').addEventListener('click', async () => {
   const masp = document.getElementById('dm-masp').value.trim();
   if (!masp) return showMsg('Chưa nhập mã SP mới.', 'err');
   const khCaRaw = document.getElementById('dm-khca').value;
+  const khTuanRaw = document.getElementById('dm-khtuan').value;
+  const t = findTram(currentTarget);
+  const lineMode = isLineMode() && t && lineCatalog.includes(t.ten_tram);
+  if (lineMode && khCaRaw === '') return showMsg('KH ca là bắt buộc khi đổi SP cho line.', 'err');
   const session = await MesAuth.getSession();
   if (!session) return requireLogin();
   const { error } = await sb.rpc('cd_tram_doi_ma_sp', {
     p_id_tram: currentTarget, p_ma_sp_moi: masp, p_ten_sp_moi: document.getElementById('dm-tensp').value.trim(),
     p_kh_ca_moi: khCaRaw === '' ? null : Number(khCaRaw),
+    p_kh_tuan_moi: khTuanRaw === '' ? null : Number(khTuanRaw),
     p_nguoi_moi: document.getElementById('dm-nguoi').value.trim(), p_user: await MesAuth.getCurrentUserIdentity(),
   });
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
@@ -709,18 +772,17 @@ async function loadKhsxToday(){
   const jsDay = d.getDay();
   const dayCol = dayCols[jsDay === 0 ? 6 : jsDay - 1];
   const { data, error } = await sb.from('cd_khsx_tuan_plan')
-    .select('ma_sp,ten_sp,cong_doan,' + dayCol)
+    .select('ma_sp,ten_sp,cong_doan,kh_tuan,' + dayCol)
     .eq('tuan_bat_dau', mondayOfKhsx(ngay)).in('cong_doan', congDoanGroup);
   if (error){ console.error('loadKhsxToday lỗi:', error.message); return; }
   planToday = (data || [])
     .filter(r => Number(r[dayCol]) > 0)
-    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, cong_doan: r.cong_doan, khCa: motCa ? Number(r[dayCol]) : Math.round(Number(r[dayCol]) / 2) }))
+    .map(r => ({ ma_sp: r.ma_sp, ten_sp: r.ten_sp, cong_doan: r.cong_doan, khCa: motCa ? Number(r[dayCol]) : Math.round(Number(r[dayCol]) / 2), khTuan: Number(r.kh_tuan) || 0 }))
     .sort((a, b) => a.ma_sp.localeCompare(b.ma_sp, 'vi'));
   renderTrams();
 }
 function openAddTramFromKhsx(maSp, tenSp, khCa, congDoanSub){
-  document.getElementById('at-khsx-wrap').style.display = 'none';
-  document.getElementById('at-ten').readOnly = false;
+  resetAddTramExtras();
   document.getElementById('addTramTitle').textContent = '+ Thêm ' + tramLabel();
   document.getElementById('at-ten').value = '';
   document.getElementById('at-masp').value = maSp;
@@ -732,22 +794,36 @@ function openAddTramFromKhsx(maSp, tenSp, khCa, congDoanSub){
   document.getElementById('at-ten').focus();
 }
 
-// Line mode: bấm "Gán kế hoạch" ở 1 Line trống — chọn mã SP từ KHSX tuần hôm nay
-// (hoặc nhập tay), tên Line khoá theo danh mục.
+// Line mode: bấm "Gán kế hoạch" ở 1 Line trống. KH ca + KH tuần link tự động
+// từ KHSX tuần của bộ phận; người kiểm tra chỉ chọn trong nhân viên bộ phận
+// này được phép thao tác trên đúng line đó.
+let ganKeHoachLine = null;
 function openGanKeHoach(line){
+  ganKeHoachLine = line;
   document.getElementById('addTramTitle').textContent = 'Gán kế hoạch cho ' + line;
   document.getElementById('at-ten').value = line;
   document.getElementById('at-ten').readOnly = true;
   document.getElementById('at-masp').value = '';
   document.getElementById('at-tensp').value = '';
   document.getElementById('at-khca').value = '';
+  document.getElementById('at-khtuan').value = '';
   document.getElementById('at-nguoi').value = '';
+  document.getElementById('at-khtuan-wrap').style.display = '';
+  document.getElementById('lbl-at-khca').textContent = 'KH ca (pcs) — bắt buộc';
+
+  // Người kiểm tra: lọc theo line
+  const ds = nguoiChoLine(line);
+  document.getElementById('at-nguoi').setAttribute('list', 'dlNguoiLine');
+  document.getElementById('dlNguoiLine').innerHTML = ds.map(n => `<option value="${escapeHtml(n)}">`).join('');
+  document.getElementById('at-nguoi-hint').textContent = ds.length
+    ? ' (' + ds.length + ' người được phép thao tác ' + line + ')'
+    : ' Chưa gán nhân viên nào cho ' + line + ' — khai ở Danh mục nhân sự.';
 
   const wrap = document.getElementById('at-khsx-wrap');
   const sel = document.getElementById('at-khsx-pick');
   const avail = planToday.filter(p => !trams.some(t => t.ma_sp === p.ma_sp));
   sel.innerHTML = '<option value="">— Nhập tay —</option>' +
-    avail.map((p, i) => `<option value="${i}">${escapeHtml(p.ma_sp)} — ${escapeHtml(p.ten_sp || '')} · KH ${fmtNum(p.khCa)}</option>`).join('');
+    avail.map((p, i) => `<option value="${i}">${escapeHtml(p.ma_sp)} — ${escapeHtml(p.ten_sp || '')} · KH ca ${fmtNum(p.khCa)} · KH tuần ${fmtNum(p.khTuan)}</option>`).join('');
   sel._avail = avail;
   wrap.style.display = avail.length ? '' : 'none';
 
@@ -760,6 +836,16 @@ document.getElementById('at-khsx-pick').addEventListener('change', (e) => {
   document.getElementById('at-masp').value = p.ma_sp;
   document.getElementById('at-tensp').value = p.ten_sp || '';
   document.getElementById('at-khca').value = p.khCa || '';
+  document.getElementById('at-khtuan').value = p.khTuan || '';
+});
+// Khi gõ/đổi mã SP trong modal gán kế hoạch: tự khớp KH ca/KH tuần từ KHSX tuần.
+document.getElementById('at-masp').addEventListener('input', () => {
+  if (!ganKeHoachLine) return;
+  const p = planToday.find(x => x.ma_sp === document.getElementById('at-masp').value.trim());
+  if (p){
+    document.getElementById('at-khca').value = p.khCa || '';
+    document.getElementById('at-khtuan').value = p.khTuan || '';
+  }
 });
 
 // In tem = mở luồng "Đóng gói lại" (tách / gộp tem đang sản xuất) ở
@@ -799,7 +885,7 @@ document.getElementById('btnKhsxBatch').addEventListener('click', () => {
     list.innerHTML = pendingPlan.map((p, i) => {
       const tenGoiY = lbl + ' ' + (nextNum + i);
       return `
-        <div class="kb-row" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}" data-cong-doan="${escapeHtml(p.cong_doan)}">
+        <div class="kb-row" data-ma-sp="${escapeHtml(p.ma_sp)}" data-ten-sp="${escapeHtml(p.ten_sp || '')}" data-cong-doan="${escapeHtml(p.cong_doan)}" data-kh-tuan="${p.khTuan || ''}">
           <input type="checkbox" class="kb-check" checked style="width:16px;height:16px;flex:none">
           <div class="kb-info">
             <div><b>${escapeHtml(p.ma_sp)}</b> — ${escapeHtml(p.ten_sp || '')} ${merged ? `<span class="sub-cd-badge">${escapeHtml(p.cong_doan)}</span>` : ''}</div>
@@ -840,6 +926,7 @@ document.getElementById('btnSubmitKhsxBatch').addEventListener('click', async ()
       p_ngay: document.getElementById('ngay').value, p_ca: document.getElementById('ca').value, p_cong_doan: r.dataset.congDoan || congDoan,
       p_ten_tram: ten, p_ma_sp: r.dataset.maSp, p_ten_sp: r.dataset.tenSp,
       p_kh_ca: khCaRaw === '' ? null : Number(khCaRaw),
+      p_kh_tuan: r.dataset.khTuan ? Number(r.dataset.khTuan) : null,
       p_nguoi: '', p_user: await MesAuth.getCurrentUserIdentity(),
     });
     if (error) fail.push(ten + ': ' + error.message); else ok++;
