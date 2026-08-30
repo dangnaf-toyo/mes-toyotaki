@@ -291,7 +291,16 @@ function nguoiChoLine(line){
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n) || 0).toLocaleString('vi-VN'); }
-function showMsg(text, cls){ const el = document.getElementById('msg'); el.textContent = text; el.className = cls; }
+let msgTimer;
+function showMsg(text, cls){
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = cls;
+  clearTimeout(msgTimer);
+  // Tự ẩn: thông báo thành công 2.5s, lỗi 6s (không kẹt mãi trên đầu trang).
+  const ms = cls === 'err' ? 6000 : 2500;
+  msgTimer = setTimeout(() => { el.className = ''; el.textContent = ''; }, ms);
+}
 function fillSelect(id, arr, placeholder){
   const sel = document.getElementById(id);
   sel.innerHTML = (placeholder ? '<option value="">' + placeholder + '</option>' : '') + (arr || []).map(v => `<option value="${v}">${v}</option>`).join("");
