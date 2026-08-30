@@ -209,7 +209,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="modal-head"><div class="modal-title">✏️ Sửa <span id="st-tram-label"></span></div><button class="modal-close" onclick="closeModal('modalSuaTram')">✕</button></div>
     <div class="modal-body">
       <p style="font-size:11.5px;color:#999">Chỉ sửa người thao tác/KH ca — không đụng mã SP hay sản lượng OK/NG đang đếm.</p>
-      <div class="fg"><label>Người kiểm tra</label><input type="text" autocomplete="off" id="st-nguoi" list="dlNhanVien"></div>
+      <div class="fg"><label>Người kiểm tra</label><input type="text" autocomplete="off" id="st-nguoi" list="dlNhanVien"><span id="st-nguoi-hint" style="font-size:11px;color:#999"></span></div>
       <div class="fg"><label>KH ca (pcs)</label><input type="number" min="0" id="st-khca"></div>
     </div>
     <div class="modal-foot"><button class="btn-outline btn" onclick="closeModal('modalSuaTram')">Huỷ</button><button class="btn" id="btnSubmitSuaTram">Lưu</button></div>
@@ -601,6 +601,20 @@ function openSuaTram(id){
   document.getElementById('st-tram-label').textContent = t ? '(' + t.ten_tram + ' — ' + t.ma_sp + ')' : '';
   document.getElementById('st-nguoi').value = t ? (t.nguoi_thao_tac || '') : '';
   document.getElementById('st-khca').value = t && t.kh_ca != null ? t.kh_ca : '';
+
+  // Line mode: người kiểm tra chỉ gợi ý nhân viên bộ phận này được phép thao
+  // tác trên đúng line đó (vẫn gõ tay tên khác được).
+  const lineMode = isLineMode() && t && lineCatalog.includes(t.ten_tram);
+  const hint = document.getElementById('st-nguoi-hint');
+  if (lineMode){
+    const ds = nguoiChoLine(t.ten_tram);
+    document.getElementById('st-nguoi').setAttribute('list', 'dlNguoiLine');
+    document.getElementById('dlNguoiLine').innerHTML = ds.map(n => `<option value="${escapeHtml(n)}">`).join('');
+    hint.textContent = ds.length ? ' (' + ds.length + ' người được phép thao tác ' + t.ten_tram + ')' : ' Chưa gán nhân viên nào cho ' + t.ten_tram + '.';
+  } else {
+    document.getElementById('st-nguoi').setAttribute('list', 'dlNhanVien');
+    hint.textContent = '';
+  }
   openModal('modalSuaTram');
 }
 document.getElementById('btnSubmitSuaTram').addEventListener('click', async () => {
