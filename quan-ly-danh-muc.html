@@ -67,7 +67,10 @@
   .muted{color:var(--text-muted);font-size:12px;}
   .empty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px;}
   .table-wrap{overflow-x:auto;}
-  .chk-grid{display:flex;flex-wrap:wrap;gap:8px 18px;border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:#fff;max-height:170px;overflow:auto;}
+  .chk-grid{border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:#fff;max-height:230px;overflow:auto;}
+  .chk-group + .chk-group{margin-top:12px;}
+  .chk-group-head{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .chk-group-items{display:flex;flex-wrap:wrap;gap:8px 18px;}
   .chk-grid label{display:flex;align-items:center;gap:7px;margin:0;font-weight:400;color:var(--text);font-size:13px;white-space:nowrap;cursor:pointer;}
   .chk-grid input{width:auto;}
   .chk-grid .empty-hint{color:var(--text-muted);font-size:12.5px;}
@@ -82,7 +85,7 @@
       <div class="title">Quản Lý Danh Mục</div>
     </div>
     <div class="tabs" id="adminTabs" style="display:none">
-      <button class="tab-btn active" data-tab="may">Máy</button>
+      <button class="tab-btn active" data-tab="may">Máy-Line</button>
       <button class="tab-btn" data-tab="sp">Sản phẩm</button>
       <button class="tab-btn" data-tab="ns">Nhân sự</button>
       <button class="tab-btn" data-tab="khuon">Khuôn</button>
@@ -103,13 +106,23 @@
     <section id="tab-may" class="tab-pane">
       <div class="card">
         <h2>
-          <span id="may-form-title">Thêm máy</span>
+          <span id="may-form-title">Thêm máy-line</span>
           <span class="cancel-edit" id="may-cancel">Huỷ sửa ✕</span>
         </h2>
         <div class="msg" id="may-msg"></div>
         <form id="may-form">
           <div class="form-grid">
-            <div><label for="may-ma">Mã máy</label><input type="text" autocomplete="off" id="may-ma" required></div>
+            <div><label for="may-ma">Mã máy / line</label><input type="text" autocomplete="off" id="may-ma" required></div>
+            <div>
+              <label for="may-bophan">Bộ phận</label>
+              <input type="text" autocomplete="off" id="may-bophan" list="may-bophan-list" placeholder="vd: Đúc">
+              <datalist id="may-bophan-list">
+                <option value="Đúc">
+                <option value="Bavia">
+                <option value="Gia công - Sơn">
+                <option value="OQC">
+              </datalist>
+            </div>
             <div>
               <label for="may-kanban">Chạy theo Kanban</label>
               <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:9px 0">
@@ -117,18 +130,18 @@
               </label>
             </div>
           </div>
-          <div class="form-actions"><button type="submit" id="may-submit">Thêm máy</button></div>
+          <div class="form-actions"><button type="submit" id="may-submit">Thêm máy-line</button></div>
         </form>
       </div>
       <div class="card">
-        <h2>Danh sách máy</h2>
+        <h2>Danh sách Máy-Line</h2>
         <div class="table-wrap">
           <table id="may-table" style="display:none">
-            <thead><tr><th>Mã máy</th><th>Kanban</th><th class="col-actions"></th></tr></thead>
+            <thead><tr><th>Mã máy / line</th><th>Bộ phận</th><th>Kanban</th><th class="col-actions"></th></tr></thead>
             <tbody id="may-tbody"></tbody>
           </table>
         </div>
-        <div class="empty" id="may-empty" style="display:none">Chưa có máy nào.</div>
+        <div class="empty" id="may-empty" style="display:none">Chưa có máy-line nào.</div>
       </div>
     </section>
 
@@ -312,14 +325,14 @@ function mayResetForm(){
   mayEditing = null;
   document.getElementById('may-form').reset();
   document.getElementById('may-ma').disabled = false;
-  document.getElementById('may-form-title').textContent = 'Thêm máy';
-  document.getElementById('may-submit').textContent = 'Thêm máy';
+  document.getElementById('may-form-title').textContent = 'Thêm máy-line';
+  document.getElementById('may-submit').textContent = 'Thêm máy-line';
   document.getElementById('may-cancel').style.display = 'none';
 }
 document.getElementById('may-cancel').addEventListener('click', mayResetForm);
 
 async function loadMay(){
-  const { data, error } = await sb.from('master_machines').select('ma_may, kanban').order('ma_may');
+  const { data, error } = await sb.from('master_machines').select('ma_may, kanban, bo_phan').order('bo_phan').order('ma_may');
   if (error){ showMsg('may-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('may-msg');
   const table = document.getElementById('may-table'), tbody = document.getElementById('may-tbody'), empty = document.getElementById('may-empty');
@@ -328,6 +341,7 @@ async function loadMay(){
   tbody.innerHTML = data.map(r => `
     <tr>
       <td>${escapeHtml(r.ma_may)}</td>
+      <td>${escapeHtml(r.bo_phan) || '<span class="muted">—</span>'}</td>
       <td>${r.kanban ? '<span style="color:var(--run-fg);font-weight:600">✔ Kanban</span>' : '<span class="muted">—</span>'}</td>
       <td class="row-actions">
         <button type="button" class="edit">Sửa</button>
@@ -341,14 +355,15 @@ async function loadMay(){
       mayEditing = r.ma_may;
       document.getElementById('may-ma').value = r.ma_may;
       document.getElementById('may-ma').disabled = true;
+      document.getElementById('may-bophan').value = r.bo_phan || '';
       document.getElementById('may-kanban').checked = !!r.kanban;
-      document.getElementById('may-form-title').textContent = 'Sửa máy: ' + r.ma_may;
+      document.getElementById('may-form-title').textContent = 'Sửa máy-line: ' + r.ma_may;
       document.getElementById('may-submit').textContent = 'Lưu thay đổi';
       document.getElementById('may-cancel').style.display = 'inline';
       window.scrollTo({ top: document.getElementById('may-form').offsetTop - 20, behavior: 'smooth' });
     });
     tr.querySelector('.del').addEventListener('click', async () => {
-      if (!confirm('Xoá máy "' + r.ma_may + '"?')) return;
+      if (!confirm('Xoá máy-line "' + r.ma_may + '"?')) return;
       const { error: delErr } = await sb.from('master_machines').delete().eq('ma_may', r.ma_may);
       if (delErr) return alert('Lỗi xoá: ' + delErr.message + (delErr.message.includes('foreign key') ? ' (máy này đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
       loadMay();
@@ -359,16 +374,17 @@ document.getElementById('may-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const ma_may = document.getElementById('may-ma').value.trim();
   const kanban = document.getElementById('may-kanban').checked;
+  const bo_phan = document.getElementById('may-bophan').value.trim() || null;
   if (!ma_may) return;
 
   let error;
   if (mayEditing){
-    ({ error } = await sb.from('master_machines').update({ kanban }).eq('ma_may', mayEditing));
+    ({ error } = await sb.from('master_machines').update({ kanban, bo_phan }).eq('ma_may', mayEditing));
   } else {
-    ({ error } = await sb.from('master_machines').insert({ ma_may, kanban }));
+    ({ error } = await sb.from('master_machines').insert({ ma_may, kanban, bo_phan }));
   }
   if (error) return showMsg('may-msg', 'error', 'Lỗi: ' + error.message);
-  showMsg('may-msg', 'ok', mayEditing ? 'Đã lưu ' + ma_may + '.' : 'Đã thêm máy ' + ma_may + '.');
+  showMsg('may-msg', 'ok', mayEditing ? 'Đã lưu ' + ma_may + '.' : 'Đã thêm máy-line ' + ma_may + '.');
   mayResetForm();
   loadMay();
 });
@@ -506,11 +522,15 @@ const NS_ROLE_LABELS = {
 // ── Line (Máy): danh sách checkbox từ danh mục máy ──────────────────────
 async function loadNsLineMayOptions(){
   const box = document.getElementById('ns-linemay');
-  const { data, error } = await sb.from('master_machines').select('ma_may').order('ma_may');
+  const { data, error } = await sb.from('master_machines').select('ma_may, bo_phan').order('bo_phan').order('ma_may');
   if (error){ box.innerHTML = '<span class="empty-hint">Không tải được danh mục máy: ' + escapeHtml(error.message) + '</span>'; return; }
-  if (!data || !data.length){ box.innerHTML = '<span class="empty-hint">Chưa có máy nào trong danh mục.</span>'; return; }
-  box.innerHTML = data.map(r =>
-    `<label><input type="checkbox" value="${escapeHtml(r.ma_may)}"> ${escapeHtml(r.ma_may)}</label>`
+  if (!data || !data.length){ box.innerHTML = '<span class="empty-hint">Chưa có máy-line nào trong danh mục.</span>'; return; }
+  const groups = {};
+  data.forEach(r => { const k = r.bo_phan || '(chưa gán bộ phận)'; (groups[k] = groups[k] || []).push(r.ma_may); });
+  box.innerHTML = Object.entries(groups).map(([bp, mays]) =>
+    `<div class="chk-group"><div class="chk-group-head">${escapeHtml(bp)}</div><div class="chk-group-items">` +
+    mays.map(m => `<label><input type="checkbox" value="${escapeHtml(m)}"> ${escapeHtml(m)}</label>`).join('') +
+    `</div></div>`
   ).join('');
 }
 function getNsLineMay(){
