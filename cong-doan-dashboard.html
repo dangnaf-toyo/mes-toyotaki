@@ -304,6 +304,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
 <datalist id="dlNhanVien"></datalist>
 <datalist id="dlNguoiLine"></datalist>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
@@ -953,6 +954,86 @@ function openInTem(idTram){
   window.open('chuyencongdoan.html?' + p.toString(), '_blank', 'noopener');
 }
 
+/* ========== In tem A6 (dùng lại renderer của intem.html) ================= */
+function svgEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function buildQrRects(dataStr, sizeMm, bgColor, fgColor){
+  var qr = qrcode(0, 'M'); qr.addData(dataStr); qr.make();
+  var n = qr.getModuleCount(), cell = sizeMm / n;
+  var out = '<rect x="0" y="0" width="'+sizeMm+'" height="'+sizeMm+'" fill="'+bgColor+'"/>';
+  for (var r=0; r<n; r++) for (var c=0; c<n; c++) if (qr.isDark(r,c))
+    out += '<rect x="'+(c*cell).toFixed(3)+'" y="'+(r*cell).toFixed(3)+'" width="'+cell.toFixed(3)+'" height="'+cell.toFixed(3)+'" fill="'+fgColor+'"/>';
+  return out;
+}
+function buildLabelSvg(d){
+  var W=72, H=100, PW=105, PH=148;                 // khổ A6 dọc — giống intem.html
+  var scale = Math.min(PW/W, PH/H), offX=(PW-W*scale)/2, offY=(PH-H*scale)/2;
+  var bg='#ffffff', fg='#000000';
+  var rows = [
+    {lbl:'Mã sản phẩm', val:d.maSP, big:true}, {lbl:'Tên sản phẩm', val:d.tenSP, big:true},
+    {lbl:'Tag No', val:d.tagNo}, {lbl:'Số lượng', val:d.soLuong}, {lbl:'Người thao tác', val:d.nguoiTT},
+    {lbl:'Ngày sản xuất', val:d.lotNo}, {lbl:'Số khuôn', val:d.soKhuon}, {lbl:'Nguyên liệu', val:d.nguyenLieu},
+    {lbl:'Máy đúc', val:d.mayDuc}, {lbl:'Ghi chú', val:d.ghiChu}
+  ];
+  var rowStartY=17.5, rowH=3.9, rowsEndY=rowStartY+(rows.length-1)*rowH;
+  var qrSize=34, qrX=(W-qrSize)/2, qrY=rowsEndY+5, ftrLineY=qrY+qrSize+2, ftrTextY=ftrLineY+2.8;
+  var svg = '<svg viewBox="0 0 '+PW+' '+PH+'" width="'+PW+'mm" height="'+PH+'mm" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect x="0" y="0" width="'+PW+'" height="'+PH+'" fill="'+bg+'"/>';
+  svg += '<g transform="translate('+offX.toFixed(3)+','+offY.toFixed(3)+') scale('+scale.toFixed(4)+')">';
+  svg += '<text x="4" y="9.6" font-family="Arial,Helvetica,sans-serif" font-size="6.2" font-weight="bold" fill="'+fg+'">TEM THÀNH PHẨM BAVIA</text>';
+  svg += '<line x1="4" y1="13.5" x2="'+(W-4)+'" y2="13.5" stroke="'+fg+'" stroke-width="0.3"/>';
+  rows.forEach(function(r,i){
+    var y = rowStartY + i*rowH, lblSize = r.big?3.0:2.6, valSize = r.big?3.9:3.0;
+    var vLen = String(r.val||'').length; if (vLen>26) valSize-=0.5; if (vLen>40) valSize-=0.5;
+    svg += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.lbl)+'</text>';
+    svg += '<text x="27" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
+  });
+  svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
+  svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="'+fg+'" stroke-width="0.3"/>';
+  svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.4" font-weight="bold" fill="'+fg+'">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
+  svg += '</g></svg>';
+  return svg;
+}
+async function printTkbTems(tags){
+  if (!tags || !tags.length) return;
+  if (typeof qrcode === 'undefined') return showMsg('Chưa tải được thư viện QR — tải lại trang.', 'err');
+  const { data, error } = await sb.from('duc_tem')
+    .select('tag_no,ten_sp,ma_sp,so_luong,ngay,lot,so_khuon,nguyen_lieu,may_duc_chi_thi,nguoi_tt,ghi_chu')
+    .in('tag_no', tags);
+  if (error || !data || !data.length) return showMsg('Không tải được tem để in.', 'err');
+  const byTag = {}; data.forEach(r => byTag[r.tag_no] = r);
+  const pages = tags.map(tag => byTag[tag]).filter(Boolean).map(r => {
+    const p = String(r.ngay || '').split('-');
+    const ngayQR = p.length === 3 ? p.join('/') : (r.ngay || '');
+    const ngayHT = p.length === 3 ? (p[2]+'/'+p[1]+'/'+p[0]) : (r.ngay || '');
+    const lotNo = r.lot || ngayHT;
+    const qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, lotNo, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join('>\n');
+    const svg = buildLabelSvg({
+      tagNo: r.tag_no, qr, tenSP: r.ten_sp, maSP: r.ma_sp, soLuong: r.so_luong,
+      lotNo, soKhuon: r.so_khuon || '', nguyenLieu: r.nguyen_lieu || '',
+      mayDuc: r.may_duc_chi_thi || '', nguoiTT: r.nguoi_tt || '', ghiChu: r.ghi_chu || '',
+    });
+    return '<div class="page">' + svg + '</div>';
+  });
+  const css = [
+    '@page{size:105mm 148mm;margin:0}',
+    '*{margin:0;padding:0;box-sizing:border-box}',
+    'html,body{background:#fff}',
+    '.page{width:105mm;height:148mm;page-break-after:always;overflow:hidden}',
+    '.page svg{display:block;width:105mm;height:148mm}',
+    '.pbtn{position:fixed;bottom:14px;right:14px;background:#0F5FA5;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer}',
+    '@media print{.pbtn{display:none}}',
+  ].join('');
+  const w = window.open('', '_blank', 'width=460,height=760,scrollbars=yes');
+  if (!w) return showMsg('Trình duyệt chặn popup — cho phép popup rồi in lại.', 'err');
+  w.document.open();
+  w.document.write('<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Tem TKB (' + tags.length + ')</title><style>' + css + '</style></head><body>'
+    + pages.join('')
+    + '<button class="pbtn" onclick="window.print()">🖨 In ngay</button>'
+    + '<' + 'script>setTimeout(function(){window.print();},250);<' + '/script>'
+    + '</body></html>');
+  w.document.close();
+}
+
 /* ========== Xử lý thùng (Bavia line mode) ================================ */
 let xlt = { idTram: null, tram: null, sources: [] };
 
@@ -1018,9 +1099,19 @@ function removeXltSource(tag){ xlt.sources = xlt.sources.filter(s => s.tag_no !=
 function renderXltSources(){
   const list = document.getElementById('xlt-srcList');
   const empty = document.getElementById('xlt-srcEmpty');
-  if (!xlt.sources.length){ list.innerHTML = ''; empty.style.display = ''; return; }
+  const cb = document.getElementById('xlt-canhbao');
+  if (!xlt.sources.length){ list.innerHTML = ''; empty.style.display = ''; cb.textContent = ''; return; }
   empty.style.display = 'none';
   const tong = xlt.sources.reduce((s, x) => s + Number(x.so_luong || 0), 0);
+  // Cảnh báo mềm: gộp thùng khác khuôn / khác lô (không chặn).
+  const khuons = [...new Set(xlt.sources.map(s => (s.so_khuon || '').trim()).filter(Boolean))];
+  const lots = [...new Set(xlt.sources.map(s => (s.lot || '').trim()).filter(Boolean))];
+  const warns = [];
+  if (khuons.length > 1) warns.push('khác khuôn (' + khuons.join(', ') + ')');
+  if (lots.length > 1) warns.push('khác lô');
+  cb.textContent = warns.length
+    ? '⚠ Đang gộp thùng ' + warns.join(' · ') + ' — tem ra ghi gộp; truy xuất vẫn chính xác theo từng nguồn.'
+    : '';
   list.innerHTML = xlt.sources.map(s => `
     <div class="kb-row" style="padding:6px 9px">
       <div class="kb-info">
@@ -1066,13 +1157,19 @@ document.getElementById('btnSubmitXuLyThung').addEventListener('click', async ()
   if (error) return cb.textContent = 'Lỗi: ' + error.message;
 
   const tems = (data && data.tems) || [];
-  document.getElementById('xlt-resultList').innerHTML = tems.map(t => {
-    const label = t.loai === 'ng_sua' ? 'NG chờ sửa' : (t.loai === 'ok_gop' ? 'gộp vào' : 'OK');
-    return `<div class="kb-row" style="padding:6px 9px">
-      <div class="kb-info"><div><b>${escapeHtml(t.tag)}</b> · ${fmtNum(t.so_luong)} · ${label}</div></div>
-      <a href="intem.html?tagNo=${encodeURIComponent(t.tag)}" target="_blank" rel="noopener"><button type="button" class="btn-tiny">In tem</button></a>
-    </div>`;
-  }).join('') || '<div style="font-size:12px;color:#999">Không tạo tem mới (chỉ NG phế).</div>';
+  xlt.resultTems = tems;
+  const inPrintable = tems.filter(t => t.loai !== 'ok_gop').map(t => t.tag);
+  document.getElementById('xlt-resultList').innerHTML =
+    (inPrintable.length
+      ? `<div style="margin-bottom:8px"><button type="button" class="btn" onclick='printTkbTems(${JSON.stringify(inPrintable)})'>🖨 In tất cả (${inPrintable.length}) tem A6</button></div>`
+      : '') +
+    (tems.map(t => {
+      const label = t.loai === 'ng_sua' ? 'NG chờ sửa' : (t.loai === 'ok_gop' ? 'gộp vào (không in)' : 'OK');
+      return `<div class="kb-row" style="padding:6px 9px">
+        <div class="kb-info"><div><b>${escapeHtml(t.tag)}</b> · ${fmtNum(t.so_luong)} · ${label}</div></div>
+        ${t.loai === 'ok_gop' ? '' : `<button type="button" class="btn-tiny" onclick='printTkbTems(["${t.tag}"])'>🖨 In</button>`}
+      </div>`;
+    }).join('') || '<div style="font-size:12px;color:#999">Không tạo tem mới (chỉ NG phế).</div>');
   document.getElementById('xlt-body').style.display = 'none';
   document.getElementById('xlt-result').style.display = '';
   btn.style.display = 'none';
