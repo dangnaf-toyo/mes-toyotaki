@@ -100,9 +100,8 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
 .kb-row input[type=number]{width:70px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px}
 .kb-row select{width:110px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px;background:#fff}
 .sub-cd-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--bg-sunken);color:var(--text-muted);border:1px solid var(--border);text-transform:uppercase;letter-spacing:.03em}
-.ngcode-box{display:flex;flex-wrap:wrap;gap:5px 12px;border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 10px;max-height:150px;overflow:auto;background:#fff}
-.ngcode-box label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:400;cursor:pointer;white-space:nowrap}
-.ngcode-box label b{font-family:'JetBrains Mono',monospace;color:var(--accent)}
+.ngref{margin-top:5px;font-size:11.5px;color:var(--text-muted);line-height:1.7}
+.ngref b{font-family:'JetBrains Mono',monospace;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -283,9 +282,9 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <div class="fg" style="flex:1;min-width:110px"><label>NG sửa</label><input type="number" min="0" id="xlt-ngsua" value="0"></div>
       </div>
       <div class="fg">
-        <label>Loại lỗi NG (chọn 1+ mã, bắt buộc nếu có NG)</label>
-        <div id="xlt-ngcodes" class="ngcode-box"></div>
-        <input type="text" autocomplete="off" id="xlt-ngkhac" placeholder="X — ghi rõ nguyên nhân khác" style="display:none;margin-top:6px">
+        <label>Nội dung NG (bắt buộc nếu có NG) — ghi theo mã lỗi, VD: <b>5V, 4M</b></label>
+        <input type="text" autocomplete="off" id="xlt-ngly" placeholder="VD: 5V, 4M, 2X-nứt chân">
+        <span id="xlt-ngly-sum" style="font-size:11px;color:#999"></span>
       </div>
 
       <div class="fg">
@@ -298,6 +297,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
       </div>
       <div class="fg"><label>Người thao tác</label><input type="text" autocomplete="off" id="xlt-nguoi" list="dlNguoiLine"><span id="xlt-nguoi-hint" style="font-size:11px;color:#999"></span></div>
       <div id="xlt-canhbao" style="font-size:11.5px;color:var(--warn-fg)"></div>
+      <details style="margin-top:8px"><summary style="font-size:11.5px;color:var(--text-muted);cursor:pointer">Bảng mã lỗi tham khảo</summary><div id="xlt-ngref" class="ngref"></div></details>
     </div>
     <div id="xlt-result" style="display:none;padding:4px 2px">
       <div style="font-size:13px;font-weight:600;color:var(--run-fg);margin-bottom:6px">✅ Đã xử lý. Thùng ra:</div>
@@ -320,9 +320,9 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <div class="fg" style="flex:1;min-width:120px"><label>Bỏ hẳn (NG phế)</label><input type="number" min="0" id="sh-ngphe" value="0"></div>
       </div>
       <div class="fg">
-        <label>Loại lỗi NG phế (chọn 1+ mã, bắt buộc nếu có)</label>
-        <div id="sh-ngcodes" class="ngcode-box"></div>
-        <input type="text" autocomplete="off" id="sh-ngkhac" placeholder="X — ghi rõ nguyên nhân khác" style="display:none;margin-top:6px">
+        <label>Nội dung NG phế (bắt buộc nếu có) — VD: <b>5V, 4M</b></label>
+        <input type="text" autocomplete="off" id="sh-ngly" placeholder="VD: 5V, 4M">
+        <span id="sh-ngly-sum" style="font-size:11px;color:#999"></span>
       </div>
       <div class="fg">
         <label>Cách đóng thùng OK ra</label>
@@ -335,6 +335,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
       <div class="fg"><label>Người thao tác</label><input type="text" autocomplete="off" id="sh-nguoi" list="dlNguoiLine"></div>
       <div id="sh-canhbao" style="font-size:11.5px;color:var(--warn-fg)"></div>
       <p style="font-size:11px;color:#999;margin-top:4px">Phần chưa nhập được giữ lại trên tem NG (ca sau sửa tiếp). OK ghi vào báo cáo ngày/ca đang chọn.</p>
+      <details style="margin-top:6px"><summary style="font-size:11.5px;color:var(--text-muted);cursor:pointer">Bảng mã lỗi tham khảo</summary><div id="sh-ngref" class="ngref"></div></details>
     </div>
     <div id="sh-result" style="display:none;padding:4px 2px">
       <div style="font-size:13px;font-weight:600;color:var(--run-fg);margin-bottom:6px">✅ Đã sửa. Thùng OK ra:</div>
@@ -1107,26 +1108,33 @@ const NG_CODES = [
   ['V','Phồng nhôm'],['W','Lỗi, lõm'],['X','Khác (ghi rõ nguyên nhân)'],
 ];
 const NG_CODE_MAP = Object.fromEntries(NG_CODES);
+const NG_REF_HTML = NG_CODES.map(([k, v]) => `<b>${k}</b> ${escapeHtml(v)}`).join(' &nbsp;·&nbsp; ');
 
-function renderNgCodePicker(prefix){
-  const box = document.getElementById(prefix + '-ngcodes');
-  box.innerHTML = NG_CODES.map(([k, v]) =>
-    `<label><input type="checkbox" value="${k}"> <b>${k}</b> ${escapeHtml(v)}</label>`).join('');
-  const khac = document.getElementById(prefix + '-ngkhac');
-  khac.style.display = 'none'; khac.value = '';
-  box.onchange = () => {
-    const xOn = box.querySelector('input[value="X"]').checked;
-    khac.style.display = xOn ? '' : 'none';
-  };
+// "5V, 4M, 2X-nứt" -> tổng số lượng ghi được (chỉ để đối chiếu, không bắt buộc khớp).
+function parseNgShorthand(text){
+  let sum = 0;
+  (String(text).match(/(\d+)\s*([A-Za-z])/g) || []).forEach(tok => {
+    sum += Number(tok.match(/\d+/)[0]) || 0;
+  });
+  return sum;
 }
-// -> { codes:[...], text:"A - Rỗ khí; C - Lõm pin", err:"" }
-function readNgCodePicker(prefix){
-  const box = document.getElementById(prefix + '-ngcodes');
-  const codes = [...box.querySelectorAll('input:checked')].map(c => c.value);
-  const khac = document.getElementById(prefix + '-ngkhac').value.trim();
-  if (codes.includes('X') && !khac) return { codes, text: '', err: 'Đã chọn "X — Khác", nhập rõ nguyên nhân.' };
-  const text = codes.map(k => k === 'X' ? ('X - ' + khac) : (k + ' - ' + NG_CODE_MAP[k])).join('; ');
-  return { codes, text, err: '' };
+// Gợi ý sống dưới ô nội dung NG.
+function wireNgLySum(prefix){
+  const inp = document.getElementById(prefix + '-ngly');
+  const out = document.getElementById(prefix + '-ngly-sum');
+  const target = () => {
+    if (prefix === 'xlt') return (Number(document.getElementById('xlt-ngphe').value) || 0) + (Number(document.getElementById('xlt-ngsua').value) || 0);
+    return Number(document.getElementById('sh-ngphe').value) || 0;
+  };
+  const upd = () => {
+    const s = parseNgShorthand(inp.value);
+    if (!inp.value.trim()){ out.textContent = ''; return; }
+    const t = target();
+    out.textContent = '= ' + s + ' sp' + (t > 0 && s !== t ? ' (NG khai ' + t + ' — chưa khớp)' : '');
+    out.style.color = (t > 0 && s !== t) ? 'var(--warn-fg)' : '#999';
+  };
+  inp.oninput = upd;
+  upd();
 }
 
 /* ========== Xử lý thùng (Bavia line mode) ================================ */
@@ -1141,7 +1149,10 @@ async function openXuLyThung(idTram){
   document.getElementById('xlt-ok').value = 0;
   document.getElementById('xlt-ngphe').value = 0;
   document.getElementById('xlt-ngsua').value = 0;
-  renderNgCodePicker('xlt');
+  document.getElementById('xlt-ngly').value = '';
+  document.getElementById('xlt-ngly-sum').textContent = '';
+  document.getElementById('xlt-ngref').innerHTML = NG_REF_HTML;
+  wireNgLySum('xlt');
   document.getElementById('xlt-qc').value = '';
   document.querySelector('input[name="xlt-cach"][value="nguyen"]').checked = true;
   document.getElementById('xlt-canhbao').textContent = '';
@@ -1225,10 +1236,8 @@ document.getElementById('btnSubmitXuLyThung').addEventListener('click', async ()
   const ngphe = Number(document.getElementById('xlt-ngphe').value) || 0;
   const ngsua = Number(document.getElementById('xlt-ngsua').value) || 0;
   if (ok + ngphe + ngsua <= 0) return cb.textContent = 'Nhập OK / NG phế / NG sửa.';
-  const ngPick = readNgCodePicker('xlt');
-  if ((ngphe > 0 || ngsua > 0) && !ngPick.codes.length) return cb.textContent = 'Có NG — chọn ít nhất 1 mã lỗi.';
-  if (ngPick.err) return cb.textContent = ngPick.err;
-  const ngly = ngPick.text;
+  const ngly = document.getElementById('xlt-ngly').value.trim();
+  if ((ngphe > 0 || ngsua > 0) && !ngly) return cb.textContent = 'Có NG — ghi nội dung NG (VD: 5V, 4M).';
   const tongNguon = xlt.sources.reduce((s, x) => s + Number(x.so_luong || 0), 0);
   if (ok + ngphe + ngsua > tongNguon) return cb.textContent = 'OK + NG (' + (ok + ngphe + ngsua) + ') vượt tổng SL nguồn (' + tongNguon + ').';
   const cach = document.querySelector('input[name="xlt-cach"]:checked').value;
@@ -1332,7 +1341,10 @@ async function openSuaHang(t){
   document.getElementById('sh-tag-label').textContent = '(' + t.tag_no + ' — ' + t.ma_sp + ', còn ' + fmtNum(t.so_luong) + ')';
   document.getElementById('sh-ok').value = 0;
   document.getElementById('sh-ngphe').value = 0;
-  renderNgCodePicker('sh');
+  document.getElementById('sh-ngly').value = '';
+  document.getElementById('sh-ngly-sum').textContent = '';
+  document.getElementById('sh-ngref').innerHTML = NG_REF_HTML;
+  wireNgLySum('sh');
   document.getElementById('sh-qc').value = '';
   document.querySelector('input[name="sh-cach"][value="nguyen"]').checked = true;
   document.getElementById('sh-nguoi').value = '';
@@ -1357,10 +1369,8 @@ document.getElementById('btnSubmitSuaHang').addEventListener('click', async () =
   const ngphe = Number(document.getElementById('sh-ngphe').value) || 0;
   if (ok + ngphe <= 0) return cb.textContent = 'Nhập OK / NG phế.';
   if (ok + ngphe > Number(suaHangTem.so_luong)) return cb.textContent = 'OK + NG phế vượt SL còn lại (' + fmtNum(suaHangTem.so_luong) + ').';
-  const ngPick = readNgCodePicker('sh');
-  if (ngphe > 0 && !ngPick.codes.length) return cb.textContent = 'Có NG phế — chọn ít nhất 1 mã lỗi.';
-  if (ngPick.err) return cb.textContent = ngPick.err;
-  const ngly = ngPick.text;
+  const ngly = document.getElementById('sh-ngly').value.trim();
+  if (ngphe > 0 && !ngly) return cb.textContent = 'Có NG phế — ghi nội dung NG (VD: 5V, 4M).';
   const cach = document.querySelector('input[name="sh-cach"]:checked').value;
   const qc = Number(document.getElementById('sh-qc').value) || 0;
   const tagGop = document.getElementById('sh-gop').value;
