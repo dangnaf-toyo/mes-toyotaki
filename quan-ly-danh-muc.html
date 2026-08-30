@@ -67,6 +67,10 @@
   .muted{color:var(--text-muted);font-size:12px;}
   .empty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px;}
   .table-wrap{overflow-x:auto;}
+  .chk-grid{display:flex;flex-wrap:wrap;gap:8px 18px;border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:#fff;max-height:170px;overflow:auto;}
+  .chk-grid label{display:flex;align-items:center;gap:7px;margin:0;font-weight:400;color:var(--text);font-size:13px;white-space:nowrap;cursor:pointer;}
+  .chk-grid input{width:auto;}
+  .chk-grid .empty-hint{color:var(--text-muted);font-size:12.5px;}
 </style>
 </head>
 <body>
@@ -192,6 +196,13 @@
               <select id="ns-vaitro">
                 <option value="nhan_vien">Nhân viên</option>
                 <option value="truong_ca">Trưởng ca</option>
+                <option value="pho_ca">Phó ca</option>
+                <option value="ipqc">IPQC</option>
+                <option value="oqc">OQC</option>
+                <option value="iqc">IQC</option>
+                <option value="bao_duong_khuon">Bảo dưỡng khuôn</option>
+                <option value="thong_ke">Thống kê</option>
+                <option value="kho">Kho</option>
               </select>
             </div>
             <div>
@@ -200,12 +211,17 @@
               <datalist id="ns-bophan-list">
                 <option value="Đúc">
                 <option value="Bavia">
+                <option value="Gia công - Sơn">
                 <option value="QC">
-                <option value="IPQC">
-                <option value="Kho NVL">
-                <option value="Kế hoạch">
-                <option value="Bảo trì">
+                <option value="OQC">
+                <option value="Kho">
+                <option value="QLSX">
+                <option value="Thiết Bị">
               </datalist>
+            </div>
+            <div style="grid-column:1/-1">
+              <label>Line (Máy) — nhân sự này thao tác được ở những máy / line nào</label>
+              <div id="ns-linemay" class="chk-grid"><span class="empty-hint">Đang tải danh mục máy…</span></div>
             </div>
           </div>
           <div class="form-actions"><button type="submit" id="ns-submit">Thêm nhân sự</button></div>
@@ -215,7 +231,7 @@
         <h2>Danh sách nhân sự</h2>
         <div class="table-wrap">
           <table id="ns-table" style="display:none">
-            <thead><tr><th>Tên nhân viên</th><th>Vai trò</th><th>Bộ phận</th><th class="col-actions"></th></tr></thead>
+            <thead><tr><th>Tên nhân viên</th><th>Vai trò</th><th>Bộ phận</th><th>Line (Máy)</th><th class="col-actions"></th></tr></thead>
             <tbody id="ns-tbody"></tbody>
           </table>
         </div>
@@ -474,16 +490,39 @@ function nsResetForm(){
   nsEditing = null;
   document.getElementById('ns-form').reset();
   document.getElementById('ns-ten').disabled = false;
+  setNsLineMay([]);
   document.getElementById('ns-form-title').textContent = 'Thêm nhân sự';
   document.getElementById('ns-submit').textContent = 'Thêm nhân sự';
   document.getElementById('ns-cancel').style.display = 'none';
 }
 document.getElementById('ns-cancel').addEventListener('click', nsResetForm);
 
-const NS_ROLE_LABELS = { nhan_vien: 'Nhân viên', truong_ca: 'Trưởng ca' };
+const NS_ROLE_LABELS = {
+  nhan_vien: 'Nhân viên', truong_ca: 'Trưởng ca', pho_ca: 'Phó ca',
+  ipqc: 'IPQC', oqc: 'OQC', iqc: 'IQC',
+  bao_duong_khuon: 'Bảo dưỡng khuôn', thong_ke: 'Thống kê', kho: 'Kho',
+};
+
+// ── Line (Máy): danh sách checkbox từ danh mục máy ──────────────────────
+async function loadNsLineMayOptions(){
+  const box = document.getElementById('ns-linemay');
+  const { data, error } = await sb.from('master_machines').select('ma_may').order('ma_may');
+  if (error){ box.innerHTML = '<span class="empty-hint">Không tải được danh mục máy: ' + escapeHtml(error.message) + '</span>'; return; }
+  if (!data || !data.length){ box.innerHTML = '<span class="empty-hint">Chưa có máy nào trong danh mục.</span>'; return; }
+  box.innerHTML = data.map(r =>
+    `<label><input type="checkbox" value="${escapeHtml(r.ma_may)}"> ${escapeHtml(r.ma_may)}</label>`
+  ).join('');
+}
+function getNsLineMay(){
+  return [...document.querySelectorAll('#ns-linemay input[type="checkbox"]:checked')].map(c => c.value);
+}
+function setNsLineMay(arr){
+  const set = new Set(arr || []);
+  document.querySelectorAll('#ns-linemay input[type="checkbox"]').forEach(c => { c.checked = set.has(c.value); });
+}
 
 async function loadNs(){
-  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro, bo_phan').order('ten_nhan_vien');
+  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro, bo_phan, line_may').order('ten_nhan_vien');
   if (error){ showMsg('ns-msg', 'error', 'Không tải được: ' + error.message); return; }
   clearMsg('ns-msg');
   const table = document.getElementById('ns-table'), tbody = document.getElementById('ns-tbody'), empty = document.getElementById('ns-empty');
@@ -494,6 +533,7 @@ async function loadNs(){
       <td>${escapeHtml(r.ten_nhan_vien)}</td>
       <td>${NS_ROLE_LABELS[r.vai_tro] || escapeHtml(r.vai_tro) || '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(r.bo_phan) || '<span class="muted">—</span>'}</td>
+      <td>${(r.line_may && r.line_may.length) ? r.line_may.map(escapeHtml).join(', ') : '<span class="muted">—</span>'}</td>
       <td class="row-actions">
         <button type="button" class="edit">Sửa</button>
         <button type="button" class="del">Xoá</button>
@@ -508,6 +548,7 @@ async function loadNs(){
       document.getElementById('ns-ten').disabled = true;
       document.getElementById('ns-vaitro').value = r.vai_tro || 'nhan_vien';
       document.getElementById('ns-bophan').value = r.bo_phan || '';
+      setNsLineMay(r.line_may || []);
       document.getElementById('ns-form-title').textContent = 'Sửa nhân sự: ' + r.ten_nhan_vien;
       document.getElementById('ns-submit').textContent = 'Lưu thay đổi';
       document.getElementById('ns-cancel').style.display = 'inline';
@@ -526,13 +567,15 @@ document.getElementById('ns-form').addEventListener('submit', async (e) => {
   const ten_nhan_vien = document.getElementById('ns-ten').value.trim();
   const vai_tro = document.getElementById('ns-vaitro').value;
   const bo_phan = document.getElementById('ns-bophan').value.trim() || null;
+  const lineMayArr = getNsLineMay();
+  const line_may = lineMayArr.length ? lineMayArr : null;
   if (!ten_nhan_vien) return;
 
   let error;
   if (nsEditing){
-    ({ error } = await sb.from('master_employees').update({ vai_tro, bo_phan }).eq('ten_nhan_vien', nsEditing));
+    ({ error } = await sb.from('master_employees').update({ vai_tro, bo_phan, line_may }).eq('ten_nhan_vien', nsEditing));
   } else {
-    ({ error } = await sb.from('master_employees').insert({ ten_nhan_vien, vai_tro, bo_phan }));
+    ({ error } = await sb.from('master_employees').insert({ ten_nhan_vien, vai_tro, bo_phan, line_may }));
   }
   if (error) return showMsg('ns-msg', 'error', 'Lỗi: ' + error.message);
   showMsg('ns-msg', 'ok', nsEditing ? 'Đã lưu ' + ten_nhan_vien + '.' : 'Đã thêm ' + ten_nhan_vien + '.');
@@ -658,6 +701,7 @@ async function main(){
   setupQuyTrinhSteps();
   loadMay();
   loadSp();
+  loadNsLineMayOptions();
   loadNs();
   loadKhuon();
 }
