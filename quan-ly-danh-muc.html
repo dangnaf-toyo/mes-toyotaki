@@ -36,9 +36,8 @@
   .tab-btn:hover{background:#334155;}
   .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 
-  .card{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:22px 24px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
+  .card{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:8px 12px 4px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
   .card h2{font-size:15px;margin:0 0 16px;font-weight:700;border-bottom:1px solid var(--border);padding-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
-  .card h2 .cancel-edit{font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;display:none;}
 
   .msg{padding:12px 14px;border-radius:6px;font-size:13px;margin-bottom:16px;display:none;}
   .msg.error{display:block;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #f0c4bd;}
@@ -59,14 +58,39 @@
 
   table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);white-space:normal;word-break:break-word;}
-  th{color:var(--text-muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:var(--bg-sunken);}
+  th{color:var(--text-muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:var(--bg-sunken);position:sticky;top:0;z-index:1;}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:var(--text);}
+  th.sortable[data-dir="asc"]::after{content:" ▲";font-size:9px;}
+  th.sortable[data-dir="desc"]::after{content:" ▼";font-size:9px;}
   td.row-actions, th.col-actions{white-space:nowrap;text-align:right;position:sticky;right:0;background:var(--bg-panel);}
+  th.col-actions{background:var(--bg-sunken);}
   .row-actions button{padding:5px 12px;font-size:12px;margin-left:6px;}
   .row-actions .del{background:transparent;color:var(--alarm-fg);border:1px solid #f0c4bd;}
   .row-actions .del:hover{background:var(--alarm-bg);}
   .muted{color:var(--text-muted);font-size:12px;}
-  .empty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px;}
-  .table-wrap{overflow-x:auto;}
+  .empty{padding:24px;text-align:center;color:var(--text-muted);font-size:13px;}
+  .table-wrap{overflow-x:auto;max-height:calc(100vh - 210px);overflow-y:auto;border-radius:6px;}
+
+  /* Thanh công cụ mỗi danh mục: lọc bên trái, "Thêm mới" góc phải */
+  .pane-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .pane-toolbar .list-search{width:230px;flex:0 0 auto;}
+  .pane-toolbar .list-filter{width:auto;flex:0 0 auto;min-width:140px;}
+  .pane-toolbar .list-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
+  .pane-toolbar .btn-add{margin-left:auto;flex:0 0 auto;}
+  .pane-toolbar .btn-reset{background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:8px 12px;}
+  .pane-toolbar .btn-reset:hover{background:var(--bg-sunken);color:var(--text);}
+
+  /* Modal thêm / sửa */
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:900;overflow-y:auto;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:22px 26px 26px;width:100%;max-width:920px;position:relative;}
+  .modal h2{font-size:15px;font-weight:700;margin:0 0 16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+  .modal .form-grid{grid-template-columns:1fr 1fr;}
+  @media (max-width:640px){.modal .form-grid{grid-template-columns:1fr;}}
+  .modal-close{position:absolute;top:12px;right:14px;background:transparent;color:var(--text-muted);font-size:16px;font-weight:700;padding:4px 9px;border-radius:6px;}
+  .modal-close:hover{background:var(--bg-sunken);color:var(--text);}
+
   .chk-grid{border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:#fff;max-height:230px;overflow:auto;}
   .chk-group + .chk-group{margin-top:12px;}
   .chk-group-head{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
@@ -74,6 +98,10 @@
   .chk-grid label{display:flex;align-items:center;gap:7px;margin:0;font-weight:400;color:var(--text);font-size:13px;white-space:nowrap;cursor:pointer;}
   .chk-grid input{width:auto;}
   .chk-grid .empty-hint{color:var(--text-muted);font-size:12.5px;}
+
+  .toast{position:fixed;top:16px;right:16px;z-index:1000;background:var(--run-fg);color:#fff;padding:10px 16px;border-radius:6px;box-shadow:var(--shadow-lg);font-size:13px;font-weight:600;opacity:0;transform:translateY(-8px);transition:opacity .2s, transform .2s;pointer-events:none;}
+  .toast.show{opacity:1;transform:none;}
+  .toast.err{background:var(--alarm-fg);}
 </style>
 </head>
 <body>
@@ -102,189 +130,217 @@
 
   <div id="adminArea" style="display:none">
 
-    <!-- ── Tab Máy ─────────────────────────────────────────────────────── -->
+    <!-- ── Tab Máy-Line ────────────────────────────────────────────────── -->
     <section id="tab-may" class="tab-pane">
-      <div class="card">
-        <h2>
-          <span id="may-form-title">Thêm máy-line</span>
-          <span class="cancel-edit" id="may-cancel">Huỷ sửa ✕</span>
-        </h2>
-        <div class="msg" id="may-msg"></div>
-        <form id="may-form">
-          <div class="form-grid">
-            <div><label for="may-ma">Mã máy / line</label><input type="text" autocomplete="off" id="may-ma" required></div>
-            <div>
-              <label for="may-bophan">Bộ phận</label>
-              <input type="text" autocomplete="off" id="may-bophan" list="may-bophan-list" placeholder="vd: Đúc">
-              <datalist id="may-bophan-list">
-                <option value="Đúc">
-                <option value="Bavia">
-                <option value="Gia công - Sơn">
-                <option value="OQC">
-              </datalist>
-            </div>
-            <div>
-              <label for="may-kanban">Chạy theo Kanban</label>
-              <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:9px 0">
-                <input type="checkbox" id="may-kanban" style="width:auto"> In tem chỉ thị trước, quét QR ghi nhận
-              </label>
-            </div>
-          </div>
-          <div class="form-actions"><button type="submit" id="may-submit">Thêm máy-line</button></div>
-        </form>
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="may-search" placeholder="Lọc nhanh trong bảng…" autocomplete="off">
+        <select class="list-filter" id="may-filt-bo_phan"></select>
+        <button type="button" class="btn-reset" id="may-clear">Xoá lọc</button>
+        <span class="list-count" id="may-count"></span>
+        <button type="button" class="btn-add" id="may-add">＋ Thêm mới</button>
       </div>
       <div class="card">
-        <h2>Danh sách Máy-Line</h2>
         <div class="table-wrap">
           <table id="may-table" style="display:none">
-            <thead><tr><th>Mã máy / line</th><th>Bộ phận</th><th>Kanban</th><th class="col-actions"></th></tr></thead>
+            <thead id="may-thead"></thead>
             <tbody id="may-tbody"></tbody>
           </table>
         </div>
         <div class="empty" id="may-empty" style="display:none">Chưa có máy-line nào.</div>
       </div>
+
+      <div class="modal-overlay" id="may-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="may-form-title">Thêm máy-line</h2>
+          <div class="msg" id="may-msg"></div>
+          <form id="may-form">
+            <div class="form-grid">
+              <div><label for="may-ma">Mã máy / line</label><input type="text" autocomplete="off" id="may-ma" required></div>
+              <div>
+                <label for="may-bophan">Bộ phận</label>
+                <input type="text" autocomplete="off" id="may-bophan" list="may-bophan-list" placeholder="vd: Đúc">
+                <datalist id="may-bophan-list">
+                  <option value="Đúc">
+                  <option value="Bavia">
+                  <option value="Gia công - Sơn">
+                  <option value="OQC">
+                </datalist>
+              </div>
+              <div>
+                <label for="may-kanban">Chạy theo Kanban</label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:9px 0">
+                  <input type="checkbox" id="may-kanban" style="width:auto"> In tem chỉ thị trước, quét QR ghi nhận
+                </label>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" id="may-submit">Thêm máy-line</button></div>
+          </form>
+        </div>
+      </div>
     </section>
 
     <!-- ── Tab Sản phẩm ────────────────────────────────────────────────── -->
     <section id="tab-sp" class="tab-pane" style="display:none">
-      <div class="card">
-        <h2>
-          <span id="sp-form-title">Thêm sản phẩm</span>
-          <span class="cancel-edit" id="sp-cancel">Huỷ sửa ✕</span>
-        </h2>
-        <div class="msg" id="sp-msg"></div>
-        <form id="sp-form">
-          <div class="form-grid">
-            <div><label for="sp-ma">Mã SP</label><input type="text" autocomplete="off" id="sp-ma" required></div>
-            <div><label for="sp-ten">Tên SP</label><input type="text" autocomplete="off" id="sp-ten"></div>
-            <div><label for="sp-makhachhang">Mã khách hàng</label><input type="text" autocomplete="off" id="sp-makhachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
-            <div><label for="sp-khachhang">Tên khách hàng</label><input type="text" autocomplete="off" id="sp-khachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
-            <div><label for="sp-cavity">Cavity</label><input type="number" step="any" id="sp-cavity"></div>
-            <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
-            <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
-            <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
-            <div><label for="sp-sldonggoi">SL đóng gói chuẩn (pcs/thùng)</label><input type="number" step="any" id="sp-sldonggoi" placeholder="Dùng cho tem chỉ thị Kanban"></div>
-            <div style="grid-column:1/-1">
-              <label>Quy trình công đoạn (chọn theo đúng thứ tự — để trống bước nào thì dừng ở đó)</label>
-              <div id="sp-quytrinh-steps" style="display:flex;gap:8px;flex-wrap:wrap">
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-                <select class="sp-quytrinh-step"></select>
-              </div>
-              <p class="muted" style="margin-top:4px">Để trống toàn bộ nếu chưa xác định — <code>chuyencongdoan.html</code> sẽ cho chọn công đoạn tự do như hiện tại.</p>
-            </div>
-          </div>
-          <div class="form-actions"><button type="submit" id="sp-submit">Thêm sản phẩm</button></div>
-        </form>
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="sp-search" placeholder="Lọc nhanh: mã / tên / khách hàng…" autocomplete="off">
+        <button type="button" class="btn-reset" id="sp-clear">Xoá lọc</button>
+        <span class="list-count" id="sp-count"></span>
+        <button type="button" class="btn-add" id="sp-add">＋ Thêm mới</button>
       </div>
       <div class="card">
-        <h2>Danh sách sản phẩm</h2>
         <div class="table-wrap">
           <table id="sp-table" style="display:none">
-            <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Mã KH — Tên khách hàng</th><th>Cavity</th><th>Cycle time (s)</th><th>Nguyên liệu</th><th>Số khuôn</th><th>SL đ.gói/thùng</th><th>Quy trình công đoạn</th><th class="col-actions"></th></tr></thead>
+            <thead id="sp-thead"></thead>
             <tbody id="sp-tbody"></tbody>
           </table>
         </div>
         <div class="empty" id="sp-empty" style="display:none">Chưa có sản phẩm nào.</div>
       </div>
+
+      <div class="modal-overlay" id="sp-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="sp-form-title">Thêm sản phẩm</h2>
+          <div class="msg" id="sp-msg"></div>
+          <form id="sp-form">
+            <div class="form-grid">
+              <div><label for="sp-ma">Mã SP</label><input type="text" autocomplete="off" id="sp-ma" required></div>
+              <div><label for="sp-ten">Tên SP</label><input type="text" autocomplete="off" id="sp-ten"></div>
+              <div><label for="sp-makhachhang">Mã khách hàng</label><input type="text" autocomplete="off" id="sp-makhachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
+              <div><label for="sp-khachhang">Tên khách hàng</label><input type="text" autocomplete="off" id="sp-khachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
+              <div><label for="sp-cavity">Cavity</label><input type="number" step="any" id="sp-cavity"></div>
+              <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
+              <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
+              <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
+              <div><label for="sp-sldonggoi">SL đóng gói chuẩn (pcs/thùng)</label><input type="number" step="any" id="sp-sldonggoi" placeholder="Dùng cho tem chỉ thị Kanban"></div>
+              <div style="grid-column:1/-1">
+                <label>Quy trình công đoạn (chọn theo đúng thứ tự — để trống bước nào thì dừng ở đó)</label>
+                <div id="sp-quytrinh-steps" style="display:flex;gap:8px;flex-wrap:wrap">
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                  <select class="sp-quytrinh-step"></select>
+                </div>
+                <p class="muted" style="margin-top:4px">Để trống toàn bộ nếu chưa xác định — <code>chuyencongdoan.html</code> sẽ cho chọn công đoạn tự do như hiện tại.</p>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" id="sp-submit">Thêm sản phẩm</button></div>
+          </form>
+        </div>
+      </div>
     </section>
 
     <!-- ── Tab Nhân sự ─────────────────────────────────────────────────── -->
     <section id="tab-ns" class="tab-pane" style="display:none">
-      <div class="card">
-        <h2>
-          <span id="ns-form-title">Thêm nhân sự</span>
-          <span class="cancel-edit" id="ns-cancel">Huỷ sửa ✕</span>
-        </h2>
-        <div class="msg" id="ns-msg"></div>
-        <form id="ns-form">
-          <div class="form-grid">
-            <div><label for="ns-ten">Tên nhân viên</label><input type="text" autocomplete="off" id="ns-ten" required></div>
-            <div><label for="ns-vaitro">Vai trò (ca sản xuất)</label>
-              <select id="ns-vaitro">
-                <option value="nhan_vien">Nhân viên</option>
-                <option value="truong_ca">Trưởng ca</option>
-                <option value="pho_ca">Phó ca</option>
-                <option value="ipqc">IPQC</option>
-                <option value="oqc">OQC</option>
-                <option value="iqc">IQC</option>
-                <option value="bao_duong_khuon">Bảo dưỡng khuôn</option>
-                <option value="thong_ke">Thống kê</option>
-                <option value="kho">Kho</option>
-              </select>
-            </div>
-            <div>
-              <label for="ns-bophan">Bộ phận</label>
-              <input type="text" autocomplete="off" id="ns-bophan" list="ns-bophan-list" placeholder="vd: Đúc">
-              <datalist id="ns-bophan-list">
-                <option value="Đúc">
-                <option value="Bavia">
-                <option value="Gia công - Sơn">
-                <option value="QC">
-                <option value="OQC">
-                <option value="Kho">
-                <option value="QLSX">
-                <option value="Thiết Bị">
-              </datalist>
-            </div>
-            <div style="grid-column:1/-1">
-              <label>Line (Máy) — nhân sự này thao tác được ở những máy / line nào (lọc theo Bộ phận đã chọn ở trên)</label>
-              <div id="ns-linemay" class="chk-grid"><span class="empty-hint">Đang tải danh mục máy…</span></div>
-            </div>
-          </div>
-          <div class="form-actions"><button type="submit" id="ns-submit">Thêm nhân sự</button></div>
-        </form>
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="ns-search" placeholder="Lọc nhanh: tên / bộ phận / line…" autocomplete="off">
+        <select class="list-filter" id="ns-filt-vai_tro"></select>
+        <select class="list-filter" id="ns-filt-bo_phan"></select>
+        <button type="button" class="btn-reset" id="ns-clear">Xoá lọc</button>
+        <span class="list-count" id="ns-count"></span>
+        <button type="button" class="btn-add" id="ns-add">＋ Thêm mới</button>
       </div>
       <div class="card">
-        <h2>Danh sách nhân sự</h2>
         <div class="table-wrap">
           <table id="ns-table" style="display:none">
-            <thead><tr><th>Tên nhân viên</th><th>Vai trò</th><th>Bộ phận</th><th>Line (Máy)</th><th class="col-actions"></th></tr></thead>
+            <thead id="ns-thead"></thead>
             <tbody id="ns-tbody"></tbody>
           </table>
         </div>
         <div class="empty" id="ns-empty" style="display:none">Chưa có nhân sự nào.</div>
       </div>
+
+      <div class="modal-overlay" id="ns-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="ns-form-title">Thêm nhân sự</h2>
+          <div class="msg" id="ns-msg"></div>
+          <form id="ns-form">
+            <div class="form-grid">
+              <div><label for="ns-ten">Tên nhân viên</label><input type="text" autocomplete="off" id="ns-ten" required></div>
+              <div><label for="ns-vaitro">Vai trò (ca sản xuất)</label>
+                <select id="ns-vaitro">
+                  <option value="nhan_vien">Nhân viên</option>
+                  <option value="truong_ca">Trưởng ca</option>
+                  <option value="pho_ca">Phó ca</option>
+                  <option value="ipqc">IPQC</option>
+                  <option value="oqc">OQC</option>
+                  <option value="iqc">IQC</option>
+                  <option value="bao_duong_khuon">Bảo dưỡng khuôn</option>
+                  <option value="thong_ke">Thống kê</option>
+                  <option value="kho">Kho</option>
+                </select>
+              </div>
+              <div>
+                <label for="ns-bophan">Bộ phận</label>
+                <input type="text" autocomplete="off" id="ns-bophan" list="ns-bophan-list" placeholder="vd: Đúc">
+                <datalist id="ns-bophan-list">
+                  <option value="Đúc">
+                  <option value="Bavia">
+                  <option value="Gia công - Sơn">
+                  <option value="QC">
+                  <option value="OQC">
+                  <option value="Kho">
+                  <option value="QLSX">
+                  <option value="Thiết Bị">
+                </datalist>
+              </div>
+              <div style="grid-column:1/-1">
+                <label>Line (Máy) — nhân sự này thao tác được ở những máy / line nào (lọc theo Bộ phận đã chọn ở trên)</label>
+                <div id="ns-linemay" class="chk-grid"><span class="empty-hint">Đang tải danh mục máy…</span></div>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" id="ns-submit">Thêm nhân sự</button></div>
+          </form>
+        </div>
+      </div>
     </section>
 
     <!-- ── Tab Khuôn ───────────────────────────────────────────────────── -->
     <section id="tab-khuon" class="tab-pane" style="display:none">
-      <div class="card">
-        <h2>
-          <span id="khuon-form-title">Thêm khuôn</span>
-          <span class="cancel-edit" id="khuon-cancel">Huỷ sửa ✕</span>
-        </h2>
-        <p class="muted" style="margin:-8px 0 14px">Lưu ý: số shot luỹ kế/trạng thái khuôn cũng được hệ thống tự cập nhật mỗi khi kết ca — chỉnh ở đây chỉ dùng để hiệu chỉnh thủ công.</p>
-        <div class="msg" id="khuon-msg"></div>
-        <form id="khuon-form">
-          <div class="form-grid">
-            <div><label for="khuon-ma">Mã khuôn</label><input type="text" autocomplete="off" id="khuon-ma" required></div>
-            <div><label for="khuon-sp">SP gắn gần nhất</label><input type="text" autocomplete="off" id="khuon-sp"></div>
-            <div><label for="khuon-tongshot">Tổng shot luỹ kế</label><input type="number" step="any" id="khuon-tongshot"></div>
-            <div><label for="khuon-nguongbd">Ngưỡng bảo dưỡng (shot)</label><input type="number" step="any" id="khuon-nguongbd"></div>
-            <div><label for="khuon-nguonglm">Ngưỡng làm mới (shot)</label><input type="number" step="any" id="khuon-nguonglm"></div>
-            <div><label for="khuon-langanbd">Lần bảo dưỡng gần nhất</label><input type="date" id="khuon-langanbd"></div>
-            <div><label for="khuon-shotbd">Shot tại lần BD gần nhất</label><input type="number" step="any" id="khuon-shotbd"></div>
-            <div><label for="khuon-trangthai">Trạng thái</label><input type="text" autocomplete="off" id="khuon-trangthai" placeholder="binh_thuong / can_bao_duong / can_lam_moi"></div>
-            <div style="grid-column:1/-1"><label for="khuon-ghichu">Ghi chú</label><input type="text" autocomplete="off" id="khuon-ghichu"></div>
-          </div>
-          <div class="form-actions"><button type="submit" id="khuon-submit">Thêm khuôn</button></div>
-        </form>
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="khuon-search" placeholder="Lọc nhanh: mã khuôn / SP…" autocomplete="off">
+        <select class="list-filter" id="khuon-filt-trang_thai_khuon"></select>
+        <button type="button" class="btn-reset" id="khuon-clear">Xoá lọc</button>
+        <span class="list-count" id="khuon-count"></span>
+        <button type="button" class="btn-add" id="khuon-add">＋ Thêm mới</button>
       </div>
       <div class="card">
-        <h2>Danh sách khuôn</h2>
         <div class="table-wrap">
           <table id="khuon-table" style="display:none">
-            <thead><tr><th>Mã khuôn</th><th>SP gần nhất</th><th>Tổng shot</th><th>Ngưỡng BD</th><th>Ngưỡng LM</th><th>Trạng thái</th><th class="col-actions"></th></tr></thead>
+            <thead id="khuon-thead"></thead>
             <tbody id="khuon-tbody"></tbody>
           </table>
         </div>
         <div class="empty" id="khuon-empty" style="display:none">Chưa có khuôn nào.</div>
+      </div>
+
+      <div class="modal-overlay" id="khuon-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="khuon-form-title">Thêm khuôn</h2>
+          <p class="muted" style="margin:-6px 0 14px">Lưu ý: số shot luỹ kế/trạng thái khuôn cũng được hệ thống tự cập nhật mỗi khi kết ca — chỉnh ở đây chỉ dùng để hiệu chỉnh thủ công.</p>
+          <div class="msg" id="khuon-msg"></div>
+          <form id="khuon-form">
+            <div class="form-grid">
+              <div><label for="khuon-ma">Mã khuôn</label><input type="text" autocomplete="off" id="khuon-ma" required></div>
+              <div><label for="khuon-sp">SP gắn gần nhất</label><input type="text" autocomplete="off" id="khuon-sp"></div>
+              <div><label for="khuon-tongshot">Tổng shot luỹ kế</label><input type="number" step="any" id="khuon-tongshot"></div>
+              <div><label for="khuon-nguongbd">Ngưỡng bảo dưỡng (shot)</label><input type="number" step="any" id="khuon-nguongbd"></div>
+              <div><label for="khuon-nguonglm">Ngưỡng làm mới (shot)</label><input type="number" step="any" id="khuon-nguonglm"></div>
+              <div><label for="khuon-langanbd">Lần bảo dưỡng gần nhất</label><input type="date" id="khuon-langanbd"></div>
+              <div><label for="khuon-shotbd">Shot tại lần BD gần nhất</label><input type="number" step="any" id="khuon-shotbd"></div>
+              <div><label for="khuon-trangthai">Trạng thái</label><input type="text" autocomplete="off" id="khuon-trangthai" placeholder="binh_thuong / can_bao_duong / can_lam_moi"></div>
+              <div style="grid-column:1/-1"><label for="khuon-ghichu">Ghi chú</label><input type="text" autocomplete="off" id="khuon-ghichu"></div>
+            </div>
+            <div class="form-actions"><button type="submit" id="khuon-submit">Thêm khuôn</button></div>
+          </form>
+        </div>
       </div>
     </section>
   </div>
@@ -297,7 +353,6 @@
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-
 function showMsg(id, cls, text){
   const el = document.getElementById(id);
   el.className = 'msg ' + cls;
@@ -308,6 +363,24 @@ function clearMsg(id){
   el.className = 'msg';
   el.textContent = '';
 }
+let toastTimer;
+function toast(text, isErr){
+  let el = document.getElementById('toast');
+  if (!el){ el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; document.body.appendChild(el); }
+  el.textContent = text;
+  el.classList.toggle('err', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+const DASH = '<span class="muted">—</span>';
+
+// ── Modal helpers ────────────────────────────────────────────────────────
+function openModal(id){ document.getElementById(id).classList.add('open'); document.body.style.overflow = 'hidden'; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(ov => ov._close && ov._close());
+});
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -319,56 +392,139 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ── Tab Máy ──────────────────────────────────────────────────────────────
+// ── Danh mục dùng chung: lọc + sắp xếp + bảng + modal thêm/sửa ───────────
+function cmp(a, b){
+  if (a == null) a = ''; if (b == null) b = '';
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (typeof a === 'boolean') return (a ? 1 : 0) - (b ? 1 : 0);
+  return String(a).localeCompare(String(b), 'vi', { numeric: true, sensitivity: 'base' });
+}
+const catalogs = {};
+function initCatalog(cfg){
+  const el = suf => document.getElementById(cfg.id + suf);
+  const state = {
+    rows: [],
+    sortK: (cfg.columns.find(c => c.sortable) || cfg.columns[0]).k,
+    sortDir: 1,
+    q: '',
+    filt: {},
+  };
+
+  // thead
+  el('-thead').innerHTML = '<tr>' + cfg.columns.map(c =>
+    `<th${c.sortable ? ` class="sortable" data-k="${c.k}"` : ''}>${escapeHtml(c.label)}</th>`
+  ).join('') + '<th class="col-actions"></th></tr>';
+  el('-thead').addEventListener('click', e => {
+    const th = e.target.closest('th[data-k]'); if (!th) return;
+    const k = th.dataset.k;
+    if (state.sortK === k) state.sortDir *= -1; else { state.sortK = k; state.sortDir = 1; }
+    render();
+  });
+
+  el('-search').addEventListener('input', e => { state.q = e.target.value.trim().toLowerCase(); render(); });
+  (cfg.filters || []).forEach(f => {
+    el('-filt-' + f.k).addEventListener('change', e => { state.filt[f.k] = e.target.value; render(); });
+  });
+  const clearBtn = el('-clear');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    state.q = ''; state.filt = {};
+    el('-search').value = '';
+    (cfg.filters || []).forEach(f => { el('-filt-' + f.k).value = ''; });
+    render();
+  });
+
+  el('-add').addEventListener('click', () => { cfg.resetForm(); openModal(cfg.id + '-modal'); });
+
+  const ov = el('-modal');
+  ov._close = () => { closeModal(cfg.id + '-modal'); cfg.resetForm(); };
+  ov.addEventListener('click', e => { if (e.target === ov) ov._close(); });
+  ov.querySelector('[data-close-modal]').addEventListener('click', ov._close);
+
+  function buildFilterOptions(){
+    (cfg.filters || []).forEach(f => {
+      const sel = el('-filt-' + f.k);
+      const cur = sel.value;
+      const vals = [...new Set(state.rows.map(r => f.valOf(r)).filter(v => v != null && v !== ''))].sort(cmp);
+      sel.innerHTML = `<option value="">${escapeHtml(f.label)}: tất cả</option>` +
+        vals.map(v => `<option value="${escapeHtml(String(v))}"${String(v) === cur ? ' selected' : ''}>${escapeHtml(f.fmt ? f.fmt(v) : String(v))}</option>`).join('');
+    });
+  }
+
+  function render(){
+    let rows = state.rows.slice();
+    if (state.q) rows = rows.filter(r => cfg.columns.some(c => String(c.text ? c.text(r) : '').toLowerCase().includes(state.q)));
+    (cfg.filters || []).forEach(f => {
+      const v = state.filt[f.k];
+      if (v) rows = rows.filter(r => String(f.valOf(r) ?? '') === v);
+    });
+    const col = cfg.columns.find(c => c.k === state.sortK);
+    const acc = col && col.sortVal ? col.sortVal : (r => r[state.sortK]);
+    rows.sort((a, b) => cmp(acc(a), acc(b)) * state.sortDir);
+
+    el('-thead').querySelectorAll('th[data-k]').forEach(th =>
+      th.setAttribute('data-dir', th.dataset.k === state.sortK ? (state.sortDir === 1 ? 'asc' : 'desc') : ''));
+
+    el('-count').textContent = state.rows.length
+      ? (rows.length === state.rows.length ? `${rows.length} mục` : `${rows.length} / ${state.rows.length} mục`)
+      : '';
+
+    const table = el('-table'), tbody = el('-tbody'), empty = el('-empty');
+    if (!rows.length){
+      table.style.display = 'none'; empty.style.display = 'block';
+      empty.textContent = state.rows.length ? 'Không có mục nào khớp bộ lọc.' : cfg.emptyText;
+      return;
+    }
+    table.style.display = 'table'; empty.style.display = 'none';
+    tbody.innerHTML = rows.map(r =>
+      '<tr>' + cfg.columns.map(c => `<td>${c.render(r)}</td>`).join('') +
+      '<td class="row-actions"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xoá</button></td></tr>'
+    ).join('');
+    [...tbody.children].forEach((tr, i) => {
+      const r = rows[i];
+      tr.querySelector('.edit').addEventListener('click', () => { cfg.fillForm(r); openModal(cfg.id + '-modal'); });
+      tr.querySelector('.del').addEventListener('click', async () => {
+        if (!confirm('Xoá "' + cfg.pk(r) + '"?')) return;
+        const { error } = await cfg.remove(r);
+        if (error) return alert('Lỗi xoá: ' + error.message + (String(error.message).includes('foreign key') ? ' (đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
+        toast('Đã xoá ' + cfg.pk(r));
+        cat.reload();
+      });
+    });
+  }
+
+  const cat = {
+    async reload(){
+      const { data, error } = await cfg.fetch();
+      if (error){ toast('Không tải được: ' + error.message, true); return; }
+      state.rows = data || [];
+      buildFilterOptions();
+      render();
+    },
+    close: () => ov._close(),
+  };
+  catalogs[cfg.id] = cat;
+  return cat;
+}
+
+// ══ Tab Máy-Line ═══════════════════════════════════════════════════════════
 let mayEditing = null;
 function mayResetForm(){
   mayEditing = null;
+  clearMsg('may-msg');
   document.getElementById('may-form').reset();
   document.getElementById('may-ma').disabled = false;
   document.getElementById('may-form-title').textContent = 'Thêm máy-line';
   document.getElementById('may-submit').textContent = 'Thêm máy-line';
-  document.getElementById('may-cancel').style.display = 'none';
 }
-document.getElementById('may-cancel').addEventListener('click', mayResetForm);
-
-async function loadMay(){
-  const { data, error } = await sb.from('master_machines').select('ma_may, kanban, bo_phan').order('bo_phan').order('ma_may');
-  if (error){ showMsg('may-msg', 'error', 'Không tải được: ' + error.message); return; }
+function mayFillForm(r){
+  mayEditing = r.ma_may;
   clearMsg('may-msg');
-  const table = document.getElementById('may-table'), tbody = document.getElementById('may-tbody'), empty = document.getElementById('may-empty');
-  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
-  empty.style.display = 'none'; table.style.display = 'table';
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td>${escapeHtml(r.ma_may)}</td>
-      <td>${escapeHtml(r.bo_phan) || '<span class="muted">—</span>'}</td>
-      <td>${r.kanban ? '<span style="color:var(--run-fg);font-weight:600">✔ Kanban</span>' : '<span class="muted">—</span>'}</td>
-      <td class="row-actions">
-        <button type="button" class="edit">Sửa</button>
-        <button type="button" class="del">Xoá</button>
-      </td>
-    </tr>
-  `).join('');
-  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
-    const r = data[i];
-    tr.querySelector('.edit').addEventListener('click', () => {
-      mayEditing = r.ma_may;
-      document.getElementById('may-ma').value = r.ma_may;
-      document.getElementById('may-ma').disabled = true;
-      document.getElementById('may-bophan').value = r.bo_phan || '';
-      document.getElementById('may-kanban').checked = !!r.kanban;
-      document.getElementById('may-form-title').textContent = 'Sửa máy-line: ' + r.ma_may;
-      document.getElementById('may-submit').textContent = 'Lưu thay đổi';
-      document.getElementById('may-cancel').style.display = 'inline';
-      window.scrollTo({ top: document.getElementById('may-form').offsetTop - 20, behavior: 'smooth' });
-    });
-    tr.querySelector('.del').addEventListener('click', async () => {
-      if (!confirm('Xoá máy-line "' + r.ma_may + '"?')) return;
-      const { error: delErr } = await sb.from('master_machines').delete().eq('ma_may', r.ma_may);
-      if (delErr) return alert('Lỗi xoá: ' + delErr.message + (delErr.message.includes('foreign key') ? ' (máy này đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
-      loadMay();
-    });
-  });
+  document.getElementById('may-ma').value = r.ma_may;
+  document.getElementById('may-ma').disabled = true;
+  document.getElementById('may-bophan').value = r.bo_phan || '';
+  document.getElementById('may-kanban').checked = !!r.kanban;
+  document.getElementById('may-form-title').textContent = 'Sửa máy-line: ' + r.ma_may;
+  document.getElementById('may-submit').textContent = 'Lưu thay đổi';
 }
 document.getElementById('may-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -376,7 +532,6 @@ document.getElementById('may-form').addEventListener('submit', async (e) => {
   const kanban = document.getElementById('may-kanban').checked;
   const bo_phan = document.getElementById('may-bophan').value.trim() || null;
   if (!ma_may) return;
-
   let error;
   if (mayEditing){
     ({ error } = await sb.from('master_machines').update({ kanban, bo_phan }).eq('ma_may', mayEditing));
@@ -384,12 +539,27 @@ document.getElementById('may-form').addEventListener('submit', async (e) => {
     ({ error } = await sb.from('master_machines').insert({ ma_may, kanban, bo_phan }));
   }
   if (error) return showMsg('may-msg', 'error', 'Lỗi: ' + error.message);
-  showMsg('may-msg', 'ok', mayEditing ? 'Đã lưu ' + ma_may + '.' : 'Đã thêm máy-line ' + ma_may + '.');
-  mayResetForm();
-  loadMay();
+  toast(mayEditing ? 'Đã lưu ' + ma_may : 'Đã thêm máy-line ' + ma_may);
+  catalogs.may.close();
+  catalogs.may.reload();
+});
+initCatalog({
+  id: 'may',
+  emptyText: 'Chưa có máy-line nào.',
+  fetch: () => sb.from('master_machines').select('ma_may, kanban, bo_phan'),
+  pk: r => r.ma_may,
+  resetForm: mayResetForm,
+  fillForm: mayFillForm,
+  remove: r => sb.from('master_machines').delete().eq('ma_may', r.ma_may),
+  filters: [{ k: 'bo_phan', label: 'Bộ phận', valOf: r => r.bo_phan }],
+  columns: [
+    { k: 'ma_may', label: 'Mã máy / line', sortable: true, sortVal: r => r.ma_may, text: r => r.ma_may, render: r => escapeHtml(r.ma_may) },
+    { k: 'bo_phan', label: 'Bộ phận', sortable: true, sortVal: r => r.bo_phan || '', text: r => r.bo_phan || '', render: r => escapeHtml(r.bo_phan) || DASH },
+    { k: 'kanban', label: 'Kanban', sortable: true, sortVal: r => !!r.kanban, text: r => r.kanban ? 'kanban' : '', render: r => r.kanban ? '<span style="color:var(--run-fg);font-weight:600">✔ Kanban</span>' : DASH },
+  ],
 });
 
-// ── Tab Sản phẩm ─────────────────────────────────────────────────────────
+// ══ Tab Sản phẩm ══════════════════════════════════════════════════════════
 // Quy trình công đoạn chọn qua dropdown (không cho gõ tay) để tránh sai chính
 // tả — sai tên công đoạn sẽ làm chuyencongdoan.html không nhận ra được bước
 // kế tiếp hợp lệ, coi như SP chưa khai báo quy trình.
@@ -410,66 +580,29 @@ function setQuyTrinhValue(str){
 let spEditing = null;
 function spResetForm(){
   spEditing = null;
+  clearMsg('sp-msg');
   document.getElementById('sp-form').reset();
   setQuyTrinhValue('');
   document.getElementById('sp-ma').disabled = false;
   document.getElementById('sp-form-title').textContent = 'Thêm sản phẩm';
   document.getElementById('sp-submit').textContent = 'Thêm sản phẩm';
-  document.getElementById('sp-cancel').style.display = 'none';
 }
-document.getElementById('sp-cancel').addEventListener('click', spResetForm);
-
-async function loadSp(){
-  const { data, error } = await sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan').order('ma_sp');
-  if (error){ showMsg('sp-msg', 'error', 'Không tải được: ' + error.message); return; }
+function spFillForm(r){
+  spEditing = r.ma_sp;
   clearMsg('sp-msg');
-  const table = document.getElementById('sp-table'), tbody = document.getElementById('sp-tbody'), empty = document.getElementById('sp-empty');
-  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
-  empty.style.display = 'none'; table.style.display = 'table';
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td>${escapeHtml(r.ma_sp)}</td>
-      <td>${escapeHtml(r.ten_sp) || '<span class="muted">—</span>'}</td>
-      <td>${[r.ma_khach_hang, r.ten_khach_hang].filter(Boolean).map(escapeHtml).join(' — ') || '<span class="muted">—</span>'}</td>
-      <td>${r.cavity ?? '<span class="muted">—</span>'}</td>
-      <td>${r.cycle_time_s ?? '<span class="muted">—</span>'}</td>
-      <td>${escapeHtml(r.nguyen_lieu) || '<span class="muted">—</span>'}</td>
-      <td>${escapeHtml(r.so_khuon) || '<span class="muted">—</span>'}</td>
-      <td>${r.sl_dong_goi_chuan ?? '<span class="muted">—</span>'}</td>
-      <td>${escapeHtml(r.quy_trinh_cong_doan) || '<span class="muted">—</span>'}</td>
-      <td class="row-actions">
-        <button type="button" class="edit">Sửa</button>
-        <button type="button" class="del">Xoá</button>
-      </td>
-    </tr>
-  `).join('');
-  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
-    const r = data[i];
-    tr.querySelector('.edit').addEventListener('click', () => {
-      spEditing = r.ma_sp;
-      document.getElementById('sp-ma').value = r.ma_sp;
-      document.getElementById('sp-ma').disabled = true;
-      document.getElementById('sp-ten').value = r.ten_sp || '';
-      document.getElementById('sp-makhachhang').value = r.ma_khach_hang || '';
-      document.getElementById('sp-khachhang').value = r.ten_khach_hang || '';
-      document.getElementById('sp-cavity').value = r.cavity ?? '';
-      document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
-      document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
-      document.getElementById('sp-sokhuon').value = r.so_khuon || '';
-      document.getElementById('sp-sldonggoi').value = r.sl_dong_goi_chuan ?? '';
-      setQuyTrinhValue(r.quy_trinh_cong_doan);
-      document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
-      document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
-      document.getElementById('sp-cancel').style.display = 'inline';
-      window.scrollTo({ top: document.getElementById('sp-form').offsetTop - 20, behavior: 'smooth' });
-    });
-    tr.querySelector('.del').addEventListener('click', async () => {
-      if (!confirm('Xoá sản phẩm "' + r.ma_sp + '"?')) return;
-      const { error: delErr } = await sb.from('master_products').delete().eq('ma_sp', r.ma_sp);
-      if (delErr) return alert('Lỗi xoá: ' + delErr.message);
-      loadSp();
-    });
-  });
+  document.getElementById('sp-ma').value = r.ma_sp;
+  document.getElementById('sp-ma').disabled = true;
+  document.getElementById('sp-ten').value = r.ten_sp || '';
+  document.getElementById('sp-makhachhang').value = r.ma_khach_hang || '';
+  document.getElementById('sp-khachhang').value = r.ten_khach_hang || '';
+  document.getElementById('sp-cavity').value = r.cavity ?? '';
+  document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
+  document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
+  document.getElementById('sp-sokhuon').value = r.so_khuon || '';
+  document.getElementById('sp-sldonggoi').value = r.sl_dong_goi_chuan ?? '';
+  setQuyTrinhValue(r.quy_trinh_cong_doan);
+  document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
+  document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
 }
 document.getElementById('sp-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -487,7 +620,6 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const sl_dong_goi_chuan = slRaw === '' ? null : Number(slRaw);
   const quy_trinh_cong_doan = getQuyTrinhValue() || null;
   if (!ma_sp) return;
-
   let error;
   if (spEditing){
     ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
@@ -495,36 +627,43 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
     ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
-  showMsg('sp-msg', 'ok', spEditing ? 'Đã lưu ' + ma_sp + '.' : 'Đã thêm ' + ma_sp + '.');
-  spResetForm();
-  loadSp();
+  toast(spEditing ? 'Đã lưu ' + ma_sp : 'Đã thêm ' + ma_sp);
+  catalogs.sp.close();
+  catalogs.sp.reload();
+});
+initCatalog({
+  id: 'sp',
+  emptyText: 'Chưa có sản phẩm nào.',
+  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan'),
+  pk: r => r.ma_sp,
+  resetForm: spResetForm,
+  fillForm: spFillForm,
+  remove: r => sb.from('master_products').delete().eq('ma_sp', r.ma_sp),
+  columns: [
+    { k: 'ma_sp', label: 'Mã SP', sortable: true, sortVal: r => r.ma_sp, text: r => r.ma_sp, render: r => escapeHtml(r.ma_sp) },
+    { k: 'ten_sp', label: 'Tên SP', sortable: true, sortVal: r => r.ten_sp || '', text: r => r.ten_sp || '', render: r => escapeHtml(r.ten_sp) || DASH },
+    { k: 'khach_hang', label: 'Mã KH — Tên khách hàng', sortable: true, sortVal: r => (r.ma_khach_hang || r.ten_khach_hang || ''), text: r => [r.ma_khach_hang, r.ten_khach_hang].filter(Boolean).join(' '), render: r => [r.ma_khach_hang, r.ten_khach_hang].filter(Boolean).map(escapeHtml).join(' — ') || DASH },
+    { k: 'cavity', label: 'Cavity', sortable: true, sortVal: r => r.cavity == null ? -Infinity : Number(r.cavity), text: r => r.cavity == null ? '' : String(r.cavity), render: r => r.cavity ?? DASH },
+    { k: 'cycle_time_s', label: 'Cycle time (s)', sortable: true, sortVal: r => r.cycle_time_s == null ? -Infinity : Number(r.cycle_time_s), text: r => r.cycle_time_s == null ? '' : String(r.cycle_time_s), render: r => r.cycle_time_s ?? DASH },
+    { k: 'nguyen_lieu', label: 'Nguyên liệu', sortable: true, sortVal: r => r.nguyen_lieu || '', text: r => r.nguyen_lieu || '', render: r => escapeHtml(r.nguyen_lieu) || DASH },
+    { k: 'so_khuon', label: 'Số khuôn', sortable: true, sortVal: r => r.so_khuon || '', text: r => r.so_khuon || '', render: r => escapeHtml(r.so_khuon) || DASH },
+    { k: 'sl_dong_goi_chuan', label: 'SL đ.gói/thùng', sortable: true, sortVal: r => r.sl_dong_goi_chuan == null ? -Infinity : Number(r.sl_dong_goi_chuan), text: r => r.sl_dong_goi_chuan == null ? '' : String(r.sl_dong_goi_chuan), render: r => r.sl_dong_goi_chuan ?? DASH },
+    { k: 'quy_trinh_cong_doan', label: 'Quy trình công đoạn', sortable: true, sortVal: r => r.quy_trinh_cong_doan || '', text: r => r.quy_trinh_cong_doan || '', render: r => escapeHtml(r.quy_trinh_cong_doan) || DASH },
+  ],
 });
 
-// ── Tab Nhân sự ──────────────────────────────────────────────────────────
-let nsEditing = null;
-function nsResetForm(){
-  nsEditing = null;
-  document.getElementById('ns-form').reset();
-  document.getElementById('ns-ten').disabled = false;
-  setNsLineMay([]);
-  document.getElementById('ns-form-title').textContent = 'Thêm nhân sự';
-  document.getElementById('ns-submit').textContent = 'Thêm nhân sự';
-  document.getElementById('ns-cancel').style.display = 'none';
-}
-document.getElementById('ns-cancel').addEventListener('click', nsResetForm);
-
+// ══ Tab Nhân sự ═══════════════════════════════════════════════════════════
 const NS_ROLE_LABELS = {
   nhan_vien: 'Nhân viên', truong_ca: 'Trưởng ca', pho_ca: 'Phó ca',
   ipqc: 'IPQC', oqc: 'OQC', iqc: 'IQC',
   bao_duong_khuon: 'Bảo dưỡng khuôn', thong_ke: 'Thống kê', kho: 'Kho',
 };
 
-// ── Line (Máy): checkbox lọc theo Bộ phận đang chọn của nhân sự ─────────
+// Line (Máy): checkbox lọc theo Bộ phận đang chọn của nhân sự.
 // nsMayAll = toàn bộ danh mục máy-line; nsLineMaySel = tập mã máy đang chọn
 // (nguồn sự thật, không phụ thuộc checkbox nào đang render).
 let nsMayAll = [];
 let nsLineMaySel = new Set();
-
 async function loadNsLineMayOptions(){
   const box = document.getElementById('ns-linemay');
   const { data, error } = await sb.from('master_machines').select('ma_may, bo_phan').order('bo_phan').order('ma_may');
@@ -535,20 +674,15 @@ async function loadNsLineMayOptions(){
 function renderNsLineMay(){
   const box = document.getElementById('ns-linemay');
   if (!nsMayAll.length){ box.innerHTML = '<span class="empty-hint">Chưa có máy-line nào trong danh mục.</span>'; return; }
-
   const boPhan = document.getElementById('ns-bophan').value.trim();
-  // Bộ phận có máy khớp -> chỉ hiện nhóm đó. Ngoài ra luôn hiện thêm nhóm nào
-  // đang chứa máy đã chọn (tránh mất lựa chọn khi đổi bộ phận).
   const matched = boPhan ? nsMayAll.some(m => m.bo_phan === boPhan) : false;
-  let hint = '';
-  let visible;
+  let hint = '', visible;
   if (matched){
     visible = nsMayAll.filter(m => m.bo_phan === boPhan || nsLineMaySel.has(m.ma_may));
   } else {
     visible = nsMayAll.slice();
     if (boPhan) hint = `<div class="empty-hint" style="margin-bottom:8px">Bộ phận “${escapeHtml(boPhan)}” chưa có máy-line riêng — hiện tất cả.</div>`;
   }
-
   const groups = {};
   visible.forEach(m => { (groups[m.bo_phan] = groups[m.bo_phan] || []).push(m.ma_may); });
   box.innerHTML = hint + Object.entries(groups).map(([bp, mays]) =>
@@ -559,7 +693,6 @@ function renderNsLineMay(){
 }
 function getNsLineMay(){ return [...nsLineMaySel]; }
 function setNsLineMay(arr){ nsLineMaySel = new Set(arr || []); renderNsLineMay(); }
-
 document.getElementById('ns-linemay').addEventListener('change', (e) => {
   const cb = e.target;
   if (!cb || cb.type !== 'checkbox') return;
@@ -567,46 +700,26 @@ document.getElementById('ns-linemay').addEventListener('change', (e) => {
 });
 document.getElementById('ns-bophan').addEventListener('input', renderNsLineMay);
 
-async function loadNs(){
-  const { data, error } = await sb.from('master_employees').select('ten_nhan_vien, vai_tro, bo_phan, line_may').order('ten_nhan_vien');
-  if (error){ showMsg('ns-msg', 'error', 'Không tải được: ' + error.message); return; }
+let nsEditing = null;
+function nsResetForm(){
+  nsEditing = null;
   clearMsg('ns-msg');
-  const table = document.getElementById('ns-table'), tbody = document.getElementById('ns-tbody'), empty = document.getElementById('ns-empty');
-  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
-  empty.style.display = 'none'; table.style.display = 'table';
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td>${escapeHtml(r.ten_nhan_vien)}</td>
-      <td>${NS_ROLE_LABELS[r.vai_tro] || escapeHtml(r.vai_tro) || '<span class="muted">—</span>'}</td>
-      <td>${escapeHtml(r.bo_phan) || '<span class="muted">—</span>'}</td>
-      <td>${(r.line_may && r.line_may.length) ? r.line_may.map(escapeHtml).join(', ') : '<span class="muted">—</span>'}</td>
-      <td class="row-actions">
-        <button type="button" class="edit">Sửa</button>
-        <button type="button" class="del">Xoá</button>
-      </td>
-    </tr>
-  `).join('');
-  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
-    const r = data[i];
-    tr.querySelector('.edit').addEventListener('click', () => {
-      nsEditing = r.ten_nhan_vien;
-      document.getElementById('ns-ten').value = r.ten_nhan_vien;
-      document.getElementById('ns-ten').disabled = true;
-      document.getElementById('ns-vaitro').value = r.vai_tro || 'nhan_vien';
-      document.getElementById('ns-bophan').value = r.bo_phan || '';
-      setNsLineMay(r.line_may || []);
-      document.getElementById('ns-form-title').textContent = 'Sửa nhân sự: ' + r.ten_nhan_vien;
-      document.getElementById('ns-submit').textContent = 'Lưu thay đổi';
-      document.getElementById('ns-cancel').style.display = 'inline';
-      window.scrollTo({ top: document.getElementById('ns-form').offsetTop - 20, behavior: 'smooth' });
-    });
-    tr.querySelector('.del').addEventListener('click', async () => {
-      if (!confirm('Xoá nhân sự "' + r.ten_nhan_vien + '"?')) return;
-      const { error: delErr } = await sb.from('master_employees').delete().eq('ten_nhan_vien', r.ten_nhan_vien);
-      if (delErr) return alert('Lỗi xoá: ' + delErr.message);
-      loadNs();
-    });
-  });
+  document.getElementById('ns-form').reset();
+  document.getElementById('ns-ten').disabled = false;
+  setNsLineMay([]);
+  document.getElementById('ns-form-title').textContent = 'Thêm nhân sự';
+  document.getElementById('ns-submit').textContent = 'Thêm nhân sự';
+}
+function nsFillForm(r){
+  nsEditing = r.ten_nhan_vien;
+  clearMsg('ns-msg');
+  document.getElementById('ns-ten').value = r.ten_nhan_vien;
+  document.getElementById('ns-ten').disabled = true;
+  document.getElementById('ns-vaitro').value = r.vai_tro || 'nhan_vien';
+  document.getElementById('ns-bophan').value = r.bo_phan || '';
+  setNsLineMay(r.line_may || []);
+  document.getElementById('ns-form-title').textContent = 'Sửa nhân sự: ' + r.ten_nhan_vien;
+  document.getElementById('ns-submit').textContent = 'Lưu thay đổi';
 }
 document.getElementById('ns-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -616,7 +729,6 @@ document.getElementById('ns-form').addEventListener('submit', async (e) => {
   const lineMayArr = getNsLineMay();
   const line_may = lineMayArr.length ? lineMayArr : null;
   if (!ten_nhan_vien) return;
-
   let error;
   if (nsEditing){
     ({ error } = await sb.from('master_employees').update({ vai_tro, bo_phan, line_may }).eq('ten_nhan_vien', nsEditing));
@@ -624,72 +736,55 @@ document.getElementById('ns-form').addEventListener('submit', async (e) => {
     ({ error } = await sb.from('master_employees').insert({ ten_nhan_vien, vai_tro, bo_phan, line_may }));
   }
   if (error) return showMsg('ns-msg', 'error', 'Lỗi: ' + error.message);
-  showMsg('ns-msg', 'ok', nsEditing ? 'Đã lưu ' + ten_nhan_vien + '.' : 'Đã thêm ' + ten_nhan_vien + '.');
-  nsResetForm();
-  loadNs();
+  toast(nsEditing ? 'Đã lưu ' + ten_nhan_vien : 'Đã thêm ' + ten_nhan_vien);
+  catalogs.ns.close();
+  catalogs.ns.reload();
+});
+initCatalog({
+  id: 'ns',
+  emptyText: 'Chưa có nhân sự nào.',
+  fetch: () => sb.from('master_employees').select('ten_nhan_vien, vai_tro, bo_phan, line_may'),
+  pk: r => r.ten_nhan_vien,
+  resetForm: nsResetForm,
+  fillForm: nsFillForm,
+  remove: r => sb.from('master_employees').delete().eq('ten_nhan_vien', r.ten_nhan_vien),
+  filters: [
+    { k: 'vai_tro', label: 'Vai trò', valOf: r => r.vai_tro, fmt: v => NS_ROLE_LABELS[v] || v },
+    { k: 'bo_phan', label: 'Bộ phận', valOf: r => r.bo_phan },
+  ],
+  columns: [
+    { k: 'ten_nhan_vien', label: 'Tên nhân viên', sortable: true, sortVal: r => r.ten_nhan_vien, text: r => r.ten_nhan_vien, render: r => escapeHtml(r.ten_nhan_vien) },
+    { k: 'vai_tro', label: 'Vai trò', sortable: true, sortVal: r => NS_ROLE_LABELS[r.vai_tro] || r.vai_tro || '', text: r => (NS_ROLE_LABELS[r.vai_tro] || r.vai_tro || '') + ' ' + (r.vai_tro || ''), render: r => escapeHtml(NS_ROLE_LABELS[r.vai_tro] || r.vai_tro) || DASH },
+    { k: 'bo_phan', label: 'Bộ phận', sortable: true, sortVal: r => r.bo_phan || '', text: r => r.bo_phan || '', render: r => escapeHtml(r.bo_phan) || DASH },
+    { k: 'line_may', label: 'Line (Máy)', sortable: true, sortVal: r => (r.line_may || []).join(', '), text: r => (r.line_may || []).join(', '), render: r => (r.line_may && r.line_may.length) ? r.line_may.map(escapeHtml).join(', ') : DASH },
+  ],
 });
 
-// ── Tab Khuôn ────────────────────────────────────────────────────────────
+// ══ Tab Khuôn ═════════════════════════════════════════════════════════════
 let khuonEditing = null;
 function khuonResetForm(){
   khuonEditing = null;
+  clearMsg('khuon-msg');
   document.getElementById('khuon-form').reset();
   document.getElementById('khuon-ma').disabled = false;
   document.getElementById('khuon-form-title').textContent = 'Thêm khuôn';
   document.getElementById('khuon-submit').textContent = 'Thêm khuôn';
-  document.getElementById('khuon-cancel').style.display = 'none';
 }
-document.getElementById('khuon-cancel').addEventListener('click', khuonResetForm);
-
-async function loadKhuon(){
-  const { data, error } = await sb.from('duc_shot_khuon')
-    .select('ma_khuon, ten_sp_gan_nhat, tong_shot_luy_ke, nguong_bao_duong, nguong_lam_moi, lan_bao_duong_gan_nhat, shot_tai_lan_bao_duong_gan_nhat, trang_thai_khuon, ghi_chu')
-    .order('ma_khuon');
-  if (error){ showMsg('khuon-msg', 'error', 'Không tải được: ' + error.message); return; }
+function khuonFillForm(r){
+  khuonEditing = r.ma_khuon;
   clearMsg('khuon-msg');
-  const table = document.getElementById('khuon-table'), tbody = document.getElementById('khuon-tbody'), empty = document.getElementById('khuon-empty');
-  if (!data.length){ table.style.display = 'none'; empty.style.display = 'block'; return; }
-  empty.style.display = 'none'; table.style.display = 'table';
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td>${escapeHtml(r.ma_khuon)}</td>
-      <td>${escapeHtml(r.ten_sp_gan_nhat) || '<span class="muted">—</span>'}</td>
-      <td>${r.tong_shot_luy_ke ?? '<span class="muted">—</span>'}</td>
-      <td>${r.nguong_bao_duong ?? '<span class="muted">—</span>'}</td>
-      <td>${r.nguong_lam_moi ?? '<span class="muted">—</span>'}</td>
-      <td>${escapeHtml(r.trang_thai_khuon) || '<span class="muted">—</span>'}</td>
-      <td class="row-actions">
-        <button type="button" class="edit">Sửa</button>
-        <button type="button" class="del">Xoá</button>
-      </td>
-    </tr>
-  `).join('');
-  [...tbody.querySelectorAll('tr')].forEach((tr, i) => {
-    const r = data[i];
-    tr.querySelector('.edit').addEventListener('click', () => {
-      khuonEditing = r.ma_khuon;
-      document.getElementById('khuon-ma').value = r.ma_khuon;
-      document.getElementById('khuon-ma').disabled = true;
-      document.getElementById('khuon-sp').value = r.ten_sp_gan_nhat || '';
-      document.getElementById('khuon-tongshot').value = r.tong_shot_luy_ke ?? '';
-      document.getElementById('khuon-nguongbd').value = r.nguong_bao_duong ?? '';
-      document.getElementById('khuon-nguonglm').value = r.nguong_lam_moi ?? '';
-      document.getElementById('khuon-langanbd').value = r.lan_bao_duong_gan_nhat || '';
-      document.getElementById('khuon-shotbd').value = r.shot_tai_lan_bao_duong_gan_nhat ?? '';
-      document.getElementById('khuon-trangthai').value = r.trang_thai_khuon || '';
-      document.getElementById('khuon-ghichu').value = r.ghi_chu || '';
-      document.getElementById('khuon-form-title').textContent = 'Sửa khuôn: ' + r.ma_khuon;
-      document.getElementById('khuon-submit').textContent = 'Lưu thay đổi';
-      document.getElementById('khuon-cancel').style.display = 'inline';
-      window.scrollTo({ top: document.getElementById('khuon-form').offsetTop - 20, behavior: 'smooth' });
-    });
-    tr.querySelector('.del').addEventListener('click', async () => {
-      if (!confirm('Xoá khuôn "' + r.ma_khuon + '"?')) return;
-      const { error: delErr } = await sb.from('duc_shot_khuon').delete().eq('ma_khuon', r.ma_khuon);
-      if (delErr) return alert('Lỗi xoá: ' + delErr.message);
-      loadKhuon();
-    });
-  });
+  document.getElementById('khuon-ma').value = r.ma_khuon;
+  document.getElementById('khuon-ma').disabled = true;
+  document.getElementById('khuon-sp').value = r.ten_sp_gan_nhat || '';
+  document.getElementById('khuon-tongshot').value = r.tong_shot_luy_ke ?? '';
+  document.getElementById('khuon-nguongbd').value = r.nguong_bao_duong ?? '';
+  document.getElementById('khuon-nguonglm').value = r.nguong_lam_moi ?? '';
+  document.getElementById('khuon-langanbd').value = r.lan_bao_duong_gan_nhat || '';
+  document.getElementById('khuon-shotbd').value = r.shot_tai_lan_bao_duong_gan_nhat ?? '';
+  document.getElementById('khuon-trangthai').value = r.trang_thai_khuon || '';
+  document.getElementById('khuon-ghichu').value = r.ghi_chu || '';
+  document.getElementById('khuon-form-title').textContent = 'Sửa khuôn: ' + r.ma_khuon;
+  document.getElementById('khuon-submit').textContent = 'Lưu thay đổi';
 }
 document.getElementById('khuon-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -697,7 +792,6 @@ document.getElementById('khuon-form').addEventListener('submit', async (e) => {
   if (!ma_khuon) return;
   const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   const str = (id) => document.getElementById(id).value.trim() || null;
-
   const payload = {
     ten_sp_gan_nhat: str('khuon-sp'),
     tong_shot_luy_ke: num('khuon-tongshot'),
@@ -709,7 +803,6 @@ document.getElementById('khuon-form').addEventListener('submit', async (e) => {
     ghi_chu: str('khuon-ghichu'),
     last_updated_at: new Date().toISOString(),
   };
-
   let error;
   if (khuonEditing){
     ({ error } = await sb.from('duc_shot_khuon').update(payload).eq('ma_khuon', khuonEditing));
@@ -717,22 +810,34 @@ document.getElementById('khuon-form').addEventListener('submit', async (e) => {
     ({ error } = await sb.from('duc_shot_khuon').insert({ ma_khuon, ...payload }));
   }
   if (error) return showMsg('khuon-msg', 'error', 'Lỗi: ' + error.message);
-  showMsg('khuon-msg', 'ok', khuonEditing ? 'Đã lưu ' + ma_khuon + '.' : 'Đã thêm ' + ma_khuon + '.');
-  khuonResetForm();
-  loadKhuon();
+  toast(khuonEditing ? 'Đã lưu ' + ma_khuon : 'Đã thêm ' + ma_khuon);
+  catalogs.khuon.close();
+  catalogs.khuon.reload();
+});
+initCatalog({
+  id: 'khuon',
+  emptyText: 'Chưa có khuôn nào.',
+  fetch: () => sb.from('duc_shot_khuon').select('ma_khuon, ten_sp_gan_nhat, tong_shot_luy_ke, nguong_bao_duong, nguong_lam_moi, lan_bao_duong_gan_nhat, shot_tai_lan_bao_duong_gan_nhat, trang_thai_khuon, ghi_chu'),
+  pk: r => r.ma_khuon,
+  resetForm: khuonResetForm,
+  fillForm: khuonFillForm,
+  remove: r => sb.from('duc_shot_khuon').delete().eq('ma_khuon', r.ma_khuon),
+  filters: [{ k: 'trang_thai_khuon', label: 'Trạng thái', valOf: r => r.trang_thai_khuon }],
+  columns: [
+    { k: 'ma_khuon', label: 'Mã khuôn', sortable: true, sortVal: r => r.ma_khuon, text: r => r.ma_khuon, render: r => escapeHtml(r.ma_khuon) },
+    { k: 'ten_sp_gan_nhat', label: 'SP gần nhất', sortable: true, sortVal: r => r.ten_sp_gan_nhat || '', text: r => r.ten_sp_gan_nhat || '', render: r => escapeHtml(r.ten_sp_gan_nhat) || DASH },
+    { k: 'tong_shot_luy_ke', label: 'Tổng shot', sortable: true, sortVal: r => r.tong_shot_luy_ke == null ? -Infinity : Number(r.tong_shot_luy_ke), text: r => r.tong_shot_luy_ke == null ? '' : String(r.tong_shot_luy_ke), render: r => r.tong_shot_luy_ke ?? DASH },
+    { k: 'nguong_bao_duong', label: 'Ngưỡng BD', sortable: true, sortVal: r => r.nguong_bao_duong == null ? -Infinity : Number(r.nguong_bao_duong), text: r => r.nguong_bao_duong == null ? '' : String(r.nguong_bao_duong), render: r => r.nguong_bao_duong ?? DASH },
+    { k: 'nguong_lam_moi', label: 'Ngưỡng LM', sortable: true, sortVal: r => r.nguong_lam_moi == null ? -Infinity : Number(r.nguong_lam_moi), text: r => r.nguong_lam_moi == null ? '' : String(r.nguong_lam_moi), render: r => r.nguong_lam_moi ?? DASH },
+    { k: 'trang_thai_khuon', label: 'Trạng thái', sortable: true, sortVal: r => r.trang_thai_khuon || '', text: r => r.trang_thai_khuon || '', render: r => escapeHtml(r.trang_thai_khuon) || DASH },
+  ],
 });
 
 // ── Gate + khởi động ────────────────────────────────────────────────────
 async function main(){
   const session = await MesAuth.requireAuth();
-
   const gate = document.getElementById('gate');
-  const { data: myRole, error } = await sb
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
+  const { data: myRole, error } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
   if (error){
     gate.innerHTML = '<div class="msg error" style="display:block">Không kiểm tra được quyền: ' + error.message + '</div>';
     return;
@@ -741,15 +846,14 @@ async function main(){
     gate.innerHTML = '<div class="msg error" style="display:block">Bạn không có quyền admin để vào trang này.</div>';
     return;
   }
-
   document.getElementById('adminArea').style.display = 'block';
   document.getElementById('adminTabs').style.display = 'flex';
   setupQuyTrinhSteps();
-  loadMay();
-  loadSp();
   loadNsLineMayOptions();
-  loadNs();
-  loadKhuon();
+  catalogs.may.reload();
+  catalogs.sp.reload();
+  catalogs.ns.reload();
+  catalogs.khuon.reload();
 }
 
 function startHeaderClock(){
@@ -762,7 +866,6 @@ function startHeaderClock(){
   setInterval(tick, 1000);
 }
 startHeaderClock();
-
 main();
 </script>
 </body>
