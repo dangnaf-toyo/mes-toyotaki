@@ -372,7 +372,7 @@ const LOAI_SU_CO = [
 
 const state = {
   user: '',
-  rows: [], machines: [], products: [], productMap: {}, personnel: [], shiftLeaders: [],
+  rows: [], machines: [], products: [], productMap: {}, personnel: [], shiftLeaders: [], personnelDuc: [],
   loaiSuCo: LOAI_SU_CO, shiftPlans: {}, cavityMap: {}, moldsByProduct: {}, moldMap: {}, incidents: [],
   ngay: '', ca: '', phuongAnCa: '', serverOffsetMs: 0,
   currentIdDong: null, screenStack: ['scr-list'],
@@ -470,8 +470,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setupProductAutocomplete('pl-ma-sp', 'pl-ma-sp-dropdown', 'pl-ten-sp', ma => populateSoKhuonMobile('pl', ma, null));
   setupProductAutocomplete('cp-ma-sp', 'cp-ma-sp-dropdown', 'cp-ten-sp', ma => populateSoKhuonMobile('cp', ma, null));
-  setupSimpleAutocomplete('pl-nv-ngay', 'pl-nv-ngay-dropdown', () => state.personnel);
-  setupSimpleAutocomplete('pl-nv-dem', 'pl-nv-dem-dropdown', () => state.personnel);
+  setupSimpleAutocomplete('pl-nv-ngay', 'pl-nv-ngay-dropdown', () => state.personnelDuc);
+  setupSimpleAutocomplete('pl-nv-dem', 'pl-nv-dem-dropdown', () => state.personnelDuc);
   setupSimpleAutocomplete('in-dam-nhiem', 'in-dam-nhiem-dropdown', () => state.personnel);
   setupSimpleAutocomplete('cp-dam-nhiem', 'cp-dam-nhiem-dropdown', () => state.personnel);
   populateHeaderMobile(suggested);
@@ -485,7 +485,7 @@ async function loadMasterData(){
     // Nhập liệu Đúc chỉ hiện máy bộ phận Đúc (bo_phan null = máy cũ chưa gán).
     sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s'),
-    sb.from('master_employees').select('ten_nhan_vien,vai_tro'),
+    sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan'),
     sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat'),
   ]);
   for (const r of [mMachines, mProducts, mEmployees, mMolds]) {
@@ -502,6 +502,10 @@ async function loadMasterData(){
   state.personnel = emps.map(e => e.ten_nhan_vien).sort(naturalCompare);
   const leaders = emps.filter(e => e.vai_tro === 'truong_ca').map(e => e.ten_nhan_vien).sort(naturalCompare);
   state.shiftLeaders = leaders.length ? leaders : state.personnel;
+  // "Nhân sự ca ngày / ca đêm" chỉ chọn công nhân bộ phận Đúc.
+  state.personnelDuc = emps
+    .filter(e => e.vai_tro === 'nhan_vien' && e.bo_phan === 'Đúc')
+    .map(e => e.ten_nhan_vien).sort(naturalCompare);
   buildMoldsByProductMapMobile(mMolds.data || []);
 }
 

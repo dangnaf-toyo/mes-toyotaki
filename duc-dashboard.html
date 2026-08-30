@@ -405,10 +405,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field"><label>KH tuần</label><input type="number" id="mp-kh-tuan" min="0"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Nhân sự ca ngày</label><input list="dl-personnel" id="mp-nv-ngay"></div>
-        <div class="field"><label>Nhân sự ca đêm</label><input list="dl-personnel" id="mp-nv-dem"></div>
+        <div class="field"><label>Nhân sự ca ngày</label><input list="dl-nv-duc" id="mp-nv-ngay"></div>
+        <div class="field"><label>Nhân sự ca đêm</label><input list="dl-nv-duc" id="mp-nv-dem"></div>
       </div>
       <datalist id="dl-personnel"></datalist>
+      <datalist id="dl-nv-duc"></datalist>
 
       <label id="mp-pair-toggle-wrap" style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:var(--bg-sunken);border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">
         <input type="checkbox" id="mp-pair-toggle" style="cursor:pointer">
@@ -1141,7 +1142,7 @@ const state = {
   user: '',
   ngay: null, ca: null, phuongAnCa: null, truongCa: null,
   machines: [], products: [], productMap: {}, cavityMap: {}, cycleTimeMap: {},
-  personnel: [], shiftLeaders: [],
+  personnel: [], shiftLeaders: [], personnelDuc: [],
   loaiSuCo: CONFIG.LOAI_SU_CO,
   shiftPlans: {},
   molds: [], moldsByProduct: {}, moldMap: {},
@@ -1444,7 +1445,7 @@ async function loadMasterData(){
     // chưa gán bộ phận, mặc định coi là Đúc).
     sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s'),
-    sb.from('master_employees').select('ten_nhan_vien,vai_tro'),
+    sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan'),
     sb.from('duc_shot_khuon').select('*'),
   ]);
   for (const r of [mMachines, mProducts, mEmployees, mMolds]) {
@@ -1469,6 +1470,10 @@ async function loadMasterData(){
   state.personnel = emps.map(e => e.ten_nhan_vien).sort(naturalCompare);
   const leaders = emps.filter(e => e.vai_tro === 'truong_ca').map(e => e.ten_nhan_vien).sort(naturalCompare);
   state.shiftLeaders = leaders.length ? leaders : state.personnel;
+  // "Nhân sự ca ngày / ca đêm" chỉ chọn công nhân bộ phận Đúc (vai_tro='nhan_vien' + bo_phan='Đúc').
+  state.personnelDuc = emps
+    .filter(e => e.vai_tro === 'nhan_vien' && e.bo_phan === 'Đúc')
+    .map(e => e.ten_nhan_vien).sort(naturalCompare);
 
   applyMoldList(mMolds.data || []);
 }
@@ -1579,6 +1584,23 @@ function populateDatalists(){
     opt.value = p;
     dlPer.appendChild(opt);
   });
+  const dlNvDuc = document.getElementById('dl-nv-duc');
+  dlNvDuc.innerHTML = '';
+  state.personnelDuc.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    dlNvDuc.appendChild(opt);
+  });
+}
+
+/** Thêm tên nhân sự gõ tay vào datalist "Nhân sự ca ngày/đêm" trong phiên hiện tại. */
+function addNvDucToDatalist(name){
+  name = String(name || '').trim();
+  if (!name || state.personnelDuc.indexOf(name) !== -1) return;
+  state.personnelDuc.push(name);
+  const opt = document.createElement('option');
+  opt.value = name;
+  document.getElementById('dl-nv-duc').appendChild(opt);
 }
 
 /**
@@ -2872,6 +2894,7 @@ async function submitPlan(){
     showToast('✓ Đã lưu kế hoạch cho ' + state.currentTarget.ma_may);
     addMoldToProductMap(maSp, soKhuon);
     addPersonnelToDatalist(nvNgay); addPersonnelToDatalist(nvDem);
+    addNvDucToDatalist(nvNgay); addNvDucToDatalist(nvDem);
     loadShiftState(false);
   } catch (e) { onError(e); }
 }
@@ -2904,6 +2927,7 @@ async function submitPairedPlan(maSpA, khCaA, soKhuon){
     showToast('✓ Đã lưu khuôn kép cho ' + state.currentTarget.ma_may + ': ' + d.ma_sp_a + ' + ' + d.ma_sp_b);
     addMoldToProductMap(maSpA, soKhuon); addMoldToProductMap(maSpB, soKhuon);
     addPersonnelToDatalist(nvNgay); addPersonnelToDatalist(nvDem);
+    addNvDucToDatalist(nvNgay); addNvDucToDatalist(nvDem);
     loadShiftState(false);
   } catch (e) { onError(e); }
 }
