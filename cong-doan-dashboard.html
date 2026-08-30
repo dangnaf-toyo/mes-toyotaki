@@ -166,10 +166,11 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
       <h2>🔧 Hàng NG chờ sửa</h2>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Tag No</th><th>Mã SP</th><th>SL chờ sửa</th><th>Line gốc</th><th>Khuôn</th><th></th></tr></thead>
-          <tbody id="ngChoSuaTbody"><tr class="empty-row"><td colspan="6">—</td></tr></tbody>
+          <thead><tr><th></th><th>Tag No</th><th>Mã SP</th><th>SL chờ sửa</th><th>Line gốc</th><th>Khuôn</th><th></th></tr></thead>
+          <tbody id="ngChoSuaTbody"><tr class="empty-row"><td colspan="7">—</td></tr></tbody>
         </table>
       </div>
+      <div style="margin-top:10px"><button type="button" class="btn-outline btn" id="btnGomNg" disabled>Gom tem (chọn ≥ 2)</button></div>
     </div>
 
     <div class="card" id="doiSoatCard" style="display:none">
@@ -1337,6 +1338,7 @@ async function loadNgChoSua(){
   card.style.display = '';
   tbody.innerHTML = data.map(t => `
     <tr>
+      <td><input type="checkbox" class="ngcs-pick" data-tag="${escapeHtml(t.tag_no)}" data-masp="${escapeHtml(t.ma_sp)}"></td>
       <td class="mono">${escapeHtml(t.tag_no)}</td>
       <td>${escapeHtml(t.ma_sp)}</td>
       <td class="num"><b>${fmtNum(t.so_luong)}</b></td>
@@ -1344,7 +1346,34 @@ async function loadNgChoSua(){
       <td>${escapeHtml(t.so_khuon) || '—'}</td>
       <td><button type="button" class="btn-tiny" style="background:var(--accent);color:#fff" onclick='openSuaHang(${JSON.stringify(t)})'>🔧 Sửa xong</button></td>
     </tr>`).join('');
+  tbody.querySelectorAll('.ngcs-pick').forEach(c => c.addEventListener('change', updateGomBtn));
+  updateGomBtn();
 }
+function updateGomBtn(){
+  const picked = [...document.querySelectorAll('#ngChoSuaTbody .ngcs-pick:checked')];
+  const btn = document.getElementById('btnGomNg');
+  const sameSp = picked.length >= 2 && new Set(picked.map(c => c.dataset.masp)).size === 1;
+  btn.disabled = !sameSp;
+  btn.textContent = picked.length >= 2
+    ? (sameSp ? 'Gom ' + picked.length + ' tem đã chọn' : '⚠ Chọn cùng 1 mã SP')
+    : 'Gom tem (chọn ≥ 2)';
+}
+document.getElementById('btnGomNg').addEventListener('click', async () => {
+  const picked = [...document.querySelectorAll('#ngChoSuaTbody .ngcs-pick:checked')].map(c => c.dataset.tag);
+  if (picked.length < 2) return;
+  if (!confirm('Gom ' + picked.length + ' tem NG chờ sửa thành 1 tem?\n(Giữ phả hệ; các tem cũ chuyển "Đã gộp NG".)')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { data, error } = await sb.rpc('bavia_gom_ng_cho_sua', {
+    p_tags: picked,
+    p_nguoi: '',
+    p_user: await MesAuth.getCurrentUserIdentity(),
+    p_client_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+  });
+  if (error) return showMsg('Lỗi gom: ' + error.message, 'err');
+  showMsg('✅ Đã gom thành ' + (data && data.tag_moi) + ' (' + fmtNum(data && data.so_luong) + ' sp)', 'ok');
+  loadNgChoSua();
+});
 
 async function openSuaHang(t){
   suaHangTem = t;
@@ -1434,12 +1463,13 @@ async function loadDoiSoat(tag){
   const box = document.getElementById('ds-result');
   if (!tag){ box.innerHTML = ''; return; }
   box.innerHTML = 'Đang tra…';
-  const [temR, nguonR, conR, tachR, suaR] = await Promise.all([
+  const [temR, nguonR, conR, tachR, suaR, gomR] = await Promise.all([
     sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,trang_thai,lot,so_khuon,may_duc_chi_thi').eq('tag_no', tag).maybeSingle(),
     sb.from('bavia_xu_ly_nguon').select('id_xu_ly,sl_lay,sl_ng_phe,sl_ng_sua').eq('tag_no_nguon', tag),
     sb.from('cd_tem_nguon').select('tag_no_moi,so_luong_lay').eq('tag_no_nguon', tag),
     sb.from('duc_tem_tach').select('tag_no_con,so_luong_con').eq('tag_no_cha', tag),
     sb.from('bavia_sua_log').select('id,ngay,ca,so_ok,so_ng_phe,ly_do,nguoi,thoi_diem').eq('tag_ng', tag).order('id', { ascending: false }),
+    sb.from('bavia_gom_log').select('id,tag_moi,tags_goc,so_luong,nguoi,thoi_diem').or('tag_moi.eq.' + tag + ',tags_goc.cs.{' + tag + '}').order('id', { ascending: false }),
   ]);
   const tem = temR.data;
   if (!tem){ box.innerHTML = '<span style="color:var(--alarm-fg)">Không tìm thấy tem ' + escapeHtml(tag) + '</span>'; return; }
@@ -1512,7 +1542,28 @@ async function loadDoiSoat(tag){
       <td><button type="button" class="btn-tiny danger" onclick="undoSuaHang(${s.id})">↩ Hoàn tác</button></td>
     </tr>`).join('') + '</tbody></table></div>';
   }
+  if ((gomR.data || []).length){
+    html += '<div style="font-weight:600;margin:10px 0 4px">Lần "Gom NG chờ sửa":</div><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Lúc</th><th>Tem gộp</th><th>SL</th><th>Từ</th><th></th></tr></thead><tbody>';
+    html += (gomR.data || []).map(g => `<tr>
+      <td>${g.id}</td>
+      <td class="mono">${g.thoi_diem ? new Date(g.thoi_diem).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+      <td class="mono">${escapeHtml(g.tag_moi)}</td>
+      <td class="num">${fmtNum(g.so_luong)}</td>
+      <td class="mono" style="font-size:11px">${(g.tags_goc || []).map(escapeHtml).join(', ')}</td>
+      <td><button type="button" class="btn-tiny danger" onclick="undoGomNg(${g.id})">↩ Hoàn tác</button></td>
+    </tr>`).join('') + '</tbody></table></div>';
+  }
   box.innerHTML = html;
+}
+async function undoGomNg(id){
+  if (!confirm('Hoàn tác lần gom NG #' + id + '?\nTem gộp bị xoá, số lượng trả về các tem NG cũ.')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('bavia_undo_gom_ng', { p_id: id, p_user: await MesAuth.getCurrentUserIdentity() });
+  if (error) return showMsg('Lỗi hoàn tác: ' + error.message, 'err');
+  showMsg('✅ Đã hoàn tác gom #' + id, 'ok');
+  loadDoiSoat(document.getElementById('ds-tag').value.trim());
+  loadNgChoSua();
 }
 
 async function undoXuLy(id){

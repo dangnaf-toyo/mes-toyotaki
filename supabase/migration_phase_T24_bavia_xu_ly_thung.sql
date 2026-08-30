@@ -518,19 +518,20 @@ grant  execute on function bavia_xu_ly_thung(text, text[], numeric, numeric, num
 --   R2 (T26/GĐ4: bavia_undo_xu_ly + bavia_undo_sua_hang), R3 (T26: kiểm
 --   ma_sp thùng gộp), R7 (T27: in qua <a target=_blank>+Blob, ít bị chặn),
 --   R8 (xác nhận: may_tt NULL → duc_recompute_tt_ca no-op như tem Kanban).
--- [CÒN LẠI — chấp nhận / để sau]:
---  R4. Sửa hàng CHÉO CA: bavia_sua_hang credit cd_bao_cao_ca theo ngày/ca
---      NGƯỜI DÙNG đang chọn (không phải ca gốc tạo tem NG). Sửa cùng ca thì
---      chính xác; sửa sang ca/ngày khác → dòng báo cáo ca đó có so_luong_ng_sua
---      âm, dòng ca gốc giữ nguyên. Tổng gộp theo mã SP (tuần/tháng) vẫn cân.
---      Chưa fix vì Bavia hầu như sửa trong cùng ca.
---  R5. NG sửa mỗi lần xử lý = 1 tem "NG chờ sửa" riêng, không gom. Cố ý (giữ
---      phả hệ + undo theo từng lần đơn giản). Có thể thêm "sửa gộp nhiều tem"
---      ở card NG chờ sửa nếu cần.
---  R6. Chuyển tem TKB sang Gia Công qua chuyencongdoan.html: RPC
---      cd_ghi_chuyen_cong_doan không chặn (chỉ append log) → hoạt động như tem
---      PK của cd_dong_goi_lai. CẦN test end-to-end (quét QR + xác nhận + kiểm
---      cd_v_vi_tri_hien_tai) — không phải lỗi thiết kế.
+-- [ĐÃ XỬ LÝ tiếp T28]:
+--  R4. Sửa hàng CHÉO CA — T28: bavia_sua_hang credit cd_bao_cao_ca về ĐÚNG
+--      ngày/ca GỐC nơi tem "NG chờ sửa" sinh ra (tra bavia_xu_ly_ra→bavia_xu_ly),
+--      lưu credit_ngay/credit_ca/credit_to vào bavia_sua_log để undo đảo đúng
+--      chỗ. Tem gộp NG / tạo trước T26 → fallback ngày/ca người dùng chọn.
+--  R5. Gom tem NG chờ sửa — T28: bavia_gom_ng_cho_sua(p_tags[]) gộp nhiều tem
+--      "NG chờ sửa" cùng mã SP thành 1 tem TKB (giữ phả hệ cd_tem_nguon), tem
+--      cũ -> trang_thai='Đã gộp NG'. bavia_gom_log + bavia_undo_gom_ng. UI:
+--      checkbox + nút "Gom" ở card NG chờ sửa; đối soát hiện lần gom + undo.
+--  R6. Chuyển tem TKB sang Gia Công qua chuyencongdoan.html: ĐÃ RÀ CODE —
+--      onQrDecoded tra live duc_tem theo tag (TKB là duc_tem row → OK), routing
+--      hint chỉ cảnh báo mềm, submitTransfer partial gọi duc_tach_tem (chạy
+--      trên TKB). KHÔNG có chặn riêng cho TKB. Vẫn nên user test 1 lần thật.
+-- [CÒN LẠI — chấp nhận]:
 --  R-undo. bavia_undo_xu_ly KHÔNG đảo log "nhận công đoạn" của thùng nguồn
 --      (thùng vẫn ở Bavia); undo event tạo trước T26 (ten_tram null) trỏ dòng
 --      cd_bao_cao_ca lệch nếu line đã kết ca.
