@@ -1440,7 +1440,9 @@ async function bootstrap(){
  */
 async function loadMasterData(){
   const [mMachines, mProducts, mEmployees, mMolds] = await Promise.all([
-    sb.from('master_machines').select('ma_may,kanban'),
+    // Bảng điều khiển Đúc chỉ hiện máy thuộc bộ phận Đúc (bo_phan null = máy cũ
+    // chưa gán bộ phận, mặc định coi là Đúc).
+    sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s'),
     sb.from('master_employees').select('ten_nhan_vien,vai_tro'),
     sb.from('duc_shot_khuon').select('*'),

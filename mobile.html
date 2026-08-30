@@ -482,7 +482,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 /** Thay api_bootstrap: master data đọc thẳng bảng Supabase, không cần RPC. */
 async function loadMasterData(){
   const [mMachines, mProducts, mEmployees, mMolds] = await Promise.all([
-    sb.from('master_machines').select('ma_may'),
+    // Nhập liệu Đúc chỉ hiện máy bộ phận Đúc (bo_phan null = máy cũ chưa gán).
+    sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s'),
     sb.from('master_employees').select('ten_nhan_vien,vai_tro'),
     sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat'),
