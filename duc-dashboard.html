@@ -1444,7 +1444,7 @@ async function loadMasterData(){
     // Bảng điều khiển Đúc chỉ hiện máy thuộc bộ phận Đúc (bo_phan null = máy cũ
     // chưa gán bộ phận, mặc định coi là Đúc).
     sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null'),
-    sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s'),
+    sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s,so_khuon'),
     sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan'),
     sb.from('duc_shot_khuon').select('*'),
   ]);
@@ -2555,6 +2555,15 @@ function buildMoldsByProductMap(moldList){
     if (!maSp || !maKhuon) return;
     if (!state.moldsByProduct[maSp]) state.moldsByProduct[maSp] = [];
     if (state.moldsByProduct[maSp].indexOf(maKhuon) === -1) state.moldsByProduct[maSp].push(maKhuon);
+  });
+  // Bổ sung số khuôn khai báo sẵn ở danh mục SP (master_products.so_khuon) —
+  // dùng khi SP chưa có dòng nào trong duc_shot_khuon (vd SP mới / SP test).
+  (state.products || []).forEach(p => {
+    if (!p.ma_sp || !p.so_khuon) return;
+    String(p.so_khuon).split(/[,;]/).map(s => s.trim()).filter(Boolean).forEach(mk => {
+      if (!state.moldsByProduct[p.ma_sp]) state.moldsByProduct[p.ma_sp] = [];
+      if (state.moldsByProduct[p.ma_sp].indexOf(mk) === -1) state.moldsByProduct[p.ma_sp].push(mk);
+    });
   });
 }
 
