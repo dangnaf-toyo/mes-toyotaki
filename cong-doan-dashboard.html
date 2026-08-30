@@ -169,6 +169,15 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         </table>
       </div>
     </div>
+
+    <div class="card" id="doiSoatCard" style="display:none">
+      <h2>🔎 Đối soát thùng &amp; hoàn tác</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <input type="text" autocomplete="off" id="ds-tag" placeholder="Quét / nhập Tag No thùng nguồn (hoặc tem TKB) rồi Enter" style="flex:1;min-width:220px">
+        <button type="button" class="btn-outline btn" id="ds-btn">Tra</button>
+      </div>
+      <div id="ds-result" style="font-size:12.5px"></div>
+    </div>
   </div>
 </div>
 
@@ -491,6 +500,7 @@ async function loadDanhMuc(){
   if (isLineMode()){
     document.getElementById('btnAddTram').style.display = 'none';
     document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' theo danh mục';
+    document.getElementById('doiSoatCard').style.display = '';
     const note = document.getElementById('tramsSectionNote');
     if (note) note.textContent = tramLabel() + ' lấy từ danh mục Máy-Line. Line chưa có kế hoạch xếp riêng bên dưới — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần.';
   }
@@ -1344,6 +1354,119 @@ document.getElementById('btnSubmitSuaHang').addEventListener('click', async () =
   showMsg('✅ Đã sửa hàng từ ' + suaHangTem.tag_no, 'ok');
   loadNgChoSua();
 });
+
+/* ========== Đối soát thùng + Undo (GĐ4) =============================== */
+document.getElementById('ds-btn').addEventListener('click', () => loadDoiSoat(document.getElementById('ds-tag').value.trim()));
+document.getElementById('ds-tag').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return; e.preventDefault();
+  loadDoiSoat(e.target.value.trim().split('>')[0].replace(/\s+/g, ''));
+});
+
+async function loadDoiSoat(tag){
+  const box = document.getElementById('ds-result');
+  if (!tag){ box.innerHTML = ''; return; }
+  box.innerHTML = 'Đang tra…';
+  const [temR, nguonR, conR, tachR, suaR] = await Promise.all([
+    sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,trang_thai,lot,so_khuon,may_duc_chi_thi').eq('tag_no', tag).maybeSingle(),
+    sb.from('bavia_xu_ly_nguon').select('id_xu_ly,sl_lay,sl_ng_phe,sl_ng_sua').eq('tag_no_nguon', tag),
+    sb.from('cd_tem_nguon').select('tag_no_moi,so_luong_lay').eq('tag_no_nguon', tag),
+    sb.from('duc_tem_tach').select('tag_no_con,so_luong_con').eq('tag_no_cha', tag),
+    sb.from('bavia_sua_log').select('id,ngay,ca,so_ok,so_ng_phe,ly_do,nguoi,thoi_diem').eq('tag_ng', tag).order('id', { ascending: false }),
+  ]);
+  const tem = temR.data;
+  if (!tem){ box.innerHTML = '<span style="color:var(--alarm-fg)">Không tìm thấy tem ' + escapeHtml(tag) + '</span>'; return; }
+
+  const evIds = [...new Set((nguonR.data || []).map(r => r.id_xu_ly))];
+  let events = [];
+  if (evIds.length){
+    const { data } = await sb.from('bavia_xu_ly').select('*').in('id', evIds).order('id', { ascending: false });
+    events = data || [];
+  }
+  const nguonByEv = {};
+  (nguonR.data || []).forEach(r => { nguonByEv[r.id_xu_ly] = r; });
+
+  const sumLay = (nguonR.data || []).reduce((s, r) => s + Number(r.sl_lay || 0), 0);
+  const sumPhe = (nguonR.data || []).reduce((s, r) => s + Number(r.sl_ng_phe || 0), 0);
+  const sumSua = (nguonR.data || []).reduce((s, r) => s + Number(r.sl_ng_sua || 0), 0);
+  const sumTach = (tachR.data || []).reduce((s, r) => s + Number(r.so_luong_con || 0), 0);
+  // OK-allocated qua cd_tem_nguon nhưng KHÔNG phải bavia NG-sửa:
+  const sumCon = (conR.data || []).reduce((s, r) => s + Number(r.so_luong_lay || 0), 0);
+  const conLai = Number(tem.so_luong || 0);
+  const banDau = conLai + sumCon + sumPhe + sumTach;  // sl_lay của bavia = OK + NG-sửa (đã nằm trong sumCon) + NG phế
+
+  let html = `<div style="margin-bottom:6px">
+    <b>${escapeHtml(tem.tag_no)}</b> · ${escapeHtml(tem.ma_sp)} ${escapeHtml(tem.ten_sp || '')}
+    · trạng thái: <b>${escapeHtml(tem.trang_thai || '—')}</b>
+    · Lô ${escapeHtml(tem.lot) || '—'} · Khuôn ${escapeHtml(tem.so_khuon) || '—'}
+  </div>
+  <table style="margin-bottom:10px"><tr>
+    <th>SL ban đầu (ước)</th><th>Đã ra (OK+sửa)</th><th>NG phế</th><th>Đã tách</th><th>Còn lại</th>
+  </tr><tr>
+    <td class="num">${fmtNum(banDau)}</td>
+    <td class="num" style="color:#1a7a3a">${fmtNum(sumCon)}</td>
+    <td class="num" style="color:#c00">${fmtNum(sumPhe)}</td>
+    <td class="num">${fmtNum(sumTach)}</td>
+    <td class="num"><b>${fmtNum(conLai)}</b></td>
+  </tr></table>`;
+
+  if (events.length){
+    html += '<div style="font-weight:600;margin-bottom:4px">Lần "Xử lý thùng" đụng vào thùng này:</div><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Lúc</th><th>Line</th><th>OK</th><th>NG phế</th><th>NG sửa</th><th></th></tr></thead><tbody>';
+    html += events.map(e => {
+      const n = nguonByEv[e.id] || {};
+      return `<tr>
+        <td>${e.id}</td>
+        <td class="mono">${e.thoi_diem ? new Date(e.thoi_diem).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+        <td>${escapeHtml(e.ten_tram || '—')}</td>
+        <td class="num">${fmtNum(n.sl_lay - n.sl_ng_phe - n.sl_ng_sua)}</td>
+        <td class="num">${fmtNum(n.sl_ng_phe)}</td>
+        <td class="num">${fmtNum(n.sl_ng_sua)}</td>
+        <td><button type="button" class="btn-tiny danger" onclick="undoXuLy(${e.id})">↩ Hoàn tác</button></td>
+      </tr>`;
+    }).join('') + '</tbody></table></div>';
+  }
+
+  if ((conR.data || []).length){
+    html += '<div style="font-weight:600;margin:10px 0 4px">Tem con tạo ra từ thùng này:</div>' +
+      (conR.data || []).map(r => `<span class="mono" style="display:inline-block;margin:2px 6px 2px 0">${escapeHtml(r.tag_no_moi)} (${fmtNum(r.so_luong_lay)})</span>`).join('');
+  }
+  if ((tachR.data || []).length){
+    html += '<div style="font-weight:600;margin:10px 0 4px">Tách thành:</div>' +
+      (tachR.data || []).map(r => `<span class="mono" style="display:inline-block;margin:2px 6px 2px 0">${escapeHtml(r.tag_no_con)} (${fmtNum(r.so_luong_con)})</span>`).join('');
+  }
+  if ((suaR.data || []).length){
+    html += '<div style="font-weight:600;margin:10px 0 4px">Lần "Sửa hàng" cho tem này:</div><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Lúc</th><th>OK</th><th>NG phế</th><th>Lý do</th><th></th></tr></thead><tbody>';
+    html += (suaR.data || []).map(s => `<tr>
+      <td>${s.id}</td>
+      <td class="mono">${s.thoi_diem ? new Date(s.thoi_diem).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+      <td class="num">${fmtNum(s.so_ok)}</td>
+      <td class="num">${fmtNum(s.so_ng_phe)}</td>
+      <td>${escapeHtml(s.ly_do || '—')}</td>
+      <td><button type="button" class="btn-tiny danger" onclick="undoSuaHang(${s.id})">↩ Hoàn tác</button></td>
+    </tr>`).join('') + '</tbody></table></div>';
+  }
+  box.innerHTML = html;
+}
+
+async function undoXuLy(id){
+  if (!confirm('Hoàn tác lần "Xử lý thùng" #' + id + '?\nCác tem thành phẩm của lần này sẽ bị xoá, số lượng trả về thùng nguồn.\nChỉ được nếu tem chưa dùng ở bước sau.')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('bavia_undo_xu_ly', { p_id: id, p_user: await MesAuth.getCurrentUserIdentity() });
+  if (error) return showMsg('Lỗi hoàn tác: ' + error.message, 'err');
+  showMsg('✅ Đã hoàn tác #' + id, 'ok');
+  loadDoiSoat(document.getElementById('ds-tag').value.trim());
+  loadTrams(); loadDangDo(); loadNgChoSua();
+}
+async function undoSuaHang(id){
+  if (!confirm('Hoàn tác lần "Sửa hàng" #' + id + '?\nTem OK sẽ bị xoá, số lượng trả về tem NG chờ sửa.')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const { error } = await sb.rpc('bavia_undo_sua_hang', { p_id: id, p_user: await MesAuth.getCurrentUserIdentity() });
+  if (error) return showMsg('Lỗi hoàn tác: ' + error.message, 'err');
+  showMsg('✅ Đã hoàn tác sửa hàng #' + id, 'ok');
+  loadDoiSoat(document.getElementById('ds-tag').value.trim());
+  loadNgChoSua();
+}
 
 /* ---------- Nạp kế hoạch hàng loạt từ KHSX tuần ---------- */
 document.getElementById('btnKhsxBatch').addEventListener('click', () => {
