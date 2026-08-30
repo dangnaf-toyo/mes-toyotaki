@@ -159,6 +159,16 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         </table>
       </div>
     </div>
+
+    <div class="card" id="ngChoSuaCard" style="display:none">
+      <h2>🔧 Hàng NG chờ sửa</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Tag No</th><th>Mã SP</th><th>SL chờ sửa</th><th>Line gốc</th><th>Khuôn</th><th></th></tr></thead>
+          <tbody id="ngChoSuaTbody"><tr class="empty-row"><td colspan="6">—</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -280,6 +290,39 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="modal-foot">
       <button type="button" class="btn-outline btn" onclick="closeModal('modalXuLyThung')">Đóng</button>
       <button type="button" class="btn" id="btnSubmitXuLyThung">Xác nhận xử lý</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Sửa hàng NG (GĐ3) -->
+<div class="modal-mask" id="modalSuaHang">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-head"><div class="modal-title">🔧 Sửa hàng NG <span id="sh-tag-label"></span></div><button class="modal-close" onclick="closeModal('modalSuaHang')">✕</button></div>
+    <div class="modal-body" id="sh-body">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="fg" style="flex:1;min-width:120px"><label class="req">Sửa được (OK)</label><input type="number" min="0" id="sh-ok" value="0"></div>
+        <div class="fg" style="flex:1;min-width:120px"><label>Bỏ hẳn (NG phế)</label><input type="number" min="0" id="sh-ngphe" value="0"></div>
+      </div>
+      <div class="fg"><label>Lý do NG phế (bắt buộc nếu có)</label><input type="text" autocomplete="off" id="sh-ngly"></div>
+      <div class="fg">
+        <label>Cách đóng thùng OK ra</label>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12.5px">
+          <label style="font-weight:400"><input type="radio" name="sh-cach" value="nguyen" checked> 1 thùng = toàn bộ OK</label>
+          <label style="font-weight:400"><input type="radio" name="sh-cach" value="quy_cach"> Chia quy cách <input type="number" min="1" id="sh-qc" style="width:70px;margin-left:4px" placeholder="pcs/thùng"></label>
+          <label style="font-weight:400"><input type="radio" name="sh-cach" value="gop"> Gộp vào thùng <select id="sh-gop" style="margin-left:4px"></select></label>
+        </div>
+      </div>
+      <div class="fg"><label>Người thao tác</label><input type="text" autocomplete="off" id="sh-nguoi" list="dlNguoiLine"></div>
+      <div id="sh-canhbao" style="font-size:11.5px;color:var(--warn-fg)"></div>
+      <p style="font-size:11px;color:#999;margin-top:4px">Phần chưa nhập được giữ lại trên tem NG (ca sau sửa tiếp). OK ghi vào báo cáo ngày/ca đang chọn.</p>
+    </div>
+    <div id="sh-result" style="display:none;padding:4px 2px">
+      <div style="font-size:13px;font-weight:600;color:var(--run-fg);margin-bottom:6px">✅ Đã sửa. Thùng OK ra:</div>
+      <div id="sh-resultList"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-outline btn" onclick="closeModal('modalSuaHang')">Đóng</button>
+      <button type="button" class="btn" id="btnSubmitSuaHang">Xác nhận sửa</button>
     </div>
   </div>
 </div>
@@ -460,7 +503,7 @@ function reloadAll(){
   // "Hàng đang chờ tại công đoạn" tạm ẩn khỏi dashboard (loadWaiting giữ lại
   // để đưa vào sau) — không gọi ở đây nữa.
   loadKhsxToday();
-  if (isLineMode()) loadDangDo();
+  if (isLineMode()){ loadDangDo(); loadNgChoSua(); }
 }
 
 function applyTramLabel(){
@@ -1207,6 +1250,100 @@ async function loadDangDo(){
       <td>${escapeHtml(t.may_duc_chi_thi) || '—'}</td>
     </tr>`).join('');
 }
+
+/* ========== Hàng NG chờ sửa (GĐ3) ====================================== */
+let suaHangTem = null;
+async function loadNgChoSua(){
+  const card = document.getElementById('ngChoSuaCard');
+  const tbody = document.getElementById('ngChoSuaTbody');
+  if (!isLineMode()){ card.style.display = 'none'; return; }
+  const { data } = await sb.from('duc_tem')
+    .select('tag_no,ma_sp,ten_sp,so_luong,lot,so_khuon,may_duc_chi_thi,tram_cong_doan')
+    .eq('trang_thai', 'NG chờ sửa').gt('so_luong', 0).order('tag_no');
+  if (!data || !data.length){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  tbody.innerHTML = data.map(t => `
+    <tr>
+      <td class="mono">${escapeHtml(t.tag_no)}</td>
+      <td>${escapeHtml(t.ma_sp)}</td>
+      <td class="num"><b>${fmtNum(t.so_luong)}</b></td>
+      <td>${escapeHtml(t.tram_cong_doan) || '—'}</td>
+      <td>${escapeHtml(t.so_khuon) || '—'}</td>
+      <td><button type="button" class="btn-tiny" style="background:var(--accent);color:#fff" onclick='openSuaHang(${JSON.stringify(t)})'>🔧 Sửa xong</button></td>
+    </tr>`).join('');
+}
+
+async function openSuaHang(t){
+  suaHangTem = t;
+  document.getElementById('sh-tag-label').textContent = '(' + t.tag_no + ' — ' + t.ma_sp + ', còn ' + fmtNum(t.so_luong) + ')';
+  document.getElementById('sh-ok').value = 0;
+  document.getElementById('sh-ngphe').value = 0;
+  document.getElementById('sh-ngly').value = '';
+  document.getElementById('sh-qc').value = '';
+  document.querySelector('input[name="sh-cach"][value="nguyen"]').checked = true;
+  document.getElementById('sh-nguoi').value = '';
+  document.getElementById('sh-canhbao').textContent = '';
+  document.getElementById('sh-body').style.display = '';
+  document.getElementById('sh-result').style.display = 'none';
+  document.getElementById('btnSubmitSuaHang').style.display = '';
+  document.getElementById('btnSubmitSuaHang').disabled = false;
+  const { data: gop } = await sb.from('duc_tem')
+    .select('tag_no,so_luong')
+    .eq('ma_sp', t.ma_sp).gt('so_luong', 0).or('tag_no.ilike.TKB%,tag_no.ilike.PK%')
+    .neq('tag_no', t.tag_no).order('tag_no');
+  document.getElementById('sh-gop').innerHTML = (gop && gop.length)
+    ? gop.map(g => `<option value="${escapeHtml(g.tag_no)}">${escapeHtml(g.tag_no)} (${fmtNum(g.so_luong)})</option>`).join('')
+    : '<option value="">(chưa có thùng nào)</option>';
+  openModal('modalSuaHang');
+}
+
+document.getElementById('btnSubmitSuaHang').addEventListener('click', async () => {
+  const cb = document.getElementById('sh-canhbao'); cb.textContent = '';
+  const ok = Number(document.getElementById('sh-ok').value) || 0;
+  const ngphe = Number(document.getElementById('sh-ngphe').value) || 0;
+  const ngly = document.getElementById('sh-ngly').value.trim();
+  if (ok + ngphe <= 0) return cb.textContent = 'Nhập OK / NG phế.';
+  if (ok + ngphe > Number(suaHangTem.so_luong)) return cb.textContent = 'OK + NG phế vượt SL còn lại (' + fmtNum(suaHangTem.so_luong) + ').';
+  if (ngphe > 0 && !ngly) return cb.textContent = 'Có NG phế — nhập lý do.';
+  const cach = document.querySelector('input[name="sh-cach"]:checked').value;
+  const qc = Number(document.getElementById('sh-qc').value) || 0;
+  const tagGop = document.getElementById('sh-gop').value;
+  if (ok > 0 && cach === 'quy_cach' && qc <= 0) return cb.textContent = 'Nhập quy cách pcs/thùng.';
+  if (ok > 0 && cach === 'gop' && !tagGop) return cb.textContent = 'Chọn thùng để gộp vào.';
+
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const btn = document.getElementById('btnSubmitSuaHang');
+  btn.disabled = true;
+  const { data, error } = await sb.rpc('bavia_sua_hang', {
+    p_tag_ng: suaHangTem.tag_no,
+    p_ngay: document.getElementById('ngay').value,
+    p_ca: document.getElementById('ca').value,
+    p_cong_doan: congDoan,
+    p_ok: ok, p_ng_phe: ngphe, p_ng_ly_do: ngly || null,
+    p_cach_dong: cach, p_quy_cach: cach === 'quy_cach' ? qc : null,
+    p_tag_gop: cach === 'gop' ? tagGop : null,
+    p_nguoi: document.getElementById('sh-nguoi').value.trim(),
+    p_user: await MesAuth.getCurrentUserIdentity(),
+  });
+  btn.disabled = false;
+  if (error) return cb.textContent = 'Lỗi: ' + error.message;
+
+  const tems = (data && data.tems) || [];
+  const printable = tems.filter(x => x.loai !== 'ok_gop').map(x => x.tag);
+  document.getElementById('sh-resultList').innerHTML =
+    (printable.length ? `<div style="margin-bottom:8px"><button type="button" class="btn" onclick='printTkbTems(${JSON.stringify(printable)})'>🖨 In tất cả (${printable.length}) tem A6</button></div>` : '') +
+    (tems.map(x => `<div class="kb-row" style="padding:6px 9px">
+      <div class="kb-info"><div><b>${escapeHtml(x.tag)}</b> · ${fmtNum(x.so_luong)} · ${x.loai === 'ok_gop' ? 'gộp vào (không in)' : 'OK'}</div></div>
+      ${x.loai === 'ok_gop' ? '' : `<button type="button" class="btn-tiny" onclick='printTkbTems(["${x.tag}"])'>🖨 In</button>`}
+    </div>`).join('') || '<div style="font-size:12px;color:#999">Không tạo tem OK (toàn NG phế).</div>') +
+    (data && Number(data.con_lai_tem_ng) > 0 ? `<div style="font-size:11.5px;color:var(--warn-fg);margin-top:6px">Tem NG còn ${fmtNum(data.con_lai_tem_ng)} chưa sửa.</div>` : '');
+  document.getElementById('sh-body').style.display = 'none';
+  document.getElementById('sh-result').style.display = '';
+  btn.style.display = 'none';
+  showMsg('✅ Đã sửa hàng từ ' + suaHangTem.tag_no, 'ok');
+  loadNgChoSua();
+});
 
 /* ---------- Nạp kế hoạch hàng loạt từ KHSX tuần ---------- */
 document.getElementById('btnKhsxBatch').addEventListener('click', () => {

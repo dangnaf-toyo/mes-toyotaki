@@ -511,3 +511,30 @@ grant  execute on function bavia_xu_ly_thung(text, text[], numeric, numeric, num
 -- select tag_no, so_luong, trang_thai from duc_tem where tag_no like 'TKB%';
 -- select * from bavia_xu_ly order by id desc limit 5;
 -- select * from bavia_xu_ly_nguon where id_xu_ly = (select max(id) from bavia_xu_ly);
+
+-- ============================================================================
+-- RỦI RO / VIỆC LÀM PHIÊN SAU (Bavia xử lý thùng) — chưa xử lý ở GĐ1/GĐ2:
+--
+--  R1. Không chống double-submit: bấm "Xác nhận xử lý" 2 lần (mạng chậm) tạo
+--      2 sự kiện, trừ nguồn 2 lần. Frontend chỉ disable nút. → thêm
+--      idempotency key hoặc unique (id_tram, sorted tags, phút).
+--  R2. Không có UNDO một sự kiện bavia_xu_ly (GĐ4). Lỡ nhập sai phải sửa tay
+--      nhiều bảng: duc_tem.so_luong, cd_tram_hien_tai, bavia_xu_ly*,
+--      cd_tem_nguon, cd_chuyen_cong_doan_log.
+--  R3. bavia_xu_ly_thung KHÔNG kiểm ma_sp của p_tag_gop khớp mã line (chỉ
+--      kiểm tồn tại). Frontend đã lọc .eq('ma_sp') nên khó xảy ra, nhưng RPC
+--      nên tự chặn.
+--  R4. Đổi SP / Kết thúc / Kết ca khi line còn tem "NG chờ sửa" chưa xử lý:
+--      cd_tram_doi_ma_sp reset so_luong_ng_sua=0 + gộp báo cáo, nhưng tem NG
+--      vật lý vẫn còn. GĐ3 xử lý tem NG-sửa ĐỘC LẬP mã đang chạy của line
+--      (credit về ngày/ca gốc qua bavia_xu_ly.tag_ng_sua) nên OK; vẫn cần
+--      test kỹ tình huống line đã kết thúc.
+--  R5. NG sửa mỗi lần xử lý = 1 tem "NG chờ sửa" riêng, không gom. 1 ca nhiều
+--      lần → nhiều tem lẻ.
+--  R6. cd_v_vi_tri_hien_tai cho tem TKB: chuyển TKB sang Gia Công qua
+--      chuyencongdoan.html (quét QR) CHƯA test end-to-end.
+--  R7. printTkbTems: popup bị chặn -> chỉ báo lỗi, không fallback.
+--  R8. Trigger trg_duc_tem_sync_actuals (D22) chạy khi INSERT tem TKB với
+--      may_tt = NULL -> giả định no-op (như tem Kanban chưa quét), chưa xác
+--      nhận tuyệt đối.
+-- ============================================================================
