@@ -149,6 +149,16 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <button type="button" class="btn" id="btnAddTram">+ Thêm trạm</button>
       </div>
     </div>
+
+    <div class="card" id="dangDoCard" style="display:none">
+      <h2>📥 Thùng đang dở (còn hàng chưa xử lý hết, đã làm ở line này)</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Tag No</th><th>Mã SP</th><th>SL còn lại</th><th>Lô</th><th>Khuôn</th><th>Máy đúc</th></tr></thead>
+          <tbody id="dangDoTbody"><tr class="empty-row"><td colspan="6">—</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -233,6 +243,47 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
   </div>
 </div>
 
+<!-- MODAL: Xử lý thùng (Bavia line mode) -->
+<div class="modal-mask" id="modalXuLyThung">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-head"><div class="modal-title">📦 Xử lý thùng <span id="xlt-line-label"></span></div><button class="modal-close" onclick="closeModal('modalXuLyThung')">✕</button></div>
+    <div class="modal-body" id="xlt-body">
+      <div class="fg">
+        <label class="req">Quét / nhập Tag No thùng nguồn (Enter để thêm)</label>
+        <input type="text" autocomplete="off" id="xlt-scan" placeholder="Bấm vào đây rồi quét QR, hoặc gõ Tag No + Enter">
+      </div>
+      <div id="xlt-srcList" style="margin:6px 0 10px"></div>
+      <div id="xlt-srcEmpty" style="font-size:11.5px;color:#999;margin-bottom:10px">Chưa quét thùng nguồn nào.</div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="fg" style="flex:1;min-width:110px"><label class="req">OK (đạt)</label><input type="number" min="0" id="xlt-ok" value="0"></div>
+        <div class="fg" style="flex:1;min-width:110px"><label>NG phế</label><input type="number" min="0" id="xlt-ngphe" value="0"></div>
+        <div class="fg" style="flex:1;min-width:110px"><label>NG sửa</label><input type="number" min="0" id="xlt-ngsua" value="0"></div>
+      </div>
+      <div class="fg"><label>Lý do NG (bắt buộc nếu có NG)</label><input type="text" autocomplete="off" id="xlt-ngly" placeholder="VD: rỗ khí, thiếu nét..."></div>
+
+      <div class="fg">
+        <label>Cách đóng thùng OK ra</label>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12.5px">
+          <label style="font-weight:400"><input type="radio" name="xlt-cach" value="nguyen" checked> 1 thùng = toàn bộ OK</label>
+          <label style="font-weight:400"><input type="radio" name="xlt-cach" value="quy_cach"> Chia theo quy cách <input type="number" min="1" id="xlt-qc" style="width:70px;margin-left:4px" placeholder="pcs/thùng"></label>
+          <label style="font-weight:400"><input type="radio" name="xlt-cach" value="gop"> Gộp vào thùng đang mở <select id="xlt-gop" style="margin-left:4px"></select></label>
+        </div>
+      </div>
+      <div class="fg"><label>Người thao tác</label><input type="text" autocomplete="off" id="xlt-nguoi" list="dlNguoiLine"><span id="xlt-nguoi-hint" style="font-size:11px;color:#999"></span></div>
+      <div id="xlt-canhbao" style="font-size:11.5px;color:var(--warn-fg)"></div>
+    </div>
+    <div id="xlt-result" style="display:none;padding:4px 2px">
+      <div style="font-size:13px;font-weight:600;color:var(--run-fg);margin-bottom:6px">✅ Đã xử lý. Thùng ra:</div>
+      <div id="xlt-resultList"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-outline btn" onclick="closeModal('modalXuLyThung')">Đóng</button>
+      <button type="button" class="btn" id="btnSubmitXuLyThung">Xác nhận xử lý</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Báo cáo sau khi kết ca -->
 <div class="modal-mask" id="modalReport">
   <div class="modal" style="max-width:600px">
@@ -240,7 +291,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="modal-body">
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Nhận vào</th><th>OK</th><th>NG</th><th>Tỷ lệ NG</th></tr></thead>
+          <thead><tr><th>Mã SP</th><th>Tên SP</th><th>Nhận vào</th><th>OK</th><th>NG phế</th><th>NG sửa</th><th>Tỷ lệ NG</th></tr></thead>
           <tbody id="reportTbody"></tbody>
         </table>
       </div>
@@ -408,6 +459,7 @@ function reloadAll(){
   // "Hàng đang chờ tại công đoạn" tạm ẩn khỏi dashboard (loadWaiting giữ lại
   // để đưa vào sau) — không gọi ở đây nữa.
   loadKhsxToday();
+  if (isLineMode()) loadDangDo();
 }
 
 function applyTramLabel(){
@@ -444,8 +496,9 @@ function activeTramRowHtml(t, merged){
       <td class="num">${t.kh_ca != null ? fmtNum(t.kh_ca) : '<span style="color:#999">—</span>'}</td>
       <td class="num">${t.kh_tuan != null ? fmtNum(t.kh_tuan) : '<span style="color:#999">—</span>'}</td>
       <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
-      <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}</td>
+      <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}${Number(t.so_luong_ng_sua) > 0 ? ` <span style="color:var(--warn-fg)" title="NG chờ sửa">+${fmtNum(t.so_luong_ng_sua)} sửa</span>` : ''}</td>
       <td style="white-space:nowrap">
+        ${isLineMode() ? `<button type="button" class="btn-tiny" style="background:var(--accent);color:#fff" onclick="openXuLyThung('${t.id_tram}')">📦 Xử lý thùng</button>` : ''}
         <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
         <button type="button" class="btn-tiny" onclick="openSuaTram('${t.id_tram}')">Sửa</button>
         <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi SP</button>
@@ -730,16 +783,18 @@ document.getElementById('btnKetCa').addEventListener('click', async () => {
 
 function showReport(rows){
   const tbody = document.getElementById('reportTbody');
-  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Không có dữ liệu.</td></tr>'; }
+  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Không có dữ liệu.</td></tr>'; }
   else {
     tbody.innerHTML = rows.map(r => {
-      const total = Number(r.so_luong_ok) + Number(r.so_luong_ng);
-      const pct = total > 0 ? (Number(r.so_luong_ng) / total * 100).toFixed(1) : '0.0';
+      const ngSua = Number(r.so_luong_ng_sua) || 0;
+      const total = Number(r.so_luong_ok) + Number(r.so_luong_ng) + ngSua;
+      const pct = total > 0 ? ((Number(r.so_luong_ng) + ngSua) / total * 100).toFixed(1) : '0.0';
       return '<tr>' +
         '<td>' + escapeHtml(r.ma_sp) + '</td><td>' + escapeHtml(r.ten_sp || '') + '</td>' +
         '<td class="num">' + fmtNum(r.so_luong_nhan_vao) + '</td>' +
         '<td class="num" style="color:#1a7a3a">' + fmtNum(r.so_luong_ok) + '</td>' +
         '<td class="num" style="color:#c00">' + fmtNum(r.so_luong_ng) + '</td>' +
+        '<td class="num" style="color:var(--warn-fg)">' + fmtNum(ngSua) + '</td>' +
         '<td class="num">' + pct + '%</td></tr>';
     }).join('');
   }
@@ -896,6 +951,164 @@ function openInTem(idTram){
     if (t.nguoi_thao_tac) p.set('nguoi', t.nguoi_thao_tac);
   }
   window.open('chuyencongdoan.html?' + p.toString(), '_blank', 'noopener');
+}
+
+/* ========== Xử lý thùng (Bavia line mode) ================================ */
+let xlt = { idTram: null, tram: null, sources: [] };
+
+async function openXuLyThung(idTram){
+  const t = findTram(idTram);
+  if (!t) return;
+  xlt = { idTram, tram: t, sources: [] };
+  document.getElementById('xlt-line-label').textContent = '(' + t.ten_tram + ' — ' + t.ma_sp + ')';
+  document.getElementById('xlt-scan').value = '';
+  document.getElementById('xlt-ok').value = 0;
+  document.getElementById('xlt-ngphe').value = 0;
+  document.getElementById('xlt-ngsua').value = 0;
+  document.getElementById('xlt-ngly').value = '';
+  document.getElementById('xlt-qc').value = '';
+  document.querySelector('input[name="xlt-cach"][value="nguyen"]').checked = true;
+  document.getElementById('xlt-canhbao').textContent = '';
+  document.getElementById('xlt-body').style.display = '';
+  document.getElementById('xlt-result').style.display = 'none';
+  document.getElementById('btnSubmitXuLyThung').style.display = '';
+  document.getElementById('btnSubmitXuLyThung').disabled = false;
+
+  // Người thao tác lọc theo line
+  const ds = isLineMode() && lineCatalog.includes(t.ten_tram) ? nguoiChoLine(t.ten_tram) : [];
+  document.getElementById('dlNguoiLine').innerHTML = ds.map(n => `<option value="${escapeHtml(n)}">`).join('');
+  document.getElementById('xlt-nguoi').value = t.nguoi_thao_tac || '';
+  document.getElementById('xlt-nguoi-hint').textContent = ds.length ? ' (' + ds.length + ' người được phép thao tác ' + t.ten_tram + ')' : '';
+
+  // Thùng OK đang mở của line này (để "gộp vào")
+  const { data: gop } = await sb.from('duc_tem')
+    .select('tag_no,so_luong')
+    .eq('ma_sp', t.ma_sp).eq('tram_cong_doan', t.ten_tram).gt('so_luong', 0)
+    .or('tag_no.ilike.TKB%,tag_no.ilike.PK%').order('tag_no');
+  document.getElementById('xlt-gop').innerHTML = (gop && gop.length)
+    ? gop.map(g => `<option value="${escapeHtml(g.tag_no)}">${escapeHtml(g.tag_no)} (${fmtNum(g.so_luong)})</option>`).join('')
+    : '<option value="">(chưa có thùng nào)</option>';
+
+  renderXltSources();
+  openModal('modalXuLyThung');
+  setTimeout(() => document.getElementById('xlt-scan').focus(), 100);
+}
+
+document.getElementById('xlt-scan').addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const raw = e.target.value.trim();
+  e.target.value = '';
+  if (!raw) return;
+  const tag = raw.split('>')[0].replace(/\s+/g, '');   // chịu QR "tag>...".
+  if (xlt.sources.some(s => s.tag_no === tag)) { document.getElementById('xlt-canhbao').textContent = 'Thùng ' + tag + ' đã quét rồi.'; return; }
+  const { data, error } = await sb.from('duc_tem')
+    .select('tag_no,ma_sp,ten_sp,so_luong,lot,so_khuon,may_duc_chi_thi,ngay')
+    .eq('tag_no', tag).maybeSingle();
+  if (error || !data){ document.getElementById('xlt-canhbao').textContent = 'Không tìm thấy tem ' + tag; return; }
+  if (Number(data.so_luong) <= 0){ document.getElementById('xlt-canhbao').textContent = 'Tem ' + tag + ' đã hết số lượng.'; return; }
+  if (data.ma_sp !== xlt.tram.ma_sp){ document.getElementById('xlt-canhbao').textContent = 'Tem ' + tag + ' là mã ' + data.ma_sp + ', khác mã đang chạy (' + xlt.tram.ma_sp + ').'; return; }
+  document.getElementById('xlt-canhbao').textContent = '';
+  xlt.sources.push(data);
+  renderXltSources();
+});
+
+function removeXltSource(tag){ xlt.sources = xlt.sources.filter(s => s.tag_no !== tag); renderXltSources(); }
+
+function renderXltSources(){
+  const list = document.getElementById('xlt-srcList');
+  const empty = document.getElementById('xlt-srcEmpty');
+  if (!xlt.sources.length){ list.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  const tong = xlt.sources.reduce((s, x) => s + Number(x.so_luong || 0), 0);
+  list.innerHTML = xlt.sources.map(s => `
+    <div class="kb-row" style="padding:6px 9px">
+      <div class="kb-info">
+        <div><b>${escapeHtml(s.tag_no)}</b> · còn <b>${fmtNum(s.so_luong)}</b></div>
+        <div class="kb-sub">Lô ${escapeHtml(s.lot) || '—'} · Khuôn ${escapeHtml(s.so_khuon) || '—'} · ${escapeHtml(s.may_duc_chi_thi) || '—'} · ${s.ngay ? String(s.ngay).split('-').reverse().join('/') : '—'}</div>
+      </div>
+      <button type="button" class="btn-tiny danger" onclick="removeXltSource('${s.tag_no}')">✕</button>
+    </div>`).join('') + `<div style="font-size:11.5px;color:#555;margin-top:4px">Tổng SL nguồn: <b>${fmtNum(tong)}</b></div>`;
+}
+
+document.getElementById('btnSubmitXuLyThung').addEventListener('click', async () => {
+  const cb = document.getElementById('xlt-canhbao');
+  cb.textContent = '';
+  if (!xlt.sources.length) return cb.textContent = 'Chưa quét thùng nguồn nào.';
+  const ok = Number(document.getElementById('xlt-ok').value) || 0;
+  const ngphe = Number(document.getElementById('xlt-ngphe').value) || 0;
+  const ngsua = Number(document.getElementById('xlt-ngsua').value) || 0;
+  const ngly = document.getElementById('xlt-ngly').value.trim();
+  if (ok + ngphe + ngsua <= 0) return cb.textContent = 'Nhập OK / NG phế / NG sửa.';
+  if ((ngphe > 0 || ngsua > 0) && !ngly) return cb.textContent = 'Có NG — nhập lý do.';
+  const tongNguon = xlt.sources.reduce((s, x) => s + Number(x.so_luong || 0), 0);
+  if (ok + ngphe + ngsua > tongNguon) return cb.textContent = 'OK + NG (' + (ok + ngphe + ngsua) + ') vượt tổng SL nguồn (' + tongNguon + ').';
+  const cach = document.querySelector('input[name="xlt-cach"]:checked').value;
+  const qc = Number(document.getElementById('xlt-qc').value) || 0;
+  const tagGop = document.getElementById('xlt-gop').value;
+  if (ok > 0 && cach === 'quy_cach' && qc <= 0) return cb.textContent = 'Nhập quy cách pcs/thùng.';
+  if (ok > 0 && cach === 'gop' && !tagGop) return cb.textContent = 'Chọn thùng để gộp vào.';
+
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const btn = document.getElementById('btnSubmitXuLyThung');
+  btn.disabled = true;
+  const { data, error } = await sb.rpc('bavia_xu_ly_thung', {
+    p_id_tram: xlt.idTram,
+    p_tag_nguon: xlt.sources.map(s => s.tag_no),
+    p_ok: ok, p_ng_phe: ngphe, p_ng_sua: ngsua, p_ng_ly_do: ngly || null,
+    p_cach_dong: cach, p_quy_cach: cach === 'quy_cach' ? qc : null,
+    p_tag_gop: cach === 'gop' ? tagGop : null,
+    p_nguoi: document.getElementById('xlt-nguoi').value.trim(),
+    p_user: await MesAuth.getCurrentUserIdentity(),
+  });
+  btn.disabled = false;
+  if (error) return cb.textContent = 'Lỗi: ' + error.message;
+
+  const tems = (data && data.tems) || [];
+  document.getElementById('xlt-resultList').innerHTML = tems.map(t => {
+    const label = t.loai === 'ng_sua' ? 'NG chờ sửa' : (t.loai === 'ok_gop' ? 'gộp vào' : 'OK');
+    return `<div class="kb-row" style="padding:6px 9px">
+      <div class="kb-info"><div><b>${escapeHtml(t.tag)}</b> · ${fmtNum(t.so_luong)} · ${label}</div></div>
+      <a href="intem.html?tagNo=${encodeURIComponent(t.tag)}" target="_blank" rel="noopener"><button type="button" class="btn-tiny">In tem</button></a>
+    </div>`;
+  }).join('') || '<div style="font-size:12px;color:#999">Không tạo tem mới (chỉ NG phế).</div>';
+  document.getElementById('xlt-body').style.display = 'none';
+  document.getElementById('xlt-result').style.display = '';
+  btn.style.display = 'none';
+  showMsg('✅ Đã xử lý thùng cho ' + xlt.tram.ten_tram, 'ok');
+  loadTrams();
+  loadDangDo();
+});
+
+/* ---------- Thùng đang dở ---------- */
+async function loadDangDo(){
+  const card = document.getElementById('dangDoCard');
+  const tbody = document.getElementById('dangDoTbody');
+  if (!isLineMode()){ card.style.display = 'none'; return; }
+  const ngay = document.getElementById('ngay').value;
+  const ca = document.getElementById('ca').value;
+  // sự kiện xử lý của (ngày, ca, công đoạn) → thùng nguồn đã đụng
+  const { data: ev } = await sb.from('bavia_xu_ly').select('id')
+    .eq('ngay', ngay).eq('ca', ca).in('cong_doan', congDoanGroup);
+  if (!ev || !ev.length){ card.style.display = 'none'; return; }
+  const { data: ng } = await sb.from('bavia_xu_ly_nguon').select('tag_no_nguon').in('id_xu_ly', ev.map(e => e.id));
+  const tags = [...new Set((ng || []).map(r => r.tag_no_nguon))];
+  if (!tags.length){ card.style.display = 'none'; return; }
+  const { data: tems } = await sb.from('duc_tem')
+    .select('tag_no,ma_sp,so_luong,lot,so_khuon,may_duc_chi_thi')
+    .in('tag_no', tags).gt('so_luong', 0).order('tag_no');
+  if (!tems || !tems.length){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  tbody.innerHTML = tems.map(t => `
+    <tr>
+      <td class="mono">${escapeHtml(t.tag_no)}</td>
+      <td>${escapeHtml(t.ma_sp)}</td>
+      <td class="num"><b>${fmtNum(t.so_luong)}</b></td>
+      <td>${escapeHtml(t.lot) || '—'}</td>
+      <td>${escapeHtml(t.so_khuon) || '—'}</td>
+      <td>${escapeHtml(t.may_duc_chi_thi) || '—'}</td>
+    </tr>`).join('');
 }
 
 /* ---------- Nạp kế hoạch hàng loạt từ KHSX tuần ---------- */
