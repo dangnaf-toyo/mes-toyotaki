@@ -530,11 +530,11 @@ async function loadDanhMuc(){
     lineCatalog = (mm || []).map(r => r.ma_may).filter(Boolean).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
   }
   if (isLineMode()){
-    document.getElementById('btnAddTram').style.display = 'none';
-    document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' theo danh mục';
+    document.getElementById('btnAddTram').textContent = '+ Thêm ' + tramLabel();
+    document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' đang hoạt động';
     document.getElementById('doiSoatCard').style.display = '';
     const note = document.getElementById('tramsSectionNote');
-    if (note) note.textContent = tramLabel() + ' lấy từ danh mục Máy-Line. Line chưa có kế hoạch xếp riêng bên dưới — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần.';
+    if (note) note.style.display = 'none';
   }
   document.getElementById('dlNhanVien').innerHTML = (empRes.data || []).map(e => `<option value="${escapeHtml(e.ten_nhan_vien)}">`).join('');
 }
@@ -597,31 +597,14 @@ function activeTramRowHtml(t, merged){
 function renderTramsLineMode(){
   const tbody = document.getElementById('tramTbody');
   const lbl = tramLabel();
-  const activeHtml = [];
-  const emptyHtml = [];
-  const seen = new Set();
-  lineCatalog.forEach(line => {
-    const t = trams.find(x => x.ten_tram === line);
-    if (t){ seen.add(t.id_tram); activeHtml.push(activeTramRowHtml(t, false)); return; }
-    emptyHtml.push(`
-      <tr>
-        <td style="color:var(--text-dim)">${escapeHtml(line)}</td>
-        <td colspan="7"><span style="color:#999">Chưa gán kế hoạch</span></td>
-        <td style="white-space:nowrap"><button type="button" class="btn-tiny gan-kh-btn" data-line="${escapeHtml(line)}">+ Gán kế hoạch</button></td>
-      </tr>`);
-  });
-  // Trạm không nằm trong danh mục line (dữ liệu cũ / tạo tay) — vẫn hiển thị để không mất.
-  trams.filter(t => !seen.has(t.id_tram)).forEach(t => activeHtml.push(activeTramRowHtml(t, false)));
-
-  const parts = [];
-  parts.push(`<tr class="tram-divider"><td colspan="10">${lbl} đang hoạt động (${activeHtml.length})</td></tr>`);
-  parts.push(activeHtml.length ? activeHtml.join('') : `<tr><td colspan="10" style="color:#999">Chưa có ${lbl.toLowerCase()} nào có kế hoạch trong ca này.</td></tr>`);
-  if (emptyHtml.length){
-    parts.push(`<tr class="tram-divider"><td colspan="10">${lbl} chưa có kế hoạch (${emptyHtml.length}) — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần</td></tr>`);
-    parts.push(emptyHtml.join(''));
-  }
-  tbody.innerHTML = parts.join('');
-  tbody.querySelectorAll('.gan-kh-btn').forEach(btn => btn.addEventListener('click', () => openGanKeHoach(btn.dataset.line)));
+  // Chỉ hiển thị line đang hoạt động (đã gán kế hoạch) trong ca — không còn
+  // liệt kê toàn bộ danh mục Máy-Line. Thêm line mới qua "+ Thêm Line" hoặc
+  // "⚡ Nạp kế hoạch từ KHSX tuần".
+  const rows = [...trams].sort((a, b) =>
+    String(a.ten_tram || '').localeCompare(String(b.ten_tram || ''), 'vi', { numeric: true }));
+  tbody.innerHTML = rows.length
+    ? rows.map(t => activeTramRowHtml(t, false)).join('')
+    : `<tr><td colspan="10" style="color:#999">Chưa có ${lbl.toLowerCase()} nào có kế hoạch trong ca này — bấm "+ Thêm ${lbl}" hoặc "⚡ Nạp kế hoạch từ KHSX tuần".</td></tr>`;
   updateSummary();
 }
 
