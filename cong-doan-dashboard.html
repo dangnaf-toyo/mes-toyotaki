@@ -100,6 +100,9 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
 .kb-row input[type=number]{width:70px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px}
 .kb-row select{width:110px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px;background:#fff}
 .sub-cd-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--bg-sunken);color:var(--text-muted);border:1px solid var(--border);text-transform:uppercase;letter-spacing:.03em}
+.ngcode-box{display:flex;flex-wrap:wrap;gap:5px 12px;border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 10px;max-height:150px;overflow:auto;background:#fff}
+.ngcode-box label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:400;cursor:pointer;white-space:nowrap}
+.ngcode-box label b{font-family:'JetBrains Mono',monospace;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -279,7 +282,11 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <div class="fg" style="flex:1;min-width:110px"><label>NG phế</label><input type="number" min="0" id="xlt-ngphe" value="0"></div>
         <div class="fg" style="flex:1;min-width:110px"><label>NG sửa</label><input type="number" min="0" id="xlt-ngsua" value="0"></div>
       </div>
-      <div class="fg"><label>Lý do NG (bắt buộc nếu có NG)</label><input type="text" autocomplete="off" id="xlt-ngly" placeholder="VD: rỗ khí, thiếu nét..."></div>
+      <div class="fg">
+        <label>Loại lỗi NG (chọn 1+ mã, bắt buộc nếu có NG)</label>
+        <div id="xlt-ngcodes" class="ngcode-box"></div>
+        <input type="text" autocomplete="off" id="xlt-ngkhac" placeholder="X — ghi rõ nguyên nhân khác" style="display:none;margin-top:6px">
+      </div>
 
       <div class="fg">
         <label>Cách đóng thùng OK ra</label>
@@ -312,7 +319,11 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <div class="fg" style="flex:1;min-width:120px"><label class="req">Sửa được (OK)</label><input type="number" min="0" id="sh-ok" value="0"></div>
         <div class="fg" style="flex:1;min-width:120px"><label>Bỏ hẳn (NG phế)</label><input type="number" min="0" id="sh-ngphe" value="0"></div>
       </div>
-      <div class="fg"><label>Lý do NG phế (bắt buộc nếu có)</label><input type="text" autocomplete="off" id="sh-ngly"></div>
+      <div class="fg">
+        <label>Loại lỗi NG phế (chọn 1+ mã, bắt buộc nếu có)</label>
+        <div id="sh-ngcodes" class="ngcode-box"></div>
+        <input type="text" autocomplete="off" id="sh-ngkhac" placeholder="X — ghi rõ nguyên nhân khác" style="display:none;margin-top:6px">
+      </div>
       <div class="fg">
         <label>Cách đóng thùng OK ra</label>
         <div style="display:flex;flex-direction:column;gap:4px;font-size:12.5px">
@@ -1087,6 +1098,37 @@ async function printTkbTems(tags){
   w.document.close();
 }
 
+/* ========== Bộ mã lỗi NG (khai báo chủng loại) ========================== */
+const NG_CODES = [
+  ['A','Rỗ khí'],['B','Thiếu nhôm bề mặt'],['C','Lõm pin'],['D','Biến dạng'],['E','Dính dầu'],
+  ['F','Nhăn'],['G','Bẩn nhôm'],['H','Va đập'],['I','Rạn nứt'],['J','Sản phẩm rơi'],
+  ['K','NG kích thước'],['L','Thiếu nhôm cạnh răng'],['M','Mờ lot mark'],['N','Ba trấu'],['O','Bề lõm sâu'],
+  ['P','Dính nhôm'],['Q','Bong nhôm'],['R','Tạp chất'],['S','Xước bề mặt'],['T','Mỏng cuống'],
+  ['V','Phồng nhôm'],['W','Lỗi, lõm'],['X','Khác (ghi rõ nguyên nhân)'],
+];
+const NG_CODE_MAP = Object.fromEntries(NG_CODES);
+
+function renderNgCodePicker(prefix){
+  const box = document.getElementById(prefix + '-ngcodes');
+  box.innerHTML = NG_CODES.map(([k, v]) =>
+    `<label><input type="checkbox" value="${k}"> <b>${k}</b> ${escapeHtml(v)}</label>`).join('');
+  const khac = document.getElementById(prefix + '-ngkhac');
+  khac.style.display = 'none'; khac.value = '';
+  box.onchange = () => {
+    const xOn = box.querySelector('input[value="X"]').checked;
+    khac.style.display = xOn ? '' : 'none';
+  };
+}
+// -> { codes:[...], text:"A - Rỗ khí; C - Lõm pin", err:"" }
+function readNgCodePicker(prefix){
+  const box = document.getElementById(prefix + '-ngcodes');
+  const codes = [...box.querySelectorAll('input:checked')].map(c => c.value);
+  const khac = document.getElementById(prefix + '-ngkhac').value.trim();
+  if (codes.includes('X') && !khac) return { codes, text: '', err: 'Đã chọn "X — Khác", nhập rõ nguyên nhân.' };
+  const text = codes.map(k => k === 'X' ? ('X - ' + khac) : (k + ' - ' + NG_CODE_MAP[k])).join('; ');
+  return { codes, text, err: '' };
+}
+
 /* ========== Xử lý thùng (Bavia line mode) ================================ */
 let xlt = { idTram: null, tram: null, sources: [] };
 
@@ -1099,7 +1141,7 @@ async function openXuLyThung(idTram){
   document.getElementById('xlt-ok').value = 0;
   document.getElementById('xlt-ngphe').value = 0;
   document.getElementById('xlt-ngsua').value = 0;
-  document.getElementById('xlt-ngly').value = '';
+  renderNgCodePicker('xlt');
   document.getElementById('xlt-qc').value = '';
   document.querySelector('input[name="xlt-cach"][value="nguyen"]').checked = true;
   document.getElementById('xlt-canhbao').textContent = '';
@@ -1182,9 +1224,11 @@ document.getElementById('btnSubmitXuLyThung').addEventListener('click', async ()
   const ok = Number(document.getElementById('xlt-ok').value) || 0;
   const ngphe = Number(document.getElementById('xlt-ngphe').value) || 0;
   const ngsua = Number(document.getElementById('xlt-ngsua').value) || 0;
-  const ngly = document.getElementById('xlt-ngly').value.trim();
   if (ok + ngphe + ngsua <= 0) return cb.textContent = 'Nhập OK / NG phế / NG sửa.';
-  if ((ngphe > 0 || ngsua > 0) && !ngly) return cb.textContent = 'Có NG — nhập lý do.';
+  const ngPick = readNgCodePicker('xlt');
+  if ((ngphe > 0 || ngsua > 0) && !ngPick.codes.length) return cb.textContent = 'Có NG — chọn ít nhất 1 mã lỗi.';
+  if (ngPick.err) return cb.textContent = ngPick.err;
+  const ngly = ngPick.text;
   const tongNguon = xlt.sources.reduce((s, x) => s + Number(x.so_luong || 0), 0);
   if (ok + ngphe + ngsua > tongNguon) return cb.textContent = 'OK + NG (' + (ok + ngphe + ngsua) + ') vượt tổng SL nguồn (' + tongNguon + ').';
   const cach = document.querySelector('input[name="xlt-cach"]:checked').value;
@@ -1288,7 +1332,7 @@ async function openSuaHang(t){
   document.getElementById('sh-tag-label').textContent = '(' + t.tag_no + ' — ' + t.ma_sp + ', còn ' + fmtNum(t.so_luong) + ')';
   document.getElementById('sh-ok').value = 0;
   document.getElementById('sh-ngphe').value = 0;
-  document.getElementById('sh-ngly').value = '';
+  renderNgCodePicker('sh');
   document.getElementById('sh-qc').value = '';
   document.querySelector('input[name="sh-cach"][value="nguyen"]').checked = true;
   document.getElementById('sh-nguoi').value = '';
@@ -1311,10 +1355,12 @@ document.getElementById('btnSubmitSuaHang').addEventListener('click', async () =
   const cb = document.getElementById('sh-canhbao'); cb.textContent = '';
   const ok = Number(document.getElementById('sh-ok').value) || 0;
   const ngphe = Number(document.getElementById('sh-ngphe').value) || 0;
-  const ngly = document.getElementById('sh-ngly').value.trim();
   if (ok + ngphe <= 0) return cb.textContent = 'Nhập OK / NG phế.';
   if (ok + ngphe > Number(suaHangTem.so_luong)) return cb.textContent = 'OK + NG phế vượt SL còn lại (' + fmtNum(suaHangTem.so_luong) + ').';
-  if (ngphe > 0 && !ngly) return cb.textContent = 'Có NG phế — nhập lý do.';
+  const ngPick = readNgCodePicker('sh');
+  if (ngphe > 0 && !ngPick.codes.length) return cb.textContent = 'Có NG phế — chọn ít nhất 1 mã lỗi.';
+  if (ngPick.err) return cb.textContent = ngPick.err;
+  const ngly = ngPick.text;
   const cach = document.querySelector('input[name="sh-cach"]:checked').value;
   const qc = Number(document.getElementById('sh-qc').value) || 0;
   const tagGop = document.getElementById('sh-gop').value;
