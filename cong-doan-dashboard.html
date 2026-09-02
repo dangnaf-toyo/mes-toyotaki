@@ -169,6 +169,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn" id="btnAddTram">+ Thêm trạm</button>
+        <button type="button" class="btn-outline btn" id="btnChepLine" style="display:none">📋 Chép line từ ca trước</button>
       </div>
     </div>
 
@@ -532,6 +533,7 @@ async function loadDanhMuc(){
   }
   if (isLineMode()){
     document.getElementById('btnAddTram').style.display = 'none';
+    document.getElementById('btnChepLine').style.display = '';
     document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' theo danh mục';
     document.getElementById('doiSoatCard').style.display = '';
     const note = document.getElementById('tramsSectionNote');
@@ -739,6 +741,37 @@ document.getElementById('btnSubmitAddTram').addEventListener('click', async () =
   if (error) return showMsg('Lỗi: ' + error.message, 'err');
   closeModal('modalAddTram');
   showMsg('✅ Đã ' + (ganKeHoachLine ? 'gán kế hoạch cho ' : 'thêm ') + ten, 'ok');
+  loadTrams();
+});
+
+/* ---------- Chép line từ ca trước sang (line mode) ---------- */
+document.getElementById('btnChepLine').addEventListener('click', async () => {
+  const ngay = document.getElementById('ngay').value;
+  const ca = document.getElementById('ca').value;
+  if (!ngay || !ca) return showMsg('Chọn ngày và ca trước.', 'err');
+  const lbl = tramLabel().toLowerCase();
+  if (!confirm('Chép các ' + lbl + ' đang chạy dở từ ca gần nhất sang ' + ca + ' ngày ' +
+      ngay.split('-').reverse().join('/') + '?\n\n' +
+      '• Nguyên mã SP / KH ca / người thao tác.\n' +
+      '• Sản lượng OK/NG bắt đầu lại từ 0.\n' +
+      '• ' + tramLabel() + ' đã có trong ca này được giữ nguyên, không đè.\n' +
+      '• Ca nguồn không bị đụng — vẫn phải kết ca ca đó cho đúng báo cáo.')) return;
+  const session = await MesAuth.getSession();
+  if (!session) return requireLogin();
+  const btn = document.getElementById('btnChepLine');
+  btn.disabled = true;
+  const { data, error } = await sb.rpc('cd_chep_line_tu_ca_truoc', {
+    p_ngay: ngay, p_ca: ca, p_cong_doan: congDoan, p_user: await MesAuth.getCurrentUserIdentity(),
+  });
+  btn.disabled = false;
+  if (error) return showMsg('Lỗi: ' + error.message, 'err');
+  if (!data || data.ok === false) {
+    return showMsg('Không có ca nào trong 7 ngày gần đây còn ' + lbl + ' để chép. ' +
+      'Nếu bắt đầu ca mới, dùng "⚡ Nạp kế hoạch từ KHSX tuần".', 'err');
+  }
+  const src = (data.src_ngay || '').split('-').reverse().join('/');
+  showMsg('✅ Đã chép ' + data.copied + ' ' + lbl + ' từ ' + data.src_ca + ' ' + src +
+    (data.skipped ? ' (' + data.skipped + ' đã có sẵn, bỏ qua)' : '') + '.', 'ok');
   loadTrams();
 });
 
