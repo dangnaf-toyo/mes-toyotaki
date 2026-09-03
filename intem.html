@@ -304,6 +304,10 @@ textarea{resize:vertical;min-height:48px}
           <input id="s_lotNo" type="date">
         </div>
         <div class="fg">
+          <label for="s_ngayGioGhiNhan">Ngày giờ SX thực tế</label>
+          <input id="s_ngayGioGhiNhan" type="datetime-local" step="60">
+        </div>
+        <div class="fg">
           <label for="s_soKhuon">Số khuôn</label>
           <div class="chip-row" id="s_soKhuon-chips"></div>
           <input id="s_soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
@@ -404,6 +408,14 @@ function getTodayString(){
   var d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
+// ISO timestamptz <-> value cho <input type="datetime-local"> (giờ máy = giờ VN
+// tại hiện trường). "" nếu rỗng.
+function isoToDtLocal(iso){
+  if(!iso) return "";
+  var d = new Date(iso), p = function(n){ return String(n).padStart(2,"0"); };
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+function dtLocalToISO(v){ return v ? new Date(v).toISOString() : null; }
 function g(id){ return document.getElementById(id).value.trim(); }
 function fmtInt(n){ return String(n == null ? '' : n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 /** Thứ Hai (ISO) của tuần chứa dateStr "YYYY-MM-DD" — khớp duc_khsx_tuan_plan.tuan_bat_dau */
@@ -536,6 +548,7 @@ function temRowToClient(r){
     soLuong: r.so_luong || "", lotNo: r.lot || "", soKhuon: r.so_khuon || "",
     nguyenLieu: r.nguyen_lieu || "", mayDuc: r.may_duc_chi_thi || "",
     ghiChu: r.ghi_chu || "", nguoiTT: r.nguoi_tt || "",
+    ngayGioGhiNhan: r.ngay_gio_ghi_nhan || "", ngayGioIn: r.ngay_gio_in || "",
     loaiSP: loaiSpFromTagNo(r.tag_no),
   };
 }
@@ -548,6 +561,7 @@ function fillFormFromTem(t){
   document.getElementById("s_tenSP").value = t.tenSP || "";
   document.getElementById("s_soLuong").value = t.soLuong || "";
   document.getElementById("s_lotNo").value = t.lotNo ? String(t.lotNo).split("/").reverse().join("-") : getTodayString();
+  document.getElementById("s_ngayGioGhiNhan").value = isoToDtLocal(t.ngayGioGhiNhan || t.ngayGioIn);
   document.getElementById("s_soKhuon").value = t.soKhuon || "";
   document.getElementById("s_nguyenLieu").value = t.nguyenLieu || "";
   document.getElementById("s_mayDuc").value = t.mayDuc || "";
@@ -602,6 +616,9 @@ async function saveTemEdit(){
   if(!may) return err("Chọn Máy đúc");
   if(!nguoi) return err("Chọn Người thao tác");
 
+  var ngayGio = g("s_ngayGioGhiNhan");
+  if (ngayGio && new Date(ngayGio).getTime() > Date.now() + 60000)
+    return err("Ngày giờ SX thực tế không được ở tương lai");
   var patch = {
     ten_sp: g("s_tenSP"), ma_sp: ma,
     so_luong: Number(sl), so_luong_tt: Number(sl),
@@ -610,6 +627,7 @@ async function saveTemEdit(){
     nguyen_lieu: g("s_nguyenLieu"),
     may_duc_chi_thi: may, may_tt: may,
     ghi_chu: g("s_ghiChu"), nguoi_tt: nguoi,
+    ngay_gio_ghi_nhan: dtLocalToISO(ngayGio),
   };
   showMsg("⏳ Đang lưu thay đổi...","wait");
   const { error } = await sb.from('duc_tem').update(patch).ilike('tag_no', currentTagNo);
