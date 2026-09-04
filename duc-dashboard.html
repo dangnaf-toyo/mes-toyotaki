@@ -587,7 +587,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     </div>
     <div class="modal-body">
       <div style="background:var(--bg-sunken);border-radius:6px;padding:10px 12px;font-size:12px">
-        <div style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">SẢN PHẨM HIỆN TẠI</div>
+        <div style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em" id="cp-current-info-label">SẢN PHẨM HIỆN TẠI</div>
         <div id="cp-current-info" style="font-weight:600;margin-top:4px">—</div>
       </div>
 
@@ -612,7 +612,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
       <label id="cp-pair-toggle-wrap" style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:var(--bg-sunken);border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">
         <input type="checkbox" id="cp-pair-toggle" style="cursor:pointer">
-        <span>🔗 Khuôn 2 cavity — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)</span>
+        <span id="cp-pair-toggle-label">🔗 Khuôn 2 cavity — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)</span>
       </label>
       <div id="cp-pair-block" style="display:none;border:1px dashed var(--border-strong);border-radius:6px;padding:10px;margin-top:6px">
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px">
@@ -633,8 +633,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       </div>
 
       <div style="border-top:1px dashed var(--border);padding-top:12px;margin-top:2px">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-style:italic">
-          Sự cố <b>C3 Đổi khuôn</b> sẽ tự động tạo trên dòng SP cũ. Sau khi đổi khuôn xong, bấm ✓ Xong trên dòng đó.
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-style:italic" id="cp-c3-hint">
+          Sự cố <b>C3 Đổi khuôn</b> sẽ tự động tạo trên dòng SP mới. Sau khi đổi khuôn xong, bấm ✓ Xong trên dòng đó.
         </div>
         <div class="field-row">
           <div class="field"><label>Giờ bắt đầu đổi khuôn <span class="req">*</span></label><input type="datetime-local" id="cp-gio-bat-dau"></div>
@@ -2230,7 +2230,7 @@ function makeRowHTML(row, stateClass, isActive){
   const pct = row.kh_ca > 0 ? Math.round((row.tt_ca / row.kh_ca) * 100) : 0;
   const progressClass = pct >= 80 ? '' : (pct >= 40 ? 'low' : 'crit');
 
-  const canSwap = isActive && !row.open_gio_phat_sinh && !row.khuon_kep_voi;
+  const canSwap = isActive && !row.open_gio_phat_sinh;
   const swapBtn = canSwap
     ? '<button class="btn-swap-inline" title="Đổi sản phẩm" onclick=\'openChangeProductModal(' + JSON.stringify(row.id_dong) + ')\'>⇄</button>'
     : '';
@@ -3162,14 +3162,27 @@ async function openChangeProductModal(idDong){
   const row = state.rows.find(r => r.id_dong === idDong);
   if (!row) return;
   if (row.open_gio_phat_sinh) return showToast('Dòng này đang có sự cố mở — xử lý xong mới đổi SP được', true);
+  const partner = row.khuon_kep_voi ? state.rows.find(r => r.id_dong === row.khuon_kep_voi) : null;
+  if (row.khuon_kep_voi && !partner) return showToast('Không tìm thấy dòng ghép cặp khuôn kép — báo kỹ thuật', true);
+  if (partner && partner.open_gio_phat_sinh) return showToast('Dòng ghép cặp (' + partner.ma_sp + ') đang có sự cố mở — xử lý xong mới đổi SP được', true);
   if (!(await ensureAuth())) return;
-  state.currentTarget = { id_dong: idDong, ma_may: row.ma_may };
+  state.currentTarget = { id_dong: idDong, ma_may: row.ma_may, isPairOut: !!partner, so_khuon: row.so_khuon };
 
   document.getElementById('cp-tag').textContent = row.ma_may;
-  document.getElementById('cp-current-info').innerHTML =
-    '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(row.ma_sp) + '</span> — ' + escapeHtml(row.ten_sp || '') + '<br>' +
-    '<span style="color:var(--text-muted);font-size:11px">TT ' + fmtNum(row.tt_ca) + ' / KH ' + fmtNum(row.kh_ca) +
-    ' (' + (row.kh_ca > 0 ? Math.round(row.tt_ca / row.kh_ca * 100) : 0) + '%)</span>';
+  if (partner) {
+    document.getElementById('cp-current-info-label').textContent = 'ĐANG CHẠY KHUÔN KÉP (ĐỔI CẢ CẶP)';
+    document.getElementById('cp-current-info').innerHTML =
+      '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(row.ma_sp) + '</span> — ' + escapeHtml(row.ten_sp || '') +
+      ' <span style="color:var(--text-muted);font-size:11px">(TT ' + fmtNum(row.tt_ca) + '/KH ' + fmtNum(row.kh_ca) + ')</span><br>' +
+      '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(partner.ma_sp) + '</span> — ' + escapeHtml(partner.ten_sp || '') +
+      ' <span style="color:var(--text-muted);font-size:11px">(TT ' + fmtNum(partner.tt_ca) + '/KH ' + fmtNum(partner.kh_ca) + ')</span>';
+  } else {
+    document.getElementById('cp-current-info-label').textContent = 'SẢN PHẨM HIỆN TẠI';
+    document.getElementById('cp-current-info').innerHTML =
+      '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(row.ma_sp) + '</span> — ' + escapeHtml(row.ten_sp || '') + '<br>' +
+      '<span style="color:var(--text-muted);font-size:11px">TT ' + fmtNum(row.tt_ca) + ' / KH ' + fmtNum(row.kh_ca) +
+      ' (' + (row.kh_ca > 0 ? Math.round(row.tt_ca / row.kh_ca * 100) : 0) + '%)</span>';
+  }
 
   document.getElementById('cp-ma-sp').value = '';
   document.getElementById('cp-ten-sp').value = '';
@@ -3183,10 +3196,16 @@ async function openChangeProductModal(idDong){
 
   document.getElementById('cp-pair-toggle').checked = false;
   document.getElementById('cp-pair-block').style.display = 'none';
+  document.getElementById('cp-pair-toggle-label').textContent = partner
+    ? '🔗 SP mới cũng là khuôn kép — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)'
+    : '🔗 Khuôn 2 cavity — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)';
   document.getElementById('cp-ma-sp-b').value = '';
   document.getElementById('cp-ten-sp-b').value = '';
   document.getElementById('cp-kh-ca-b').value = '';
   document.getElementById('cp-kh-tuan-b').value = '';
+
+  document.getElementById('cp-c3-hint').innerHTML =
+    'Sự cố <b>C3 Đổi khuôn</b> sẽ tự động tạo trên (các) dòng SP mới. Sau khi đổi khuôn xong, bấm ✓ Xong trên dòng đó.';
 
   document.getElementById('modal-change-product').classList.add('open');
 }
@@ -3202,6 +3221,9 @@ async function submitChangeProduct(){
   if (!gioBatDau) return showToast('Nhập giờ bắt đầu đổi khuôn', true);
   if (!soKhuon) return showToast('Bắt buộc nhập số khuôn', true);
 
+  if (state.currentTarget.isPairOut) {
+    return submitChangeProductPairOut(newMaSp, khCa, gioBatDau, soKhuon);
+  }
   if (document.getElementById('cp-pair-toggle').checked) {
     return submitPairedChangeProduct(newMaSp, khCa, gioBatDau, soKhuon);
   }
@@ -3251,6 +3273,42 @@ async function submitPairedChangeProduct(maSpA, khCaA, gioBatDau, soKhuon){
     hideOverlay(); closeModal();
     showToast('✓ Đã đổi sang khuôn kép: ' + d.ma_sp_a + ' + ' + d.ma_sp_b + ' trên máy ' + d.ma_may);
     addMoldToProductMap(maSpA, soKhuon); addMoldToProductMap(maSpB, soKhuon);
+    addPersonnelToDatalist(damNhiem);
+    loadShiftState(false);
+  } catch (e) { onError(e); }
+}
+
+// Đổi mã khi máy ĐANG chạy khuôn kép (T33) — đóng cả cặp cũ, tạo 1 (khuôn
+// đơn) hoặc 2 (khuôn kép mới) dòng SP mới, tuỳ checkbox "SP mới cũng là khuôn kép".
+async function submitChangeProductPairOut(maSpA, khCaA, gioBatDau, soKhuon){
+  const isPair = document.getElementById('cp-pair-toggle').checked;
+  let maSpB = '', khCaB = null;
+  if (isPair) {
+    maSpB = document.getElementById('cp-ma-sp-b').value.trim();
+    khCaB = Number(document.getElementById('cp-kh-ca-b').value);
+    if (!maSpB) return showToast('Nhập mã SP B', true);
+    if (!khCaB || khCaB <= 0) return showToast('Nhập KH ca B hợp lệ', true);
+    if (maSpB === maSpA) return showToast('SP A và SP B phải khác nhau', true);
+  }
+  if (!(await ensureAuthOnSubmit('modal-change-product'))) return;
+
+  const damNhiem = document.getElementById('cp-dam-nhiem').value;
+  showOverlay('Đang đóng khuôn kép cũ và tạo dòng SP mới...');
+  try {
+    const d = await rpcWrite('duc_change_product_pair_out', {
+      p_old_id_dong: state.currentTarget.id_dong,
+      p_so_khuon: soKhuon,
+      p_gio_bat_dau_doi_khuon: new Date(gioBatDau).toISOString(),
+      p_dam_nhiem: damNhiem, p_user: state.user,
+      p_new_a_ma_sp: maSpA, p_new_a_ten_sp: document.getElementById('cp-ten-sp').value,
+      p_new_a_kh_ca: khCaA, p_new_a_kh_tuan: Number(document.getElementById('cp-kh-tuan').value) || 0,
+      p_new_b_ma_sp: maSpB || null, p_new_b_ten_sp: document.getElementById('cp-ten-sp-b').value,
+      p_new_b_kh_ca: khCaB, p_new_b_kh_tuan: Number(document.getElementById('cp-kh-tuan-b').value) || 0,
+    });
+    hideOverlay(); closeModal();
+    showToast('✓ Đã kết thúc khuôn kép ' + d.old_ma_sp_a + ' + ' + d.old_ma_sp_b +
+      ' → ' + d.new_ma_sp_a + (d.new_ma_sp_b ? ' + ' + d.new_ma_sp_b : '') + ' trên máy ' + d.ma_may);
+    addMoldToProductMap(maSpA, soKhuon); if (maSpB) addMoldToProductMap(maSpB, soKhuon);
     addPersonnelToDatalist(damNhiem);
     loadShiftState(false);
   } catch (e) { onError(e); }
