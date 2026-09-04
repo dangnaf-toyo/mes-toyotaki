@@ -111,11 +111,35 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 .lightbox{position:fixed;inset:0;background:rgba(15,23,42,.85);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;cursor:zoom-out}
 .lightbox.show{display:flex}
 .lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+
+.qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
+.qr-modal.show{display:flex}
+.qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(0,0,0,.7);flex-shrink:0}
+.qr-modal-hdr span{color:#fff;font-size:13px;font-weight:700}
+.qr-modal-close{background:#c00;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+#qrReaderDiv{position:relative;flex:1;overflow:hidden}
+#qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+.manual-tag-input{flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--border-strong);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
+.cach-ly-list{display:flex;flex-direction:column;gap:6px}
+.cach-ly-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--alarm-bg);border:1px solid #FBD5D5;border-radius:7px;padding:8px 12px}
+.cach-ly-row.da_giai_toa{background:var(--bg-sunken);border-color:var(--border);opacity:.7}
+.cach-ly-row .tag{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--alarm-fg)}
+.cach-ly-row.da_giai_toa .tag{color:var(--text-muted)}
+.cach-ly-row .meta{font-size:11px;color:var(--text-muted)}
+.cach-ly-empty{font-size:12px;color:var(--text-dim);padding:6px 0}
 </style>
 </head>
 <body>
 <div class="overlay" id="overlay">Đang xử lý...</div>
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')"><img id="lightbox-img"></div>
+<canvas id="scanCanvas" style="display:none"></canvas>
+<div class="qr-modal" id="qrModal">
+  <div class="qr-modal-hdr">
+    <span>📷 Đưa mã QR trên tem vào giữa khung hình</span>
+    <button type="button" class="qr-modal-close" id="btnCloseQrModal">✖ Đóng</button>
+  </div>
+  <div id="qrReaderDiv"></div>
+</div>
 
 <div class="app">
   <header>
@@ -151,6 +175,16 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
       <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
       <input type="text" autocomplete="off" id="f-nguoi-dam-nhiem">
     </div>
+  </div>
+
+  <div class="panel">
+    <div class="cause-title">🔒 Cách ly tem/thùng hàng <span style="font-weight:400;font-size:11px;color:var(--text-dim)">— chặn chuyển công đoạn / đóng gói lại / nhập kho / xuất hàng với tem thuộc diện nghi vấn</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button type="button" class="btn btn-primary" id="btnScan">📷 Quét QR để cách ly</button>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+      <input type="text" autocomplete="off" id="manualTagInput" class="manual-tag-input" placeholder="Hoặc gõ Tag No + Enter">
+    </div>
+    <div class="cach-ly-list" id="cach-ly-list"></div>
   </div>
 
   <div class="panel cause-section">
@@ -221,6 +255,8 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
@@ -229,6 +265,7 @@ const state = {
   id: null, case: null, locked: false, currentUserEmail: '',
   images: { phat_sinh: [], luu_xuat: [] },
   doiSach: { ps_tam_thoi: [], ps_lau_dai: [], lx_tam_thoi: [], lx_lau_dai: [] },
+  cachLy: [],
 };
 const DS_KEYS = ['ps_tam_thoi', 'ps_lau_dai', 'lx_tam_thoi', 'lx_lau_dai'];
 
@@ -271,7 +308,14 @@ async function load(){
   DS_KEYS.forEach(key => {
     state.doiSach[key] = jsonArr(data['doi_sach_' + key + '_json']).map(x => Object.assign({ noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: [] }, x));
   });
+  await loadCachLy();
   renderAll();
+}
+
+async function loadCachLy(){
+  const { data, error } = await sb.from('duc_tem_cach_ly').select('*').eq('id_ncp', state.id).order('thoi_diem_cach_ly', { ascending: false });
+  if (error) { console.error('loadCachLy lỗi:', error); return; }
+  state.cachLy = data || [];
 }
 
 function renderAll(){
@@ -299,6 +343,7 @@ function renderAll(){
   renderCauseImages('luu_xuat');
   DS_KEYS.forEach(renderDoiSachList);
   renderBanner();
+  renderCachLyList();
 
   document.getElementById('btn-save').classList.toggle('hidden', state.locked);
   document.getElementById('btn-submit').classList.toggle('hidden', state.locked);
@@ -524,6 +569,146 @@ async function reopen(){
   if (error) return alert('Lỗi: ' + error.message);
   if (data && data.ok === false) return alert('Lỗi: ' + data.error);
   load();
+}
+
+// ===================== Cách ly tem/thùng hàng =====================
+function renderCachLyList(){
+  const el = document.getElementById('cach-ly-list');
+  if (!state.cachLy.length) { el.innerHTML = '<div class="cach-ly-empty">Chưa cách ly tem nào.</div>'; return; }
+  el.innerHTML = state.cachLy.map(r => {
+    const dangCachLy = r.trang_thai === 'dang_cach_ly';
+    const meta = dangCachLy
+      ? 'Cách ly bởi ' + escapeHtml(r.nguoi_cach_ly || '?') + ' lúc ' + new Date(r.thoi_diem_cach_ly).toLocaleString('vi-VN', { hour12: false })
+      : 'Đã giải toả bởi ' + escapeHtml(r.nguoi_giai_toa || '?') + ' lúc ' + new Date(r.thoi_diem_giai_toa).toLocaleString('vi-VN', { hour12: false });
+    return `<div class="cach-ly-row ${dangCachLy ? '' : 'da_giai_toa'}">
+      <div><span class="tag">${escapeHtml(r.tag_no)}</span><div class="meta">${meta}</div></div>
+      ${dangCachLy ? `<button type="button" class="btn btn-outline" onclick="giaiToaTem('${r.tag_no.replace(/'/g, "\\'")}')">🔓 Giải toả</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function giaiToaTem(tagNo){
+  if (!(await ensureAuth())) return;
+  if (!confirm('Giải toả cách ly cho tem ' + tagNo + '?')) return;
+  showOverlay('Đang giải toả...');
+  const { data, error } = await sb.rpc('duc_ncp_giai_toa_tem', { p_id_ncp: state.id, p_tag_no: tagNo, p_user: state.currentUserEmail });
+  hideOverlay();
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  await loadCachLy();
+  renderCachLyList();
+}
+
+// ── Quét QR (giống hệt pattern chuyencongdoan.html) ─────────────────────────
+let html5QrCode = null;
+let scanningActive = false;
+
+function getScanner(){
+  if (!html5QrCode) html5QrCode = new Html5Qrcode("qrReaderDiv");
+  return html5QrCode;
+}
+
+async function openCamera(){
+  if (typeof Html5Qrcode !== "function"){
+    alert("Lỗi tải thư viện đọc QR (html5-qrcode) — kiểm tra kết nối mạng rồi tải lại trang.");
+    return;
+  }
+  document.getElementById("qrModal").classList.add("show");
+  const scanner = getScanner();
+  scanningActive = true;
+  try {
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 8, qrbox: { width: 260, height: 260 } },
+      onScanSuccess,
+      () => { /* chưa thấy mã trong frame này — bỏ qua, thử tiếp frame sau */ }
+    );
+  } catch(e){
+    scanningActive = false;
+    await closeQrModal();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      document.getElementById("qrFileInput").click();
+      return;
+    }
+    alert("Không mở được camera: " + e + ". Kiểm tra đã cho phép quyền Camera cho trang này chưa.");
+  }
+}
+
+async function closeQrModal(){
+  document.getElementById("qrModal").classList.remove("show");
+  scanningActive = false;
+  if (html5QrCode && html5QrCode.isScanning){
+    try { await html5QrCode.stop(); } catch(e){ /* đã dừng rồi hoặc chưa start xong — bỏ qua */ }
+  }
+}
+
+async function onScanSuccess(decodedText){
+  if (!scanningActive) return;
+  scanningActive = false;
+  try {
+    await closeQrModal();
+    await onQrDecoded(decodedText);
+  } catch(e){
+    alert("Lỗi xử lý dữ liệu vừa quét: " + (e && e.message ? e.message : e));
+  }
+}
+
+document.getElementById("btnScan").addEventListener("click", openCamera);
+document.getElementById("btnCloseQrModal").addEventListener("click", closeQrModal);
+document.getElementById("qrFileInput").addEventListener("change", onFileChosen);
+document.getElementById("manualTagInput").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = e.target.value.trim();
+  if (!v) return;
+  e.target.value = "";
+  onQrDecoded(v);
+});
+
+function onFileChosen(evt){
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  if (typeof jsQR !== "function") { alert("Lỗi tải thư viện đọc QR (jsQR) — kiểm tra kết nối mạng rồi tải lại trang."); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const canvas = document.getElementById("scanCanvas");
+      const ctx = canvas.getContext("2d");
+      const w = img.width, h = img.height;
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const data = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(data.data, data.width, data.height);
+      if (code && code.data) onQrDecoded(code.data);
+      else alert("Không đọc được mã QR trong ảnh vừa chụp. Vui lòng chụp lại, đảm bảo mã QR rõ nét, đủ sáng và nằm giữa khung ảnh.");
+    } catch(e){
+      alert("Lỗi xử lý ảnh: " + e.message);
+    }
+    evt.target.value = "";
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("Không đọc được ảnh vừa chụp. Vui lòng thử lại."); };
+  img.src = url;
+}
+
+function parseTagNo(raw){
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  return s.includes('>') ? s.split('>')[0].trim() : s;
+}
+
+async function onQrDecoded(text){
+  const tagNo = parseTagNo(text);
+  if (!tagNo) return alert("Không đọc được Tag No từ dữ liệu vừa quét/nhập.");
+  if (!(await ensureAuth())) return;
+  showOverlay('Đang cách ly tem ' + tagNo + '...');
+  const { data, error } = await sb.rpc('duc_ncp_cach_ly_tem', { p_id_ncp: state.id, p_tag_no: tagNo, p_user: state.currentUserEmail });
+  hideOverlay();
+  if (error) return alert('Lỗi: ' + error.message);
+  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
+  await loadCachLy();
+  renderCachLyList();
 }
 
 load();

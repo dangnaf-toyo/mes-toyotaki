@@ -652,6 +652,16 @@ function onFileChosen(evt){
 // tra cứu LIVE từ duc_tem, không tin tưởng số lượng nhúng sẵn trong QR (tem
 // có thể đã bị dùng 1 phần qua "Đóng gói lại"/tách kể từ lúc in — QR chỉ ghi
 // số lượng gốc lúc in, có thể đã cũ).
+// Trả về id_ncp nếu tem đang bị cách ly (phiếu NCP), null nếu không — kiểm
+// SỚM ngay lúc quét để chặn trước khi người dùng điền cả form (server-side
+// cũng chặn lại lần nữa khi ghi RPC, đây chỉ là cảnh báo sớm ở client).
+async function idNcpDangCachLy(tagNo){
+  try {
+    const { data } = await sb.rpc('duc_tem_id_ncp_cach_ly', { p_tag_no: tagNo });
+    return data || null;
+  } catch (e) { return null; }
+}
+
 function parseTagNo(raw){
   const s = String(raw || '').trim();
   if (!s) return '';
@@ -674,6 +684,11 @@ async function onQrDecoded(text){
   if (error || !data){ err("Không tìm thấy tem " + tagNo + " trong hệ thống."); return; }
   if (!data.so_luong || data.so_luong <= 0){
     err("Tem " + tagNo + " đã hết số lượng (có thể đã dùng ở lần chuyển/đóng gói trước) — không dùng được nữa.");
+    return;
+  }
+  const idNcpCl = await idNcpDangCachLy(tagNo);
+  if (idNcpCl){
+    err("🔒 Tem " + tagNo + " đang bị CÁCH LY theo phiếu NCP " + idNcpCl + " — không thể chuyển công đoạn.");
     return;
   }
 
@@ -973,6 +988,11 @@ async function addPackSource(decoded){
   if (error || !data){ err("Không tìm thấy tem trong hệ thống: " + decoded.tagNo); return; }
   if (!data.so_luong || data.so_luong <= 0){
     err("Tem " + decoded.tagNo + " đã hết số lượng (có thể đã dùng ở lần đóng gói/tách trước) — không dùng làm nguồn được.");
+    return;
+  }
+  const idNcpCl = await idNcpDangCachLy(decoded.tagNo);
+  if (idNcpCl){
+    err("🔒 Tem " + decoded.tagNo + " đang bị CÁCH LY theo phiếu NCP " + idNcpCl + " — không thể dùng làm nguồn đóng gói.");
     return;
   }
   if (packSources.length && packSources[0].ma_sp !== data.ma_sp){
