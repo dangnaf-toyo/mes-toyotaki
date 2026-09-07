@@ -136,7 +136,7 @@
   .day.today{border-color:var(--tk-warn);background:#FEF8EC;}
   .day-date{font-size:11.5px;font-weight:700;color:#4a3f33;}
   .day-wd{font-size:10.5px;color:var(--tk-muted);text-transform:uppercase;}
-  .day-bars{display:flex;align-items:flex-end;gap:4px;height:60px;margin:8px 0 6px;}
+  .day-bars{display:flex;align-items:flex-end;gap:4px;height:60px;margin:8px 0 6px;overflow:hidden;}
   .day-bar{flex:1;border-radius:3px 3px 0 0;}
   .day-bar.kh{background:#EFE2CE;}
   .day-bar.tt{background:var(--tk-orange);}
@@ -458,7 +458,10 @@ function computeAll(ctx){
     const isFuture = iso > todayISO;
     return { date: d, iso, kh, tt, htPct: kh > 0 ? tt/kh*100 : 0, sc, phut, ng, isToday, isFuture };
   });
-  const maxKh = Math.max(1, ...days.map(d => d.kh));
+  // Lấy max của CẢ kh lẫn tt (không chỉ kh) — nếu cả kỳ không có kế hoạch KHSX
+  // (kh=0 mọi ngày, ví dụ tuần chưa được lập kế hoạch) mà vẫn sàn max về 1 thì
+  // cột TT thật sẽ bị tính thành hàng nghìn % chiều cao, tràn lên đè cả header.
+  const maxKh = Math.max(1, ...days.map(d => Math.max(d.kh, d.tt)));
 
   // ── KPI tuần — KH lấy từ kế hoạch tuần đã duyệt (cả tuần, kể cả ngày chưa
   // tới); TT/sự cố/dừng máy vẫn chỉ tính ca đã kết ca ──
