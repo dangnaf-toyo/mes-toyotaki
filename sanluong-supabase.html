@@ -57,20 +57,6 @@
   .refresh-btn:hover{background:var(--bg-sunken);}
   .refresh-btn:disabled{opacity:.5;cursor:wait;}
 
-  /* Sync status banner */
-  .sync-banner{
-    max-width:none;margin:0;padding:9px 28px;font-size:12.5px;display:flex;align-items:center;gap:8px;
-    border-bottom:1px solid var(--border);
-  }
-  .sync-banner .dot{width:8px;height:8px;border-radius:50%;flex:none;}
-  .sync-banner.demo{background:var(--warn-bg);color:var(--warn-fg);}
-  .sync-banner.demo .dot{background:var(--warn-fg);}
-  .sync-banner.live{background:var(--run-bg);color:var(--run-fg);}
-  .sync-banner.live .dot{background:var(--run-fg);}
-  .sync-banner.loading{background:var(--bg-sunken);color:var(--accent);}
-  .sync-banner.loading .dot{background:var(--accent);animation:pulse 1s infinite;}
-  .sync-banner.error{background:var(--alarm-bg);color:var(--alarm-fg);}
-  .sync-banner.error .dot{background:var(--alarm-fg);}
 
   .cmt-month-bar{
     max-width:none;margin:0;padding:9px 28px;font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -165,7 +151,7 @@
   @media print{
     .tabnav{display:none;}
     .tab-content{display:block !important;page-break-after:always;}
-    .hdr-wrap,.print-btn,.refresh-btn,.sync-banner{display:none;}
+    .hdr-wrap,.print-btn,.refresh-btn{display:none;}
     body{background:#fff;}
   }
   @media (max-width:900px){
@@ -194,11 +180,6 @@
       <div class="time" id="hdrClockTime"></div>
     </div>
   </header>
-</div>
-
-<div class="sync-banner demo" id="syncBanner">
-  <span class="dot"></span>
-  <span id="syncText">Đang khởi tạo…</span>
 </div>
 
 <div class="cmt-month-bar" id="cmtMonthBar">
@@ -865,11 +846,6 @@ function renderAll(data){
 }
 
 /* ---------- Load ---------- */
-function setBanner(state, text){
-  const b = document.getElementById('syncBanner');
-  b.className = 'sync-banner ' + state;
-  document.getElementById('syncText').textContent = text;
-}
 function nowStr(){
   const d = new Date();
   return d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',hour12:false}) + ' ' + d.toLocaleDateString('vi-VN');
@@ -879,12 +855,11 @@ async function loadData(){
   const btn = document.getElementById('btnRefresh');
   btn.disabled = true;
   if (!isConfigured()){
-    setBanner('demo', '🔌 Chưa kết nối Supabase — đang hiển thị dữ liệu mẫu. Điền SUPABASE_URL/SUPABASE_ANON_KEY ở đầu file.');
+    console.warn('Chưa kết nối Supabase — đang hiển thị dữ liệu mẫu. Điền SUPABASE_URL/SUPABASE_ANON_KEY ở đầu file.');
     renderAll(DEMO_DATA);
     btn.disabled = false;
     return;
   }
-  setBanner('loading', '🔄 Đang tải dữ liệu từ Supabase…');
   try {
     const [giaoHangRaw, khsxRaw, capacityRaw, forecastRaw, commentsRaw, configRaw] = await Promise.all([
       fetchSupabaseTable('sl_giao_hang'), fetchSupabaseTable('sl_khsx'), fetchSupabaseTable('sl_capacity'),
@@ -898,14 +873,13 @@ async function loadData(){
     const config = remapKeys(configRaw, {key:'Key', value:'Value'});
     const data = buildDataModel({giaoHang, khsx, capacity, forecast, comments, config});
     renderAll(data);
-    setBanner('live', `🟢 Dữ liệu trực tuyến (Supabase) — cập nhật lúc ${nowStr()} · tự động làm mới mỗi 5 phút`);
   } catch(err){
     console.error('Lỗi tải dữ liệu Supabase:', err);
     const isFetchFail = err instanceof TypeError;
     const hint = isFetchFail
       ? ' Nguyên nhân thường gặp: (1) đang mở file bằng cách bấm đúp — hãy host file này lên GitHub Pages/Netlify rồi mở bằng https://, hoặc (2) trình duyệt chặn do thiếu mạng.'
       : '';
-    setBanner('error', `⚠️ Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu.`);
+    console.error(`Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu.`);
     renderAll(DEMO_DATA);
   } finally {
     btn.disabled = false;
