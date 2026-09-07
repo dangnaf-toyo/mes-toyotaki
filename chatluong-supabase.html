@@ -148,16 +148,6 @@
     .mx-head:not(:first-child){display:none;}
   }
 
-  .sync-banner{max-width:none;margin:0 0 14px;padding:9px 20px;font-size:12.5px;display:flex;align-items:center;gap:8px;border-radius:8px;}
-  .sync-banner .dot{width:8px;height:8px;border-radius:50%;flex:none;}
-  .sync-banner.demo{background:#FBF3E8;color:#8A6A3D;}
-  .sync-banner.demo .dot{background:#C89341;}
-  .sync-banner.live{background:#E4EEE7;color:var(--good);}
-  .sync-banner.live .dot{background:var(--good);}
-  .sync-banner.loading{background:#EEF1F4;color:#33465C;}
-  .sync-banner.loading .dot{background:#33465C;animation:pulse 1s infinite;}
-  .sync-banner.error{background:#F5E2DD;color:var(--bad);}
-  .sync-banner.error .dot{background:var(--bad);}
 
   .cmt-month-bar{
     max-width:none;margin:0 0 14px;padding:9px 20px;font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -182,7 +172,7 @@
   .save-status.ok{color:var(--good);}
   .save-status.err{color:var(--bad);}
   @media print{
-    .hdr-wrap, nav.tabs, .sync-banner, .cmt-month-bar, .top-actions, .comment-save-row{display:none !important;}
+    .hdr-wrap, nav.tabs, .cmt-month-bar, .top-actions, .comment-save-row{display:none !important;}
     section.view{display:block !important;page-break-after:always;}
   }
 </style>
@@ -217,10 +207,6 @@
   Ngày xuất báo cáo: <b id="metaNgayBaoCao">—</b> · Tháng báo cáo hiện tại: <b id="metaThangBaoCao">—</b>
 </div>
 <div class="wrap">
-
-  <div class="sync-banner demo" id="syncBanner">
-    <span class="dot"></span><span id="syncText">Đang khởi tạo…</span>
-  </div>
 
   <div class="cmt-month-bar" id="cmtMonthBar">
     <span>📝 Xem/ghi chú (comment) của tháng:</span>
@@ -1265,11 +1251,6 @@ function reapplyAllComments(comments){
 }
 
 /* ---------- Load ---------- */
-function setBanner(state, text){
-  const b = document.getElementById('syncBanner');
-  b.className = 'sync-banner ' + state;
-  document.getElementById('syncText').textContent = text;
-}
 function nowStr(){
   const d = new Date();
   return d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',hour12:false}) + ' ' + d.toLocaleDateString('vi-VN');
@@ -1292,12 +1273,11 @@ async function loadData(){
   const btn = document.getElementById('btnRefresh');
   btn.disabled = true;
   if (!isConfigured()){
-    setBanner('demo', '🔌 Chưa kết nối Supabase — đang hiển thị dữ liệu mẫu. Điền SUPABASE_URL/SUPABASE_ANON_KEY ở đầu thẻ <script>.');
+    console.warn('Chưa kết nối Supabase — đang hiển thị dữ liệu mẫu. Điền SUPABASE_URL/SUPABASE_ANON_KEY ở đầu thẻ <script>.');
     renderDashboard(DEMO_DATA);
     btn.disabled = false;
     return;
   }
-  setBanner('loading', '🔄 Đang tải dữ liệu từ Supabase…');
   try {
     const KEY_MAPS = {
       tongHop: {thang:'Thang', san_luong_noi_bo_tong:'SanLuongNoiBoTong', bao_phe_noi_bo_tong:'BaoPheNoiBoTong', giao_hang_tong:'GiaoHangTong', tra_ve_tong:'TraVeTong', diem_thuong_phat:'DiemThuongPhat'},
@@ -1332,15 +1312,14 @@ async function loadData(){
     const data = buildDataModel(Object.assign({}, core, extra, { cdBaoCaoCa }));
     renderDashboard(data);
     const missingExtra = extraSettled.filter(r => r.status !== 'fulfilled').length;
-    const extraNote = missingExtra ? ` · ${missingExtra}/5 bảng "Bất thường/NG lần 1" lỗi hoặc chưa có dữ liệu` : '';
-    setBanner('live', `🟢 Dữ liệu trực tuyến (Supabase) — cập nhật lúc ${nowStr()} · tự động làm mới mỗi 5 phút${extraNote}`);
+    if (missingExtra) console.warn(`${missingExtra}/5 bảng "Bất thường/NG lần 1" lỗi hoặc chưa có dữ liệu`);
   } catch(err){
     console.error('Lỗi tải dữ liệu Supabase:', err);
     const isFetchFail = err instanceof TypeError;
     const hint = isFetchFail
       ? ' Nguyên nhân thường gặp: (1) đang mở file bằng cách bấm đúp — hãy host file này lên GitHub Pages/Netlify rồi mở bằng https://, (2) chưa bật RLS "public read" trên các bảng cl_*, hoặc (3) trình duyệt chặn do thiếu mạng.'
       : '';
-    setBanner('error', `⚠️ Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu.`);
+    console.error(`Không tải được dữ liệu từ Supabase (${err.message}).${hint} Đang hiển thị dữ liệu mẫu.`);
     renderDashboard(DEMO_DATA);
   } finally {
     btn.disabled = false;
