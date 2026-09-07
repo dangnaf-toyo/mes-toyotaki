@@ -53,8 +53,6 @@
   .btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;}
   .btn-ghost:hover:not(:disabled){background:#334155;}
   .btn:disabled{opacity:.5;cursor:not-allowed;}
-  .meta{text-align:right; font-size:12.5px; color:var(--muted); line-height:1.6; margin:10px 0 0; max-width:none; padding:0 24px;}
-  .meta b{color:var(--ink);}
 
   nav.tabs{display:flex; gap:6px; flex-wrap:wrap;}
   nav.tabs button{font-family:'Inter',sans-serif; font-size:12px; font-weight:600; padding:6px 12px; border:1px solid #475569; background:transparent; color:#F1F5F9; cursor:pointer; border-radius:5px; transition:.15s;}
@@ -200,11 +198,6 @@
       <div class="time" id="hdrClockTime"></div>
     </div>
   </header>
-</div>
-<div class="meta">
-  Kỳ báo cáo: <b>Tháng 1 – Tháng 12 / 2026</b> (theo từng tháng, không lũy kế) ·
-  Người lập: <b id="metaNguoiLap">—</b> ·
-  Ngày xuất báo cáo: <b id="metaNgayBaoCao">—</b> · Tháng báo cáo hiện tại: <b id="metaThangBaoCao">—</b>
 </div>
 <div class="wrap">
 
@@ -491,8 +484,7 @@ const DEMO_DATA = (function(){
   return {
     internalTotal, returnTotal, bonusPoints, internalByCustomer, returnByCustomer,
     processes, returnNotTracked, qcDaily, qcRepaint, comments,
-    batThuong, batThuongKHCongDoan, batThuongNBCongDoan, batThuongChuaTraLoi, ngLan1,
-    nguoiLap: 'Hồ Văn Đảng — Giám đốc Sản xuất', ngayBaoCao: '06/07/2026'
+    batThuong, batThuongKHCongDoan, batThuongNBCongDoan, batThuongChuaTraLoi, ngLan1
   };
 })();
 
@@ -709,8 +701,7 @@ function buildDataModel(raw){
   return {
     internalTotal, returnTotal, bonusPoints, internalByCustomer, returnByCustomer,
     processes, returnNotTracked, qcDaily, qcRepaint, comments,
-    batThuong, batThuongKHCongDoan, batThuongNBCongDoan, batThuongChuaTraLoi, ngLan1,
-    nguoiLap: cfg['NguoiLap'] || '—', ngayBaoCao: cfg['NgayBaoCao'] || '—'
+    batThuong, batThuongKHCongDoan, batThuongNBCongDoan, batThuongChuaTraLoi, ngLan1
   };
 }
 
@@ -911,9 +902,6 @@ function renderDashboard(data){
     return REPORT_IDX_FALLBACK;
   })();
 
-  document.getElementById('metaNguoiLap').textContent = data.nguoiLap;
-  document.getElementById('metaNgayBaoCao').textContent = data.ngayBaoCao;
-  document.getElementById('metaThangBaoCao').textContent = 'Tháng ' + (reportIdx+1);
 
   const internalT = rateOrNull(data.internalTotal.ng[reportIdx], data.internalTotal.prod[reportIdx]);
   const returnT = rateOrNull(data.returnTotal.ret[reportIdx], data.returnTotal.ship[reportIdx]);
