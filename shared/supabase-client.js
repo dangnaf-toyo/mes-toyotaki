@@ -11,8 +11,21 @@
  * ============================================================================
  */
 
-const SUPABASE_URL = 'https://fgghikpzcxjqzahfiiil.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_WWugFHNNGGQPWZRsMxGyVA_YpsL4v3v';
+// Production = đúng domain GitHub Pages đang phục vụ xưởng. Mọi hostname khác
+// (staging trên Cloudflare Pages, mở file cục bộ, localhost khi dev) đều trỏ
+// vào Supabase project staging — không bao giờ vô tình đụng dữ liệu thật.
+const PROD_HOSTNAME = 'dangnaf-toyo.github.io';
+const IS_PROD = location.hostname === PROD_HOSTNAME;
+
+const SUPABASE_URL = IS_PROD
+  ? 'https://fgghikpzcxjqzahfiiil.supabase.co'
+  : 'https://TODO-STAGING-PROJECT-REF.supabase.co'; // TODO: điền sau khi tạo project Supabase staging
+
+const SUPABASE_ANON_KEY = IS_PROD
+  ? 'sb_publishable_WWugFHNNGGQPWZRsMxGyVA_YpsL4v3v'
+  : 'TODO-STAGING-ANON-KEY'; // TODO: điền anon key của project staging
+
+const IS_STAGING = !IS_PROD;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

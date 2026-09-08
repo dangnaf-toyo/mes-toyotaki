@@ -249,6 +249,13 @@ body{padding-top:var(--navbar-h)}
       '<div class="mnb-auth" id="mnbAuth">…</div>';
     document.body.insertBefore(bar, document.body.firstChild);
 
+    if (typeof IS_STAGING !== 'undefined' && IS_STAGING) {
+      const stagingBanner = document.createElement('div');
+      stagingBanner.textContent = '⚠️ MÔI TRƯỜNG STAGING — dữ liệu thử nghiệm, KHÔNG dùng cho sản xuất thật';
+      stagingBanner.style.cssText = 'background:#B91C1C;color:#fff;text-align:center;font-weight:700;font-size:13px;padding:6px 10px;position:relative;z-index:1001';
+      document.body.insertBefore(stagingBanner, bar.nextSibling);
+    }
+
     const pwMask = document.createElement('div');
     pwMask.className = 'mnb-pw-mask';
     pwMask.id = 'mnbPwMask';
