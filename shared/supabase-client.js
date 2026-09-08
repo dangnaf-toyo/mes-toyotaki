@@ -19,11 +19,11 @@ const IS_PROD = location.hostname === PROD_HOSTNAME;
 
 const SUPABASE_URL = IS_PROD
   ? 'https://fgghikpzcxjqzahfiiil.supabase.co'
-  : 'https://TODO-STAGING-PROJECT-REF.supabase.co'; // TODO: điền sau khi tạo project Supabase staging
+  : 'https://jcjbleugnclzsghfpmvk.supabase.co';
 
 const SUPABASE_ANON_KEY = IS_PROD
   ? 'sb_publishable_WWugFHNNGGQPWZRsMxGyVA_YpsL4v3v'
-  : 'TODO-STAGING-ANON-KEY'; // TODO: điền anon key của project staging
+  : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjamJsZXVnbmNsenNnaGZwbXZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NjU1MTEsImV4cCI6MjEwNDQ0MTUxMX0.8xSvNyRGAAP_r2or4G2DK-bVj1IT5tMwzPKoi00tI0w';
 
 const IS_STAGING = !IS_PROD;
 
