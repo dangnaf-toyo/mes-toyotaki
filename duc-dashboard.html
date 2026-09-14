@@ -1765,6 +1765,17 @@ function buildKhsxSuggestion_(opt, remaining){
   };
 }
 
+// Phần KH ngày đã "chiếm chỗ" bởi các dòng khác trong ngày (mọi ca) cho cùng
+// mã SP: lấy max(kh_ca, tt_ca) từng dòng — dòng đã chạy thì tt_ca là số thật,
+// dòng mới có kế hoạch nhưng CHƯA chạy (vd Ca 2 đã nạp KH trước khi Ca 1 chạy
+// xong) thì kh_ca là phần đã "giữ chỗ". Cộng lại để trừ ra khỏi KH ngày, tránh
+// tình trạng nạp KH cho cả 2 ca mà mỗi ca đều nhận nguyên KH ngày (D51-ish).
+function daChiemChoTrongNgay_(todayRows, maSp){
+  return (todayRows || [])
+    .filter(r => r.ma_sp === maSp)
+    .reduce((s, r) => s + Math.max(Number(r.tt_ca) || 0, Number(r.kh_ca) || 0), 0);
+}
+
 // Tìm mã đang chạy dở trong ngày (từ dữ liệu thực tế duc_ca_hien_tai) và còn
 // thiếu sản lượng so với KH ngày của chính mã đó. Trả về null nếu chưa có gì
 // chạy trong ngày, hoặc mã chạy gần nhất đã đạt/vượt KH ngày (cần chọn mã kế
@@ -1774,10 +1785,7 @@ function resolveContinuingProduct_(todayRows, options){
   const latest = todayRows.reduce((a, b) => (Number(b.row_seq) || 0) > (Number(a.row_seq) || 0) ? b : a);
   const opt = options.find(o => o.ma_sp === latest.ma_sp);
   if (!opt) return null;
-  const sanXuatLuyKe = todayRows
-    .filter(r => r.ma_sp === opt.ma_sp)
-    .reduce((s, r) => s + (Number(r.tt_ca) || 0), 0);
-  const remaining = opt.kh_ngay - sanXuatLuyKe;
+  const remaining = opt.kh_ngay - daChiemChoTrongNgay_(todayRows, opt.ma_sp);
   if (remaining <= 0) return null;
   return { opt, remaining };
 }
@@ -1796,7 +1804,7 @@ async function loadWeeklyPlanSuggestions(){
 
     const [khsxRes, todayRes] = await Promise.all([
       sb.from('duc_khsx_tuan_plan').select('*').eq('tuan_bat_dau', mondayStr),
-      sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,ca,row_seq,tt_ca').eq('ngay', ngayForThisCall),
+      sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,ca,row_seq,tt_ca,kh_ca').eq('ngay', ngayForThisCall),
     ]);
     if (khsxRes.error) throw khsxRes.error;
     if (todayRes.error) throw todayRes.error;
@@ -1823,10 +1831,8 @@ async function loadWeeklyPlanSuggestions(){
 
       if (list.length === 1) {
         const opt = list[0];
-        const sanXuatLuyKe = todayRows
-          .filter(r => r.ma_sp === opt.ma_sp)
-          .reduce((s, r) => s + (Number(r.tt_ca) || 0), 0);
-        suggestions[m] = buildKhsxSuggestion_(opt, Math.max(0, opt.kh_ngay - sanXuatLuyKe));
+        const remaining = opt.kh_ngay - daChiemChoTrongNgay_(todayRows, opt.ma_sp);
+        suggestions[m] = buildKhsxSuggestion_(opt, Math.max(0, remaining));
         return;
       }
 
