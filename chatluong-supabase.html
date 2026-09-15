@@ -214,33 +214,34 @@
 
     <div class="kpi-row" id="baopheKpiRow"></div>
 
-    <div class="panel">
-      <div class="panel-head"><h3>Chi phí báo phế theo tháng</h3></div>
-      <p class="desc">Cột: tổng chi phí báo phế trong tháng (VND) · Đường: tỷ lệ % chi phí báo phế / doanh thu · nét đứt: mục tiêu · Tháng 1–Tháng 12, tháng chưa có dữ liệu để trống</p>
-      <div style="max-width:820px;">
-        <canvas id="chartBaoPheThang" height="110"></canvas>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>Chi phí báo phế theo tháng</h3></div>
+        <p class="desc">Cột: tổng chi phí báo phế trong tháng (VND) · Đường: tỷ lệ % chi phí báo phế / doanh thu · nét đứt: mục tiêu · Tháng 1–Tháng 12, tháng chưa có dữ liệu để trống</p>
+        <canvas id="chartBaoPheThang" height="180"></canvas>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Chi phí báo phế theo mã sản phẩm</h3></div>
+        <p class="desc">Top 10 mã có chi phí báo phế lớn nhất (tổng các công đoạn) · tháng đang xem ở dropdown "Xem/ghi comment" phía trên</p>
+        <canvas id="chartBaoPheMa" height="180"></canvas>
       </div>
     </div>
 
     <div class="panel">
-      <div class="panel-head">
-        <h3>Chi phí báo phế theo mã sản phẩm</h3>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:11px;color:var(--muted);font-weight:600;">Tháng</span>
-          <select id="baopheMonthSelect" style="border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;background:#fff;color:var(--ink);"></select>
-        </div>
-      </div>
-      <p class="desc">Sắp xếp giảm dần theo tổng chi phí báo phế (tổng các công đoạn) · tất cả mã có phát sinh chi phí</p>
-      <div id="baopheMaWrap" style="overflow-x:hidden;">
-        <canvas id="chartBaoPheMa"></canvas>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3>Top 5 mã có chi phí báo phế lớn nhất theo từng công đoạn</h3>
+      <h3>Top 5 mã có chi phí báo phế lớn nhất</h3>
       <p class="desc" id="baopheTop5Desc">&nbsp;</p>
       <div style="overflow-x:auto;">
-        <table id="baopheTop5Table"><thead><tr><th>Công đoạn</th><th>#1</th><th>#2</th><th>#3</th><th>#4</th><th>#5</th></tr></thead><tbody></tbody></table>
+        <table id="baopheTop5Table"><thead><tr id="baopheTop5Head"><th>Mã sản phẩm</th><th>Tổng cộng</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Ghi chú</h3>
+      <div class="comment-box">
+        <label>Comment — Chi phí phế phẩm</label>
+        <textarea data-key="baophe:ghichu" spellcheck="false" placeholder="Ghi chú của anh về chi phí báo phế tháng này..."></textarea>
+        <div class="comment-save-row"><button type="button" class="save-btn">💾 Lưu dữ liệu</button><span class="save-status"></span></div>
       </div>
     </div>
 
@@ -1255,6 +1256,7 @@ function reapplyAllComments(comments){
   wireAllCommentBoxes(document.getElementById('customer'), comments);
   wireAllCommentBoxes(document.getElementById('batthuong'), comments);
   wireAllCommentBoxes(document.getElementById('nglan1'), comments);
+  wireAllCommentBoxes(document.getElementById('baophe'), comments);
   const box = document.getElementById('conclusionBox');
   applyCommentValue(box, comments);
 }
@@ -1361,6 +1363,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     try { localStorage.setItem('mes_cmt_month', String(selectedCommentMonth)); } catch(e){}
     clearAllCommentBoxes();
     reapplyAllComments(lastComments);
+    if (baopheThangRows.length) renderBaopheMonthDetail(baopheCurrentThang());
   });
 })();
 
@@ -1441,14 +1444,12 @@ function renderBaopheThangChart(){
   }));
 }
 
-function renderBaopheMonthSelect(){
-  const sel = document.getElementById('baopheMonthSelect');
-  const months = baopheThangRows.map(r => r.thang).sort();
-  const prev = sel.value;
-  sel.innerHTML = months.map(m => `<option value="${m}">${baopheMonthLabel(m)}</option>`).join('');
-  if (months.includes(prev)) sel.value = prev;
-  else if (!baopheSelectedMonth || !months.includes(baopheSelectedMonth)) baopheSelectedMonth = months[months.length - 1];
-  if (baopheSelectedMonth) sel.value = baopheSelectedMonth;
+// Tháng đang xem của tab "Chi phí phế phẩm" dùng CHUNG dropdown "Xem/ghi comment
+// tháng" ở đầu trang (selectedCommentMonth, chỉ có số tháng 1-12) — ghép thêm năm
+// lấy từ dữ liệu cl_bao_phe_thang đã tải để ra khoá 'YYYY-MM'.
+function baopheCurrentThang(){
+  const year = baopheThangRows.length ? baopheThangRows[0].thang.slice(0, 4) : String(new Date().getFullYear());
+  return `${year}-${String(selectedCommentMonth).padStart(2, '0')}`;
 }
 
 async function renderBaopheMonthDetail(thang){
@@ -1463,15 +1464,13 @@ async function renderBaopheMonthDetail(thang){
     console.error('Lỗi tải chi tiết chi phí báo phế:', err);
   }
 
-  // ---- bar theo mã (tổng các công đoạn), giảm dần, hiển thị tất cả để nhìn tổng thể ----
+  // ---- bar theo mã (tổng các công đoạn), giảm dần, top 10 ----
   const byMa = {};
   detail.forEach(r => { byMa[r.ma_san_pham] = (byMa[r.ma_san_pham] || 0) + (r.thanh_tien || 0); });
-  const maSorted = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const maSorted = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-  const maCanvas = document.getElementById('chartBaoPheMa');
-  maCanvas.parentElement.style.height = Math.max(230, maSorted.length * 20) + 'px';
   if (chartsByKey.baophe_ma) chartsByKey.baophe_ma.destroy();
-  track('baophe_ma', new Chart(maCanvas, {
+  track('baophe_ma', new Chart(document.getElementById('chartBaoPheMa'), {
     type: 'bar',
     data: {
       labels: maSorted.map(([ma]) => ma),
@@ -1479,33 +1478,34 @@ async function renderBaopheMonthDetail(thang){
     },
     options: {
       indexAxis: 'y',
-      maintainAspectRatio: false,
       plugins: {legend: {display: false}},
       scales: {x: {ticks: {callback: v => (v / 1e6).toLocaleString('vi-VN') + 'tr'}}}
     }
   }));
 
-  // ---- top 5 mã theo từng công đoạn — mỗi công đoạn 1 hàng ngang, 5 mã nằm cạnh nhau ----
-  const byCongDoan = {};
+  // ---- top 5 mã theo tổng chi phí báo phế, mỗi mã 1 dòng, cột = từng công đoạn + tổng cộng ----
+  const byMaCongDoan = {}; // ma -> {congDoan -> tien}
+  const congDoanSet = [];
   detail.forEach(r => {
     if (!(r.thanh_tien > 0)) return;
-    (byCongDoan[r.cong_doan] = byCongDoan[r.cong_doan] || []).push(r);
+    if (!congDoanSet.includes(r.cong_doan)) congDoanSet.push(r.cong_doan);
+    const m = (byMaCongDoan[r.ma_san_pham] = byMaCongDoan[r.ma_san_pham] || {});
+    m[r.cong_doan] = (m[r.cong_doan] || 0) + r.thanh_tien;
   });
-  const congDoanSorted = Object.entries(byCongDoan)
-    .map(([cd, rows]) => [cd, rows.sort((a, b) => b.thanh_tien - a.thanh_tien).slice(0, 5)])
-    .sort((a, b) => (b[1][0]?.thanh_tien || 0) - (a[1][0]?.thanh_tien || 0));
+  const top5Ma = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   document.getElementById('baopheTop5Desc').textContent = `Tháng ${baopheMonthLabel(thang)}`;
+  document.getElementById('baopheTop5Head').innerHTML =
+    `<th>Mã sản phẩm</th>${congDoanSet.map(cd => `<th>${cd}</th>`).join('')}<th>Tổng cộng</th>`;
   const tbody = document.querySelector('#baopheTop5Table tbody');
-  tbody.innerHTML = congDoanSorted.length ? congDoanSorted.map(([cd, rows]) => {
-    const cells = Array.from({length: 5}, (_, i) => rows[i]
-      ? `<td><div style="font-weight:600;">${rows[i].ma_san_pham}</div><div style="color:var(--muted);font-size:11px;">${fmtVND(rows[i].thanh_tien)}</div></td>`
-      : `<td class="cell-blank">–</td>`);
-    return `<tr><td style="text-align:left;font-weight:600;white-space:nowrap;">${cd}</td>${cells.join('')}</tr>`;
-  }).join('') : '<tr><td colspan="6" class="cell-blank">Không có dữ liệu chi phí báo phế trong tháng này.</td></tr>';
+  tbody.innerHTML = top5Ma.length ? top5Ma.map(([ma, total]) => {
+    const cells = congDoanSet.map(cd => {
+      const v = (byMaCongDoan[ma] || {})[cd];
+      return v ? `<td>${fmtVND(v)}</td>` : `<td class="cell-blank">–</td>`;
+    });
+    return `<tr><td style="text-align:left;font-weight:600;white-space:nowrap;">${ma}</td>${cells.join('')}<td style="font-weight:700;">${fmtVND(total)}</td></tr>`;
+  }).join('') : `<tr><td colspan="${congDoanSet.length + 2}" class="cell-blank">Không có dữ liệu chi phí báo phế trong tháng này.</td></tr>`;
 }
-
-document.getElementById('baopheMonthSelect').addEventListener('change', (e) => renderBaopheMonthDetail(e.target.value));
 
 async function loadBaoPheData(){
   if (!isConfigured()) return;
@@ -1513,8 +1513,7 @@ async function loadBaoPheData(){
     baopheThangRows = await fetchSupabaseTable(BAOPHE_THANG_TABLE, 'thang,tong_chi_phi,tong_doanh_thu,muc_tieu');
     if (!baopheThangRows.length) return;
     renderBaopheThangChart();
-    renderBaopheMonthSelect();
-    await renderBaopheMonthDetail(baopheSelectedMonth);
+    await renderBaopheMonthDetail(baopheCurrentThang());
   } catch (err) {
     console.error('Lỗi tải dữ liệu chi phí báo phế:', err);
   }
