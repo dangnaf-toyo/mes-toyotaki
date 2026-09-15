@@ -1483,28 +1483,41 @@ async function renderBaopheMonthDetail(thang){
     }
   }));
 
-  // ---- top 5 mã theo tổng chi phí báo phế, mỗi mã 1 dòng, cột = từng công đoạn + tổng cộng ----
-  const byMaCongDoan = {}; // ma -> {congDoan -> tien}
-  const congDoanSet = [];
+  // ---- top 5 mã theo tổng chi phí báo phế, mỗi mã 1 dòng, cột = công đoạn cố định + tổng số ----
+  // Tên công đoạn trong dữ liệu thô thay đổi cách viết theo từng tháng (vd "Đúc+Bavia+
+  // Đánh bòng" vs "Đúc+Bavia"), nên gộp về 5 nhóm cố định theo thứ tự quy trình thực tế;
+  // công đoạn không khớp nhóm nào (vd "Đúc+gia công ngoài", "Chi phí lọc hàng lỗi...")
+  // vẫn được cộng vào cột Tổng số, chỉ không có cột riêng.
+  const CONG_DOAN_ORDER = ['Đúc', 'Đúc+Bavia', 'Đúc+Bavia+Gia Công', 'Đúc+Bavia+Gia Công+Sơn', 'Khách hàng trả về'];
+  function classifyCongDoan(cd){
+    if (cd === 'Đúc') return 'Đúc';
+    if (cd.includes('Sơn')) return 'Đúc+Bavia+Gia Công+Sơn';
+    if (cd.includes('Gia Công')) return 'Đúc+Bavia+Gia Công';
+    if (cd.includes('Bavia')) return 'Đúc+Bavia';
+    if (cd.trim().toLowerCase() === 'khách hàng trả về') return 'Khách hàng trả về';
+    return null;
+  }
+  const byMaCongDoan = {}; // ma -> {nhóm cố định -> tien}
   detail.forEach(r => {
     if (!(r.thanh_tien > 0)) return;
-    if (!congDoanSet.includes(r.cong_doan)) congDoanSet.push(r.cong_doan);
+    const nhom = classifyCongDoan(r.cong_doan);
+    if (!nhom) return;
     const m = (byMaCongDoan[r.ma_san_pham] = byMaCongDoan[r.ma_san_pham] || {});
-    m[r.cong_doan] = (m[r.cong_doan] || 0) + r.thanh_tien;
+    m[nhom] = (m[nhom] || 0) + r.thanh_tien;
   });
   const top5Ma = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   document.getElementById('baopheTop5Desc').textContent = `Tháng ${baopheMonthLabel(thang)}`;
   document.getElementById('baopheTop5Head').innerHTML =
-    `<th>Mã sản phẩm</th>${congDoanSet.map(cd => `<th>${cd}</th>`).join('')}<th>Tổng cộng</th>`;
+    `<th>Mã sản phẩm</th>${CONG_DOAN_ORDER.map(cd => `<th>${cd}</th>`).join('')}<th>Tổng số</th>`;
   const tbody = document.querySelector('#baopheTop5Table tbody');
   tbody.innerHTML = top5Ma.length ? top5Ma.map(([ma, total]) => {
-    const cells = congDoanSet.map(cd => {
+    const cells = CONG_DOAN_ORDER.map(cd => {
       const v = (byMaCongDoan[ma] || {})[cd];
       return v ? `<td>${fmtVND(v)}</td>` : `<td class="cell-blank">–</td>`;
     });
     return `<tr><td style="text-align:left;font-weight:600;white-space:nowrap;">${ma}</td>${cells.join('')}<td style="font-weight:700;">${fmtVND(total)}</td></tr>`;
-  }).join('') : `<tr><td colspan="${congDoanSet.length + 2}" class="cell-blank">Không có dữ liệu chi phí báo phế trong tháng này.</td></tr>`;
+  }).join('') : `<tr><td colspan="${CONG_DOAN_ORDER.length + 2}" class="cell-blank">Không có dữ liệu chi phí báo phế trong tháng này.</td></tr>`;
 }
 
 async function loadBaoPheData(){
