@@ -183,11 +183,11 @@
       <div class="title">Dashboard KPI Chất Lượng</div>
     </div>
     <nav class="tabs">
-      <button class="tab-btn" data-tab="baophe">Chi phí phế phẩm</button>
       <button class="tab-btn active" data-tab="overview">Tổng quan</button>
       <button class="tab-btn" data-tab="process">Theo công đoạn</button>
       <button class="tab-btn" data-tab="customer">Theo khách hàng</button>
       <button class="tab-btn" data-tab="batthuong">Bất thường chất lượng</button>
+      <button class="tab-btn" data-tab="baophe">Chi phí phế phẩm</button>
       <button class="tab-btn" data-tab="nglan1">Tỷ lệ NG lần 1</button>
     </nav>
     <div class="top-actions" style="display:flex;gap:8px">
@@ -216,8 +216,10 @@
 
     <div class="panel">
       <div class="panel-head"><h3>Chi phí báo phế theo tháng</h3></div>
-      <p class="desc">Cột: tổng chi phí báo phế trong tháng (VND) · Đường: tỷ lệ % chi phí báo phế / doanh thu · nét đứt: mục tiêu</p>
-      <canvas id="chartBaoPheThang" height="110"></canvas>
+      <p class="desc">Cột: tổng chi phí báo phế trong tháng (VND) · Đường: tỷ lệ % chi phí báo phế / doanh thu · nét đứt: mục tiêu · Tháng 1–Tháng 12, tháng chưa có dữ liệu để trống</p>
+      <div style="max-width:820px;">
+        <canvas id="chartBaoPheThang" height="110"></canvas>
+      </div>
     </div>
 
     <div class="panel">
@@ -228,14 +230,18 @@
           <select id="baopheMonthSelect" style="border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;background:#fff;color:var(--ink);"></select>
         </div>
       </div>
-      <p class="desc">Sắp xếp giảm dần theo tổng chi phí báo phế (tổng các công đoạn) · tối đa 20 mã cao nhất</p>
-      <canvas id="chartBaoPheMa" height="230"></canvas>
+      <p class="desc">Sắp xếp giảm dần theo tổng chi phí báo phế (tổng các công đoạn) · tất cả mã có phát sinh chi phí</p>
+      <div id="baopheMaWrap" style="overflow-x:hidden;">
+        <canvas id="chartBaoPheMa"></canvas>
+      </div>
     </div>
 
     <div class="panel">
       <h3>Top 5 mã có chi phí báo phế lớn nhất theo từng công đoạn</h3>
       <p class="desc" id="baopheTop5Desc">&nbsp;</p>
-      <div class="grid-3" id="baopheTop5Grid"></div>
+      <div style="overflow-x:auto;">
+        <table id="baopheTop5Table"><thead><tr><th>Công đoạn</th><th>#1</th><th>#2</th><th>#3</th><th>#4</th><th>#5</th></tr></thead><tbody></tbody></table>
+      </div>
     </div>
 
   </section>
@@ -1392,10 +1398,6 @@ function renderBaophKpiRow(row){
       <div class="big">${fmtVND(row.tong_chi_phi)}</div>
     </div>
     <div class="kpi">
-      <div class="eyebrow">Tổng doanh thu · ${baopheMonthLabel(row.thang)}</div>
-      <div class="big">${fmtVND(row.tong_doanh_thu)}</div>
-    </div>
-    <div class="kpi">
       <div class="eyebrow">Tỷ lệ báo phế / doanh thu</div>
       <div class="big">${rate == null ? '–' : rate.toFixed(2).replace('.', ',') + '%'}</div>
       <div class="sub">${target == null ? '' : `Mục tiêu ${target.toFixed(2).replace('.', ',')}%`}</div>
@@ -1407,17 +1409,23 @@ function renderBaophKpiRow(row){
 }
 
 function renderBaopheThangChart(){
-  const rows = baopheThangRows.slice().sort((a, b) => a.thang.localeCompare(b.thang));
-  const labels = rows.map(r => baopheMonthLabel(r.thang));
-  const chiPhi = rows.map(r => r.tong_chi_phi);
-  const tyLe = rows.map(r => (r.tong_chi_phi != null && r.tong_doanh_thu) ? (r.tong_chi_phi / r.tong_doanh_thu * 100) : null);
-  const mucTieu = rows.find(r => r.muc_tieu != null);
-  const targetData = mucTieu ? rows.map(() => mucTieu.muc_tieu * 100) : null;
+  const byMonth = {};
+  baopheThangRows.forEach(r => { byMonth[r.thang] = r; });
+  const year = baopheThangRows.length ? baopheThangRows[0].thang.slice(0, 4) : new Date().getFullYear();
+  const monthKeys = Array.from({length: 12}, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
+  const labels = monthKeys.map(k => baopheMonthLabel(k));
+  const chiPhi = monthKeys.map(k => byMonth[k] ? byMonth[k].tong_chi_phi : null);
+  const tyLe = monthKeys.map(k => {
+    const r = byMonth[k];
+    return (r && r.tong_chi_phi != null && r.tong_doanh_thu) ? (r.tong_chi_phi / r.tong_doanh_thu * 100) : null;
+  });
+  const mucTieu = baopheThangRows.find(r => r.muc_tieu != null);
+  const targetData = mucTieu ? monthKeys.map(() => mucTieu.muc_tieu * 100) : null;
 
   if (chartsByKey.baophe_thang) chartsByKey.baophe_thang.destroy();
   const datasets = [
-    {label: 'Tổng chi phí báo phế (VND)', data: chiPhi, backgroundColor: palette.bad, yAxisID: 'y', borderRadius: 4},
-    {label: 'Tỷ lệ % / doanh thu', data: tyLe, type: 'line', borderColor: palette.orange, backgroundColor: palette.orange, yAxisID: 'y1', tension: .3, pointRadius: 4, borderWidth: 2.5}
+    {label: 'Tổng chi phí báo phế (VND)', data: chiPhi, backgroundColor: palette.bad, yAxisID: 'y', borderRadius: 4, barPercentage: 0.5, categoryPercentage: 0.6},
+    {label: 'Tỷ lệ % / doanh thu', data: tyLe, type: 'line', borderColor: palette.orange, backgroundColor: palette.orange, yAxisID: 'y1', tension: .3, pointRadius: 4, borderWidth: 2.5, spanGaps: false}
   ];
   if (targetData) datasets.push({label: 'Mục tiêu', data: targetData, type: 'line', yAxisID: 'y1', borderColor: palette.muted, borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false});
   track('baophe_thang', new Chart(document.getElementById('chartBaoPheThang'), {
@@ -1455,13 +1463,15 @@ async function renderBaopheMonthDetail(thang){
     console.error('Lỗi tải chi tiết chi phí báo phế:', err);
   }
 
-  // ---- bar theo mã (tổng các công đoạn), giảm dần, top 20 ----
+  // ---- bar theo mã (tổng các công đoạn), giảm dần, hiển thị tất cả để nhìn tổng thể ----
   const byMa = {};
   detail.forEach(r => { byMa[r.ma_san_pham] = (byMa[r.ma_san_pham] || 0) + (r.thanh_tien || 0); });
-  const maSorted = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  const maSorted = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
 
+  const maCanvas = document.getElementById('chartBaoPheMa');
+  maCanvas.parentElement.style.height = Math.max(230, maSorted.length * 20) + 'px';
   if (chartsByKey.baophe_ma) chartsByKey.baophe_ma.destroy();
-  track('baophe_ma', new Chart(document.getElementById('chartBaoPheMa'), {
+  track('baophe_ma', new Chart(maCanvas, {
     type: 'bar',
     data: {
       labels: maSorted.map(([ma]) => ma),
@@ -1469,12 +1479,13 @@ async function renderBaopheMonthDetail(thang){
     },
     options: {
       indexAxis: 'y',
+      maintainAspectRatio: false,
       plugins: {legend: {display: false}},
       scales: {x: {ticks: {callback: v => (v / 1e6).toLocaleString('vi-VN') + 'tr'}}}
     }
   }));
 
-  // ---- top 5 mã theo từng công đoạn ----
+  // ---- top 5 mã theo từng công đoạn — mỗi công đoạn 1 hàng ngang, 5 mã nằm cạnh nhau ----
   const byCongDoan = {};
   detail.forEach(r => {
     if (!(r.thanh_tien > 0)) return;
@@ -1485,14 +1496,13 @@ async function renderBaopheMonthDetail(thang){
     .sort((a, b) => (b[1][0]?.thanh_tien || 0) - (a[1][0]?.thanh_tien || 0));
 
   document.getElementById('baopheTop5Desc').textContent = `Tháng ${baopheMonthLabel(thang)}`;
-  document.getElementById('baopheTop5Grid').innerHTML = congDoanSorted.length ? congDoanSorted.map(([cd, rows]) => `
-    <div class="panel" style="margin-bottom:0;">
-      <h3 style="font-size:13.5px;">${cd}</h3>
-      <table>
-        <thead><tr><th>Mã sản phẩm</th><th>Chi phí báo phế</th></tr></thead>
-        <tbody>${rows.map(r => `<tr><td>${r.ma_san_pham}</td><td>${fmtVND(r.thanh_tien)}</td></tr>`).join('')}</tbody>
-      </table>
-    </div>`).join('') : '<p class="desc">Không có dữ liệu chi phí báo phế trong tháng này.</p>';
+  const tbody = document.querySelector('#baopheTop5Table tbody');
+  tbody.innerHTML = congDoanSorted.length ? congDoanSorted.map(([cd, rows]) => {
+    const cells = Array.from({length: 5}, (_, i) => rows[i]
+      ? `<td><div style="font-weight:600;">${rows[i].ma_san_pham}</div><div style="color:var(--muted);font-size:11px;">${fmtVND(rows[i].thanh_tien)}</div></td>`
+      : `<td class="cell-blank">–</td>`);
+    return `<tr><td style="text-align:left;font-weight:600;white-space:nowrap;">${cd}</td>${cells.join('')}</tr>`;
+  }).join('') : '<tr><td colspan="6" class="cell-blank">Không có dữ liệu chi phí báo phế trong tháng này.</td></tr>';
 }
 
 document.getElementById('baopheMonthSelect').addEventListener('change', (e) => renderBaopheMonthDetail(e.target.value));
