@@ -183,6 +183,7 @@
       <div class="title">Dashboard KPI Chất Lượng</div>
     </div>
     <nav class="tabs">
+      <button class="tab-btn" data-tab="baophe">Chi phí phế phẩm</button>
       <button class="tab-btn active" data-tab="overview">Tổng quan</button>
       <button class="tab-btn" data-tab="process">Theo công đoạn</button>
       <button class="tab-btn" data-tab="customer">Theo khách hàng</button>
@@ -190,7 +191,7 @@
       <button class="tab-btn" data-tab="nglan1">Tỷ lệ NG lần 1</button>
     </nav>
     <div class="top-actions" style="display:flex;gap:8px">
-      <button type="button" class="btn btn-ghost" id="btnRefresh" onclick="loadData()">🔄 Làm mới</button>
+      <button type="button" class="btn btn-ghost" id="btnRefresh" onclick="loadData(); loadBaoPheData();">🔄 Làm mới</button>
       <button type="button" class="btn btn-ghost" onclick="window.print()">🖨️ In / PDF</button>
     </div>
     <div class="header-clock">
@@ -207,6 +208,37 @@
     <span class="cmt-month-hint">Mỗi tháng có ô comment riêng — đổi tháng để xem lại comment tháng khác (không ảnh hưởng số liệu/biểu đồ).</span>
   </div>
 
+
+  <!-- ================= CHI PHÍ PHẾ PHẨM ================= -->
+  <section class="view" id="baophe">
+
+    <div class="kpi-row" id="baopheKpiRow"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Chi phí báo phế theo tháng</h3></div>
+      <p class="desc">Cột: tổng chi phí báo phế trong tháng (VND) · Đường: tỷ lệ % chi phí báo phế / doanh thu · nét đứt: mục tiêu</p>
+      <canvas id="chartBaoPheThang" height="110"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Chi phí báo phế theo mã sản phẩm</h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:var(--muted);font-weight:600;">Tháng</span>
+          <select id="baopheMonthSelect" style="border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;background:#fff;color:var(--ink);"></select>
+        </div>
+      </div>
+      <p class="desc">Sắp xếp giảm dần theo tổng chi phí báo phế (tổng các công đoạn) · tối đa 20 mã cao nhất</p>
+      <canvas id="chartBaoPheMa" height="230"></canvas>
+    </div>
+
+    <div class="panel">
+      <h3>Top 5 mã có chi phí báo phế lớn nhất theo từng công đoạn</h3>
+      <p class="desc" id="baopheTop5Desc">&nbsp;</p>
+      <div class="grid-3" id="baopheTop5Grid"></div>
+    </div>
+
+  </section>
 
   <!-- ================= OVERVIEW ================= -->
   <section class="view active" id="overview">
@@ -1326,6 +1358,158 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   });
 })();
 
+/* ---------- Tab "Chi phí phế phẩm" ---------- */
+const BAOPHE_THANG_TABLE = 'cl_bao_phe_thang';
+const BAOPHE_CHITIET_TABLE = 'cl_bao_phe_chi_tiet';
+let baopheThangRows = [];
+let baopheSelectedMonth = null;
+let baopheStructureBuilt = false;
+
+function baopheMonthLabel(thang){
+  const [y, m] = thang.split('-');
+  return `T${parseInt(m, 10)}/${y}`;
+}
+function fmtVND(v){
+  return v == null ? '–' : Math.round(v).toLocaleString('vi-VN') + ' đ';
+}
+
+async function fetchBaoPheChiTietForMonth(thang){
+  const url = `${SUPABASE_URL}/rest/v1/${BAOPHE_CHITIET_TABLE}?thang=eq.${encodeURIComponent(thang)}&select=ma_san_pham,cong_doan,thanh_tien`;
+  const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+  if (!res.ok) throw new Error('HTTP ' + res.status + ' fetching ' + BAOPHE_CHITIET_TABLE);
+  return res.json();
+}
+
+function renderBaophKpiRow(row){
+  const el = document.getElementById('baopheKpiRow');
+  if (!row){ el.innerHTML = '<div class="kpi"><div class="eyebrow">Chưa có dữ liệu</div></div>'; return; }
+  const rate = (row.tong_chi_phi != null && row.tong_doanh_thu) ? (row.tong_chi_phi / row.tong_doanh_thu * 100) : null;
+  const target = row.muc_tieu != null ? row.muc_tieu * 100 : null;
+  const ok = rate != null && target != null ? rate <= target : null;
+  el.innerHTML = `
+    <div class="kpi">
+      <div class="eyebrow">Tổng chi phí báo phế · ${baopheMonthLabel(row.thang)}</div>
+      <div class="big">${fmtVND(row.tong_chi_phi)}</div>
+    </div>
+    <div class="kpi">
+      <div class="eyebrow">Tổng doanh thu · ${baopheMonthLabel(row.thang)}</div>
+      <div class="big">${fmtVND(row.tong_doanh_thu)}</div>
+    </div>
+    <div class="kpi">
+      <div class="eyebrow">Tỷ lệ báo phế / doanh thu</div>
+      <div class="big">${rate == null ? '–' : rate.toFixed(2).replace('.', ',') + '%'}</div>
+      <div class="sub">${target == null ? '' : `Mục tiêu ${target.toFixed(2).replace('.', ',')}%`}</div>
+    </div>
+    <div class="kpi">
+      <div class="eyebrow">Đánh giá</div>
+      <div class="big">${ok == null ? '–' : `<span class="pill ${ok ? 'good' : 'bad'}">${ok ? 'Đạt' : 'Không đạt'}</span>`}</div>
+    </div>`;
+}
+
+function renderBaopheThangChart(){
+  const rows = baopheThangRows.slice().sort((a, b) => a.thang.localeCompare(b.thang));
+  const labels = rows.map(r => baopheMonthLabel(r.thang));
+  const chiPhi = rows.map(r => r.tong_chi_phi);
+  const tyLe = rows.map(r => (r.tong_chi_phi != null && r.tong_doanh_thu) ? (r.tong_chi_phi / r.tong_doanh_thu * 100) : null);
+  const mucTieu = rows.find(r => r.muc_tieu != null);
+  const targetData = mucTieu ? rows.map(() => mucTieu.muc_tieu * 100) : null;
+
+  if (chartsByKey.baophe_thang) chartsByKey.baophe_thang.destroy();
+  const datasets = [
+    {label: 'Tổng chi phí báo phế (VND)', data: chiPhi, backgroundColor: palette.bad, yAxisID: 'y', borderRadius: 4},
+    {label: 'Tỷ lệ % / doanh thu', data: tyLe, type: 'line', borderColor: palette.orange, backgroundColor: palette.orange, yAxisID: 'y1', tension: .3, pointRadius: 4, borderWidth: 2.5}
+  ];
+  if (targetData) datasets.push({label: 'Mục tiêu', data: targetData, type: 'line', yAxisID: 'y1', borderColor: palette.muted, borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false});
+  track('baophe_thang', new Chart(document.getElementById('chartBaoPheThang'), {
+    type: 'bar',
+    data: {labels, datasets},
+    options: {
+      plugins: {legend: {position: 'bottom', labels: {boxWidth: 12}}},
+      scales: {
+        y: {position: 'left', title: {display: true, text: 'Chi phí (VND)'}, ticks: {callback: v => (v / 1e6).toLocaleString('vi-VN') + 'tr'}},
+        y1: {position: 'right', title: {display: true, text: 'Tỷ lệ %'}, ticks: {callback: v => v.toFixed ? v.toFixed(2) + '%' : v + '%'}, grid: {drawOnChartArea: false}}
+      }
+    }
+  }));
+}
+
+function renderBaopheMonthSelect(){
+  const sel = document.getElementById('baopheMonthSelect');
+  const months = baopheThangRows.map(r => r.thang).sort();
+  const prev = sel.value;
+  sel.innerHTML = months.map(m => `<option value="${m}">${baopheMonthLabel(m)}</option>`).join('');
+  if (months.includes(prev)) sel.value = prev;
+  else if (!baopheSelectedMonth || !months.includes(baopheSelectedMonth)) baopheSelectedMonth = months[months.length - 1];
+  if (baopheSelectedMonth) sel.value = baopheSelectedMonth;
+}
+
+async function renderBaopheMonthDetail(thang){
+  if (!thang) return;
+  baopheSelectedMonth = thang;
+  renderBaophKpiRow(baopheThangRows.find(r => r.thang === thang));
+
+  let detail = [];
+  try {
+    detail = await fetchBaoPheChiTietForMonth(thang);
+  } catch (err) {
+    console.error('Lỗi tải chi tiết chi phí báo phế:', err);
+  }
+
+  // ---- bar theo mã (tổng các công đoạn), giảm dần, top 20 ----
+  const byMa = {};
+  detail.forEach(r => { byMa[r.ma_san_pham] = (byMa[r.ma_san_pham] || 0) + (r.thanh_tien || 0); });
+  const maSorted = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 20);
+
+  if (chartsByKey.baophe_ma) chartsByKey.baophe_ma.destroy();
+  track('baophe_ma', new Chart(document.getElementById('chartBaoPheMa'), {
+    type: 'bar',
+    data: {
+      labels: maSorted.map(([ma]) => ma),
+      datasets: [{label: 'Chi phí báo phế (VND)', data: maSorted.map(([, v]) => v), backgroundColor: palette.bad, borderRadius: 4}]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: {legend: {display: false}},
+      scales: {x: {ticks: {callback: v => (v / 1e6).toLocaleString('vi-VN') + 'tr'}}}
+    }
+  }));
+
+  // ---- top 5 mã theo từng công đoạn ----
+  const byCongDoan = {};
+  detail.forEach(r => {
+    if (!(r.thanh_tien > 0)) return;
+    (byCongDoan[r.cong_doan] = byCongDoan[r.cong_doan] || []).push(r);
+  });
+  const congDoanSorted = Object.entries(byCongDoan)
+    .map(([cd, rows]) => [cd, rows.sort((a, b) => b.thanh_tien - a.thanh_tien).slice(0, 5)])
+    .sort((a, b) => (b[1][0]?.thanh_tien || 0) - (a[1][0]?.thanh_tien || 0));
+
+  document.getElementById('baopheTop5Desc').textContent = `Tháng ${baopheMonthLabel(thang)}`;
+  document.getElementById('baopheTop5Grid').innerHTML = congDoanSorted.length ? congDoanSorted.map(([cd, rows]) => `
+    <div class="panel" style="margin-bottom:0;">
+      <h3 style="font-size:13.5px;">${cd}</h3>
+      <table>
+        <thead><tr><th>Mã sản phẩm</th><th>Chi phí báo phế</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td>${r.ma_san_pham}</td><td>${fmtVND(r.thanh_tien)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`).join('') : '<p class="desc">Không có dữ liệu chi phí báo phế trong tháng này.</p>';
+}
+
+document.getElementById('baopheMonthSelect').addEventListener('change', (e) => renderBaopheMonthDetail(e.target.value));
+
+async function loadBaoPheData(){
+  if (!isConfigured()) return;
+  try {
+    baopheThangRows = await fetchSupabaseTable(BAOPHE_THANG_TABLE, 'thang,tong_chi_phi,tong_doanh_thu,muc_tieu');
+    if (!baopheThangRows.length) return;
+    renderBaopheThangChart();
+    renderBaopheMonthSelect();
+    await renderBaopheMonthDetail(baopheSelectedMonth);
+  } catch (err) {
+    console.error('Lỗi tải dữ liệu chi phí báo phế:', err);
+  }
+}
+
 /* ---------- Init ---------- */
 function startHeaderClock(){
   function tick(){
@@ -1340,7 +1524,9 @@ startHeaderClock();
 
 renderDashboard(DEMO_DATA);
 loadData();
+loadBaoPheData();
 setInterval(loadData, AUTO_REFRESH_MS);
+setInterval(loadBaoPheData, AUTO_REFRESH_MS);
 
 </script>
 </body>
