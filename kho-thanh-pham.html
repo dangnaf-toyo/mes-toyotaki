@@ -78,6 +78,9 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .stock-group{margin-bottom:10px}
 .stock-group .sp{font-weight:700;font-size:13px}
 .stock-group .tong{color:var(--run-fg);font-weight:700;font-family:'JetBrains Mono',monospace}
+.delivery-status{display:inline-block;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;white-space:nowrap}
+.delivery-status.plan{background:var(--warn-bg);color:var(--warn-fg)}
+.delivery-status.done{background:var(--run-bg);color:var(--run-fg)}
 </style>
 </head>
 <body>
@@ -88,6 +91,8 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
     <button type="button" class="tab-btn active" id="tabBtnNhap">📥 Nhập kho</button>
     <button type="button" class="tab-btn" id="tabBtnXuat">📤 Xuất hàng</button>
     <button type="button" class="tab-btn" id="tabBtnTon">📦 Tồn kho</button>
+    <button type="button" class="tab-btn" id="tabBtnKeHoachGiao">📅 Kế hoạch giao hàng</button>
+    <button type="button" class="tab-btn" id="tabBtnKetQuaGiao">✅ Kết quả giao hàng</button>
   </div>
   <div class="header-clock"><span class="date" id="hdrDate"></span><span class="time" id="hdrTime"></span></div>
 </header>
@@ -154,6 +159,24 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
       <div id="tonList"><div class="empty">Bấm "Tải lại" để xem tồn kho.</div></div>
     </div>
   </div>
+
+  <!-- ================= TAB: KẾ HOẠCH GIAO HÀNG ================= -->
+  <div id="tabKeHoachGiao" style="display:none">
+    <div class="card">
+      <h2>Kế hoạch giao hàng đang thực hiện</h2>
+      <button type="button" class="btn-outline btn" id="btnRefreshKeHoachGiao" style="margin-bottom:12px">🔄 Tải lại</button>
+      <div id="keHoachGiaoList"><div class="empty">Bấm "Tải lại" để xem các phiếu giao hàng đang mở.</div></div>
+    </div>
+  </div>
+
+  <!-- ================= TAB: KẾT QUẢ GIAO HÀNG ================= -->
+  <div id="tabKetQuaGiao" style="display:none">
+    <div class="card">
+      <h2>Kết quả giao hàng</h2>
+      <button type="button" class="btn-outline btn" id="btnRefreshKetQuaGiao" style="margin-bottom:12px">🔄 Tải lại</button>
+      <div id="ketQuaGiaoList"><div class="empty">Bấm "Tải lại" để xem các phiếu đã xuất kho.</div></div>
+    </div>
+  </div>
 </div>
 
 <canvas id="scanCanvas" style="display:none"></canvas>
@@ -211,14 +234,20 @@ function switchTab(tab){
   document.getElementById("tabNhap").style.display = tab === "nhap" ? "" : "none";
   document.getElementById("tabXuat").style.display = tab === "xuat" ? "" : "none";
   document.getElementById("tabTon").style.display = tab === "ton" ? "" : "none";
+  document.getElementById("tabKeHoachGiao").style.display = tab === "ke-hoach-giao" ? "" : "none";
+  document.getElementById("tabKetQuaGiao").style.display = tab === "ket-qua-giao" ? "" : "none";
   document.getElementById("tabBtnNhap").classList.toggle("active", tab === "nhap");
   document.getElementById("tabBtnXuat").classList.toggle("active", tab === "xuat");
   document.getElementById("tabBtnTon").classList.toggle("active", tab === "ton");
+  document.getElementById("tabBtnKeHoachGiao").classList.toggle("active", tab === "ke-hoach-giao");
+  document.getElementById("tabBtnKetQuaGiao").classList.toggle("active", tab === "ket-qua-giao");
   stopCamera();
 }
 document.getElementById("tabBtnNhap").addEventListener("click", () => switchTab("nhap"));
 document.getElementById("tabBtnXuat").addEventListener("click", () => switchTab("xuat"));
 document.getElementById("tabBtnTon").addEventListener("click", () => switchTab("ton"));
+document.getElementById("tabBtnKeHoachGiao").addEventListener("click", () => { switchTab("ke-hoach-giao"); loadGiaoHang("mo"); });
+document.getElementById("tabBtnKetQuaGiao").addEventListener("click", () => { switchTab("ket-qua-giao"); loadGiaoHang("da_xuat"); });
 
 /* ---------- Camera QR (dùng chung, đích xử lý phụ thuộc scanTarget) ------- */
 let html5QrCode = null;
@@ -430,6 +459,53 @@ async function loadTonKho(){
       </div>
     </div>`).join("") +
     '<p style="font-size:11px;color:var(--text-dim);margin-top:8px">' + pallets.length + ' pallet đã nhập kho, ' + temTags.length + ' tem lẻ đang trong kho.</p>';
+}
+
+/* ================= GIAO HÀNG ================= */
+document.getElementById("btnRefreshKeHoachGiao").addEventListener("click", () => loadGiaoHang("mo"));
+document.getElementById("btnRefreshKetQuaGiao").addEventListener("click", () => loadGiaoHang("da_xuat"));
+
+function fmtDateTime(value){
+  if (!value) return "—";
+  return new Date(value).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" });
+}
+
+async function loadGiaoHang(trangThai){
+  const isPlan = trangThai === "mo";
+  const el = document.getElementById(isPlan ? "keHoachGiaoList" : "ketQuaGiaoList");
+  el.innerHTML = '<div class="empty">Đang tải...</div>';
+  const { data: phieu, error } = await sb.from("kho_phieu_xuat")
+    .select("id_phieu,ngay,khach_hang,so_don_hang,nguoi_xuat,thoi_diem_tao,thoi_diem_dong")
+    .eq("trang_thai", trangThai)
+    .order(isPlan ? "thoi_diem_tao" : "thoi_diem_dong", { ascending: false });
+  if (error){ el.innerHTML = '<div class="empty">Lỗi tải dữ liệu: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!phieu || !phieu.length){
+    el.innerHTML = '<div class="empty">' + (isPlan ? "Chưa có kế hoạch giao hàng đang mở." : "Chưa có kết quả giao hàng.") + '</div>';
+    return;
+  }
+
+  const ids = phieu.map(p => p.id_phieu);
+  const { data: items, error: itemError } = await sb.from("kho_phieu_xuat_item")
+    .select("id_phieu,so_luong").in("id_phieu", ids);
+  if (itemError){ el.innerHTML = '<div class="empty">Lỗi tải chi tiết: ' + escapeHtml(itemError.message) + '</div>'; return; }
+  const totals = {};
+  (items || []).forEach(item => {
+    if (!totals[item.id_phieu]) totals[item.id_phieu] = { muc: 0, sl: 0 };
+    totals[item.id_phieu].muc += 1;
+    totals[item.id_phieu].sl += Number(item.so_luong) || 0;
+  });
+  el.innerHTML = phieu.map(p => {
+    const total = totals[p.id_phieu] || { muc: 0, sl: 0 };
+    const time = isPlan ? p.thoi_diem_tao : p.thoi_diem_dong;
+    return `<div class="item-row">
+      <div>
+        <div class="tag">${escapeHtml(p.id_phieu)} <span class="delivery-status ${isPlan ? "plan" : "done"}">${isPlan ? "Đang lập kế hoạch" : "Đã xuất kho"}</span></div>
+        <div class="meta">${p.khach_hang ? "Khách hàng: " + escapeHtml(p.khach_hang) : "Chưa có khách hàng"}${p.so_don_hang ? " · Đơn hàng: " + escapeHtml(p.so_don_hang) : ""}</div>
+        <div class="meta">${fmtNum(total.muc)} mục · ${fmtNum(total.sl)} sp · ${isPlan ? "Tạo" : "Xuất"}: ${escapeHtml(fmtDateTime(time))}</div>
+      </div>
+      <div class="meta">${p.nguoi_xuat ? escapeHtml(p.nguoi_xuat) : ""}</div>
+    </div>`;
+  }).join("");
 }
 
 </script>
