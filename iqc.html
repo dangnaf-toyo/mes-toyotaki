@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="vi"><head><base target="_top"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TOYOTAKI - IQC</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Segoe UI",sans-serif;background:#eef2f6;color:#172033}.header{background:#1e293b;color:#fff;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}.logo{font-size:20px;font-weight:800}.subtitle{font-size:12px;color:#cbd5e1;margin-top:3px}.header-right{display:flex;align-items:center;gap:10px}.clock{font-size:18px;font-weight:700}.tab{background:#334155;color:#fff;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:700}.tab.active{background:#2563eb}.container{max-width:1700px;margin:18px auto;padding:0 20px}.summary{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}.card,.section{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}.card{padding:16px}.card-title{font-size:13px;color:#64748b}.card-number{font-size:30px;font-weight:800;margin-top:7px}.ok{color:#059669}.ng{color:#dc2626}.waiting{color:#d97706}.section{margin-bottom:18px;overflow:hidden}.section-header{padding:15px 20px;border-bottom:1px solid #e2e8f0;font-size:18px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f8fafc;color:#475569;text-align:left;padding:10px;border-bottom:1px solid #e2e8f0;white-space:nowrap}td{padding:9px;border-bottom:1px solid #e2e8f0;white-space:nowrap}tr:hover{background:#f8fafc}.badge{display:inline-block;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700}.badge-ok{background:#dcfce7;color:#166534}.badge-ng{background:#fee2e2;color:#991b1b}.badge-wait{background:#fef3c7;color:#92400e}.badge-check{background:#dbeafe;color:#1d4ed8}.form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px}.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:12px;font-weight:700;color:#475569}input,select,textarea{color:#172033;background:#fff;font-family:inherit;width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:9px;font-size:14px;outline:none}input:focus,select:focus,textarea:focus{border-color:#2563eb;box-shadow:0 0 0 2px #dbeafe}input[readonly]{background:#f8fafc}.full{grid-column:1/-1}.help{font-size:11px;color:#64748b;line-height:1.4}.actions{padding:0 20px 20px;display:flex;gap:10px}.button{border:0;border-radius:7px;padding:9px 15px;font-weight:700;cursor:pointer}.button:disabled{opacity:.6;cursor:not-allowed}.btn-primary{background:#2563eb;color:#fff}.btn-secondary{background:#e2e8f0;color:#334155}.btn-danger{background:#dc2626;color:#fff}.btn-success{background:#059669;color:#fff}.btn-small{padding:6px 9px;font-size:11px}.hidden{display:none!important}.confirm-line{display:flex;gap:7px}.confirm-line input{flex:1}.confirm-ok{min-width:95px}.confirmed{border-color:#059669!important;background:#f0fdf4!important}.confirm-status{font-size:11px;color:#64748b}.confirm-status.ok{color:#059669}.timer{font-weight:800;color:#d97706}.timer.done{color:#059669}.modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:30}.modal-box{background:#fff;border-radius:14px;width:min(1000px,100%);max-height:92vh;overflow:auto}.modal-head{padding:15px 20px;border-bottom:1px solid #e2e8f0;font-weight:800;display:flex;justify-content:space-between}.modal-body{padding:20px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}.metric{border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;padding:12px}.history-tools{display:flex;gap:10px;padding:16px 20px;border-bottom:1px solid #e2e8f0}.history-tools input{max-width:450px}.clickable{cursor:pointer}.clickable:hover{background:#eff6ff}.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.detail{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px}.detail small{display:block;color:#64748b;margin-bottom:4px}.chart-grid{display:grid;grid-template-columns:300px 1fr;gap:25px;padding:20px}.donut{width:230px;height:230px;border-radius:50%;margin:auto;position:relative;background:conic-gradient(#059669 0deg 180deg,#dc2626 180deg 360deg)}.donut:after{content:"";position:absolute;width:125px;height:125px;background:#fff;border-radius:50%;left:52px;top:52px}.legend{line-height:2;font-size:14px}.bar{height:22px;background:#e2e8f0;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:#dc2626}.search-box{display:flex;gap:10px;padding:16px 20px}.defect-row{border:1px solid #dbe3ec;border-radius:10px;padding:12px;margin-bottom:10px;background:#f8fafc}.defect-row-grid{display:grid;grid-template-columns:1fr 1.2fr 1.1fr .75fr 1.3fr auto;gap:9px;align-items:end}.defect-row label{font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:5px}.defect-summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:12px;margin-top:14px}.pill-total{font-weight:800;margin-bottom:8px}@media(max-width:1000px){.defect-row-grid{grid-template-columns:1fr 1fr 1fr}.defect-row-grid .remove-defect{grid-column:auto}}.note-cell{white-space:normal!important;min-width:180px;max-width:280px}.result-input{background:#f8fafc}.danger-note{color:#b91c1c;font-size:11px;font-weight:700}@media(max-width:1200px){.summary{grid-template-columns:repeat(3,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}.chart-grid{grid-template-columns:1fr}}@media(max-width:700px){.summary{grid-template-columns:repeat(2,1fr)}.form-grid,.two-col,.detail-grid{grid-template-columns:1fr}.header{flex-direction:column;align-items:flex-start;gap:10px}.history-tools{flex-direction:column}.history-tools input{max-width:none}}
+.lot-scroll{max-height:480px;overflow:auto;border-bottom:1px solid #e2e8f0}.lot-scroll thead th{position:sticky;top:0;z-index:3;background:#f8fafc}</style></head><body>
+<div class="header"><div><div class="logo">TOYOTAKI — IQC</div><div class="subtitle">Incoming Quality Control</div></div><div class="header-right"><button class="button btn-secondary btn-small" onclick="loadDashboard()">↻ Làm mới</button><button class="tab active" id="tabIqc" onclick="showPage('iqc')">IQC</button><button class="tab" id="tabStats" onclick="showPage('stats')">📊 Thống kê tháng</button><div class="clock" id="clock"></div></div></div>
+<div class="container" id="pageIqc">
+<div class="summary"><div class="card"><div class="card-title">Tổng số LOT</div><div class="card-number" id="total">0</div></div><div class="card"><div class="card-title">Chờ kiểm</div><div class="card-number waiting" id="waiting">0</div></div><div class="card"><div class="card-title">Đang kiểm</div><div class="card-number" id="checking">0</div></div><div class="card"><div class="card-title">Đã kiểm</div><div class="card-number" id="done">0</div></div><div class="card"><div class="card-title">OK</div><div class="card-number ok" id="ok">0</div></div><div class="card"><div class="card-title">NG</div><div class="card-number ng" id="ng">0</div></div></div>
+<div class="section"><div class="section-header"><span>Lịch sử kiểm tra theo mã / tên sản phẩm</span></div><div class="history-tools"><input id="historyProductCode" placeholder="Nhập mã hoặc tên sản phẩm, ví dụ FSL140K hoặc Handle..."><button class="button btn-primary" onclick="searchHistory()">Tìm kiếm</button><button class="button btn-secondary" onclick="clearHistory()">Xóa</button></div><div class="table-wrap"><table><thead><tr><th>Ngày nhận</th><th>Ngày lấy</th><th>Ngày hoàn thành</th><th>Mã SP</th><th>Tên SP</th><th>LOT</th><th>SL LOT</th><th>Tiêu chuẩn</th><th>Rút kiểm</th><th>KQ</th><th>Thời gian</th></tr></thead><tbody id="historyTable"><tr><td colspan="11" style="text-align:center;color:#64748b">Nhập mã hoặc tên sản phẩm để tìm.</td></tr></tbody></table></div></div>
+<div class="section"><div class="section-header"><span>Giám sát hàng IQC đầu vào</span><div><button class="button btn-danger" onclick="openDefect()">+ Nhập lỗi</button> <button class="button btn-primary" onclick="newLot()">+ Nhập LOT IQC</button></div></div><div class="table-wrap lot-scroll"><table><thead><tr><th>Ngày nhận</th><th>Ngày lấy</th><th>NCC</th><th>Mã SP</th><th>Tên SP</th><th>LOT</th><th>SL LOT</th><th>Tiêu chuẩn</th><th>Rút kiểm</th><th>AQL</th><th>Vị trí</th><th>Trạng thái</th><th>Thời gian</th><th>KQ</th><th>OK</th><th>NG</th><th>% OK</th><th>% NG</th><th class="note-cell">Ghi chú</th><th>Thao tác</th></tr></thead><tbody id="lotTable"></tbody></table></div></div>
+<div class="section" id="formSection"><div class="section-header"><span id="formTitle">Nhập thông tin LOT IQC</span><button class="button btn-secondary btn-small" onclick="resetForm()">Làm mới</button></div><div class="help" style="padding:10px 20px;background:#f8fafc">General Inspection Level II: cỡ mẫu được tính tự động theo kích thước LOT. Mức AQL được lưu theo LOT; hệ thống hiện chưa tự tính Ac/Re, vì vậy quyết định OK/NG vẫn theo tiêu chuẩn kiểm tra đang áp dụng.</div><form id="lotForm"><div class="form-grid">
+<div class="field"><label>Ngày + giờ nhận hàng</label><div class="confirm-line"><input type="datetime-local" id="receivedDate" required><button type="button" class="button btn-success confirm-ok" onclick="confirmDate('receivedDate','receivedConfirm')">✓ Xác nhận</button></div><div id="receivedConfirm" class="confirm-status">Chưa xác nhận</div></div>
+<div class="field"><label>Ngày + giờ bắt đầu kiểm (không bắt buộc khi tạo đơn)</label><div class="confirm-line"><input type="datetime-local" id="pickupDate"><button type="button" class="button btn-success confirm-ok" onclick="confirmDate('pickupDate','pickupConfirm')">✓ Xác nhận</button></div><div id="pickupConfirm" class="confirm-status">Chưa bắt đầu kiểm</div><div class="help">Có thể để trống khi tạo LOT. Chỉ khi nhập và xác nhận thời gian bắt đầu kiểm thì bộ đếm mới chạy.</div></div>
+<div class="field"><label>Ngày + giờ hoàn thành kiểm tra</label><div class="confirm-line"><input type="datetime-local" id="completionDate"><button type="button" class="button btn-success confirm-ok" onclick="confirmDate('completionDate','completionConfirm')">✓ Xác nhận</button></div><div id="completionConfirm" class="confirm-status">Chưa hoàn thành</div></div>
+<div class="field"><label>Nhà cung cấp <span style="color:#dc2626">*</span></label><input id="supplier" required></div><div class="field"><label>Mã sản phẩm <span style="color:#dc2626">*</span></label><input id="productCode" required></div><div class="field"><label>Tên sản phẩm</label><input id="productName"></div><div class="field"><label>Số LOT <span style="color:#dc2626">*</span></label><input id="lotNo" required></div><div class="field"><label>Số lượng LOT <span style="color:#dc2626">*</span></label><input type="number" id="lotQty" min="1" step="1" required></div>
+<div class="field"><label>Tiêu chuẩn kiểm tra <span style="color:#dc2626">*</span></label><select id="inspectionType" required><option value="">-- Chọn tiêu chuẩn --</option><option>Kiểm tra N5</option><option>Kiểm tra 100%</option><option>Kiểm tra AQL</option></select></div>
+<div class="field hidden" id="aqlField"><label>Chọn AQL</label><select id="aql"><option value="">-- Chọn AQL --</option><option>0.65</option><option>1.0</option><option>1.5</option><option>2.5</option><option>4.0</option><option>6.5</option></select><div id="aqlInfo" class="help"></div></div>
+<div class="field"><label>Số lượng rút kiểm</label><input type="number" id="sampleQty" readonly><div id="sampleInfo" class="help"></div></div><div class="field"><label>Vị trí hàng</label><select id="location"><option>Kho</option><option>IQC</option><option>Đã trả</option></select></div><div class="field"><label>Trạng thái kiểm</label><select id="status"><option>Chưa lấy hàng</option><option>Đang chờ kiểm</option><option>Đang kiểm tra</option><option>Đã kiểm tra</option></select></div>
+<div class="field" id="resultField"><label>Kết quả</label><select id="result"><option value="">Chưa có</option><option>OK</option><option>NG</option></select></div>
+<div class="field hidden" id="okQtyField"><label>Số lượng OK</label><input type="number" id="okQty" min="0" value="0"></div><div class="field hidden" id="ngQtyField"><label>Số lượng NG</label><input type="number" id="ngQty" min="0" value="0"></div><div class="field hidden" id="okPctField"><label>Tỷ lệ OK</label><input id="okPct" class="result-input" readonly></div><div class="field hidden" id="ngPctField"><label>Tỷ lệ NG</label><input id="ngPct" class="result-input" readonly></div>
+<div class="field"><label>Người kiểm <span style="color:#dc2626">*</span></label><input id="inspector" required placeholder="Nhập tên người kiểm"></div><div class="field full"><label>Ghi chú</label><textarea id="note" rows="3"></textarea></div>
+</div><div class="actions"><button class="button btn-primary" id="saveBtn">Lưu LOT</button><button type="button" class="button btn-secondary" onclick="resetForm()">Hủy</button></div></form></div>
+<div class="section"><div class="section-header"><span>Danh sách lỗi IQC</span><button class="button btn-danger" onclick="openDefect()">+ Nhập lỗi</button></div><div id="defectOverview" class="defect-summary" style="margin:12px 20px"></div><div class="table-wrap"><table><thead><tr><th>LOT</th><th>Loại NG</th><th>Chi tiết lỗi</th><th>Số lượng lỗi</th><th>% NG</th><th>Tổng lỗi LOT</th><th>Ảnh</th><th>Thời gian</th><th>Thao tác</th></tr></thead><tbody id="defectTable"></tbody></table></div></div>
+</div>
+
+<div class="container hidden" id="pageStats"><div class="summary" style="margin-bottom:14px">
+<div class="card"><div class="card-title">LOT trong tháng</div><div class="card-number" id="statTotalLots">0</div></div>
+<div class="card"><div class="card-title">Tổng SL LOT</div><div class="card-number" id="statLotQty">0</div></div>
+<div class="card"><div class="card-title">Tổng rút kiểm</div><div class="card-number" id="statSampleQty">0</div></div>
+<div class="card"><div class="card-title">OK LOT</div><div class="card-number ok" id="statOkLots">0</div></div>
+<div class="card"><div class="card-title">NG LOT</div><div class="card-number ng" id="statNgLots">0</div></div>
+<div class="card"><div class="card-title">Chưa có KQ</div><div class="card-number waiting" id="statPendingLots">0</div></div>
+</div><div class="section"><div class="section-header"><span>📊 THỐNG KÊ THEO THÁNG <small id="statsRefreshAt" style="font-size:11px;color:#64748b;margin-left:8px"></small></span><div><input type="month" id="statsMonth"><button class="button btn-primary" onclick="loadStats()">Làm mới ngay</button></div></div><div class="chart-grid"><div><div class="donut" id="donut"></div><div class="legend" id="legend" style="margin-top:15px"></div></div><div><h3>Tỷ lệ LOT OK / NG</h3><div class="table-wrap"><table><thead><tr><th>Tháng</th><th>Mã SP</th><th>Tên SP</th><th>Số LOT</th><th>SL LOT</th><th>Rút kiểm</th><th>OK LOT</th><th>NG LOT</th><th>% OK</th><th>% NG</th></tr></thead><tbody id="statsTable"></tbody></table></div></div></div></div><div class="section"><div class="section-header"><span>📈 Thống kê lỗi theo tháng</span></div><div style="padding:20px" id="defectStats"></div></div></div>
+
+<div class="modal hidden" id="completeModal"><div class="modal-box" style="max-width:720px"><div class="modal-head"><span>✅ Hoàn thành kiểm tra</span><button class="button btn-secondary btn-small" onclick="closeComplete()">Đóng</button></div><div class="modal-body"><div id="completeHint" class="help"></div><div class="field"><label>Ngày + giờ hoàn thành kiểm tra</label><div class="confirm-line"><input type="datetime-local" id="completeAt" required><button type="button" class="button btn-success confirm-ok" onclick="confirmDate('completeAt','completeConfirm')">✓ Xác nhận</button></div><div id="completeConfirm" class="confirm-status">Chưa xác nhận</div></div><br><div id="completeNormal"><div class="field"><label>Kết quả</label><select id="completeResult"><option>OK</option><option>NG</option></select></div></div><div id="complete100" class="hidden"><div class="two-col"><div class="field"><label>Số lượng OK</label><input type="number" id="completeOkQty" min="0"></div><div class="field"><label>Số lượng NG</label><input type="number" id="completeNgQty" min="0"></div></div><br><div class="two-col"><div class="metric">Tỷ lệ OK: <b id="completeOkPct">0.00%</b></div><div class="metric">Tỷ lệ NG: <b id="completeNgPct">0.00%</b></div></div><br><div class="field"><label>Kết quả</label><select id="completeResult100"><option>OK</option><option>NG</option></select></div></div><br><div class="field"><label>Người kiểm <span style="color:#dc2626">*</span></label><input id="completeInspector" required></div><br><div class="field"><label>Ghi chú</label><textarea id="completeNote"></textarea></div><br><button class="button btn-success" onclick="saveComplete()">Xác nhận hoàn thành kiểm tra</button></div></div></div>
+
+<div class="modal hidden" id="defectModal"><div class="modal-box" style="max-width:1050px"><div class="modal-head"><span id="defectModalTitle">📝 Nhập lỗi IQC</span><button class="button btn-secondary btn-small" onclick="closeDefect()">Đóng</button></div><div class="modal-body"><div class="field"><label>LOT</label><select id="defectLot"></select></div><div class="help" style="margin:8px 0 14px">Một LOT có thể có nhiều loại lỗi. Mỗi dòng là <b>1 loại lỗi + số lượng lỗi</b>. Bấm <b>＋ Thêm lỗi</b> để nhập 5 loại, 10 loại... Khi bấm <b>Sửa</b> ở danh sách, cửa sổ này sẽ tải <b>toàn bộ lỗi đã lưu của LOT</b> để sửa/thêm tiếp.</div><div id="defectRows"></div><div id="defectRowCount" class="help" style="margin-top:8px;font-weight:700"></div><div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="button btn-secondary" onclick="addDefectRow()">＋ Thêm lỗi</button><button type="button" class="button btn-danger" onclick="saveDefects()">Lưu lỗi</button></div></div></div></div>
+
+<div class="modal hidden" id="detailModal"><div class="modal-box"><div class="modal-head"><span id="detailTitle">Chi tiết LOT</span><button class="button btn-secondary btn-small" onclick="closeDetail()">Đóng</button></div><div class="modal-body" id="detailBody"></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+(function () {
+  const safeRows = (rows) => Array.isArray(rows) ? rows : [];
+  const toLocalDateTime = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const off = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - off * 60000);
+    return local.toISOString().slice(0, 16);
+  };
+  const toIso = (value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString();
+  };
+  const toNumber = (value, fallback = 0) => {
+    const n = Number(value ?? fallback);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const formatDisplayDate = (value) => {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  };
+
+  const normalizeLot = (row = {}) => ({
+    id: row.id,
+    receivedDate: toLocalDateTime(row.received_at),
+    pickupDate: toLocalDateTime(row.pickup_at),
+    completionDate: toLocalDateTime(row.completed_at),
+    supplier: row.supplier || '',
+    productCode: row.product_code || '',
+    productName: row.product_name || '',
+    lotNo: row.lot_no || '',
+    lotQty: toNumber(row.lot_qty),
+    inspectionType: row.inspection_type || 'Kiểm tra AQL',
+    aql: row.aql || '',
+    sampleQty: toNumber(row.sample_qty),
+    location: row.location || 'Kho',
+    status: row.status || 'Chưa lấy hàng',
+    result: row.result || '',
+    okQty: toNumber(row.ok_qty),
+    ngQty: toNumber(row.ng_qty),
+    okPercent: toNumber(row.ok_pct),
+    ngPercent: toNumber(row.ng_pct),
+    inspector: row.inspector || '',
+    note: row.note || '',
+    receivedInput: toLocalDateTime(row.received_at),
+    pickupInput: toLocalDateTime(row.pickup_at),
+    completionInput: toLocalDateTime(row.completed_at),
+    inspectionMinutes: toNumber(row.inspection_minutes),
+    startMs: row.pickup_at ? new Date(row.pickup_at).getTime() : null,
+    completedMs: row.completed_at ? new Date(row.completed_at).getTime() : null,
+  });
+
+  const normalizeDefect = (row = {}, lotMap = new Map()) => ({
+    id: row.id,
+    lotId: row.lot_id,
+    lotNo: lotMap.get(row.lot_id)?.lotNo || '',
+    defectType: row.defect_type || 'NG khác',
+    defectName: row.defect_name || '',
+    defectQty: toNumber(row.defect_qty),
+    defectPercent: toNumber(row.defect_percent),
+    note: row.note || '',
+    images: row.images || '',
+    time: formatDisplayDate(row.created_at),
+  });
+
+  const computeSampleQty = (lotQty, aql) => {
+    const q = Math.max(1, toNumber(lotQty, 0));
+    if (q <= 8) return 8;
+    if (q <= 15) return 13;
+    if (q <= 25) return 20;
+    if (q <= 50) return 32;
+    if (q <= 90) return 50;
+    if (q <= 150) return 80;
+    if (q <= 280) return 125;
+    if (q <= 500) return 200;
+    if (q <= 1200) return 315;
+    if (q <= 3200) return 500;
+    if (q <= 10000) return 800;
+    if (q <= 35000) return 1250;
+    if (q <= 150000) return 2000;
+    return 3150;
+  };
+
+  const normalizePayload = (data = {}) => {
+    const lotQty = toNumber(data.lotQty ?? data.lot_qty, 0);
+    const okQty = toNumber(data.okQty ?? data.ok_qty, 0);
+    const ngQty = toNumber(data.ngQty ?? data.ng_qty, 0);
+    const sampleQty = toNumber(data.sampleQty ?? data.sample_qty, computeSampleQty(lotQty, data.aql || ''));
+    const receivedAt = toIso(data.receivedDate ?? data.received_at);
+    const pickupAt = toIso(data.pickupDate ?? data.pickup_at);
+    const completedAt = toIso(data.completionDate ?? data.completed_at);
+
+    const inspectionMinutes = (() => {
+      if (pickupAt && completedAt) {
+        const diff = Math.max(0, (new Date(completedAt).getTime() - new Date(pickupAt).getTime()) / 60000);
+        return Math.round(diff);
+      }
+      return toNumber(data.inspectionMinutes ?? data.inspection_minutes, 0);
+    })();
+
+    return {
+      received_at: receivedAt,
+      pickup_at: pickupAt,
+      completed_at: completedAt,
+      supplier: String(data.supplier || '').trim(),
+      product_code: String(data.productCode || data.product_code || '').trim(),
+      product_name: String(data.productName || data.product_name || '').trim(),
+      lot_no: String(data.lotNo || data.lot_no || '').trim(),
+      lot_qty: lotQty,
+      inspection_type: String(data.inspectionType || data.inspection_type || 'Kiểm tra AQL').trim(),
+      aql: String(data.aql || '').trim(),
+      sample_qty: sampleQty,
+      location: String(data.location || 'Kho').trim(),
+      status: String(data.status || 'Chưa lấy hàng').trim(),
+      result: String(data.result || '').trim(),
+      ok_qty: okQty,
+      ng_qty: ngQty,
+      ok_pct: lotQty ? (okQty / lotQty) * 100 : 0,
+      ng_pct: lotQty ? (ngQty / lotQty) * 100 : 0,
+      inspector: String(data.inspector || '').trim(),
+      note: String(data.note || '').trim(),
+      inspection_minutes: inspectionMinutes,
+    };
+  };
+
+  const requireAuth = async () => {
+    const session = await MesAuth.getSession();
+    if (!session) {
+      const returnTo = encodeURIComponent(window.location.href);
+      window.location.href = 'shared/login.html?returnTo=' + returnTo;
+      throw new Error('Chưa đăng nhập');
+    }
+    return session;
+  };
+
+  const readLots = async () => {
+    try {
+      const { data, error } = await sb.from('iqc_lots').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return safeRows(data).map(normalizeLot);
+    } catch (err) {
+      console.warn('iqc_lots not ready:', err.message || err);
+      throw err;
+    }
+  };
+
+  const readDefects = async () => {
+    try {
+      const { data, error } = await sb.from('iqc_defects').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return safeRows(data);
+    } catch (err) {
+      console.warn('iqc_defects not ready:', err.message || err);
+      throw err;
+    }
+  };
+
+  const IqcApi = {
+    async getDashboardData() {
+      const lots = await readLots();
+      const defectsData = await readDefects();
+      const lotMap = new Map(lots.map((lot) => [lot.id, lot]));
+      const defects = defectsData.map((row) => normalizeDefect(row, lotMap));
+
+      return {
+        summary: {
+          total: lots.length,
+          waiting: lots.filter((lot) => ['Chưa lấy hàng', 'Đang chờ kiểm'].includes(lot.status)).length,
+          checking: lots.filter((lot) => lot.status === 'Đang kiểm tra').length,
+          done: lots.filter((lot) => lot.status === 'Đã kiểm tra').length,
+          ok: lots.filter((lot) => lot.result === 'OK').length,
+          ng: lots.filter((lot) => lot.result === 'NG').length,
+        },
+        lots,
+        defects,
+      };
+    },
+
+    async getAqlInfo(qty, aql) {
+      return { sample: computeSampleQty(qty, aql), code: 'L2' };
+    },
+
+    async getAppearanceDefects() {
+      try {
+        const { data, error } = await sb.from('quality_defect_catalog').select('label').contains('processes', ['IQC']).eq('defect_group', 'NG ngoại quan').eq('is_active', true).order('sort_order', { ascending: true });
+        if (error) throw error;
+        return safeRows(data).map((row) => row.label).filter(Boolean);
+      } catch (err) {
+        return ['Mặt xước', 'Màu lệch', 'Kích thước lệch', 'Rãnh/co ngót', 'Rỉ sét', 'Vết bẩn', 'Khác'];
+      }
+    },
+
+    async getLot(id) {
+      try {
+        const { data, error } = await sb.from('iqc_lots').select('*').eq('id', id).single();
+        if (error) throw error;
+        return normalizeLot(data);
+      } catch (err) {
+        throw new Error('Không tìm thấy LOT hoặc bảng IQC chưa được tạo: ' + (err.message || err));
+      }
+    },
+
+    async addLot(data) {
+      await requireAuth();
+      const row = normalizePayload(data);
+      const { data: inserted, error } = await sb.from('iqc_lots').insert([row]).select('*').single();
+      if (error) throw error;
+      return inserted;
+    },
+
+    async updateLot(id, data) {
+      await requireAuth();
+      const row = normalizePayload(data);
+      const { data: updated, error } = await sb.from('iqc_lots').update(row).eq('id', id).select('*').single();
+      if (error) throw error;
+      return updated;
+    },
+
+    async deleteLot(id) {
+      await requireAuth();
+      const { error } = await sb.from('iqc_lots').delete().eq('id', id);
+      if (error) throw error;
+      return { ok: true };
+    },
+
+    async completeLot(id, payload) {
+      await requireAuth();
+      const lot = await this.getLot(id);
+      const row = normalizePayload({ ...lot, ...payload });
+      const { data, error } = await sb.from('iqc_lots').update({
+        completed_at: row.completed_at,
+        result: row.result || 'OK',
+        ok_qty: row.ok_qty,
+        ng_qty: row.ng_qty,
+        ok_pct: row.ok_pct,
+        ng_pct: row.ng_pct,
+        inspector: row.inspector,
+        note: row.note,
+        status: 'Đã kiểm tra',
+        inspection_minutes: row.inspection_minutes,
+      }).eq('id', id).select('*').single();
+      if (error) throw error;
+      return { minutes: toNumber(data.inspection_minutes, 0), result: data.result || 'OK' };
+    },
+
+    async deleteDefect(id) {
+      await requireAuth();
+      const { error } = await sb.from('iqc_defects').delete().eq('id', id);
+      if (error) throw error;
+      return { ok: true };
+    },
+
+    async replaceLotDefects(lotId, itemsJson) {
+      await requireAuth();
+      const items = JSON.parse(itemsJson || '[]');
+      const { error: delErr } = await sb.from('iqc_defects').delete().eq('lot_id', lotId);
+      if (delErr) throw delErr;
+      const rows = items.map((item) => ({
+        lot_id: lotId,
+        defect_type: item.defectType || 'NG khác',
+        defect_name: item.defectName || '',
+        defect_qty: toNumber(item.defectQty, 0),
+        note: item.note || '',
+        images: item.images || '',
+      }));
+      if (rows.length) {
+        const { error: insErr } = await sb.from('iqc_defects').insert(rows);
+        if (insErr) throw insErr;
+      }
+      return {
+        expectedCount: rows.length,
+        actualCount: rows.length,
+        totalQty: rows.reduce((sum, row) => sum + toNumber(row.defect_qty, 0), 0),
+      };
+    },
+
+    async uploadImage(dataUrl, name, type) {
+      return { url: dataUrl, name, type };
+    },
+
+    async searchLotHistory(key) {
+      const term = String(key || '').trim();
+      try {
+        let query = sb.from('iqc_lots').select('*');
+        if (term) {
+          query = query.or(`product_code.ilike.%${term}%,product_name.ilike.%${term}%,lot_no.ilike.%${term}%`);
+        }
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error) throw error;
+        return safeRows(data).map(normalizeLot);
+      } catch (err) {
+        console.warn('searchLotHistory fallback:', err.message || err);
+        return [];
+      }
+    },
+
+    async getLotDetails(id) {
+      try {
+        const [lotRes, defectsRes] = await Promise.all([
+          sb.from('iqc_lots').select('*').eq('id', id).single(),
+          sb.from('iqc_defects').select('*').eq('lot_id', id).order('created_at', { ascending: true }),
+        ]);
+        if (lotRes.error) throw lotRes.error;
+        if (defectsRes.error) throw defectsRes.error;
+
+        const lot = normalizeLot(lotRes.data || {});
+        const defects = safeRows(defectsRes.data).map((row) => normalizeDefect(row, new Map([[id, lot]])));
+        const defectSummary = [];
+        const summaryMap = new Map();
+        defects.forEach((row) => {
+          const key = row.defectName || row.defectType;
+          const current = summaryMap.get(key) || { name: key, qty: 0 };
+          current.qty += row.defectQty;
+          summaryMap.set(key, current);
+        });
+        summaryMap.forEach((value) => {
+          const percent = lot.sampleQty > 0 ? (value.qty / lot.sampleQty) * 100 : 0;
+          defectSummary.push({ name: value.name, qty: value.qty, percent });
+        });
+
+        const totalDefectQty = defects.reduce((sum, row) => sum + row.defectQty, 0);
+        const totalDefectPercent = lot.sampleQty > 0 ? (totalDefectQty / lot.sampleQty) * 100 : 0;
+
+        return {
+          lot,
+          defects,
+          defectSummary,
+          totalDefectQty,
+          calculated: {
+            okQty: lot.okQty,
+            ngQty: lot.ngQty,
+            okPercent: lot.okPercent,
+            ngPercent: lot.ngPercent,
+            totalDefectPercent,
+          },
+        };
+      } catch (err) {
+        throw new Error('Không thể tải chi tiết LOT: ' + (err.message || err));
+      }
+    },
+
+    async getMonthlyStats(month) {
+      try {
+        const monthStart = new Date(`${month}-01T00:00:00`);
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+        const { data: lots, error } = await sb.from('iqc_lots').select('*')
+          .gte('created_at', monthStart.toISOString())
+          .lt('created_at', monthEnd.toISOString())
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        const normLots = safeRows(lots).map(normalizeLot);
+        const lotIds = normLots.map((lot) => lot.id);
+        let defectRows = [];
+        if (lotIds.length) {
+          const { data, error: defectError } = await sb.from('iqc_defects').select('*').in('lot_id', lotIds);
+          if (defectError) throw defectError;
+          defectRows = safeRows(data);
+        }
+
+        const totalLotQty = normLots.reduce((sum, lot) => sum + lot.lotQty, 0);
+        const totalSampleQty = normLots.reduce((sum, lot) => sum + lot.sampleQty, 0);
+        const okLots = normLots.filter((lot) => lot.result === 'OK').length;
+        const ngLots = normLots.filter((lot) => lot.result === 'NG').length;
+        const pendingLots = normLots.filter((lot) => !lot.result).length;
+
+        const productMap = new Map();
+        normLots.forEach((lot) => {
+          const key = `${lot.productCode}|${lot.productName}`;
+          if (!productMap.has(key)) {
+            productMap.set(key, {
+              productCode: lot.productCode,
+              productName: lot.productName,
+              lotCount: 0,
+              lotQty: 0,
+              sampleQty: 0,
+              okLots: 0,
+              ngLots: 0,
+            });
+          }
+          const item = productMap.get(key);
+          item.lotCount += 1;
+          item.lotQty += lot.lotQty;
+          item.sampleQty += lot.sampleQty;
+          if (lot.result === 'OK') item.okLots += 1;
+          if (lot.result === 'NG') item.ngLots += 1;
+        });
+
+        const defectMap = new Map();
+        defectRows.forEach((row) => {
+          const key = row.defect_name || row.defect_type || 'Khác';
+          const current = defectMap.get(key) || { name: key, qty: 0, rows: 0 };
+          current.qty += toNumber(row.defect_qty, 0);
+          current.rows += 1;
+          defectMap.set(key, current);
+        });
+
+        return {
+          month,
+          totalLots: normLots.length,
+          totalLotQty,
+          totalSampleQty,
+          okLots,
+          ngLots,
+          pendingLots,
+          products: Array.from(productMap.values()),
+          defects: Array.from(defectMap.values()).sort((a, b) => b.qty - a.qty),
+          refreshedAt: new Date().toLocaleTimeString('vi-VN'),
+        };
+      } catch (err) {
+        console.warn('getMonthlyStats fallback:', err.message || err);
+        return {
+          month,
+          totalLots: 0,
+          totalLotQty: 0,
+          totalSampleQty: 0,
+          okLots: 0,
+          ngLots: 0,
+          pendingLots: 0,
+          products: [],
+          defects: [],
+          refreshedAt: new Date().toLocaleTimeString('vi-VN'),
+        };
+      }
+    },
+  };
+
+  window.IqcApi = IqcApi;
+})();
+</script>
+<script>
+let dashboard={lots:[],defects:[]},editingId=null,completingId=null,completingLot=null,currentPage='iqc',statsRefreshTimer=null;const $=id=>document.getElementById(id),val=id=>$(id).value;function esc(x){return String(x??'').replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[m]));}
+function clock(){$('clock').innerText=new Date().toLocaleString('vi-VN');}setInterval(clock,1000);clock();function nowInput(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function showPage(p){
+  currentPage=p;
+  $('pageIqc').classList.toggle('hidden',p!=='iqc');
+  $('pageStats').classList.toggle('hidden',p!=='stats');
+  $('tabIqc').classList.toggle('active',p==='iqc');
+  $('tabStats').classList.toggle('active',p==='stats');
+
+  if(statsRefreshTimer){
+    clearInterval(statsRefreshTimer);
+    statsRefreshTimer=null;
+  }
+
+  if(p==='stats'){
+    loadStats();
+    // Khi đang đứng ở trang thống kê: tự đọc lại MES mỗi 30 giây.
+    statsRefreshTimer=setInterval(loadStats,30000);
+  }
+}
+function confirmDate(inputId,statusId){const x=$(inputId),s=$(statusId);if(!x.value){alert('Hãy chọn ngày + giờ trước.');x.focus();return false;}x.classList.add('confirmed');s.innerText='✓ Đã xác nhận: '+new Date(x.value).toLocaleString('vi-VN');s.classList.add('ok');if(inputId==='pickupDate'&&$('status').value==='Chưa lấy hàng')$('status').value='Đang kiểm tra';return true;}
+function isConfirmed(id){return $(id).classList.contains('confirmed')&&!!$(id).value;}
+async function loadDashboard(){
+  try {
+    const d = await IqcApi.getDashboardData();
+    renderDashboard(d);
+    if(currentPage==='stats') loadStats();
+  } catch (e) {
+    console.error('Không tải được dữ liệu IQC:', e);
+    $('lotTable').innerHTML='<tr><td colspan="20" style="text-align:center;color:#b91c1c">Không tải được dữ liệu IQC: '+esc(e.message||e)+'</td></tr>';
+  }
+}
+function renderDashboard(d){dashboard=d;['total','waiting','checking','done','ok','ng'].forEach(k=>$(k).innerText=d.summary[k]);const tb=$('lotTable');tb.innerHTML='';d.lots.forEach(l=>{const st=l.status==='Đang kiểm tra'?`<span class="badge badge-check">${esc(l.status)}</span>`:l.status==='Đã kiểm tra'?`<span class="badge badge-ok">${esc(l.status)}</span>`:`<span class="badge badge-wait">${esc(l.status)}</span>`;const res=l.result==='OK'?'<span class="badge badge-ok">OK</span>':l.result==='NG'?'<span class="badge badge-ng">NG</span>':'<span class="badge badge-wait">Chưa có</span>';const action=l.status!=='Đã kiểm tra'?`<button class="button btn-success btn-small" onclick="openComplete('${esc(l.id)}')">Hoàn thành kiểm tra</button>`:'';tb.innerHTML+=`<tr><td>${esc(l.receivedDate)}</td><td>${esc(l.pickupDate)}</td><td>${esc(l.supplier)}</td><td>${esc(l.productCode)}</td><td>${esc(l.productName)}</td><td><b>${esc(l.lotNo)}</b></td><td>${l.lotQty}</td><td>${esc(l.inspectionType)}</td><td>${l.sampleQty}</td><td>${esc(l.aql||'—')}</td><td>${esc(l.location)}</td><td>${st}</td><td class="timer ${l.completedMs?'done':''}" data-start="${l.startMs||''}" data-end="${l.completedMs||''}" data-min="${l.inspectionMinutes||0}" data-status="${esc(l.status||'')}">${timerText(l)}</td><td>${res}</td><td class="ok">${l.inspectionType==='Kiểm tra 100%'?l.okQty:'—'}</td><td class="ng">${l.inspectionType==='Kiểm tra 100%'?l.ngQty:'—'}</td><td>${l.inspectionType==='Kiểm tra 100%'?Number(l.okPercent).toFixed(2)+'%':'—'}</td><td>${l.inspectionType==='Kiểm tra 100%'?Number(l.ngPercent).toFixed(2)+'%':'—'}</td><td class="note-cell">${esc(l.note||'')}</td><td><button class="button btn-secondary btn-small" onclick="editLot('${esc(l.id)}')">Sửa</button> <button class="button btn-danger btn-small" onclick="deleteLotUI('${esc(l.id)}','${esc(l.lotNo)}')">Xóa</button> ${action}</td></tr>`});renderDefects(d.defects);populateDefectLots();refreshTimers();}
+function timerText(l){if(l.completedMs||l.inspectionMinutes)return (l.inspectionMinutes||0)+' phút';if(l.status==='Chưa lấy hàng')return '—';if(l.startMs)return Math.max(0,Math.floor((Date.now()-l.startMs)/60000))+' phút';return '—';}function refreshTimers(){$$('.timer').forEach(e=>{const s=Number(e.dataset.start),end=Number(e.dataset.end),m=Number(e.dataset.min),status=e.dataset.status||'';if(status==='Chưa lấy hàng'&&!end){e.innerText='—';return;}if(s&&!end)e.innerText=Math.max(0,Math.floor((Date.now()-s)/60000))+' phút';else if(end||m)e.innerText=(m||0)+' phút';else e.innerText='—';});}function $$(s){return document.querySelectorAll(s)}setInterval(refreshTimers,10000);
+function newLot(){resetForm();$('formSection').scrollIntoView({behavior:'smooth'});}
+function resetForm(){editingId=null;$('formTitle').innerText='📝 Nhập thông tin LOT IQC';$('saveBtn').innerText='Lưu LOT';$('lotForm').reset();['receivedDate','pickupDate','completionDate'].forEach(id=>$(id).classList.remove('confirmed'));$('receivedConfirm').innerText='Chưa xác nhận';$('pickupConfirm').innerText='Chưa bắt đầu kiểm';$('completionConfirm').innerText='Chưa hoàn thành';['receivedConfirm','pickupConfirm','completionConfirm'].forEach(id=>$(id).classList.remove('ok'));$('aqlField').classList.add('hidden');$('sampleQty').value='';$('sampleInfo').innerText='';$('aqlInfo').innerText='';$('okPct').value='';$('ngPct').value='';$('status').value='Chưa lấy hàng';updateInspectionUI();}
+async function editLot(id){
+  try {
+    const lot = await IqcApi.getLot(id);
+    fillLot(lot);
+  } catch (e) {
+    alert(e.message || 'Lỗi tải LOT');
+  }
+}
+function fillLot(l){
+  editingId=l.id;
+  $('formTitle').innerText='✏️ Sửa LOT IQC — '+l.lotNo;
+  $('saveBtn').innerText='Cập nhật LOT';
+
+  // Nạp ĐÚNG các giá trị thời gian cũ từ MES.
+  // Backend trả về receivedInput / pickupInput / completionInput.
+  $('receivedDate').value=l.receivedInput||'';
+  $('pickupDate').value=l.pickupInput||'';
+  $('completionDate').value=l.completionInput||'';
+
+  $('supplier').value=l.supplier||'';
+  $('productCode').value=l.productCode||'';
+  $('productName').value=l.productName||'';
+  $('lotNo').value=l.lotNo||'';
+  $('lotQty').value=l.lotQty||'';
+  $('aql').value=l.aql||'';
+  $('location').value=l.location||'Kho';
+  $('status').value=l.status||'Chưa lấy hàng';
+  $('inspector').value=l.inspector||'';
+  $('note').value=l.note||'';
+
+  $('inspectionType').value=l.inspectionType||'Kiểm tra AQL';
+  $('sampleQty').value=l.sampleQty||'';
+  $('okQty').value=l.okQty||0;
+  $('ngQty').value=l.ngQty||0;
+  $('result').value=l.result||'';
+
+  // Ngày đã lưu từ lần trước được coi là đã xác nhận.
+  ['receivedDate','pickupDate','completionDate'].forEach(id=>$(id).classList.remove('confirmed'));
+  ['receivedConfirm','pickupConfirm','completionConfirm'].forEach(id=>$(id).classList.remove('ok'));
+
+  if($('receivedDate').value) confirmDate('receivedDate','receivedConfirm');
+  else $('receivedConfirm').innerText='Chưa xác nhận';
+
+  if($('pickupDate').value) confirmDate('pickupDate','pickupConfirm');
+  else $('pickupConfirm').innerText='Chưa bắt đầu kiểm';
+
+  if($('completionDate').value) confirmDate('completionDate','completionConfirm');
+  else $('completionConfirm').innerText='Chưa hoàn thành';
+
+  updateInspectionUI();
+  update100();
+  $('formSection').scrollIntoView({behavior:'smooth'});
+}
+async function requestSample(){const q=Number(val('lotQty')||0),type=val('inspectionType');$('aqlInfo').innerText='';if(type==='Kiểm tra N5'){$('sampleQty').value=q?Math.min(5,q):'';$('sampleInfo').innerText=q?'N5 = '+Math.min(5,q)+' PCS':'';return}if(type==='Kiểm tra 100%'){$('sampleQty').value=q||'';$('sampleInfo').innerText=q?'100% = '+q+' PCS':'';return}if(type==='Kiểm tra AQL'){const a=val('aql');if(!q||!a){$('sampleQty').value='';$('sampleInfo').innerText='Nhập SL LOT và chọn AQL.';return}try{const x=await IqcApi.getAqlInfo(q,a);$('sampleQty').value=x.sample||'';$('sampleInfo').innerText=x.sample?'Level II — Code '+x.code+' — Rút '+x.sample+' PCS':'Không có cỡ LOT phù hợp.';$('aqlInfo').innerText=x.sample?'AQL '+a+' — General Inspection Level II':''}catch(e){$('sampleQty').value='';$('sampleInfo').innerText='Lỗi tính mẫu: '+(e.message||e);} }}
+function updateInspectionUI(){const t=val('inspectionType'),is100=t==='Kiểm tra 100%';$('aqlField').classList.toggle('hidden',t!=='Kiểm tra AQL');$('resultField').classList.remove('hidden');const r=$('result'),previousResult=r.value;r.innerHTML=is100?'<option value="">Chưa có</option><option>OK</option><option>NG</option>':'<option value="">Chưa có</option><option>OK</option><option>NG</option>';r.value=previousResult;['okQtyField','ngQtyField','okPctField','ngPctField'].forEach(id=>$(id).classList.toggle('hidden',!is100));requestSample();update100();}
+function update100(){if(val('inspectionType')!=='Kiểm tra 100%')return;const base=Number(val('lotQty')||0),ok=Number(val('okQty')||0),ng=Number(val('ngQty')||0);$('okPct').value=(base?ok/base*100:0).toFixed(2)+'%';$('ngPct').value=(base?ng/base*100:0).toFixed(2)+'%';if(ng>0)$('result').value='NG';else if(base>0&&ok===base)$('result').value='OK';}
+$('inspectionType').addEventListener('change',updateInspectionUI);$('lotQty').addEventListener('input',()=>{requestSample();update100()});$('aql').addEventListener('change',requestSample);$('okQty').addEventListener('input',update100);$('ngQty').addEventListener('input',update100);
+$('lotForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+
+  if(!isConfirmed('receivedDate')){
+    alert('Hãy chọn và bấm ✓ Xác nhận cho Ngày nhận hàng.');
+    return;
+  }
+
+  // Không bắt buộc nhập ngày bắt đầu kiểm khi tạo đơn.
+  if(val('pickupDate') && !isConfirmed('pickupDate')){
+    alert('Bạn đã nhập thời gian bắt đầu kiểm. Hãy bấm ✓ Xác nhận.');
+    return;
+  }
+
+  if(val('completionDate') && !val('pickupDate')){
+    alert('Muốn nhập ngày hoàn thành thì phải có ngày + giờ bắt đầu kiểm.');
+    return;
+  }
+
+  if(val('completionDate') && !isConfirmed('completionDate')){
+    alert('Bạn đã nhập ngày hoàn thành. Hãy bấm ✓ Xác nhận.');
+    return;
+  }
+
+  const type=val('inspectionType');
+  if(!type){
+    alert('Hãy chọn tiêu chuẩn kiểm tra.');
+    return;
+  }
+
+  const supplier=val('supplier').trim();
+  const productCode=val('productCode').trim();
+  const lotNo=val('lotNo').trim();
+  const lotQty=Number(val('lotQty')||0);
+  const inspector=val('inspector').trim();
+  if(!supplier)return alert('Hãy nhập Nhà cung cấp.');
+  if(!productCode)return alert('Hãy nhập Mã sản phẩm.');
+  if(!lotNo)return alert('Hãy nhập Số LOT.');
+  if(!Number.isFinite(lotQty)||lotQty<=0)return alert('Số lượng LOT phải lớn hơn 0.');
+  if(type==='Kiểm tra AQL'&&!val('aql'))return alert('Hãy chọn AQL.');
+  if(!inspector)return alert('Hãy nhập Người kiểm.');
+
+  const data={
+    receivedDate:val('receivedDate'),
+    pickupDate:val('pickupDate'),
+    completionDate:val('completionDate'),
+    supplier:supplier,
+    productCode:productCode,
+    productName:val('productName'),
+    lotNo:lotNo,
+    lotQty:lotQty,
+    inspectionType:type,
+    sampleQty:Number(val('sampleQty')||0),
+    aql:val('aql'),
+    location:val('location'),
+    status:val('pickupDate') ? val('status') : 'Chưa lấy hàng',
+    result:val('result'),
+    okQty:val('okQty'),
+    ngQty:val('ngQty'),
+    inspector:inspector,
+    note:val('note')
+  };
+
+  const saveBtn=$('saveBtn');
+  const oldSaveText=saveBtn.innerText;
+  saveBtn.disabled=true;
+  saveBtn.innerText='Đang lưu...';
+
+  try {
+    if (editingId) {
+      await IqcApi.updateLot(editingId, data);
+    } else {
+      await IqcApi.addLot(data);
+    }
+    saveBtn.disabled=false;
+    saveBtn.innerText=oldSaveText;
+    alert(editingId?'Đã cập nhật LOT.':'Đã tạo LOT.');
+    resetForm();
+    loadDashboard();
+  } catch (e) {
+    saveBtn.disabled=false;
+    saveBtn.innerText=oldSaveText;
+    alert('Lỗi: '+(e.message||e));
+  }
+});
+function populateDefectLots(selected){$('defectLot').innerHTML=dashboard.lots.map(l=>`<option value="${esc(l.id)}">${esc(l.lotNo)} — ${esc(l.productCode)} — ${esc(l.productName)}</option>`).join('');if(selected)$('defectLot').value=selected;}
+let defectEditingId=null,appearanceOptions=[];
+function loadAppearanceOptions(cb){if(appearanceOptions.length){cb&&cb();return}(async()=>{try{const a=await IqcApi.getAppearanceDefects();appearanceOptions=a||[];cb&&cb();}catch(e){appearanceOptions=[];cb&&cb();}})();}
+function appearanceOptionsHtml(selected){return '<option value="">-- Chọn lỗi ngoại quan --</option>'+appearanceOptions.map(x=>`<option value="${esc(x)}" ${x===selected?'selected':''}>${esc(x)}</option>`).join('')}
+function addDefectRow(data={}){const wrap=$('defectRows');const row=document.createElement('div');row.className='defect-row';row.dataset.id=data.id||'';row.dataset.images=data.images||'';const isApp=data.defectType==='NG ngoại quan';let selectedApp='';let extra='';if(isApp){selectedApp=appearanceOptions.find(x=>data.defectName===x||String(data.defectName||'').startsWith(x+' — '))||'';if(selectedApp&&String(data.defectName).length>selectedApp.length)extra=String(data.defectName).slice(selectedApp.length).replace(/^\s*—\s*/,'');}else extra=data.defectName||'';row.innerHTML=`<div class="defect-row-grid"><div><label>Loại NG</label><select class="d-type"><option ${data.defectType==='NG kích thước'?'selected':''}>NG kích thước</option><option ${data.defectType==='NG ngoại quan'?'selected':''}>NG ngoại quan</option><option ${data.defectType==='NG khác'?'selected':''}>NG khác</option></select></div><div class="d-appearance-wrap ${isApp?'':'hidden'}"><label>Lỗi ngoại quan</label><select class="d-appearance">${appearanceOptionsHtml(selectedApp)}</select></div><div><label class="d-name-label">Chi tiết lỗi</label><input class="d-name" placeholder="${data.defectType==='NG khác'?'Nhập chi tiết lỗi':'Chi tiết thêm (nếu cần)'}" value="${esc(extra)}"></div><div><label>Số lượng (PCS)</label><input type="number" min="1" class="d-qty" value="${data.defectQty||''}"></div><div><label>Ghi chú</label><input class="d-note" value="${esc(data.note||'')}"></div><button type="button" class="button btn-secondary btn-small remove-defect" onclick="removeDefectRow(this.closest('.defect-row'))">Xóa</button></div><div style="margin-top:8px"><label style="font-size:11px;font-weight:700;color:#475569">Ảnh lỗi</label><input type="file" class="d-images" multiple accept="image/*"></div>`;wrap.appendChild(row);updateDefectRowCount();const type=row.querySelector('.d-type');const appSel=row.querySelector('.d-appearance');type.addEventListener('change',()=>syncDefectRow(row));appSel.addEventListener('change',()=>syncDefectRow(row));syncDefectRow(row);}
+function syncDefectRow(row){const type=row.querySelector('.d-type').value;const aw=row.querySelector('.d-appearance-wrap');const name=row.querySelector('.d-name');const label=row.querySelector('.d-name-label');if(type==='NG ngoại quan'){aw.classList.remove('hidden');const app=row.querySelector('.d-appearance').value;const isOther=app==='Khác';label.innerText=isOther?'Chi tiết lỗi khác':'Chi tiết thêm (nếu cần)';name.placeholder=isOther?'Bắt buộc nhập chi tiết lỗi khác':'Có thể nhập thêm';}else{aw.classList.add('hidden');label.innerText='Chi tiết lỗi';name.placeholder=type==='NG khác'?'Nhập chi tiết lỗi':'Nhập chi tiết lỗi';}}
+function updateDefectRowCount(){const n=document.querySelectorAll('#defectRows .defect-row').length;const el=$('defectRowCount');if(el)el.innerText='Đang nhập: '+n+' loại lỗi cho LOT này.';}
+function openDefect(){defectEditingId=null;populateDefectLots();$('defectModalTitle').innerText='⚠️ Nhập lỗi IQC';$('defectRows').innerHTML='';loadAppearanceOptions(()=>addDefectRow());$('defectModal').classList.remove('hidden');}
+function editDefect(id){const d=dashboard.defects.find(x=>String(x.id)===String(id));if(!d)return alert('Không tìm thấy lỗi.');const all=dashboard.defects.filter(x=>String(x.lotId)===String(d.lotId));defectEditingId=d.lotId;populateDefectLots(d.lotId);$('defectModalTitle').innerText='✏️ Sửa / thêm toàn bộ lỗi — LOT '+d.lotNo+' ('+all.length+' lỗi đã lưu)';$('defectRows').innerHTML='';loadAppearanceOptions(()=>{if(all.length)all.forEach(x=>addDefectRow(x));else addDefectRow();});$('defectModal').classList.remove('hidden');}
+function removeDefectRow(row){if(!row)return;const id=row.dataset.id||'';if(!id){row.remove();updateDefectRowCount();return;}const name=row.querySelector('.d-name')?.value||row.querySelector('.d-appearance')?.value||'lỗi này';if(!confirm('Xóa lỗi đã lưu này khỏi hệ thống?\n'+name))return;(async()=>{try{await IqcApi.deleteDefect(id);dashboard.defects=dashboard.defects.filter(x=>String(x.id)!==String(id));row.remove();updateDefectRowCount();}catch(e){alert('Lỗi xóa: '+(e.message||e));}})();}
+function closeDefect(){$('defectModal').classList.add('hidden');defectEditingId=null;}
+function collectDefectRows(){return [...document.querySelectorAll('.defect-row')].map(row=>{const type=row.querySelector('.d-type').value;const app=type==='NG ngoại quan'?row.querySelector('.d-appearance').value:'';const extra=row.querySelector('.d-name').value.trim();const name=type==='NG ngoại quan'?(app+(extra?' — '+extra:'')):extra;return{id:row.dataset.id||'',existingImages:row.dataset.images||'',row,type,name,qty:Number(row.querySelector('.d-qty').value||0),note:row.querySelector('.d-note').value.trim(),files:[...row.querySelector('.d-images').files]};});}
+async function uploadDefectFiles(files){if(!files.length)return[];const urls=[];for(const f of files){const url=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=async()=>{try{const x=await IqcApi.uploadImage(r.result,f.name,f.type);resolve(x.url);}catch(e){reject(e);}};r.onerror=()=>reject(new Error('Lỗi đọc file ảnh'));r.readAsDataURL(f)});urls.push(url)}return urls;}
+async function saveDefects(){
+  const lotId=val('defectLot');
+  const lot=dashboard.lots.find(x=>String(x.id)===String(lotId));
+  if(!lot)return alert('Chưa chọn LOT.');
+
+  const rows=collectDefectRows();
+  if(!rows.length)return alert('Hãy thêm ít nhất 1 lỗi.');
+
+  const items=[];
+  for(const r of rows){
+    if(!r.name)return alert('Có dòng chưa chọn/nhập tên lỗi.');
+    if(r.type==='NG ngoại quan'){
+      const app=r.row.querySelector('.d-appearance').value;
+      const extra=r.row.querySelector('.d-name').value.trim();
+      if(!app)return alert('Có dòng NG ngoại quan chưa chọn loại lỗi.');
+      if(app==='Khác'&&!extra)return alert('Khi chọn lỗi ngoại quan Khác, hãy nhập chi tiết lỗi.');
+    }
+    if(r.qty<=0)return alert('Số lượng lỗi phải lớn hơn 0.');
+
+    const newUrls=await uploadDefectFiles(r.files);
+    items.push({
+      defectType:r.type,
+      defectName:r.name,
+      defectQty:r.qty,
+      note:r.note,
+      images:newUrls.length?newUrls.join('|'):(r.existingImages||'')
+    });
+  }
+
+  const countBefore=items.length;
+  if(!confirm('Xác nhận lưu '+countBefore+' loại lỗi cho LOT '+lot.lotNo+'?'))return;
+
+  const btns=[...document.querySelectorAll('#defectModal button')];
+  btns.forEach(b=>b.disabled=true);
+
+  try {
+    const res = await IqcApi.replaceLotDefects(lotId, JSON.stringify(items));
+    btns.forEach(b=>b.disabled=false);
+    if(Number(res.actualCount)!==Number(res.expectedCount)){
+      alert('CẢNH BÁO: Gửi '+res.expectedCount+' loại nhưng Sheet đọc lại '+res.actualCount+' loại. Hãy chụp thông báo này gửi lại.');
+      return;
+    }
+    alert(
+      'ĐÃ LƯU ĐỦ '+res.actualCount+' LOẠI LỖI\n'+
+      'Tổng số lượng lỗi: '+res.totalQty+' PCS'
+    );
+    closeDefect();
+    loadDashboard();
+  } catch (e) {
+    btns.forEach(b=>b.disabled=false);
+    alert('Lỗi lưu danh sách lỗi: '+(e.message||e));
+  }
+}
+function renderDefects(ds){
+  const tb=$('defectTable');tb.innerHTML='';
+  const lotTotals={};
+  ds.forEach(d=>{const k=String(d.lotId||'');if(!lotTotals[k])lotTotals[k]={qty:0,items:0,names:{},lotNo:d.lotNo};lotTotals[k].qty+=Number(d.defectQty||0);lotTotals[k].items++;const n=d.defectName||d.defectType||'Khác';lotTotals[k].names[n]=(lotTotals[k].names[n]||0)+Number(d.defectQty||0);});
+  ds.slice().reverse().forEach(d=>{const imgs=(d.images||'').split('|').filter(Boolean).map((u,i)=>`<a href="${esc(u)}" target="_blank">Ảnh ${i+1}</a>`).join(' ');const t=lotTotals[String(d.lotId)]||{qty:0,items:0};tb.innerHTML+=`<tr><td>${esc(d.lotNo)}</td><td><b>${esc(d.defectType)}</b></td><td>${esc(d.defectName)}</td><td class="ng">${d.defectQty}</td><td class="ng">${Number(d.defectPercent).toFixed(2)}%</td><td><b>${t.qty} PCS</b> / ${t.items} loại</td><td>${imgs}</td><td>${esc(d.time)}</td><td><button class="button btn-secondary btn-small" onclick="editDefect('${esc(d.id)}')">Sửa</button> <button class="button btn-danger btn-small" onclick="deleteDefectUI('${esc(d.id)}','${esc(d.lotNo)}','${esc(d.defectName)}')">Xóa</button></td></tr>`});
+  const overview=$('defectOverview');
+  const entries=Object.values(lotTotals);
+  if(!entries.length){overview.innerHTML='<span class="help">Chưa có lỗi nào được nhập.</span>';return;}
+  overview.innerHTML='<div class="pill-total">📊 Tổng hợp toàn bộ lỗi đã nhập theo LOT</div>'+entries.map(x=>{const details=Object.entries(x.names).sort((a,b)=>b[1]-a[1]).map(([n,q])=>`${esc(n)}: <b>${q}</b>`).join(' &nbsp; | &nbsp; ');return `<div style="padding:7px 0;border-top:1px solid #e2e8f0"><b>LOT ${esc(x.lotNo)}</b> — Tổng <span class="ng"><b>${x.qty} PCS</b></span> / ${x.items} loại<br><span class="help">${details}</span></div>`}).join('');
+}
+async function deleteDefectUI(id,lotNo,name){if(!confirm(`Xóa lỗi "${name}" của LOT ${lotNo}?\nDữ liệu lỗi này sẽ bị xóa khỏi hệ thống.`))return;try{await IqcApi.deleteDefect(id);alert('Đã xóa lỗi.');loadDashboard();}catch(e){alert('Lỗi: '+(e.message||e));}}
+async function deleteLotUI(id,lotNo){if(!confirm(`XÓA TOÀN BỘ LOT ${lotNo}?\n\nThao tác này sẽ xóa cả LOT và toàn bộ các lỗi đã nhập cho LOT này. Không thể hoàn tác.`))return;try{await IqcApi.deleteLot(id);alert('Đã xóa LOT '+lotNo);if(editingId===id)resetForm();loadDashboard();}catch(e){alert('Lỗi: '+(e.message||e));}}
+function openComplete(id){completingId=id;completingLot=dashboard.lots.find(x=>x.id===id);if(!completingLot)return;$('completeAt').value=completingLot.completionInput||nowInput();$('completeConfirm').innerText=completingLot.completionInput?'✓ Đã xác nhận: '+new Date(completingLot.completionInput).toLocaleString('vi-VN'):'Chưa xác nhận';$('completeAt').classList.toggle('confirmed',!!completingLot.completionInput);$('completeConfirm').classList.toggle('ok',!!completingLot.completionInput);$('completeInspector').value=completingLot.inspector||'';$('completeNote').value=completingLot.note||'';$('completeResult').value=completingLot.result||'OK';$('completeResult100').value=completingLot.result||'OK';$('completeNormal').classList.toggle('hidden',completingLot.inspectionType==='Kiểm tra 100%');$('complete100').classList.toggle('hidden',completingLot.inspectionType!=='Kiểm tra 100%');if(completingLot.inspectionType==='Kiểm tra 100%'){$('completeOkQty').value=completingLot.okQty||0;$('completeNgQty').value=completingLot.ngQty||0;updateComplete100()}$('completeHint').innerText='Bắt đầu: '+(completingLot.pickupDate||'—')+' | Kết thúc: nhập ngày + giờ hoàn thành. Thời gian kiểm = kết thúc − bắt đầu.';$('completeModal').classList.remove('hidden');}
+function closeComplete(){$('completeModal').classList.add('hidden');completingId=null;completingLot=null}
+function updateComplete100(){if(!completingLot)return;const b=Number(completingLot.lotQty||0),ok=Number(val('completeOkQty')||0),ng=Number(val('completeNgQty')||0);$('completeOkPct').innerText=(b?ok/b*100:0).toFixed(2)+'%';$('completeNgPct').innerText=(b?ng/b*100:0).toFixed(2)+'%';if(ng>0)$('completeResult100').value='NG';else if(b&&ok===b)$('completeResult100').value='OK';}
+$('completeOkQty').addEventListener('input',updateComplete100);$('completeNgQty').addEventListener('input',updateComplete100);
+async function saveComplete(){if(!completingId)return;if(!isConfirmed('completeAt'))return alert('Hãy chọn ngày + giờ hoàn thành rồi bấm ✓ Xác nhận.');if(!val('completeInspector').trim())return alert('Hãy nhập Người kiểm.');let result=val('completeResult');let ok=val('completeOkQty'),ng=val('completeNgQty');if(completingLot.inspectionType==='Kiểm tra 100%'){result=val('completeResult100');if(Number(ok)+Number(ng)!==Number(completingLot.lotQty))return alert('Kiểm tra 100%: OK + NG phải bằng đúng SL LOT.')}const payload={completionDate:val('completeAt'),result,okQty:ok,ngQty:ng,inspector:val('completeInspector'),note:val('completeNote')};try{const r=await IqcApi.completeLot(completingId,payload);alert('Đã hoàn thành kiểm tra — '+r.minutes+' phút — '+r.result);closeComplete();loadDashboard();}catch(e){alert('Lỗi: '+(e.message||e));}}
+async function searchHistory(){const key=val('historyProductCode').trim();if(!key)return alert('Nhập mã hoặc tên sản phẩm.');$('historyTable').innerHTML='<tr><td colspan="11" style="text-align:center">Đang tìm...</td></tr>';try{const rows=await IqcApi.searchLotHistory(key);renderHistory(rows);}catch(e){alert(e.message||'Lỗi tìm kiếm lịch sử');}}
+function clearHistory(){$('historyProductCode').value='';$('historyTable').innerHTML='<tr><td colspan="11" style="text-align:center;color:#64748b">Nhập mã hoặc tên sản phẩm để tìm.</td></tr>'}
+function renderHistory(rows){const tb=$('historyTable');tb.innerHTML='';if(!rows.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:#64748b">Không có lịch sử.</td></tr>';return}rows.forEach(l=>{const r=l.result==='OK'?'<span class="badge badge-ok">OK</span>':l.result==='NG'?'<span class="badge badge-ng">NG</span>':'<span class="badge badge-wait">Chưa có</span>';tb.innerHTML+=`<tr class="clickable" onclick="openDetail('${esc(l.id)}')"><td>${esc(l.receivedDate)}</td><td>${esc(l.pickupDate)}</td><td>${esc(l.completionDate)}</td><td><b>${esc(l.productCode)}</b></td><td>${esc(l.productName)}</td><td><b>${esc(l.lotNo)}</b></td><td>${l.lotQty}</td><td>${esc(l.inspectionType)}</td><td>${l.sampleQty}</td><td>${r}</td><td>${l.inspectionMinutes?l.inspectionMinutes+' phút':'—'}</td></tr>`})}
+async function openDetail(id){$('detailModal').classList.remove('hidden');$('detailBody').innerHTML='Đang tải...';try{const d=await IqcApi.getLotDetails(id);renderDetail(d);}catch(e){$('detailBody').innerHTML='<span class="ng">'+esc(e.message||'Lỗi tải chi tiết')+'</span>';}}
+function closeDetail(){$('detailModal').classList.add('hidden')}
+function renderDetail(d){const l=d.lot,c=d.calculated,r=l.result==='OK'?'<span class="badge badge-ok">OK</span>':l.result==='NG'?'<span class="badge badge-ng">NG</span>':'Chưa có';const defs=(d.defects||[]).map(x=>`<tr><td>${esc(x.defectType)}</td><td>${esc(x.defectName)}</td><td class="ng">${x.defectQty}</td><td class="ng">${Number(x.defectPercent).toFixed(2)}%</td><td>${esc(x.time)}</td><td><button class="button btn-secondary btn-small" onclick="closeDetail();editDefect('${esc(x.id)}')">Sửa</button> <button class="button btn-danger btn-small" onclick="closeDetail();deleteDefectUI('${esc(x.id)}','${esc(l.lotNo)}','${esc(x.defectName)}')">Xóa</button></td></tr>`).join('');const sums=(d.defectSummary||[]).map(x=>`<tr><td>${esc(x.name)}</td><td class="ng"><b>${x.qty}</b></td><td class="ng"><b>${Number(x.percent).toFixed(2)}%</b></td></tr>`).join('');$('detailTitle').innerText='📄 Chi tiết LOT — '+l.lotNo;$('detailBody').innerHTML=`<div class="detail-grid"><div class="detail"><small>Ngày nhận</small><b>${esc(l.receivedDate)}</b></div><div class="detail"><small>Ngày lấy</small><b>${esc(l.pickupDate)}</b></div><div class="detail"><small>Ngày hoàn thành</small><b>${esc(l.completionDate||'—')}</b></div><div class="detail"><small>Thời gian kiểm</small><b>${l.inspectionMinutes} phút</b></div><div class="detail"><small>NCC</small><b>${esc(l.supplier)}</b></div><div class="detail"><small>Mã SP</small><b>${esc(l.productCode)}</b></div><div class="detail"><small>Tên SP</small><b>${esc(l.productName)}</b></div><div class="detail"><small>LOT</small><b>${esc(l.lotNo)}</b></div><div class="detail"><small>SL LOT</small><b>${l.lotQty} PCS</b></div><div class="detail"><small>Tiêu chuẩn</small><b>${esc(l.inspectionType)}</b></div><div class="detail"><small>AQL</small><b>${esc(l.aql||'—')}</b></div><div class="detail"><small>Rút kiểm</small><b>${l.sampleQty} PCS</b></div><div class="detail"><small>Vị trí</small><b>${esc(l.location)}</b></div><div class="detail"><small>Trạng thái</small><b>${esc(l.status)}</b></div><div class="detail"><small>Kết quả</small><b>${r}</b></div><div class="detail"><small>Người kiểm</small><b>${esc(l.inspector)}</b></div>${l.inspectionType==='Kiểm tra 100%'?`<div class="detail"><small>OK</small><b class="ok">${c.okQty} PCS</b></div><div class="detail"><small>NG</small><b class="ng">${c.ngQty} PCS</b></div><div class="detail"><small>% OK</small><b class="ok">${c.okPercent.toFixed(2)}%</b></div><div class="detail"><small>% NG</small><b class="ng">${c.ngPercent.toFixed(2)}%</b></div>`:''}</div><div class="defect-summary"><div class="pill-total">📊 Tổng hợp lỗi của LOT: ${d.totalDefectQty||0} PCS — ${Number(c.totalDefectPercent||0).toFixed(2)}% trên cỡ mẫu</div><div class="table-wrap"><table><thead><tr><th>Loại lỗi</th><th>Số lượng</th><th>% trên cỡ mẫu</th></tr></thead><tbody>${sums||'<tr><td colspan="3">Chưa có lỗi.</td></tr>'}</tbody></table></div></div><h3>⚠️ Chi tiết từng lỗi</h3><div class="table-wrap"><table><thead><tr><th>Loại NG</th><th>Chi tiết</th><th>SL</th><th>% NG</th><th>Thời gian</th><th></th></tr></thead><tbody>${defs||'<tr><td colspan="6">Chưa có lỗi.</td></tr>'}</tbody></table></div>${l.note?`<div class="metric" style="margin-top:15px"><b>Ghi chú:</b><br>${esc(l.note)}</div>`:''}`}
+
+let statsLoading=false;
+async function loadStats(){
+  if(statsLoading)return;
+  statsLoading=true;
+  const m=val('statsMonth')||new Date().toISOString().slice(0,7);
+  try {
+    const d = await IqcApi.getMonthlyStats(m);
+    statsLoading=false;
+    renderStats(d);
+    const el=$('statsRefreshAt');
+    if(el)el.innerText='• cập nhật '+(d.refreshedAt||new Date().toLocaleTimeString('vi-VN'));
+  } catch (e) {
+    statsLoading=false;
+    alert('Lỗi cập nhật thống kê: '+(e.message||e));
+  }
+}
+function renderStats(d){
+  $('statTotalLots').innerText=d.totalLots||0;
+  $('statLotQty').innerText=Number(d.totalLotQty||0).toLocaleString('vi-VN');
+  $('statSampleQty').innerText=Number(d.totalSampleQty||0).toLocaleString('vi-VN');
+  $('statOkLots').innerText=d.okLots||0;
+  $('statNgLots').innerText=d.ngLots||0;
+  $('statPendingLots').innerText=d.pendingLots||0;
+
+  const tb=$('statsTable');
+  tb.innerHTML='';
+  if(!d.products.length){
+    tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#64748b;padding:20px">Không có LOT trong tháng '+esc(d.month)+'.</td></tr>';
+  }else{
+    d.products.forEach(x=>{
+      const judged=x.okLots+x.ngLots;
+      tb.innerHTML+=`<tr>
+        <td>${esc(d.month)}</td><td><b>${esc(x.productCode)}</b></td><td>${esc(x.productName)}</td>
+        <td>${x.lotCount}</td><td>${Number(x.lotQty||0).toLocaleString('vi-VN')}</td>
+        <td>${Number(x.sampleQty||0).toLocaleString('vi-VN')}</td>
+        <td class="ok">${x.okLots}</td><td class="ng">${x.ngLots}</td>
+        <td>${judged?(x.okLots/judged*100).toFixed(1):0}%</td>
+        <td>${judged?(x.ngLots/judged*100).toFixed(1):0}%</td>
+      </tr>`;
+    });
+  }
+
+  const judged=d.okLots+d.ngLots;
+  const op=judged?d.okLots/judged*100:0;
+  const np=judged?d.ngLots/judged*100:0;
+  const deg=op*3.6;
+  $('donut').style.background=judged
+    ?`conic-gradient(#059669 0deg ${deg}deg,#dc2626 ${deg}deg 360deg)`
+    :'conic-gradient(#cbd5e1 0deg 360deg)';
+  $('legend').innerHTML=`<b>${esc(d.month)}</b><br>
+    Tổng LOT: ${d.totalLots}<br>
+    Đã có kết quả: ${judged}<br>
+    <span class="ok">● OK: ${d.okLots} (${op.toFixed(1)}%)</span><br>
+    <span class="ng">● NG: ${d.ngLots} (${np.toFixed(1)}%)</span><br>
+    <span class="waiting">● Chưa có KQ: ${d.pendingLots}</span>`;
+
+  const box=$('defectStats');
+  if(!d.defects.length){
+    box.innerHTML='<div class="help">Tháng này chưa có dữ liệu lỗi.</div>';
+  }else{
+    const max=Math.max(...d.defects.map(x=>x.qty),1);
+    box.innerHTML=d.defects.map(x=>`<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between"><b>${esc(x.name)}</b><span class="ng">${x.qty} PCS / ${x.rows} dòng</span></div>
+      <div class="bar"><i style="width:${x.qty/max*100}%"></i></div>
+    </div>`).join('');
+  }
+}
+$('pickupDate').removeAttribute('required');
+$('historyProductCode').addEventListener('keydown',e=>{if(e.key==='Enter')searchHistory()});$('statsMonth').value=new Date().toISOString().slice(0,7);$('statsMonth').addEventListener('change',()=>{if(currentPage==='stats')loadStats();});loadDashboard();
+</script></body></html>
