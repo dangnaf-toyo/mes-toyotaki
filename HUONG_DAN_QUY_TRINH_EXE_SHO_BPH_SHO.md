@@ -51,7 +51,7 @@ Quy cách thùng gộp **60pcs/thùng** không nằm trong danh mục SP — là
 - `EXE-SHO`: 1 chặng — Đúc → Đánh bóng.
 - `BPH-SHO`: 2 chặng — Đúc → Đánh bóng, rồi Đánh bóng → Gia Công, rồi Gia Công → OQC (3 lượt chuyển, tem vẫn giữ nguyên 150pcs/thùng suốt, không đóng gói lại ở Đánh bóng/Gia Công).
 
-**Đây là bước bắt buộc trước khi ghi nhận thùng thành phẩm** — hệ thống chỉ trừ được nguồn từ những tem Đúc **đã chuyển và đã xác nhận** tới đúng công đoạn gộp đóng gói (Đánh bóng với EXE-SHO, OQC với BPH-SHO).
+**Đây là bước bắt buộc trước khi ghi nhận thùng thành phẩm** — hệ thống chỉ trừ được nguồn từ những tem Đúc **đã được Chuyển công đoạn** tới đúng công đoạn gộp đóng gói (Đánh bóng với EXE-SHO, OQC với BPH-SHO). Từ T45: **không cần đợi ai đó "Xác nhận đã giao hàng"** ở `chuyencongdoan.html` — chỉ cần phiếu chuyển tồn tại là dùng được ngay, khớp thực tế sản xuất chạy liên tục qua các công đoạn; bước "Xác nhận đã giao hàng" (lọc theo Bộ phận GIAO) vẫn còn, chỉ là làm cuối ca cho đủ sổ sách, không còn chặn thao tác.
 
 ### Bước 4 — In trước lô tem thành phẩm
 `intem.html` → tab **Tem Thành Phẩm**. Chọn công đoạn (**Đánh bóng** cho EXE-SHO, **OQC** cho BPH-SHO), mã SP, ngày sản xuất, số thùng cần in → **Tạo lô & in**. Mỗi tem = 1 Tag No mới (`TP{ngày}-{số}`), trạng thái `Chờ đóng gói TP`, in sẵn 60pcs/thùng + Mã SP tại KH + Tên khách hàng.
@@ -59,7 +59,7 @@ Quy cách thùng gộp **60pcs/thùng** không nằm trong danh mục SP — là
 In **trước** khi đóng thùng thật — dán/gài sẵn tem chờ. Tem **không in Người kiểm tra/Ngày SX** (T41) — 2 thông tin này ghi nhận ở bước sau, lúc quét.
 
 ### Bước 5 — Khai báo tem Đúc đang dùng (T43)
-`ghi-nhan-tem-thanh-pham.html` (menu Sản xuất → "Ghi nhận thùng thành phẩm"). Chọn **Người kiểm tra**, chọn đúng **Công đoạn** (Đánh bóng hoặc OQC — dùng để khai báo, không chỉ để cộng sản lượng như "Trạm/tổ"). Ở khu **"Tem Đúc đang dùng"**, đọc/nhập Tag No của thùng Đúc đang thực sự đánh — hệ thống xác nhận tem đó đã Chuyển công đoạn (đã xác nhận) tới đúng công đoạn này, rồi thêm vào danh sách "đang dùng".
+`ghi-nhan-tem-thanh-pham.html` (menu Sản xuất → "Ghi nhận thùng thành phẩm"). Chọn **Người kiểm tra**, chọn đúng **Công đoạn** (Đánh bóng hoặc OQC — dùng để khai báo, không chỉ để cộng sản lượng như "Trạm/tổ"). Ở khu **"Tem Đúc đang dùng"**, đọc/nhập Tag No của thùng Đúc đang thực sự đánh — hệ thống kiểm tra tem đó đã có phiếu Chuyển công đoạn tới đúng công đoạn này (không cần đã "Xác nhận đã giao hàng" — T45), rồi thêm vào danh sách "đang dùng".
 
 Mỗi lần lấy 5-7 thùng Đúc về chuyền, đọc lần lượt từng tem — không cần đọc hết 1 lượt, có thể đọc thêm bất cứ lúc nào. Hệ thống chỉ trừ nguồn từ các tem **đã khai báo**, theo đúng thứ tự khai báo — tem chưa khai báo dù đã chuyển công đoạn cũng KHÔNG bị trừ nhầm. Tem đã dùng hết (0 pcs) không khai báo lại được.
 
@@ -125,7 +125,8 @@ Thực hiện theo đúng thứ tự — mỗi bước xác nhận trước khi 
 | "Vai trò không hợp lệ" khi tạo tài khoản Nhân viên — Đánh bóng | Edge Function `admin-create-user` chưa deploy lại sau khi đổi code | Deploy lại qua Supabase CLI |
 | "Chưa đủ nguồn từ tem Đúc ĐÃ KHAI BÁO" | Chưa khai báo (đọc) đủ tem Đúc ở khu "Tem Đúc đang dùng" — dù tem Đúc đã Chuyển công đoạn xong, hệ thống KHÔNG tự dùng nếu chưa khai báo tường minh (T43) | Quay lại Bước 5, đọc thêm tem thùng Đúc tiếp theo rồi ghi nhận lại đúng tem thành phẩm đó |
 | "Tem đã dùng hết — không thể khai báo lại" | Đọc lại 1 tem Đúc đã tiêu thụ hết (0pcs) ở khu "Tem Đúc đang dùng" | Đọc tem thùng Đúc khác còn hàng — đây là chặn có chủ đích, không phải lỗi |
-| Khai báo nguồn báo "chưa được Chuyển công đoạn tới ..." | Đọc nhầm tem Đúc chưa Chuyển công đoạn (hoặc chưa xác nhận) tới đúng công đoạn đang chọn ở đầu trang | Kiểm tra lại Bước 3 (Chuyển công đoạn + xác nhận), và đúng "Công đoạn" đang chọn ở đầu `ghi-nhan-tem-thanh-pham.html` |
+| Khai báo nguồn báo "chưa được Chuyển công đoạn tới ..." | Đọc nhầm tem Đúc chưa Chuyển công đoạn tới đúng công đoạn đang chọn ở đầu trang (từ T45 không còn cần "Xác nhận đã giao hàng" nữa, chỉ cần phiếu chuyển tồn tại) | Kiểm tra lại Bước 3 (Chuyển công đoạn), và đúng "Công đoạn" đang chọn ở đầu `ghi-nhan-tem-thanh-pham.html` |
+| "Xác nhận đã giao hàng" chọn nhầm Bộ phận không thấy phiếu | Màn xác nhận ở `chuyencongdoan.html` lọc theo **Bộ phận GIAO** (VD "Đúc"), không phải bộ phận nhận (VD "Đánh bóng") | Chọn đúng bộ phận đã GIAO hàng ở dropdown, không phải bộ phận đang nhận — từ T45 bước này không còn bắt buộc trước khi khai báo nguồn nữa, chỉ để đủ sổ sách |
 | Tem thành phẩm không hiện Mã SP tại KH / Tên KH | Chưa khai ở danh mục SP trước khi in lô | Khai trước, in lại lô (lô cũ đã đông lạnh dữ liệu tại thời điểm in, không tự cập nhật) |
 | "Tem không phải tem thành phẩm chờ đóng gói" | Quét nhầm Tag No tem Đúc (TKD...) hoặc tem Kanban khác vào màn Ghi nhận thùng thành phẩm | Kiểm tra đúng màn hình — Kanban Đúc dùng `ghi-nhan-kanban.html`, thành phẩm dùng `ghi-nhan-tem-thanh-pham.html` |
 | Danh mục sản phẩm hiện trống toàn bộ | Trang `quan-ly-danh-muc.html` đọc cột chưa được tạo (migration liên quan T40 chưa chạy) — lỗi PostgREST làm SẬP CẢ query, không riêng field mới | Chạy đủ migration theo đúng thứ tự ở đầu file này |
