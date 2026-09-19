@@ -11,18 +11,20 @@
 <!--
   ghi-nhan-tem-thanh-pham.html — màn quét ghi nhận thùng THÀNH PHẨM (tem in
   trước ở intem.html tab "Tem Thành Phẩm"). Mỗi thùng đủ quy cách (VD 60pcs
-  Đánh bóng), người thao tác quét QR trên tem tại đây → RPC
+  Đánh bóng), chọn Người kiểm tra rồi quét QR trên tem tại đây → RPC
   cd_ghi_nhan_tem_thanh_pham TỰ ĐỘNG trừ FIFO từ các tem Đúc đang có mặt tại
   công đoạn (theo cd_chuyen_cong_doan_log đã xác nhận), ghi lineage vào
   cd_tem_nguon (truy xuất nguồn gốc), chuyển trạng thái 'Chờ đóng gói TP' →
-  'Đã đóng gói TP'. Không nhập gì thêm lúc quét — mọi thông tin (mã SP,
-  khách hàng, người kiểm tra) đã in sẵn trên tem từ lúc tạo lô.
+  'Đã đóng gói TP'. Mã SP/khách hàng đã in sẵn trên tem từ lúc tạo lô — CHỈ
+  "Người kiểm tra" + "ngày giờ kiểm" (ngay_gio_ghi_nhan) mới ghi nhận Ở ĐÂY,
+  đúng lúc thùng đầy chuẩn bị gài tem vào thùng (T41 — trước đó T40 in sẵn
+  người kiểm lúc tạo lô, đã sửa theo yêu cầu thực tế).
 
   Chọn "Trạm đang hoạt động" 1 lần đầu ca (không bắt buộc) để sản lượng OK tự
   cộng vào đúng trạm trên Bảng điều khiển công đoạn — bỏ trống vẫn ghi nhận
   được, chỉ là không cộng sản lượng vào trạm nào.
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql.
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (đổi luồng người kiểm).
 -->
 <style>
 :root{
@@ -122,6 +124,15 @@ select:focus,input:focus{border-color:var(--accent)}
 
   <!-- Nội dung chính -->
   <div id="mainUI" style="display:none;flex-direction:column;gap:12px">
+
+    <div class="card">
+      <h2>Người kiểm tra</h2>
+      <div class="field">
+        <label for="nguoiKiem">Ai đang kiểm/đóng thùng này</label>
+        <select id="nguoiKiem"></select>
+        <div class="hint">Mặc định là tài khoản đang đăng nhập. Chọn tên khác nếu người kiểm không phải bạn — ghi nhận cùng lúc với ngày giờ kiểm.</div>
+      </div>
+    </div>
 
     <div class="card">
       <h2>Trạm đang hoạt động (không bắt buộc)</h2>
@@ -245,8 +256,20 @@ async function boot(){
   document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
   document.getElementById('ca').innerHTML = '<option value="">-- Chọn ca --</option>' + CA_LIST.map(c => '<option value="'+c+'">'+c+'</option>').join('');
   document.getElementById('ngay').value = getTodayString();
-  await loadTrams();
+  await Promise.all([loadNguoiKiem(), loadTrams()]);
   wire();
+}
+
+async function loadNguoiKiem(){
+  const sel = document.getElementById('nguoiKiem');
+  sel.innerHTML = '<option value="' + escapeHtml(myIdentity) + '">Tôi — ' + escapeHtml(myIdentity) + '</option>';
+  const { data } = await sb.from('master_employees').select('ten_nhan_vien,vai_tro').order('ten_nhan_vien');
+  const rows = (data || []).filter(r => r.ten_nhan_vien);
+  rows.sort((a, b) => (a.vai_tro === 'nhan_vien' ? 0 : 1) - (b.vai_tro === 'nhan_vien' ? 0 : 1));
+  rows.forEach(r => {
+    sel.innerHTML += '<option value="' + escapeHtml(r.ten_nhan_vien) + '">' + escapeHtml(r.ten_nhan_vien)
+      + (r.vai_tro && r.vai_tro !== 'nhan_vien' ? ' (' + escapeHtml(r.vai_tro) + ')' : '') + '</option>';
+  });
 }
 document.getElementById('btnGoLogin').addEventListener('click', () => {
   window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
@@ -282,9 +305,10 @@ async function ghiNhan(raw){
   showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
 
   const p_id_tram = document.getElementById('tram').value || null;
+  const p_nguoi_kiem = document.getElementById('nguoiKiem').value || myIdentity;
 
   try {
-    const { data, error } = await sb.rpc('cd_ghi_nhan_tem_thanh_pham', { p_tag_no: tagNo, p_id_tram, p_nguoi: myIdentity });
+    const { data, error } = await sb.rpc('cd_ghi_nhan_tem_thanh_pham', { p_tag_no: tagNo, p_nguoi_kiem, p_id_tram });
     if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', error.message || String(error)]]); beep(false); showMsg('', ''); return; }
     if (!data || data.ok === false) {
       const isDup = data && data.da_ghi_nhan;
@@ -300,7 +324,8 @@ async function ghiNhan(raw){
       ['Thùng', 'số ' + (data.so_thung_stt ?? '?')],
       ['Số lượng', fmtNum(data.so_luong) + ' pcs'],
       ['Nguồn (tem Đúc)', (data.nguon || []).length + ' tem'],
-      ['Lúc', fmtTime(data.ngay_gio_ghi_nhan)],
+      ['Người kiểm', data.nguoi_kiem],
+      ['Ngày giờ kiểm', fmtTime(data.ngay_gio_ghi_nhan)],
     ];
     renderResult('ok', '✓ Đã ghi nhận thùng', lines);
     beep(true);
