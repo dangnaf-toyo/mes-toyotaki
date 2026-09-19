@@ -209,6 +209,7 @@
               <div><label for="sp-ten">Tên SP</label><input type="text" autocomplete="off" id="sp-ten"></div>
               <div><label for="sp-makhachhang">Mã khách hàng</label><input type="text" autocomplete="off" id="sp-makhachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
               <div><label for="sp-khachhang">Tên khách hàng</label><input type="text" autocomplete="off" id="sp-khachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
+              <div><label for="sp-masptaikh">Mã SP tại khách hàng</label><input type="text" autocomplete="off" id="sp-masptaikh" placeholder="SKU/mã hàng phía khách hàng — tem thành phẩm"></div>
               <div><label for="sp-cavity">Cavity</label><input type="number" step="any" id="sp-cavity"></div>
               <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
               <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
@@ -595,6 +596,7 @@ function spFillForm(r){
   document.getElementById('sp-ten').value = r.ten_sp || '';
   document.getElementById('sp-makhachhang').value = r.ma_khach_hang || '';
   document.getElementById('sp-khachhang').value = r.ten_khach_hang || '';
+  document.getElementById('sp-masptaikh').value = r.ma_sp_khach_hang || '';
   document.getElementById('sp-cavity').value = r.cavity ?? '';
   document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
   document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
@@ -610,6 +612,7 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const ten_sp = document.getElementById('sp-ten').value.trim() || null;
   const ma_khach_hang = document.getElementById('sp-makhachhang').value.trim() || null;
   const ten_khach_hang = document.getElementById('sp-khachhang').value.trim() || null;
+  const ma_sp_khach_hang = document.getElementById('sp-masptaikh').value.trim() || null;
   const cavityRaw = document.getElementById('sp-cavity').value;
   const ctRaw = document.getElementById('sp-ct').value;
   const cavity = cavityRaw === '' ? null : Number(cavityRaw);
@@ -622,9 +625,9 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   if (!ma_sp) return;
   let error;
   if (spEditing){
-    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
+    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
   } else {
-    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }));
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
   toast(spEditing ? 'Đã lưu ' + ma_sp : 'Đã thêm ' + ma_sp);
@@ -634,7 +637,7 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
 initCatalog({
   id: 'sp',
   emptyText: 'Chưa có sản phẩm nào.',
-  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan'),
+  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan'),
   pk: r => r.ma_sp,
   resetForm: spResetForm,
   fillForm: spFillForm,
@@ -643,6 +646,7 @@ initCatalog({
     { k: 'ma_sp', label: 'Mã SP', sortable: true, sortVal: r => r.ma_sp, text: r => r.ma_sp, render: r => escapeHtml(r.ma_sp) },
     { k: 'ten_sp', label: 'Tên SP', sortable: true, sortVal: r => r.ten_sp || '', text: r => r.ten_sp || '', render: r => escapeHtml(r.ten_sp) || DASH },
     { k: 'khach_hang', label: 'Mã KH — Tên khách hàng', sortable: true, sortVal: r => (r.ma_khach_hang || r.ten_khach_hang || ''), text: r => [r.ma_khach_hang, r.ten_khach_hang].filter(Boolean).join(' '), render: r => [r.ma_khach_hang, r.ten_khach_hang].filter(Boolean).map(escapeHtml).join(' — ') || DASH },
+    { k: 'ma_sp_khach_hang', label: 'Mã SP tại KH', sortable: true, sortVal: r => r.ma_sp_khach_hang || '', text: r => r.ma_sp_khach_hang || '', render: r => escapeHtml(r.ma_sp_khach_hang) || DASH },
     { k: 'cavity', label: 'Cavity', sortable: true, sortVal: r => r.cavity == null ? -Infinity : Number(r.cavity), text: r => r.cavity == null ? '' : String(r.cavity), render: r => r.cavity ?? DASH },
     { k: 'cycle_time_s', label: 'Cycle time (s)', sortable: true, sortVal: r => r.cycle_time_s == null ? -Infinity : Number(r.cycle_time_s), text: r => r.cycle_time_s == null ? '' : String(r.cycle_time_s), render: r => r.cycle_time_s ?? DASH },
     { k: 'nguyen_lieu', label: 'Nguyên liệu', sortable: true, sortVal: r => r.nguyen_lieu || '', text: r => r.nguyen_lieu || '', render: r => escapeHtml(r.nguyen_lieu) || DASH },

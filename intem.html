@@ -147,6 +147,7 @@ textarea{resize:vertical;min-height:48px}
     <button type="button" class="tab-btn active" id="tabBtnPrint">🖨️ In Tem</button>
     <button type="button" class="tab-btn" id="tabBtnSearch">🔎 Tra cứu Tem</button>
     <button type="button" class="tab-btn" id="tabBtnKanban">📋 Chỉ thị SX</button>
+    <button type="button" class="tab-btn" id="tabBtnTp">🏷️ Tem Thành Phẩm</button>
   </div>
 
   <!-- ============ TAB: In Tem (tạo tem mới) ============ -->
@@ -265,6 +266,68 @@ textarea{resize:vertical;min-height:48px}
         <button class="btn btn-p" type="button" onclick="printKanbanBatch()">🖨 In lại cả lô</button>
       </div>
       <div class="empty-hint" style="text-align:left;padding-top:8px">Tem chỉ thị ở trạng thái <b>Chờ sản xuất</b> — chỉ cộng vào sản lượng khi người thao tác quét QR ghi nhận tại màn hình "Ghi nhận thùng (Kanban)".</div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: Tem Thành Phẩm ============ -->
+  <div id="panelTp" style="display:none">
+    <div class="card">
+      <div class="card-ttl">In trước lô tem thành phẩm</div>
+      <div class="grid">
+        <div class="fg">
+          <label class="req" for="tp_congDoan">Công đoạn</label>
+          <select id="tp_congDoan" onchange="onTpCongDoanChange()"></select>
+        </div>
+        <div class="fg">
+          <label class="req" for="tp_maSP">Mã sản phẩm</label>
+          <select id="tp_maSP" onchange="onTpMaChange()"></select>
+        </div>
+        <div class="fg">
+          <label for="tp_tenSP">Tên sản phẩm</label>
+          <input id="tp_tenSP" type="text" placeholder="Tự điền theo mã" disabled>
+        </div>
+        <div class="fg">
+          <label for="tp_khachHang">Khách hàng</label>
+          <input id="tp_khachHang" type="text" placeholder="Tự điền theo mã (Mã KH — Tên KH)" disabled>
+        </div>
+        <div class="fg">
+          <label for="tp_maSpKh">Mã SP tại khách hàng</label>
+          <input id="tp_maSpKh" type="text" placeholder="Tự điền theo mã" disabled>
+        </div>
+        <div class="fg">
+          <label class="req" for="tp_ngay">Ngày sản xuất</label>
+          <input id="tp_ngay" type="date">
+        </div>
+        <div class="fg">
+          <label class="req" for="tp_nguoiKiem">Người kiểm tra</label>
+          <select id="tp_nguoiKiem"></select>
+        </div>
+        <div class="fg">
+          <label for="tp_slChuan">SL / thùng (theo công đoạn)</label>
+          <input id="tp_slChuan" type="text" disabled>
+        </div>
+        <div class="fg">
+          <label class="req" for="tp_soThung">Số thùng</label>
+          <input id="tp_soThung" type="number" placeholder="Số tem cần in" min="1">
+        </div>
+        <div class="fg">
+          <label for="tp_slThungCuoi">SL thùng cuối (nếu lẻ)</label>
+          <input id="tp_slThungCuoi" type="number" placeholder="Bỏ trống nếu đều nhau" min="1">
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-s" type="button" onclick="clearTp()">🗑 Xóa</button>
+        <button class="btn btn-p" id="tp_btnTao" type="button" onclick="taoLoTemThanhPham()">🏷️ Tạo lô &amp; in</button>
+      </div>
+    </div>
+
+    <div class="card" id="tp_batchCard" style="display:none">
+      <div class="card-ttl">Lô vừa tạo — <span id="tp_batchLo"></span></div>
+      <div id="tp_batchList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+      <div class="btns">
+        <button class="btn btn-p" type="button" onclick="printTpBatch()">🖨 In lại cả lô</button>
+      </div>
+      <div class="empty-hint" style="text-align:left;padding-top:8px">Tem thành phẩm ở trạng thái <b>Chờ đóng gói</b> — người đóng thùng chỉ quét QR ở màn hình "Ghi nhận thùng thành phẩm" khi thùng đầy, hệ thống tự trừ nguồn từ tem Đúc đang có mặt tại công đoạn.</div>
     </div>
   </div>
 
@@ -430,20 +493,23 @@ function mondayOf(dateStr){
 // TABS
 // =============================================================================
 function switchTab(tab){
-  var tabs = ['print', 'search', 'kanban'];
+  var tabs = ['print', 'search', 'kanban', 'tp'];
   if (tabs.indexOf(tab) < 0) tab = 'print';
   document.getElementById('tabBtnPrint').classList.toggle('active', tab === 'print');
   document.getElementById('tabBtnSearch').classList.toggle('active', tab === 'search');
   document.getElementById('tabBtnKanban').classList.toggle('active', tab === 'kanban');
+  document.getElementById('tabBtnTp').classList.toggle('active', tab === 'tp');
   document.getElementById('panelPrint').style.display = tab === 'print' ? 'block' : 'none';
   document.getElementById('panelSearch').style.display = tab === 'search' ? 'block' : 'none';
   document.getElementById('panelKanban').style.display = tab === 'kanban' ? 'block' : 'none';
+  document.getElementById('panelTp').style.display = tab === 'tp' ? 'block' : 'none';
   if (tab !== 'search') { stopCamera(); }
 }
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tabBtnPrint').addEventListener('click', () => switchTab('print'));
   document.getElementById('tabBtnSearch').addEventListener('click', () => switchTab('search'));
   document.getElementById('tabBtnKanban').addEventListener('click', () => switchTab('kanban'));
+  document.getElementById('tabBtnTp').addEventListener('click', () => switchTab('tp'));
 });
 
 // =============================================================================
@@ -451,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
-    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan').order('ma_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan,ma_khach_hang,ten_khach_hang,ma_sp_khach_hang').order('ma_sp'),
     sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
@@ -459,11 +525,15 @@ async function loadMaster(){
   if (may.error) throw new Error('Không tải được danh mục máy: ' + may.error.message);
   if (nv.error) throw new Error('Không tải được danh mục nhân sự: ' + nv.error.message);
 
-  masterData = (prod.data || []).map(r => ({ ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '', slDongGoiChuan: r.sl_dong_goi_chuan || '' }));
+  masterData = (prod.data || []).map(r => ({
+    ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '', slDongGoiChuan: r.sl_dong_goi_chuan || '',
+    maKhachHang: r.ma_khach_hang || '', tenKhachHang: r.ten_khach_hang || '', maSpKhachHang: r.ma_sp_khach_hang || '',
+  }));
   masterMap = {};
   masterData.forEach(m => { masterMap[m.ma] = m; });
   buildSelects(masterData, (may.data||[]).map(r=>r.ma_may), (nv.data||[]).map(r=>r.ten_nhan_vien));
   buildKanbanForm(masterData, may.data || []);
+  buildTpForm(masterData, (nv.data||[]).map(r=>r.ten_nhan_vien));
 }
 
 function fillOptions(sel, values, placeholder){
@@ -1112,7 +1182,221 @@ function openPrintMulti(dList){
 document.addEventListener('DOMContentLoaded', () => {
   var kn = document.getElementById('k_ngay');
   if (kn && !kn.value) kn.value = getTodayString();
+  var tn = document.getElementById('tp_ngay');
+  if (tn && !tn.value) tn.value = getTodayString();
 });
+
+// =============================================================================
+// TEM THÀNH PHẨM — in trước lô (giống Kanban) + đóng gói theo công đoạn.
+// Định mức SL/thùng theo công đoạn — KHÔNG lấy master_products.sl_dong_goi_chuan
+// (cột đó giữ quy cách thùng Đúc/150) — khớp CONFIG.PACKAGING bên
+// chuyencongdoan.html (Đóng gói lại), chỉ có Đánh bóng tính đến nay.
+// =============================================================================
+var TP_PACKAGING = { "Đánh bóng": 60 };
+var lastTpBatch = null;
+
+function buildTpForm(items, nguois){
+  var selCd = document.getElementById('tp_congDoan');
+  selCd.innerHTML = '<option value="">-- Chọn công đoạn --</option>' +
+    Object.keys(TP_PACKAGING).map(function(cd){ return '<option value="' + cd + '">' + cd + '</option>'; }).join('');
+  var selSp = document.getElementById('tp_maSP');
+  selSp.innerHTML = '<option value="">-- Chọn mã SP --</option>' +
+    items.map(function(m){ return '<option value="' + m.ma + '">' + m.ma + '</option>'; }).join('');
+  fillOptions(document.getElementById('tp_nguoiKiem'), nguois, '-- Chọn người kiểm tra --');
+}
+
+function onTpCongDoanChange(){
+  var cd = document.getElementById('tp_congDoan').value;
+  var sl = TP_PACKAGING[cd] || 0;
+  document.getElementById('tp_slChuan').value = sl > 0 ? fmtInt(sl) + ' pcs' : '';
+}
+
+function onTpMaChange(){
+  var ma = document.getElementById('tp_maSP').value;
+  var item = masterMap[ma];
+  document.getElementById('tp_tenSP').value = item ? item.ten : '';
+  document.getElementById('tp_khachHang').value = item ? [item.maKhachHang, item.tenKhachHang].filter(Boolean).join(' — ') : '';
+  document.getElementById('tp_maSpKh').value = item ? item.maSpKhachHang : '';
+}
+
+function tpSlThung(){
+  return TP_PACKAGING[document.getElementById('tp_congDoan').value] || 0;
+}
+
+function clearTp(){
+  ['tp_maSP', 'tp_congDoan', 'tp_nguoiKiem'].forEach(function(i){ document.getElementById(i).value = ''; });
+  ['tp_tenSP', 'tp_khachHang', 'tp_maSpKh', 'tp_slChuan', 'tp_soThung', 'tp_slThungCuoi']
+    .forEach(function(i){ document.getElementById(i).value = ''; });
+  document.getElementById('tp_batchCard').style.display = 'none';
+  document.getElementById('msg').style.display = 'none';
+}
+
+async function taoLoTemThanhPham(){
+  if (!(await requireLoginOrRedirect())) return;
+  var cd = g('tp_congDoan'), ma = g('tp_maSP'), ngay = g('tp_ngay'), nguoiKiem = g('tp_nguoiKiem');
+  var soThung = g('tp_soThung'), slCuoi = g('tp_slThungCuoi');
+  var slThung = tpSlThung();
+  if (!cd) return err('Chọn Công đoạn');
+  if (!ma) return err('Chọn Mã sản phẩm');
+  if (!ngay) return err('Chọn Ngày sản xuất');
+  if (!nguoiKiem) return err('Chọn Người kiểm tra');
+  if (slThung <= 0) return err('Công đoạn "' + cd + '" chưa khai định mức SL/thùng');
+  if (!soThung || isNaN(soThung) || +soThung <= 0 || +soThung % 1 !== 0) return err('Số thùng phải là số nguyên > 0');
+  if (+soThung > 500) return err('Tối đa 500 tem / lô');
+  if (slCuoi && (isNaN(slCuoi) || +slCuoi <= 0)) return err('SL thùng cuối không hợp lệ');
+
+  var nguoi = '';
+  try { nguoi = (await MesAuth.getCurrentUserIdentity()) || ''; } catch (e) {}
+  if (!nguoi) { try { nguoi = (await MesAuth.getSession())?.user?.email || ''; } catch (e) {} }
+
+  var btn = document.getElementById('tp_btnTao');
+  btn.disabled = true; btn.textContent = '⏳ Đang tạo lô…';
+  showMsg('⏳ Đang sinh ' + soThung + ' tem thành phẩm…', 'wait');
+  try {
+    var res = await sb.rpc('cd_tao_lo_tem_thanh_pham', {
+      p_cong_doan: cd, p_ma_sp: ma, p_ngay: ngay,
+      p_so_thung: Number(soThung), p_sl_thung: slThung,
+      p_sl_thung_cuoi: slCuoi ? Number(slCuoi) : null,
+      p_nguoi_kiem: nguoiKiem, p_nguoi: nguoi,
+    });
+    btn.disabled = false; btn.textContent = '🏷️ Tạo lô & in';
+    if (res.error) return err('Lỗi server: ' + res.error.message);
+    var data = res.data;
+    if (!data || !data.ok) return err(data && data.error ? data.error : 'Tạo lô thất bại');
+    lastTpBatch = data.tems || [];
+    renderTpBatch(data.id_lo_chi_thi, lastTpBatch);
+    showMsg('✅ Đã tạo ' + data.so_tem + ' tem (lô ' + data.id_lo_chi_thi + ') — đang mở cửa sổ in…', 'ok', 6000);
+    printTpBatch();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '🏷️ Tạo lô & in';
+    err('Lỗi: ' + (e && e.message ? e.message : e));
+  }
+}
+
+function renderTpBatch(lo, tems){
+  document.getElementById('tp_batchLo').textContent = lo + ' · ' + tems.length + ' tem';
+  document.getElementById('tp_batchList').innerHTML = tems.map(function(t, i){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;'
+      + 'padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px">'
+      + '<span><b>' + svgEsc(t.tag_no) + '</b> · ' + fmtInt(t.so_luong) + ' pcs</span>'
+      + '<button class="btn btn-s" type="button" style="flex:none;padding:5px 10px;min-width:0" '
+      + 'onclick="printTpOne(' + i + ')">🖨 In lại</button>'
+      + '</div>';
+  }).join('');
+  document.getElementById('tp_batchCard').style.display = 'block';
+}
+
+/** 1 phần tử tems (từ cd_tao_lo_tem_thanh_pham) -> object cho buildTpLabelSvg.
+    QR: tag_no>ten_sp>ma_sp>so_luong>dd/mm/yyyy>yyyy-mm-dd>ma_sp_khach_hang>
+    ten_khach_hang>nguoi_kiem — 6 trường đầu cùng vị trí với QR tem Kanban Đúc. */
+function tpTemToPrintData(t){
+  var ngayISO = String(t.ngay || '');
+  var p = ngayISO.split('-');
+  var ngayQR = p.length === 3 ? (p[0] + '/' + p[1] + '/' + p[2]) : ngayISO;
+  var ngayHienThi = p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : ngayISO;
+  var qr = [t.tag_no, t.ten_sp, t.ma_sp, t.so_luong, ngayQR, ngayISO, t.ma_sp_khach_hang || '', t.ten_khach_hang || '', t.nguoi_kiem].join('>\n');
+  return {
+    ok: true, tagNo: t.tag_no, qr: qr, ngaySX: ngayHienThi,
+    tenSP: t.ten_sp, maSP: t.ma_sp, soLuong: t.so_luong,
+    maSpKhachHang: t.ma_sp_khach_hang || '', tenKhachHang: t.ten_khach_hang || '',
+    nguoiKiem: t.nguoi_kiem,
+  };
+}
+
+function printTpOne(i){
+  if (!lastTpBatch || !lastTpBatch[i]) return;
+  openPrintMultiTp([tpTemToPrintData(lastTpBatch[i])]);
+}
+
+function printTpBatch(){
+  if (!lastTpBatch || !lastTpBatch.length){ err('Chưa có lô nào để in'); return; }
+  openPrintMultiTp(lastTpBatch.map(tpTemToPrintData));
+}
+
+// Tem Thành Phẩm — logo + tiêu đề + tên công ty CĂN GIỮA đầu tem (logo ghim
+// mép trái), 6 dòng thông tin bên trái, SL/thùng + Ngày SX dạng ô số liệu
+// nhỏ + QR ở góc dưới bên phải — bố cục đã duyệt qua Artifact.
+function buildTpLabelSvg(d){
+  var W = 100, H = 70;
+  var logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPC9zdmc+Cg==";
+  var rows = [
+    {lbl:"Mã SP",        val:d.maSP},
+    {lbl:"Mã SP tại KH", val:d.maSpKhachHang},
+    {lbl:"Tên SP",       val:d.tenSP, big:true},
+    {lbl:"Khách hàng",   val:d.tenKhachHang},
+    {lbl:"Người kiểm",   val:d.nguoiKiem},
+    {lbl:"Tag No",       val:d.tagNo}
+  ];
+  var divX = 63, rowStartY = 23, rowH = 7.4;
+
+  var s = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
+  s += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#ffffff"/>';
+  s += '<image x="4" y="2.6" width="9" height="8.3" href="'+logoUri+'"/>';
+  s += '<text x="'+(W/2)+'" y="9.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
+  s += '<text x="'+(W/2)+'" y="13.8" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.7" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
+  s += '<line x1="3" y1="16" x2="'+(W-3)+'" y2="16" stroke="#000" stroke-width="0.35"/>';
+  s += '<line x1="'+divX+'" y1="18" x2="'+divX+'" y2="'+(H-3)+'" stroke="#000" stroke-width="0.3" stroke-dasharray="1,1"/>';
+
+  rows.forEach(function(r, i){
+    var y = rowStartY + i*rowH;
+    var lblSize = 3.0;
+    var valSize = r.big ? 4.2 : 3.7;
+    var vLen = String(r.val||"").length;
+    if (vLen > 16) valSize -= 0.5;
+    if (vLen > 24) valSize -= 0.5;
+    s += '<text x="4.5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="#334155">'+svgEsc(r.lbl)+'</text>';
+    s += '<text x="4.5" y="'+(y+3.4).toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="#000">'+svgEsc(r.val)+'</text>';
+  });
+
+  // Ô số liệu nhỏ SL/thùng · Ngày SX
+  var statY = 19, statH = 12, statW = (W - divX - 6 - 2) / 2;
+  [ {lbl:"SL/THÙNG", val:fmtInt(d.soLuong) + " pcs"}, {lbl:"NGÀY SX", val:d.ngaySX} ].forEach(function(st, i){
+    var x = divX + 3 + i*(statW + 2);
+    s += '<rect x="'+x.toFixed(2)+'" y="'+statY+'" width="'+statW.toFixed(2)+'" height="'+statH+'" rx="0.8" fill="#F5F7FA" stroke="#E2E8F0" stroke-width="0.25"/>';
+    s += '<text x="'+(x+1.6).toFixed(2)+'" y="'+(statY+4.4)+'" font-family="Arial,Helvetica,sans-serif" font-size="2.2" font-weight="bold" fill="#64748B">'+svgEsc(st.lbl)+'</text>';
+    s += '<text x="'+(x+1.6).toFixed(2)+'" y="'+(statY+9.2)+'" font-family="Arial,Helvetica,sans-serif" font-size="3.4" font-weight="bold" fill="#000">'+svgEsc(st.val)+'</text>';
+  });
+
+  // QR góc dưới bên phải
+  var qrSize = W - divX - 6, qrX = divX + 3, qrY = H - 3 - qrSize;
+  s += '<g transform="translate('+qrX.toFixed(2)+','+qrY.toFixed(2)+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
+
+  s += '</svg>';
+  return s;
+}
+
+function openPrintMultiTp(dList){
+  if (!dList || !dList.length){ err('Không có tem để in'); return; }
+  var PER_PAGE = 8;
+  var cells = dList.map(function(d){ return '<div class="cell">' + buildTpLabelSvg(d) + '</div>'; });
+  var pages = '';
+  for (var i = 0; i < cells.length; i += PER_PAGE){
+    pages += '<div class="pg">' + cells.slice(i, i + PER_PAGE).join('') + '</div>';
+  }
+  var nPages = Math.ceil(cells.length / PER_PAGE);
+  var css = [
+    "@page{size:A4 portrait;margin:6mm}",
+    "*{margin:0;padding:0;box-sizing:border-box}",
+    "body{font-family:Arial,Helvetica,sans-serif;background:#fff}",
+    ".pg{width:198mm;display:grid;grid-template-columns:repeat(2,98mm);grid-auto-rows:68.5mm;gap:2mm;align-content:start;page-break-after:always}",
+    ".pg:last-child{page-break-after:auto}",
+    ".cell{border:0.3mm dashed #999;overflow:hidden;background:#fff}",
+    ".cell svg{display:block;width:100%;height:100%}",
+    ".pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:9}",
+    "@media print{.pbtn{display:none}}"
+  ].join("");
+  var popupHtml =
+    "<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"UTF-8\">"
+    + "<title>Lô tem Thành Phẩm (" + dList.length + " tem · " + nPages + " tờ A4)</title>"
+    + "<style>" + css + "</style></head><body>"
+    + pages
+    + '<button class="pbtn" onclick="window.print()">🖨 In ngay (' + dList.length + ' tem · ' + nPages + ' tờ)</button>'
+    + '<script>setTimeout(function(){window.print();},200);<\/script>'
+    + "</body></html>";
+  var w = window.open("", "_blank", "width=820,height=920,scrollbars=yes");
+  if (!w){ err("Trình duyệt chặn popup — cho phép popup rồi thử lại"); return; }
+  w.document.open(); w.document.write(popupHtml); w.document.close();
+}
 
 // =============================================================================
 // IN TEM (tạo tem mới)
