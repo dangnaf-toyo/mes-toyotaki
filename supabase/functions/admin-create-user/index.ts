@@ -18,7 +18,7 @@ const ROLES = [
   'nhan_vien_duc', 'nhan_vien_bavia', 'nhan_vien_gia_cong', 'nhan_vien_danh_bong',
   'nhan_vien_oqc', 'nhan_vien_son',
 ];
-const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Sơn', 'OQC'];
+const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng', 'Sơn', 'OQC'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
