@@ -1309,17 +1309,18 @@ function printTpBatch(){
 }
 
 // Tem Thành Phẩm — logo + tiêu đề + tên công ty CĂN GIỮA đầu tem (logo ghim
-// mép trái), 6 dòng thông tin bên trái (nhãn + giá trị CHUNG 1 dòng, giống
-// tem Kanban Đúc), QR lấp đầy toàn bộ cột phải. KHÔNG in Người kiểm/Ngày SX
-// (chọn lúc quét ghi nhận thùng — xem T41) — bố cục đã duyệt qua Artifact.
+// mép trái), 6 dòng thông tin bên trái (Khách hàng lên đầu, nhãn + giá trị
+// CHUNG 1 dòng, giống tem Kanban Đúc), KHÔNG có vạch dọc ngăn cách với QR —
+// QR lấp đầy toàn bộ cột phải, không in Người kiểm/Ngày SX (chọn lúc quét
+// ghi nhận thùng — xem T41) — bố cục đã duyệt qua Artifact + chỉnh tay.
 function buildTpLabelSvg(d){
   var W = 100, H = 70;
   var logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPC9zdmc+Cg==";
   var rows = [
+    {lbl:"Khách hàng",   val:d.tenKhachHang, big:true},
     {lbl:"Mã SP",        val:d.maSP,        big:true},
     {lbl:"Mã SP tại KH", val:d.maSpKhachHang},
     {lbl:"Tên SP",       val:d.tenSP,        big:true},
-    {lbl:"Khách hàng",   val:d.tenKhachHang},
     {lbl:"Số lượng",     val:fmtInt(d.soLuong) + " pcs", big:true},
     {lbl:"Tag No",       val:d.tagNo}
   ];
@@ -1327,11 +1328,10 @@ function buildTpLabelSvg(d){
 
   var s = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
   s += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#ffffff"/>';
-  s += '<image x="4" y="2.6" width="9" height="8.3" href="'+logoUri+'"/>';
-  s += '<text x="'+(W/2)+'" y="9.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
-  s += '<text x="'+(W/2)+'" y="13.8" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.7" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
+  s += '<image x="4" y="2.4" width="9" height="8.3" href="'+logoUri+'" preserveAspectRatio="xMidYMid meet"/>';
+  s += '<text x="'+(W/2)+'" y="9" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
+  s += '<text x="'+(W/2)+'" y="13.6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.4" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
   s += '<line x1="3" y1="16" x2="'+(W-3)+'" y2="16" stroke="#000" stroke-width="0.35"/>';
-  s += '<line x1="'+divX+'" y1="18" x2="'+divX+'" y2="'+(H-3)+'" stroke="#000" stroke-width="0.35"/>';
 
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
