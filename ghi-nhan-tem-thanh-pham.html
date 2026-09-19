@@ -12,19 +12,26 @@
   ghi-nhan-tem-thanh-pham.html — màn quét ghi nhận thùng THÀNH PHẨM (tem in
   trước ở intem.html tab "Tem Thành Phẩm"). Mỗi thùng đủ quy cách (VD 60pcs
   Đánh bóng), chọn Người kiểm tra rồi quét QR trên tem tại đây → RPC
-  cd_ghi_nhan_tem_thanh_pham TỰ ĐỘNG trừ FIFO từ các tem Đúc đang có mặt tại
-  công đoạn (theo cd_chuyen_cong_doan_log đã xác nhận), ghi lineage vào
-  cd_tem_nguon (truy xuất nguồn gốc), chuyển trạng thái 'Chờ đóng gói TP' →
-  'Đã đóng gói TP'. Mã SP/khách hàng đã in sẵn trên tem từ lúc tạo lô — CHỈ
-  "Người kiểm tra" + "ngày giờ kiểm" (ngay_gio_ghi_nhan) mới ghi nhận Ở ĐÂY,
-  đúng lúc thùng đầy chuẩn bị gài tem vào thùng (T41 — trước đó T40 in sẵn
-  người kiểm lúc tạo lô, đã sửa theo yêu cầu thực tế).
+  cd_ghi_nhan_tem_thanh_pham trừ nguồn từ các tem Đúc ĐÃ ĐƯỢC KHAI BÁO đang
+  dùng (không tự động chọn ngầm nữa — xem T43), ghi lineage vào cd_tem_nguon
+  (truy xuất nguồn gốc), chuyển trạng thái 'Chờ đóng gói TP' → 'Đã đóng gói
+  TP'. Mã SP/khách hàng đã in sẵn trên tem từ lúc tạo lô — CHỈ "Người kiểm
+  tra" + "ngày giờ kiểm" (ngay_gio_ghi_nhan) mới ghi nhận Ở ĐÂY.
+
+  T43 — dây chuyền Đánh bóng lấy nhiều thùng Đúc 1 lúc: người ở cuối chuyền
+  ĐỌC TEM thùng Đúc đang đánh (khu "Tem Đúc đang dùng" bên dưới) để khai báo
+  tường minh — hệ thống CHỈ trừ nguồn từ các tem đã khai báo, theo đúng thứ
+  tự khai báo (không tự nhảy sang tem khác). Khi 1 tem nguồn hết, hệ thống
+  cảnh báo ngay sau lần ghi nhận làm nó hết — đọc tem thùng tiếp theo trước
+  khi ghi nhận tiếp. Tem Đúc đã dùng hết (so_luong=0) không khai báo lại
+  được. 1 thùng thành phẩm vẫn có thể lấy từ 2 tem Đúc liền kề trong hàng
+  đợi (150/60 không chia hết, không tránh được).
 
   Chọn "Trạm đang hoạt động" 1 lần đầu ca (không bắt buộc) để sản lượng OK tự
   cộng vào đúng trạm trên Bảng điều khiển công đoạn — bỏ trống vẫn ghi nhận
   được, chỉ là không cộng sản lượng vào trạm nào.
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (đổi luồng người kiểm).
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn).
 -->
 <style>
 :root{
@@ -88,6 +95,17 @@ select:focus,input:focus{border-color:var(--accent)}
 #phienLog .li .mono{font-size:12px;color:var(--text-muted)}
 .empty{padding:18px;text-align:center;color:var(--text-dim);font-style:italic;font-size:13px}
 
+/* ── Tem Đúc đang dùng (T43) ── */
+#nguonList{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.nguon-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:9px;border:1.5px solid var(--ok-bd);background:var(--ok-bg)}
+.nguon-item .n-tag{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:var(--text)}
+.nguon-item .n-sp{font-size:12px;color:var(--text-muted);margin-top:1px}
+.nguon-item .n-con{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px;color:var(--ok-fg)}
+.het-banner{display:none;margin-top:12px;padding:12px 14px;border-radius:9px;background:var(--warn-bg);
+  border:1.5px solid var(--warn-bd);color:var(--warn-fg);font-size:14px;font-weight:700}
+.het-banner.show{display:block}
+
 /* ── Chặn khi chưa đăng nhập ── */
 #authGate{display:none;text-align:center;padding:28px 16px}
 #authGate.show{display:block}
@@ -135,7 +153,7 @@ select:focus,input:focus{border-color:var(--accent)}
     </div>
 
     <div class="card">
-      <h2>Trạm đang hoạt động (không bắt buộc)</h2>
+      <h2>Công đoạn &amp; trạm đang hoạt động</h2>
       <div class="field-row">
         <div class="field">
           <label for="congDoan">Công đoạn</label>
@@ -151,10 +169,26 @@ select:focus,input:focus{border-color:var(--accent)}
         <input type="date" id="ngay">
       </div>
       <div class="field">
-        <label for="tram">Trạm/tổ</label>
+        <label for="tram">Trạm/tổ (không bắt buộc)</label>
         <select id="tram"><option value="">-- Không gắn trạm (chỉ ghi nhận, không cộng sản lượng) --</option></select>
-        <div class="hint">Chọn 1 lần đầu ca — mọi lượt quét tiếp theo tự cộng sản lượng OK vào đúng trạm này.</div>
+        <div class="hint">"Công đoạn" dùng để khai báo tem Đúc đang dùng bên dưới — chọn đúng trước khi đọc tem. "Trạm/tổ" chỉ để cộng sản lượng, chọn 1 lần đầu ca.</div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Tem Đúc đang dùng</h2>
+      <button type="button" class="btn" id="btnScanNguon">📷 Đọc tem thùng Đúc đang đánh</button>
+      <input type="file" id="qrFileInputNguon" accept="image/*" capture="environment" style="display:none">
+      <div class="field" style="margin-top:14px">
+        <label for="tagInputNguon">…hoặc nhập Tag No thủ công</label>
+        <div class="row">
+          <input type="text" id="tagInputNguon" placeholder="VD: TKD20260919-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button type="button" class="btn mini" id="btnKhaiBao">Khai báo</button>
+        </div>
+      </div>
+      <div class="het-banner" id="hetBanner"></div>
+      <div id="nguonList"><div class="empty">Chưa khai báo tem Đúc nào — đọc tem thùng đang đánh trước khi ghi nhận thùng thành phẩm.</div></div>
+      <div class="hint">Mỗi lần lấy nhiều thùng Đúc về chuyền, đọc lần lượt từng tem — hệ thống chỉ trừ nguồn theo đúng thứ tự đã đọc. Tem đã dùng hết không đọc lại được.</div>
     </div>
 
     <div class="card">
@@ -258,7 +292,7 @@ async function boot(){
   document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
   document.getElementById('ca').innerHTML = '<option value="">-- Chọn ca --</option>' + CA_LIST.map(c => '<option value="'+c+'">'+c+'</option>').join('');
   document.getElementById('ngay').value = getTodayString();
-  await Promise.all([loadNguoiKiem(), loadTrams()]);
+  await Promise.all([loadNguoiKiem(), loadTrams(), loadNguonList()]);
   wire();
 }
 
@@ -293,6 +327,51 @@ async function loadTrams(){
   trams = data || [];
   sel.innerHTML = '<option value="">-- Không gắn trạm (chỉ ghi nhận, không cộng sản lượng) --</option>' +
     trams.map(t => '<option value="'+t.id_tram+'">'+escapeHtml(t.ten_tram)+' — '+escapeHtml(t.ma_sp)+'</option>').join('');
+}
+
+// ── Tem Đúc đang dùng (T43) ──────────────────────────────────────────────────
+let busyNguon = false;
+async function khaiBaoNguon(raw){
+  var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
+  if (!tagNo) { showMsg('Chưa có Tag No để khai báo.', 'err', 4000); return; }
+  if (busyNguon) return;
+  busyNguon = true;
+  document.getElementById('btnKhaiBao').disabled = true;
+  showMsg('⏳ Đang khai báo ' + tagNo + '…', 'wait');
+
+  const congDoan = document.getElementById('congDoan').value;
+  try {
+    const { data, error } = await sb.rpc('cd_khai_bao_nguon_dang_dung', { p_tag_no: tagNo, p_cong_doan: congDoan, p_nguoi: myIdentity });
+    if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); beep(false); return; }
+    if (!data || data.ok === false) { showMsg((data && data.error) || 'Không khai báo được', 'err', 6000); beep(false); return; }
+    showMsg((data.da_khai_bao_truoc_do ? '✓ Đã đang dùng ' : '✓ Đã khai báo ') + data.tag_no + ' — còn ' + fmtNum(data.so_luong_con_lai) + ' pcs', 'ok', 3000);
+    beep(true);
+    await loadNguonList();
+  } catch (e) {
+    showMsg('Lỗi: ' + (e && e.message ? e.message : e), 'err', 6000);
+    beep(false);
+  } finally {
+    busyNguon = false;
+    document.getElementById('btnKhaiBao').disabled = false;
+    document.getElementById('tagInputNguon').value = '';
+  }
+}
+
+async function loadNguonList(){
+  const { data, error } = await sb.from('duc_tem')
+    .select('tag_no,ma_sp,ten_sp,so_luong')
+    .not('thoi_diem_bat_dau_dung', 'is', null)
+    .gt('so_luong', 0)
+    .order('thoi_diem_bat_dau_dung', { ascending: true });
+  const box = document.getElementById('nguonList');
+  if (error){ box.innerHTML = '<div class="empty">Không tải được danh sách: ' + escapeHtml(error.message) + '</div>'; return; }
+  const rows = data || [];
+  if (!rows.length){ box.innerHTML = '<div class="empty">Chưa khai báo tem Đúc nào — đọc tem thùng đang đánh trước khi ghi nhận thùng thành phẩm.</div>'; return; }
+  box.innerHTML = rows.map(r =>
+    '<div class="nguon-item">' +
+      '<div><div class="n-tag">' + escapeHtml(r.tag_no) + '</div><div class="n-sp">' + escapeHtml(r.ma_sp) + (r.ten_sp ? ' — ' + escapeHtml(r.ten_sp) : '') + '</div></div>' +
+      '<div class="n-con">' + fmtNum(r.so_luong) + ' pcs</div>' +
+    '</div>').join('');
 }
 
 // ── Ghi nhận 1 tem ─────────────────────────────────────────────────────────
@@ -338,6 +417,14 @@ async function ghiNhan(raw){
       so_luong: Number(data.so_luong) || 0, at: data.ngay_gio_ghi_nhan,
     });
     renderPhien();
+    await loadNguonList();
+    const hetEl = document.getElementById('hetBanner');
+    if ((data.nguon_vua_het || []).length) {
+      hetEl.textContent = '⚠️ Tem nguồn ' + data.nguon_vua_het.join(', ') + ' vừa dùng hết — đọc tem thùng Đúc tiếp theo trước khi ghi nhận thùng kế tiếp.';
+      hetEl.classList.add('show');
+    } else {
+      hetEl.classList.remove('show');
+    }
   } catch (e) {
     renderResult('err', 'Lỗi', [['Chi tiết', e && e.message ? e.message : String(e)]]);
     beep(false);
@@ -370,11 +457,14 @@ function renderPhien(){
     '</div>').join('');
 }
 
-// ── Quét QR (theo pattern intem.html — 1 instance duy nhất) ────────────────
+// ── Quét QR (theo pattern intem.html — 1 instance duy nhất, dùng chung cho cả
+// "Tem Đúc đang dùng" lẫn "Quét tem thành phẩm" qua scanTarget) ─────────────
 let html5QrCode = null, scanningActive = false;
+let scanTarget = 'thanhpham'; // 'thanhpham' (ghiNhan) hoặc 'nguon' (khaiBaoNguon)
 function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode('qrReaderDiv'); return html5QrCode; }
 
-async function openCamera(){
+async function openCamera(target){
+  scanTarget = target || 'thanhpham';
   showMsg('', '');
   if (typeof Html5Qrcode !== 'function') {
     showMsg('Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang. Có thể nhập Tag No thủ công.', 'err');
@@ -395,7 +485,7 @@ async function openCamera(){
     await closeQrModal();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showMsg('📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…', 'wait');
-      document.getElementById('qrFileInput').click();
+      document.getElementById(scanTarget === 'nguon' ? 'qrFileInputNguon' : 'qrFileInput').click();
       return;
     }
     showMsg('Không mở được camera: ' + e + '. Kiểm tra quyền Camera cho trang này.', 'err');
@@ -414,9 +504,9 @@ async function onScanSuccess(decodedText){
   await closeQrModal();
   const tagNo = String(decodedText).split('>')[0].trim();
   if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
-  ghiNhan(tagNo);
+  if (scanTarget === 'nguon') khaiBaoNguon(tagNo); else ghiNhan(tagNo);
 }
-function onFileChosen(evt){
+function onFileChosen(evt, target){
   const file = evt.target.files && evt.target.files[0];
   evt.target.value = '';
   if (!file) { showMsg('Không nhận được ảnh (có thể bạn đã huỷ chụp).', 'err', 4000); return; }
@@ -425,7 +515,7 @@ function onFileChosen(evt){
     .then(decodedText => {
       const tagNo = String(decodedText).split('>')[0].trim();
       if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
-      ghiNhan(tagNo);
+      if (target === 'nguon') khaiBaoNguon(tagNo); else ghiNhan(tagNo);
     })
     .catch(() => showMsg('Không đọc được mã QR trong ảnh — chụp lại, để mã QR rõ nét và nằm giữa khung.', 'err', 5000));
 }
@@ -433,10 +523,13 @@ function onFileChosen(evt){
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
   ['congDoan', 'ngay', 'ca'].forEach(id => document.getElementById(id).addEventListener('change', loadTrams));
-  document.getElementById('btnScan').addEventListener('click', openCamera);
+  document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
+  document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
-  document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
+  document.getElementById('qrFileInput').addEventListener('change', (e) => onFileChosen(e, 'thanhpham'));
+  document.getElementById('qrFileInputNguon').addEventListener('change', (e) => onFileChosen(e, 'nguon'));
   document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
+  document.getElementById('btnKhaiBao').addEventListener('click', () => khaiBaoNguon(document.getElementById('tagInputNguon').value));
   document.getElementById('tagInput').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -450,8 +543,20 @@ function wire(){
     lastScanSubmitAt = now;
     ghiNhan(v);
   });
+  document.getElementById('tagInputNguon').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var v = e.target.value;
+    e.target.value = '';
+    if (!v.replace(/\s+/g, '')) return;
+    var now = Date.now();
+    if (now - lastScanSubmitAtNguon < 1500) return;
+    lastScanSubmitAtNguon = now;
+    khaiBaoNguon(v);
+  });
 }
 var lastScanSubmitAt = 0;
+var lastScanSubmitAtNguon = 0;
 
 boot();
 </script>
