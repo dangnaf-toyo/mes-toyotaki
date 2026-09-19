@@ -174,37 +174,16 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
     <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
     <input type="text" autocomplete="off" id="manualTagInput" placeholder="Bấm vào đây rồi quét bằng đầu đọc QR, hoặc gõ Tag No + Enter">
   </div>
-  <div class="empty-hint" id="emptyHint">Chưa quét tem nào. Bấm nút phía trên, hướng camera về phía mã QR trên tem — hệ thống tự nhận diện, không cần bấm chụp.</div>
+  <div class="empty-hint" id="emptyHint">Chưa quét tem nào. Bấm nút phía trên, hướng camera về phía mã QR trên tem — hệ thống tự nhận diện, không cần bấm chụp. Quét được nhiều tem liên tiếp để chuyển cùng lúc.</div>
 
   <div class="scanned-box" id="scannedBox">
-    <div class="badge-ok">✅ Đã đọc được tem</div>
-    <div class="sr"><div class="k">Tag No</div><div class="v" id="svTag"></div></div>
-    <div class="sr"><div class="k">Mã sản phẩm</div><div class="v" id="svMa"></div></div>
-    <div class="sr"><div class="k">Tên sản phẩm</div><div class="v" id="svTen"></div></div>
-    <div class="sr"><div class="k">Ngày đúc</div><div class="v" id="svNgay"></div></div>
-    <div class="sr"><div class="k">Lot No</div><div class="v" id="svLot"></div></div>
-    <div class="sr"><div class="k">Số khuôn</div><div class="v" id="svKhuon"></div></div>
-    <div class="sr"><div class="k">Nguyên liệu</div><div class="v" id="svNL"></div></div>
-    <div class="sr"><div class="k">Máy đúc</div><div class="v" id="svMay"></div></div>
-    <div class="sr"><div class="k">SL trên tem</div><div class="v" id="svSL"></div></div>
-    <button class="scan-btn rescan" id="btnRescan">🔄 Chụp lại tem khác</button>
+    <div class="badge-ok" id="scannedCountBadge">✅ Đã đọc được 1 tem</div>
+    <div id="scannedList"></div>
+    <button class="scan-btn rescan" id="btnRescan">📷 Quét thêm tem</button>
   </div>
 </div>
 <div class="card form-section" id="formSection">
-  <div class="card-ttl">🔀 Bước 2 — Thông tin chuyển công đoạn</div>
-
-  <div class="fg">
-    <label class="req" for="soLuong">Số lượng thực tế chuyển</label>
-    <input id="soLuong" type="number" min="1">
-    <div class="hint" id="slHint"></div>
-  </div>
-
-  <div class="fg" id="tachKhiChuyenWrap" style="display:none">
-    <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none">
-      <input type="checkbox" id="tachKhiChuyen" style="width:auto">
-      Phần còn lại vẫn ở công đoạn cũ (tách thành tem mới, không tính là hao hụt)
-    </label>
-  </div>
+  <div class="card-ttl">🔀 Bước 2 — Thông tin chuyển công đoạn (áp dụng cho cả lô)</div>
 
   <div class="fg">
     <label class="req" for="congDoanGiao">Công đoạn giao</label>
@@ -368,7 +347,7 @@ const CONG_DOAN_DONG_GOI = ["Bavia", "Gia Công", "Đánh bóng", "Sơn", "OQC"]
 const CONFIG = { PACKAGING: { "Bavia": 36, "Gia Công": 60, "Đánh bóng": 60, "Sơn": 60, "OQC": 100 } };
 const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
 
-let scannedData = null;
+let scannedList = [];        // [{tagNo, maSP, tenSP, soLuongTem, soLuongChuyen, tach, ngay, lotNo, soKhuon, nguyenLieu, mayDuc}] — tab 1, nhiều tem/lô
 let scanTarget = "transfer"; // "transfer" (tab 1) hoặc "pack" (tab Đóng gói lại)
 let productRoutingMap = {};  // ma_sp -> ["Đúc","Bavia",...] theo đúng thứ tự khai báo
 let packSources = [];        // [{tag_no, ma_sp, ten_sp, so_luong, ngay, lot, so_khuon, nguyen_lieu, may_duc}]
@@ -457,9 +436,12 @@ async function lockNguoiNhanToCurrentUser(){
 // chỉ cho chọn ĐÚNG bước kế tiếp thay vì tự do chọn 1 trong 5 công đoạn. SP
 // chưa khai báo quy trình, hoặc bước giao không khớp quy trình → giữ tự do
 // chọn như trước (không chặn ai chưa kịp cấu hình danh mục).
+// Gợi ý theo tem ĐẦU TIÊN trong danh sách (mềm, không chặn — lô có thể gồm
+// nhiều mã SP khác nhau, mỗi tem vẫn ghi đúng dữ liệu riêng của nó khi gửi).
 function applyRoutingHint(){
   const hintEl = document.getElementById("routingHint");
-  const route = scannedData ? productRoutingMap[scannedData.maSP] : null;
+  const first = scannedList[0];
+  const route = first ? productRoutingMap[first.maSP] : null;
   const giaoVal = document.getElementById("congDoanGiao").value;
   if (!route || !route.length){
     fillCongDoanNhan(CONG_DOAN_LIST);
@@ -470,17 +452,17 @@ function applyRoutingHint(){
   const idx = route.indexOf(giaoVal);
   if (idx === -1){
     fillCongDoanNhan(CONG_DOAN_LIST);
-    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — công đoạn giao hiện chọn không khớp quy trình, tự chọn công đoạn nhận.";
+    hintEl.textContent = "Quy trình " + first.maSP + ": " + route.join(" → ") + " — công đoạn giao hiện chọn không khớp quy trình, tự chọn công đoạn nhận.";
     hintEl.classList.add("show");
   } else if (idx === route.length - 1){
     fillCongDoanNhan(CONG_DOAN_LIST);
-    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — đã ở bước cuối, tự chọn công đoạn nhận nếu cần.";
+    hintEl.textContent = "Quy trình " + first.maSP + ": " + route.join(" → ") + " — đã ở bước cuối, tự chọn công đoạn nhận nếu cần.";
     hintEl.classList.add("show");
   } else {
     const next = route[idx + 1];
     fillCongDoanNhan([next]);
     document.getElementById("congDoanNhan").value = next;
-    hintEl.textContent = "Quy trình " + scannedData.maSP + ": " + route.join(" → ") + " — bước kế tiếp: " + next + " (hoặc chọn \"" + CONG_DOAN_LOC_HANG + "\" nếu nghi ngờ hàng NG cần kiểm/lọc lại).";
+    hintEl.textContent = "Quy trình " + first.maSP + ": " + route.join(" → ") + " — bước kế tiếp: " + next + " (hoặc chọn \"" + CONG_DOAN_LOC_HANG + "\" nếu nghi ngờ hàng NG cần kiểm/lọc lại).";
     hintEl.classList.add("show");
   }
   checkReady();
@@ -488,21 +470,24 @@ function applyRoutingHint(){
 }
 document.getElementById("congDoanGiao").addEventListener("change", applyRoutingHint);
 
-// Cảnh báo FIFO (MỀM — không chặn) — có lô cùng mã SP, cùng đang chờ ở đúng
-// "Công đoạn nhận" đang chọn, nhưng có ngày trên tem CŨ HƠN tem đang xử lý.
+// Cảnh báo FIFO (MỀM — không chặn) — dựa theo tem ĐẦU TIÊN trong danh sách:
+// có lô cùng mã SP, cùng đang chờ ở đúng "Công đoạn nhận" đang chọn, nhưng
+// có ngày trên tem CŨ HƠN tem đang xử lý.
 async function checkFifoWarning(){
   const warnEl = document.getElementById("fifoWarn");
   warnEl.classList.remove("show"); warnEl.textContent = "";
-  if (!scannedData) return;
+  const first = scannedList[0];
+  if (!first) return;
   const congDoanNhan = document.getElementById("congDoanNhan").value;
   if (!congDoanNhan) return;
   const { data: positions } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', congDoanNhan);
   if (!positions || !positions.length) return;
-  const tags = positions.map(p => p.tag_no).filter(t => t !== scannedData.tagNo);
+  const scannedTags = new Set(scannedList.map(s => s.tagNo));
+  const tags = positions.map(p => p.tag_no).filter(t => !scannedTags.has(t));
   if (!tags.length) return;
-  const { data: tems } = await sb.from('duc_tem').select('tag_no,ngay').in('tag_no', tags).eq('ma_sp', scannedData.maSP).gt('so_luong', 0);
+  const { data: tems } = await sb.from('duc_tem').select('tag_no,ngay').in('tag_no', tags).eq('ma_sp', first.maSP).gt('so_luong', 0);
   if (!tems || !tems.length) return;
-  const curNgay = new Date(scannedData.ngay);
+  const curNgay = new Date(first.ngay);
   if (isNaN(curNgay)) return;
   const older = tems.filter(t => t.ngay && new Date(t.ngay) < curNgay).sort((a, b) => new Date(a.ngay) - new Date(b.ngay));
   if (older.length){
@@ -677,6 +662,11 @@ async function onQrDecoded(text){
 
   if (scanTarget === "pack"){ await addPackSource({ tagNo }); return; }
 
+  if (scannedList.some(s => s.tagNo === tagNo)){
+    err("Tem " + tagNo + " đã quét rồi trong lô này.");
+    return;
+  }
+
   showMsg("⏳ Đang tra cứu tem " + tagNo + "...", "wait");
   const { data, error } = await sb.from('duc_tem')
     .select('tag_no,ma_sp,ten_sp,so_luong,ngay,lot,so_khuon,nguyen_lieu,may_duc_chi_thi')
@@ -692,79 +682,104 @@ async function onQrDecoded(text){
     return;
   }
 
-  scannedData = {
-    tagNo: data.tag_no, tenSP: data.ten_sp || '', maSP: data.ma_sp || '', soLuongTem: data.so_luong,
-    ngay: data.ngay ? String(data.ngay).replace(/-/g, '/') : '', lotNo: data.lot || '',
-    soKhuon: data.so_khuon || '', nguyenLieu: data.nguyen_lieu || '', mayDuc: data.may_duc_chi_thi || '',
-  };
-  document.getElementById("msg").style.display = "none";
-  renderScanned();
-
-  // Tự chọn sẵn "Công đoạn giao" theo vị trí hiện tại của tem — người dùng
-  // không cần bấm chọn nữa. Nếu tem chưa từng chuyển (chưa có bản ghi vị trí),
+  // Vị trí hiện tại của tem — tem chưa từng chuyển (chưa có bản ghi vị trí)
   // mặc định "Đúc" vì mọi tem đều được in ra từ công đoạn Đúc.
   let viTriHienTai = "Đúc";
   try {
-    const { data: pos } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', scannedData.tagNo).maybeSingle();
+    const { data: pos } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', tagNo).maybeSingle();
     if (pos && pos.vi_tri_hien_tai) viTriHienTai = pos.vi_tri_hien_tai;
   } catch(e){ /* không chặn luồng chính nếu lỗi */ }
-  document.getElementById("congDoanGiao").value = viTriHienTai;
-  applyRoutingHint();
+
+  // Cả lô phải cùng 1 "Công đoạn giao" — tem đầu tiên định vị trí giao, tem
+  // quét sau phải khớp đúng vị trí đó mới gộp chung được (khác vị trí thì
+  // phải chuyển riêng thành 1 lô khác).
+  if (scannedList.length && viTriHienTai !== document.getElementById("congDoanGiao").value){
+    err("Tem " + tagNo + " đang ở " + viTriHienTai + ", khác công đoạn giao của lô đang quét (" + document.getElementById("congDoanGiao").value + ") — chuyển riêng thành lô khác.");
+    return;
+  }
+
+  scannedList.push({
+    tagNo: data.tag_no, tenSP: data.ten_sp || '', maSP: data.ma_sp || '',
+    soLuongTem: data.so_luong, soLuongChuyen: data.so_luong, tach: false,
+    ngay: data.ngay ? String(data.ngay).replace(/-/g, '/') : '', lotNo: data.lot || '',
+    soKhuon: data.so_khuon || '', nguyenLieu: data.nguyen_lieu || '', mayDuc: data.may_duc_chi_thi || '',
+  });
+  document.getElementById("msg").style.display = "none";
+  renderScannedList();
+
+  if (scannedList.length === 1){
+    document.getElementById("congDoanGiao").value = viTriHienTai;
+    applyRoutingHint();
+  }
   checkReady();
 }
 
-function renderScanned(){
-  document.getElementById("svTag").textContent = scannedData.tagNo;
-  document.getElementById("svMa").textContent = scannedData.maSP;
-  document.getElementById("svTen").textContent = scannedData.tenSP;
-  document.getElementById("svNgay").textContent = scannedData.ngay;
-  document.getElementById("svLot").textContent = scannedData.lotNo || "—";
-  document.getElementById("svKhuon").textContent = scannedData.soKhuon || "—";
-  document.getElementById("svNL").textContent = scannedData.nguyenLieu || "—";
-  document.getElementById("svMay").textContent = scannedData.mayDuc;
-  document.getElementById("svSL").textContent = scannedData.soLuongTem;
-
+function renderScannedList(){
+  const n = scannedList.length;
+  document.getElementById("scannedCountBadge").textContent = "✅ Đã đọc được " + n + " tem";
   document.getElementById("emptyHint").style.display = "none";
-  document.getElementById("scannedBox").classList.add("show");
-  document.getElementById("formSection").classList.add("show");
+  document.getElementById("scannedBox").classList.toggle("show", n > 0);
+  document.getElementById("formSection").classList.toggle("show", n > 0);
 
-  const slInput = document.getElementById("soLuong");
-  slInput.value = scannedData.soLuongTem;
-  slInput.max = scannedData.soLuongTem;
-  document.getElementById("slHint").textContent = "Tối đa " + scannedData.soLuongTem + " (số lượng gốc trên tem). Có thể giảm nếu bị hao hụt thực tế.";
+  const listEl = document.getElementById("scannedList");
+  listEl.innerHTML = scannedList.map((s, i) => `
+    <div class="src-item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="info"><b>${s.tagNo}</b><span>${s.maSP} — ${s.tenSP} · gốc ${s.soLuongTem} pcs</span></div>
+        <button type="button" onclick="removeScannedItem(${i})">✕ Bỏ</button>
+      </div>
+      <div class="fg-row" style="margin:0">
+        <div class="fg" style="margin:0">
+          <label style="margin:0">SL thực tế chuyển</label>
+          <input type="number" min="1" max="${s.soLuongTem}" value="${s.soLuongChuyen}" oninput="setScannedSl(${i}, this.value)">
+        </div>
+      </div>
+      ${s.soLuongChuyen < s.soLuongTem ? `
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;font-size:12px">
+        <input type="checkbox" style="width:auto" ${s.tach ? "checked" : ""} onchange="setScannedTach(${i}, this.checked)">
+        Phần còn lại vẫn ở công đoạn cũ (tách tem, không tính hao hụt)
+      </label>` : ``}
+    </div>`).join('');
 
   document.getElementById("msg").style.display = "none";
   checkReady();
 }
 
+function setScannedSl(i, v){
+  const s = scannedList[i]; if (!s) return;
+  let n = Number(v) || 0;
+  if (n > s.soLuongTem) n = s.soLuongTem;
+  s.soLuongChuyen = n;
+  if (n >= s.soLuongTem) s.tach = false;
+  renderScannedList();
+}
+function setScannedTach(i, v){ if (scannedList[i]) scannedList[i].tach = v; }
+function removeScannedItem(i){
+  scannedList.splice(i, 1);
+  renderScannedList();
+  if (!scannedList.length){ resetForNext(); }
+}
+
 function checkReady(){
-  let ok = !!scannedData;
-  const sl = Number(document.getElementById("soLuong").value);
-  ok = ok && sl > 0 && sl <= Number(scannedData ? scannedData.soLuongTem : 0);
+  let ok = scannedList.length > 0;
+  ok = ok && scannedList.every(s => s.soLuongChuyen > 0 && s.soLuongChuyen <= s.soLuongTem);
   ok = ok && document.getElementById("congDoanGiao").value !== "";
   ok = ok && document.getElementById("congDoanNhan").value !== "";
   ok = ok && document.getElementById("nguoiNhan").value !== "";
   document.getElementById("btnSubmit").disabled = !ok;
-
-  const wrap = document.getElementById("tachKhiChuyenWrap");
-  const showTach = !!scannedData && sl > 0 && sl < Number(scannedData.soLuongTem);
-  wrap.style.display = showTach ? "block" : "none";
-  if (!showTach) document.getElementById("tachKhiChuyen").checked = false;
+  document.getElementById("btnSubmit").textContent = "🔀  Chuyển Công Đoạn" + (scannedList.length > 1 ? " (" + scannedList.length + " tem)" : "");
 }
-["soLuong", "congDoanGiao", "congDoanNhan", "nguoiGiao", "nguoiNhan"].forEach(id => {
+["congDoanGiao", "congDoanNhan", "nguoiGiao", "nguoiNhan"].forEach(id => {
   document.getElementById(id).addEventListener("input", checkReady);
   document.getElementById(id).addEventListener("change", checkReady);
 });
 
 function resetForNext(){
-  scannedData = null;
+  scannedList = [];
   document.getElementById("scannedBox").classList.remove("show");
   document.getElementById("formSection").classList.remove("show");
   document.getElementById("emptyHint").style.display = "block";
-  document.getElementById("soLuong").value = "";
   document.getElementById("btnSubmit").disabled = true;
-  document.getElementById("tachKhiChuyen").checked = false;
-  document.getElementById("tachKhiChuyenWrap").style.display = "none";
   document.getElementById("ghiChu").value = "";
 }
 
@@ -786,58 +801,61 @@ async function submitTransfer(){
 
   const btn = document.getElementById("btnSubmit");
   btn.disabled = true;
-  btn.textContent = "⏳ Đang xử lý...";
-
-  const soLuong = Number(document.getElementById("soLuong").value);
   const nguoiThaoTac = document.getElementById("nguoiNhan").value;
+  const nguoiGiao = document.getElementById("nguoiGiao").value || '';
+  const ghiChu = document.getElementById("ghiChu").value || '';
 
-  // Nếu người thao tác đánh dấu "phần còn lại vẫn ở công đoạn cũ", tách tem
-  // trước: tem con (đúng bằng số lượng thực chuyển) mới là tem thực sự di
-  // chuyển, tem cha giữ nguyên phần còn lại tại công đoạn nguồn — khác với
-  // hao hụt (mất hẳn, không còn tồn tại ở đâu cả).
-  let tagNoDeChuyen = scannedData.tagNo;
-  let slTemDeChuyen = Number(scannedData.soLuongTem);
-  if (document.getElementById("tachKhiChuyen").checked){
-    btn.textContent = "⏳ Đang tách tem...";
-    const { data: tagCon, error: tachErr } = await sb.rpc('duc_tach_tem', {
-      p_tag_no_cha: scannedData.tagNo, p_so_luong_tach: soLuong,
-      p_ly_do: 'Tách khi chuyển công đoạn (' + congDoanGiao + ' → ' + congDoanNhan + ')',
-      p_nguoi: nguoiThaoTac,
-    });
-    if (tachErr){
-      err("Lỗi tách tem trước khi chuyển: " + tachErr.message);
-      btn.textContent = "🔀  Chuyển Công Đoạn";
-      checkReady();
-      return;
+  const items = scannedList.slice();
+  let done = 0, failed = 0;
+  const lastMsgs = [];
+
+  for (let idx = 0; idx < items.length; idx++){
+    const s = items[idx];
+    btn.textContent = "⏳ Đang xử lý " + (idx + 1) + "/" + items.length + " (" + s.tagNo + ")...";
+
+    // "Phần còn lại vẫn ở công đoạn cũ": tách tem trước — tem con (đúng bằng
+    // số lượng thực chuyển) mới là tem thực sự di chuyển, tem cha giữ nguyên
+    // phần còn lại tại công đoạn nguồn — khác với hao hụt (mất hẳn).
+    let tagNoDeChuyen = s.tagNo;
+    let slTemDeChuyen = Number(s.soLuongTem);
+    if (s.tach && s.soLuongChuyen < s.soLuongTem){
+      const { data: tagCon, error: tachErr } = await sb.rpc('duc_tach_tem', {
+        p_tag_no_cha: s.tagNo, p_so_luong_tach: s.soLuongChuyen,
+        p_ly_do: 'Tách khi chuyển công đoạn (' + congDoanGiao + ' → ' + congDoanNhan + ')',
+        p_nguoi: nguoiThaoTac,
+      });
+      if (tachErr){ failed++; lastMsgs.push(s.tagNo + ": lỗi tách tem — " + tachErr.message); continue; }
+      tagNoDeChuyen = tagCon;
+      slTemDeChuyen = s.soLuongChuyen;
     }
-    tagNoDeChuyen = tagCon;
-    slTemDeChuyen = soLuong;
-    btn.textContent = "⏳ Đang ghi chuyển công đoạn...";
+
+    const { data, error } = await sb.rpc('cd_ghi_chuyen_cong_doan', {
+      p_tag_no: tagNoDeChuyen, p_ma_sp: s.maSP, p_ten_sp: s.tenSP,
+      p_sl_tren_tem: slTemDeChuyen, p_sl_thuc_chuyen: s.soLuongChuyen,
+      p_lot_no: s.lotNo || '', p_so_khuon: s.soKhuon || '',
+      p_nguyen_lieu: s.nguyenLieu || '', p_may_duc: s.mayDuc,
+      p_ngay_duc: s.ngay || '',
+      p_cong_doan_giao: congDoanGiao, p_cong_doan_nhan: congDoanNhan,
+      p_nguoi_giao: nguoiGiao, p_nguoi_nhan: nguoiThaoTac,
+      p_ghi_chu: ghiChu,
+    });
+    if (error){ failed++; lastMsgs.push(s.tagNo + ": " + error.message); continue; }
+    done++;
+    lastMsgs.push(data[0].id_phieu + " — " + s.tagNo + " (" + s.soLuongChuyen + " pcs)"
+      + (tagNoDeChuyen !== s.tagNo ? " [tách tem mới " + tagNoDeChuyen + "]" : ""));
   }
 
-  const { data, error } = await sb.rpc('cd_ghi_chuyen_cong_doan', {
-    p_tag_no: tagNoDeChuyen, p_ma_sp: scannedData.maSP, p_ten_sp: scannedData.tenSP,
-    p_sl_tren_tem: slTemDeChuyen, p_sl_thuc_chuyen: soLuong,
-    p_lot_no: scannedData.lotNo || '', p_so_khuon: scannedData.soKhuon || '',
-    p_nguyen_lieu: scannedData.nguyenLieu || '', p_may_duc: scannedData.mayDuc,
-    p_ngay_duc: scannedData.ngay || '',
-    p_cong_doan_giao: congDoanGiao, p_cong_doan_nhan: congDoanNhan,
-    p_nguoi_giao: document.getElementById("nguoiGiao").value || '',
-    p_nguoi_nhan: document.getElementById("nguoiNhan").value,
-    p_ghi_chu: document.getElementById("ghiChu").value || ''
-  });
-
-  btn.textContent = "🔀  Chuyển Công Đoạn";
-  if (error){
-    err("Lỗi: " + error.message);
-    checkReady();
-    return;
+  btn.disabled = false;
+  if (!failed){
+    showMsg("✅ Đã chuyển " + done + "/" + items.length + " tem từ " + congDoanGiao + " sang " + congDoanNhan + ".\n" + lastMsgs.join(" · "), "ok", 10000);
+    resetForNext();
+  } else {
+    err("Đã chuyển " + done + "/" + items.length + " tem, " + failed + " tem lỗi:\n" + lastMsgs.join(" · "));
+    // Chỉ giữ lại các tem lỗi trong danh sách để thử lại, bỏ các tem đã thành công.
+    scannedList = scannedList.filter((s, i) => lastMsgs[i] && lastMsgs[i].startsWith(s.tagNo + ":"));
+    renderScannedList();
   }
-  const r = data[0];
-  const thoiGian = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN', { hour12: false });
-  const tachNote = (tagNoDeChuyen !== scannedData.tagNo) ? (" — tem mới " + tagNoDeChuyen + ", tem gốc " + scannedData.tagNo + " giữ lại phần còn ở " + congDoanGiao) : "";
-  showMsg("✅ " + r.id_phieu + " — đã chuyển " + soLuong + " từ " + congDoanGiao + " sang " + congDoanNhan + " lúc " + thoiGian + tachNote, "ok", 8000);
-  resetForNext();
+  checkReady();
 }
 
 /* ---------- Chỉ báo đăng nhập ---------- */
