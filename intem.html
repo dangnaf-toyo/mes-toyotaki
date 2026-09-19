@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>In Tem Đúc — TOYOTAKI</title>
+<title>In Tem — TOYOTAKI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -130,7 +130,7 @@ textarea{resize:vertical;min-height:48px}
 <header>
   <div class="brand">
     <div class="co">Toyotaki</div>
-    <div class="title">In Tem — Đúc</div>
+    <div class="title">In Tem</div>
   </div>
   <div class="header-clock">
     <span class="date" id="clock-date">—</span>
@@ -1318,31 +1318,36 @@ function buildTpLabelSvg(d){
   var logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODIiIGhlaWdodD0iNzciIHZpZXdCb3g9IjAgMCA4MiA3NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMC42MTE5IDIwLjU3OTlWNTEuMTAzM0gyNS4yMTcxVjE2LjEyNDlIMFYwLjg2MDM1Mkg0NC4xMTI2VjMxLjMwMzhMNDcuNzc4NyAyNy42NDcyTDY1LjgwNjQgNTEuMTAzM0g3MS43NjkzTDUxLjE1MzYgMjQuMjgwM0w3NC42MjU0IDAuODYwMzUySDgyTDU3Ljk5NCAyNC44NDA1TDgwLjU2OSA1Ni4yOTE5SDYzLjIwMjlMNDcuMTk2MyAzNS42MjUzTDM4Ljg2MTMgNDMuOTUwMlY2LjA0ODlINS4yNTEzMlYxMC45MzY0SDMwLjQ2ODRWNTYuMjkxOUgxNS4zNjA1VjIwLjU3OTlIMjAuNjExOVoiIGZpbGw9IiNDQTY2MjciLz4KPC9zdmc+Cg==";
   var rows = [
     {lbl:"Khách hàng",   val:d.tenKhachHang, big:true},
-    {lbl:"Mã SP",        val:d.maSP,        big:true},
     {lbl:"Mã SP tại KH", val:d.maSpKhachHang},
     {lbl:"Tên SP",       val:d.tenSP,        big:true},
+    {lbl:"Mã SP",        val:d.maSP,        big:true},
     {lbl:"Số lượng",     val:fmtInt(d.soLuong) + " pcs", big:true},
     {lbl:"Tag No",       val:d.tagNo}
   ];
-  var divX = 63, rowStartY = 23, rowH = 7.7;
+  var divX = 63, rowStartY = 24, rowH = 7.5;
+
+  // Logo (to hơn) ghim mép trái; tiêu đề + tên công ty căn giữa PHẦN CÒN LẠI
+  // (từ mép phải logo tới mép phải tem), không phải giữa toàn bộ tem.
+  var logoW = 10.8, logoH = 10, logoX = 4, logoY = 2;
+  var headCenterX = (logoX + logoW + (W - 3)) / 2;
 
   var s = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'mm" height="'+H+'mm" xmlns="http://www.w3.org/2000/svg">';
   s += '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#ffffff"/>';
-  s += '<image x="4" y="2" width="9" height="8.3" href="'+logoUri+'" preserveAspectRatio="xMidYMid meet"/>';
-  s += '<text x="8.5" y="12" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="1.7" font-weight="bold" fill="#CA6627">TOYOTAKI</text>';
-  s += '<text x="'+(W/2)+'" y="9" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
-  s += '<text x="'+(W/2)+'" y="13.6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.4" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
-  s += '<line x1="3" y1="16" x2="'+(W-3)+'" y2="16" stroke="#000" stroke-width="0.35"/>';
+  s += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'" preserveAspectRatio="xMidYMid meet"/>';
+  s += '<text x="'+(logoX+logoW/2).toFixed(2)+'" y="'+(logoY+logoH+1.9).toFixed(2)+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="1.8" font-weight="bold" fill="#CA6627">TOYOTAKI</text>';
+  s += '<text x="'+headCenterX.toFixed(2)+'" y="9" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
+  s += '<text x="'+headCenterX.toFixed(2)+'" y="13.6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.4" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
+  s += '<line x1="3" y1="17" x2="'+(W-3)+'" y2="17" stroke="#000" stroke-width="0.35"/>';
 
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
     var lblSize = r.big ? 3.0 : 2.8;
     var valSize = r.big ? 4.6 : 3.8;
     var vLen = String(r.val||"").length;
-    if (vLen > 16) valSize -= 0.6;
-    if (vLen > 24) valSize -= 0.6;
+    if (vLen > 14) valSize -= 0.6;
+    if (vLen > 20) valSize -= 0.6;
     s += '<text x="4.5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="#334155">'+svgEsc(r.lbl)+'</text>';
-    s += '<text x="22" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="#000">'+svgEsc(r.val)+'</text>';
+    s += '<text x="28" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="#000">'+svgEsc(r.val)+'</text>';
   });
 
   // QR lấp đầy toàn bộ cột phải (không còn ô số liệu SL/Ngày SX ở trên nữa)
