@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ghi nhận thùng thành phẩm — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  ghi-nhan-tem-thanh-pham.html — màn quét ghi nhận thùng THÀNH PHẨM (tem in
+  trước ở intem.html tab "Tem Thành Phẩm"). Mỗi thùng đủ quy cách (VD 60pcs
+  Đánh bóng), người thao tác quét QR trên tem tại đây → RPC
+  cd_ghi_nhan_tem_thanh_pham TỰ ĐỘNG trừ FIFO từ các tem Đúc đang có mặt tại
+  công đoạn (theo cd_chuyen_cong_doan_log đã xác nhận), ghi lineage vào
+  cd_tem_nguon (truy xuất nguồn gốc), chuyển trạng thái 'Chờ đóng gói TP' →
+  'Đã đóng gói TP'. Không nhập gì thêm lúc quét — mọi thông tin (mã SP,
+  khách hàng, người kiểm tra) đã in sẵn trên tem từ lúc tạo lô.
+
+  Chọn "Trạm đang hoạt động" 1 lần đầu ca (không bắt buộc) để sản lượng OK tự
+  cộng vào đúng trạm trên Bảng điều khiển công đoạn — bỏ trống vẫn ghi nhận
+  được, chỉ là không cộng sản lượng vào trạm nào.
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql.
+-->
+<style>
+:root{
+  --bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--border:#D9DFE5;--border-strong:#B8C1CC;
+  --text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;
+  --accent:#0F5FA5;--accent-hover:#0A4681;
+  --ok-fg:#047857;--ok-bg:#ECFDF5;--ok-bd:#A7E3C6;
+  --warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-bd:#F5DFB0;
+  --alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--alarm-bd:#FCA5A5;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.05);--shadow-md:0 4px 14px rgba(15,23,42,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+body{padding:10px 10px 60px}
+.wrap{max-width:600px;margin:12px auto 0;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--bg-panel);border-radius:12px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:16px}
+.card h2{font-size:14px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--text-muted);margin-bottom:5px}
+select,input[type=text],input[type=date]{width:100%;padding:12px 12px;border:1.5px solid var(--border-strong);border-radius:9px;
+  font-family:inherit;font-size:16px;font-weight:600;background:#fff;color:var(--text);outline:none}
+select:focus,input:focus{border-color:var(--accent)}
+.field+.field{margin-top:12px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;border:none;border-radius:11px;padding:16px;font-family:inherit;font-size:17px;font-weight:800;
+  cursor:pointer;transition:background .12s;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn:active{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.mini{padding:10px 14px;font-size:13px;width:auto;border-radius:9px}
+.row{display:flex;gap:8px;align-items:center}
+.row input[type=text]{flex:1;width:auto;min-width:0}
+.muted{font-size:12.5px;color:var(--text-muted)}
+.hint{font-size:12px;color:var(--text-dim);margin-top:6px}
+
+/* ── Thẻ xác nhận sau khi quét ── */
+#result{display:none}
+#result.show{display:block}
+.res-card{border-radius:12px;padding:18px;border:2px solid}
+.res-card.ok{background:var(--ok-bg);border-color:var(--ok-bd)}
+.res-card.warn{background:var(--warn-bg);border-color:var(--warn-bd)}
+.res-card.err{background:var(--alarm-bg);border-color:var(--alarm-bd)}
+.res-icon{font-size:34px;line-height:1}
+.res-title{font-size:20px;font-weight:800;margin:6px 0 2px}
+.res-card.ok .res-title{color:var(--ok-fg)}
+.res-card.warn .res-title{color:var(--warn-fg)}
+.res-card.err .res-title{color:var(--alarm-fg)}
+.res-lines{margin-top:10px;font-size:15px}
+.res-lines div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px dashed rgba(0,0,0,.10)}
+.res-lines div:first-child{border-top:none}
+.res-lines .k{color:var(--text-muted);font-weight:600}
+.res-lines .v{font-weight:800;text-align:right}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ── Lũy kế phiên ── */
+.tally{display:flex;gap:10px;flex-wrap:wrap}
+.tally .stat{flex:1;min-width:130px;background:var(--bg-sunken);border-radius:10px;padding:12px;text-align:center}
+.tally .stat .n{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--accent)}
+.tally .stat .l{font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:2px}
+#phienLog{margin-top:12px;max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:9px}
+#phienLog .li{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;font-size:13px;border-top:1px solid var(--border)}
+#phienLog .li:first-child{border-top:none}
+#phienLog .li .mono{font-size:12px;color:var(--text-muted)}
+.empty{padding:18px;text-align:center;color:var(--text-dim);font-style:italic;font-size:13px}
+
+/* ── Chặn khi chưa đăng nhập ── */
+#authGate{display:none;text-align:center;padding:28px 16px}
+#authGate.show{display:block}
+#authGate .btn{margin-top:16px}
+
+/* ── Modal quét QR (theo intem.html) ── */
+.qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
+.qr-modal.show{display:flex}
+.qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px;background:rgba(0,0,0,.7);flex-shrink:0}
+.qr-modal-hdr span{color:#fff;font-size:14px;font-weight:700}
+.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:9px;font-family:inherit;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer}
+#qrReaderDiv{position:relative;flex:1;overflow:hidden}
+#qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+
+#msg{padding:12px 14px;border-radius:9px;font-size:14px;font-weight:600;display:none}
+#msg.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-bd);display:block}
+#msg.ok{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-bd);display:block}
+#msg.wait{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);display:block}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div id="msg"></div>
+
+  <!-- Chưa đăng nhập -->
+  <div class="card" id="authGate">
+    <div style="font-size:32px">🔒</div>
+    <h2 style="margin-top:8px">Cần đăng nhập</h2>
+    <p class="muted">Trang ghi nhận thùng thành phẩm yêu cầu đăng nhập bằng tài khoản hệ thống.</p>
+    <button type="button" class="btn" id="btnGoLogin">Đến trang đăng nhập</button>
+  </div>
+
+  <!-- Nội dung chính -->
+  <div id="mainUI" style="display:none;flex-direction:column;gap:12px">
+
+    <div class="card">
+      <h2>Trạm đang hoạt động (không bắt buộc)</h2>
+      <div class="field-row">
+        <div class="field">
+          <label for="congDoan">Công đoạn</label>
+          <select id="congDoan"></select>
+        </div>
+        <div class="field">
+          <label for="ca">Ca</label>
+          <select id="ca"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="ngay">Ngày</label>
+        <input type="date" id="ngay">
+      </div>
+      <div class="field">
+        <label for="tram">Trạm/tổ</label>
+        <select id="tram"><option value="">-- Không gắn trạm (chỉ ghi nhận, không cộng sản lượng) --</option></select>
+        <div class="hint">Chọn 1 lần đầu ca — mọi lượt quét tiếp theo tự cộng sản lượng OK vào đúng trạm này.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quét tem thành phẩm</h2>
+      <button type="button" class="btn" id="btnScan">📷 Quét QR trên tem</button>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
+      <div class="field" style="margin-top:14px">
+        <label for="tagInput">…hoặc nhập Tag No thủ công</label>
+        <div class="row">
+          <input type="text" id="tagInput" placeholder="VD: TP20260919-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button type="button" class="btn mini" id="btnGhiNhan">Ghi nhận</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="result">
+      <div class="res-card" id="resCard">
+        <div class="res-icon" id="resIcon"></div>
+        <div class="res-title" id="resTitle"></div>
+        <div class="res-lines" id="resLines"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Phiên làm việc này</h2>
+      <div class="tally">
+        <div class="stat"><div class="n" id="tallyThung">0</div><div class="l">Thùng đã ghi nhận</div></div>
+        <div class="stat"><div class="n" id="tallyPcs">0</div><div class="l">Tổng pcs</div></div>
+      </div>
+      <div id="phienLog"><div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div></div>
+      <div class="hint">Số liệu phiên chỉ tính trên máy này, mất khi tải lại trang.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal camera quét QR -->
+<div class="qr-modal" id="qrModal">
+  <div class="qr-modal-hdr">
+    <span>📷 Đưa mã QR trên tem vào khung</span>
+    <button type="button" class="qr-modal-close" id="btnCloseQrModal">✖ Đóng</button>
+  </div>
+  <div id="qrReaderDiv"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function fmtTime(iso){
+  const d = iso ? new Date(iso) : new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+}
+function getTodayString(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls || '';
+  if (ms) setTimeout(() => { if (el.textContent === text) el.className = ''; }, ms);
+}
+function beep(okTone){
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.frequency.value = okTone ? 880 : 320;
+    g.gain.setValueAtTime(0.14, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.22);
+    o.start(); o.stop(ac.currentTime + 0.22);
+  } catch (e) { /* thiết bị không cho phát âm — bỏ qua */ }
+}
+
+// Công đoạn có quy cách đóng gói riêng cho tem thành phẩm — khớp CONFIG.PACKAGING
+// bên chuyencongdoan.html/intem.html, hiện chỉ có Đánh bóng.
+const CONG_DOAN_LIST = ["Đánh bóng"];
+const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let myIdentity = '';
+let busy = false;
+let trams = [];
+const phien = []; // { tag_no, ma_sp, so_thung_stt, so_luong, at }
+
+// ── Auth gate ──────────────────────────────────────────────────────────────
+async function boot(){
+  const session = await MesAuth.getSession();
+  if (!session) {
+    document.getElementById('authGate').classList.add('show');
+    return;
+  }
+  document.getElementById('mainUI').style.display = 'flex';
+  myIdentity = (await MesAuth.getCurrentUserIdentity()) || 'Không rõ';
+  document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
+  document.getElementById('ca').innerHTML = '<option value="">-- Chọn ca --</option>' + CA_LIST.map(c => '<option value="'+c+'">'+c+'</option>').join('');
+  document.getElementById('ngay').value = getTodayString();
+  await loadTrams();
+  wire();
+}
+document.getElementById('btnGoLogin').addEventListener('click', () => {
+  window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
+});
+
+// ── Trạm đang hoạt động ──────────────────────────────────────────────────────
+async function loadTrams(){
+  const congDoan = document.getElementById('congDoan').value;
+  const ngay = document.getElementById('ngay').value;
+  const ca = document.getElementById('ca').value;
+  const sel = document.getElementById('tram');
+  trams = [];
+  if (!congDoan || !ngay || !ca){
+    sel.innerHTML = '<option value="">-- Chọn ngày/ca trước --</option>';
+    return;
+  }
+  const { data, error } = await sb.from('cd_tram_hien_tai').select('*').eq('cong_doan', congDoan).eq('ngay', ngay).eq('ca', ca).order('ten_tram');
+  if (error){ showMsg('Không tải được danh sách trạm: ' + error.message, 'err', 5000); return; }
+  trams = data || [];
+  sel.innerHTML = '<option value="">-- Không gắn trạm (chỉ ghi nhận, không cộng sản lượng) --</option>' +
+    trams.map(t => '<option value="'+t.id_tram+'">'+escapeHtml(t.ten_tram)+' — '+escapeHtml(t.ma_sp)+'</option>').join('');
+}
+
+// ── Ghi nhận 1 tem ─────────────────────────────────────────────────────────
+async function ghiNhan(raw){
+  // Chấp nhận cả CHUỖI QR ĐẦY ĐỦ lẫn Tag No trần (đầu đọc QR rời gõ nguyên
+  // payload vào ô nhập tay) — cắt lấy token đầu, bỏ khoảng trắng/xuống dòng.
+  var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
+  if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
+  if (busy) return;
+  busy = true;
+  document.getElementById('btnGhiNhan').disabled = true;
+  showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
+
+  const p_id_tram = document.getElementById('tram').value || null;
+
+  try {
+    const { data, error } = await sb.rpc('cd_ghi_nhan_tem_thanh_pham', { p_tag_no: tagNo, p_id_tram, p_nguoi: myIdentity });
+    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', error.message || String(error)]]); beep(false); showMsg('', ''); return; }
+    if (!data || data.ok === false) {
+      const isDup = data && data.da_ghi_nhan;
+      renderResult(isDup ? 'warn' : 'err', isDup ? 'Tem đã được ghi nhận' : 'Không ghi nhận được',
+        [['Thông báo', (data && data.error) || 'Lỗi không xác định']]);
+      beep(false);
+      showMsg('', '');
+      return;
+    }
+    // Thành công
+    const lines = [
+      ['Mã SP', data.ma_sp + (data.ten_sp ? ' — ' + data.ten_sp : '')],
+      ['Thùng', 'số ' + (data.so_thung_stt ?? '?')],
+      ['Số lượng', fmtNum(data.so_luong) + ' pcs'],
+      ['Nguồn (tem Đúc)', (data.nguon || []).length + ' tem'],
+      ['Lúc', fmtTime(data.ngay_gio_ghi_nhan)],
+    ];
+    renderResult('ok', '✓ Đã ghi nhận thùng', lines);
+    beep(true);
+    showMsg('', '');
+
+    phien.unshift({
+      tag_no: data.tag_no, ma_sp: data.ma_sp, so_thung_stt: data.so_thung_stt,
+      so_luong: Number(data.so_luong) || 0, at: data.ngay_gio_ghi_nhan,
+    });
+    renderPhien();
+  } catch (e) {
+    renderResult('err', 'Lỗi', [['Chi tiết', e && e.message ? e.message : String(e)]]);
+    beep(false);
+    showMsg('', '');
+  } finally {
+    busy = false;
+    document.getElementById('btnGhiNhan').disabled = false;
+    document.getElementById('tagInput').value = '';
+  }
+}
+
+function renderResult(kind, title, lines){
+  document.getElementById('resCard').className = 'res-card ' + kind;
+  document.getElementById('resIcon').textContent = kind === 'ok' ? '✅' : (kind === 'warn' ? '⚠️' : '⛔');
+  document.getElementById('resTitle').textContent = title;
+  document.getElementById('resLines').innerHTML = lines.map(([k, v]) =>
+    '<div><span class="k">' + escapeHtml(k) + '</span><span class="v">' + escapeHtml(v) + '</span></div>').join('');
+  document.getElementById('result').classList.add('show');
+}
+
+function renderPhien(){
+  document.getElementById('tallyThung').textContent = fmtNum(phien.length);
+  document.getElementById('tallyPcs').textContent = fmtNum(phien.reduce((s, r) => s + r.so_luong, 0));
+  const box = document.getElementById('phienLog');
+  if (!phien.length) { box.innerHTML = '<div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div>'; return; }
+  box.innerHTML = phien.map(r =>
+    '<div class="li">' +
+      '<span><b>' + escapeHtml(r.ma_sp) + '</b> · thùng ' + (r.so_thung_stt ?? '?') + ' · ' + fmtNum(r.so_luong) + ' pcs</span>' +
+      '<span class="mono">' + escapeHtml(r.tag_no) + ' · ' + fmtTime(r.at) + '</span>' +
+    '</div>').join('');
+}
+
+// ── Quét QR (theo pattern intem.html — 1 instance duy nhất) ────────────────
+let html5QrCode = null, scanningActive = false;
+function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode('qrReaderDiv'); return html5QrCode; }
+
+async function openCamera(){
+  showMsg('', '');
+  if (typeof Html5Qrcode !== 'function') {
+    showMsg('Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang. Có thể nhập Tag No thủ công.', 'err');
+    return;
+  }
+  document.getElementById('qrModal').classList.add('show');
+  const scanner = getScanner();
+  scanningActive = true;
+  try {
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 8, qrbox: { width: 260, height: 260 } },
+      onScanSuccess,
+      () => { /* frame chưa thấy mã — bỏ qua */ }
+    );
+  } catch (e) {
+    scanningActive = false;
+    await closeQrModal();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showMsg('📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…', 'wait');
+      document.getElementById('qrFileInput').click();
+      return;
+    }
+    showMsg('Không mở được camera: ' + e + '. Kiểm tra quyền Camera cho trang này.', 'err');
+  }
+}
+async function closeQrModal(){
+  document.getElementById('qrModal').classList.remove('show');
+  scanningActive = false;
+  if (html5QrCode && html5QrCode.isScanning) {
+    try { await html5QrCode.stop(); } catch (e) { /* đã dừng — bỏ qua */ }
+  }
+}
+async function onScanSuccess(decodedText){
+  if (!scanningActive) return;
+  scanningActive = false;
+  await closeQrModal();
+  const tagNo = String(decodedText).split('>')[0].trim();
+  if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
+  ghiNhan(tagNo);
+}
+function onFileChosen(evt){
+  const file = evt.target.files && evt.target.files[0];
+  evt.target.value = '';
+  if (!file) { showMsg('Không nhận được ảnh (có thể bạn đã huỷ chụp).', 'err', 4000); return; }
+  showMsg('⏳ Đang đọc mã QR trong ảnh…', 'wait');
+  getScanner().scanFile(file, false)
+    .then(decodedText => {
+      const tagNo = String(decodedText).split('>')[0].trim();
+      if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
+      ghiNhan(tagNo);
+    })
+    .catch(() => showMsg('Không đọc được mã QR trong ảnh — chụp lại, để mã QR rõ nét và nằm giữa khung.', 'err', 5000));
+}
+
+// ── Wire ───────────────────────────────────────────────────────────────────
+function wire(){
+  ['congDoan', 'ngay', 'ca'].forEach(id => document.getElementById(id).addEventListener('change', loadTrams));
+  document.getElementById('btnScan').addEventListener('click', openCamera);
+  document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
+  document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
+  document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
+  document.getElementById('tagInput').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var v = e.target.value;
+    e.target.value = '';               // xoá ngay: ký tự còn lại của chuỗi QR
+                                        // (máy quét gõ tiếp sau Enter) không dồn vào
+    if (!v.replace(/\s+/g, '')) return;
+    var now = Date.now();
+    if (now - lastScanSubmitAt < 1500) return;  // gộp nhiều Enter máy quét gửi liền
+                                                 // nhau (QR có \n giữa các trường)
+    lastScanSubmitAt = now;
+    ghiNhan(v);
+  });
+}
+var lastScanSubmitAt = 0;
+
+boot();
+</script>
+</body>
+</html>
