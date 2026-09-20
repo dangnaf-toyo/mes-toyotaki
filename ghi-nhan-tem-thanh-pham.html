@@ -36,7 +36,13 @@
   thành phẩm), lưu cd_ng_khai_bao (tag_no, loại NG, số lượng). KPI thêm
   "NG pcs hôm nay" + "Tỷ lệ NG hôm nay" = NG/(TT pcs OK + NG).
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG).
+  T48 — ô "Mã sản phẩm đang sản xuất" cạnh Trạm/tổ: chọn 1 mã SP hiện dải
+  tồn kho theo TỪNG CÔNG ĐOẠN của đúng lưu trình mã đó (master_products.
+  quy_trinh_cong_doan), lấy từ RPC cd_ton_kho_theo_ma_sp — tổng so_luong còn
+  lại của các tem mã đó, gộp theo vị trí hiện tại (cd_v_vi_tri_hien_tai, tem
+  chưa từng chuyển công đoạn coi như còn ở "Đúc").
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48 (tồn kho).
 -->
 <style>
 :root{
@@ -94,9 +100,19 @@ select:focus,input:focus{border-color:var(--accent)}
 .ng-form .btn.ng-submit{background:var(--alarm-fg)}
 .ng-form .btn.ng-submit:active{background:#8f1616}
 
-/* ── Hàng thiết lập gọn: Người kiểm / Công đoạn / Trạm ── */
-.settings-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-@media (max-width:700px){.settings-row{grid-template-columns:1fr}}
+/* ── Hàng thiết lập gọn: Người kiểm / Công đoạn / Trạm / Mã SP ── */
+.settings-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:900px){.settings-row{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:480px){.settings-row{grid-template-columns:1fr}}
+
+/* ── Tồn kho theo mã SP (dọc theo lưu trình) ── */
+#tonKhoRow{display:none;margin-top:9px;padding-top:9px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px}
+#tonKhoRow.show{display:flex}
+.tk-tile{flex:1;min-width:84px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:9px;padding:7px 9px;text-align:center}
+.tk-tile.here{background:var(--ok-bg);border-color:var(--ok-bd)}
+.tk-tile .tk-v{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;color:var(--text)}
+.tk-tile.here .tk-v{color:var(--ok-fg)}
+.tk-tile .tk-l{font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-top:1px}
 
 /* ── Lưới chính 2 cột ── */
 .main-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
@@ -197,7 +213,12 @@ select:focus,input:focus{border-color:var(--accent)}
           <label for="tram">Trạm/tổ (không bắt buộc)</label>
           <select id="tram"><option value="">-- Không gắn trạm --</option></select>
         </div>
+        <div class="field" style="margin:0">
+          <label for="spDangSx">Mã SP đang sản xuất (xem tồn kho)</label>
+          <select id="spDangSx"><option value="">-- Chọn mã SP --</option></select>
+        </div>
       </div>
+      <div id="tonKhoRow"></div>
     </div>
 
     <div class="main-grid">
@@ -303,10 +324,15 @@ const CONG_DOAN_LIST = Object.keys(TP_PACKAGING);
 // theo thực tế sau. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
 const NG_TYPES = ["Nhẹ cân", "Dập lẹm", "Khác"];
 
+// Thứ tự công đoạn mặc định khi mã SP chưa khai báo quy_trinh_cong_doan
+// riêng — khớp CONG_DOAN_LIST bên quan-ly-danh-muc.html.
+const CONG_DOAN_ALL_ORDER = ["Đúc", "Bavia", "Gia Công", "Cắt viền", "Đánh bóng", "Sơn", "OQC", "Nhập kho", "Xuất hàng"];
+
 // ── State ──────────────────────────────────────────────────────────────────
 let myIdentity = '';
 let busy = false;
 let trams = [];
+let productMap = {}; // ma_sp -> { ten_sp, quy_trinh_cong_doan }
 
 // ── Auth gate ──────────────────────────────────────────────────────────────
 async function boot(){
@@ -318,8 +344,45 @@ async function boot(){
   document.getElementById('mainUI').style.display = 'flex';
   myIdentity = (await MesAuth.getCurrentUserIdentity()) || 'Không rõ';
   document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
-  await Promise.all([loadNguoiKiem(), loadTrams(), loadNguonList(), loadKpi()]);
+  await Promise.all([loadNguoiKiem(), loadTrams(), loadNguonList(), loadKpi(), loadSpDangSx()]);
   wire();
+}
+
+// ── Mã SP đang sản xuất → tồn kho theo công đoạn (T48) ──────────────────────
+async function loadSpDangSx(){
+  const { data, error } = await sb.from('master_products').select('ma_sp,ten_sp,quy_trinh_cong_doan').order('ma_sp');
+  const sel = document.getElementById('spDangSx');
+  if (error){ sel.innerHTML = '<option value="">-- Lỗi tải danh mục SP --</option>'; return; }
+  (data || []).forEach(p => { productMap[p.ma_sp] = p; });
+  sel.innerHTML = '<option value="">-- Chọn mã SP --</option>' +
+    (data || []).map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp) + (p.ten_sp ? ' — ' + escapeHtml(p.ten_sp) : '') + '</option>').join('');
+}
+
+async function loadTonKho(maSp){
+  const row = document.getElementById('tonKhoRow');
+  if (!maSp) { row.classList.remove('show'); row.innerHTML = ''; return; }
+  row.classList.add('show');
+  row.innerHTML = '<div class="empty">Đang tải tồn kho…</div>';
+
+  const { data, error } = await sb.rpc('cd_ton_kho_theo_ma_sp', { p_ma_sp: maSp });
+  if (error) { row.innerHTML = '<div class="empty">Không tải được tồn kho: ' + escapeHtml(error.message) + '</div>'; return; }
+
+  const tonMap = {};
+  (data || []).forEach(r => { tonMap[r.cong_doan] = Number(r.so_luong) || 0; });
+
+  const p = productMap[maSp];
+  const rawSteps = (p && p.quy_trinh_cong_doan) ? p.quy_trinh_cong_doan.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const steps = rawSteps && rawSteps.length ? rawSteps : CONG_DOAN_ALL_ORDER.filter(cd => tonMap[cd] !== undefined);
+  // Công đoạn có tồn kho nhưng không nằm trong lưu trình khai báo (VD đã đổi
+  // quy trình sau khi tem đã chạy) — vẫn hiện thêm cuối, không giấu số liệu.
+  const extra = Object.keys(tonMap).filter(cd => !steps.includes(cd));
+  const allSteps = steps.concat(extra);
+
+  if (!allSteps.length) { row.innerHTML = '<div class="empty">Mã SP này chưa có tem nào còn tồn.</div>'; return; }
+  row.innerHTML = allSteps.map(cd => {
+    const sl = tonMap[cd] || 0;
+    return '<div class="tk-tile' + (sl > 0 ? ' here' : '') + '"><div class="tk-v">' + fmtNum(sl) + '</div><div class="tk-l">' + escapeHtml(cd) + '</div></div>';
+  }).join('');
 }
 
 async function loadNguoiKiem(){
@@ -657,6 +720,7 @@ function onFileChosen(evt, target){
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
   document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); updateGhiNhanGate(); });
+  document.getElementById('spDangSx').addEventListener('change', (e) => loadTonKho(e.target.value));
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
