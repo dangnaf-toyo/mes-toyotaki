@@ -42,6 +42,11 @@
   lại của các tem mã đó, gộp theo vị trí hiện tại (cd_v_vi_tri_hien_tai, tem
   chưa từng chuyển công đoạn coi như còn ở "Đúc").
 
+  T48b — cảnh báo mã SP khác nhau: nếu ô "Mã SP đang sản xuất" đang chọn 1
+  mã, mà tem Đúc khai báo (khaiBaoNguon) hoặc tem thành phẩm ghi nhận
+  (ghiNhan) có ma_sp KHÁC mã đó, hiện cảnh báo màu vàng cam (không chặn thao
+  tác, chỉ nhắc người vận hành kiểm tra lại).
+
   Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48 (tồn kho).
 -->
 <style>
@@ -171,6 +176,7 @@ select:focus,input:focus{border-color:var(--accent)}
 #msg.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-bd);display:block}
 #msg.ok{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-bd);display:block}
 #msg.wait{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);display:block}
+#msg.warn{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);display:block}
 </style>
 </head>
 <body>
@@ -463,8 +469,14 @@ async function khaiBaoNguon(raw){
     const { data, error } = await sb.rpc('cd_khai_bao_nguon_dang_dung', { p_tag_no: tagNo, p_cong_doan: congDoan, p_nguoi: myIdentity });
     if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); beep(false); return; }
     if (!data || data.ok === false) { showMsg((data && data.error) || 'Không khai báo được', 'err', 6000); beep(false); return; }
-    showMsg((data.da_khai_bao_truoc_do ? '✓ Đã đang dùng ' : '✓ Đã khai báo ') + data.tag_no + ' — còn ' + fmtNum(data.so_luong_con_lai) + ' pcs', 'ok', 3000);
-    beep(true);
+    const spSel = document.getElementById('spDangSx').value;
+    if (spSel && data.ma_sp && data.ma_sp !== spSel) {
+      showMsg('⚠️ Tem ' + data.tag_no + ' có mã SP ' + data.ma_sp + ' — KHÁC với mã đang chọn (' + spSel + ') — kiểm tra lại trước khi dùng!', 'warn', 9000);
+      beep(false);
+    } else {
+      showMsg((data.da_khai_bao_truoc_do ? '✓ Đã đang dùng ' : '✓ Đã khai báo ') + data.tag_no + ' — còn ' + fmtNum(data.so_luong_con_lai) + ' pcs', 'ok', 3000);
+      beep(true);
+    }
     await loadNguonList();
   } catch (e) {
     showMsg('Lỗi: ' + (e && e.message ? e.message : e), 'err', 6000);
@@ -622,8 +634,16 @@ async function ghiNhan(raw){
       ['Người kiểm', data.nguoi_kiem],
       ['Ngày giờ kiểm', fmtTime(data.ngay_gio_ghi_nhan)],
     ];
-    renderResult('ok', '✓ Đã ghi nhận thùng', lines);
-    beep(true);
+    const spSel = document.getElementById('spDangSx').value;
+    const spMismatch = spSel && data.ma_sp && data.ma_sp !== spSel;
+    if (spMismatch) {
+      lines.unshift(['⚠️ Cảnh báo', 'Mã SP khác với mã đang chọn (' + spSel + ')']);
+      renderResult('warn', '⚠️ Đã ghi nhận — SAI MÃ SP?', lines);
+      beep(false);
+    } else {
+      renderResult('ok', '✓ Đã ghi nhận thùng', lines);
+      beep(true);
+    }
     showMsg('', '');
 
     await Promise.all([loadNguonList(), loadKpi()]);
