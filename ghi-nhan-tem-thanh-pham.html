@@ -478,6 +478,11 @@ async function loadTrams(){
 // Line 1 CHƯA tồn tại hôm nay — không đụng vào Line 1 đã có (tránh đổi
 // nhầm mã SP đang chạy thật nếu ai đó đang xem tồn kho mã khác).
 const DANH_BONG_KEM_CA_NGAY = 'Ca ngày';
+// cd_tram_tao hiện có 10 tham số (p_kh_ca/p_kh_tuan thêm từ T4/T23 — DROP +
+// CREATE lại nên identity hàm đổi hẳn, gọi thiếu tham số → PostgREST trả
+// 404 "không tìm thấy hàm khớp chữ ký", KHÔNG phải lỗi quyền/thiếu bảng).
+// KH ca/KH tuần tự tra cd_khsx_tuan_plan (giống loadKpi() ở trên) — có gì
+// dùng nấy, không có thì để null (không bắt buộc phải nhập tay ở trang này).
 async function ensureLine1(){
   const congDoan = document.getElementById('congDoan').value;
   if (congDoan !== 'Đánh bóng Kẽm') return;
@@ -485,10 +490,20 @@ async function ensureLine1(){
   const maSp = document.getElementById('spDangSx').value;
   if (!maSp) return;
   const p = productMap[maSp];
+
+  const ngay = getTodayString();
+  const mon = mondayOf(ngay);
+  const dowCol = ['cn','t2','t3','t4','t5','t6','t7'][new Date(ngay + 'T00:00:00').getDay()];
+  const { data: planRows } = await sb.from('cd_khsx_tuan_plan')
+    .select(dowCol + ',kh_tuan').eq('cong_doan', congDoan).eq('ma_sp', maSp).eq('tuan_bat_dau', mon);
+  const plan = (planRows || [])[0];
+  const khCa = plan ? Number(plan[dowCol]) || null : null;
+  const khTuan = plan ? Number(plan.kh_tuan) || null : null;
+
   const { error } = await sb.rpc('cd_tram_tao', {
-    p_ngay: getTodayString(), p_ca: DANH_BONG_KEM_CA_NGAY, p_cong_doan: congDoan,
+    p_ngay: ngay, p_ca: DANH_BONG_KEM_CA_NGAY, p_cong_doan: congDoan,
     p_ten_tram: 'Line 1', p_ma_sp: maSp, p_ten_sp: (p && p.ten_sp) || '',
-    p_nguoi: myIdentity, p_user: myIdentity,
+    p_kh_ca: khCa, p_kh_tuan: khTuan, p_nguoi: myIdentity, p_user: myIdentity,
   });
   if (error) { showMsg('Không tự tạo được Line 1: ' + error.message, 'err', 6000); return; }
   await loadTrams();
