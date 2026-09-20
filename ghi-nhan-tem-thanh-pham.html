@@ -47,7 +47,12 @@
   (ghiNhan) có ma_sp KHÁC mã đó, hiện cảnh báo màu vàng cam (không chặn thao
   tác, chỉ nhắc người vận hành kiểm tra lại).
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48 (tồn kho).
+  T49 — ô tồn kho tại Đánh bóng tách riêng "Chờ đánh bóng" (WIP + tem Đúc đã
+  chuyển tới nhưng chưa tới lượt, loai='wip') và "Đã đánh bóng" (tem thành
+  phẩm ĐÃ quét ghi nhận, còn nằm tại Đánh bóng, loai='tp_da_dong_goi') — tem
+  thành phẩm CHƯA quét (chỉ mới in) không tính vào tồn kho nào cả.
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho).
 -->
 <style>
 :root{
@@ -373,22 +378,39 @@ async function loadTonKho(maSp){
   const { data, error } = await sb.rpc('cd_ton_kho_theo_ma_sp', { p_ma_sp: maSp });
   if (error) { row.innerHTML = '<div class="empty">Không tải được tồn kho: ' + escapeHtml(error.message) + '</div>'; return; }
 
-  const tonMap = {};
-  (data || []).forEach(r => { tonMap[r.cong_doan] = Number(r.so_luong) || 0; });
+  // 'wip' = tem gốc chưa đóng thùng (WIP + tem Đúc chờ tới lượt), 'tp_da_dong_goi'
+  // = tem thành phẩm đã quét ghi nhận, còn nằm tại công đoạn tạo ra nó — Đánh
+  // bóng hiện tách riêng 2 ô "Chờ đánh bóng"/"Đã đánh bóng" từ 2 loại này (T49).
+  const wipMap = {}, tpMap = {};
+  (data || []).forEach(r => {
+    const map = r.loai === 'tp_da_dong_goi' ? tpMap : wipMap;
+    map[r.cong_doan] = (map[r.cong_doan] || 0) + (Number(r.so_luong) || 0);
+  });
+  const combined = {};
+  new Set([...Object.keys(wipMap), ...Object.keys(tpMap)]).forEach(cd => {
+    combined[cd] = (wipMap[cd] || 0) + (tpMap[cd] || 0);
+  });
 
   const p = productMap[maSp];
   const rawSteps = (p && p.quy_trinh_cong_doan) ? p.quy_trinh_cong_doan.split(',').map(s => s.trim()).filter(Boolean) : null;
-  const steps = rawSteps && rawSteps.length ? rawSteps : CONG_DOAN_ALL_ORDER.filter(cd => tonMap[cd] !== undefined);
+  const steps = rawSteps && rawSteps.length ? rawSteps : CONG_DOAN_ALL_ORDER.filter(cd => combined[cd] !== undefined);
   // Công đoạn có tồn kho nhưng không nằm trong lưu trình khai báo (VD đã đổi
   // quy trình sau khi tem đã chạy) — vẫn hiện thêm cuối, không giấu số liệu.
-  const extra = Object.keys(tonMap).filter(cd => !steps.includes(cd));
+  const extra = Object.keys(combined).filter(cd => !steps.includes(cd));
   const allSteps = steps.concat(extra);
 
   if (!allSteps.length) { row.innerHTML = '<div class="empty">Mã SP này chưa có tem nào còn tồn.</div>'; return; }
-  row.innerHTML = allSteps.map(cd => {
-    const sl = tonMap[cd] || 0;
-    return '<div class="tk-tile' + (sl > 0 ? ' here' : '') + '"><div class="tk-v">' + fmtNum(sl) + '</div><div class="tk-l">' + escapeHtml(cd) + '</div></div>';
-  }).join('');
+  const tiles = [];
+  allSteps.forEach(cd => {
+    if (cd === 'Đánh bóng') {
+      tiles.push(['Chờ đánh bóng', wipMap['Đánh bóng'] || 0]);
+      tiles.push(['Đã đánh bóng', tpMap['Đánh bóng'] || 0]);
+    } else {
+      tiles.push([cd, combined[cd] || 0]);
+    }
+  });
+  row.innerHTML = tiles.map(([label, sl]) =>
+    '<div class="tk-tile' + (sl > 0 ? ' here' : '') + '"><div class="tk-v">' + fmtNum(sl) + '</div><div class="tk-l">' + escapeHtml(label) + '</div></div>').join('');
 }
 
 async function loadNguoiKiem(){
