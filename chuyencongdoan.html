@@ -569,13 +569,25 @@ document.getElementById("btnScan").addEventListener("click", () => { scanTarget 
 document.getElementById("btnRescan").addEventListener("click", () => { scanTarget = "transfer"; openCamera(); });
 document.getElementById("pkBtnScan").addEventListener("click", () => { scanTarget = "pack"; openCamera(); });
 
+// Đầu đọc QR rời "gõ" nguyên payload vào ô nhập tay, gồm nhiều trường cách
+// nhau bằng ">" và XUỐNG DÒNG (QR build bằng .join('>\n')) — mỗi dấu xuống
+// dòng bị trình duyệt hiểu là 1 lần bấm Enter riêng, nên nếu không chặn thì
+// sau khi xử lý đúng Tag No (đoạn đầu), các đoạn sau (tên SP, số lượng,
+// ngày, máy đúc...) sẽ tiếp tục bị tra cứu nhầm như thể là Tag No mới. Gộp
+// mọi lần Enter đến trong 1.5s thành 1 lần xử lý DUY NHẤT (đoạn đầu tiên) —
+// cùng cơ chế đã dùng ở ghi-nhan-kanban.html/ghi-nhan-tem-thanh-pham.html.
+const lastManualSubmitAt = {};
 function wireManualTagInput(inputId, target){
+  lastManualSubmitAt[inputId] = 0;
   document.getElementById(inputId).addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
     const v = e.target.value.trim();
+    e.target.value = ""; // xoá ngay — phần còn lại của chuỗi QR (đầu đọc gõ tiếp sau Enter) không dồn vào
     if (!v) return;
-    e.target.value = "";
+    const now = Date.now();
+    if (now - lastManualSubmitAt[inputId] < 1500) return; // các đoạn sau của cùng 1 lần quét — bỏ qua
+    lastManualSubmitAt[inputId] = now;
     scanTarget = target;
     onQrDecoded(v);
   });
