@@ -92,7 +92,13 @@
   không gắn tem/máy cụ thể vì Kanban Đúc không có "tem nguồn" như Đánh bóng
   Kẽm (T46) để trừ vào.
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1) + T52 (gộp Kanban Đúc Kẽm) + T53 (giữ KPI/tồn kho + máy đúc + NG cho Đúc Kẽm).
+  T54 — bỏ hẳn card "Phiên làm việc này" của Đúc Kẽm (T53) — trùng với dải
+  KPI/score card chung phía trên, không cần 2 chỗ hiện cùng 1 thông tin.
+  "Ghi nhận NG" thêm chọn CHỦNG LOẠI (DUC_NG_TYPES, có "Khác" gõ tay) chứ
+  không chỉ nhập số lượng — RPC duc_kanban_ghi_nhan_ng đổi chữ ký thêm
+  p_loai_ng (bảng duc_kanban_ng_log thêm cột loai_ng).
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1) + T52 (gộp Kanban Đúc Kẽm) + T53 (giữ KPI/tồn kho + máy đúc + NG cho Đúc Kẽm) + T54 (bỏ phiên làm việc + chủng loại NG).
 -->
 <style>
 :root{
@@ -188,12 +194,8 @@ select:focus,input:focus{border-color:var(--accent)}
 .res-flag{display:none;margin-top:8px;font-size:12.5px;font-weight:800;color:var(--warn-fg)}
 .mono{font-family:'JetBrains Mono',monospace}
 
-/* ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) ── */
-#kbPhienLog{margin-top:8px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
-#kbPhienLog .li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;font-size:12.5px;border-top:1px solid var(--border)}
-#kbPhienLog .li:first-child{border-top:none}
-#kbPhienLog .li .mono{font-size:11.5px;color:var(--text-muted)}
-#kbPhienLog .li.doi{background:var(--warn-bg)}
+/* ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) — card "Phiên làm
+   việc" (T53) đã bỏ (T54): trùng với dải KPI/score card chung phía trên. ── */
 
 .empty{padding:12px;text-align:center;color:var(--text-dim);font-style:italic;font-size:12.5px}
 
@@ -256,16 +258,6 @@ select:focus,input:focus{border-color:var(--accent)}
       <div class="kpi-tile tt"><div class="kv" id="kpiTtPcs">0</div><div class="kl">TT pcs hôm nay</div></div>
       <div class="kpi-tile ng"><div class="kv" id="kpiNgPcs">0</div><div class="kl">NG pcs hôm nay</div></div>
       <div class="kpi-tile ng"><div class="kv" id="kpiNgRate">0%</div><div class="kl">Tỷ lệ NG hôm nay</div></div>
-    </div>
-
-    <div class="card" id="kanbanPhienCard" style="display:none">
-      <h2>Phiên làm việc này</h2>
-      <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
-        <div class="kpi-tile tt"><div class="kv" id="kbTallyThung">0</div><div class="kl">Thùng đã ghi nhận</div></div>
-        <div class="kpi-tile tt"><div class="kv" id="kbTallyPcs">0</div><div class="kl">Tổng pcs</div></div>
-      </div>
-      <div id="kbPhienLog"><div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div></div>
-      <div class="hint">Số liệu phiên chỉ tính trên máy này, mất khi tải lại trang. Sản lượng thật đã lưu trên Bảng điều khiển Đúc.</div>
     </div>
 
     <div class="card">
@@ -337,7 +329,12 @@ select:focus,input:focus{border-color:var(--accent)}
       <div class="card">
         <h2>Ghi nhận NG</h2>
         <div class="field" style="margin:0">
-          <label for="ngKanbanInput">Số lượng NG phát sinh (mã SP đang chọn ở trên)</label>
+          <label for="ngKanbanLoai">Chủng loại NG (mã SP đang chọn ở trên)</label>
+          <select id="ngKanbanLoai"></select>
+        </div>
+        <input type="text" class="ng-khac" id="ngKanbanKhac" placeholder="Ghi rõ loại NG khác…" style="display:none;margin-top:8px">
+        <div class="field">
+          <label for="ngKanbanInput">Số lượng NG</label>
           <div class="row">
             <input type="number" id="ngKanbanInput" min="1" step="1" placeholder="Số lượng NG">
             <button type="button" class="btn mini" id="btnNgKanban">Ghi nhận NG</button>
@@ -430,6 +427,10 @@ const KEM_MACHINES = ["Kẽm 190T", "Kẽm 160T"];
 // đủ theo thực tế sau. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
 const NG_TYPES = ["Nhẹ cân", "Dập lẹm", "Khác"];
 
+// Chủng loại NG cho công đoạn Đúc Kẽm — danh sách tạm (khác NG_TYPES của
+// Đánh bóng Kẽm, sẽ bổ sung đầy đủ theo thực tế sau). "Khác" gõ tay.
+const DUC_NG_TYPES = ["Thiếu liệu", "Rỗ khí", "Bavia dư", "Khác"];
+
 // Thứ tự công đoạn mặc định khi mã SP chưa khai báo quy_trinh_cong_doan
 // riêng — khớp CONG_DOAN_LIST bên quan-ly-danh-muc.html.
 const CONG_DOAN_ALL_ORDER = ["Đúc", "Bavia", "Gia Công", "Cắt viền", "Đánh bóng Kẽm", "Sơn", "OQC", "Nhập kho", "Xuất hàng"];
@@ -440,7 +441,6 @@ let busy = false;
 let trams = [];
 let productMap = {}; // ma_sp -> { ten_sp, quy_trinh_cong_doan }
 let busyKanban = false;
-const phien = []; // { tag_no, ma_sp, so_thung_stt, so_luong, may_tt, doi_may, at } — chế độ Kanban Đúc Kẽm
 
 // ── Auth gate ──────────────────────────────────────────────────────────────
 async function boot(){
@@ -452,6 +452,7 @@ async function boot(){
   document.getElementById('mainUI').style.display = 'flex';
   myIdentity = (await MesAuth.getCurrentUserIdentity()) || 'Không rõ';
   document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
+  document.getElementById('ngKanbanLoai').innerHTML = DUC_NG_TYPES.map(t => '<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>').join('');
   // Cho phép mở thẳng vào chế độ Kanban qua link (?cd=Đúc+Kẽm) — dùng khi
   // redirect từ ghi-nhan-kanban.html cũ (T52).
   const cdParam = new URLSearchParams(location.search).get('cd');
@@ -469,12 +470,11 @@ async function boot(){
 // thao tác GIỮ NGUYÊN hiển thị ở cả 2 chế độ (T53) ─────────────────────────
 function applyMode(){
   const kb = isKanban();
-  document.getElementById('kanbanPhienCard').style.display = kb ? '' : 'none';
   document.getElementById('mainGridTP').style.display = kb ? 'none' : '';
   document.getElementById('mainGridKanban').style.display = kb ? '' : 'none';
   document.getElementById('lblNguoiKiem').textContent = kb ? 'Người thao tác' : 'Người kiểm tra';
   document.getElementById('lblTram').textContent = kb ? 'Máy đúc' : 'Trạm/tổ (không bắt buộc)';
-  if (kb) { loadMayKemOptions(); renderPhien(); }
+  if (kb) loadMayKemOptions();
   else loadTrams();
   if (window.MesNav) MesNav.setTitle(
     kb ? 'Ghi nhận thùng (Kanban) — Đúc Kẽm' : 'Ghi nhận thùng thành phẩm',
@@ -924,19 +924,8 @@ function renderResult(kind, title, lines, flag){
 }
 
 // ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html; T53 — máy đúc qua ô
-// "Trạm/tổ" dùng chung, xem loadMayKemOptions()/suggestMayKem() ở trên) ─────
-function renderPhien(){
-  document.getElementById('kbTallyThung').textContent = fmtNum(phien.length);
-  document.getElementById('kbTallyPcs').textContent = fmtNum(phien.reduce((s, r) => s + r.so_luong, 0));
-  const box = document.getElementById('kbPhienLog');
-  if (!phien.length) { box.innerHTML = '<div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div>'; return; }
-  box.innerHTML = phien.map(r =>
-    '<div class="li' + (r.doi_may ? ' doi' : '') + '">' +
-      '<span><b>' + escapeHtml(r.ma_sp) + '</b> · thùng ' + (r.so_thung_stt ?? '?') + ' · ' + fmtNum(r.so_luong) + ' pcs' +
-        (r.doi_may ? ' · ⚠ ' + escapeHtml(r.may_tt) : '') + '</span>' +
-      '<span class="mono">' + escapeHtml(r.tag_no) + ' · ' + fmtTime(r.at) + '</span>' +
-    '</div>').join('');
-}
+// "Trạm/tổ" dùng chung, xem loadMayKemOptions()/suggestMayKem() ở trên; T54
+// — bỏ card "Phiên làm việc" riêng, trùng với dải KPI chung phía trên) ─────
 async function ghiNhanKanban(raw){
   var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
@@ -969,13 +958,7 @@ async function ghiNhanKanban(raw){
     renderResult('ok', '✓ Đã ghi nhận thùng', lines, data.doi_may ? ('⚠ Đúc ở máy ' + data.may_tt + ' — khác máy trên tem chỉ thị') : '');
     beep(true);
     showMsg('', '');
-
-    phien.unshift({
-      tag_no: data.tag_no, ma_sp: data.ma_sp, so_thung_stt: data.so_thung_stt,
-      so_luong: Number(data.so_luong) || 0, may_tt: data.may_tt, doi_may: !!data.doi_may,
-      at: data.ngay_gio_ghi_nhan,
-    });
-    renderPhien();
+    await loadKpi();
   } catch (e) {
     renderResult('err', 'Lỗi', [['Chi tiết', e && e.message ? e.message : String(e)]]);
     beep(false);
@@ -993,6 +976,10 @@ let busyNgKanban = false;
 async function ghiNhanNgKanban(){
   const maSp = document.getElementById('spDangSx').value;
   if (!maSp) { showMsg('Chọn Mã SP đang sản xuất trước khi ghi nhận NG.', 'err', 5000); return; }
+  const loaiSel = document.getElementById('ngKanbanLoai');
+  const khacInput = document.getElementById('ngKanbanKhac');
+  const loai = loaiSel.value === 'Khác' ? khacInput.value.trim() : loaiSel.value;
+  if (!loai) { showMsg('Chưa ghi rõ chủng loại NG.', 'err', 4000); return; }
   const soLuong = Number(document.getElementById('ngKanbanInput').value);
   if (!soLuong || soLuong <= 0) { showMsg('Số lượng NG phải lớn hơn 0.', 'err', 4000); return; }
   if (busyNgKanban) return;
@@ -1001,13 +988,14 @@ async function ghiNhanNgKanban(){
   showMsg('⏳ Đang ghi nhận NG…', 'wait');
   try {
     const { data, error } = await sb.rpc('duc_kanban_ghi_nhan_ng', {
-      p_ngay: getTodayString(), p_ma_sp: maSp, p_so_luong: soLuong, p_nguoi: myIdentity,
+      p_ngay: getTodayString(), p_ma_sp: maSp, p_loai_ng: loai, p_so_luong: soLuong, p_nguoi: myIdentity,
     });
     if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); return; }
     if (!data || data.ok === false) { showMsg((data && data.error) || 'Không ghi nhận được NG', 'err', 6000); return; }
-    showMsg('✓ Đã ghi nhận ' + fmtNum(soLuong) + ' pcs NG cho ' + maSp, 'ok', 3000);
+    showMsg('✓ Đã ghi nhận ' + fmtNum(soLuong) + ' pcs NG (' + loai + ') cho ' + maSp, 'ok', 3000);
     beep(true);
     document.getElementById('ngKanbanInput').value = '';
+    khacInput.value = '';
     await loadKpi();
   } catch (e) {
     showMsg('Lỗi: ' + (e && e.message ? e.message : e), 'err', 6000);
@@ -1100,6 +1088,9 @@ function wire(){
   document.getElementById('btnKhaiBao').addEventListener('click', () => khaiBaoNguon(document.getElementById('tagInputNguon').value));
   document.getElementById('btnGhiNhanKanban').addEventListener('click', () => ghiNhanKanban(document.getElementById('tagInputKanban').value));
   document.getElementById('btnNgKanban').addEventListener('click', ghiNhanNgKanban);
+  document.getElementById('ngKanbanLoai').addEventListener('change', (e) => {
+    document.getElementById('ngKanbanKhac').style.display = e.target.value === 'Khác' ? '' : 'none';
+  });
   document.getElementById('tagInputKanban').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
