@@ -127,6 +127,14 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
 .routing-hint.show{display:block}
 .fifo-warn{font-size:12px;color:var(--warn-fg);background:var(--warn-bg);border:1px solid var(--warn-fg);border-radius:8px;padding:8px 10px;margin-bottom:14px;display:none}
 .fifo-warn.show{display:block}
+.summary-box{margin-top:10px;padding:10px 12px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:10px}
+.summary-box .ttl{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.summary-box table{width:100%;border-collapse:collapse;font-size:12.5px}
+.summary-box th{text-align:left;padding:4px 0;color:var(--text-muted);font-weight:700;border-bottom:1.5px solid var(--border)}
+.summary-box td{padding:4px 0;border-bottom:1px dashed var(--border)}
+.summary-box tfoot td{border-top:1.5px solid var(--border);border-bottom:none;font-weight:700;padding-top:6px}
+.summary-box .num{text-align:right;font-family:'JetBrains Mono',monospace}
+.summary-box .cnt{text-align:center;font-family:'JetBrains Mono',monospace}
 .src-item{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12.5px}
 .src-item .info b{display:block;font-size:13px}
 .src-item .info span{color:var(--text-muted);font-size:11px}
@@ -180,6 +188,7 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
   <div class="scanned-box" id="scannedBox">
     <div class="badge-ok" id="scannedCountBadge">✅ Đã đọc được 1 tem</div>
     <div id="scannedList"></div>
+    <div id="scannedSummary"></div>
     <button class="scan-btn rescan" id="btnRescan">📷 Quét thêm tem</button>
   </div>
 </div>
@@ -768,8 +777,38 @@ function renderScannedList(){
     </div>`).join('');
 
   document.getElementById(activeMsgId).style.display = "none";
+  renderScannedSummary();
   checkReady();
 }
+
+// Tổng hợp theo mã SP — số tem đã quét + tổng số lượng — để đối chiếu với
+// thực tế khi vận chuyển hàng đi (VD đếm số thùng thật khớp với danh sách).
+function renderScannedSummary(){
+  const el = document.getElementById("scannedSummary");
+  if (!scannedList.length){ el.innerHTML = ""; return; }
+  const bySp = {};
+  const order = [];
+  scannedList.forEach(s => {
+    if (!bySp[s.maSP]){ bySp[s.maSP] = { count: 0, total: 0, ten: s.tenSP }; order.push(s.maSP); }
+    bySp[s.maSP].count += 1;
+    bySp[s.maSP].total += Number(s.soLuongChuyen) || 0;
+  });
+  const rows = order.map(ma => {
+    const g = bySp[ma];
+    return `<tr><td>${ma}${g.ten ? " — " + g.ten : ""}</td><td class="cnt">${g.count}</td><td class="num">${fmtNum(g.total)}</td></tr>`;
+  }).join("");
+  const totalTem = scannedList.length;
+  const totalSl = scannedList.reduce((s, x) => s + (Number(x.soLuongChuyen) || 0), 0);
+  el.innerHTML = `<div class="summary-box">
+    <div class="ttl">📊 Tổng hợp theo mã SP (đối chiếu khi vận chuyển)</div>
+    <table>
+      <thead><tr><th>Mã SP</th><th class="cnt">Số tem</th><th class="num">Tổng SL</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td>Tổng cộng</td><td class="cnt">${totalTem}</td><td class="num">${fmtNum(totalSl)}</td></tr></tfoot>
+    </table>
+  </div>`;
+}
+function fmtNum(n){ return (Number(n) || 0).toLocaleString("vi-VN"); }
 
 function setScannedSl(i, v){
   const s = scannedList[i]; if (!s) return;
@@ -812,6 +851,7 @@ function resetForNext(){
   document.getElementById("scannedBox").classList.remove("show");
   document.getElementById("formSection").classList.remove("show");
   document.getElementById("emptyHint").style.display = "block";
+  document.getElementById("scannedSummary").innerHTML = "";
   document.getElementById("btnSubmit").disabled = true;
   document.getElementById("ghiChu").value = "";
 }
