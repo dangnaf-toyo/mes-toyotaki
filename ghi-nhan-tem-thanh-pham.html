@@ -133,6 +133,9 @@ select:focus,input:focus{border-color:var(--accent)}
 .het-banner{display:none;margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--warn-bg);
   border:1.5px solid var(--warn-bd);color:var(--warn-fg);font-size:12.5px;font-weight:700}
 .het-banner.show{display:block}
+.insufficient-banner{display:none;margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--alarm-bg);
+  border:1.5px solid var(--alarm-bd);color:var(--alarm-fg);font-size:12.5px;font-weight:700}
+.insufficient-banner.show{display:block}
 
 /* ── Chặn khi chưa đăng nhập ── */
 #authGate{display:none;text-align:center;padding:28px 16px}
@@ -223,6 +226,7 @@ select:focus,input:focus{border-color:var(--accent)}
             <button type="button" class="btn mini" id="btnGhiNhan">Ghi nhận</button>
           </div>
         </div>
+        <div class="insufficient-banner" id="insufficientBanner"></div>
         <div id="result">
           <div class="res-card" id="resCard">
             <span class="res-icon" id="resIcon"></span><span class="res-title" id="resTitle"></span>
@@ -411,6 +415,23 @@ async function khaiBaoNguon(raw){
 
 const NG_OPTIONS_HTML = NG_TYPES.map(t => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
 
+// ── Chặn "Ghi nhận" khi tổng nguồn Đúc đang dùng không đủ 1 thùng thành phẩm ──
+let nguonTotal = 0;
+function updateGhiNhanGate(){
+  const congDoan = document.getElementById('congDoan').value;
+  const required = TP_PACKAGING[congDoan] || 0;
+  const banner = document.getElementById('insufficientBanner');
+  const btn = document.getElementById('btnGhiNhan');
+  if (required > 0 && nguonTotal < required) {
+    banner.textContent = '⛔ Số lượng sản phẩm hiện có không đủ 1 thùng thành phẩm (' + fmtNum(nguonTotal) + '/' + fmtNum(required) + ' pcs) — đọc thêm tem thùng Đúc trước khi ghi nhận.';
+    banner.classList.add('show');
+    btn.disabled = true;
+  } else {
+    banner.classList.remove('show');
+    btn.disabled = false;
+  }
+}
+
 async function loadNguonList(){
   const { data, error } = await sb.from('duc_tem')
     .select('tag_no,ma_sp,ten_sp,so_luong')
@@ -420,6 +441,8 @@ async function loadNguonList(){
   const box = document.getElementById('nguonList');
   if (error){ box.innerHTML = '<div class="empty">Không tải được danh sách: ' + escapeHtml(error.message) + '</div>'; return; }
   const rows = data || [];
+  nguonTotal = rows.reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
+  updateGhiNhanGate();
   if (!rows.length){ box.innerHTML = '<div class="empty">Chưa khai báo tem Đúc nào.</div>'; return; }
   box.innerHTML = rows.map(r =>
     '<div class="nguon-item-wrap" data-tag-no="' + escapeHtml(r.tag_no) + '">' +
@@ -502,6 +525,12 @@ async function ghiNhan(raw){
   // payload vào ô nhập tay) — cắt lấy token đầu, bỏ khoảng trắng/xuống dòng.
   var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
+  const congDoan0 = document.getElementById('congDoan').value;
+  if ((TP_PACKAGING[congDoan0] || 0) > 0 && nguonTotal < TP_PACKAGING[congDoan0]) {
+    showMsg('Số lượng sản phẩm hiện có không đủ 1 thùng thành phẩm.', 'err', 5000);
+    beep(false);
+    return;
+  }
   if (busy) return;
   busy = true;
   document.getElementById('btnGhiNhan').disabled = true;
@@ -548,7 +577,7 @@ async function ghiNhan(raw){
     showMsg('', '');
   } finally {
     busy = false;
-    document.getElementById('btnGhiNhan').disabled = false;
+    updateGhiNhanGate();
     document.getElementById('tagInput').value = '';
   }
 }
@@ -627,7 +656,7 @@ function onFileChosen(evt, target){
 
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
-  document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); });
+  document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); updateGhiNhanGate(); });
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
