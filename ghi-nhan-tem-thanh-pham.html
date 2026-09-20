@@ -57,7 +57,13 @@
   tự do gõ tên tay. Ô Trạm/tổ ở đây mặc định chọn sẵn "Line 1" nếu đã có kế
   hoạch hôm nay (hiện chỉ chạy 1 line, Line 2 bật khi cần qua dashboard).
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line).
+  T51 — đổi tên công đoạn "Đánh bóng" → "Đánh bóng Kẽm" (toàn hệ thống, cả dữ
+  liệu cũ lẫn mới). Đồng thời: "Người kiểm tra" mặc định luôn là tài khoản
+  đang đăng nhập — chọn người KHÁC chỉ giới hạn trong nhân viên có
+  master_employees.bo_phan TRÙNG đúng công đoạn đang chọn (loadNguoiKiem()
+  lọc lại mỗi khi đổi công đoạn), tránh gán nhầm người tổ khác.
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm).
 -->
 <style>
 :root{
@@ -330,19 +336,19 @@ function beep(okTone){
 }
 
 // Công đoạn có quy cách đóng gói riêng cho tem thành phẩm — khớp TP_PACKAGING
-// bên intem.html. Đánh bóng (EXE-SHO/BPH-SHO) và OQC (riêng BPH-SHO, quy
-// trình dài hơn: Đúc→Đánh bóng→Gia Công→OQC→Nhập kho, đóng 150pcs suốt tới
-// OQC mới gộp về 60pcs).
-const TP_PACKAGING = { "Đánh bóng": 60, "OQC": 60 };
+// bên intem.html. Đánh bóng Kẽm (EXE-SHO/BPH-SHO, T51 đổi tên từ "Đánh
+// bóng") và OQC (riêng BPH-SHO, quy trình dài hơn: Đúc→Đánh bóng Kẽm→Gia
+// Công→OQC→Nhập kho, đóng 150pcs suốt tới OQC mới gộp về 60pcs).
+const TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
 const CONG_DOAN_LIST = Object.keys(TP_PACKAGING);
 
-// Chủng loại NG cho công đoạn Đánh bóng — danh sách tạm, sẽ bổ sung đầy đủ
-// theo thực tế sau. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
+// Chủng loại NG cho công đoạn Đánh bóng Kẽm — danh sách tạm, sẽ bổ sung đầy
+// đủ theo thực tế sau. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
 const NG_TYPES = ["Nhẹ cân", "Dập lẹm", "Khác"];
 
 // Thứ tự công đoạn mặc định khi mã SP chưa khai báo quy_trinh_cong_doan
 // riêng — khớp CONG_DOAN_LIST bên quan-ly-danh-muc.html.
-const CONG_DOAN_ALL_ORDER = ["Đúc", "Bavia", "Gia Công", "Cắt viền", "Đánh bóng", "Sơn", "OQC", "Nhập kho", "Xuất hàng"];
+const CONG_DOAN_ALL_ORDER = ["Đúc", "Bavia", "Gia Công", "Cắt viền", "Đánh bóng Kẽm", "Sơn", "OQC", "Nhập kho", "Xuất hàng"];
 
 // ── State ──────────────────────────────────────────────────────────────────
 let myIdentity = '';
@@ -407,9 +413,9 @@ async function loadTonKho(maSp){
   if (!allSteps.length) { row.innerHTML = '<div class="empty">Mã SP này chưa có tem nào còn tồn.</div>'; return; }
   const tiles = [];
   allSteps.forEach(cd => {
-    if (cd === 'Đánh bóng') {
-      tiles.push(['Chờ đánh bóng', wipMap['Đánh bóng'] || 0]);
-      tiles.push(['Đã đánh bóng', tpMap['Đánh bóng'] || 0]);
+    if (cd === 'Đánh bóng Kẽm') {
+      tiles.push(['Chờ đánh bóng', wipMap['Đánh bóng Kẽm'] || 0]);
+      tiles.push(['Đã đánh bóng', tpMap['Đánh bóng Kẽm'] || 0]);
     } else {
       tiles.push([cd, combined[cd] || 0]);
     }
@@ -418,10 +424,16 @@ async function loadTonKho(maSp){
     '<div class="tk-tile' + (sl > 0 ? ' here' : '') + '"><div class="tk-v">' + fmtNum(sl) + '</div><div class="tk-l">' + escapeHtml(label) + '</div></div>').join('');
 }
 
+// Mặc định luôn là tài khoản đang đăng nhập ("Tôi — ..."), chọn người khác
+// CHỈ giới hạn trong nhân viên thuộc đúng tổ/bộ phận của công đoạn đang chọn
+// (master_employees.bo_phan) — tránh gán nhầm người của tổ khác.
 async function loadNguoiKiem(){
   const sel = document.getElementById('nguoiKiem');
   sel.innerHTML = '<option value="' + escapeHtml(myIdentity) + '">Tôi — ' + escapeHtml(myIdentity) + '</option>';
-  const { data } = await sb.from('master_employees').select('ten_nhan_vien,vai_tro').order('ten_nhan_vien');
+  const congDoan = document.getElementById('congDoan').value;
+  let query = sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan').order('ten_nhan_vien');
+  if (congDoan) query = query.eq('bo_phan', congDoan);
+  const { data } = await query;
   const rows = (data || []).filter(r => r.ten_nhan_vien);
   rows.sort((a, b) => (a.vai_tro === 'nhan_vien' ? 0 : 1) - (b.vai_tro === 'nhan_vien' ? 0 : 1));
   rows.forEach(r => {
@@ -770,7 +782,7 @@ function onFileChosen(evt, target){
 
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
-  document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); updateGhiNhanGate(); });
+  document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); updateGhiNhanGate(); loadNguoiKiem(); });
   document.getElementById('spDangSx').addEventListener('change', (e) => loadTonKho(e.target.value));
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));

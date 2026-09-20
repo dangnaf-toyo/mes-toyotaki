@@ -400,7 +400,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
 // lượt, chỉ gộp lại ở TẦNG HIỂN THỊ dashboard này). CONG_DOAN_SUB_MAP khai
 // báo "trang X hiển thị gộp các cong_doan nào" — trang chính vẫn là 1 giá trị
 // CONG_DOAN_LIST, các giá trị phụ không xuất hiện trong danh mục chọn/menu.
-const CONG_DOAN_LIST = ["Bavia", "Gia Công", "Đánh bóng", "Sơn", "OQC"];
+const CONG_DOAN_LIST = ["Bavia", "Gia Công", "Đánh bóng Kẽm", "Sơn", "OQC"];
 const CONG_DOAN_SUB_MAP = { 'Gia Công': ['Gia Công', 'Cắt viền'] };
 const CA_LIST = ["Ca ngày", "Ca đêm", "Ca 1", "Ca 2"];
 let congDoan = null;
@@ -409,20 +409,21 @@ let productMap = {};
 let trams = [];
 let planToday = [];
 let currentTarget = null;
-const TRAM_LABEL_MAP = { 'Bavia': 'Line', 'Gia Công': 'Máy', 'Cắt viền': 'Máy', 'Đánh bóng': 'Line', 'Sơn': 'Line', 'OQC': 'Bàn kiểm' };
+const TRAM_LABEL_MAP = { 'Bavia': 'Line', 'Gia Công': 'Máy', 'Cắt viền': 'Máy', 'Đánh bóng Kẽm': 'Line', 'Sơn': 'Line', 'OQC': 'Bàn kiểm' };
 function tramLabel(){ return TRAM_LABEL_MAP[congDoan] || 'Trạm'; }
 
 // Công đoạn có danh mục Line/Máy CỐ ĐỊNH trong master_machines (theo bo_phan) →
 // dashboard chạy "kiểu Đúc": bảng luôn liệt kê sẵn line, bấm vào line trống để
 // gán kế hoạch (từ KHSX tuần), có nút Đổi SP và In tem (tách/gộp). Công đoạn
 // không map → giữ nguyên mô hình trạm tự do như cũ.
-// T50 — Đánh bóng thêm vào (Line 1/Line 2, master_machines.bo_phan='Đánh
-// bóng') — hiện chỉ chạy Line 1, Line 2 khai báo sẵn để bật ngay khi cần.
+// T50 — Đánh bóng Kẽm thêm vào (Line 1/Line 2, master_machines.bo_phan=
+// 'Đánh bóng Kẽm') — hiện chỉ chạy Line 1, Line 2 khai báo sẵn để bật ngay
+// khi cần. T51 đổi tên "Đánh bóng" → "Đánh bóng Kẽm" (đầy đủ hơn).
 // "📦 Xử lý thùng" + card "Đối soát" + loadDangDo/loadNgChoSua (bavia_xu_ly*)
 // VẪN CHỈ RIÊNG Bavia (guard bằng congDoan==='Bavia', không phải isLineMode())
 // — line mode chỉ dùng chung phần bảng liệt kê line + gán kế hoạch, không tự
 // động kéo theo các tính năng đặc thù của Bavia cho công đoạn line-mode khác.
-const CD_TO_BO_PHAN = { 'Bavia': 'Bavia', 'Đánh bóng': 'Đánh bóng' };
+const CD_TO_BO_PHAN = { 'Bavia': 'Bavia', 'Đánh bóng Kẽm': 'Đánh bóng Kẽm' };
 let lineCatalog = [];   // [ma_may] — rỗng nghĩa là dùng mô hình trạm tự do
 let empList = [];        // master_employees {ten_nhan_vien,vai_tro,bo_phan,line_may}
 function isLineMode(){ return lineCatalog.length > 0; }
