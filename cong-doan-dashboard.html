@@ -416,7 +416,13 @@ function tramLabel(){ return TRAM_LABEL_MAP[congDoan] || 'Trạm'; }
 // dashboard chạy "kiểu Đúc": bảng luôn liệt kê sẵn line, bấm vào line trống để
 // gán kế hoạch (từ KHSX tuần), có nút Đổi SP và In tem (tách/gộp). Công đoạn
 // không map → giữ nguyên mô hình trạm tự do như cũ.
-const CD_TO_BO_PHAN = { 'Bavia': 'Bavia' };
+// T50 — Đánh bóng thêm vào (Line 1/Line 2, master_machines.bo_phan='Đánh
+// bóng') — hiện chỉ chạy Line 1, Line 2 khai báo sẵn để bật ngay khi cần.
+// "📦 Xử lý thùng" + card "Đối soát" + loadDangDo/loadNgChoSua (bavia_xu_ly*)
+// VẪN CHỈ RIÊNG Bavia (guard bằng congDoan==='Bavia', không phải isLineMode())
+// — line mode chỉ dùng chung phần bảng liệt kê line + gán kế hoạch, không tự
+// động kéo theo các tính năng đặc thù của Bavia cho công đoạn line-mode khác.
+const CD_TO_BO_PHAN = { 'Bavia': 'Bavia', 'Đánh bóng': 'Đánh bóng' };
 let lineCatalog = [];   // [ma_may] — rỗng nghĩa là dùng mô hình trạm tự do
 let empList = [];        // master_employees {ten_nhan_vien,vai_tro,bo_phan,line_may}
 function isLineMode(){ return lineCatalog.length > 0; }
@@ -535,7 +541,9 @@ async function loadDanhMuc(){
     document.getElementById('btnAddTram').style.display = 'none';
     document.getElementById('btnChepLine').style.display = '';
     document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' theo danh mục';
-    document.getElementById('doiSoatCard').style.display = '';
+    // "Đối soát" (đối chiếu bavia_xu_ly*) là tính năng RIÊNG của Bavia — không
+    // áp dụng cho Đánh bóng hay công đoạn line-mode khác sau này.
+    if (congDoan === 'Bavia') document.getElementById('doiSoatCard').style.display = '';
     const note = document.getElementById('tramsSectionNote');
     if (note) note.textContent = tramLabel() + ' lấy từ danh mục Máy-Line. Line chưa có kế hoạch xếp riêng bên dưới — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần.';
   }
@@ -548,7 +556,8 @@ function reloadAll(){
   // "Hàng đang chờ tại công đoạn" tạm ẩn khỏi dashboard (loadWaiting giữ lại
   // để đưa vào sau) — không gọi ở đây nữa.
   loadKhsxToday();
-  if (isLineMode()){ loadDangDo(); loadNgChoSua(); }
+  // Đang đổ / NG chờ sửa (bavia_xu_ly*) là tính năng RIÊNG của Bavia.
+  if (congDoan === 'Bavia'){ loadDangDo(); loadNgChoSua(); }
 }
 
 function applyTramLabel(){
@@ -587,7 +596,7 @@ function activeTramRowHtml(t, merged){
       <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
       <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}${Number(t.so_luong_ng_sua) > 0 ? ` <span style="color:var(--warn-fg)" title="NG chờ sửa">+${fmtNum(t.so_luong_ng_sua)} sửa</span>` : ''}</td>
       <td style="white-space:nowrap">
-        ${isLineMode() ? `<button type="button" class="btn-tiny" style="background:var(--accent);color:#fff" onclick="openXuLyThung('${t.id_tram}')">📦 Xử lý thùng</button>` : ''}
+        ${congDoan === 'Bavia' ? `<button type="button" class="btn-tiny" style="background:var(--accent);color:#fff" onclick="openXuLyThung('${t.id_tram}')">📦 Xử lý thùng</button>` : ''}
         <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
         <button type="button" class="btn-tiny" onclick="openSuaTram('${t.id_tram}')">Sửa</button>
         <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi SP</button>
