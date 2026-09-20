@@ -34,7 +34,7 @@
       { label: 'Bảng điều khiển OQC', href: 'cong-doan-dashboard.html?cd=OQC' },
       { label: 'Nhập liệu di động', href: 'mobile.html' },
       { label: 'In tem', href: 'intem.html' },
-      { label: 'Ghi nhận thùng (Kanban)', href: 'ghi-nhan-kanban.html' },
+      { label: 'Ghi nhận thùng (Kanban)', href: 'ghi-nhan-tem-thanh-pham.html?cd=%C4%90%C3%BAc+K%E1%BA%BDm' },
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
       { label: 'Kế hoạch bảo dưỡng khuôn', href: 'bao-duong-khuon-tuan.html' },
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html' },
