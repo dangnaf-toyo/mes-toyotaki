@@ -16,6 +16,11 @@
   Dữ liệu lấy từ RPC đệ quy cd_truy_xuat_pha_he (gộp duc_tem_tach +
   cd_tem_nguon), xem supabase/migration_phase_T5_truy_xuat_pha_he.sql.
   Đọc công khai, không có thao tác ghi nào ở trang này.
+
+  Mỗi tem cha/con trong cây (renderNodeDetail) hiện ĐẦY ĐỦ thông tin
+  (duc_tem select('*') + vị trí hiện tại), không chỉ mã SP/số lượng tóm tắt
+  như trước — đối chiếu nhanh khi có khiếu nại chất lượng cần biết ai/máy
+  nào/khi nào làm ra tem nguồn.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -58,6 +63,12 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 .rel-tach{color:var(--warn-fg)}
 .rel-dong_goi{color:var(--run-fg)}
 .node-meta{color:var(--text-dim);font-size:11px}
+.node-head{margin-bottom:4px}
+.node-detail{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 14px;background:var(--bg-sunken);border-radius:7px;padding:7px 10px;margin:4px 0 6px}
+.node-detail .nd{display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:1.5px 0}
+.node-detail .nd .k{color:var(--text-dim);font-weight:600}
+.node-detail .nd .v{font-weight:700;text-align:right}
+.node-detail .missing{grid-column:1/-1;color:var(--text-dim);font-style:italic;font-size:11px}
 .empty{color:var(--text-dim);font-style:italic;font-size:12.5px;padding:6px 0}
 #msg{max-width:none;margin:12px 0 12px;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FECACA;display:block!important}
@@ -178,15 +189,21 @@ async function search(raw){
   const allTags = new Set([tagNo]);
   edges.forEach(e => { allTags.add(e.tu); allTags.add(e.den); });
 
-  const { data: temList } = await sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,ngay').in('tag_no', [...allTags]);
+  const [{ data: temList }, { data: locList }] = await Promise.all([
+    sb.from('duc_tem').select('*').in('tag_no', [...allTags]),
+    sb.from('cd_v_vi_tri_hien_tai').select('tag_no,vi_tri_hien_tai').in('tag_no', [...allTags]),
+  ]);
   const tagInfo = {};
   (temList || []).forEach(t => { tagInfo[t.tag_no] = t; });
   tagInfo[tagNo] = temRes.data;
+  const tagLoc = {};
+  (locList || []).forEach(l => { tagLoc[l.tag_no] = l.vi_tri_hien_tai; });
+  if (locRes.data) tagLoc[tagNo] = locRes.data.vi_tri_hien_tai;
 
   document.getElementById('resultArea').style.display = 'block';
   renderCurrent(temRes.data, locRes.data);
-  renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo);
-  renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo);
+  renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo, tagLoc);
+  renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo, tagLoc);
   renderHistory(histRes.data || []);
   showMsg('✅ Đã tra cứu ' + tagNo, 'ok');
 }
@@ -212,7 +229,28 @@ const REL_LABEL = {
   xuoi:  { tach: '✂ Tách ra thành', dong_goi: '📦 Dùng để đóng gói thành' },
 };
 
-function renderTree(elId, edges, rootTag, direction, tagInfo){
+function renderNodeDetail(info, loc){
+  if (!info) return '<div class="node-detail"><div class="missing">Không tìm thấy dữ liệu tem này (có thể đã bị xoá).</div></div>';
+  const rows = [
+    ['Mã SP', info.ma_sp],
+    ['Tên SP', info.ten_sp],
+    ['Số lượng còn lại', fmtNum(info.so_luong)],
+    ['Trạng thái', info.trang_thai],
+    ['Ngày (gốc)', fmtDateVN(info.ngay)],
+    ['Trạm/Line/Máy', info.tram_cong_doan],
+    ['Thời điểm SX', info.thoi_diem_san_xuat ? new Date(info.thoi_diem_san_xuat).toLocaleString('vi-VN', { hour12: false }) : ''],
+    ['Người thao tác', info.nguoi_tt],
+    ['Số khuôn', info.so_khuon],
+    ['Nguyên liệu', info.nguyen_lieu],
+    ['Ngày giờ ghi nhận', info.ngay_gio_ghi_nhan ? new Date(info.ngay_gio_ghi_nhan).toLocaleString('vi-VN', { hour12: false }) : ''],
+    ['Vị trí hiện tại', loc || ''],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (!rows.length) return '';
+  return '<div class="node-detail">' + rows.map(([k, v]) =>
+    '<div class="nd"><span class="k">' + escapeHtml(k) + '</span><span class="v">' + escapeHtml(v) + '</span></div>').join('') + '</div>';
+}
+
+function renderTree(elId, edges, rootTag, direction, tagInfo, tagLoc){
   const el = document.getElementById(elId);
   if (!edges.length){ el.innerHTML = '<div class="empty">' + (direction === 'nguoc' ? 'Không có — đây là tem gốc, chưa được tách/gộp từ tem nào khác.' : 'Chưa được dùng để tách/đóng gói thành tem nào khác.') + '</div>'; return; }
 
@@ -228,9 +266,10 @@ function renderTree(elId, edges, rootTag, direction, tagInfo){
       const info = tagInfo[other];
       const nextVisited = new Set(visited); nextVisited.add(other);
       const grandChildren = renderChildrenList(other, nextVisited);
-      return '<li><span class="rel-' + e.loai + '">' + REL_LABEL[direction][e.loai] + '</span> ' +
-        '<span class="tag-chip">' + escapeHtml(other) + '</span> — ' + fmtNum(e.so_luong) + ' sp' +
-        (info ? ' <span class="node-meta">(' + escapeHtml(info.ma_sp) + ', còn ' + fmtNum(info.so_luong) + ')</span>' : '') +
+      return '<li>' +
+        '<div class="node-head"><span class="rel-' + e.loai + '">' + REL_LABEL[direction][e.loai] + '</span> ' +
+        '<span class="tag-chip">' + escapeHtml(other) + '</span> — ' + fmtNum(e.so_luong) + ' sp' + '</div>' +
+        renderNodeDetail(info, tagLoc[other]) +
         (grandChildren ? '<ul class="tree">' + grandChildren + '</ul>' : '') + '</li>';
     }).join('');
   }
