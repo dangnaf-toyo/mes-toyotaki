@@ -63,7 +63,14 @@
   master_employees.bo_phan TRÙNG đúng công đoạn đang chọn (loadNguoiKiem()
   lọc lại mỗi khi đổi công đoạn), tránh gán nhầm người tổ khác.
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm).
+  T51b — bỏ hẳn yêu cầu phải mở cong-doan-dashboard.html để "+ Gán kế hoạch"
+  cho Line 1 trước: khi chọn công đoạn Đánh bóng Kẽm + đã biết Mã SP đang
+  sản xuất (ô T48), tự gọi RPC cd_tram_tao tạo Line 1 luôn tại đây nếu CHƯA
+  có (ensureLine1()) — không đụng vào Line 1 nếu đã tồn tại (tránh đổi nhầm
+  mã SP đang chạy thật). Ca cố định "Ca ngày" (Đánh bóng Kẽm giờ nằm trong
+  CONG_DOAN_MOT_CA bên cong-doan-dashboard.html, phải giữ khớp giá trị này).
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1).
 -->
 <style>
 :root{
@@ -457,10 +464,34 @@ async function loadTrams(){
   trams = data || [];
   sel.innerHTML = '<option value="">-- Không gắn trạm --</option>' +
     trams.map(t => '<option value="'+t.id_tram+'">'+escapeHtml(t.ten_tram)+' — '+escapeHtml(t.ma_sp)+'</option>').join('');
-  // Đánh bóng hiện chỉ chạy Line 1 (T50) — mặc định chọn sẵn nếu đã có kế
-  // hoạch hôm nay, đỡ phải chọn tay mỗi lần vào trang.
+  // Đánh bóng Kẽm hiện chỉ chạy Line 1 (T50) — mặc định chọn sẵn nếu đã có
+  // kế hoạch hôm nay, đỡ phải chọn tay mỗi lần vào trang.
   const line1 = trams.find(t => t.ten_tram === 'Line 1');
   if (line1) sel.value = line1.id_tram;
+  await ensureLine1();
+}
+
+// Đánh bóng Kẽm chỉ chạy "Ca ngày" (khớp CONG_DOAN_MOT_CA bên
+// cong-doan-dashboard.html) — trang này không có ô chọn ca (T44), nên tự
+// tạo Line 1 thẳng ở đây khi biết Mã SP đang sản xuất (T48), khỏi phải mở
+// cong-doan-dashboard.html riêng chỉ để bấm "+ Gán kế hoạch". CHỈ tạo khi
+// Line 1 CHƯA tồn tại hôm nay — không đụng vào Line 1 đã có (tránh đổi
+// nhầm mã SP đang chạy thật nếu ai đó đang xem tồn kho mã khác).
+const DANH_BONG_KEM_CA_NGAY = 'Ca ngày';
+async function ensureLine1(){
+  const congDoan = document.getElementById('congDoan').value;
+  if (congDoan !== 'Đánh bóng Kẽm') return;
+  if (trams.some(t => t.ten_tram === 'Line 1')) return;
+  const maSp = document.getElementById('spDangSx').value;
+  if (!maSp) return;
+  const p = productMap[maSp];
+  const { error } = await sb.rpc('cd_tram_tao', {
+    p_ngay: getTodayString(), p_ca: DANH_BONG_KEM_CA_NGAY, p_cong_doan: congDoan,
+    p_ten_tram: 'Line 1', p_ma_sp: maSp, p_ten_sp: (p && p.ten_sp) || '',
+    p_nguoi: myIdentity, p_user: myIdentity,
+  });
+  if (error) { showMsg('Không tự tạo được Line 1: ' + error.message, 'err', 6000); return; }
+  await loadTrams();
 }
 
 // ── KPI Kế hoạch / Thực tế hôm nay ───────────────────────────────────────────
@@ -783,7 +814,7 @@ function onFileChosen(evt, target){
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
   document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); updateGhiNhanGate(); loadNguoiKiem(); });
-  document.getElementById('spDangSx').addEventListener('change', (e) => loadTonKho(e.target.value));
+  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); });
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
