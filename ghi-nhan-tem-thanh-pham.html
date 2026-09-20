@@ -70,7 +70,18 @@
   mã SP đang chạy thật). Ca cố định "Ca ngày" (Đánh bóng Kẽm giờ nằm trong
   CONG_DOAN_MOT_CA bên cong-doan-dashboard.html, phải giữ khớp giá trị này).
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1).
+  T52 — GỘP ghi-nhan-kanban.html vào đây: thêm công đoạn "Đúc Kẽm" trong ô
+  Công đoạn — chọn công đoạn này chuyển hẳn màn hình sang chế độ Kanban
+  (isKanban()/applyMode()): ẩn KPI/Tồn kho/Trạm-tổ/2 card Tem Đúc-Tem thành
+  phẩm, hiện 2 card "Đổi máy đúc" + "Quét tem chỉ thị Kanban" (gọi RPC
+  duc_ghi_nhan_tem_kanban, y hệt ghi-nhan-kanban.html cũ) và card "Phiên làm
+  việc này" (tally + log phiên, chỉ lưu trên trình duyệt). "Người kiểm tra"
+  đổi nhãn thành "Người thao tác" ở chế độ này, KHÔNG lọc theo bo_phan (Đúc
+  Kẽm không tag riêng theo bo_phan như các công đoạn line-mode khác).
+  ghi-nhan-kanban.html cũ giờ CHỈ còn redirect sang đây (?cd=Đúc+Kẽm) — trang
+  gộp đọc query param `cd` lúc boot() để tự chọn sẵn công đoạn tương ứng.
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1) + T52 (gộp Kanban Đúc Kẽm).
 -->
 <style>
 :root{
@@ -163,7 +174,20 @@ select:focus,input:focus{border-color:var(--accent)}
 .res-lines div:first-child{border-top:none}
 .res-lines .k{color:var(--text-muted);font-weight:600}
 .res-lines .v{font-weight:800;text-align:right}
+.res-flag{display:none;margin-top:8px;font-size:12.5px;font-weight:800;color:var(--warn-fg)}
 .mono{font-family:'JetBrains Mono',monospace}
+
+/* ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) ── */
+#doiMayBox{display:none;margin-top:8px;padding:9px 10px;border:1.5px dashed var(--warn-bd);border-radius:9px;background:var(--warn-bg)}
+#doiMayBox.show{display:block}
+.doimay-active{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--warn-bg);border:1px solid var(--warn-bd);
+  color:var(--warn-fg);font-size:12.5px;font-weight:700;display:none}
+.doimay-active.show{display:block}
+#kbPhienLog{margin-top:8px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+#kbPhienLog .li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;font-size:12.5px;border-top:1px solid var(--border)}
+#kbPhienLog .li:first-child{border-top:none}
+#kbPhienLog .li .mono{font-size:11.5px;color:var(--text-muted)}
+#kbPhienLog .li.doi{background:var(--warn-bg)}
 
 .empty{padding:12px;text-align:center;color:var(--text-dim);font-style:italic;font-size:12.5px}
 
@@ -219,7 +243,7 @@ select:focus,input:focus{border-color:var(--accent)}
   <!-- Nội dung chính -->
   <div id="mainUI" style="display:none;flex-direction:column;gap:8px">
 
-    <div class="kpi-row">
+    <div class="kpi-row" id="kpiRowTP">
       <div class="kpi-tile kh"><div class="kv" id="kpiKhThung">0</div><div class="kl">KH thùng hôm nay</div></div>
       <div class="kpi-tile kh"><div class="kv" id="kpiKhPcs">0</div><div class="kl">KH pcs hôm nay</div></div>
       <div class="kpi-tile tt"><div class="kv" id="kpiTtThung">0</div><div class="kl">TT thùng hôm nay</div></div>
@@ -228,21 +252,31 @@ select:focus,input:focus{border-color:var(--accent)}
       <div class="kpi-tile ng"><div class="kv" id="kpiNgRate">0%</div><div class="kl">Tỷ lệ NG hôm nay</div></div>
     </div>
 
+    <div class="card" id="kanbanPhienCard" style="display:none">
+      <h2>Phiên làm việc này</h2>
+      <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
+        <div class="kpi-tile tt"><div class="kv" id="kbTallyThung">0</div><div class="kl">Thùng đã ghi nhận</div></div>
+        <div class="kpi-tile tt"><div class="kv" id="kbTallyPcs">0</div><div class="kl">Tổng pcs</div></div>
+      </div>
+      <div id="kbPhienLog"><div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div></div>
+      <div class="hint">Số liệu phiên chỉ tính trên máy này, mất khi tải lại trang. Sản lượng thật đã lưu trên Bảng điều khiển Đúc.</div>
+    </div>
+
     <div class="card">
       <div class="settings-row">
-        <div class="field" style="margin:0">
+        <div class="field" style="margin:0" id="spDangSxFieldWrap">
           <label for="spDangSx">Mã SP đang sản xuất</label>
           <select id="spDangSx"><option value="">-- Chọn mã SP --</option></select>
         </div>
         <div class="field" style="margin:0">
-          <label for="nguoiKiem">Người kiểm tra</label>
+          <label for="nguoiKiem"><span id="lblNguoiKiem">Người kiểm tra</span></label>
           <select id="nguoiKiem"></select>
         </div>
         <div class="field" style="margin:0">
           <label for="congDoan">Công đoạn</label>
           <select id="congDoan"></select>
         </div>
-        <div class="field" style="margin:0">
+        <div class="field" style="margin:0" id="tramFieldWrap">
           <label for="tram">Trạm/tổ (không bắt buộc)</label>
           <select id="tram"><option value="">-- Không gắn trạm --</option></select>
         </div>
@@ -250,7 +284,7 @@ select:focus,input:focus{border-color:var(--accent)}
       <div id="tonKhoRow"></div>
     </div>
 
-    <div class="main-grid">
+    <div class="main-grid" id="mainGridTP">
       <div class="card">
         <h2>Tem Đúc đang dùng</h2>
         <button type="button" class="btn" id="btnScanNguon">📷 Đọc tem thùng Đúc đang đánh</button>
@@ -277,12 +311,39 @@ select:focus,input:focus{border-color:var(--accent)}
           </div>
         </div>
         <div class="insufficient-banner" id="insufficientBanner"></div>
-        <div id="result">
-          <div class="res-card" id="resCard">
-            <span class="res-icon" id="resIcon"></span><span class="res-title" id="resTitle"></span>
-            <div class="res-lines" id="resLines"></div>
+      </div>
+    </div>
+
+    <div class="main-grid" id="mainGridKanban" style="display:none">
+      <div class="card">
+        <h2>Đổi máy đúc</h2>
+        <button type="button" class="btn" style="background:#fff;color:var(--accent);border:1.5px solid var(--accent)" id="btnToggleDoiMay">🔧 Đổi máy đúc (khi máy chỉ thị bị hỏng)</button>
+        <div id="doiMayBox">
+          <label for="doiMay">Máy đúc thực tế</label>
+          <select id="doiMay"><option value="">— Đúng máy trên tem chỉ thị —</option></select>
+          <div class="hint">Chọn máy khác nếu thùng này được đúc ở máy không đúng chỉ thị. Áp dụng cho mọi lần quét tiếp theo tới khi bạn đổi lại.</div>
+        </div>
+        <div class="doimay-active" id="doiMayActive"></div>
+      </div>
+
+      <div class="card">
+        <h2>Quét tem chỉ thị Kanban</h2>
+        <button type="button" class="btn" id="btnScanKanban">📷 Quét QR trên tem</button>
+        <input type="file" id="qrFileInputKanban" accept="image/*" capture="environment" style="display:none">
+        <div class="field" style="margin-top:8px">
+          <div class="row">
+            <input type="text" id="tagInputKanban" placeholder="VD: TKD20260829-0012" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <button type="button" class="btn mini" id="btnGhiNhanKanban">Ghi nhận</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="result">
+      <div class="res-card" id="resCard">
+        <span class="res-icon" id="resIcon"></span><span class="res-title" id="resTitle"></span>
+        <div class="res-lines" id="resLines"></div>
+        <div class="res-flag" id="resFlag"></div>
       </div>
     </div>
 
@@ -347,7 +408,12 @@ function beep(okTone){
 // bóng") và OQC (riêng BPH-SHO, quy trình dài hơn: Đúc→Đánh bóng Kẽm→Gia
 // Công→OQC→Nhập kho, đóng 150pcs suốt tới OQC mới gộp về 60pcs).
 const TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
-const CONG_DOAN_LIST = Object.keys(TP_PACKAGING);
+// "Đúc Kẽm" (T52) không phải công đoạn đóng gói TP — chọn công đoạn này
+// chuyển hẳn màn hình sang chế độ Kanban (xem isKanban()/applyMode()), giữ
+// mặc định vẫn là công đoạn đầu tiên của TP_PACKAGING (không đổi hành vi cũ).
+const CONG_DOAN_KANBAN = "Đúc Kẽm";
+const CONG_DOAN_LIST = [...Object.keys(TP_PACKAGING), CONG_DOAN_KANBAN];
+function isKanban(){ return document.getElementById('congDoan').value === CONG_DOAN_KANBAN; }
 
 // Chủng loại NG cho công đoạn Đánh bóng Kẽm — danh sách tạm, sẽ bổ sung đầy
 // đủ theo thực tế sau. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
@@ -362,6 +428,8 @@ let myIdentity = '';
 let busy = false;
 let trams = [];
 let productMap = {}; // ma_sp -> { ten_sp, quy_trinh_cong_doan }
+let busyKanban = false;
+const phien = []; // { tag_no, ma_sp, so_thung_stt, so_luong, may_tt, doi_may, at } — chế độ Kanban Đúc Kẽm
 
 // ── Auth gate ──────────────────────────────────────────────────────────────
 async function boot(){
@@ -373,8 +441,39 @@ async function boot(){
   document.getElementById('mainUI').style.display = 'flex';
   myIdentity = (await MesAuth.getCurrentUserIdentity()) || 'Không rõ';
   document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
-  await Promise.all([loadNguoiKiem(), loadTrams(), loadNguonList(), loadKpi(), loadSpDangSx()]);
+  // Cho phép mở thẳng vào chế độ Kanban qua link (?cd=Đúc+Kẽm) — dùng khi
+  // redirect từ ghi-nhan-kanban.html cũ (T52).
+  const cdParam = new URLSearchParams(location.search).get('cd');
+  if (cdParam && CONG_DOAN_LIST.includes(cdParam)) document.getElementById('congDoan').value = cdParam;
+  applyMode();
+  const tasks = [loadNguoiKiem(), loadSpDangSx(), loadMayListKanban()];
+  if (!isKanban()) tasks.push(loadTrams(), loadNguonList(), loadKpi());
+  await Promise.all(tasks);
   wire();
+}
+
+// ── Chế độ Kanban Đúc Kẽm (T52) ↔ chế độ Tem thành phẩm — ẩn/hiện theo công
+// đoạn đang chọn, không tách trang riêng nữa ─────────────────────────────────
+function applyMode(){
+  const kb = isKanban();
+  document.getElementById('kpiRowTP').style.display = kb ? 'none' : '';
+  document.getElementById('kanbanPhienCard').style.display = kb ? '' : 'none';
+  document.getElementById('spDangSxFieldWrap').style.display = kb ? 'none' : '';
+  document.getElementById('tramFieldWrap').style.display = kb ? 'none' : '';
+  document.getElementById('mainGridTP').style.display = kb ? 'none' : '';
+  document.getElementById('mainGridKanban').style.display = kb ? '' : 'none';
+  document.getElementById('lblNguoiKiem').textContent = kb ? 'Người thao tác' : 'Người kiểm tra';
+  document.getElementById('tonKhoRow').classList.remove('show');
+  if (kb) renderPhien();
+  if (window.MesNav) MesNav.setTitle(
+    kb ? 'Ghi nhận thùng (Kanban) — Đúc Kẽm' : 'Ghi nhận thùng thành phẩm',
+    kb ? 'Quét QR tem chỉ thị — máy chạy theo tem in trước' : 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc'
+  );
+}
+function onCongDoanChange(){
+  applyMode();
+  loadNguoiKiem();
+  if (!isKanban()) { loadTrams(); loadKpi(); updateGhiNhanGate(); }
 }
 
 // ── Mã SP đang sản xuất → tồn kho theo công đoạn (T48) ──────────────────────
@@ -439,7 +538,9 @@ async function loadNguoiKiem(){
   sel.innerHTML = '<option value="' + escapeHtml(myIdentity) + '">Tôi — ' + escapeHtml(myIdentity) + '</option>';
   const congDoan = document.getElementById('congDoan').value;
   let query = sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan').order('ten_nhan_vien');
-  if (congDoan) query = query.eq('bo_phan', congDoan);
+  // Đúc Kẽm (chế độ Kanban) không tag nhân viên theo bo_phan riêng như các
+  // công đoạn line-mode khác — hiện đủ danh sách, giống ghi-nhan-kanban.html cũ.
+  if (congDoan && congDoan !== CONG_DOAN_KANBAN) query = query.eq('bo_phan', congDoan);
   const { data } = await query;
   const rows = (data || []).filter(r => r.ten_nhan_vien);
   rows.sort((a, b) => (a.vai_tro === 'nhan_vien' ? 0 : 1) - (b.vai_tro === 'nhan_vien' ? 0 : 1));
@@ -754,19 +855,97 @@ async function ghiNhan(raw){
   }
 }
 
-function renderResult(kind, title, lines){
+function renderResult(kind, title, lines, flag){
   document.getElementById('resCard').className = 'res-card ' + kind;
   document.getElementById('resIcon').textContent = kind === 'ok' ? '✅' : (kind === 'warn' ? '⚠️' : '⛔');
   document.getElementById('resTitle').textContent = title;
   document.getElementById('resLines').innerHTML = lines.map(([k, v]) =>
     '<div><span class="k">' + escapeHtml(k) + '</span><span class="v">' + escapeHtml(v) + '</span></div>').join('');
+  const f = document.getElementById('resFlag');
+  if (flag) { f.textContent = flag; f.style.display = 'block'; } else { f.style.display = 'none'; }
   document.getElementById('result').classList.add('show');
+}
+
+// ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) ──────────────────────
+async function loadMayListKanban(){
+  const sel = document.getElementById('doiMay');
+  // Chỉ máy bộ phận Đúc (bo_phan null = máy cũ chưa gán) — loại LINE bộ phận khác.
+  const { data } = await sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may');
+  sel.innerHTML = '<option value="">— Đúng máy trên tem chỉ thị —</option>' +
+    (data || []).filter(r => r.ma_may).map(r => '<option value="' + escapeHtml(r.ma_may) + '">' + escapeHtml(r.ma_may) + '</option>').join('');
+}
+function refreshDoiMayIndicator(){
+  const may = document.getElementById('doiMay').value;
+  const ind = document.getElementById('doiMayActive');
+  if (may) { ind.textContent = '⚠ Đang ghi nhận sản lượng về máy: ' + may + ' (khác máy trên tem chỉ thị)'; ind.classList.add('show'); }
+  else { ind.classList.remove('show'); }
+}
+function renderPhien(){
+  document.getElementById('kbTallyThung').textContent = fmtNum(phien.length);
+  document.getElementById('kbTallyPcs').textContent = fmtNum(phien.reduce((s, r) => s + r.so_luong, 0));
+  const box = document.getElementById('kbPhienLog');
+  if (!phien.length) { box.innerHTML = '<div class="empty">Chưa ghi nhận thùng nào trong phiên này.</div>'; return; }
+  box.innerHTML = phien.map(r =>
+    '<div class="li' + (r.doi_may ? ' doi' : '') + '">' +
+      '<span><b>' + escapeHtml(r.ma_sp) + '</b> · thùng ' + (r.so_thung_stt ?? '?') + ' · ' + fmtNum(r.so_luong) + ' pcs' +
+        (r.doi_may ? ' · ⚠ ' + escapeHtml(r.may_tt) : '') + '</span>' +
+      '<span class="mono">' + escapeHtml(r.tag_no) + ' · ' + fmtTime(r.at) + '</span>' +
+    '</div>').join('');
+}
+async function ghiNhanKanban(raw){
+  var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
+  if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
+  if (busyKanban) return;
+  busyKanban = true;
+  document.getElementById('btnGhiNhanKanban').disabled = true;
+  showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
+
+  const p_may_tt = document.getElementById('doiMay').value || null;
+  const p_nguoi_tt = document.getElementById('nguoiKiem').value || myIdentity;
+
+  try {
+    const { data, error } = await sb.rpc('duc_ghi_nhan_tem_kanban', { p_tag_no: tagNo, p_may_tt, p_nguoi_tt });
+    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', error.message || String(error)]]); beep(false); showMsg('', ''); return; }
+    if (!data || data.ok === false) {
+      const isDup = data && data.da_ghi_nhan;
+      renderResult(isDup ? 'warn' : 'err', isDup ? 'Tem đã được ghi nhận' : 'Không ghi nhận được',
+        [['Thông báo', (data && data.error) || 'Lỗi không xác định']]);
+      beep(false);
+      showMsg('', '');
+      return;
+    }
+    const lines = [
+      ['Mã SP', data.ma_sp + (data.ten_sp ? ' — ' + data.ten_sp : '')],
+      ['Thùng', 'số ' + (data.so_thung_stt ?? '?')],
+      ['Số lượng', fmtNum(data.so_luong) + ' pcs'],
+      ['Máy đúc', data.may_tt],
+      ['Lúc', fmtTime(data.ngay_gio_ghi_nhan)],
+    ];
+    renderResult('ok', '✓ Đã ghi nhận thùng', lines, data.doi_may ? ('⚠ Đúc ở máy ' + data.may_tt + ' — khác máy trên tem chỉ thị') : '');
+    beep(true);
+    showMsg('', '');
+
+    phien.unshift({
+      tag_no: data.tag_no, ma_sp: data.ma_sp, so_thung_stt: data.so_thung_stt,
+      so_luong: Number(data.so_luong) || 0, may_tt: data.may_tt, doi_may: !!data.doi_may,
+      at: data.ngay_gio_ghi_nhan,
+    });
+    renderPhien();
+  } catch (e) {
+    renderResult('err', 'Lỗi', [['Chi tiết', e && e.message ? e.message : String(e)]]);
+    beep(false);
+    showMsg('', '');
+  } finally {
+    busyKanban = false;
+    document.getElementById('btnGhiNhanKanban').disabled = false;
+    document.getElementById('tagInputKanban').value = '';
+  }
 }
 
 // ── Quét QR (theo pattern intem.html — 1 instance duy nhất, dùng chung cho cả
 // "Tem Đúc đang dùng" lẫn "Quét tem thành phẩm" qua scanTarget) ─────────────
 let html5QrCode = null, scanningActive = false;
-let scanTarget = 'thanhpham'; // 'thanhpham' (ghiNhan) hoặc 'nguon' (khaiBaoNguon)
+let scanTarget = 'thanhpham'; // 'thanhpham' (ghiNhan) | 'nguon' (khaiBaoNguon) | 'kanban' (ghiNhanKanban)
 function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode('qrReaderDiv'); return html5QrCode; }
 
 async function openCamera(target){
@@ -791,7 +970,8 @@ async function openCamera(target){
     await closeQrModal();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showMsg('📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…', 'wait');
-      document.getElementById(scanTarget === 'nguon' ? 'qrFileInputNguon' : 'qrFileInput').click();
+      const fileInputId = scanTarget === 'nguon' ? 'qrFileInputNguon' : (scanTarget === 'kanban' ? 'qrFileInputKanban' : 'qrFileInput');
+      document.getElementById(fileInputId).click();
       return;
     }
     showMsg('Không mở được camera: ' + e + '. Kiểm tra quyền Camera cho trang này.', 'err');
@@ -810,7 +990,9 @@ async function onScanSuccess(decodedText){
   await closeQrModal();
   const tagNo = String(decodedText).split('>')[0].trim();
   if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
-  if (scanTarget === 'nguon') khaiBaoNguon(tagNo); else ghiNhan(tagNo);
+  if (scanTarget === 'nguon') khaiBaoNguon(tagNo);
+  else if (scanTarget === 'kanban') ghiNhanKanban(tagNo);
+  else ghiNhan(tagNo);
 }
 function onFileChosen(evt, target){
   const file = evt.target.files && evt.target.files[0];
@@ -821,22 +1003,40 @@ function onFileChosen(evt, target){
     .then(decodedText => {
       const tagNo = String(decodedText).split('>')[0].trim();
       if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
-      if (target === 'nguon') khaiBaoNguon(tagNo); else ghiNhan(tagNo);
+      if (target === 'nguon') khaiBaoNguon(tagNo);
+      else if (target === 'kanban') ghiNhanKanban(tagNo);
+      else ghiNhan(tagNo);
     })
     .catch(() => showMsg('Không đọc được mã QR trong ảnh — chụp lại, để mã QR rõ nét và nằm giữa khung.', 'err', 5000));
 }
 
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
-  document.getElementById('congDoan').addEventListener('change', () => { loadTrams(); loadKpi(); updateGhiNhanGate(); loadNguoiKiem(); });
+  document.getElementById('congDoan').addEventListener('change', onCongDoanChange);
   document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); });
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
+  document.getElementById('btnScanKanban').addEventListener('click', () => openCamera('kanban'));
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
   document.getElementById('qrFileInput').addEventListener('change', (e) => onFileChosen(e, 'thanhpham'));
   document.getElementById('qrFileInputNguon').addEventListener('change', (e) => onFileChosen(e, 'nguon'));
+  document.getElementById('qrFileInputKanban').addEventListener('change', (e) => onFileChosen(e, 'kanban'));
   document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
   document.getElementById('btnKhaiBao').addEventListener('click', () => khaiBaoNguon(document.getElementById('tagInputNguon').value));
+  document.getElementById('btnGhiNhanKanban').addEventListener('click', () => ghiNhanKanban(document.getElementById('tagInputKanban').value));
+  document.getElementById('btnToggleDoiMay').addEventListener('click', () => document.getElementById('doiMayBox').classList.toggle('show'));
+  document.getElementById('doiMay').addEventListener('change', refreshDoiMayIndicator);
+  document.getElementById('tagInputKanban').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var v = e.target.value;
+    e.target.value = '';
+    if (!v.replace(/\s+/g, '')) return;
+    var now = Date.now();
+    if (now - lastScanSubmitAtKanban < 1500) return;
+    lastScanSubmitAtKanban = now;
+    ghiNhanKanban(v);
+  });
   document.getElementById('tagInput').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -864,6 +1064,7 @@ function wire(){
 }
 var lastScanSubmitAt = 0;
 var lastScanSubmitAtNguon = 0;
+var lastScanSubmitAtKanban = 0;
 
 boot();
 </script>
