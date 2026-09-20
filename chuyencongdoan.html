@@ -86,7 +86,7 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
   background:var(--accent);color:#fff;display:flex;align-items:center;
   justify-content:center;gap:8px}
 .submit-btn:disabled{opacity:.45;cursor:not-allowed}
-#msg{width:100%;max-width:480px;margin-top:2px;padding:12px 14px;
+.msg-here{width:100%;margin-top:2px;padding:12px 14px;
   border-radius:9px;font-size:13.5px;display:none;font-weight:600}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-fg);display:block!important}
 .ok{background:var(--run-bg);color:var(--run-fg);border:1px solid var(--run-fg);display:block!important}
@@ -174,6 +174,7 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
     <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
     <input type="text" autocomplete="off" id="manualTagInput" placeholder="Bấm vào đây rồi quét bằng đầu đọc QR, hoặc gõ Tag No + Enter">
   </div>
+  <div id="msgScan" class="msg-here" style="margin-top:10px"></div>
   <div class="empty-hint" id="emptyHint">Chưa quét tem nào. Bấm nút phía trên, hướng camera về phía mã QR trên tem — hệ thống tự nhận diện, không cần bấm chụp. Quét được nhiều tem liên tiếp để chuyển cùng lúc.</div>
 
   <div class="scanned-box" id="scannedBox">
@@ -219,6 +220,7 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
       <label class="req" for="confirmCongDoan">Bộ phận (Công đoạn giao — nơi bạn xác nhận thay mặt)</label>
       <select id="confirmCongDoan"></select>
     </div>
+    <div id="msgConfirm" class="msg-here"></div>
   </div>
   <div class="card">
     <div class="card-ttl">📋 Phiếu đang chờ xác nhận</div>
@@ -255,6 +257,7 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
       <label>Hoặc nhập tay / dùng đầu đọc QR rời</label>
       <input type="text" autocomplete="off" id="pkManualTagInput" placeholder="Bấm vào đây rồi quét bằng đầu đọc QR, hoặc gõ Tag No + Enter">
     </div>
+    <div id="msgPack" class="msg-here" style="margin-top:10px"></div>
     <div class="empty-hint" id="pkEmptyHint">Chưa quét tem nguồn nào.</div>
     <div id="pkSrcList" style="margin-top:10px"></div>
     <div class="pk-total" id="pkTotal" style="display:none"></div>
@@ -287,8 +290,6 @@ select:disabled{background:var(--bg-sunken);color:var(--text-muted);cursor:not-a
     <button class="submit-btn" id="pkBtnSubmit">📦&nbsp; Đóng gói &amp; Tạo tem mới</button>
   </div>
 </div>
-
-<div id="msg"></div>
 
 <canvas id="scanCanvas" style="display:none"></canvas>
 
@@ -362,9 +363,14 @@ function fillSelect(id, arr, placeholder){
 
 function err(t){ showMsg("❌ " + t, "err"); }
 let msgToken = 0;
+// Thông báo hiện NGAY DƯỚI khu vực thao tác của tab đang mở (dễ theo dõi khi
+// quét tem lỗi) thay vì 1 vị trí cố định cuối trang — mỗi tab có khung riêng
+// (msgScan/msgConfirm/msgPack), activeMsgId cập nhật theo tab đang active.
+let activeMsgId = "msgScan";
 function showMsg(t, cls, autoHideMs){
-  const el = document.getElementById("msg");
-  el.textContent = t; el.className = cls; el.style.display = "block";
+  const el = document.getElementById(activeMsgId);
+  if (!el) return;
+  el.textContent = t; el.className = "msg-here " + cls; el.style.display = "block";
   msgToken += 1;
   const myToken = msgToken;
   if (autoHideMs){
@@ -514,7 +520,7 @@ function getScanner(){
 }
 
 async function openCamera(){
-  document.getElementById("msg").style.display = "none";
+  document.getElementById(activeMsgId).style.display = "none";
   if (typeof Html5Qrcode !== "function"){
     err("Lỗi tải thư viện đọc QR (html5-qrcode) — kiểm tra kết nối mạng rồi tải lại trang.");
     return;
@@ -720,7 +726,7 @@ async function onQrDecoded(text){
   item.congDoanNhan = r.suggested;
   item.routingHint = r.hint;
   scannedList.push(item);
-  document.getElementById("msg").style.display = "none";
+  document.getElementById(activeMsgId).style.display = "none";
   renderScannedList();
   checkReady();
 }
@@ -761,7 +767,7 @@ function renderScannedList(){
       </label>` : ``}
     </div>`).join('');
 
-  document.getElementById("msg").style.display = "none";
+  document.getElementById(activeMsgId).style.display = "none";
   checkReady();
 }
 
@@ -902,6 +908,7 @@ function switchTab(tab){
   document.getElementById("tabBtnConfirm").classList.toggle("active", tab === "confirm");
   document.getElementById("tabBtnPack").classList.toggle("active", tab === "pack");
   if (tab !== "scan") stopCamera();
+  activeMsgId = tab === "confirm" ? "msgConfirm" : tab === "pack" ? "msgPack" : "msgScan";
 }
 
 async function loadConfirmDanhMuc(){
@@ -1051,7 +1058,7 @@ async function addPackSource(decoded){
     tag_no: data.tag_no, ma_sp: data.ma_sp, ten_sp: data.ten_sp, so_luong: Number(data.so_luong),
     ngay: data.ngay, lot: data.lot, so_khuon: data.so_khuon, nguyen_lieu: data.nguyen_lieu, may_duc: data.may_duc_chi_thi,
   });
-  document.getElementById("msg").style.display = "none";
+  document.getElementById(activeMsgId).style.display = "none";
   renderPackSources();
   if (!packUnits.length) suggestPackUnits();
 }
