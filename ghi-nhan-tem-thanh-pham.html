@@ -81,7 +81,18 @@
   ghi-nhan-kanban.html cũ giờ CHỈ còn redirect sang đây (?cd=Đúc+Kẽm) — trang
   gộp đọc query param `cd` lúc boot() để tự chọn sẵn công đoạn tương ứng.
 
-  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1) + T52 (gộp Kanban Đúc Kẽm).
+  T53 — Đúc Kẽm (chế độ Kanban) giờ giữ NGUYÊN dải KPI + tồn kho + "Mã SP
+  đang sản xuất" + "Người thao tác" giống Đánh bóng Kẽm (không ẩn nữa như
+  T52 bản đầu). Ô "Trạm/tổ" đổi công dụng thành "Máy đúc" khi ở chế độ này
+  (dùng CHUNG 1 <select id="tram">, chỉ đổi nội dung/nhãn theo mode) — lọc
+  đúng 2 máy "Kẽm 190T"/"Kẽm 160T", tự gợi ý máy theo kế hoạch hôm nay
+  (duc_ca_hien_tai khớp mã SP đang chọn), người dùng đổi tay nếu máy chỉ
+  thị in sai. Thêm card "Ghi nhận NG" (RPC duc_kanban_ghi_nhan_ng, T53) —
+  nhập số lượng NG bất kỳ lúc nào, CỘNG DỒN theo (ngày, mã SP đang chọn),
+  không gắn tem/máy cụ thể vì Kanban Đúc không có "tem nguồn" như Đánh bóng
+  Kẽm (T46) để trừ vào.
+
+  Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1) + T52 (gộp Kanban Đúc Kẽm) + T53 (giữ KPI/tồn kho + máy đúc + NG cho Đúc Kẽm).
 -->
 <style>
 :root{
@@ -100,7 +111,7 @@ body{padding:8px 8px 14px}
 .card{background:var(--bg-panel);border-radius:11px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:11px 13px}
 .card h2{font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px}
-select,input[type=text]{width:100%;padding:9px 10px;border:1.5px solid var(--border-strong);border-radius:8px;
+select,input[type=text],input[type=number]{width:100%;padding:9px 10px;border:1.5px solid var(--border-strong);border-radius:8px;
   font-family:inherit;font-size:14.5px;font-weight:600;background:#fff;color:var(--text);outline:none}
 select:focus,input:focus{border-color:var(--accent)}
 .field+.field{margin-top:8px}
@@ -110,7 +121,7 @@ select:focus,input:focus{border-color:var(--accent)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.mini{padding:9px 12px;font-size:12.5px;width:auto;border-radius:8px}
 .row{display:flex;gap:8px;align-items:center}
-.row input[type=text]{flex:1;width:auto;min-width:0}
+.row input[type=text],.row input[type=number]{flex:1;width:auto;min-width:0}
 .muted{font-size:12px;color:var(--text-muted)}
 .hint{font-size:11px;color:var(--text-dim);margin-top:5px;line-height:1.4}
 
@@ -178,11 +189,6 @@ select:focus,input:focus{border-color:var(--accent)}
 .mono{font-family:'JetBrains Mono',monospace}
 
 /* ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) ── */
-#doiMayBox{display:none;margin-top:8px;padding:9px 10px;border:1.5px dashed var(--warn-bd);border-radius:9px;background:var(--warn-bg)}
-#doiMayBox.show{display:block}
-.doimay-active{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--warn-bg);border:1px solid var(--warn-bd);
-  color:var(--warn-fg);font-size:12.5px;font-weight:700;display:none}
-.doimay-active.show{display:block}
 #kbPhienLog{margin-top:8px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
 #kbPhienLog .li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;font-size:12.5px;border-top:1px solid var(--border)}
 #kbPhienLog .li:first-child{border-top:none}
@@ -264,7 +270,7 @@ select:focus,input:focus{border-color:var(--accent)}
 
     <div class="card">
       <div class="settings-row">
-        <div class="field" style="margin:0" id="spDangSxFieldWrap">
+        <div class="field" style="margin:0">
           <label for="spDangSx">Mã SP đang sản xuất</label>
           <select id="spDangSx"><option value="">-- Chọn mã SP --</option></select>
         </div>
@@ -276,8 +282,8 @@ select:focus,input:focus{border-color:var(--accent)}
           <label for="congDoan">Công đoạn</label>
           <select id="congDoan"></select>
         </div>
-        <div class="field" style="margin:0" id="tramFieldWrap">
-          <label for="tram">Trạm/tổ (không bắt buộc)</label>
+        <div class="field" style="margin:0">
+          <label for="tram"><span id="lblTram">Trạm/tổ (không bắt buộc)</span></label>
           <select id="tram"><option value="">-- Không gắn trạm --</option></select>
         </div>
       </div>
@@ -316,17 +322,6 @@ select:focus,input:focus{border-color:var(--accent)}
 
     <div class="main-grid" id="mainGridKanban" style="display:none">
       <div class="card">
-        <h2>Đổi máy đúc</h2>
-        <button type="button" class="btn" style="background:#fff;color:var(--accent);border:1.5px solid var(--accent)" id="btnToggleDoiMay">🔧 Đổi máy đúc (khi máy chỉ thị bị hỏng)</button>
-        <div id="doiMayBox">
-          <label for="doiMay">Máy đúc thực tế</label>
-          <select id="doiMay"><option value="">— Đúng máy trên tem chỉ thị —</option></select>
-          <div class="hint">Chọn máy khác nếu thùng này được đúc ở máy không đúng chỉ thị. Áp dụng cho mọi lần quét tiếp theo tới khi bạn đổi lại.</div>
-        </div>
-        <div class="doimay-active" id="doiMayActive"></div>
-      </div>
-
-      <div class="card">
         <h2>Quét tem chỉ thị Kanban</h2>
         <button type="button" class="btn" id="btnScanKanban">📷 Quét QR trên tem</button>
         <input type="file" id="qrFileInputKanban" accept="image/*" capture="environment" style="display:none">
@@ -336,6 +331,19 @@ select:focus,input:focus{border-color:var(--accent)}
             <button type="button" class="btn mini" id="btnGhiNhanKanban">Ghi nhận</button>
           </div>
         </div>
+        <div class="hint">Máy đúc lấy từ ô "Máy đúc" phía trên — đổi ở đó nếu chỉ thị in sai máy.</div>
+      </div>
+
+      <div class="card">
+        <h2>Ghi nhận NG</h2>
+        <div class="field" style="margin:0">
+          <label for="ngKanbanInput">Số lượng NG phát sinh (mã SP đang chọn ở trên)</label>
+          <div class="row">
+            <input type="number" id="ngKanbanInput" min="1" step="1" placeholder="Số lượng NG">
+            <button type="button" class="btn mini" id="btnNgKanban">Ghi nhận NG</button>
+          </div>
+        </div>
+        <div class="hint">Nhập bất kỳ lúc nào phát sinh NG, hoặc gộp nhập 1 lần cuối ca — mỗi lần nhập cộng dồn vào "NG pcs hôm nay" phía trên.</div>
       </div>
     </div>
 
@@ -414,6 +422,9 @@ const TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
 const CONG_DOAN_KANBAN = "Đúc Kẽm";
 const CONG_DOAN_LIST = [...Object.keys(TP_PACKAGING), CONG_DOAN_KANBAN];
 function isKanban(){ return document.getElementById('congDoan').value === CONG_DOAN_KANBAN; }
+// Kẽm chỉ đúc trên đúng 2 máy này (T53) — dùng chung ô "Trạm/tổ" (đổi thành
+// "Máy đúc" ở chế độ Kanban) để chọn, KHÔNG dùng ô "Đổi máy đúc" riêng nữa.
+const KEM_MACHINES = ["Kẽm 190T", "Kẽm 160T"];
 
 // Chủng loại NG cho công đoạn Đánh bóng Kẽm — danh sách tạm, sẽ bổ sung đầy
 // đủ theo thực tế sau. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
@@ -445,26 +456,26 @@ async function boot(){
   // redirect từ ghi-nhan-kanban.html cũ (T52).
   const cdParam = new URLSearchParams(location.search).get('cd');
   if (cdParam && CONG_DOAN_LIST.includes(cdParam)) document.getElementById('congDoan').value = cdParam;
-  applyMode();
-  const tasks = [loadNguoiKiem(), loadSpDangSx(), loadMayListKanban()];
-  if (!isKanban()) tasks.push(loadTrams(), loadNguonList(), loadKpi());
+  applyMode(); // đã tự nạp Trạm/tổ hoặc Máy đúc theo đúng chế độ
+  const tasks = [loadNguoiKiem(), loadSpDangSx(), loadKpi()];
+  if (!isKanban()) tasks.push(loadNguonList());
   await Promise.all(tasks);
   wire();
 }
 
-// ── Chế độ Kanban Đúc Kẽm (T52) ↔ chế độ Tem thành phẩm — ẩn/hiện theo công
-// đoạn đang chọn, không tách trang riêng nữa ─────────────────────────────────
+// ── Chế độ Kanban Đúc Kẽm (T52/T53) ↔ chế độ Tem thành phẩm — chỉ ẩn/hiện
+// khu quét (Tem Đúc/Tem thành phẩm ↔ Quét Kanban/Ghi nhận NG) + đổi công
+// dụng ô "Trạm/tổ" thành "Máy đúc". KPI, tồn kho, Mã SP đang sản xuất, Người
+// thao tác GIỮ NGUYÊN hiển thị ở cả 2 chế độ (T53) ─────────────────────────
 function applyMode(){
   const kb = isKanban();
-  document.getElementById('kpiRowTP').style.display = kb ? 'none' : '';
   document.getElementById('kanbanPhienCard').style.display = kb ? '' : 'none';
-  document.getElementById('spDangSxFieldWrap').style.display = kb ? 'none' : '';
-  document.getElementById('tramFieldWrap').style.display = kb ? 'none' : '';
   document.getElementById('mainGridTP').style.display = kb ? 'none' : '';
   document.getElementById('mainGridKanban').style.display = kb ? '' : 'none';
   document.getElementById('lblNguoiKiem').textContent = kb ? 'Người thao tác' : 'Người kiểm tra';
-  document.getElementById('tonKhoRow').classList.remove('show');
-  if (kb) renderPhien();
+  document.getElementById('lblTram').textContent = kb ? 'Máy đúc' : 'Trạm/tổ (không bắt buộc)';
+  if (kb) { loadMayKemOptions(); renderPhien(); }
+  else loadTrams();
   if (window.MesNav) MesNav.setTitle(
     kb ? 'Ghi nhận thùng (Kanban) — Đúc Kẽm' : 'Ghi nhận thùng thành phẩm',
     kb ? 'Quét QR tem chỉ thị — máy chạy theo tem in trước' : 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc'
@@ -473,7 +484,23 @@ function applyMode(){
 function onCongDoanChange(){
   applyMode();
   loadNguoiKiem();
-  if (!isKanban()) { loadTrams(); loadKpi(); updateGhiNhanGate(); }
+  loadKpi();
+  if (!isKanban()) updateGhiNhanGate();
+  else suggestMayKem(document.getElementById('spDangSx').value);
+}
+
+// ── Máy đúc (T53) — ô "Trạm/tổ" đổi thành chọn 1 trong 2 máy Kẽm, tự gợi ý
+// theo kế hoạch hàng ngày (duc_ca_hien_tai) của mã SP đang chọn ───────────
+function loadMayKemOptions(){
+  document.getElementById('tram').innerHTML = '<option value="">— Đúng máy trên tem chỉ thị —</option>' +
+    KEM_MACHINES.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+}
+async function suggestMayKem(maSp){
+  if (!isKanban() || !maSp) return;
+  const { data } = await sb.from('duc_ca_hien_tai').select('ma_may')
+    .eq('ngay', getTodayString()).eq('ma_sp', maSp).in('ma_may', KEM_MACHINES).limit(1);
+  const may = data && data[0] && data[0].ma_may;
+  if (may) document.getElementById('tram').value = may;
 }
 
 // ── Mã SP đang sản xuất → tồn kho theo công đoạn (T48) ──────────────────────
@@ -614,6 +641,7 @@ async function ensureLine1(){
 async function loadKpi(){
   const congDoan = document.getElementById('congDoan').value;
   if (!congDoan) return;
+  if (isKanban()) return loadKpiKanban();
   const ngay = getTodayString();
   const mon = mondayOf(ngay);
   const dowCol = ['cn','t2','t3','t4','t5','t6','t7'][new Date(ngay + 'T00:00:00').getDay()];
@@ -636,6 +664,35 @@ async function loadKpi(){
   const ngRate = (ttPcs + ngPcs) > 0 ? (ngPcs / (ttPcs + ngPcs) * 100) : 0;
 
   document.getElementById('kpiKhThung').textContent = fmtNum(slThung ? Math.round(khPcs / slThung) : 0);
+  document.getElementById('kpiKhPcs').textContent = fmtNum(khPcs);
+  document.getElementById('kpiTtThung').textContent = fmtNum(ttRows.length);
+  document.getElementById('kpiTtPcs').textContent = fmtNum(ttPcs);
+  document.getElementById('kpiNgPcs').textContent = fmtNum(ngPcs);
+  document.getElementById('kpiNgRate').textContent = ngRate.toFixed(1).replace(/\.0$/, '') + '%';
+}
+
+// KPI cho Đúc Kẽm (T53) — công đoạn-rộng (cả 2 máy Kẽm, mọi mã SP), KHÔNG
+// lọc theo "Mã SP đang sản xuất" đang chọn, khớp cách TP_PACKAGING làm ở
+// trên. "KH thùng"/"TT thùng" không có nghĩa cố định ở Kanban (mỗi tem chỉ
+// thị 1 số lượng khác nhau tuỳ lô in) — thay "TT thùng" bằng số tem đã quét,
+// "KH thùng" để trống.
+async function loadKpiKanban(){
+  const ngay = getTodayString();
+  const [khRes, ttRes, ngRes] = await Promise.all([
+    sb.from('duc_ca_hien_tai').select('kh_ca').eq('ngay', ngay).in('ma_may', KEM_MACHINES),
+    sb.from('duc_tem').select('so_luong')
+      .eq('trang_thai', 'Đã sản xuất').in('may_tt', KEM_MACHINES)
+      .gte('ngay_gio_ghi_nhan', ngay + 'T00:00:00+07:00')
+      .lt('ngay_gio_ghi_nhan', addDays(ngay, 1) + 'T00:00:00+07:00'),
+    sb.from('duc_kanban_ng_log').select('so_luong').eq('ngay', ngay),
+  ]);
+  const khPcs = (khRes.data || []).reduce((s, r) => s + (Number(r.kh_ca) || 0), 0);
+  const ttRows = ttRes.data || [];
+  const ttPcs = ttRows.reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
+  const ngPcs = (ngRes.data || []).reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
+  const ngRate = (ttPcs + ngPcs) > 0 ? (ngPcs / (ttPcs + ngPcs) * 100) : 0;
+
+  document.getElementById('kpiKhThung').textContent = '—';
   document.getElementById('kpiKhPcs').textContent = fmtNum(khPcs);
   document.getElementById('kpiTtThung').textContent = fmtNum(ttRows.length);
   document.getElementById('kpiTtPcs').textContent = fmtNum(ttPcs);
@@ -866,20 +923,8 @@ function renderResult(kind, title, lines, flag){
   document.getElementById('result').classList.add('show');
 }
 
-// ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) ──────────────────────
-async function loadMayListKanban(){
-  const sel = document.getElementById('doiMay');
-  // Chỉ máy bộ phận Đúc (bo_phan null = máy cũ chưa gán) — loại LINE bộ phận khác.
-  const { data } = await sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may');
-  sel.innerHTML = '<option value="">— Đúng máy trên tem chỉ thị —</option>' +
-    (data || []).filter(r => r.ma_may).map(r => '<option value="' + escapeHtml(r.ma_may) + '">' + escapeHtml(r.ma_may) + '</option>').join('');
-}
-function refreshDoiMayIndicator(){
-  const may = document.getElementById('doiMay').value;
-  const ind = document.getElementById('doiMayActive');
-  if (may) { ind.textContent = '⚠ Đang ghi nhận sản lượng về máy: ' + may + ' (khác máy trên tem chỉ thị)'; ind.classList.add('show'); }
-  else { ind.classList.remove('show'); }
-}
+// ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html; T53 — máy đúc qua ô
+// "Trạm/tổ" dùng chung, xem loadMayKemOptions()/suggestMayKem() ở trên) ─────
 function renderPhien(){
   document.getElementById('kbTallyThung').textContent = fmtNum(phien.length);
   document.getElementById('kbTallyPcs').textContent = fmtNum(phien.reduce((s, r) => s + r.so_luong, 0));
@@ -900,7 +945,7 @@ async function ghiNhanKanban(raw){
   document.getElementById('btnGhiNhanKanban').disabled = true;
   showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
 
-  const p_may_tt = document.getElementById('doiMay').value || null;
+  const p_may_tt = document.getElementById('tram').value || null;
   const p_nguoi_tt = document.getElementById('nguoiKiem').value || myIdentity;
 
   try {
@@ -939,6 +984,36 @@ async function ghiNhanKanban(raw){
     busyKanban = false;
     document.getElementById('btnGhiNhanKanban').disabled = false;
     document.getElementById('tagInputKanban').value = '';
+  }
+}
+
+// ── Ghi nhận NG (T53) — cộng dồn theo (ngày, mã SP đang chọn), không gắn
+// tem/máy cụ thể (Kanban Đúc không có "tem nguồn" để trừ vào như T46) ───────
+let busyNgKanban = false;
+async function ghiNhanNgKanban(){
+  const maSp = document.getElementById('spDangSx').value;
+  if (!maSp) { showMsg('Chọn Mã SP đang sản xuất trước khi ghi nhận NG.', 'err', 5000); return; }
+  const soLuong = Number(document.getElementById('ngKanbanInput').value);
+  if (!soLuong || soLuong <= 0) { showMsg('Số lượng NG phải lớn hơn 0.', 'err', 4000); return; }
+  if (busyNgKanban) return;
+  busyNgKanban = true;
+  document.getElementById('btnNgKanban').disabled = true;
+  showMsg('⏳ Đang ghi nhận NG…', 'wait');
+  try {
+    const { data, error } = await sb.rpc('duc_kanban_ghi_nhan_ng', {
+      p_ngay: getTodayString(), p_ma_sp: maSp, p_so_luong: soLuong, p_nguoi: myIdentity,
+    });
+    if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); return; }
+    if (!data || data.ok === false) { showMsg((data && data.error) || 'Không ghi nhận được NG', 'err', 6000); return; }
+    showMsg('✓ Đã ghi nhận ' + fmtNum(soLuong) + ' pcs NG cho ' + maSp, 'ok', 3000);
+    beep(true);
+    document.getElementById('ngKanbanInput').value = '';
+    await loadKpi();
+  } catch (e) {
+    showMsg('Lỗi: ' + (e && e.message ? e.message : e), 'err', 6000);
+  } finally {
+    busyNgKanban = false;
+    document.getElementById('btnNgKanban').disabled = false;
   }
 }
 
@@ -1013,7 +1088,7 @@ function onFileChosen(evt, target){
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
   document.getElementById('congDoan').addEventListener('change', onCongDoanChange);
-  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); });
+  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); });
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
   document.getElementById('btnScanKanban').addEventListener('click', () => openCamera('kanban'));
@@ -1024,8 +1099,7 @@ function wire(){
   document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
   document.getElementById('btnKhaiBao').addEventListener('click', () => khaiBaoNguon(document.getElementById('tagInputNguon').value));
   document.getElementById('btnGhiNhanKanban').addEventListener('click', () => ghiNhanKanban(document.getElementById('tagInputKanban').value));
-  document.getElementById('btnToggleDoiMay').addEventListener('click', () => document.getElementById('doiMayBox').classList.toggle('show'));
-  document.getElementById('doiMay').addEventListener('change', refreshDoiMayIndicator);
+  document.getElementById('btnNgKanban').addEventListener('click', ghiNhanNgKanban);
   document.getElementById('tagInputKanban').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
