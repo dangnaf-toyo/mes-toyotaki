@@ -296,7 +296,7 @@ textarea{resize:vertical;min-height:48px}
         </div>
         <div class="fg">
           <label class="req" for="tp_ngay">Ngày sản xuất</label>
-          <input id="tp_ngay" type="date">
+          <input id="tp_ngay" type="date" onchange="onTpKhsx()">
         </div>
         <div class="fg">
           <label for="tp_slChuan">SL / thùng (theo công đoạn)</label>
@@ -305,6 +305,7 @@ textarea{resize:vertical;min-height:48px}
         <div class="fg">
           <label class="req" for="tp_soThung">Số thùng</label>
           <input id="tp_soThung" type="number" placeholder="Số tem cần in" min="1">
+          <div class="empty-hint" id="tp_khsxHint" style="padding-top:4px"></div>
         </div>
         <div class="fg">
           <label for="tp_slThungCuoi">SL thùng cuối (nếu lẻ)</label>
@@ -1192,6 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 var TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
 var lastTpBatch = null;
+var tpKhNgay = null;   // KH ngày tra được từ cd_khsx_tuan_plan của công đoạn đang chọn (gợi ý)
 
 function buildTpForm(items){
   var selCd = document.getElementById('tp_congDoan');
@@ -1206,6 +1208,7 @@ function onTpCongDoanChange(){
   var cd = document.getElementById('tp_congDoan').value;
   var sl = TP_PACKAGING[cd] || 0;
   document.getElementById('tp_slChuan').value = sl > 0 ? fmtInt(sl) + ' pcs' : '';
+  onTpKhsx();
 }
 
 function onTpMaChange(){
@@ -1214,6 +1217,38 @@ function onTpMaChange(){
   document.getElementById('tp_tenSP').value = item ? item.ten : '';
   document.getElementById('tp_khachHang').value = item ? [item.maKhachHang, item.tenKhachHang].filter(Boolean).join(' — ') : '';
   document.getElementById('tp_maSpKh').value = item ? item.maSpKhachHang : '';
+  onTpKhsx();
+}
+
+// KH ngày để gợi ý Số thùng — tra theo KHSX tuần của ĐÚNG công đoạn đang in
+// tem (VD "Đánh bóng Kẽm" → cd_khsx_tuan_plan, KHÔNG phải KH của Đúc — tem
+// thành phẩm là hàng ra của công đoạn đó, không phải hàng đúc).
+async function onTpKhsx(){
+  var cd = document.getElementById('tp_congDoan').value;
+  var ma = document.getElementById('tp_maSP').value;
+  var ngay = document.getElementById('tp_ngay').value;
+  var hintEl = document.getElementById('tp_khsxHint');
+  tpKhNgay = null;
+  if (!cd || !ma || !ngay){ hintEl.textContent = ''; return; }
+  var mon = mondayOf(ngay);
+  var dowCol = ['cn', 't2', 't3', 't4', 't5', 't6', 't7'][new Date(ngay + 'T00:00:00').getDay()];
+  hintEl.textContent = '⏳ Đang tra KHSX tuần…';
+  var res = await sb.from('cd_khsx_tuan_plan')
+    .select('t2,t3,t4,t5,t6,t7,cn')
+    .eq('tuan_bat_dau', mon).eq('cong_doan', cd).eq('ma_sp', ma);
+  if (res.error){ hintEl.textContent = 'Không tra được KHSX: ' + res.error.message; return; }
+  var data = res.data || [];
+  if (!data.length){
+    hintEl.textContent = '⚠️ Chưa có KHSX tuần "' + cd + '" đã đăng ký cho ' + ma + ' (tuần bắt đầu ' + mon + '). Nhập số thùng thủ công.';
+    return;
+  }
+  var khNgay = data.reduce(function(s, r){ return s + (Number(r[dowCol]) || 0); }, 0);
+  tpKhNgay = khNgay;
+  var slThung = tpSlThung();
+  var goiY = slThung > 0 ? Math.ceil(khNgay / slThung) : 0;
+  hintEl.textContent = 'KH ' + cd + ' ngày ' + ngay.split('-').reverse().join('/') + ': ' + fmtInt(khNgay) + ' pcs'
+    + (goiY ? ('   →   gợi ý ' + goiY + ' thùng') : '');
+  if (goiY && !document.getElementById('tp_soThung').value) document.getElementById('tp_soThung').value = goiY;
 }
 
 function tpSlThung(){
@@ -1224,6 +1259,8 @@ function clearTp(){
   ['tp_maSP', 'tp_congDoan'].forEach(function(i){ document.getElementById(i).value = ''; });
   ['tp_tenSP', 'tp_khachHang', 'tp_maSpKh', 'tp_slChuan', 'tp_soThung', 'tp_slThungCuoi']
     .forEach(function(i){ document.getElementById(i).value = ''; });
+  tpKhNgay = null;
+  document.getElementById('tp_khsxHint').textContent = '';
   document.getElementById('tp_batchCard').style.display = 'none';
   document.getElementById('msg').style.display = 'none';
 }
