@@ -24,7 +24,7 @@
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
       { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
-      { label: 'Bom', folder: true },
+      { label: 'Bom', href: 'bom.html' },
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
@@ -93,6 +93,7 @@
     'ncp-detail-v2.html': { icon: '📝', title: 'Chi Tiết NCP V2', desc: 'Nguyên nhân, đối sách và cách ly Task/LOT', noTitleBar: true },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
     'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
+    'bom.html': { icon: '🧾', title: 'BOM Sản Phẩm', desc: 'Nhôm, linh kiện và luồng công đoạn theo từng phiên bản BOM', noTitleBar: true },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
   };
