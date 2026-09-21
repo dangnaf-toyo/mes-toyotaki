@@ -117,7 +117,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-item{padding:9px 12px;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:600}
 .mnb-item:hover{background:#faf5f0;color:#C87941}
 .mnb-item.route-active{background:#f5e6d7;color:#a85e2a}
-.mnb-folder{padding:9px 12px;border-radius:6px;color:#7a6d5d;font-size:13px;font-weight:600;cursor:default}
+.mnb-folder{padding:9px 12px;border-radius:6px;color:#333;font-size:13px;font-weight:600;cursor:default}
 .mnb-auth{flex-shrink:0;font-size:11.5px;color:#c9c2b6;display:flex;align-items:center;gap:8px;white-space:nowrap;padding-right:6px}
 .mnb-auth a{color:#C87941;text-decoration:none;font-weight:700}
 .mnb-burger{display:none;background:none;border:none;color:#fff;font-size:19px;cursor:pointer;padding:0 6px;flex-shrink:0}
@@ -169,7 +169,7 @@ body{padding-top:var(--navbar-h)}
   function groupsHtml(groups, cur) {
     return groups.map(g => {
       const itemsHtml = g.items.map(it => it.folder
-        ? `<div class="mnb-folder" title="Thư mục Bom">📁 ${it.label}</div>`
+        ? `<div class="mnb-folder" title="Thư mục Bom">${it.label}</div>`
         : `<a href="${it.href}" class="mnb-item${it.href.toLowerCase() === cur ? ' route-active' : ''}">${it.label}</a>`
       ).join('');
       const groupActive = g.items.some(it => it.href && it.href.toLowerCase() === cur);
