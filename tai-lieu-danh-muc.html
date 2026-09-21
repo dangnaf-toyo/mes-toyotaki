@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý tài liệu kỹ thuật — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  tai-lieu-danh-muc.html — T62 "Quản lý tài liệu kỹ thuật": danh sách mã SP
+  theo vòng đời sản phẩm (báo giá/phát triển/sản xuất/line off), chọn 1 mã SP
+  để xem 8 loại tài liệu và các "hồ sơ" (documents) trong từng loại. Xem/upload
+  phiên bản thật nằm ở tai-lieu-chi-tiet.html?id=<document_id>.
+
+  Quyền: RLS của bảng `documents` đã tự lọc theo has_doc_permission(...,'read')
+  — trang này KHÔNG cần tự kiểm tra quyền đọc tài liệu. Quyền 'write' theo
+  category (để hiện category rỗng + nút "Tạo tài liệu mới") được hỏi qua RPC
+  has_doc_permission(category_id,'write') — cache theo category_id vì quyền
+  này không phụ thuộc mã SP.
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab-btn{padding:6px 12px;border:1px solid #475569;border-radius:5px;background:transparent;color:#F1F5F9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab-btn:hover{background:#334155}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-tiny{background:transparent;border:1px dashed var(--border-strong);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:11px;cursor:pointer}
+.btn-tiny:hover{background:var(--bg-sunken);color:var(--text)}
+
+.main{display:flex;gap:6px;flex:1;min-height:0}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{flex:1;overflow-y:auto;padding:8px}
+
+.col-list{flex:0 0 340px}
+.col-list input[type=search]{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:6px;font-family:inherit;font-size:12.5px;outline:none}
+.col-list input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,95,165,.1)}
+.prod-row{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.prod-row:hover{background:var(--bg-sunken)}
+.prod-row.active{background:#EFF6FF;border-color:var(--accent)}
+.prod-row .ma{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;background:var(--bg-sunken);padding:1px 6px;border-radius:3px}
+.prod-row.active .ma{background:var(--accent);color:#fff}
+.prod-row .ten{flex:1;font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prod-row .lc-btn{font-size:10px;color:var(--text-dim);background:none;border:1px dashed var(--border-strong);border-radius:4px;padding:1px 5px;cursor:pointer;flex-shrink:0}
+.prod-row .lc-btn:hover{color:var(--text);border-color:var(--border-strong)}
+.empty-hint{padding:20px;text-align:center;color:var(--text-muted);font-size:12.5px}
+
+.col-detail{flex:1;min-width:0}
+.detail-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px}
+.cat-card{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden}
+.cat-card .cat-head{background:var(--bg-sunken);padding:8px 12px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:12.5px;border-bottom:1px solid var(--border)}
+.cat-card .cat-head .cnt{font-weight:500;color:var(--text-muted);font-size:11px}
+.cat-card .cat-body{padding:6px 8px}
+.doc-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;cursor:pointer}
+.doc-row:hover{background:var(--bg-sunken)}
+.doc-row .name{flex:1;font-size:12.5px}
+.doc-row .arrow{color:var(--text-dim);font-size:11px}
+.cat-empty{padding:8px;color:var(--text-dim);font-size:11.5px;font-style:italic}
+
+.modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.open{display:flex}
+.modal{background:#FFF;border-radius:10px;width:100%;max-width:440px;box-shadow:var(--shadow-lg);overflow:hidden}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{background:transparent;border:none;font-size:18px;color:var(--text-muted);cursor:pointer}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.field select,.field input{width:100%;padding:7px 9px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12.5px;outline:none}
+.modal-foot{padding:12px 18px;background:var(--bg-sunken);border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.msg-inline{font-size:11.5px;color:var(--alarm-fg)}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📁 Tài liệu kỹ thuật</div>
+    </div>
+    <div class="tabs" id="lifecycleTabs">
+      <button class="tab-btn active" data-lc="san_xuat">Đang sản xuất</button>
+      <button class="tab-btn" data-lc="phat_trien">Đang phát triển</button>
+      <button class="tab-btn" data-lc="bao_gia">Báo giá</button>
+      <button class="tab-btn" data-lc="line_off">Line off</button>
+    </div>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel col-list">
+      <div class="panel-head">
+        <input type="search" id="prodSearch" placeholder="Tìm theo mã / tên SP…">
+      </div>
+      <div class="panel-body" id="prodList"><div class="empty-hint">Đang tải…</div></div>
+    </div>
+
+    <div class="panel col-detail">
+      <div class="panel-head">
+        <h2 id="detailTitle">Chọn 1 mã sản phẩm bên trái</h2>
+      </div>
+      <div class="panel-body" id="detailBody"><div class="detail-empty">Chưa chọn mã SP nào.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: đổi trạng thái vòng đời -->
+<div class="modal-mask" id="modal-lc">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Đổi trạng thái vòng đời</div>
+      <button class="modal-close" onclick="closeLcModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Mã sản phẩm</label>
+        <input type="text" id="lc-ma-sp" disabled>
+      </div>
+      <div class="field">
+        <label>Trạng thái mới</label>
+        <select id="lc-trang-thai">
+          <option value="bao_gia">Báo giá</option>
+          <option value="phat_trien">Đang phát triển</option>
+          <option value="san_xuat">Đang sản xuất</option>
+          <option value="line_off">Line off</option>
+        </select>
+      </div>
+      <div class="msg-inline" id="lc-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeLcModal()">Huỷ</button>
+      <button class="btn btn-primary" id="lc-submit" onclick="submitLcChange()">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: tạo tài liệu mới -->
+<div class="modal-mask" id="modal-new-doc">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Tạo tài liệu mới</div>
+      <button class="modal-close" onclick="closeNewDocModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Loại tài liệu</label>
+        <input type="text" id="nd-category-name" disabled>
+      </div>
+      <div class="field">
+        <label>Tên tài liệu / hồ sơ <span style="color:#DC2626">*</span></label>
+        <input type="text" id="nd-ten" placeholder="VD: Bản vẽ lắp ráp, Bản vẽ chi tiết A…">
+      </div>
+      <div class="msg-inline" id="nd-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeNewDocModal()">Huỷ</button>
+      <button class="btn btn-primary" id="nd-submit" onclick="submitNewDoc()">Tạo &amp; tiếp tục</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+const LC_LABELS = { bao_gia: 'Báo giá', phat_trien: 'Đang phát triển', san_xuat: 'Đang sản xuất', line_off: 'Line off' };
+
+const state = {
+  session: null,
+  canChangeLifecycle: false,
+  lifecycle: 'san_xuat',
+  products: [],
+  filtered: [],
+  selectedMaSp: null,
+  categories: [],           // doc_categories, order by thu_tu
+  writableCache: {},        // category_id -> boolean (has write permission)
+};
+
+// ── Header clock ─────────────────────────────────────────────────────────
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+
+// ── Tabs vòng đời ─────────────────────────────────────────────────────────
+document.querySelectorAll('#lifecycleTabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#lifecycleTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.lifecycle = btn.dataset.lc;
+    loadProducts();
+  });
+});
+
+document.getElementById('prodSearch').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  state.filtered = !q ? state.products
+    : state.products.filter(p => (p.ma_sp || '').toLowerCase().includes(q) || (p.ten_sp || '').toLowerCase().includes(q));
+  renderProductList();
+});
+
+async function loadProducts(){
+  document.getElementById('prodList').innerHTML = '<div class="empty-hint">Đang tải…</div>';
+  const { data, error } = await sb.from('master_products')
+    .select('ma_sp, ten_sp, trang_thai_vong_doi')
+    .eq('trang_thai_vong_doi', state.lifecycle)
+    .order('ma_sp');
+  if (error){ toast('Không tải được danh sách SP: ' + error.message, true); return; }
+  state.products = data || [];
+  state.filtered = state.products;
+  document.getElementById('prodSearch').value = '';
+  renderProductList();
+}
+
+function renderProductList(){
+  const box = document.getElementById('prodList');
+  if (!state.filtered.length){
+    box.innerHTML = '<div class="empty-hint">Không có mã SP nào ở trạng thái này.</div>';
+    return;
+  }
+  box.innerHTML = state.filtered.map(p => `
+    <div class="prod-row${p.ma_sp === state.selectedMaSp ? ' active' : ''}" data-ma="${escapeHtml(p.ma_sp)}">
+      <span class="ma">${escapeHtml(p.ma_sp)}</span>
+      <span class="ten">${escapeHtml(p.ten_sp) || ''}</span>
+      ${state.canChangeLifecycle ? `<button type="button" class="lc-btn" data-lc-ma="${escapeHtml(p.ma_sp)}" title="Đổi trạng thái vòng đời">Đổi trạng thái</button>` : ''}
+    </div>
+  `).join('');
+  box.querySelectorAll('.prod-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.lc-btn')) return;
+      selectProduct(row.dataset.ma);
+    });
+  });
+  box.querySelectorAll('.lc-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openLcModal(btn.dataset.lcMa); });
+  });
+}
+
+function selectProduct(maSp){
+  state.selectedMaSp = maSp;
+  renderProductList();
+  const p = state.products.find(x => x.ma_sp === maSp);
+  document.getElementById('detailTitle').textContent = maSp + (p && p.ten_sp ? ' — ' + p.ten_sp : '');
+  loadDetail(maSp);
+}
+
+async function ensureCategories(){
+  if (state.categories.length) return state.categories;
+  const { data, error } = await sb.from('doc_categories').select('id, ma, ten, thu_tu').order('thu_tu');
+  if (error){ toast('Không tải được danh mục loại tài liệu: ' + error.message, true); return []; }
+  state.categories = data || [];
+  return state.categories;
+}
+
+async function isWritable(categoryId){
+  if (categoryId in state.writableCache) return state.writableCache[categoryId];
+  const { data, error } = await sb.rpc('has_doc_permission', { p_category_id: categoryId, p_quyen: 'write' });
+  const val = !error && !!data;
+  state.writableCache[categoryId] = val;
+  return val;
+}
+
+async function loadDetail(maSp){
+  const body = document.getElementById('detailBody');
+  body.innerHTML = '<div class="detail-empty">Đang tải…</div>';
+  const categories = await ensureCategories();
+
+  const { data: docs, error } = await sb.from('documents')
+    .select('id, ten_tai_lieu, category_id, current_version_id, created_at')
+    .eq('ma_sp', maSp)
+    .order('created_at');
+  if (error){ toast('Không tải được tài liệu: ' + error.message, true); body.innerHTML = '<div class="detail-empty">Lỗi tải dữ liệu.</div>'; return; }
+
+  const byCategory = {};
+  (docs || []).forEach(d => { (byCategory[d.category_id] = byCategory[d.category_id] || []).push(d); });
+
+  // Quyền write không phụ thuộc mã SP — tính song song cho 8 category.
+  const writableFlags = await Promise.all(categories.map(c => isWritable(c.id)));
+
+  const visibleCats = categories.filter((c, i) => (byCategory[c.id] && byCategory[c.id].length) || writableFlags[i]);
+
+  if (!visibleCats.length){
+    body.innerHTML = '<div class="detail-empty">Bạn chưa có quyền xem/tạo tài liệu nào cho mã SP này.</div>';
+    return;
+  }
+
+  body.innerHTML = visibleCats.map((c, idx) => {
+    const i = categories.indexOf(c);
+    const writable = writableFlags[i];
+    const list = byCategory[c.id] || [];
+    return `
+    <div class="cat-card">
+      <div class="cat-head">
+        <span>${escapeHtml(c.ten)}</span>
+        <span class="cnt">${list.length} hồ sơ</span>
+        ${writable ? `<button type="button" class="btn-tiny" style="margin-left:auto" data-new-doc-cat="${c.id}" data-new-doc-cat-name="${escapeHtml(c.ten)}" data-new-doc-ma-sp="${escapeHtml(maSp)}">+ Tạo tài liệu mới</button>` : ''}
+      </div>
+      <div class="cat-body">
+        ${list.length ? list.map(d => `
+          <div class="doc-row" data-doc-id="${d.id}">
+            <span class="name">${escapeHtml(d.ten_tai_lieu)}</span>
+            <span class="arrow">→</span>
+          </div>
+        `).join('') : '<div class="cat-empty">Chưa có tài liệu nào.</div>'}
+      </div>
+    </div>`;
+  }).join('');
+
+  body.querySelectorAll('.doc-row').forEach(row => {
+    row.addEventListener('click', () => { window.location.href = 'tai-lieu-chi-tiet.html?id=' + encodeURIComponent(row.dataset.docId); });
+  });
+  body.querySelectorAll('[data-new-doc-cat]').forEach(btn => {
+    btn.addEventListener('click', () => openNewDocModal(btn.dataset.newDocCat, btn.dataset.newDocCatName, btn.dataset.newDocMaSp));
+  });
+}
+
+// ── Modal: tạo tài liệu mới ───────────────────────────────────────────────
+let newDocCtx = null;
+function openNewDocModal(categoryId, categoryName, maSp){
+  newDocCtx = { categoryId, maSp };
+  document.getElementById('nd-category-name').value = categoryName;
+  document.getElementById('nd-ten').value = '';
+  document.getElementById('nd-msg').style.display = 'none';
+  document.getElementById('modal-new-doc').classList.add('open');
+}
+function closeNewDocModal(){ document.getElementById('modal-new-doc').classList.remove('open'); }
+async function submitNewDoc(){
+  const ten = document.getElementById('nd-ten').value.trim();
+  const msg = document.getElementById('nd-msg');
+  if (!ten){ msg.style.display = 'block'; msg.textContent = 'Cần nhập tên tài liệu.'; return; }
+  const btn = document.getElementById('nd-submit');
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.from('documents').insert({
+      ma_sp: newDocCtx.maSp,
+      category_id: newDocCtx.categoryId,
+      ten_tai_lieu: ten,
+      created_by: state.session.user.id,
+    }).select('id').single();
+    if (error) throw error;
+    window.location.href = 'tai-lieu-chi-tiet.html?id=' + encodeURIComponent(data.id);
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+// ── Modal: đổi trạng thái vòng đời ────────────────────────────────────────
+let lcTargetMaSp = null;
+function openLcModal(maSp){
+  lcTargetMaSp = maSp;
+  document.getElementById('lc-ma-sp').value = maSp;
+  document.getElementById('lc-trang-thai').value = state.lifecycle;
+  document.getElementById('lc-msg').style.display = 'none';
+  document.getElementById('modal-lc').classList.add('open');
+}
+function closeLcModal(){ document.getElementById('modal-lc').classList.remove('open'); }
+async function submitLcChange(){
+  const newState = document.getElementById('lc-trang-thai').value;
+  const msg = document.getElementById('lc-msg');
+  const btn = document.getElementById('lc-submit');
+  btn.disabled = true;
+  try {
+    const { error } = await sb.rpc('doc_set_product_lifecycle', { p_ma_sp: lcTargetMaSp, p_trang_thai_moi: newState });
+    if (error) throw error;
+    toast('Đã đổi trạng thái ' + lcTargetMaSp + ' → ' + (LC_LABELS[newState] || newState));
+    closeLcModal();
+    loadProducts();
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  const { data: myRole } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
+  state.canChangeLifecycle = !!(myRole && ['admin', 'giam_doc_sx', 'qlsx_truong_phong'].includes(myRole.role));
+  await ensureCategories();
+  await loadProducts();
+}
+main();
+</script>
+</body>
+</html>

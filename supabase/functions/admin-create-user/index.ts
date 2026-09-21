@@ -18,7 +18,7 @@ const ROLES = [
   'nhan_vien_duc', 'nhan_vien_bavia', 'nhan_vien_gia_cong', 'nhan_vien_danh_bong',
   'nhan_vien_oqc', 'nhan_vien_son',
 ];
-const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC'];
+const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,8 +71,11 @@ Deno.serve(async (req) => {
     const password = String(body.password || '');
     const fullName = body.full_name ? String(body.full_name).trim() : null;
     const role = String(body.role || '');
-    // Quản lý bộ phận có thể phụ trách NHIỀU công đoạn cùng lúc (VD 1 người
-    // quản lý cả Gia Công và Sơn) — nhận mảng, lọc bỏ giá trị không hợp lệ.
+    // Mọi vai trò đều có thể gửi kèm bộ phận (dùng để phân quyền tài liệu kỹ
+    // thuật — VD 1 nhan_vien_duc cần gắn bộ phận "Đúc" để đọc tài liệu Đúc);
+    // riêng "Quản lý bộ phận" vẫn bắt buộc >=1 bộ phận (rule cũ, xem validate
+    // bên dưới) và có thể phụ trách NHIỀU công đoạn cùng lúc. Lọc bỏ giá trị
+    // không hợp lệ.
     const boPhanPhuTrach = Array.isArray(body.bo_phan_phu_trach)
       ? body.bo_phan_phu_trach.map((v: unknown) => String(v).trim()).filter((v: string) => BO_PHAN_LIST.includes(v))
       : [];
@@ -107,7 +110,7 @@ Deno.serve(async (req) => {
       username: rawUsername,
       full_name: fullName,
       role,
-      bo_phan_phu_trach: role === 'quan_ly_bo_phan' ? boPhanPhuTrach : null,   // text[] hoặc null
+      bo_phan_phu_trach: boPhanPhuTrach.length > 0 ? boPhanPhuTrach : null,   // text[] hoặc null
       created_by: caller.id,
     });
 
