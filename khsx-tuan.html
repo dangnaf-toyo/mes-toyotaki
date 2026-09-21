@@ -1269,16 +1269,41 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
   }
   if (parsed.length === 0) return showMsg('Không có dòng dữ liệu hợp lệ trong file', 'err', 3000);
 
-  if (!confirm('Nhập ' + parsed.length + ' dòng kế hoạch từ Excel vào ' + activeTab + ' tuần ' + fmtDate(weekMonday) + '? Các dòng trùng Mã máy/Mã SP sẽ bị GHI ĐÈ.')) return;
+  // Gộp các dòng trùng khoá (Đúc: Mã máy+Mã SP; công đoạn khác: Mã SP) — VD 1 SP
+  // chạy nhiều khuôn trên cùng máy trong tuần sẽ có 2+ dòng cùng khoá. Nếu để
+  // trùng, upsert hàng loạt sẽ báo lỗi Postgres "ON CONFLICT DO UPDATE command
+  // cannot affect row a second time" vì cùng 1 khoá xung đột xuất hiện 2 lần
+  // trong 1 câu lệnh. Cộng dồn sản lượng theo ngày, gộp Số khuôn/Ghi chú.
+  const mergedMap = new Map();
+  let soDongGop = 0;
+  for (const p of parsed) {
+    const key = activeTab === 'Đúc' ? (p.ma_may + '||' + p.ma_sp) : p.ma_sp;
+    const existing = mergedMap.get(key);
+    if (!existing) { mergedMap.set(key, { ...p, days: p.days.slice() }); continue; }
+    soDongGop++;
+    existing.days = existing.days.map((v, i) => v + p.days[i]);
+    if (p.so_khuon && !String(existing.so_khuon).split(',').map(s=>s.trim()).includes(p.so_khuon)) {
+      existing.so_khuon = [existing.so_khuon, p.so_khuon].filter(Boolean).join(', ');
+    }
+    if (p.ghi_chu && p.ghi_chu !== existing.ghi_chu) {
+      existing.ghi_chu = [existing.ghi_chu, p.ghi_chu].filter(Boolean).join(' | ');
+    }
+  }
+  const merged = [...mergedMap.values()];
 
-  const ok = await ghiLogVaXinLyDoNeuCan('sua', 'Nhập từ Excel (' + parsed.length + ' dòng)', '', '');
+  const confirmMsg = 'Nhập ' + merged.length + ' dòng kế hoạch từ Excel vào ' + activeTab + ' tuần ' + fmtDate(weekMonday)
+    + (soDongGop > 0 ? ' (đã gộp ' + soDongGop + ' dòng trùng Mã máy/Mã SP, cộng dồn số lượng)' : '')
+    + '? Các dòng trùng Mã máy/Mã SP sẽ bị GHI ĐÈ.';
+  if (!confirm(confirmMsg)) return;
+
+  const ok = await ghiLogVaXinLyDoNeuCan('sua', 'Nhập từ Excel (' + merged.length + ' dòng)', '', '');
   if (!ok) return;
 
   const user = await MesAuth.getCurrentUserIdentity();
   const nowIso = new Date().toISOString();
   let error;
   if (activeTab === 'Đúc') {
-    const payloads = parsed.map(p => ({
+    const payloads = merged.map(p => ({
       tuan_bat_dau: fmtDate(weekMonday), ma_may: p.ma_may, ma_sp: p.ma_sp, ten_sp: p.ten_sp,
       so_khuon: p.so_khuon, kh_tuan: p.days.reduce((s,x)=>s+x,0),
       t2: p.days[0], t3: p.days[1], t4: p.days[2], t5: p.days[3], t6: p.days[4], t7: p.days[5], cn: p.days[6],
@@ -1286,7 +1311,7 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
     }));
     ({ error } = await sb.from('duc_khsx_tuan_plan').upsert(payloads, { onConflict: 'tuan_bat_dau,ma_may,ma_sp' }));
   } else {
-    const payloads = parsed.map(p => ({
+    const payloads = merged.map(p => ({
       tuan_bat_dau: fmtDate(weekMonday), cong_doan: activeTab, ma_sp: p.ma_sp, ten_sp: p.ten_sp,
       kh_tuan: p.days.reduce((s,x)=>s+x,0),
       t2: p.days[0], t3: p.days[1], t4: p.days[2], t5: p.days[3], t6: p.days[4], t7: p.days[5], cn: p.days[6],
@@ -1295,7 +1320,8 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
     ({ error } = await sb.from('cd_khsx_tuan_plan').upsert(payloads, { onConflict: 'tuan_bat_dau,cong_doan,ma_sp' }));
   }
   if (error) return showMsg('Lỗi nhập Excel: ' + error.message, 'err');
-  showMsg('✓ Đã nhập ' + parsed.length + ' dòng từ Excel', 'ok', 2500);
+  showMsg('✓ Đã nhập ' + merged.length + ' dòng từ Excel'
+    + (soDongGop > 0 ? ' (đã gộp ' + soDongGop + ' dòng trùng máy/SP)' : ''), 'ok', 3000);
   loadActivePanel(); loadDuyetInfo(); loadChangeLog();
 });
 
