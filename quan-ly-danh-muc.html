@@ -102,6 +102,14 @@
   .toast{position:fixed;top:16px;right:16px;z-index:1000;background:var(--run-fg);color:#fff;padding:10px 16px;border-radius:6px;box-shadow:var(--shadow-lg);font-size:13px;font-weight:600;opacity:0;transform:translateY(-8px);transition:opacity .2s, transform .2s;pointer-events:none;}
   .toast.show{opacity:1;transform:none;}
   .toast.err{background:var(--alarm-fg);}
+
+  /* Lưới phân quyền tài liệu (T62) */
+  #dp-table{table-layout:fixed;}
+  #dp-table th,#dp-table td{text-align:center;white-space:normal;}
+  #dp-table th:first-child,#dp-table td:first-child{text-align:left;width:150px;}
+  .dp-cell{display:flex;flex-direction:column;gap:2px;align-items:center;font-size:11px;}
+  .dp-cell label{display:flex;align-items:center;gap:4px;font-weight:400;color:var(--text);cursor:pointer;white-space:nowrap;}
+  .dp-cell input{width:auto;}
 </style>
 </head>
 <body>
@@ -117,6 +125,7 @@
       <button class="tab-btn" data-tab="sp">Sản phẩm</button>
       <button class="tab-btn" data-tab="ns">Nhân sự</button>
       <button class="tab-btn" data-tab="khuon">Khuôn</button>
+      <button class="tab-btn" data-tab="taillieu">Phân quyền tài liệu</button>
     </div>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
@@ -347,6 +356,19 @@
             </div>
             <div class="form-actions"><button type="submit" id="khuon-submit">Thêm khuôn</button></div>
           </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tab Phân quyền tài liệu kỹ thuật (T62) ─────────────────────────── -->
+    <section id="tab-taillieu" class="tab-pane" style="display:none">
+      <p class="muted" style="margin-bottom:12px">Hàng = loại tài liệu, cột = bộ phận. Tick "Ghi" hoặc "Tải gốc" sẽ tự tick kèm "Đọc" (không thể bật Ghi/Tải gốc mà tắt Đọc).</p>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="dp-table">
+            <thead><tr id="dp-thead-row"><th>Loại tài liệu</th></tr></thead>
+            <tbody id="dp-tbody"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -843,6 +865,90 @@ initCatalog({
   ],
 });
 
+// ══ Tab Phân quyền tài liệu kỹ thuật (T62) ════════════════════════════════
+// BO_PHAN_LIST — copy đúng danh sách dùng trong supabase/functions/admin-create-user
+// (T62 yêu cầu) — không tự bịa thêm bộ phận nào khác.
+const DP_BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA'];
+const DP_QUYEN_LIST = [
+  { k: 'read', label: 'Đọc' },
+  { k: 'write', label: 'Ghi' },
+  { k: 'download_source', label: 'Tải gốc' },
+];
+let dpCategories = [];
+let dpGranted = new Set(); // "categoryId|boPhan|quyen"
+function dpKey(catId, boPhan, quyen){ return catId + '|' + boPhan + '|' + quyen; }
+
+async function loadDocPermissions(){
+  const [{ data: cats, error: catErr }, { data: perms, error: permErr }] = await Promise.all([
+    sb.from('doc_categories').select('id, ma, ten, thu_tu').order('thu_tu'),
+    sb.from('document_permissions').select('category_id, bo_phan, quyen'),
+  ]);
+  if (catErr){ toast('Không tải được doc_categories: ' + catErr.message, true); return; }
+  if (permErr){ toast('Không tải được document_permissions: ' + permErr.message, true); return; }
+  dpCategories = cats || [];
+  dpGranted = new Set((perms || []).map(p => dpKey(p.category_id, p.bo_phan, p.quyen)));
+  renderDocPermissions();
+}
+
+function renderDocPermissions(){
+  const theadRow = document.getElementById('dp-thead-row');
+  theadRow.innerHTML = '<th>Loại tài liệu</th>' + DP_BO_PHAN_LIST.map(bp => `<th>${escapeHtml(bp)}</th>`).join('');
+
+  const tbody = document.getElementById('dp-tbody');
+  tbody.innerHTML = dpCategories.map(cat => {
+    const cells = DP_BO_PHAN_LIST.map(bp => {
+      const boxes = DP_QUYEN_LIST.map(q => {
+        const checked = dpGranted.has(dpKey(cat.id, bp, q.k));
+        return `<label><input type="checkbox" data-cat="${cat.id}" data-bp="${escapeHtml(bp)}" data-quyen="${q.k}"${checked ? ' checked' : ''}> ${q.label}</label>`;
+      }).join('');
+      return `<td><div class="dp-cell">${boxes}</div></td>`;
+    }).join('');
+    return `<tr><td>${escapeHtml(cat.ten)}</td>${cells}</tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', onDpCheckboxChange);
+  });
+}
+
+// Ghi/Tải gốc bật kèm Đọc; tắt Đọc khi Ghi/Tải gốc đang tắt cả 2 — DB không tự
+// suy luận điều này (document_permissions lưu từng dòng quyền độc lập), UI
+// phải tự enforce như spec yêu cầu.
+async function onDpCheckboxChange(e){
+  const cb = e.target;
+  const catId = cb.dataset.cat, boPhan = cb.dataset.bp, quyen = cb.dataset.quyen;
+  const cellBoxes = cb.closest('.dp-cell').querySelectorAll('input[type=checkbox]');
+  const readBox = [...cellBoxes].find(b => b.dataset.quyen === 'read');
+  const writeBox = [...cellBoxes].find(b => b.dataset.quyen === 'write');
+  const sourceBox = [...cellBoxes].find(b => b.dataset.quyen === 'download_source');
+
+  if (quyen !== 'read' && cb.checked && readBox && !readBox.checked){
+    readBox.checked = true;
+    await dpSetPermission(catId, boPhan, 'read', true);
+  }
+  if (quyen === 'read' && !cb.checked && ((writeBox && writeBox.checked) || (sourceBox && sourceBox.checked))){
+    // Không cho tắt Đọc khi Ghi/Tải gốc đang bật — khôi phục lại checkbox.
+    cb.checked = true;
+    toast('Không thể tắt "Đọc" khi "Ghi" hoặc "Tải gốc" đang bật.', true);
+    return;
+  }
+  await dpSetPermission(catId, boPhan, quyen, cb.checked);
+}
+
+async function dpSetPermission(catId, boPhan, quyen, grant){
+  const key = dpKey(catId, boPhan, quyen);
+  if (grant){
+    const { error } = await sb.from('document_permissions').insert({ category_id: catId, bo_phan: boPhan, quyen });
+    if (error){ toast('Lỗi cấp quyền: ' + error.message, true); return; }
+    dpGranted.add(key);
+  } else {
+    const { error } = await sb.from('document_permissions').delete().eq('category_id', catId).eq('bo_phan', boPhan).eq('quyen', quyen);
+    if (error){ toast('Lỗi thu hồi quyền: ' + error.message, true); return; }
+    dpGranted.delete(key);
+  }
+  toast((grant ? 'Đã cấp' : 'Đã thu hồi') + ' quyền "' + (DP_QUYEN_LIST.find(q => q.k === quyen) || {}).label + '" — ' + boPhan);
+}
+
 // ── Gate + khởi động ────────────────────────────────────────────────────
 async function main(){
   const session = await MesAuth.requireAuth();
@@ -864,6 +970,7 @@ async function main(){
   catalogs.sp.reload();
   catalogs.ns.reload();
   catalogs.khuon.reload();
+  loadDocPermissions();
 }
 
 function startHeaderClock(){

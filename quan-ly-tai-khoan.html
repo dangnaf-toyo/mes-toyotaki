@@ -216,7 +216,7 @@ const ROLE_LABELS = {
   nhan_vien_oqc: 'Nhân viên — OQC',
   nhan_vien_son: 'Nhân viên — Sơn',
 };
-const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC'];
+const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA'];
 
 let currentSession = null;
 
@@ -354,17 +354,13 @@ function buildUserRow(row){
     fillRoleSelect(sel, row.role);
     roleTd.appendChild(sel);
 
+    // Bộ phận phụ trách: dùng cho phân quyền tài liệu kỹ thuật ở MỌI vai trò
+    // (không chỉ quan_ly_bo_phan), nên luôn hiển thị nhóm checkbox.
     const bpTd = tr.children[3];
     const bpChecks = document.createElement('div');
     bpChecks.className = 'bp-check-group';
     fillBoPhanChecks(bpChecks, row.bo_phan_phu_trach || []);
-    bpChecks.style.display = row.role === 'quan_ly_bo_phan' ? '' : 'none';
     bpTd.appendChild(bpChecks);
-    const bpNote = document.createElement('span');
-    bpNote.className = 'muted';
-    bpNote.textContent = '—';
-    bpNote.style.display = row.role === 'quan_ly_bo_phan' ? 'none' : '';
-    bpTd.appendChild(bpNote);
 
     const actionTd = tr.children[5];
     const saveBtn = document.createElement('button');
@@ -372,12 +368,10 @@ function buildUserRow(row){
     saveBtn.textContent = 'Lưu';
     saveBtn.disabled = true;
     function syncChanged(){
-      bpChecks.style.display = sel.value === 'quan_ly_bo_phan' ? '' : 'none';
-      bpNote.style.display = sel.value === 'quan_ly_bo_phan' ? 'none' : '';
       const roleChanged = sel.value !== row.role;
       const nowChecked = getBoPhanChecked(bpChecks);
       const before = row.bo_phan_phu_trach || [];
-      const bpChanged = sel.value === 'quan_ly_bo_phan' && nowChecked.join(',') !== before.join(',');
+      const bpChanged = nowChecked.join(',') !== before.join(',');
       saveBtn.disabled = !(roleChanged || bpChanged);
     }
     sel.addEventListener('change', syncChanged);
@@ -394,7 +388,7 @@ function buildUserRow(row){
         .from('user_roles')
         .update({
           role: sel.value,
-          bo_phan_phu_trach: sel.value === 'quan_ly_bo_phan' ? chosenBp : null,
+          bo_phan_phu_trach: chosenBp.length ? chosenBp : null,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', row.user_id);
@@ -404,7 +398,7 @@ function buildUserRow(row){
         saveBtn.textContent = 'Lưu';
       } else {
         row.role = sel.value;
-        row.bo_phan_phu_trach = sel.value === 'quan_ly_bo_phan' ? chosenBp : null;
+        row.bo_phan_phu_trach = chosenBp.length ? chosenBp : null;
         saveBtn.textContent = 'Đã lưu';
         setTimeout(() => { saveBtn.textContent = 'Lưu'; saveBtn.disabled = true; }, 1200);
       }

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chi tiết tài liệu kỹ thuật — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  tai-lieu-chi-tiet.html?id=<document_id> — T62. Xem phiên bản (view-only,
+  qua Edge Function get-document-view-url, KHÔNG tải trực tiếp), tải bản gốc
+  CAD (get-document-source-url, chỉ ai có quyền download_source), upload
+  phiên bản mới, duyệt/thu hồi phiên bản.
+
+  Bucket Storage 'tech-documents' là PRIVATE — trang này KHÔNG bao giờ gọi
+  sb.storage.from('tech-documents').getPublicUrl(...)/download(...) trực
+  tiếp để ĐỌC; chỉ dùng sb.storage.from(...).upload(...) để GHI phiên bản
+  mới (RLS storage.objects đã tự kiểm tra quyền write theo path). Đọc luôn
+  đi qua 2 Edge Function nói trên.
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.brand .sub{font-size:11px;color:#94A3B8}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover:not(:disabled){background:#334155}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-danger{background:#FEE2E2;border:1px solid #F87171;color:#B91C1C;padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.btn-danger:hover{background:#FECACA}
+.btn-success{background:#D1FAE5;border:1px solid #6EE7B7;color:#065F46;padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.btn-success:hover{background:#A7F3D0}
+
+.main{display:flex;gap:6px;flex:1;min-height:0}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{flex:1;overflow-y:auto;padding:10px}
+
+.col-versions{flex:0 0 380px}
+.ver-row{border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:8px;cursor:pointer}
+.ver-row:hover{background:var(--bg-sunken)}
+.ver-row.active{border-color:var(--accent);background:#EFF6FF}
+.ver-row .top{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700}
+.ver-row .top .v{font-family:'JetBrains Mono',monospace}
+.ver-row .meta{font-size:10.5px;color:var(--text-muted);margin-top:3px}
+.ver-row .note{font-size:11px;color:var(--text);margin-top:4px}
+.ver-row .actions{display:flex;gap:6px;margin-top:6px}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em}
+.badge.hien-hanh{background:var(--run-bg);color:var(--run-fg)}
+.badge.nhap{background:var(--bg-sunken);color:var(--text-muted)}
+.badge.cho_duyet{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.da_duyet{background:var(--run-bg);color:var(--run-fg)}
+.badge.thu_hoi{background:var(--alarm-bg);color:var(--alarm-fg)}
+
+.col-viewer{flex:1;min-width:0}
+.viewer-wrap{position:relative;flex:1;background:#111;border-radius:0 0 8px 8px;overflow:hidden}
+.viewer-wrap iframe{width:100%;height:100%;border:none;display:block}
+.watermark-layer{position:absolute;inset:0;pointer-events:none;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(6,1fr);z-index:5}
+.watermark-layer span{display:flex;align-items:center;justify-content:center;transform:rotate(-30deg);color:rgba(255,255,255,.18);font-size:12px;font-weight:700;white-space:nowrap;text-align:center;line-height:1.3}
+.viewer-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px;flex-direction:column;gap:8px}
+
+.upload-form{border:1px dashed var(--border-strong);border-radius:8px;padding:10px;margin-top:10px}
+.upload-form .field{margin-bottom:8px}
+.upload-form label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.upload-form input[type=text],.upload-form input[type=file]{width:100%;padding:6px 8px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12px}
+.msg-inline{font-size:11.5px;color:var(--alarm-fg);margin-top:6px}
+.msg-inline.ok{color:var(--run-fg)}
+
+.hist-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+.hist-table th,.hist-table td{border-bottom:1px solid var(--border);padding:5px 6px;text-align:left}
+.hist-table th{color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title" id="hdrTitle">Chi tiết tài liệu</div>
+      <div class="sub" id="hdrSub">—</div>
+    </div>
+    <button class="btn btn-ghost" onclick="window.location.href='tai-lieu-danh-muc.html'">← Quay lại danh mục</button>
+    <button class="btn btn-outline" id="btn-download-source" style="display:none">⬇ Tải bản gốc CAD</button>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel col-versions">
+      <div class="panel-head"><h2>Các phiên bản</h2></div>
+      <div class="panel-body">
+        <div id="versionList"><div style="color:var(--text-dim);font-size:12px">Đang tải…</div></div>
+
+        <div class="upload-form" id="uploadForm" style="display:none">
+          <div style="font-weight:700;font-size:12px;margin-bottom:8px">＋ Tải lên phiên bản mới</div>
+          <div class="field">
+            <label>File bản xem (PDF/ảnh) <span style="color:#DC2626">*</span></label>
+            <input type="file" id="up-view-file" accept=".pdf,image/*">
+          </div>
+          <div class="field">
+            <label>File bản gốc CAD (tuỳ chọn)</label>
+            <input type="file" id="up-source-file">
+          </div>
+          <div class="field">
+            <label>Ghi chú thay đổi</label>
+            <input type="text" id="up-note" placeholder="VD: sửa dung sai lỗ Ø8, cập nhật theo yêu cầu KH…">
+          </div>
+          <button class="btn btn-primary" id="up-submit" onclick="submitUpload()">Tải lên</button>
+          <div class="msg-inline" id="up-msg" style="display:none"></div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div style="font-weight:700;font-size:12px;margin-bottom:4px">Lịch sử</div>
+          <table class="hist-table" id="histTable">
+            <thead><tr><th>Phiên bản</th><th>Người tải</th><th>Lúc tải</th><th>Người duyệt</th><th>Lúc duyệt</th></tr></thead>
+            <tbody id="histBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel col-viewer">
+      <div class="panel-head"><h2 id="viewerTitle">Xem tài liệu</h2></div>
+      <div class="viewer-wrap" id="viewerWrap">
+        <div class="viewer-empty">Chọn 1 phiên bản bên trái để xem.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+function fmtDT(iso){ if (!iso) return '—'; return new Date(iso).toLocaleString('vi-VN', { hour12: false }); }
+
+const STATUS_LABELS = { nhap: 'Nháp', cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', thu_hoi: 'Thu hồi' };
+
+const params = new URLSearchParams(window.location.search);
+const docId = params.get('id');
+
+const state = {
+  session: null,
+  doc: null,
+  versions: [],
+  canWrite: false,
+  canDownloadSource: false,
+  selectedVersion: null,
+  userNameCache: {},
+};
+
+async function resolveUserName(userId){
+  if (!userId) return '—';
+  if (state.userNameCache[userId]) return state.userNameCache[userId];
+  const { data } = await sb.from('user_roles').select('username, full_name, email').eq('user_id', userId).maybeSingle();
+  const text = data ? (data.username && data.full_name ? (data.username + '_' + data.full_name) : (data.username || data.full_name || data.email)) : ('(ẩn)');
+  state.userNameCache[userId] = text;
+  return text;
+}
+
+async function loadDoc(){
+  const { data, error } = await sb.from('documents')
+    .select('id, ma_sp, category_id, ten_tai_lieu, current_version_id, doc_categories(ten), master_products(ten_sp)')
+    .eq('id', docId)
+    .maybeSingle();
+  if (error || !data){
+    document.getElementById('hdrTitle').textContent = 'Không tìm thấy tài liệu';
+    document.getElementById('hdrSub').textContent = error ? error.message : 'Có thể bạn không có quyền xem tài liệu này.';
+    return false;
+  }
+  state.doc = data;
+  document.getElementById('hdrTitle').textContent = data.ten_tai_lieu;
+  const catName = data.doc_categories ? data.doc_categories.ten : '';
+  const prodName = data.master_products ? data.master_products.ten_sp : '';
+  document.getElementById('hdrSub').textContent = [data.ma_sp, prodName, catName].filter(Boolean).join(' · ');
+  return true;
+}
+
+async function loadPermissions(){
+  const [{ data: w }, { data: d }] = await Promise.all([
+    sb.rpc('has_doc_permission', { p_category_id: state.doc.category_id, p_quyen: 'write' }),
+    sb.rpc('has_doc_permission', { p_category_id: state.doc.category_id, p_quyen: 'download_source' }),
+  ]);
+  state.canWrite = !!w;
+  state.canDownloadSource = !!d;
+  document.getElementById('uploadForm').style.display = state.canWrite ? 'block' : 'none';
+  document.getElementById('btn-download-source').style.display = state.canDownloadSource ? 'inline-flex' : 'none';
+}
+
+async function loadVersions(){
+  const { data, error } = await sb.from('document_versions')
+    .select('*')
+    .eq('document_id', docId)
+    .order('so_phien_ban', { ascending: false });
+  if (error){ toast('Không tải được phiên bản: ' + error.message, true); return; }
+  state.versions = data || [];
+  await renderVersionList();
+  await renderHistory();
+}
+
+async function renderVersionList(){
+  const box = document.getElementById('versionList');
+  if (!state.versions.length){
+    box.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Chưa có phiên bản nào.</div>';
+    return;
+  }
+  box.innerHTML = state.versions.map(v => {
+    const isCurrent = state.doc.current_version_id === v.id;
+    const canApprove = state.canWrite && (v.trang_thai === 'nhap' || v.trang_thai === 'cho_duyet');
+    const canRevoke = state.canWrite && v.trang_thai === 'da_duyet';
+    return `
+    <div class="ver-row${state.selectedVersion === v.id ? ' active' : ''}" data-vid="${v.id}">
+      <div class="top">
+        <span class="v">v${v.so_phien_ban}</span>
+        ${isCurrent ? '<span class="badge hien-hanh">Hiện hành</span>' : ''}
+        <span class="badge ${v.trang_thai}">${escapeHtml(STATUS_LABELS[v.trang_thai] || v.trang_thai)}</span>
+      </div>
+      <div class="meta">Tải lên: ${fmtDT(v.uploaded_at)}${v.file_path_goc ? ' · có bản gốc CAD' : ''}</div>
+      ${v.ghi_chu_thay_doi ? `<div class="note">${escapeHtml(v.ghi_chu_thay_doi)}</div>` : ''}
+      <div class="actions">
+        ${canApprove ? `<button type="button" class="btn-success" data-approve="${v.id}">Duyệt</button>` : ''}
+        ${canRevoke ? `<button type="button" class="btn-danger" data-revoke="${v.id}">Thu hồi</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.ver-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('[data-approve],[data-revoke]')) return;
+      selectVersion(row.dataset.vid);
+    });
+  });
+  box.querySelectorAll('[data-approve]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      btn.disabled = true;
+      const { error } = await sb.rpc('doc_approve_version', { p_version_id: btn.dataset.approve });
+      if (error){ toast('Lỗi duyệt: ' + error.message, true); btn.disabled = false; return; }
+      toast('Đã duyệt phiên bản.');
+      await loadDoc();
+      await loadVersions();
+    });
+  });
+  box.querySelectorAll('[data-revoke]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('Thu hồi phiên bản này?')) return;
+      btn.disabled = true;
+      const { error } = await sb.rpc('doc_revoke_version', { p_version_id: btn.dataset.revoke });
+      if (error){ toast('Lỗi thu hồi: ' + error.message, true); btn.disabled = false; return; }
+      toast('Đã thu hồi phiên bản.');
+      await loadDoc();
+      await loadVersions();
+    });
+  });
+}
+
+async function renderHistory(){
+  const rows = await Promise.all(state.versions.map(async v => {
+    const uploader = await resolveUserName(v.uploaded_by);
+    const approver = v.approved_by ? await resolveUserName(v.approved_by) : '—';
+    return `<tr><td>v${v.so_phien_ban}</td><td>${escapeHtml(uploader)}</td><td>${fmtDT(v.uploaded_at)}</td><td>${escapeHtml(approver)}</td><td>${fmtDT(v.approved_at)}</td></tr>`;
+  }));
+  document.getElementById('histBody').innerHTML = rows.join('') || '<tr><td colspan="5" class="muted">Chưa có lịch sử.</td></tr>';
+}
+
+// ── Viewer view-only ─────────────────────────────────────────────────────
+// Biện pháp chặn phổ thông (chuột phải / Ctrl+S / Ctrl+P trong vùng xem) —
+// KHÔNG phải chặn tuyệt đối, người dùng vẫn có thể chụp ảnh màn hình v.v.
+function wireViewerGuards(wrap){
+  wrap.addEventListener('contextmenu', e => e.preventDefault());
+  wrap.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && ['s', 'p'].includes(e.key.toLowerCase())) e.preventDefault();
+  });
+}
+
+function buildWatermark(text){
+  const cells = 24;
+  return '<div class="watermark-layer">' + Array.from({ length: cells }).map(() => `<span>${escapeHtml(text)}</span>`).join('') + '</div>';
+}
+
+async function selectVersion(versionId){
+  state.selectedVersion = versionId;
+  document.querySelectorAll('.ver-row').forEach(r => r.classList.toggle('active', r.dataset.vid === versionId));
+  const wrap = document.getElementById('viewerWrap');
+  wrap.innerHTML = '<div class="viewer-empty">Đang tải…</div>';
+  try {
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/get-document-view-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.session.access_token,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ version_id: versionId }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || ('Lỗi HTTP ' + resp.status));
+    const watermarkText = (result.ten_nguoi_xem || '') + ' · ' + fmtDT(result.thoi_gian);
+    wrap.innerHTML = `<iframe src="${escapeHtml(result.url)}#toolbar=0" title="Xem tài liệu"></iframe>` + buildWatermark(watermarkText);
+    wireViewerGuards(wrap);
+  } catch (e) {
+    wrap.innerHTML = '<div class="viewer-empty">Không xem được: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+document.getElementById('btn-download-source').addEventListener('click', async () => {
+  const versionId = state.selectedVersion || (state.versions[0] && state.versions[0].id);
+  if (!versionId){ toast('Chưa có phiên bản nào để tải.', true); return; }
+  try {
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/get-document-source-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.session.access_token,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ version_id: versionId }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || ('Lỗi HTTP ' + resp.status));
+    window.open(result.url, '_blank');
+  } catch (e) {
+    toast('Không tải được bản gốc: ' + e.message, true);
+  }
+});
+
+// ── Upload phiên bản mới ─────────────────────────────────────────────────
+function extOf(file){
+  const m = /\.([a-zA-Z0-9]+)$/.exec(file.name || '');
+  return m ? m[1].toLowerCase() : 'bin';
+}
+
+async function submitUpload(){
+  const viewFile = document.getElementById('up-view-file').files[0];
+  const sourceFile = document.getElementById('up-source-file').files[0];
+  const note = document.getElementById('up-note').value.trim() || null;
+  const msg = document.getElementById('up-msg');
+  msg.style.display = 'none';
+  if (!viewFile){ msg.style.display = 'block'; msg.className = 'msg-inline'; msg.textContent = 'Cần chọn file bản xem (PDF/ảnh).'; return; }
+
+  const btn = document.getElementById('up-submit');
+  btn.disabled = true;
+  try {
+    const nextVer = state.versions.length ? Math.max(...state.versions.map(v => v.so_phien_ban)) + 1 : 1;
+    const base = `${state.doc.ma_sp}/${state.doc.category_id}/${state.doc.id}/v${nextVer}`;
+    const viewPath = `${base}/view.${extOf(viewFile)}`;
+    const { error: viewErr } = await sb.storage.from('tech-documents').upload(viewPath, viewFile, { upsert: false });
+    if (viewErr) throw new Error('Lỗi tải file xem: ' + viewErr.message);
+
+    let sourcePath = null;
+    if (sourceFile){
+      sourcePath = `${base}/source.${extOf(sourceFile)}`;
+      const { error: srcErr } = await sb.storage.from('tech-documents').upload(sourcePath, sourceFile, { upsert: false });
+      if (srcErr) throw new Error('Lỗi tải file gốc CAD: ' + srcErr.message);
+    }
+
+    const { error: insErr } = await sb.from('document_versions').insert({
+      document_id: state.doc.id,
+      so_phien_ban: nextVer,
+      file_path_view: viewPath,
+      file_path_goc: sourcePath,
+      ghi_chu_thay_doi: note,
+      trang_thai: 'nhap',
+      uploaded_by: state.session.user.id,
+    });
+    if (insErr) throw insErr;
+
+    toast('Đã tải lên phiên bản v' + nextVer + '.');
+    document.getElementById('up-view-file').value = '';
+    document.getElementById('up-source-file').value = '';
+    document.getElementById('up-note').value = '';
+    await loadVersions();
+  } catch (e) {
+    msg.style.display = 'block'; msg.className = 'msg-inline'; msg.textContent = 'Lỗi: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────
+async function main(){
+  startClock();
+  if (!docId){
+    document.getElementById('hdrTitle').textContent = 'Thiếu tham số id';
+    return;
+  }
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  const ok = await loadDoc();
+  if (!ok) return;
+  await loadPermissions();
+  await loadVersions();
+}
+main();
+</script>
+</body>
+</html>
