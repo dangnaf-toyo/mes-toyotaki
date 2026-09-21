@@ -910,7 +910,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // CHỈ THỊ SX (KANBAN) — tạo & in trước lô tem theo KH ca
 // =============================================================================
 var lastKanbanBatch = null;      // mảng tems của lô vừa tạo (để in lại)
-var kanbanKhNgay = null;         // KH ngày tra được từ duc_khsx_tuan_plan (gợi ý)
+var kanbanKhNgay = null;         // KH ngày tra được (gợi ý)
+// Đúc Kẽm chỉ chạy trên đúng 2 máy này (khớp ghi-nhan-tem-thanh-pham.html) —
+// KH ngày của Đúc Kẽm lấy theo KH của công đoạn "Đánh bóng Kẽm" (nơi tem này
+// sẽ được đóng gói), KHÔNG lấy theo duc_khsx_tuan_plan của riêng Đúc, vì SL
+// cần đúc trong ngày phải bám sát nhu cầu đánh bóng, không phải KH đúc cũ.
+var KEM_MACHINES = ["Kẽm 190T", "Kẽm 160T"];
+var KEM_CONG_DOAN_KH = "Đánh bóng Kẽm";
 
 function buildKanbanForm(items, mayRows){
   var selMay = document.getElementById('k_mayDuc');
@@ -951,15 +957,22 @@ async function onKanbanKhsx(){
   if (!ma || !may || !ngay){ hintEl.textContent = ''; return; }
   var mon = mondayOf(ngay);
   var dowCol = ['cn', 't2', 't3', 't4', 't5', 't6', 't7'][new Date(ngay + 'T00:00:00').getDay()];
+  var isKem = KEM_MACHINES.indexOf(may) !== -1;
   hintEl.textContent = '⏳ Đang tra KHSX tuần…';
-  var res = await sb.from('duc_khsx_tuan_plan')
-    .select('t2,t3,t4,t5,t6,t7,cn')
-    .eq('tuan_bat_dau', mon).eq('ma_may', may).eq('ma_sp', ma);
+  var res = isKem
+    ? await sb.from('cd_khsx_tuan_plan')
+        .select('t2,t3,t4,t5,t6,t7,cn')
+        .eq('tuan_bat_dau', mon).eq('cong_doan', KEM_CONG_DOAN_KH).eq('ma_sp', ma)
+    : await sb.from('duc_khsx_tuan_plan')
+        .select('t2,t3,t4,t5,t6,t7,cn')
+        .eq('tuan_bat_dau', mon).eq('ma_may', may).eq('ma_sp', ma);
   if (res.error){ hintEl.textContent = 'Không tra được KHSX: ' + res.error.message; return; }
   var data = res.data || [];
   if (!data.length){
-    hintEl.textContent = '⚠️ Chưa có KHSX tuần đã đăng ký cho ' + may + ' / ' + ma
-      + ' (tuần bắt đầu ' + mon + '). Nhập số thùng thủ công.';
+    hintEl.textContent = isKem
+      ? '⚠️ Chưa có KHSX tuần "' + KEM_CONG_DOAN_KH + '" đã đăng ký cho ' + ma + ' (tuần bắt đầu ' + mon + '). Nhập số thùng thủ công.'
+      : '⚠️ Chưa có KHSX tuần đã đăng ký cho ' + may + ' / ' + ma
+        + ' (tuần bắt đầu ' + mon + '). Nhập số thùng thủ công.';
     onKanbanRecalc();
     return;
   }
@@ -967,7 +980,7 @@ async function onKanbanKhsx(){
   kanbanKhNgay = khNgay;
   var slThung = kanbanSlThung();
   var goiY = slThung > 0 ? Math.ceil(khNgay / slThung) : 0;
-  hintEl.textContent = 'KH ngày ' + ngay.split('-').reverse().join('/') + ': ' + fmtInt(khNgay) + ' pcs'
+  hintEl.textContent = (isKem ? 'KH ' + KEM_CONG_DOAN_KH + ' ngày ' : 'KH ngày ') + ngay.split('-').reverse().join('/') + ': ' + fmtInt(khNgay) + ' pcs'
     + (goiY ? ('   →   gợi ý ' + goiY + ' thùng') : '');
   if (goiY && !document.getElementById('k_soThung').value) document.getElementById('k_soThung').value = goiY;
   onKanbanRecalc();
