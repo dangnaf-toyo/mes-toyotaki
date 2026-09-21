@@ -676,15 +676,21 @@ async function loadKpi(){
 // "KH thùng" để trống.
 async function loadKpiKanban(){
   const ngay = getTodayString();
+  const mon = mondayOf(ngay);
+  const dowCol = ['cn','t2','t3','t4','t5','t6','t7'][new Date(ngay + 'T00:00:00').getDay()];
   const [khRes, ttRes, ngRes] = await Promise.all([
-    sb.from('duc_ca_hien_tai').select('kh_ca').eq('ngay', ngay).in('ma_may', KEM_MACHINES),
+    // KH ngày lấy từ KHSX tuần của bộ phận Đúc (duc_khsx_tuan_plan, theo 2
+    // máy Kẽm, mọi mã SP) — KHÔNG lấy duc_ca_hien_tai.kh_ca vì bảng đó chỉ
+    // có dữ liệu khi mở ca thủ công bên duc-dashboard.html, luồng Kanban ở
+    // đây không tạo ca nên luôn trống.
+    sb.from('duc_khsx_tuan_plan').select(dowCol).eq('tuan_bat_dau', mon).in('ma_may', KEM_MACHINES),
     sb.from('duc_tem').select('so_luong')
       .eq('trang_thai', 'Đã sản xuất').in('may_tt', KEM_MACHINES)
       .gte('ngay_gio_ghi_nhan', ngay + 'T00:00:00+07:00')
       .lt('ngay_gio_ghi_nhan', addDays(ngay, 1) + 'T00:00:00+07:00'),
     sb.from('duc_kanban_ng_log').select('so_luong').eq('ngay', ngay),
   ]);
-  const khPcs = (khRes.data || []).reduce((s, r) => s + (Number(r.kh_ca) || 0), 0);
+  const khPcs = (khRes.data || []).reduce((s, r) => s + (Number(r[dowCol]) || 0), 0);
   const ttRows = ttRes.data || [];
   const ttPcs = ttRows.reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
   const ngPcs = (ngRes.data || []).reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
