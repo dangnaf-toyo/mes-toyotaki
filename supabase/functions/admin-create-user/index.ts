@@ -16,7 +16,7 @@ const ROLES = [
   'admin', 'truong_ca', 'ipqc', 'qc_manager', 'kho_nvl', 'ke_hoach',
   'qlsx_nhan_vien', 'qlsx_truong_phong', 'quan_ly_bo_phan', 'giam_doc_sx',
   'nhan_vien_duc', 'nhan_vien_bavia', 'nhan_vien_gia_cong', 'nhan_vien_danh_bong',
-  'nhan_vien_oqc', 'nhan_vien_son',
+  'nhan_vien_oqc', 'nhan_vien_son', 'iatf_admin',
 ];
 const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA'];
 
