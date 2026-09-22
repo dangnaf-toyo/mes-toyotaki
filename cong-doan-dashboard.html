@@ -161,6 +161,11 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
     <div class="card">
       <h2 id="tramsSectionTitle">🧑‍🏭 Trạm đang hoạt động</h2>
       <p id="tramsSectionNote" style="font-size:10.5px;color:#999;margin:-6px 0 10px">Các dòng mờ, chữ nghiêng là kế hoạch tuần chưa tạo trạm — bấm "+ Tạo..." để tạo ngay với Mã SP/KH ca điền sẵn.</p>
+      <p id="baviaMigrateHint" style="display:none;font-size:11px;background:var(--bg-sunken,#f4f4f4);border-radius:6px;padding:8px 10px;margin:-2px 0 10px">
+        📦 Ghi nhận hàng ra (khai báo nguồn, in tem, quét ghi nhận) đã chuyển sang
+        <a href="ghi-nhan-tem-thanh-pham.html?cd=Bavia" target="_blank">Ghi nhận thùng thành phẩm — Bavia</a>
+        (in tem trước ở <a href="intem.html" target="_blank">intem.html</a>, chọn công đoạn "Bavia", SL/thùng nhập tự do). Trang này chỉ còn dùng để Đối soát, Gom NG chờ sửa, Sửa hàng.
+      </p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th id="thCongDoanSub" style="display:none">Công đoạn</th><th id="thTenTram">Tên trạm</th><th>Mã SP</th><th>Tên SP</th><th>Người kiểm tra</th><th>KH ca</th><th>KH tuần</th><th>OK ca này</th><th>NG ca này</th><th></th></tr></thead>
@@ -544,7 +549,10 @@ async function loadDanhMuc(){
     document.getElementById('tramsSectionTitle').textContent = '🧑‍🏭 ' + tramLabel() + ' theo danh mục';
     // "Đối soát" (đối chiếu bavia_xu_ly*) là tính năng RIÊNG của Bavia — không
     // áp dụng cho Đánh bóng hay công đoạn line-mode khác sau này.
-    if (congDoan === 'Bavia') document.getElementById('doiSoatCard').style.display = '';
+    if (congDoan === 'Bavia') {
+      document.getElementById('doiSoatCard').style.display = '';
+      document.getElementById('baviaMigrateHint').style.display = '';
+    }
     const note = document.getElementById('tramsSectionNote');
     if (note) note.textContent = tramLabel() + ' lấy từ danh mục Máy-Line. Line chưa có kế hoạch xếp riêng bên dưới — bấm "Gán kế hoạch" để chọn mã SP từ KHSX tuần.';
   }
@@ -597,7 +605,10 @@ function activeTramRowHtml(t, merged){
       <td class="num" style="color:#1a7a3a">${fmtNum(t.so_luong_ok)}</td>
       <td class="num" style="color:#c00">${fmtNum(t.so_luong_ng)}${Number(t.so_luong_ng_sua) > 0 ? ` <span style="color:var(--warn-fg)" title="NG chờ sửa">+${fmtNum(t.so_luong_ng_sua)} sửa</span>` : ''}</td>
       <td style="white-space:nowrap">
-        ${congDoan === 'Bavia' ? `<button type="button" class="btn-tiny" style="background:var(--accent);color:#fff" onclick="openXuLyThung('${t.id_tram}')">📦 Xử lý thùng</button>` : ''}
+        <!-- T65: Bavia chuyển hẳn sang kiến trúc "in tem trước + quét ghi nhận"
+             (ghi-nhan-tem-thanh-pham.html?cd=Bavia + intem.html) — nút "📦 Xử lý
+             thùng" ẩn khỏi UI (giữ nguyên hàm openXuLyThung()/RPC bavia_xu_ly_thung
+             để tra cứu/Đối soát dữ liệu cũ, không xoá). -->
         <button type="button" class="btn-tiny" onclick="openNhapSL('${t.id_tram}')">+ SL</button>
         <button type="button" class="btn-tiny" onclick="openSuaTram('${t.id_tram}')">Sửa</button>
         <button type="button" class="btn-tiny" onclick="openDoiMa('${t.id_tram}')">Đổi SP</button>

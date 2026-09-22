@@ -417,7 +417,11 @@ const TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
 // chuyển hẳn màn hình sang chế độ Kanban (xem isKanban()/applyMode()), giữ
 // mặc định vẫn là công đoạn đầu tiên của TP_PACKAGING (không đổi hành vi cũ).
 const CONG_DOAN_KANBAN = "Đúc Kẽm";
-const CONG_DOAN_LIST = [...Object.keys(TP_PACKAGING), CONG_DOAN_KANBAN];
+// Bavia (T65) — cũng in tem trước/quét ghi nhận như Đánh bóng Kẽm, nhưng SL/thùng
+// CHƯA chuẩn hoá nên không có trong TP_PACKAGING (người dùng tự nhập lúc in ở
+// intem.html) — TP_PACKAGING['Bavia'] luôn undefined, các chỗ đọc `TP_PACKAGING[congDoan] || 0`
+// tự trả 0 → không gate theo "đủ SL cần" cho Bavia (đúng ý, không cần đổi các chỗ đó).
+const CONG_DOAN_LIST = [...Object.keys(TP_PACKAGING), "Bavia", CONG_DOAN_KANBAN];
 function isKanban(){ return document.getElementById('congDoan').value === CONG_DOAN_KANBAN; }
 // Kẽm chỉ đúc trên đúng 2 máy này (T53) — dùng chung ô "Trạm/tổ" (đổi thành
 // "Máy đúc" ở chế độ Kanban) để chọn, KHÔNG dùng ô "Đổi máy đúc" riêng nữa.
@@ -785,6 +789,10 @@ async function loadNguonList(){
   nguonTotal = rows.reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
   updateGhiNhanGate();
   if (!rows.length){ box.innerHTML = '<div class="empty">Chưa khai báo tem Đúc nào.</div>'; return; }
+  // Bavia (T65): "NG chờ sửa" là thao tác riêng, tạo tem NG chờ sửa để xử lý
+  // tiếp qua bavia_sua_hang (cong-doan-dashboard.html) — khác với "⚠ Báo NG"
+  // (cd_khai_bao_ng) là phế ngay, trừ thẳng không tạo tem.
+  const isBavia = document.getElementById('congDoan').value === 'Bavia';
   box.innerHTML = rows.map(r =>
     '<div class="nguon-item-wrap" data-tag-no="' + escapeHtml(r.tag_no) + '">' +
     '<div class="nguon-item">' +
@@ -792,6 +800,7 @@ async function loadNguonList(){
       '<div class="n-actions">' +
         '<div class="n-con">' + fmtNum(r.so_luong) + ' pcs</div>' +
         '<button type="button" class="btn ng-toggle" data-act="ng-toggle">⚠ Báo NG</button>' +
+        (isBavia ? '<button type="button" class="btn ng-toggle" data-act="ng-sua-toggle">🔧 NG cần sửa</button>' : '') +
       '</div>' +
     '</div>' +
     '<div class="ng-form" data-role="ng-form">' +
@@ -802,6 +811,14 @@ async function loadNguonList(){
       '<input type="text" class="ng-khac" data-role="ng-khac" placeholder="Ghi rõ loại NG khác…" style="display:none">' +
       '<button type="button" class="btn mini ng-submit" data-act="ng-submit">Ghi nhận NG</button>' +
     '</div>' +
+    (isBavia ?
+      '<div class="ng-form" data-role="ng-sua-form">' +
+        '<div class="ng-row">' +
+          '<input type="text" data-role="ng-sua-ly-do" placeholder="Lý do cần sửa…">' +
+          '<input type="number" data-role="ng-sua-sl" min="1" step="1" placeholder="SL cần sửa">' +
+        '</div>' +
+        '<button type="button" class="btn mini ng-submit" data-act="ng-sua-submit">Tạo tem NG chờ sửa</button>' +
+      '</div>' : '') +
     '</div>').join('');
 }
 
@@ -847,12 +864,57 @@ async function submitNg(wrap){
     btn.disabled = false;
   }
 }
+// ── Bavia (T65): Báo NG cần sửa — tách khỏi luồng OK, tạo tem "NG chờ sửa"
+// qua bavia_bao_ng_cho_sua rồi để bavia_sua_hang/gom xử lý tiếp như cũ ──────
+let busyNgSua = false;
+function toggleNgSuaForm(wrap){
+  const form = wrap.querySelector('[data-role="ng-sua-form"]');
+  document.querySelectorAll('.ng-form.show').forEach(f => { if (f !== form) f.classList.remove('show'); });
+  form.classList.toggle('show');
+}
+async function submitNgSua(wrap){
+  if (busyNgSua) return;
+  const tagNo = wrap.getAttribute('data-tag-no');
+  const lyDoInput = wrap.querySelector('[data-role="ng-sua-ly-do"]');
+  const slInput = wrap.querySelector('[data-role="ng-sua-sl"]');
+  const lyDo = lyDoInput.value.trim();
+  const soLuong = Number(slInput.value);
+  if (!lyDo) { showMsg('Chưa nhập lý do cần sửa.', 'err', 4000); return; }
+  if (!soLuong || soLuong <= 0) { showMsg('Số lượng cần sửa phải lớn hơn 0.', 'err', 4000); return; }
+
+  busyNgSua = true;
+  const btn = wrap.querySelector('[data-act="ng-sua-submit"]');
+  btn.disabled = true;
+  showMsg('⏳ Đang tạo tem NG chờ sửa ' + tagNo + '…', 'wait');
+  try {
+    const clientKey = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    const { data, error } = await sb.rpc('bavia_bao_ng_cho_sua', {
+      p_tag_nguon: tagNo, p_so_luong: soLuong, p_ly_do: lyDo,
+      p_nguoi: myIdentity, p_user: myIdentity, p_client_key: clientKey,
+    });
+    if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); beep(false); return; }
+    if (!data || data.ok === false) { showMsg((data && data.error) || 'Không tạo được tem NG chờ sửa', 'err', 6000); beep(false); return; }
+    showMsg('✓ Đã tạo tem ' + data.tag_ra + ' (NG chờ sửa, ' + fmtNum(soLuong) + ' pcs) từ ' + tagNo + ' — còn ' + fmtNum(data.so_luong_con_lai) + ' pcs', 'ok', 5000);
+    beep(true);
+    slInput.value = '';
+    lyDoInput.value = '';
+    await Promise.all([loadNguonList(), loadKpi()]);
+  } catch (e) {
+    showMsg('Lỗi: ' + (e && e.message ? e.message : e), 'err', 6000);
+    beep(false);
+  } finally {
+    busyNgSua = false;
+    btn.disabled = false;
+  }
+}
 document.getElementById('nguonList').addEventListener('click', (e) => {
   const wrap = e.target.closest('.nguon-item-wrap');
   if (!wrap) return;
   const act = e.target.getAttribute('data-act');
   if (act === 'ng-toggle') toggleNgForm(wrap);
   else if (act === 'ng-submit') submitNg(wrap);
+  else if (act === 'ng-sua-toggle') toggleNgSuaForm(wrap);
+  else if (act === 'ng-sua-submit') submitNgSua(wrap);
 });
 document.getElementById('nguonList').addEventListener('change', (e) => {
   if (e.target.getAttribute('data-role') !== 'ng-loai') return;

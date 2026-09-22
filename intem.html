@@ -300,7 +300,7 @@ textarea{resize:vertical;min-height:48px}
         </div>
         <div class="fg">
           <label for="tp_slChuan">SL / thùng (theo công đoạn)</label>
-          <input id="tp_slChuan" type="text" disabled>
+          <input id="tp_slChuan" type="text" disabled oninput="onTpKhsx()">
         </div>
         <div class="fg">
           <label class="req" for="tp_soThung">Số thùng</label>
@@ -1191,13 +1191,19 @@ document.addEventListener('DOMContentLoaded', () => {
 // mặc định 100pcs cho SP khác, riêng BPH-SHO 60pcs qua Tem Thành Phẩm).
 // =============================================================================
 var TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
+// Bavia (T65) — cũng in tem trước như Đánh bóng Kẽm/OQC, nhưng SL/thùng CHƯA
+// chuẩn hoá (mỗi lô có thể khác nhau) nên KHÔNG có định mức cứng trong
+// TP_PACKAGING — người dùng tự nhập "SL/thùng" mỗi lần tạo lô (xem
+// onTpCongDoanChange()/tpSlThung()).
+var TP_CONG_DOAN_TUY_CHINH = ["Bavia"];
+var TP_CONG_DOAN_LIST = Object.keys(TP_PACKAGING).concat(TP_CONG_DOAN_TUY_CHINH);
 var lastTpBatch = null;
 var tpKhNgay = null;   // KH ngày tra được từ cd_khsx_tuan_plan của công đoạn đang chọn (gợi ý)
 
 function buildTpForm(items){
   var selCd = document.getElementById('tp_congDoan');
   selCd.innerHTML = '<option value="">-- Chọn công đoạn --</option>' +
-    Object.keys(TP_PACKAGING).map(function(cd){ return '<option value="' + cd + '">' + cd + '</option>'; }).join('');
+    TP_CONG_DOAN_LIST.map(function(cd){ return '<option value="' + cd + '">' + cd + '</option>'; }).join('');
   var selSp = document.getElementById('tp_maSP');
   selSp.innerHTML = '<option value="">-- Chọn mã SP --</option>' +
     items.map(function(m){ return '<option value="' + m.ma + '">' + m.ma + '</option>'; }).join('');
@@ -1205,8 +1211,21 @@ function buildTpForm(items){
 
 function onTpCongDoanChange(){
   var cd = document.getElementById('tp_congDoan').value;
-  var sl = TP_PACKAGING[cd] || 0;
-  document.getElementById('tp_slChuan').value = sl > 0 ? fmtInt(sl) + ' pcs' : '';
+  var slChuanEl = document.getElementById('tp_slChuan');
+  if (TP_CONG_DOAN_TUY_CHINH.includes(cd)) {
+    // Bavia: SL/thùng chưa chuẩn hoá — cho nhập tay mỗi lần tạo lô.
+    slChuanEl.disabled = false;
+    slChuanEl.type = 'number';
+    slChuanEl.min = '1';
+    slChuanEl.value = '';
+    slChuanEl.placeholder = 'Nhập SL/thùng';
+  } else {
+    var sl = TP_PACKAGING[cd] || 0;
+    slChuanEl.disabled = true;
+    slChuanEl.type = 'text';
+    slChuanEl.placeholder = '';
+    slChuanEl.value = sl > 0 ? fmtInt(sl) + ' pcs' : '';
+  }
   onTpKhsx();
 }
 
@@ -1251,13 +1270,17 @@ async function onTpKhsx(){
 }
 
 function tpSlThung(){
-  return TP_PACKAGING[document.getElementById('tp_congDoan').value] || 0;
+  var cd = document.getElementById('tp_congDoan').value;
+  if (TP_CONG_DOAN_TUY_CHINH.includes(cd)) return Number(document.getElementById('tp_slChuan').value) || 0;
+  return TP_PACKAGING[cd] || 0;
 }
 
 function clearTp(){
   ['tp_maSP', 'tp_congDoan'].forEach(function(i){ document.getElementById(i).value = ''; });
   ['tp_tenSP', 'tp_khachHang', 'tp_maSpKh', 'tp_slChuan', 'tp_soThung', 'tp_slThungCuoi']
     .forEach(function(i){ document.getElementById(i).value = ''; });
+  var slChuanEl = document.getElementById('tp_slChuan');
+  slChuanEl.disabled = true; slChuanEl.type = 'text'; slChuanEl.placeholder = '';
   tpKhNgay = null;
   document.getElementById('tp_khsxHint').textContent = '';
   document.getElementById('tp_batchCard').style.display = 'none';
