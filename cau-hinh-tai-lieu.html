@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cấu hình kiểm soát tài liệu — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  cau-hinh-tai-lieu.html — T63. Trang CẤU HÌNH hệ thống kiểm soát tài liệu QMS:
+    Tab 1: 16 tham số P1-P16 (document_config_params) — sửa tại chỗ, chỉ admin.
+    Tab 2: Ủy quyền duyệt tầng B/C theo loại tài liệu (document_delegations).
+    Tab 3: Rà soát tài liệu mức "mật" + bảng tĩnh tóm tắt ai duyệt tầng nào.
+    Tab 4: Chỉ số (KPI) K1-K5 tính client-side từ document_change_requests +
+           external_documents trong 90 ngày gần nhất.
+
+  Chỉ admin (user_roles.role = 'admin') mới thấy nội dung — theo RLS của
+  document_config_params/document_delegations (write chỉ admin), nhưng client
+  vẫn tự chặn trước để không hiện UI vô nghĩa cho user thường.
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab-btn{padding:6px 12px;border:1px solid #475569;border-radius:5px;background:transparent;color:#F1F5F9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab-btn:hover{background:#334155}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-danger{background:#FEE2E2;border:1px solid #F87171;color:#B91C1C;padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.btn-danger:hover{background:#FECACA}
+.btn-tiny{background:transparent;border:1px dashed var(--border-strong);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:11px;cursor:pointer}
+.btn-tiny:hover{background:var(--bg-sunken);color:var(--text)}
+
+.main{display:flex;gap:6px;flex:1;min-height:0}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0;flex:1}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{flex:1;overflow-y:auto;padding:12px}
+
+.gate{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--text-muted);font-size:14px;text-align:center;flex-direction:column;gap:8px}
+.gate .big{font-size:32px}
+
+table.grid{width:100%;border-collapse:collapse;font-size:12px}
+table.grid th,table.grid td{border-bottom:1px solid var(--border);padding:7px 8px;text-align:left;vertical-align:middle}
+table.grid th{color:var(--text-muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+table.grid tr.warn-row{background:var(--warn-bg)}
+table.grid .ma{font-family:'JetBrains Mono',monospace;font-weight:700}
+table.grid input[type=number]{width:110px;padding:5px 7px;border:1px solid var(--border-strong);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:12px}
+table.grid input[type=number]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,95,165,.1)}
+.note-small{font-size:10.5px;color:var(--text-muted);max-width:260px}
+.warn-row .note-small{color:var(--warn-fg);font-weight:600}
+.row-msg{font-size:10.5px;color:var(--alarm-fg);margin-top:3px}
+
+.field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.field select,.field input{width:100%;padding:7px 9px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12.5px;outline:none}
+
+.modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.open{display:flex}
+.modal{background:#FFF;border-radius:10px;width:100%;max-width:460px;box-shadow:var(--shadow-lg);overflow:hidden}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{background:transparent;border:none;font-size:18px;color:var(--text-muted);cursor:pointer}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow-y:auto}
+.modal-foot{padding:12px 18px;background:var(--bg-sunken);border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.msg-inline{font-size:11.5px;color:var(--alarm-fg)}
+
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em}
+.badge.B{background:#EFF6FF;color:var(--accent)}
+.badge.C{background:var(--bg-sunken);color:var(--text-muted)}
+.badge.mat{background:var(--alarm-bg);color:var(--alarm-fg)}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.kpi{border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--bg-sunken)}
+.kpi .label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px}
+.kpi .stat{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:var(--text)}
+.kpi .stat.warn{color:var(--warn-fg)}
+.kpi .stat.alarm{color:var(--alarm-fg)}
+.kpi .formula{font-size:10.5px;color:var(--text-dim);margin-top:6px;line-height:1.4}
+
+.info-card{border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:14px;background:var(--bg-panel)}
+.info-card h3{font-size:12.5px;margin-bottom:10px}
+.info-card .tier-row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.info-card .tier-row:last-child{border-bottom:none}
+.info-card .tier-tag{flex:0 0 90px;font-weight:700;font-size:12px}
+.info-card .tier-desc{flex:1;font-size:12px;color:var(--text-muted)}
+
+.empty-hint{padding:20px;text-align:center;color:var(--text-muted);font-size:12.5px}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">⚙️ Cấu hình kiểm soát tài liệu</div>
+    </div>
+    <div class="tabs" id="mainTabs">
+      <button class="tab-btn active" data-tab="params">Tham số cấu hình</button>
+      <button class="tab-btn" data-tab="delegations">Ủy quyền duyệt</button>
+      <button class="tab-btn" data-tab="security">Mức mật &amp; bảng phân quyền</button>
+      <button class="tab-btn" data-tab="kpi">Chỉ số</button>
+    </div>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main" id="gateWrap">
+    <div class="panel"><div class="panel-body"><div class="gate">Đang kiểm tra quyền truy cập…</div></div></div>
+  </div>
+
+  <div class="main" id="contentWrap" style="display:none">
+    <!-- Tab 1: Tham số cấu hình -->
+    <div class="panel" id="tab-params">
+      <div class="panel-head"><h2>16 tham số cấu hình (P1–P16)</h2></div>
+      <div class="panel-body">
+        <table class="grid">
+          <thead><tr><th>Mã</th><th>Tên tham số</th><th>Giá trị</th><th>Đơn vị</th><th>Ghi chú</th><th></th></tr></thead>
+          <tbody id="paramsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Ủy quyền duyệt -->
+    <div class="panel" id="tab-delegations" style="display:none">
+      <div class="panel-head">
+        <h2>Ủy quyền duyệt tầng B/C</h2>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="openDelModal()">+ Thêm ủy quyền</button>
+      </div>
+      <div class="panel-body">
+        <table class="grid">
+          <thead><tr><th>Người được ủy quyền</th><th>Tầng</th><th>Loại tài liệu</th><th>Hiệu lực từ</th><th>Hiệu lực đến</th><th>Người thay thế</th><th>Ghi chú</th><th></th></tr></thead>
+          <tbody id="delBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: Mức mật & bảng phân quyền -->
+    <div class="panel" id="tab-security" style="display:none">
+      <div class="panel-head"><h2>Tài liệu mức "Mật" (rà soát)</h2></div>
+      <div class="panel-body">
+        <table class="grid">
+          <thead><tr><th>Tên tài liệu</th><th>Loại</th><th>Mã SP</th><th>Ngày tạo</th></tr></thead>
+          <tbody id="matBody"></tbody>
+        </table>
+        <div class="info-card">
+          <h3>Ai duyệt tầng nào</h3>
+          <div class="tier-row">
+            <div class="tier-tag">Tầng C</div>
+            <div class="tier-desc">Người được ủy quyền tầng C cho loại tài liệu tương ứng (tab Ủy quyền duyệt), hoặc Admin nếu chưa có ủy quyền.</div>
+          </div>
+          <div class="tier-row">
+            <div class="tier-tag">Tầng B</div>
+            <div class="tier-desc">Người được ủy quyền tầng B → sau đó Kiểm soát tài liệu (role Admin) kiểm hình thức, cấp mã trước khi phát hành.</div>
+          </div>
+          <div class="tier-row">
+            <div class="tier-tag">Tầng A</div>
+            <div class="tier-desc">Ban giám đốc (role Admin / Giám đốc SX) duyệt → Khách hàng phê duyệt (xác nhận thủ công) nếu ảnh hưởng khách hàng → Kiểm soát tài liệu (role Admin) kiểm hình thức trước khi phát hành.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Chỉ số -->
+    <div class="panel" id="tab-kpi" style="display:none">
+      <div class="panel-head"><h2>Chỉ số kiểm soát tài liệu (90 ngày gần nhất)</h2></div>
+      <div class="panel-body">
+        <div class="kpi-grid" id="kpiGrid"><div class="empty-hint">Đang tải…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: thêm ủy quyền -->
+<div class="modal-mask" id="modal-del">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Thêm ủy quyền duyệt</div>
+      <button class="modal-close" onclick="closeDelModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Người được ủy quyền <span style="color:#DC2626">*</span></label>
+        <select id="del-user"></select>
+      </div>
+      <div class="field">
+        <label>Tầng <span style="color:#DC2626">*</span></label>
+        <select id="del-tang">
+          <option value="B">Tầng B</option>
+          <option value="C">Tầng C</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Loại tài liệu</label>
+        <select id="del-category">
+          <option value="">— Mọi loại tài liệu —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Hiệu lực từ <span style="color:#DC2626">*</span></label>
+        <input type="date" id="del-tu">
+      </div>
+      <div class="field">
+        <label>Hiệu lực đến (tuỳ chọn)</label>
+        <input type="date" id="del-den">
+      </div>
+      <div class="field">
+        <label>Người thay thế (tuỳ chọn)</label>
+        <select id="del-thay-the">
+          <option value="">— Không có —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ghi chú</label>
+        <input type="text" id="del-ghi-chu" placeholder="Lý do ủy quyền, phạm vi…">
+      </div>
+      <div class="msg-inline" id="del-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeDelModal()">Huỷ</button>
+      <button class="btn btn-primary" id="del-submit" onclick="submitDelegation()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+function fmtDate(iso){ if (!iso) return '—'; return new Date(iso).toLocaleDateString('vi-VN'); }
+function todayISO(){ return new Date().toISOString().slice(0, 10); }
+
+const state = {
+  session: null,
+  isAdmin: false,
+  params: [],
+  categories: [],
+  users: [],
+  delegations: [],
+  userNameCache: {},
+};
+
+async function resolveUserName(userId){
+  if (!userId) return '—';
+  if (state.userNameCache[userId]) return state.userNameCache[userId];
+  const { data } = await sb.from('user_roles').select('username, full_name, email').eq('user_id', userId).maybeSingle();
+  const text = data ? (data.username && data.full_name ? (data.username + '_' + data.full_name) : (data.username || data.full_name || data.email)) : '(ẩn)';
+  state.userNameCache[userId] = text;
+  return text;
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────
+document.querySelectorAll('#mainTabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#mainTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['params', 'delegations', 'security', 'kpi'].forEach(t => {
+      document.getElementById('tab-' + t).style.display = (t === btn.dataset.tab) ? 'flex' : 'none';
+    });
+    if (btn.dataset.tab === 'delegations') loadDelegations();
+    if (btn.dataset.tab === 'security') loadSecurity();
+    if (btn.dataset.tab === 'kpi') loadKpi();
+  });
+});
+
+// ── Tab 1: Tham số cấu hình ─────────────────────────────────────────────
+async function loadParams(){
+  const { data, error } = await sb.from('document_config_params').select('*').order('ma');
+  if (error){ toast('Không tải được tham số: ' + error.message, true); return; }
+  state.params = (data || []).sort((a, b) => {
+    const na = parseInt(a.ma.replace(/\D/g, ''), 10) || 0;
+    const nb = parseInt(b.ma.replace(/\D/g, ''), 10) || 0;
+    return na - nb;
+  });
+  renderParams();
+}
+
+function renderParams(){
+  const body = document.getElementById('paramsBody');
+  body.innerHTML = state.params.map(p => {
+    const isWarn = p.ma === 'P9';
+    return `
+    <tr class="${isWarn ? 'warn-row' : ''}" data-ma="${escapeHtml(p.ma)}">
+      <td class="ma">${escapeHtml(p.ma)}</td>
+      <td>${escapeHtml(p.ten)}</td>
+      <td><input type="number" step="any" data-orig="${p.gia_tri}" value="${p.gia_tri}"></td>
+      <td>${escapeHtml(p.don_vi || '')}</td>
+      <td class="note-small">${escapeHtml(p.ghi_chu || '')}</td>
+      <td>
+        <button type="button" class="btn-tiny" data-save="${escapeHtml(p.ma)}" disabled>Lưu</button>
+        <div class="row-msg" style="display:none"></div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  body.querySelectorAll('tr').forEach(row => {
+    const input = row.querySelector('input[type=number]');
+    const saveBtn = row.querySelector('[data-save]');
+    input.addEventListener('input', () => {
+      const changed = parseFloat(input.value) !== parseFloat(input.dataset.orig);
+      saveBtn.disabled = !changed || input.value === '';
+    });
+    saveBtn.addEventListener('click', () => saveParam(row.dataset.ma, input, saveBtn, row.querySelector('.row-msg')));
+  });
+}
+
+async function saveParam(ma, input, btn, msgEl){
+  msgEl.style.display = 'none';
+  const val = parseFloat(input.value);
+  if (isNaN(val)){ msgEl.style.display = 'block'; msgEl.textContent = 'Giá trị không hợp lệ.'; return; }
+  if (ma === 'P9' && val > 10){
+    msgEl.style.display = 'block';
+    msgEl.textContent = 'P9 không được vượt trần 10 ngày làm việc theo IATF §7.5.3.2.2';
+    return;
+  }
+  btn.disabled = true;
+  const { error } = await sb.from('document_config_params').update({
+    gia_tri: val,
+    updated_by: state.session.user.id,
+    updated_at: new Date().toISOString(),
+  }).eq('ma', ma);
+  if (error){
+    msgEl.style.display = 'block'; msgEl.textContent = 'Lỗi: ' + error.message;
+    btn.disabled = false;
+    return;
+  }
+  input.dataset.orig = val;
+  toast('Đã lưu ' + ma + '.');
+  const p = state.params.find(x => x.ma === ma);
+  if (p) p.gia_tri = val;
+}
+
+// ── Tab 2: Ủy quyền duyệt ────────────────────────────────────────────────
+async function ensureCategories(){
+  if (state.categories.length) return state.categories;
+  const { data, error } = await sb.from('doc_categories').select('id, ma, ten, thu_tu').order('thu_tu');
+  if (error){ toast('Không tải được danh mục loại tài liệu: ' + error.message, true); return []; }
+  state.categories = data || [];
+  return state.categories;
+}
+
+async function ensureUsers(){
+  if (state.users.length) return state.users;
+  const { data, error } = await sb.from('user_roles').select('user_id, username, full_name, email, role').order('username');
+  if (error){ toast('Không tải được danh sách người dùng: ' + error.message, true); return []; }
+  state.users = data || [];
+  return state.users;
+}
+
+function userLabel(u){
+  const name = (u.username && u.full_name) ? (u.username + '_' + u.full_name) : (u.username || u.full_name || u.email || u.user_id);
+  return name + (u.role ? ' (' + u.role + ')' : '');
+}
+
+async function loadDelegations(){
+  const body = document.getElementById('delBody');
+  body.innerHTML = '<tr><td colspan="8">Đang tải…</td></tr>';
+  await ensureCategories();
+  const { data, error } = await sb.from('document_delegations').select('*').order('hieu_luc_tu', { ascending: false });
+  if (error){ toast('Không tải được ủy quyền: ' + error.message, true); body.innerHTML = '<tr><td colspan="8">Lỗi tải dữ liệu.</td></tr>'; return; }
+  state.delegations = data || [];
+  if (!state.delegations.length){
+    body.innerHTML = '<tr><td colspan="8" class="empty-hint">Chưa có ủy quyền nào. Mọi phiếu tầng B/C sẽ kẹt ở bước duyệt (chỉ Admin duyệt được).</td></tr>';
+    return;
+  }
+  const rows = await Promise.all(state.delegations.map(async d => {
+    const name = await resolveUserName(d.user_id);
+    const replacement = d.nguoi_thay_the ? await resolveUserName(d.nguoi_thay_the) : '—';
+    const cat = d.category_id ? (state.categories.find(c => c.id === d.category_id) || {}).ten : 'Mọi loại';
+    return `
+    <tr data-id="${d.id}">
+      <td>${escapeHtml(name)}</td>
+      <td><span class="badge ${d.tang}">Tầng ${d.tang}</span></td>
+      <td>${escapeHtml(cat || '—')}</td>
+      <td>${fmtDate(d.hieu_luc_tu)}</td>
+      <td>${d.hieu_luc_den ? fmtDate(d.hieu_luc_den) : '—'}</td>
+      <td>${escapeHtml(replacement)}</td>
+      <td class="note-small">${escapeHtml(d.ghi_chu || '')}</td>
+      <td><button type="button" class="btn-danger" data-del="${d.id}">Xoá</button></td>
+    </tr>`;
+  }));
+  body.innerHTML = rows.join('');
+  body.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Xoá ủy quyền này?')) return;
+      btn.disabled = true;
+      const { error } = await sb.from('document_delegations').delete().eq('id', btn.dataset.del);
+      if (error){ toast('Lỗi xoá: ' + error.message, true); btn.disabled = false; return; }
+      toast('Đã xoá ủy quyền.');
+      loadDelegations();
+    });
+  });
+}
+
+async function openDelModal(){
+  await ensureCategories();
+  await ensureUsers();
+  const userSel = document.getElementById('del-user');
+  const thaySel = document.getElementById('del-thay-the');
+  const catSel = document.getElementById('del-category');
+  userSel.innerHTML = state.users.map(u => `<option value="${u.user_id}">${escapeHtml(userLabel(u))}</option>`).join('');
+  thaySel.innerHTML = '<option value="">— Không có —</option>' + state.users.map(u => `<option value="${u.user_id}">${escapeHtml(userLabel(u))}</option>`).join('');
+  catSel.innerHTML = '<option value="">— Mọi loại tài liệu —</option>' + state.categories.map(c => `<option value="${c.id}">${escapeHtml(c.ten)}</option>`).join('');
+  document.getElementById('del-tang').value = 'B';
+  document.getElementById('del-tu').value = todayISO();
+  document.getElementById('del-den').value = '';
+  document.getElementById('del-ghi-chu').value = '';
+  document.getElementById('del-msg').style.display = 'none';
+  document.getElementById('modal-del').classList.add('open');
+}
+function closeDelModal(){ document.getElementById('modal-del').classList.remove('open'); }
+
+async function submitDelegation(){
+  const msg = document.getElementById('del-msg');
+  msg.style.display = 'none';
+  const userId = document.getElementById('del-user').value;
+  const tang = document.getElementById('del-tang').value;
+  const categoryId = document.getElementById('del-category').value || null;
+  const tu = document.getElementById('del-tu').value;
+  const den = document.getElementById('del-den').value || null;
+  const thayThe = document.getElementById('del-thay-the').value || null;
+  const ghiChu = document.getElementById('del-ghi-chu').value.trim() || null;
+  if (!userId || !tu){ msg.style.display = 'block'; msg.textContent = 'Cần chọn người được ủy quyền và ngày hiệu lực từ.'; return; }
+  const btn = document.getElementById('del-submit');
+  btn.disabled = true;
+  try {
+    const { error } = await sb.from('document_delegations').insert({
+      user_id: userId,
+      tang,
+      category_id: categoryId,
+      hieu_luc_tu: tu,
+      hieu_luc_den: den,
+      nguoi_thay_the: thayThe,
+      ghi_chu: ghiChu,
+      created_by: state.session.user.id,
+    });
+    if (error) throw error;
+    toast('Đã thêm ủy quyền.');
+    closeDelModal();
+    loadDelegations();
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Tab 3: Mức mật & bảng phân quyền ──────────────────────────────────────
+async function loadSecurity(){
+  const body = document.getElementById('matBody');
+  body.innerHTML = '<tr><td colspan="4">Đang tải…</td></tr>';
+  const { data, error } = await sb.from('documents')
+    .select('id, ten_tai_lieu, ma_sp, muc_mat, created_at, doc_categories(ten), master_products(ten_sp)')
+    .eq('muc_mat', 'mat')
+    .order('created_at', { ascending: false });
+  if (error){ toast('Không tải được danh sách tài liệu mật: ' + error.message, true); body.innerHTML = '<tr><td colspan="4">Lỗi tải dữ liệu.</td></tr>'; return; }
+  if (!data || !data.length){
+    body.innerHTML = '<tr><td colspan="4" class="empty-hint">Chưa có tài liệu nào ở mức "Mật".</td></tr>';
+    return;
+  }
+  body.innerHTML = data.map(d => {
+    const cat = d.doc_categories ? d.doc_categories.ten : '—';
+    const prod = d.master_products ? d.master_products.ten_sp : '';
+    return `
+    <tr>
+      <td>${escapeHtml(d.ten_tai_lieu)} <span class="badge mat">Mật</span></td>
+      <td>${escapeHtml(cat)}</td>
+      <td>${escapeHtml(d.ma_sp || '—')}${prod ? ' — ' + escapeHtml(prod) : ''}</td>
+      <td>${fmtDate(d.created_at)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Tab 4: Chỉ số ─────────────────────────────────────────────────────────
+function kpiCard(label, statHtml, formula, cls){
+  return `<div class="kpi">
+    <div class="label">${escapeHtml(label)}</div>
+    <div class="stat${cls ? ' ' + cls : ''}">${statHtml}</div>
+    <div class="formula">${formula}</div>
+  </div>`;
+}
+
+async function loadKpi(){
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '<div class="empty-hint">Đang tải…</div>';
+  const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+
+  const [dcrRes, extRes, p9Res] = await Promise.all([
+    sb.from('document_change_requests').select('trang_thai, tang, updated_at, han_duyet, created_at').gte('created_at', since),
+    sb.from('external_documents').select('ngay_nhan, ngay_ap_dung').gte('ngay_nhan', since.slice(0, 10)),
+    sb.from('document_config_params').select('gia_tri').eq('ma', 'P9').maybeSingle(),
+  ]);
+
+  if (dcrRes.error || extRes.error){
+    grid.innerHTML = '<div class="empty-hint">Lỗi tải dữ liệu: ' + escapeHtml((dcrRes.error || extRes.error).message) + '</div>';
+    return;
+  }
+
+  const dcrs = dcrRes.data || [];
+  const exts = extRes.data || [];
+  const p9 = (p9Res.data && p9Res.data.gia_tri) || 7;
+
+  // K1: % phiếu da_phat_hanh đúng hạn (updated_at <= han_duyet)
+  const issued = dcrs.filter(d => d.trang_thai === 'da_phat_hanh');
+  const issuedOnTime = issued.filter(d => d.han_duyet && d.updated_at && new Date(d.updated_at) <= new Date(d.han_duyet));
+  const k1 = issued.length ? (issuedOnTime.length / issued.length * 100) : null;
+
+  // K2: % phiếu tầng A trên tổng số phiếu
+  const tierA = dcrs.filter(d => d.tang === 'A');
+  const k2 = dcrs.length ? (tierA.length / dcrs.length * 100) : null;
+
+  // K4: số phiếu tu_choi trong 90 ngày
+  const k4 = dcrs.filter(d => d.trang_thai === 'tu_choi').length;
+
+  // K5: % external_documents có ngay_ap_dung và (ngay_ap_dung - ngay_nhan) <= P9 (ngày lịch, xấp xỉ)
+  const extWithApply = exts.filter(e => e.ngay_ap_dung);
+  const extOnTime = extWithApply.filter(e => {
+    const diffDays = (new Date(e.ngay_ap_dung) - new Date(e.ngay_nhan)) / (24 * 3600 * 1000);
+    return diffDays <= p9;
+  });
+  const k5 = exts.length ? (extOnTime.length / exts.length * 100) : null;
+
+  function pct(v){ return v === null ? '—' : v.toFixed(1) + '%'; }
+  function pctClass(v, warnAt, alarmAt, inverse){
+    if (v === null) return '';
+    if (!inverse){
+      if (v < alarmAt) return 'alarm';
+      if (v < warnAt) return 'warn';
+      return '';
+    } else {
+      if (v > alarmAt) return 'alarm';
+      if (v > warnAt) return 'warn';
+      return '';
+    }
+  }
+
+  grid.innerHTML = [
+    kpiCard('K1 — Phiếu phát hành đúng hạn', pct(k1), 'Số phiếu <b>đã phát hành</b> có ngày cập nhật ≤ hạn duyệt, trên tổng số phiếu đã phát hành (90 ngày).', pctClass(k1, 90, 70)),
+    kpiCard('K2 — Tỷ lệ phiếu tầng A', pct(k2), 'Số phiếu tầng A trên tổng số phiếu thay đổi tài liệu (90 ngày). Cảnh báo theo P14 nếu vượt ngưỡng 3 tháng liên tiếp.', pctClass(k2, 30, 50, true)),
+    kpiCard('K3 — Tỷ lệ sai tầng (hậu kiểm)', 'Chưa đo', 'Chưa đo — cần lấy mẫu hậu kiểm thủ công theo P12/P13 (10% phiếu tầng B/C mỗi tháng, ngưỡng sai chấp nhận 5%).'),
+    kpiCard('K4 — Số phiếu bị từ chối', String(k4), 'Số phiếu có trạng thái "từ chối" trong 90 ngày gần nhất.', k4 > 0 ? 'warn' : ''),
+    kpiCard('K5 — Tài liệu khách hàng áp dụng đúng hạn', pct(k5), 'Số tài liệu bên ngoài có ngày áp dụng, và (ngày áp dụng − ngày nhận) ≤ P9 (' + p9 + ' ngày), trên tổng số tài liệu bên ngoài nhận trong 90 ngày.', pctClass(k5, 90, 70)),
+  ].join('');
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  const { data: myRole } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
+  state.isAdmin = !!(myRole && myRole.role === 'admin');
+
+  if (!state.isAdmin){
+    document.getElementById('gateWrap').innerHTML = `
+      <div class="panel"><div class="panel-body">
+        <div class="gate">
+          <div class="big">🔒</div>
+          <div>Chỉ Admin mới truy cập trang Cấu hình.</div>
+        </div>
+      </div></div>`;
+    return;
+  }
+
+  document.getElementById('gateWrap').style.display = 'none';
+  document.getElementById('contentWrap').style.display = 'flex';
+  await ensureCategories();
+  await loadParams();
+}
+main();
+</script>
+</body>
+</html>

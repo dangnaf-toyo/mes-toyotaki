@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tài liệu hệ thống — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  tai-lieu-he-thong.html — T63 "Tài liệu hệ thống": duyệt xem danh sách tài
+  liệu KHÔNG gắn mã SP, chia 4 tab theo cấp (doc_categories.cap = '1'..'4').
+  Mỗi tab có thể gồm nhiều category cùng cấp — không hard-code chỉ 1 category.
+
+  Trang này CHỈ DUYỆT XEM + điều hướng sang phieu-thay-doi-tai-lieu.html để
+  tạo/sửa/huỷ tài liệu — KHÔNG tự insert/update bảng documents trực tiếp
+  (mọi thay đổi tài liệu hệ thống phải đi qua Phiếu thay đổi tài liệu).
+
+  Quyền đọc: RLS documents đã tự lọc theo has_doc_permission(...,'read').
+  Quyền tạo/sửa/huỷ (hiện nút): RPC has_doc_permission(category_id,'write').
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab-btn{padding:6px 12px;border:1px solid #475569;border-radius:5px;background:transparent;color:#F1F5F9;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.tab-btn:hover{background:#334155}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-tiny{background:transparent;border:1px dashed var(--border-strong);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:11px;cursor:pointer}
+.btn-tiny:hover{background:var(--bg-sunken);color:var(--text)}
+
+.main{display:flex;gap:6px;flex:1;min-height:0}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0;flex:1}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700;flex:1}
+.panel-head input[type=search]{padding:7px 10px;border:1px solid var(--border-strong);border-radius:6px;font-family:inherit;font-size:12.5px;outline:none;width:240px}
+.panel-head input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,95,165,.1)}
+.panel-body{flex:1;overflow-y:auto;padding:8px}
+
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12.5px;vertical-align:middle}
+tbody tr:hover{background:var(--bg-sunken)}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700}
+.badge.noi-bo{background:#F1F5F9;color:var(--text-muted)}
+.badge.mat{background:var(--alarm-bg);color:var(--alarm-fg)}
+.ver-tag{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11.5px;color:var(--text)}
+.ver-tag.none{color:var(--text-dim);font-weight:400;font-style:italic;font-family:inherit}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.empty-hint{padding:24px;text-align:center;color:var(--text-muted);font-size:12.5px}
+
+.dropdown-wrap{position:relative;display:inline-block}
+.dropdown-menu{position:absolute;top:calc(100% + 4px);left:0;background:#FFF;border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow-md);z-index:50;min-width:220px;display:none;overflow:hidden}
+.dropdown-menu.open{display:block}
+.dropdown-menu button{display:block;width:100%;text-align:left;padding:8px 12px;background:none;border:none;font-family:inherit;font-size:12.5px;cursor:pointer;color:var(--text)}
+.dropdown-menu button:hover{background:var(--bg-sunken)}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📘 Tài liệu hệ thống</div>
+    </div>
+    <div class="tabs" id="capTabs">
+      <button class="tab-btn active" data-cap="1">Cấp 1 · Sổ tay CL</button>
+      <button class="tab-btn" data-cap="2">Cấp 2 · Thủ tục</button>
+      <button class="tab-btn" data-cap="3">Cấp 3 · Phương pháp/Tiêu chuẩn</button>
+      <button class="tab-btn" data-cap="4">Cấp 4 · Biểu mẫu</button>
+    </div>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="panelTitle">Cấp 1 · Sổ tay chất lượng</h2>
+        <input type="search" id="docSearch" placeholder="Tìm theo tên tài liệu…">
+        <div class="dropdown-wrap" id="newDocWrap"></div>
+      </div>
+      <div class="panel-body" id="docBody"><div class="empty-hint">Đang tải…</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+const CAP_TITLES = {
+  '1': 'Cấp 1 · Sổ tay chất lượng',
+  '2': 'Cấp 2 · Thủ tục',
+  '3': 'Cấp 3 · Phương pháp / Tiêu chuẩn',
+  '4': 'Cấp 4 · Biểu mẫu',
+};
+
+const state = {
+  session: null,
+  cap: '1',
+  allCategories: [],     // toàn bộ doc_categories (mọi cấp)
+  catsInTab: [],         // category thuộc cap đang chọn
+  writableCache: {},     // category_id -> boolean
+  docs: [],              // documents của tab hiện tại (đã join tên loại + phiên bản)
+  filtered: [],
+};
+
+// ── Header clock ─────────────────────────────────────────────────────────
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+
+// ── Tabs cấp ──────────────────────────────────────────────────────────────
+document.querySelectorAll('#capTabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#capTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.cap = btn.dataset.cap;
+    document.getElementById('panelTitle').textContent = CAP_TITLES[state.cap] || '';
+    document.getElementById('docSearch').value = '';
+    loadTab();
+  });
+});
+
+document.getElementById('docSearch').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  state.filtered = !q ? state.docs
+    : state.docs.filter(d => (d.ten_tai_lieu || '').toLowerCase().includes(q));
+  renderDocTable();
+});
+
+async function ensureCategories(){
+  if (state.allCategories.length) return state.allCategories;
+  const { data, error } = await sb.from('doc_categories').select('id, ma, ten, thu_tu, cap').order('thu_tu');
+  if (error){ toast('Không tải được danh mục loại tài liệu: ' + error.message, true); return []; }
+  state.allCategories = data || [];
+  return state.allCategories;
+}
+
+async function isWritable(categoryId){
+  if (categoryId in state.writableCache) return state.writableCache[categoryId];
+  const { data, error } = await sb.rpc('has_doc_permission', { p_category_id: categoryId, p_quyen: 'write' });
+  const val = !error && !!data;
+  state.writableCache[categoryId] = val;
+  return val;
+}
+
+async function loadTab(){
+  const body = document.getElementById('docBody');
+  body.innerHTML = '<div class="empty-hint">Đang tải…</div>';
+  document.getElementById('newDocWrap').innerHTML = '';
+
+  const allCats = await ensureCategories();
+  const catsInTab = allCats.filter(c => c.cap === state.cap);
+  state.catsInTab = catsInTab;
+
+  if (!catsInTab.length){
+    body.innerHTML = '<div class="empty-hint">Chưa có loại tài liệu nào cho cấp này.</div>';
+    return;
+  }
+
+  const catIds = catsInTab.map(c => c.id);
+  const catNameById = {};
+  catsInTab.forEach(c => { catNameById[c.id] = c.ten; });
+
+  const { data: docs, error } = await sb.from('documents')
+    .select('id, ten_tai_lieu, category_id, current_version_id, muc_mat, created_at')
+    .in('category_id', catIds)
+    .order('created_at', { ascending: false });
+  if (error){ toast('Không tải được tài liệu: ' + error.message, true); body.innerHTML = '<div class="detail-empty">Lỗi tải dữ liệu.</div>'; return; }
+
+  // Lấy số phiên bản hiện hành (join riêng document_versions theo current_version_id).
+  const versionIds = (docs || []).map(d => d.current_version_id).filter(Boolean);
+  let versionById = {};
+  if (versionIds.length){
+    const { data: vers } = await sb.from('document_versions').select('id, so_phien_ban').in('id', versionIds);
+    (vers || []).forEach(v => { versionById[v.id] = v.so_phien_ban; });
+  }
+
+  state.docs = (docs || []).map(d => ({
+    ...d,
+    ten_loai: catNameById[d.category_id] || '',
+    so_phien_ban: d.current_version_id ? versionById[d.current_version_id] : null,
+  }));
+  state.filtered = state.docs;
+
+  // Nút "+ Đề nghị tài liệu mới" — chỉ hiện nếu có quyền write trên ít nhất 1 category của tab.
+  const writableFlags = await Promise.all(catsInTab.map(c => isWritable(c.id)));
+  const writableCats = catsInTab.filter((c, i) => writableFlags[i]);
+  renderNewDocButton(writableCats);
+
+  renderDocTable();
+}
+
+function renderNewDocButton(writableCats){
+  const wrap = document.getElementById('newDocWrap');
+  if (!writableCats.length){ wrap.innerHTML = ''; return; }
+
+  if (writableCats.length === 1){
+    const c = writableCats[0];
+    wrap.innerHTML = `<button type="button" class="btn btn-primary" id="btn-new-doc">+ Đề nghị tài liệu mới</button>`;
+    document.getElementById('btn-new-doc').addEventListener('click', () => goToPhieu({ category_id: c.id, loai: 'tao_moi' }));
+    return;
+  }
+
+  wrap.innerHTML = `
+    <button type="button" class="btn btn-primary" id="btn-new-doc-toggle">+ Đề nghị tài liệu mới ▾</button>
+    <div class="dropdown-menu" id="new-doc-menu">
+      ${writableCats.map(c => `<button type="button" data-cat="${c.id}">${escapeHtml(c.ten)}</button>`).join('')}
+    </div>
+  `;
+  const menu = document.getElementById('new-doc-menu');
+  document.getElementById('btn-new-doc-toggle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.classList.toggle('open');
+  });
+  menu.querySelectorAll('button[data-cat]').forEach(btn => {
+    btn.addEventListener('click', () => goToPhieu({ category_id: btn.dataset.cat, loai: 'tao_moi' }));
+  });
+  document.addEventListener('click', () => menu.classList.remove('open'), { once: true });
+}
+
+function goToPhieu(params){
+  const qs = new URLSearchParams(params).toString();
+  window.location.href = 'phieu-thay-doi-tai-lieu.html?' + qs;
+}
+
+function renderDocTable(){
+  const body = document.getElementById('docBody');
+  const showLoaiCol = state.catsInTab.length > 1;
+
+  if (!state.filtered.length){
+    body.innerHTML = '<div class="empty-hint">Không có tài liệu nào.</div>';
+    return;
+  }
+
+  body.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Tên tài liệu</th>
+          ${showLoaiCol ? '<th>Loại</th>' : ''}
+          <th>Mức mật</th>
+          <th>Phiên bản hiện hành</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${state.filtered.map(d => `
+          <tr data-doc-id="${d.id}" data-cat-id="${d.category_id}">
+            <td>${escapeHtml(d.ten_tai_lieu)}</td>
+            ${showLoaiCol ? `<td>${escapeHtml(d.ten_loai)}</td>` : ''}
+            <td>${d.muc_mat === 'mat' ? '<span class="badge mat">Mật</span>' : '<span class="badge noi-bo">Nội bộ</span>'}</td>
+            <td>${d.so_phien_ban ? `<span class="ver-tag">v${d.so_phien_ban}</span>` : '<span class="ver-tag none">Chưa có</span>'}</td>
+            <td>
+              <div class="row-actions">
+                <button type="button" class="btn-outline" data-act="xem">Xem</button>
+                <button type="button" class="btn-tiny" data-act="sua_doi">Đề nghị sửa đổi</button>
+                <button type="button" class="btn-tiny" data-act="huy">Đề nghị huỷ</button>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  body.querySelectorAll('tr[data-doc-id]').forEach(tr => {
+    const docId = tr.dataset.docId;
+    const catId = tr.dataset.catId;
+    tr.querySelector('[data-act="xem"]').addEventListener('click', () => {
+      window.location.href = 'tai-lieu-chi-tiet.html?id=' + encodeURIComponent(docId);
+    });
+    const btnSua = tr.querySelector('[data-act="sua_doi"]');
+    const btnHuy = tr.querySelector('[data-act="huy"]');
+    isWritable(catId).then(writable => {
+      btnSua.style.display = writable ? '' : 'none';
+      btnHuy.style.display = writable ? '' : 'none';
+    });
+    btnSua.style.display = 'none';
+    btnHuy.style.display = 'none';
+    btnSua.addEventListener('click', () => goToPhieu({ document_id: docId, loai: 'sua_doi' }));
+    btnHuy.addEventListener('click', () => goToPhieu({ document_id: docId, loai: 'huy' }));
+  });
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  await ensureCategories();
+  await loadTab();
+}
+main();
+</script>
+</body>
+</html>

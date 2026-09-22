@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Danh sách phiếu thay đổi tài liệu — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  danh-sach-phieu-thay-doi.html — T63. Danh sách phiếu thay đổi tài liệu (DCR):
+  khối "Việc của tôi" (phiếu đang chờ hành động của người xem) + bảng "Tất cả
+  phiếu" (filter tầng/trạng thái). Nút "+ Lập phiếu mới" mở modal chọn
+  tạo tài liệu hệ thống mới hoặc sửa đổi/huỷ tài liệu đã có, điều hướng sang
+  phieu-thay-doi-tai-lieu.html.
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.brand .sub{font-size:11px;color:#94A3B8}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover:not(:disabled){background:#334155}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+
+.main{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow-y:auto}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm)}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{padding:14px}
+
+.tier-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.tier-badge.A{background:var(--alarm-bg);color:var(--alarm-fg)}
+.tier-badge.B{background:var(--warn-bg);color:var(--warn-fg)}
+.tier-badge.C{background:var(--run-bg);color:var(--run-fg)}
+
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em}
+.badge.dang_xac_nhan{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.dang_duyet{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.cho_khach_hang{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.da_duyet{background:var(--run-bg);color:var(--run-fg)}
+.badge.da_phat_hanh{background:var(--run-bg);color:var(--run-fg)}
+.badge.tu_choi{background:var(--alarm-bg);color:var(--alarm-fg)}
+
+.mine-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);cursor:pointer}
+.mine-row:last-child{border-bottom:none}
+.mine-row:hover{background:var(--bg-sunken)}
+.mine-row .name{flex:1;font-size:12.5px;font-weight:600}
+.mine-row .meta{font-size:11px;color:var(--text-muted)}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--bg-sunken)}
+
+.filters{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.filters select{padding:5px 8px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:11.5px}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-backdrop.show{display:flex}
+.modal{background:var(--bg-panel);border-radius:10px;box-shadow:var(--shadow-lg);width:480px;max-width:92vw;max-height:88vh;overflow-y:auto}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center}
+.modal-head h3{font-size:14px;font-weight:700}
+.modal-head .x{margin-left:auto;cursor:pointer;color:var(--text-muted);font-size:16px;background:none;border:none}
+.modal-body{padding:18px}
+.opt-card{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;cursor:pointer}
+.opt-card:hover{background:var(--bg-sunken)}
+.opt-card.active{border-color:var(--accent);background:#EFF6FF}
+.opt-card .t{font-size:12.5px;font-weight:700;margin-bottom:2px}
+.opt-card .d{font-size:11px;color:var(--text-muted)}
+.sub-form{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.field{margin-bottom:12px}
+.field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px}
+.field input[type=text],.field select{width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;font-family:inherit;font-size:12.5px;outline:none}
+.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,95,165,.1)}
+.autocomplete-list{border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;display:none}
+.autocomplete-list.show{display:block}
+.autocomplete-list .item{padding:7px 10px;font-size:12px;cursor:pointer}
+.autocomplete-list .item:hover{background:var(--bg-sunken)}
+.autocomplete-list .item .sub{font-size:10.5px;color:var(--text-muted)}
+.picked{margin-top:6px;font-size:12px;padding:7px 10px;border-radius:6px;background:var(--bg-sunken);display:none}
+.picked.show{display:block}
+.radio-row{display:flex;gap:10px;margin-top:8px}
+.radio-row label{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer}
+
+.msg-inline{font-size:11.5px;color:var(--alarm-fg);margin-top:8px}
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+.empty{color:var(--text-dim);font-size:12px;padding:6px 0}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📋 Phiếu thay đổi tài liệu</div>
+      <div class="sub" id="hdrSub">—</div>
+    </div>
+    <button class="btn btn-primary" onclick="openModal()">+ Lập phiếu mới</button>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel">
+      <div class="panel-head"><h2>Việc của tôi</h2></div>
+      <div class="panel-body" id="mineBody"><div class="empty">Đang tải…</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Tất cả phiếu</h2>
+        <div class="filters">
+          <select id="filterTang" onchange="renderAll()">
+            <option value="">Tầng: Tất cả</option>
+            <option value="A">Tầng A</option>
+            <option value="B">Tầng B</option>
+            <option value="C">Tầng C</option>
+          </select>
+          <select id="filterTrangThai" onchange="renderAll()">
+            <option value="">Trạng thái: Tất cả</option>
+            <option value="dang_xac_nhan">Đang xác nhận</option>
+            <option value="dang_duyet">Đang duyệt</option>
+            <option value="cho_khach_hang">Chờ khách hàng</option>
+            <option value="da_duyet">Đã duyệt</option>
+            <option value="tu_choi">Từ chối</option>
+            <option value="da_phat_hanh">Đã phát hành</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-body" id="allBody"><div class="empty">Đang tải…</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Lập phiếu thay đổi mới</h3>
+      <button class="x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="opt-card" id="optNew" onclick="chooseOpt('new')">
+        <div class="t">Tài liệu hệ thống mới</div>
+        <div class="d">Sổ tay chất lượng, Thủ tục, Phương pháp/Tiêu chuẩn, Biểu mẫu…</div>
+      </div>
+      <div class="opt-card" id="optEdit" onclick="chooseOpt('edit')">
+        <div class="t">Sửa đổi / huỷ tài liệu đã có</div>
+        <div class="d">Tìm tài liệu hiện có để đề nghị thay đổi hoặc huỷ.</div>
+      </div>
+
+      <div id="subFormNew" class="sub-form" style="display:none">
+        <div class="field">
+          <label>Loại tài liệu</label>
+          <select id="newCategorySelect"><option value="">— Chọn loại tài liệu —</option></select>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="goNew()">Tiếp tục</button>
+      </div>
+
+      <div id="subFormEdit" class="sub-form" style="display:none">
+        <div class="field">
+          <label>Tìm tài liệu</label>
+          <input type="text" id="docSearchInput" placeholder="Gõ ít nhất 2 ký tự tên tài liệu…" oninput="onDocSearch(this.value)">
+          <div class="autocomplete-list" id="docSearchList"></div>
+          <div class="picked" id="docPicked"></div>
+        </div>
+        <div class="field">
+          <label>Loại yêu cầu</label>
+          <div class="radio-row">
+            <label><input type="radio" name="editLoai" value="sua_doi" checked> Sửa đổi</label>
+            <label><input type="radio" name="editLoai" value="huy"> Huỷ</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center" id="goEditBtn" onclick="goEdit()" disabled>Tiếp tục</button>
+      </div>
+      <div class="msg-inline" id="modalMsg" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+function fmtDate(s){ return s ? new Date(s).toLocaleDateString('vi-VN') : '—'; }
+
+const LOAI_LABELS = { tao_moi: 'Tạo tài liệu mới', sua_doi: 'Sửa đổi tài liệu', huy: 'Đề nghị huỷ tài liệu' };
+const TRANG_THAI_LABELS = {
+  dang_xac_nhan: 'Đang xác nhận', dang_duyet: 'Đang duyệt', cho_khach_hang: 'Chờ khách hàng',
+  da_duyet: 'Đã duyệt', tu_choi: 'Từ chối', da_phat_hanh: 'Đã phát hành',
+};
+const HANH_DONG_ROLES = ['admin', 'giam_doc_sx', 'ke_hoach'];
+
+const state = {
+  session: null,
+  myRole: null,
+  myBoPhan: [],
+  all: [],
+  mineIds: new Set(),
+  pickedDoc: null,
+};
+
+async function loadAll(){
+  const [{ data: myRoleRow }, { data: myBoPhan }, { data: all, error }] = await Promise.all([
+    sb.from('user_roles').select('role').eq('user_id', state.session.user.id).maybeSingle(),
+    sb.rpc('current_user_bo_phan'),
+    sb.from('document_change_requests')
+      .select('id, tieu_de, tang, trang_thai, loai_yeu_cau, created_at, category_id, doc_categories(ten), documents(ten_tai_lieu)')
+      .order('created_at', { ascending: false }),
+  ]);
+  state.myRole = myRoleRow ? myRoleRow.role : null;
+  state.myBoPhan = myBoPhan || [];
+  if (error){ toast('Lỗi tải danh sách: ' + error.message, true); return; }
+  state.all = all || [];
+
+  const actionable = state.all.filter(d => ['dang_xac_nhan','dang_duyet','cho_khach_hang'].includes(d.trang_thai));
+  const mineSet = new Set();
+
+  // dang_xac_nhan: kiểm tra dcr_confirmations của mình đang 'cho'
+  const xacNhanIds = actionable.filter(d => d.trang_thai === 'dang_xac_nhan').map(d => d.id);
+  if (xacNhanIds.length && state.myBoPhan.length){
+    const { data: confirms } = await sb.from('dcr_confirmations')
+      .select('dcr_id, bo_phan, trang_thai').in('dcr_id', xacNhanIds).eq('trang_thai', 'cho');
+    (confirms || []).forEach(c => { if (state.myBoPhan.includes(c.bo_phan)) mineSet.add(c.dcr_id); });
+  }
+
+  // dang_duyet / cho_khach_hang: role admin/giam_doc_sx/ke_hoach luôn thấy;
+  // ngoài ra kiểm tra document_is_delegate cho từng phiếu còn lại.
+  const duyetItems = actionable.filter(d => d.trang_thai !== 'dang_xac_nhan');
+  if (HANH_DONG_ROLES.includes(state.myRole)){
+    duyetItems.forEach(d => mineSet.add(d.id));
+  } else {
+    for (const d of duyetItems){
+      if (d.tang === 'A') continue; // tầng A luôn cần role ở trên, không có delegate
+      const { data } = await sb.rpc('document_is_delegate', { p_user_id: state.session.user.id, p_tang: d.tang, p_category_id: d.category_id });
+      if (data) mineSet.add(d.id);
+    }
+  }
+
+  state.mineIds = mineSet;
+}
+
+function renderMine(){
+  const mine = state.all.filter(d => state.mineIds.has(d.id));
+  const el = document.getElementById('mineBody');
+  if (!mine.length){ el.innerHTML = '<div class="empty">Không có phiếu nào cần bạn xử lý.</div>'; return; }
+  el.innerHTML = mine.map(d => `
+    <div class="mine-row" onclick="goDetail('${d.id}')">
+      <span class="tier-badge ${d.tang}">${d.tang}</span>
+      <div class="name">${escapeHtml(d.tieu_de)}</div>
+      <span class="badge ${d.trang_thai}">${escapeHtml(TRANG_THAI_LABELS[d.trang_thai] || d.trang_thai)}</span>
+      <div class="meta">${escapeHtml(d.doc_categories ? d.doc_categories.ten : '')} · ${fmtDate(d.created_at)}</div>
+    </div>
+  `).join('');
+}
+
+function renderAllTable(){
+  const tang = document.getElementById('filterTang').value;
+  const trangThai = document.getElementById('filterTrangThai').value;
+  let rows = state.all;
+  if (tang) rows = rows.filter(d => d.tang === tang);
+  if (trangThai) rows = rows.filter(d => d.trang_thai === trangThai);
+
+  const el = document.getElementById('allBody');
+  if (!rows.length){ el.innerHTML = '<div class="empty">Không có phiếu nào khớp bộ lọc.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Tiêu đề</th><th>Loại tài liệu</th><th>Loại yêu cầu</th><th>Tầng</th><th>Trạng thái</th><th>Ngày lập</th></tr></thead>
+      <tbody>
+        ${rows.map(d => `
+          <tr onclick="goDetail('${d.id}')">
+            <td>${escapeHtml(d.tieu_de)}</td>
+            <td>${escapeHtml(d.doc_categories ? d.doc_categories.ten : '—')}</td>
+            <td>${escapeHtml(LOAI_LABELS[d.loai_yeu_cau] || d.loai_yeu_cau)}</td>
+            <td><span class="tier-badge ${d.tang}">${d.tang}</span></td>
+            <td><span class="badge ${d.trang_thai}">${escapeHtml(TRANG_THAI_LABELS[d.trang_thai] || d.trang_thai)}</span></td>
+            <td>${fmtDate(d.created_at)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderAll(){
+  renderMine();
+  renderAllTable();
+}
+
+function goDetail(id){
+  window.location.href = 'phieu-thay-doi-chi-tiet.html?id=' + encodeURIComponent(id);
+}
+
+// ── Modal "Lập phiếu mới" ───────────────────────────────────────────────────
+function openModal(){
+  document.getElementById('modalBackdrop').classList.add('show');
+  document.getElementById('modalMsg').style.display = 'none';
+}
+function closeModal(){
+  document.getElementById('modalBackdrop').classList.remove('show');
+  document.getElementById('optNew').classList.remove('active');
+  document.getElementById('optEdit').classList.remove('active');
+  document.getElementById('subFormNew').style.display = 'none';
+  document.getElementById('subFormEdit').style.display = 'none';
+  document.getElementById('docSearchInput').value = '';
+  document.getElementById('docSearchList').classList.remove('show');
+  document.getElementById('docPicked').classList.remove('show');
+  document.getElementById('goEditBtn').disabled = true;
+  state.pickedDoc = null;
+}
+async function chooseOpt(opt){
+  document.getElementById('optNew').classList.toggle('active', opt === 'new');
+  document.getElementById('optEdit').classList.toggle('active', opt === 'edit');
+  document.getElementById('subFormNew').style.display = opt === 'new' ? 'block' : 'none';
+  document.getElementById('subFormEdit').style.display = opt === 'edit' ? 'block' : 'none';
+  if (opt === 'new'){
+    const sel = document.getElementById('newCategorySelect');
+    if (sel.options.length <= 1){
+      const { data } = await sb.from('doc_categories').select('id, ten').neq('cap', 'ky_thuat').order('thu_tu');
+      (data || []).forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id; o.textContent = c.ten;
+        sel.appendChild(o);
+      });
+    }
+  }
+}
+function goNew(){
+  const catId = document.getElementById('newCategorySelect').value;
+  const msg = document.getElementById('modalMsg');
+  if (!catId){ msg.style.display = 'block'; msg.textContent = 'Vui lòng chọn loại tài liệu.'; return; }
+  window.location.href = 'phieu-thay-doi-tai-lieu.html?category_id=' + encodeURIComponent(catId) + '&loai=tao_moi';
+}
+let docSearchTimer;
+function onDocSearch(q){
+  clearTimeout(docSearchTimer);
+  const list = document.getElementById('docSearchList');
+  if (q.trim().length < 2){ list.classList.remove('show'); list.innerHTML = ''; return; }
+  docSearchTimer = setTimeout(async () => {
+    const { data } = await sb.from('documents').select('id, ten_tai_lieu, ma_sp').ilike('ten_tai_lieu', '%' + q.trim() + '%').limit(15);
+    if (!data || !data.length){ list.innerHTML = '<div class="item">Không tìm thấy tài liệu nào.</div>'; list.classList.add('show'); return; }
+    list.innerHTML = data.map(d => `
+      <div class="item" onclick='pickDoc(${JSON.stringify(JSON.stringify(d))})'>
+        ${escapeHtml(d.ten_tai_lieu)}${d.ma_sp ? `<div class="sub">${escapeHtml(d.ma_sp)}</div>` : ''}
+      </div>`).join('');
+    list.classList.add('show');
+  }, 250);
+}
+function pickDoc(jsonStr){
+  const d = JSON.parse(jsonStr);
+  state.pickedDoc = d;
+  document.getElementById('docSearchList').classList.remove('show');
+  document.getElementById('docSearchInput').value = d.ten_tai_lieu;
+  const picked = document.getElementById('docPicked');
+  picked.classList.add('show');
+  picked.textContent = 'Đã chọn: ' + d.ten_tai_lieu + (d.ma_sp ? ' (' + d.ma_sp + ')' : '');
+  document.getElementById('goEditBtn').disabled = false;
+}
+function goEdit(){
+  if (!state.pickedDoc) return;
+  const loai = document.querySelector('input[name=editLoai]:checked').value;
+  window.location.href = 'phieu-thay-doi-tai-lieu.html?document_id=' + encodeURIComponent(state.pickedDoc.id) + '&loai=' + encodeURIComponent(loai);
+}
+
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  await loadAll();
+  renderAll();
+}
+main();
+</script>
+</body>
+</html>

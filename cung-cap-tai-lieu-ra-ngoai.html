@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cung cấp tài liệu ra ngoài — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  cung-cap-tai-lieu-ra-ngoai.html — T63 "Cung cấp tài liệu ra ngoài": ghi nhận
+  việc cấp tài liệu nội bộ (documents) hoặc tài liệu bên ngoài đã áp dụng
+  (external_documents, trang_thai = 'ap_dung') cho khách hàng/NCC/bên ngoài.
+  Bảng: external_document_provisions.
+  Quyền: mọi user đăng nhập đọc/ghi trực tiếp (RLS mở qua sb.from(...)).
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--info-fg:#1D4ED8;--info-bg:#EFF6FF;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-success{background:var(--run-fg);color:#FFF}
+.btn-success:hover:not(:disabled){background:#036049}
+.btn-danger{background:var(--alarm-fg);color:#FFF}
+.btn-danger:hover:not(:disabled){background:#991B1B}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+
+.main{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{padding:14px}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-panel)}
+td{padding:7px 8px;border-bottom:1px solid var(--border)}
+.mono{font-family:'JetBrains Mono',monospace;font-weight:600}
+.empty-hint{padding:20px;text-align:center;color:var(--text-muted);font-size:12.5px}
+
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em}
+.badge.noi_bo{background:var(--info-bg);color:var(--info-fg)}
+.badge.ben_ngoai{background:var(--run-bg);color:var(--run-fg)}
+
+.field{margin-bottom:10px}
+.field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.field select,.field input{width:100%;padding:7px 9px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12.5px;outline:none}
+.radio-row{display:flex;gap:16px}
+.radio-row label{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;max-width:720px}
+.form-grid .field.full{grid-column:1 / -1}
+.msg-inline{font-size:11.5px;color:var(--alarm-fg);margin-bottom:8px}
+.note-hint{font-size:11.5px;color:var(--text-muted);margin-top:6px;font-style:italic}
+
+.autocomplete{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:#FFF;border:1px solid var(--border-strong);border-top:none;border-radius:0 0 6px 6px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;z-index:20;display:none}
+.ac-list.open{display:block}
+.ac-item{padding:7px 9px;font-size:12.5px;cursor:pointer}
+.ac-item:hover{background:var(--bg-sunken)}
+.ac-item .ac-sub{font-size:10.5px;color:var(--text-muted)}
+.ac-selected{margin-top:6px;font-size:12px;background:var(--run-bg);color:var(--run-fg);border-radius:5px;padding:6px 9px;display:none;align-items:center;justify-content:space-between;gap:8px}
+.ac-selected.show{display:flex}
+.ac-selected button{background:transparent;border:none;color:var(--run-fg);font-weight:700;cursor:pointer;font-size:12px}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📤 Cung cấp tài liệu ra ngoài</div>
+    </div>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel">
+      <div class="panel-head"><h2>Cung cấp tài liệu mới</h2></div>
+      <div class="panel-body">
+        <div class="msg-inline" id="fm-msg" style="display:none"></div>
+        <div class="field">
+          <label>Nguồn tài liệu</label>
+          <div class="radio-row">
+            <label><input type="radio" name="src-type" value="noi_bo" checked> Tài liệu nội bộ</label>
+            <label><input type="radio" name="src-type" value="ben_ngoai"> Tài liệu bên ngoài đã tiếp nhận</label>
+          </div>
+        </div>
+
+        <div class="field" id="wrap-noi-bo">
+          <label>Tìm tài liệu nội bộ (gõ ≥2 ký tự)</label>
+          <div class="autocomplete">
+            <input type="text" id="ac-input" placeholder="Nhập tên tài liệu…" autocomplete="off">
+            <div class="ac-list" id="ac-list"></div>
+          </div>
+          <div class="ac-selected" id="ac-selected">
+            <span id="ac-selected-text"></span>
+            <button type="button" onclick="clearDocSelection()">✕ Bỏ chọn</button>
+          </div>
+        </div>
+
+        <div class="field" id="wrap-ben-ngoai" style="display:none">
+          <label>Chọn tài liệu bên ngoài đã áp dụng</label>
+          <select id="ext-select">
+            <option value="">— Chọn tài liệu —</option>
+          </select>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Người nhận <span style="color:#DC2626">*</span></label>
+            <input type="text" id="nguoi-nhan" placeholder="VD: Nguyễn Văn A">
+          </div>
+          <div class="field">
+            <label>Đơn vị nhận</label>
+            <input type="text" id="don-vi-nhan" placeholder="VD: Khách hàng ABC">
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="btn-submit" onclick="submitProvision()">Cung cấp</button>
+        <div class="note-hint">Xuất file có watermark "Do not Copy" — tính năng đính kèm/watermark file thật sẽ bổ sung sau, trang này chỉ ghi nhận việc cung cấp.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-head"><h2>Lịch sử cung cấp</h2></div>
+      <div class="panel-body" style="overflow-y:auto;flex:1">
+        <table>
+          <thead>
+            <tr>
+              <th>Tên tài liệu</th><th>Nguồn</th><th>Người nhận</th><th>Đơn vị nhận</th><th>Người cung cấp</th><th>Thời gian</th>
+            </tr>
+          </thead>
+          <tbody id="histTbody"><tr><td colspan="6" class="empty-hint">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+const state = {
+  session: null,
+  selectedDocument: null,  // { id, ten_tai_lieu }
+  externalDocs: [],
+  userNameCache: {},
+};
+
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+
+async function resolveUserName(userId){
+  if (!userId) return '—';
+  if (state.userNameCache[userId]) return state.userNameCache[userId];
+  const { data } = await sb.from('user_roles').select('username, full_name, email').eq('user_id', userId).maybeSingle();
+  const text = data ? (data.username && data.full_name ? (data.username + '_' + data.full_name) : (data.username || data.full_name || data.email)) : ('(ẩn)');
+  state.userNameCache[userId] = text;
+  return text;
+}
+
+// ── Chọn nguồn tài liệu (radio) ──────────────────────────────────────────
+document.querySelectorAll('input[name="src-type"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const v = document.querySelector('input[name="src-type"]:checked').value;
+    document.getElementById('wrap-noi-bo').style.display = v === 'noi_bo' ? '' : 'none';
+    document.getElementById('wrap-ben-ngoai').style.display = v === 'ben_ngoai' ? '' : 'none';
+  });
+});
+
+// ── Autocomplete tài liệu nội bộ ──────────────────────────────────────────
+let acDebounce;
+const acInput = document.getElementById('ac-input');
+const acList = document.getElementById('ac-list');
+acInput.addEventListener('input', () => {
+  clearDocSelection(false);
+  const q = acInput.value.trim();
+  clearTimeout(acDebounce);
+  if (q.length < 2){ acList.classList.remove('open'); acList.innerHTML = ''; return; }
+  acDebounce = setTimeout(() => searchDocuments(q), 250);
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.autocomplete')) acList.classList.remove('open');
+});
+
+async function searchDocuments(q){
+  const { data, error } = await sb.from('documents')
+    .select('id, ten_tai_lieu, ma_sp')
+    .ilike('ten_tai_lieu', `%${q}%`)
+    .order('ten_tai_lieu')
+    .limit(20);
+  if (error){ acList.innerHTML = `<div class="ac-item">Lỗi: ${escapeHtml(error.message)}</div>`; acList.classList.add('open'); return; }
+  if (!data || !data.length){
+    acList.innerHTML = `<div class="ac-item">Không tìm thấy tài liệu nào.</div>`;
+    acList.classList.add('open');
+    return;
+  }
+  acList.innerHTML = data.map(d => `
+    <div class="ac-item" data-id="${d.id}" data-ten="${escapeHtml(d.ten_tai_lieu)}">
+      ${escapeHtml(d.ten_tai_lieu)}
+      ${d.ma_sp ? `<div class="ac-sub">Mã SP: ${escapeHtml(d.ma_sp)}</div>` : ''}
+    </div>`).join('');
+  acList.classList.add('open');
+  acList.querySelectorAll('.ac-item[data-id]').forEach(item => {
+    item.addEventListener('click', () => {
+      state.selectedDocument = { id: item.dataset.id, ten_tai_lieu: item.dataset.ten };
+      document.getElementById('ac-selected-text').textContent = 'Đã chọn: ' + item.dataset.ten;
+      document.getElementById('ac-selected').classList.add('show');
+      acInput.value = '';
+      acList.classList.remove('open');
+      acList.innerHTML = '';
+    });
+  });
+}
+
+function clearDocSelection(clearInput = true){
+  state.selectedDocument = null;
+  document.getElementById('ac-selected').classList.remove('show');
+  if (clearInput) acInput.value = '';
+}
+
+// ── Dropdown tài liệu bên ngoài đã áp dụng ──────────────────────────────
+async function loadExternalDocs(){
+  const sel = document.getElementById('ext-select');
+  const { data, error } = await sb.from('external_documents')
+    .select('id, ma_goc, ten')
+    .eq('trang_thai', 'ap_dung')
+    .order('ten');
+  if (error){ toast('Không tải được tài liệu bên ngoài: ' + error.message, true); return; }
+  state.externalDocs = data || [];
+  sel.innerHTML = '<option value="">— Chọn tài liệu —</option>' +
+    state.externalDocs.map(d => `<option value="${d.id}">${escapeHtml(d.ma_goc)} — ${escapeHtml(d.ten)}</option>`).join('');
+}
+
+// ── Submit cung cấp ────────────────────────────────────────────────────
+async function submitProvision(){
+  const msg = document.getElementById('fm-msg');
+  msg.style.display = 'none';
+  const srcType = document.querySelector('input[name="src-type"]:checked').value;
+  const nguoiNhan = document.getElementById('nguoi-nhan').value.trim();
+  const donViNhan = document.getElementById('don-vi-nhan').value.trim();
+
+  if (!nguoiNhan){ msg.style.display = 'block'; msg.textContent = 'Cần nhập người nhận.'; return; }
+
+  const payload = {
+    nguoi_nhan: nguoiNhan,
+    don_vi_nhan: donViNhan || null,
+    nguoi_cung_cap: state.session.user.id,
+    document_id: null,
+    external_document_id: null,
+  };
+
+  if (srcType === 'noi_bo'){
+    if (!state.selectedDocument){ msg.style.display = 'block'; msg.textContent = 'Cần chọn tài liệu nội bộ.'; return; }
+    payload.document_id = state.selectedDocument.id;
+  } else {
+    const extId = document.getElementById('ext-select').value;
+    if (!extId){ msg.style.display = 'block'; msg.textContent = 'Cần chọn tài liệu bên ngoài.'; return; }
+    payload.external_document_id = extId;
+  }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  try {
+    const { error } = await sb.from('external_document_provisions').insert(payload);
+    if (error) throw error;
+    toast('Đã ghi nhận cung cấp tài liệu.');
+    document.getElementById('nguoi-nhan').value = '';
+    document.getElementById('don-vi-nhan').value = '';
+    clearDocSelection();
+    document.getElementById('ext-select').value = '';
+    await loadHistory();
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Lịch sử cung cấp ──────────────────────────────────────────────────
+async function loadHistory(){
+  const tbody = document.getElementById('histTbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-hint">Đang tải…</td></tr>';
+
+  const [{ data: rowsNoiBo, error: errA }, { data: rowsBenNgoai, error: errB }] = await Promise.all([
+    sb.from('external_document_provisions')
+      .select('id, nguoi_nhan, don_vi_nhan, thoi_gian, nguoi_cung_cap, document_id, documents(ten_tai_lieu)')
+      .not('document_id', 'is', null),
+    sb.from('external_document_provisions')
+      .select('id, nguoi_nhan, don_vi_nhan, thoi_gian, nguoi_cung_cap, external_document_id, external_documents(ten)')
+      .not('external_document_id', 'is', null),
+  ]);
+  if (errA || errB){ toast('Lỗi tải lịch sử: ' + (errA || errB).message, true); tbody.innerHTML = '<tr><td colspan="6" class="empty-hint">Lỗi tải dữ liệu.</td></tr>'; return; }
+
+  const combined = [
+    ...(rowsNoiBo || []).map(r => ({ ...r, nguon: 'noi_bo', ten: r.documents ? r.documents.ten_tai_lieu : '(đã xoá)' })),
+    ...(rowsBenNgoai || []).map(r => ({ ...r, nguon: 'ben_ngoai', ten: r.external_documents ? r.external_documents.ten : '(đã xoá)' })),
+  ].sort((a, b) => new Date(b.thoi_gian) - new Date(a.thoi_gian));
+
+  if (!combined.length){
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-hint">Chưa có lượt cung cấp nào.</td></tr>';
+    return;
+  }
+
+  const names = await Promise.all(combined.map(r => resolveUserName(r.nguoi_cung_cap)));
+
+  tbody.innerHTML = combined.map((r, i) => `
+    <tr>
+      <td>${escapeHtml(r.ten)}</td>
+      <td><span class="badge ${r.nguon}">${r.nguon === 'noi_bo' ? 'Nội bộ' : 'Bên ngoài'}</span></td>
+      <td>${escapeHtml(r.nguoi_nhan)}</td>
+      <td>${escapeHtml(r.don_vi_nhan) || '—'}</td>
+      <td>${escapeHtml(names[i])}</td>
+      <td>${r.thoi_gian ? new Date(r.thoi_gian).toLocaleString('vi-VN') : '—'}</td>
+    </tr>`).join('');
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  await Promise.all([loadExternalDocs(), loadHistory()]);
+}
+main();
+</script>
+</body>
+</html>

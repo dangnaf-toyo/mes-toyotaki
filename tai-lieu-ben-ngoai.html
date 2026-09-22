@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tài liệu bên ngoài — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  tai-lieu-ben-ngoai.html — T63 "Tài liệu bên ngoài": tiếp nhận bản vẽ/tiêu
+  chuẩn của khách hàng/nhà cung cấp, kiểm bảng kiểm 7 mục, duyệt áp dụng.
+  Bảng: external_documents / external_document_checklist.
+  Quyền: mọi user đăng nhập đọc/ghi trực tiếp (RLS mở), riêng bước "Duyệt áp
+  dụng"/"Từ chối" chỉ hiện với role admin/giam_doc_sx/qc_manager.
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--info-fg:#1D4ED8;--info-bg:#EFF6FF;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-success{background:var(--run-fg);color:#FFF}
+.btn-success:hover:not(:disabled){background:#036049}
+.btn-danger{background:var(--alarm-fg);color:#FFF}
+.btn-danger:hover:not(:disabled){background:#991B1B}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+
+.main{display:flex;gap:6px;flex:1;min-height:0}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0;flex:1}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{flex:1;overflow-y:auto;padding:8px}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:700;padding:6px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-panel)}
+td{padding:7px 8px;border-bottom:1px solid var(--border)}
+tr.doc-row{cursor:pointer}
+tr.doc-row:hover td{background:var(--bg-sunken)}
+.mono{font-family:'JetBrains Mono',monospace;font-weight:600}
+.overdue{color:var(--alarm-fg);font-weight:700}
+.empty-hint{padding:20px;text-align:center;color:var(--text-muted);font-size:12.5px}
+
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em}
+.badge.tiep_nhan{background:var(--bg-sunken);color:var(--text-muted)}
+.badge.dang_kiem{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.cho_duyet{background:var(--info-bg);color:var(--info-fg)}
+.badge.ap_dung{background:var(--run-bg);color:var(--run-fg)}
+.badge.tu_choi{background:var(--alarm-bg);color:var(--alarm-fg)}
+
+.modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.open{display:flex}
+.modal{background:#FFF;border-radius:10px;width:100%;max-width:440px;box-shadow:var(--shadow-lg);overflow:hidden}
+.modal.wide{max-width:640px}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{background:transparent;border:none;font-size:18px;color:var(--text-muted);cursor:pointer}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px;max-height:70vh;overflow-y:auto}
+.field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.field select,.field input{width:100%;padding:7px 9px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12.5px;outline:none}
+.radio-row{display:flex;gap:16px}
+.radio-row label{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text)}
+.modal-foot{padding:12px 18px;background:var(--bg-sunken);border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.msg-inline{font-size:11.5px;color:var(--alarm-fg)}
+
+.detail-info{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg-sunken);border-radius:6px;padding:10px;font-size:12px}
+.detail-info .k{color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+.detail-info .v{font-weight:600}
+.checklist{display:flex;flex-direction:column;gap:8px}
+.chk-item{border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.chk-item .chk-head{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.chk-item input[type=checkbox]{width:16px;height:16px}
+.chk-item input[type=text]{margin-top:0}
+.chk-summary{font-size:11.5px;color:var(--text-muted)}
+.tooltip-hint{font-size:11px;color:var(--warn-fg)}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📥 Tài liệu bên ngoài</div>
+    </div>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Danh sách tài liệu bên ngoài đã tiếp nhận</h2>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="openNewModal()">+ Tiếp nhận tài liệu mới</button>
+      </div>
+      <div class="panel-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Mã gốc</th><th>Tên</th><th>Nguồn</th><th>Mức mật</th><th>Trạng thái</th>
+              <th>Ngày nhận</th><th>Số ngày trôi qua</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="docTbody"><tr><td colspan="8" class="empty-hint">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: tiếp nhận tài liệu mới -->
+<div class="modal-mask" id="modal-new">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Tiếp nhận tài liệu bên ngoài mới</div>
+      <button class="modal-close" onclick="closeNewModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Mã gốc <span style="color:#DC2626">*</span></label>
+        <input type="text" id="nw-ma-goc" placeholder="VD: DWG-1234-Rev.C">
+      </div>
+      <div class="field">
+        <label>Tên tài liệu <span style="color:#DC2626">*</span></label>
+        <input type="text" id="nw-ten" placeholder="VD: Bản vẽ chi tiết trục A">
+      </div>
+      <div class="field">
+        <label>Nguồn (khách hàng / NCC)</label>
+        <input type="text" id="nw-nguon" placeholder="VD: Khách hàng ABC">
+      </div>
+      <div class="field">
+        <label>Mức mật</label>
+        <div class="radio-row">
+          <label><input type="radio" name="nw-muc-mat" value="noi_bo" checked> Nội bộ</label>
+          <label><input type="radio" name="nw-muc-mat" value="mat"> Mật</label>
+        </div>
+      </div>
+      <div class="msg-inline" id="nw-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeNewModal()">Huỷ</button>
+      <button class="btn btn-primary" id="nw-submit" onclick="submitNew()">Tiếp nhận</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: chi tiết + bảng kiểm -->
+<div class="modal-mask" id="modal-detail">
+  <div class="modal wide">
+    <div class="modal-head">
+      <div class="modal-title" id="dt-title">Chi tiết tài liệu bên ngoài</div>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-info" id="dt-info"></div>
+      <div>
+        <div class="field"><label>Bảng kiểm 7 mục</label></div>
+        <div class="checklist" id="dt-checklist"></div>
+        <div class="chk-summary" id="dt-chk-summary"></div>
+      </div>
+      <div class="msg-inline" id="dt-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot" id="dt-actions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+const STATUS_LABELS = { tiep_nhan: 'Tiếp nhận', dang_kiem: 'Đang kiểm', cho_duyet: 'Chờ duyệt', ap_dung: 'Áp dụng', tu_choi: 'Từ chối' };
+const MUC_MAT_LABELS = { noi_bo: 'Nội bộ', mat: 'Mật' };
+
+const state = {
+  session: null,
+  canApprove: false,
+  documents: [],
+  p9: 7,
+  currentDetail: null,     // external_document row đang mở
+  currentChecklist: [],    // 7 dòng checklist đang mở
+};
+
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+
+function daysSince(dateStr){
+  if (!dateStr) return null;
+  const d0 = new Date(dateStr + 'T00:00:00');
+  const d1 = new Date(); d1.setHours(0,0,0,0);
+  return Math.round((d1 - d0) / 86400000);
+}
+
+async function loadDocuments(){
+  const tbody = document.getElementById('docTbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="empty-hint">Đang tải…</td></tr>';
+  const { data, error } = await sb.from('external_documents')
+    .select('id, ma_goc, ten, nguon, muc_mat, trang_thai, ngay_nhan, ngay_ap_dung')
+    .order('created_at', { ascending: false });
+  if (error){ toast('Không tải được danh sách: ' + error.message, true); tbody.innerHTML = '<tr><td colspan="8" class="empty-hint">Lỗi tải dữ liệu.</td></tr>'; return; }
+  state.documents = data || [];
+  renderDocuments();
+}
+
+function renderDocuments(){
+  const tbody = document.getElementById('docTbody');
+  if (!state.documents.length){
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-hint">Chưa có tài liệu bên ngoài nào.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = state.documents.map(d => {
+    const soNgay = daysSince(d.ngay_nhan);
+    const overdue = d.trang_thai !== 'ap_dung' && d.trang_thai !== 'tu_choi' && soNgay !== null && soNgay > state.p9;
+    return `
+    <tr class="doc-row" data-id="${d.id}">
+      <td class="mono">${escapeHtml(d.ma_goc)}</td>
+      <td>${escapeHtml(d.ten)}</td>
+      <td>${escapeHtml(d.nguon) || '—'}</td>
+      <td>${MUC_MAT_LABELS[d.muc_mat] || d.muc_mat}</td>
+      <td><span class="badge ${d.trang_thai}">${STATUS_LABELS[d.trang_thai] || d.trang_thai}</span></td>
+      <td>${d.ngay_nhan ? new Date(d.ngay_nhan + 'T00:00:00').toLocaleDateString('vi-VN') : '—'}</td>
+      <td class="${overdue ? 'overdue' : ''}">${soNgay === null ? '—' : soNgay + ' ngày' + (overdue ? ' (quá hạn P9)' : '')}</td>
+      <td><button type="button" class="btn-outline" data-view="${d.id}">Xem chi tiết</button></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('[data-view]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openDetailModal(btn.dataset.view); });
+  });
+  tbody.querySelectorAll('.doc-row').forEach(row => {
+    row.addEventListener('click', () => openDetailModal(row.dataset.id));
+  });
+}
+
+// ── Modal: tiếp nhận tài liệu mới ────────────────────────────────────────
+function openNewModal(){
+  document.getElementById('nw-ma-goc').value = '';
+  document.getElementById('nw-ten').value = '';
+  document.getElementById('nw-nguon').value = '';
+  document.querySelector('input[name="nw-muc-mat"][value="noi_bo"]').checked = true;
+  document.getElementById('nw-msg').style.display = 'none';
+  document.getElementById('modal-new').classList.add('open');
+}
+function closeNewModal(){ document.getElementById('modal-new').classList.remove('open'); }
+
+async function submitNew(){
+  const maGoc = document.getElementById('nw-ma-goc').value.trim();
+  const ten = document.getElementById('nw-ten').value.trim();
+  const nguon = document.getElementById('nw-nguon').value.trim();
+  const mucMat = document.querySelector('input[name="nw-muc-mat"]:checked').value;
+  const msg = document.getElementById('nw-msg');
+  if (!maGoc || !ten){ msg.style.display = 'block'; msg.textContent = 'Cần nhập mã gốc và tên tài liệu.'; return; }
+  const btn = document.getElementById('nw-submit');
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.from('external_documents').insert({
+      ma_goc: maGoc, ten, nguon: nguon || null, muc_mat: mucMat,
+      created_by: state.session.user.id,
+    }).select('id').single();
+    if (error) throw error;
+    const { error: seedErr } = await sb.rpc('external_document_seed_checklist', { p_external_document_id: data.id });
+    if (seedErr) throw seedErr;
+    toast('Đã tiếp nhận tài liệu ' + maGoc);
+    closeNewModal();
+    await loadDocuments();
+    openDetailModal(data.id);
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Modal: chi tiết + bảng kiểm ───────────────────────────────────────────
+async function openDetailModal(id){
+  document.getElementById('dt-msg').style.display = 'none';
+  document.getElementById('modal-detail').classList.add('open');
+  document.getElementById('dt-info').innerHTML = '<div class="empty-hint">Đang tải…</div>';
+  document.getElementById('dt-checklist').innerHTML = '';
+  document.getElementById('dt-actions').innerHTML = '';
+
+  const [{ data: doc, error: docErr }, { data: checklist, error: chkErr }] = await Promise.all([
+    sb.from('external_documents').select('*').eq('id', id).single(),
+    sb.from('external_document_checklist').select('*').eq('external_document_id', id).order('id'),
+  ]);
+  if (docErr || chkErr){ toast('Lỗi tải chi tiết: ' + (docErr || chkErr).message, true); closeDetailModal(); return; }
+
+  state.currentDetail = doc;
+  state.currentChecklist = checklist || [];
+  document.getElementById('dt-title').textContent = doc.ma_goc + ' — ' + doc.ten;
+  renderDetailInfo();
+  renderChecklist();
+  renderDetailActions();
+}
+function closeDetailModal(){ document.getElementById('modal-detail').classList.remove('open'); state.currentDetail = null; state.currentChecklist = []; }
+
+function renderDetailInfo(){
+  const d = state.currentDetail;
+  document.getElementById('dt-info').innerHTML = `
+    <div><div class="k">Mã gốc</div><div class="v">${escapeHtml(d.ma_goc)}</div></div>
+    <div><div class="k">Trạng thái</div><div class="v"><span class="badge ${d.trang_thai}">${STATUS_LABELS[d.trang_thai] || d.trang_thai}</span></div></div>
+    <div><div class="k">Nguồn</div><div class="v">${escapeHtml(d.nguon) || '—'}</div></div>
+    <div><div class="k">Mức mật</div><div class="v">${MUC_MAT_LABELS[d.muc_mat] || d.muc_mat}</div></div>
+    <div><div class="k">Ngày nhận</div><div class="v">${d.ngay_nhan ? new Date(d.ngay_nhan + 'T00:00:00').toLocaleDateString('vi-VN') : '—'}</div></div>
+    <div><div class="k">Ngày áp dụng</div><div class="v">${d.ngay_ap_dung ? new Date(d.ngay_ap_dung + 'T00:00:00').toLocaleDateString('vi-VN') : '—'}</div></div>
+  `;
+}
+
+function renderChecklist(){
+  const box = document.getElementById('dt-checklist');
+  const editable = state.currentDetail.trang_thai === 'dang_kiem' || state.currentDetail.trang_thai === 'tiep_nhan';
+  box.innerHTML = state.currentChecklist.map((c, i) => `
+    <div class="chk-item">
+      <div class="chk-head">
+        <input type="checkbox" data-chk-id="${c.id}" ${c.dat ? 'checked' : ''} ${editable ? '' : 'disabled'}>
+        <span>${i + 1}. ${escapeHtml(c.muc)}</span>
+      </div>
+      <input type="text" placeholder="Ghi chú…" data-chk-note="${c.id}" value="${escapeHtml(c.ghi_chu) || ''}" ${editable ? '' : 'disabled'}>
+    </div>
+  `).join('');
+
+  const chuaDat = state.currentChecklist.filter(c => !c.dat).length;
+  document.getElementById('dt-chk-summary').textContent = chuaDat === 0
+    ? 'Đủ 7/7 mục đạt.'
+    : `Còn ${chuaDat} mục chưa đạt / ${state.currentChecklist.length} mục.`;
+
+  if (!editable) return;
+  box.querySelectorAll('[data-chk-id]').forEach(cb => {
+    cb.addEventListener('change', () => saveChecklistItem(cb.dataset.chkId, cb.checked, box.querySelector(`[data-chk-note="${cb.dataset.chkId}"]`).value));
+  });
+  box.querySelectorAll('[data-chk-note]').forEach(inp => {
+    inp.addEventListener('change', () => saveChecklistItem(inp.dataset.chkNote, box.querySelector(`[data-chk-id="${inp.dataset.chkNote}"]`).checked, inp.value));
+  });
+}
+
+async function saveChecklistItem(id, dat, ghiChu){
+  const { error } = await sb.from('external_document_checklist').update({ dat, ghi_chu: ghiChu || null }).eq('id', id);
+  if (error){ toast('Lỗi lưu bảng kiểm: ' + error.message, true); return; }
+  const item = state.currentChecklist.find(c => String(c.id) === String(id));
+  if (item){ item.dat = dat; item.ghi_chu = ghiChu; }
+  renderChecklist();
+  renderDetailActions();
+}
+
+function renderDetailActions(){
+  const box = document.getElementById('dt-actions');
+  const d = state.currentDetail;
+  const chuaDat = state.currentChecklist.filter(c => !c.dat).length;
+  let html = '';
+
+  if (d.trang_thai === 'tiep_nhan'){
+    html += `<button type="button" class="btn btn-primary" id="act-bat-dau-kiem">Bắt đầu kiểm</button>`;
+  } else if (d.trang_thai === 'dang_kiem'){
+    if (chuaDat === 0){
+      html += `<button type="button" class="btn btn-primary" id="act-gui-duyet">Gửi duyệt áp dụng</button>`;
+    } else {
+      html += `<span class="tooltip-hint">Còn ${chuaDat} mục chưa đạt — cần đủ 7/7 mục mới gửi duyệt được.</span>
+                <button type="button" class="btn btn-primary" disabled title="Còn ${chuaDat} mục chưa đạt">Gửi duyệt áp dụng</button>`;
+    }
+  } else if (d.trang_thai === 'cho_duyet' && state.canApprove){
+    html += `<button type="button" class="btn btn-danger" id="act-tu-choi">Từ chối</button>
+              <button type="button" class="btn btn-success" id="act-duyet">Duyệt áp dụng</button>`;
+  } else if (d.trang_thai === 'cho_duyet' && !state.canApprove){
+    html += `<span class="tooltip-hint">Đang chờ admin / giám đốc SX / QC manager duyệt.</span>`;
+  }
+
+  html += `<button type="button" class="btn-outline" onclick="closeDetailModal()">Đóng</button>`;
+  box.innerHTML = html;
+
+  const btnStart = document.getElementById('act-bat-dau-kiem');
+  if (btnStart) btnStart.addEventListener('click', () => changeStatus('dang_kiem'));
+  const btnSubmit = document.getElementById('act-gui-duyet');
+  if (btnSubmit) btnSubmit.addEventListener('click', () => changeStatus('cho_duyet'));
+  const btnApprove = document.getElementById('act-duyet');
+  if (btnApprove) btnApprove.addEventListener('click', () => approveOrReject(true));
+  const btnReject = document.getElementById('act-tu-choi');
+  if (btnReject) btnReject.addEventListener('click', () => approveOrReject(false));
+}
+
+async function changeStatus(newStatus){
+  const msg = document.getElementById('dt-msg');
+  msg.style.display = 'none';
+  const { error } = await sb.from('external_documents').update({ trang_thai: newStatus }).eq('id', state.currentDetail.id);
+  if (error){ msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + error.message; return; }
+  state.currentDetail.trang_thai = newStatus;
+  toast('Đã chuyển trạng thái sang "' + (STATUS_LABELS[newStatus] || newStatus) + '"');
+  renderDetailInfo();
+  renderChecklist();
+  renderDetailActions();
+  loadDocuments();
+}
+
+async function approveOrReject(dongY){
+  const msg = document.getElementById('dt-msg');
+  msg.style.display = 'none';
+  const update = dongY
+    ? { trang_thai: 'ap_dung', ngay_ap_dung: new Date().toISOString().slice(0, 10) }
+    : { trang_thai: 'tu_choi' };
+  const { error } = await sb.from('external_documents').update(update).eq('id', state.currentDetail.id);
+  if (error){ msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + error.message; return; }
+  Object.assign(state.currentDetail, update);
+  toast(dongY ? 'Đã duyệt áp dụng' : 'Đã từ chối');
+  renderDetailInfo();
+  renderDetailActions();
+  loadDocuments();
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  const [{ data: myRole }, { data: p9 }] = await Promise.all([
+    sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle(),
+    sb.rpc('document_get_param', { p_ma: 'P9' }),
+  ]);
+  state.canApprove = !!(myRole && ['admin', 'giam_doc_sx', 'qc_manager'].includes(myRole.role));
+  if (typeof p9 === 'number' && p9 > 0) state.p9 = p9;
+  await loadDocuments();
+}
+main();
+</script>
+</body>
+</html>
