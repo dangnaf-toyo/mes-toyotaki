@@ -1115,7 +1115,6 @@ function buildKanbanLabelSvg(d){
   s += '<text x="15" y="9.6" font-family="Arial,Helvetica,sans-serif" font-size="4.4" font-weight="bold" fill="'+fg+'">TEM CHỈ THỊ SẢN XUẤT'+(dark ? ' — PHÁT TRIỂN' : '')+'</text>';
   s += '<line x1="3" y1="14" x2="'+(W-3)+'" y2="14" stroke="'+fg+'" stroke-width="0.35"/>';
   s += '<line x1="'+divX+'" y1="15.5" x2="'+divX+'" y2="'+(H-3)+'" stroke="'+fg+'" stroke-width="0.35"/>';
-  s += buildShapeIcon('circle', W-9, 3, 6, fg); // icon tròn = công đoạn Đúc
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
     var lblSize = r.big ? 3.0 : 2.7;
@@ -1126,7 +1125,10 @@ function buildKanbanLabelSvg(d){
     s += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.lbl)+'</text>';
     s += '<text x="23" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
   });
-  var qrSize = 34, cx = divX + (W - divX)/2, qrX = cx - qrSize/2, qrY = 17;
+  // QR nhỏ hơn trước (chỉ còn nhúng tag_no nên không cần version lớn) — nhường
+  // 8mm phía trên trong cột phải để đặt icon công đoạn ngay trên góc QR.
+  var qrSize = 30, cx = divX + (W - divX)/2, qrX = cx - qrSize/2, qrY = 25;
+  s += buildShapeIcon('circle', cx-3, 17, 6, fg); // icon tròn = công đoạn Đúc, ngay trên QR
   if (dark){
     s += '<rect x="'+(qrX-1.6)+'" y="'+(qrY-1.6)+'" width="'+(qrSize+3.2)+'" height="'+(qrSize+3.2)+'" fill="#ffffff"/>';
   }
@@ -1370,7 +1372,6 @@ function buildTpLabelSvg(d){
   s += '<text x="'+headCenterX.toFixed(2)+'" y="9" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
   s += '<text x="'+headCenterX.toFixed(2)+'" y="13.6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.4" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
   s += '<line x1="3" y1="17" x2="'+(W-3)+'" y2="17" stroke="#000" stroke-width="0.35"/>';
-  s += buildShapeIcon('triangle', W-9, 2, 6, '#000'); // icon tam giác = tem Thành phẩm
 
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
@@ -1385,6 +1386,9 @@ function buildTpLabelSvg(d){
 
   // QR lấp đầy toàn bộ cột phải (không còn ô số liệu SL/Ngày SX ở trên nữa)
   var qrSize = W - divX - 6, qrX = divX + 3, qrY = H - 3 - qrSize;
+  // Cột phải phía trên QR (từ vạch ngang y=17 tới đỉnh QR) đang trống — đặt
+  // icon công đoạn ngay trên góc trái QR.
+  s += buildShapeIcon('triangle', qrX, 19, 8, '#000'); // icon tam giác = tem Thành phẩm
   s += '<g transform="translate('+qrX.toFixed(2)+','+qrY.toFixed(2)+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
 
   s += '</svg>';
@@ -1573,7 +1577,6 @@ function buildLabelSvg(d){
   svg += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'"/>';
   svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="'+fg+'">TEM SẢN PHẨM'+(dark ? ' — ĐANG PHÁT TRIỂN' : '')+'</text>';
   svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="'+fg+'" stroke-width="0.3"/>';
-  svg += buildShapeIcon('circle', W-11, 4, 7, fg); // icon tròn = công đoạn Đúc
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
     var lblSize = r.big ? 3.0 : 2.6;
@@ -1590,6 +1593,7 @@ function buildLabelSvg(d){
     svg += '<rect x="'+(qrX-1.5)+'" y="'+(qrY-1.5)+'" width="'+(qrSize+3)+'" height="'+(qrSize+3)+'" fill="#ffffff"/>';
   }
   svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
+  svg += buildShapeIcon('circle', qrX+qrSize+2, qrY, 7, fg); // icon tròn = công đoạn Đúc, cạnh góc trên QR
   svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="'+fg+'" stroke-width="0.3"/>';
   svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+ftrSize+'" font-weight="bold" fill="'+fg+'">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
   svg += "</g></svg>";
