@@ -36,11 +36,6 @@
       { label: 'In tem', href: 'intem.html' },
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
       { label: 'Kế hoạch bảo dưỡng khuôn', href: 'bao-duong-khuon-tuan.html' },
-      { label: 'Tài liệu kỹ thuật', href: 'tai-lieu-danh-muc.html' },
-      { label: 'Tài liệu hệ thống (QM/QP/WI/Biểu mẫu)', href: 'tai-lieu-he-thong.html' },
-      { label: 'Phiếu thay đổi tài liệu', href: 'danh-sach-phieu-thay-doi.html' },
-      { label: 'Tài liệu bên ngoài', href: 'tai-lieu-ben-ngoai.html' },
-      { label: 'Cung cấp tài liệu ra ngoài', href: 'cung-cap-tai-lieu-ra-ngoai.html' },
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html' },
       { label: 'Đóng gói Pallet', href: 'oqc.html' },
       { label: 'Báo cáo cuối ca công đoạn', href: 'cong-doan-bao-cao-ca.html' },
@@ -58,12 +53,19 @@
       { label: 'Truy xuất nguồn gốc', href: 'truy-xuat-nguon-goc.html' },
       { label: 'Tra cứu tem đã in', href: 'tra-cuu-tem.html' },
     ] },
+    { label: 'QMS · Tài liệu', items: [
+      { label: 'Tài liệu kỹ thuật', href: 'tai-lieu-danh-muc.html' },
+      { label: 'Tài liệu hệ thống (QM/QP/WI/Biểu mẫu)', href: 'tai-lieu-he-thong.html' },
+      { label: 'Phiếu thay đổi tài liệu', href: 'danh-sach-phieu-thay-doi.html' },
+      { label: 'Tài liệu bên ngoài', href: 'tai-lieu-ben-ngoai.html' },
+      { label: 'Cung cấp tài liệu ra ngoài', href: 'cung-cap-tai-lieu-ra-ngoai.html' },
+      { label: 'Cấu hình kiểm soát tài liệu', href: 'cau-hinh-tai-lieu.html' },
+    ] },
   ];
   const ADMIN_MENU = { label: 'Quản trị', items: [
     { label: 'Tài khoản', href: 'quan-ly-tai-khoan.html' },
     { label: 'Danh mục', href: 'quan-ly-danh-muc.html' },
     { label: 'Năng lực máy CNC', href: 'nang-luc-cnc.html' },
-    { label: 'Cấu hình kiểm soát tài liệu', href: 'cau-hinh-tai-lieu.html' },
   ] };
 
   // Tiêu đề chuẩn hoá cho từng trang — 1 nguồn duy nhất, thay cho header tự
