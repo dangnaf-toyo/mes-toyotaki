@@ -1125,10 +1125,7 @@ function buildKanbanLabelSvg(d){
     s += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.lbl)+'</text>';
     s += '<text x="23" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
   });
-  // QR nhỏ hơn trước (chỉ còn nhúng tag_no nên không cần version lớn) — nhường
-  // 8mm phía trên trong cột phải để đặt icon công đoạn ngay trên góc QR.
-  var qrSize = 30, cx = divX + (W - divX)/2, qrX = cx - qrSize/2, qrY = 25;
-  s += buildShapeIcon('circle', cx-3, 17, 6, fg); // icon tròn = công đoạn Đúc, ngay trên QR
+  var qrSize = 34, cx = divX + (W - divX)/2, qrX = cx - qrSize/2, qrY = 17;
   if (dark){
     s += '<rect x="'+(qrX-1.6)+'" y="'+(qrY-1.6)+'" width="'+(qrSize+3.2)+'" height="'+(qrSize+3.2)+'" fill="#ffffff"/>';
   }
@@ -1386,9 +1383,6 @@ function buildTpLabelSvg(d){
 
   // QR lấp đầy toàn bộ cột phải (không còn ô số liệu SL/Ngày SX ở trên nữa)
   var qrSize = W - divX - 6, qrX = divX + 3, qrY = H - 3 - qrSize;
-  // Cột phải phía trên QR (từ vạch ngang y=17 tới đỉnh QR) đang trống — đặt
-  // icon công đoạn ngay trên góc trái QR.
-  s += buildShapeIcon('triangle', qrX, 19, 8, '#000'); // icon tam giác = tem Thành phẩm
   s += '<g transform="translate('+qrX.toFixed(2)+','+qrY.toFixed(2)+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
 
   s += '</svg>';
@@ -1522,22 +1516,6 @@ function svgEsc(s){
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-// Icon hình dạng phân biệt công đoạn bằng mắt thường trên tem (không nhúng
-// vào QR) — đặt cố định ở góc trên-phải mỗi tem. x,y là góc trên-trái của ô
-// vuông bao icon (kích thước size x size), color tô đặc hình.
-function buildShapeIcon(shape, x, y, size, color){
-  var cx = x + size/2, cy = y + size/2;
-  if (shape === 'circle'){
-    return '<circle cx="'+cx.toFixed(2)+'" cy="'+cy.toFixed(2)+'" r="'+(size/2).toFixed(2)+'" fill="'+color+'"/>';
-  }
-  if (shape === 'triangle'){
-    var p1x=cx, p1y=y, p2x=x, p2y=y+size, p3x=x+size, p3y=y+size;
-    return '<polygon points="'+p1x.toFixed(2)+','+p1y.toFixed(2)+' '+p2x.toFixed(2)+','+p2y.toFixed(2)+' '+p3x.toFixed(2)+','+p3y.toFixed(2)+'" fill="'+color+'"/>';
-  }
-  // square (mặc định)
-  return '<rect x="'+x.toFixed(2)+'" y="'+y.toFixed(2)+'" width="'+size.toFixed(2)+'" height="'+size.toFixed(2)+'" fill="'+color+'"/>';
-}
-
 function buildLabelSvg(d){
   var W=72, H=100; // toạ độ thiết kế gốc của tem — giữ nguyên layout, chỉ scale khi in ra khổ A6
   var PW=105, PH=148; // khổ giấy in thực tế — A6
@@ -1593,7 +1571,6 @@ function buildLabelSvg(d){
     svg += '<rect x="'+(qrX-1.5)+'" y="'+(qrY-1.5)+'" width="'+(qrSize+3)+'" height="'+(qrSize+3)+'" fill="#ffffff"/>';
   }
   svg += '<g transform="translate('+qrX+','+qrY+')">'+buildQrRects(d.qr, qrSize, '#ffffff', '#000000')+'</g>';
-  svg += buildShapeIcon('circle', qrX+qrSize+2, qrY, 7, fg); // icon tròn = công đoạn Đúc, cạnh góc trên QR
   svg += '<line x1="4" y1="'+ftrLineY+'" x2="'+(W-4)+'" y2="'+ftrLineY+'" stroke="'+fg+'" stroke-width="0.3"/>';
   svg += '<text x="'+(W/2)+'" y="'+ftrTextY+'" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+ftrSize+'" font-weight="bold" fill="'+fg+'">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
   svg += "</g></svg>";
