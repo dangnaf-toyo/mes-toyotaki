@@ -724,9 +724,11 @@ async function tachTem(){
     var r = conData[0];
     var ngayISO = String(r.ngay || "");
     var parts = ngayISO.split("-");
-    var ngayQR = parts.length === 3 ? (parts[0]+"/"+parts[1]+"/"+parts[2]) : ngayISO;
     var ngayHienThi = parts.length === 3 ? (parts[2]+"/"+parts[1]+"/"+parts[0]) : ngayISO;
-    var qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, r.lot || ngayHienThi, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join(">\n");
+    // QR chỉ nhúng tag_no — mọi màn hình quét đều tra lại dữ liệu mới nhất từ
+    // DB theo tag_no, các trường khác trong QR trước đây không hề được dùng
+    // lại nên bỏ hẳn để giảm mật độ module QR (dễ đọc hơn khi in 8 tem/A4).
+    var qr = r.tag_no;
     openPrint({
       ok: true, tagNo: r.tag_no, qr: qr, ngay: ngayHienThi, tenSP: r.ten_sp, maSP: r.ma_sp,
       soLuong: r.so_luong, lotNo: r.lot || ngayHienThi, soKhuon: r.so_khuon || "", nguyenLieu: r.nguyen_lieu || "",
@@ -747,10 +749,9 @@ async function reprintTem(){
 
   var ngayISO = String(r.ngay || "");
   var parts = ngayISO.split("-");
-  var ngayQR = parts.length === 3 ? (parts[0]+"/"+parts[1]+"/"+parts[2]) : ngayISO;
   var ngayHienThi = parts.length === 3 ? (parts[2]+"/"+parts[1]+"/"+parts[0]) : ngayISO;
   var lotNo = r.lot || ngayHienThi;
-  var qr = [r.tag_no, r.ten_sp, r.ma_sp, r.so_luong, ngayQR, lotNo, r.so_khuon, r.nguyen_lieu, r.may_duc_chi_thi].join(">\n");
+  var qr = r.tag_no; // chỉ tag_no — xem ghi chú trong tachTem()
 
   var d = {
     ok: true, tagNo: r.tag_no, qr: qr, ngay: ngayHienThi,
@@ -1061,15 +1062,12 @@ function renderKanbanBatch(lo, tems){
 }
 
 /** 1 phần tử tems (từ duc_tao_lo_kanban) -> object cho buildKanbanLabelSvg.
-    Chuỗi QR giữ đúng format hiện hành: tag_no>ten_sp>ma_sp>so_luong>YYYY/MM/DD>lot>
-    so_khuon>nguyen_lieu>may_duc_chi_thi ; lot = chuỗi ngày "YYYY-MM-DD" (khớp
-    duc_tao_lo_kanban: lot = p_ngay::text). */
+    QR chỉ nhúng tag_no (xem ghi chú trong tachTem()). */
 function kanbanTemToPrintData(t){
   var ngayISO = String(t.ngay || '');
   var p = ngayISO.split('-');
-  var ngayQR = p.length === 3 ? (p[0] + '/' + p[1] + '/' + p[2]) : ngayISO;
   var ngayHienThi = p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : ngayISO;
-  var qr = [t.tag_no, t.ten_sp, t.ma_sp, t.so_luong, ngayQR, ngayISO, t.so_khuon, t.nguyen_lieu, t.may_duc_chi_thi].join('>\n');
+  var qr = t.tag_no;
   return {
     ok: true, tagNo: t.tag_no, qr: qr, ngayChiThi: ngayHienThi,
     tenSP: t.ten_sp, maSP: t.ma_sp, soLuong: t.so_luong,
@@ -1117,6 +1115,7 @@ function buildKanbanLabelSvg(d){
   s += '<text x="15" y="9.6" font-family="Arial,Helvetica,sans-serif" font-size="4.4" font-weight="bold" fill="'+fg+'">TEM CHỈ THỊ SẢN XUẤT'+(dark ? ' — PHÁT TRIỂN' : '')+'</text>';
   s += '<line x1="3" y1="14" x2="'+(W-3)+'" y2="14" stroke="'+fg+'" stroke-width="0.35"/>';
   s += '<line x1="'+divX+'" y1="15.5" x2="'+divX+'" y2="'+(H-3)+'" stroke="'+fg+'" stroke-width="0.35"/>';
+  s += buildShapeIcon('circle', W-9, 3, 6, fg); // icon tròn = công đoạn Đúc
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
     var lblSize = r.big ? 3.0 : 2.7;
@@ -1320,14 +1319,10 @@ function renderTpBatch(lo, tems){
 }
 
 /** 1 phần tử tems (từ cd_tao_lo_tem_thanh_pham) -> object cho buildTpLabelSvg.
-    QR: tag_no>ten_sp>ma_sp>so_luong>dd/mm/yyyy>yyyy-mm-dd>ma_sp_khach_hang>
-    ten_khach_hang — 6 trường đầu cùng vị trí với QR tem Kanban Đúc. KHÔNG có
-    người kiểm (chưa xác định lúc in — chọn lúc quét ghi nhận thùng). */
+    QR chỉ nhúng tag_no (xem ghi chú trong tachTem()). KHÔNG có người kiểm
+    (chưa xác định lúc in — chọn lúc quét ghi nhận thùng). */
 function tpTemToPrintData(t){
-  var ngayISO = String(t.ngay || '');
-  var p = ngayISO.split('-');
-  var ngayQR = p.length === 3 ? (p[0] + '/' + p[1] + '/' + p[2]) : ngayISO;
-  var qr = [t.tag_no, t.ten_sp, t.ma_sp, t.so_luong, ngayQR, ngayISO, t.ma_sp_khach_hang || '', t.ten_khach_hang || ''].join('>\n');
+  var qr = t.tag_no;
   return {
     ok: true, tagNo: t.tag_no, qr: qr,
     tenSP: t.ten_sp, maSP: t.ma_sp, soLuong: t.so_luong,
@@ -1375,6 +1370,7 @@ function buildTpLabelSvg(d){
   s += '<text x="'+headCenterX.toFixed(2)+'" y="9" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="bold" fill="#000">TEM THÀNH PHẨM</text>';
   s += '<text x="'+headCenterX.toFixed(2)+'" y="13.6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="2.4" font-weight="bold" fill="#000">CÔNG TY CỔ PHẦN CÔNG NGHIỆP TOYOTAKI</text>';
   s += '<line x1="3" y1="17" x2="'+(W-3)+'" y2="17" stroke="#000" stroke-width="0.35"/>';
+  s += buildShapeIcon('triangle', W-9, 2, 6, '#000'); // icon tam giác = tem Thành phẩm
 
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
@@ -1447,7 +1443,6 @@ async function inTem(){
   var pad2 = n => String(n).padStart(2,"0");
   var ngayISO = now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate());
   var ngay = pad2(now.getDate())+"/"+pad2(now.getMonth()+1)+"/"+now.getFullYear();
-  var ngayQR = now.getFullYear()+"/"+pad2(now.getMonth()+1)+"/"+pad2(now.getDate());
   var lotNoInput = g("lotNo");
   var lotNo = lotNoInput ? lotNoInput.split("-").reverse().join("/") : ngay;
   var tenSP = g("tenSP"), soKhuon = g("soKhuon"), nguyenLieu = g("nguyenLieu"), ghiChu = g("ghiChu");
@@ -1462,7 +1457,7 @@ async function inTem(){
     setBtn(false);
     if (error) { err("Lỗi server: " + error.message); return; }
 
-    var qr = [tagNo, tenSP, ma, sl, ngayQR, lotNoInput || ngay, soKhuon, nguyenLieu, may].join(">\n");
+    var qr = tagNo; // chỉ tag_no — xem ghi chú trong tachTem()
     var d = { tagNo: tagNo, qr: qr, ngay: ngay, tenSP: tenSP, maSP: ma, soLuong: sl,
               lotNo: lotNoInput || ngay, soKhuon: soKhuon, nguyenLieu: nguyenLieu,
               mayDuc: may, nguoiTT: nguoi, ghiChu: ghiChu, loaiSP: loai };
@@ -1523,6 +1518,22 @@ function svgEsc(s){
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+// Icon hình dạng phân biệt công đoạn bằng mắt thường trên tem (không nhúng
+// vào QR) — đặt cố định ở góc trên-phải mỗi tem. x,y là góc trên-trái của ô
+// vuông bao icon (kích thước size x size), color tô đặc hình.
+function buildShapeIcon(shape, x, y, size, color){
+  var cx = x + size/2, cy = y + size/2;
+  if (shape === 'circle'){
+    return '<circle cx="'+cx.toFixed(2)+'" cy="'+cy.toFixed(2)+'" r="'+(size/2).toFixed(2)+'" fill="'+color+'"/>';
+  }
+  if (shape === 'triangle'){
+    var p1x=cx, p1y=y, p2x=x, p2y=y+size, p3x=x+size, p3y=y+size;
+    return '<polygon points="'+p1x.toFixed(2)+','+p1y.toFixed(2)+' '+p2x.toFixed(2)+','+p2y.toFixed(2)+' '+p3x.toFixed(2)+','+p3y.toFixed(2)+'" fill="'+color+'"/>';
+  }
+  // square (mặc định)
+  return '<rect x="'+x.toFixed(2)+'" y="'+y.toFixed(2)+'" width="'+size.toFixed(2)+'" height="'+size.toFixed(2)+'" fill="'+color+'"/>';
+}
+
 function buildLabelSvg(d){
   var W=72, H=100; // toạ độ thiết kế gốc của tem — giữ nguyên layout, chỉ scale khi in ra khổ A6
   var PW=105, PH=148; // khổ giấy in thực tế — A6
@@ -1562,6 +1573,7 @@ function buildLabelSvg(d){
   svg += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'"/>';
   svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="'+fg+'">TEM SẢN PHẨM'+(dark ? ' — ĐANG PHÁT TRIỂN' : '')+'</text>';
   svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="'+fg+'" stroke-width="0.3"/>';
+  svg += buildShapeIcon('circle', W-11, 4, 7, fg); // icon tròn = công đoạn Đúc
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
     var lblSize = r.big ? 3.0 : 2.6;
