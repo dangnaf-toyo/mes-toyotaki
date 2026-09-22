@@ -37,6 +37,10 @@
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
       { label: 'Kế hoạch bảo dưỡng khuôn', href: 'bao-duong-khuon-tuan.html' },
       { label: 'Tài liệu kỹ thuật', href: 'tai-lieu-danh-muc.html' },
+      { label: 'Tài liệu hệ thống (QM/QP/WI/Biểu mẫu)', href: 'tai-lieu-he-thong.html' },
+      { label: 'Phiếu thay đổi tài liệu', href: 'danh-sach-phieu-thay-doi.html' },
+      { label: 'Tài liệu bên ngoài', href: 'tai-lieu-ben-ngoai.html' },
+      { label: 'Cung cấp tài liệu ra ngoài', href: 'cung-cap-tai-lieu-ra-ngoai.html' },
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html' },
       { label: 'Đóng gói Pallet', href: 'oqc.html' },
       { label: 'Báo cáo cuối ca công đoạn', href: 'cong-doan-bao-cao-ca.html' },
@@ -59,6 +63,7 @@
     { label: 'Tài khoản', href: 'quan-ly-tai-khoan.html' },
     { label: 'Danh mục', href: 'quan-ly-danh-muc.html' },
     { label: 'Năng lực máy CNC', href: 'nang-luc-cnc.html' },
+    { label: 'Cấu hình kiểm soát tài liệu', href: 'cau-hinh-tai-lieu.html' },
   ] };
 
   // Tiêu đề chuẩn hoá cho từng trang — 1 nguồn duy nhất, thay cho header tự
@@ -90,6 +95,13 @@
     'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin', noTitleBar: true },
     'tai-lieu-danh-muc.html': { icon: '📁', title: 'Quản lý tài liệu kỹ thuật', desc: 'Bản vẽ, khuôn/jig, đồ gá, dưỡng kiểm, QCP, tiêu chuẩn — theo mã SP', noTitleBar: true },
     'tai-lieu-chi-tiet.html': { icon: '📄', title: 'Chi tiết tài liệu kỹ thuật', desc: 'Xem view-only, tải bản gốc CAD (nếu có quyền), quản lý phiên bản', noTitleBar: true },
+    'tai-lieu-he-thong.html': { icon: '📘', title: 'Tài liệu hệ thống', desc: 'Sổ tay chất lượng, thủ tục, phương pháp/tiêu chuẩn, biểu mẫu — theo cấp 1-4', noTitleBar: true },
+    'phieu-thay-doi-tai-lieu.html': { icon: '📝', title: 'Lập phiếu thay đổi tài liệu', desc: 'Tạo mới / sửa đổi / huỷ tài liệu — tự tính tầng rủi ro A/B/C', noTitleBar: true },
+    'phieu-thay-doi-chi-tiet.html': { icon: '📝', title: 'Chi tiết phiếu thay đổi tài liệu', desc: 'Xác nhận theo bộ phận, duyệt theo tầng, phát hành', noTitleBar: true },
+    'danh-sach-phieu-thay-doi.html': { icon: '📋', title: 'Phiếu thay đổi tài liệu', desc: 'Việc của tôi, toàn bộ phiếu theo tầng/trạng thái', noTitleBar: true },
+    'tai-lieu-ben-ngoai.html': { icon: '📥', title: 'Tài liệu bên ngoài', desc: 'Tiếp nhận, bảng kiểm 7 mục, duyệt áp dụng', noTitleBar: true },
+    'cung-cap-tai-lieu-ra-ngoai.html': { icon: '📤', title: 'Cung cấp tài liệu ra ngoài', desc: 'Ghi nhận cung cấp tài liệu nội bộ/bên ngoài cho khách hàng, NCC', noTitleBar: true },
+    'cau-hinh-tai-lieu.html': { icon: '⚙️', title: 'Cấu hình kiểm soát tài liệu', desc: '16 tham số, ủy quyền duyệt, mức mật, chỉ số — chỉ Admin', noTitleBar: true },
     'nang-luc-cnc.html': { icon: '🛠️', title: 'Năng Lực Máy Gia Công CNC', desc: 'Quy trình CNC theo SP, forecast tháng, tính số máy cần — chỉ Admin', noTitleBar: true },
     'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin', noTitleBar: true },
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chi tiết phiếu thay đổi tài liệu — Toyotaki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+
+<!--
+  ============================================================================
+  phieu-thay-doi-chi-tiet.html — T63. Xem chi tiết 1 phiếu thay đổi tài liệu
+  (DCR): tầng rủi ro, trạng thái, câu hỏi leo thang đã chọn, khối "Xác nhận
+  theo bộ phận" (dcr_confirmations, chỉ tầng A/B), khối "Các bước duyệt"
+  (dcr_approval_steps), hành động Xác nhận/Từ chối/Duyệt tuỳ quyền người xem.
+
+  Query params:
+    ?id=<dcr_id>
+  ============================================================================
+-->
+
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.brand .sub{font-size:11px;color:#94A3B8}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#FFF}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover:not(:disabled){background:#334155}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-danger{background:transparent;border:1px solid var(--alarm-fg);color:var(--alarm-fg);padding:5px 10px;border-radius:5px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.btn-danger:hover{background:var(--alarm-bg)}
+
+.main{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow-y:auto}
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm)}
+.panel-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.panel-head h2{font-size:13px;font-weight:700}
+.panel-body{padding:14px}
+
+.banner{border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;font-size:12.5px;font-weight:600}
+.banner.ok{background:var(--run-bg);color:var(--run-fg)}
+.banner.bad{background:var(--alarm-bg);color:var(--alarm-fg)}
+.banner .btn-primary{margin-left:auto}
+
+.top-row{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.tier-badge{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.tier-badge.A{background:var(--alarm-bg);color:var(--alarm-fg)}
+.tier-badge.B{background:var(--warn-bg);color:var(--warn-fg)}
+.tier-badge.C{background:var(--run-bg);color:var(--run-fg)}
+
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.03em}
+.badge.dang_xac_nhan{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.dang_duyet{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.cho_khach_hang{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.da_duyet{background:var(--run-bg);color:var(--run-fg)}
+.badge.da_phat_hanh{background:var(--run-bg);color:var(--run-fg)}
+.badge.tu_choi{background:var(--alarm-bg);color:var(--alarm-fg)}
+.badge.cho{background:var(--bg-sunken);color:var(--text-muted)}
+.badge.da_xac_nhan{background:var(--run-bg);color:var(--run-fg)}
+.badge.khong_phan_hoi{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.duyet{background:var(--run-bg);color:var(--run-fg)}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.kv{margin-bottom:10px}
+.kv label{font-size:10.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px}
+.kv .val{font-size:12.5px;white-space:pre-wrap}
+.kv .val.overdue{color:var(--alarm-fg);font-weight:700}
+
+.tag-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.tag-item{font-size:12px;padding:6px 10px;border-radius:6px;background:var(--warn-bg);color:var(--warn-fg);font-weight:600}
+
+.row-line{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.row-line:last-child{border-bottom:none}
+.row-line .name{flex:1;font-size:12.5px;font-weight:600}
+.row-line .meta{font-size:11px;color:var(--text-muted)}
+.row-line .actions{display:flex;gap:6px}
+
+.inline-form{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.inline-form input[type=text]{flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12px;outline:none}
+.inline-form input:focus{border-color:var(--accent)}
+
+.msg-inline{font-size:11.5px;color:var(--alarm-fg);margin-top:6px}
+.toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
+.toast.show{display:flex}
+.toast.error{background:#B91C1C}
+.empty{color:var(--text-dim);font-size:12px;padding:6px 0}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📋 Chi tiết phiếu thay đổi</div>
+      <div class="sub" id="hdrSub">—</div>
+    </div>
+    <button class="btn btn-ghost" onclick="window.location.href='danh-sach-phieu-thay-doi.html'">← Danh sách phiếu</button>
+    <div class="header-clock">
+      <span class="date" id="clock-date">—</span>
+      <span class="time" id="clock-time">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="main" id="mainArea">
+    <div style="color:var(--text-dim);font-size:12px;padding:14px">Đang tải…</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastTimer;
+function toast(text, isErr){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  el.classList.toggle('error', !!isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+function startClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick(); setInterval(tick, 1000);
+}
+function fmtDateTime(s){
+  if (!s) return '—';
+  return new Date(s).toLocaleString('vi-VN', { hour12: false });
+}
+
+const params = new URLSearchParams(window.location.search);
+const dcrId = params.get('id');
+
+const LOAI_LABELS = { tao_moi: 'Tạo tài liệu mới', sua_doi: 'Sửa đổi tài liệu', huy: 'Đề nghị huỷ tài liệu' };
+const TRANG_THAI_LABELS = {
+  dang_xac_nhan: 'Đang xác nhận điểm sử dụng', dang_duyet: 'Đang duyệt', cho_khach_hang: 'Chờ khách hàng',
+  da_duyet: 'Đã duyệt', tu_choi: 'Từ chối', da_phat_hanh: 'Đã phát hành',
+};
+const CONFIRM_LABELS = { cho: 'Chờ', da_xac_nhan: 'Đã xác nhận', tu_choi: 'Từ chối', khong_phan_hoi: 'Không phản hồi' };
+const BUOC_LABELS = {
+  nguoi_duyet_uy_quyen: 'Người duyệt được ủy quyền', ban_giam_doc: 'Ban giám đốc',
+  khach_hang: 'Khách hàng (chứng từ đính kèm)', kstl: 'Kiểm soát tài liệu',
+};
+const BUOC_STATUS_LABELS = { cho: 'Chờ', duyet: 'Đã duyệt', tu_choi: 'Từ chối' };
+
+const state = {
+  session: null,
+  dcr: null,
+  confirmations: [],
+  steps: [],
+  myBoPhan: [],
+  myRole: null,
+  userNameCache: {},
+};
+
+async function resolveUserName(userId){
+  if (!userId) return '—';
+  if (state.userNameCache[userId]) return state.userNameCache[userId];
+  const { data } = await sb.from('user_roles').select('username, full_name, email').eq('user_id', userId).maybeSingle();
+  const text = data ? (data.username && data.full_name ? (data.username + '_' + data.full_name) : (data.username || data.full_name || data.email)) : '(ẩn)';
+  state.userNameCache[userId] = text;
+  return text;
+}
+
+async function loadAll(){
+  if (!dcrId){ toast('Thiếu id phiếu.', true); return false; }
+
+  const [{ data: dcr, error: dcrErr }, { data: myBoPhan }, { data: myRoleRow }] = await Promise.all([
+    sb.from('document_change_requests')
+      .select('*, doc_categories(ten, cap), documents(ten_tai_lieu, ma_sp)')
+      .eq('id', dcrId).maybeSingle(),
+    sb.rpc('current_user_bo_phan'),
+    sb.from('user_roles').select('role').eq('user_id', state.session.user.id).maybeSingle(),
+  ]);
+  if (dcrErr || !dcr){ toast('Không tải được phiếu: ' + (dcrErr ? dcrErr.message : 'không tìm thấy hoặc không có quyền'), true); return false; }
+  state.dcr = dcr;
+  state.myBoPhan = myBoPhan || [];
+  state.myRole = myRoleRow ? myRoleRow.role : null;
+
+  const [{ data: confirmations }, { data: steps }] = await Promise.all([
+    sb.from('dcr_confirmations').select('*').eq('dcr_id', dcrId).order('bo_phan'),
+    sb.from('dcr_approval_steps').select('*').eq('dcr_id', dcrId).order('thu_tu'),
+  ]);
+  state.confirmations = confirmations || [];
+  state.steps = steps || [];
+  return true;
+}
+
+function renderBanner(){
+  const d = state.dcr;
+  if (d.trang_thai === 'da_phat_hanh'){
+    return `<div class="banner ok">✅ Phiếu đã phát hành.
+      ${d.document_id ? `<button class="btn btn-primary" onclick="window.location.href='tai-lieu-chi-tiet.html?id=${encodeURIComponent(d.document_id)}'">Xem tài liệu</button>` : ''}
+    </div>`;
+  }
+  if (d.trang_thai === 'tu_choi'){
+    let lyDo = '—';
+    const rejConfirm = state.confirmations.find(c => c.trang_thai === 'tu_choi');
+    const rejStep = state.steps.find(s => s.trang_thai === 'tu_choi');
+    if (rejStep && rejStep.y_kien) lyDo = rejStep.y_kien;
+    else if (rejConfirm && rejConfirm.y_kien) lyDo = rejConfirm.y_kien;
+    return `<div class="banner bad">❌ Phiếu bị từ chối. Lý do: ${escapeHtml(lyDo)}</div>`;
+  }
+  return '';
+}
+
+function renderQuestions(){
+  const d = state.dcr;
+  const items = [];
+  if (d.t1_khach_hang) items.push('Khách hàng phải phê duyệt hoặc được thông báo trước khi áp dụng');
+  if (d.t2_chi_phi) items.push('Chi phí phát sinh vượt ngưỡng do Ban giám đốc đặt');
+  if (d.t3a_dac_tinh) items.push('Chạm đặc tính đặc biệt, an toàn hoặc luật định');
+  if (d.t3b_doi_luu_trinh) items.push('Đổi lưu trình / đổi nội dung kỹ thuật');
+  if (d.t3c_ma_thay_doi) items.push('Có mã thay đổi thiết kế/quá trình liên quan: ' + d.t3c_ma_thay_doi);
+  if (!items.length) return '<div class="empty">Không câu hỏi leo thang nào được chọn.</div>';
+  return `<div class="tag-list">${items.map(t => `<div class="tag-item">${escapeHtml(t)}</div>`).join('')}</div>`;
+}
+
+function renderOverview(){
+  const d = state.dcr;
+  const isOverdue = d.han_duyet && new Date() > new Date(d.han_duyet) && !['da_phat_hanh','tu_choi'].includes(d.trang_thai);
+  return `
+    <div class="top-row">
+      <span class="tier-badge ${d.tang}">${d.tang}</span>
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">${escapeHtml(d.tieu_de)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span class="badge ${d.trang_thai}">${escapeHtml(TRANG_THAI_LABELS[d.trang_thai] || d.trang_thai)}</span>
+          <span style="font-size:11.5px;color:var(--text-muted)">${escapeHtml(LOAI_LABELS[d.loai_yeu_cau] || d.loai_yeu_cau)}</span>
+          <span style="font-size:11.5px;color:var(--text-muted)">${escapeHtml(d.doc_categories ? d.doc_categories.ten : '')}</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div>
+        <div class="kv"><label>Tài liệu liên quan</label><div class="val">${d.documents ? escapeHtml(d.documents.ten_tai_lieu) + (d.documents.ma_sp ? ' (' + escapeHtml(d.documents.ma_sp) + ')' : '') : '— (tạo mới)'}</div></div>
+        <div class="kv"><label>Người lập</label><div class="val" id="nguoiLapVal">—</div></div>
+        <div class="kv"><label>Ngày lập</label><div class="val">${fmtDateTime(d.created_at)}</div></div>
+        <div class="kv"><label>Hạn duyệt</label><div class="val ${isOverdue ? 'overdue' : ''}">${fmtDateTime(d.han_duyet)}${isOverdue ? ' — QUÁ HẠN' : ''}</div></div>
+      </div>
+      <div>
+        <div class="kv"><label>Nội dung trước thay đổi</label><div class="val">${escapeHtml(d.noi_dung_truoc) || '—'}</div></div>
+        <div class="kv"><label>Nội dung sau thay đổi</label><div class="val">${escapeHtml(d.noi_dung_sau) || '—'}</div></div>
+        <div class="kv"><label>Lý do thay đổi</label><div class="val">${escapeHtml(d.ly_do) || '—'}</div></div>
+      </div>
+    </div>
+    <div class="kv" style="margin-top:6px"><label>Câu hỏi leo thang đã chọn</label>${renderQuestions()}</div>
+  `;
+}
+
+function canActOnBoPhan(bp){
+  return state.myBoPhan.includes(bp) || state.myRole === 'admin';
+}
+
+function renderConfirmations(){
+  if (!state.confirmations.length) return '';
+  const rows = state.confirmations.map(c => {
+    const canAct = c.trang_thai === 'cho' && canActOnBoPhan(c.bo_phan);
+    return `
+      <div class="row-line" data-confirm-id="${c.id}">
+        <div class="name">${escapeHtml(c.bo_phan)}</div>
+        <div class="meta">Hạn: ${fmtDateTime(c.han)}</div>
+        <span class="badge ${c.trang_thai}">${escapeHtml(CONFIRM_LABELS[c.trang_thai] || c.trang_thai)}</span>
+        ${canAct ? `
+          <div class="actions">
+            <button class="btn-outline" onclick="doConfirm('${c.bo_phan}', true)">Xác nhận</button>
+            <button class="btn-danger" onclick="doConfirm('${c.bo_phan}', false)">Từ chối</button>
+          </div>` : ''}
+      </div>`;
+  }).join('');
+  return `
+    <div class="panel">
+      <div class="panel-head"><h2>Xác nhận theo bộ phận</h2></div>
+      <div class="panel-body">${rows}</div>
+    </div>`;
+}
+
+function canActOnStep(step){
+  const d = state.dcr;
+  switch (step.buoc){
+    case 'nguoi_duyet_uy_quyen': return state._isDelegate || state.myRole === 'admin';
+    case 'ban_giam_doc': return state.myRole === 'admin' || state.myRole === 'giam_doc_sx';
+    case 'khach_hang': return state.myRole === 'admin' || state.myRole === 'giam_doc_sx' || state.myRole === 'ke_hoach';
+    case 'kstl': return state.myRole === 'admin';
+    default: return false;
+  }
+}
+
+function renderSteps(){
+  if (!state.steps.length) return '';
+  const pendingSteps = state.steps.filter(s => s.trang_thai === 'cho');
+  const firstPendingId = pendingSteps.length ? pendingSteps.reduce((a,b) => a.thu_tu < b.thu_tu ? a : b).id : null;
+  const rows = state.steps.map(s => {
+    const canAct = s.id === firstPendingId && canActOnStep(s);
+    return `
+      <div class="row-line" data-step-id="${s.id}">
+        <div class="name">${s.thu_tu}. ${escapeHtml(BUOC_LABELS[s.buoc] || s.buoc)}</div>
+        <div class="meta">${s.thoi_gian ? fmtDateTime(s.thoi_gian) : ''}</div>
+        <span class="badge ${s.trang_thai}">${escapeHtml(BUOC_STATUS_LABELS[s.trang_thai] || s.trang_thai)}</span>
+        ${canAct ? `
+          <div class="actions">
+            <button class="btn-outline" onclick="doApproveStep(true)">Duyệt</button>
+            <button class="btn-danger" onclick="doApproveStep(false)">Từ chối</button>
+          </div>` : ''}
+      </div>`;
+  }).join('');
+  return `
+    <div class="panel">
+      <div class="panel-head"><h2>Các bước duyệt</h2></div>
+      <div class="panel-body">${rows}</div>
+    </div>`;
+}
+
+async function doConfirm(boPhan, dongY){
+  const yKien = window.prompt(dongY ? 'Ý kiến (không bắt buộc):' : 'Lý do từ chối:', '') || null;
+  if (!dongY && yKien === null) return;
+  try {
+    const { error } = await sb.rpc('dcr_confirm', { p_dcr_id: dcrId, p_bo_phan: boPhan, p_dong_y: dongY, p_y_kien: yKien });
+    if (error) throw error;
+    toast(dongY ? 'Đã xác nhận.' : 'Đã từ chối.');
+    await refresh();
+  } catch (e) {
+    toast('Lỗi: ' + e.message, true);
+  }
+}
+
+async function doApproveStep(dongY){
+  const yKien = window.prompt(dongY ? 'Ý kiến (không bắt buộc):' : 'Lý do từ chối:', '') || null;
+  if (!dongY && yKien === null) return;
+  try {
+    const { error } = await sb.rpc('dcr_approve_step', { p_dcr_id: dcrId, p_dong_y: dongY, p_y_kien: yKien });
+    if (error) throw error;
+    toast(dongY ? 'Đã duyệt.' : 'Đã từ chối.');
+    await refresh();
+  } catch (e) {
+    toast('Lỗi: ' + e.message, true);
+  }
+}
+
+async function checkDelegate(){
+  const d = state.dcr;
+  if (d.tang === 'C' || d.tang === 'B'){
+    const { data } = await sb.rpc('document_is_delegate', { p_user_id: state.session.user.id, p_tang: d.tang, p_category_id: d.category_id });
+    state._isDelegate = !!data;
+  } else {
+    state._isDelegate = false;
+  }
+}
+
+async function render(){
+  document.getElementById('hdrSub').textContent = state.dcr.tieu_de;
+  const banner = renderBanner();
+  await checkDelegate();
+  let nguoiLapText = '—';
+  document.getElementById('mainArea').innerHTML = `
+    ${banner}
+    <div class="panel"><div class="panel-head"><h2>Thông tin phiếu</h2></div><div class="panel-body">${renderOverview()}</div></div>
+    ${renderConfirmations()}
+    ${renderSteps()}
+  `;
+  resolveUserName(state.dcr.nguoi_lap).then(name => {
+    const el = document.getElementById('nguoiLapVal');
+    if (el) el.textContent = name;
+  });
+}
+
+async function refresh(){
+  const ok = await loadAll();
+  if (!ok) return;
+  await render();
+}
+
+async function main(){
+  startClock();
+  const session = await MesAuth.requireAuth();
+  state.session = session;
+  const ok = await loadAll();
+  if (!ok) return;
+  await render();
+}
+main();
+</script>
+</body>
+</html>
