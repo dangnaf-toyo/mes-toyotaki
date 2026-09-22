@@ -3133,6 +3133,16 @@ async function submitResolve(){
   if (!gio) return showToast('Nhập giờ trở lại', true);
   if (!(await ensureAuthOnSubmit('modal-resolve'))) return;
 
+  const row = state.rows.find(r => r.id_dong === state.currentTarget.id_dong);
+  const isDoiKhuon = row && (row.open_loai_su_co || '').split(' ')[0] === 'C3';
+  const mins = row && row.open_gio_phat_sinh ? Math.round((new Date(gio) - new Date(row.open_gio_phat_sinh)) / 60000) : 0;
+  const bonusNote = document.getElementById('mr-bonus').value.trim();
+  if (isDoiKhuon && mins > 120 && !bonusNote) {
+    alert('⚠️ Thời gian đổi khuôn dài hơn mục tiêu, hãy ghi chi tiết nguyên nhân và đối sách vào phần bổ sung nội dung xử lý.');
+    document.getElementById('mr-bonus').focus();
+    return;
+  }
+
   showOverlay('Đang lưu bản ghi...');
   try {
     const d = await rpcWrite('duc_resolve_incident', {
