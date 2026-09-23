@@ -1755,14 +1755,66 @@ function nangLucCa_(maSp, phuongAnCa, ca){
   return Math.floor((shiftMin * 60) / cycleTime) * cavity;
 }
 
-// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan }, remaining: phần KH ngày còn lại chưa chạy
-function buildKhsxSuggestion_(opt, remaining){
-  const cap = nangLucCa_(opt.ma_sp, state.phuongAnCa, state.ca);
+// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan }, remaining: phần KH ngày còn lại chưa chạy.
+// phuongAnCa/ca: mặc định ca hiện tại (state) — truyền rõ khi tính cho MỘT CA
+// KHÁC (VD ca kế tiếp lúc Kết ca, xem computeCarryOverKhCaSuggestions_()).
+function buildKhsxSuggestion_(opt, remaining, phuongAnCa, ca){
+  const cap = nangLucCa_(opt.ma_sp, phuongAnCa || state.phuongAnCa, ca || state.ca);
   const khCa = cap ? Math.min(remaining, cap) : Math.round(remaining / 2);
   return {
     conflict: false, ma_sp: opt.ma_sp, ten_sp: opt.ten_sp, so_khuon: opt.so_khuon,
     kh_ngay: opt.kh_ngay, kh_tuan: opt.kh_tuan, kh_ca: Math.max(0, Math.round(khCa)),
   };
+}
+
+// Kết ca (endShift()): tính lại KH ca cho ca KẾ TIẾP từ KHSX tuần — thay vì
+// mặc định = KH ca của ca vừa xong (bug đã xác nhận: dòng phụ KH ca=100 lúc
+// ca ngày bị mang nguyên sang ca đêm dù KH ngày còn dư ~3680, năng lực máy
+// thật ~4400/ca — carry-over trước đây không gọi lại engine gợi ý này).
+// Cùng công thức buildKhsxSuggestion_()/daChiemChoTrongNgay_() dùng khi tạo
+// dòng SP mới, chỉ khác tham số (ngày/ca là NGÀY/CA KẾ TIẾP, không phải ca
+// đang kết) — trả về map { ma_may: kh_ca_goi_y }, máy nào không có dòng KHSX
+// tuần khớp ma_sp cho đúng ngày đó thì KHÔNG có trong map (caller tự fallback
+// về kh_ca cũ).
+async function computeCarryOverKhCaSuggestions_(rows, nextNgayStr, nextCaStr, phuongAnCa){
+  const result = {};
+  if (!nextNgayStr || !nextCaStr || !rows || !rows.length) return result;
+  try {
+    const d = new Date(nextNgayStr + 'T00:00:00');
+    const jsDay = d.getDay();
+    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const monday = new Date(d);
+    monday.setDate(monday.getDate() + (jsDay === 0 ? -6 : 1 - jsDay));
+    const mondayStr = monday.getFullYear() + '-' + pad(monday.getMonth() + 1) + '-' + pad(monday.getDate());
+    const dayCols = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
+    const maMays = [...new Set(rows.map(r => r.ma_may))];
+
+    const [khsxRes, nextDayRes] = await Promise.all([
+      sb.from('duc_khsx_tuan_plan').select('ma_may,ma_sp,' + dayCols.join(',')).eq('tuan_bat_dau', mondayStr).in('ma_may', maMays),
+      sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,tt_ca,kh_ca').eq('ngay', nextNgayStr).in('ma_may', maMays),
+    ]);
+    if (khsxRes.error) throw khsxRes.error;
+    if (nextDayRes.error) throw nextDayRes.error;
+
+    const khNgayByKey = {};
+    (khsxRes.data || []).forEach(r => { khNgayByKey[r.ma_may + '|' + r.ma_sp] = Number(r[dayCols[dayIdx]]) || 0; });
+
+    const nextDayByMachine = {};
+    (nextDayRes.data || []).forEach(r => {
+      if (!nextDayByMachine[r.ma_may]) nextDayByMachine[r.ma_may] = [];
+      nextDayByMachine[r.ma_may].push(r);
+    });
+
+    rows.forEach(r => {
+      const khNgay = khNgayByKey[r.ma_may + '|' + r.ma_sp];
+      if (khNgay === undefined) return;   // không có KHSX tuần khớp máy+mã cho ngày đó — để caller fallback
+      const remaining = Math.max(0, khNgay - daChiemChoTrongNgay_(nextDayByMachine[r.ma_may] || [], r.ma_sp));
+      result[r.ma_may] = buildKhsxSuggestion_({ ma_sp: r.ma_sp }, remaining, phuongAnCa, nextCaStr).kh_ca;
+    });
+  } catch (e) {
+    console.error('computeCarryOverKhCaSuggestions_ lỗi:', e);
+  }
+  return result;
 }
 
 // Phần KH ngày đã "chiếm chỗ" bởi các dòng khác trong ngày (mọi ca) cho cùng
@@ -4375,6 +4427,11 @@ async function endShift(){
   const nextShift = computeNextShift(state.ngay, state.ca, state.phuongAnCa);
   document.getElementById('es-next-text').textContent = nextShift
     ? nextShift.ca + ' — ' + formatDateShort(nextShift.ngay) : '(không xác định)';
+  // Tính lại "KH ca mới" theo KHSX tuần cho ĐÚNG ca kế tiếp — thay vì mặc định
+  // = KH ca của ca vừa xong (xem comment ở computeCarryOverKhCaSuggestions_()).
+  const khCaSuggestions = nextShift
+    ? await computeCarryOverKhCaSuggestions_(withPlan, toDateInputValue(nextShift.ngay), nextShift.ca, state.phuongAnCa)
+    : {};
 
   const openRows = shiftRows.filter(r => r.open_gio_phat_sinh);
   const warn = document.getElementById('es-warning');
@@ -4451,6 +4508,14 @@ async function endShift(){
       const badgeOpen = hasOpen
         ? '<span style="display:inline-block;background:#FEE2E2;color:#B91C1C;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;margin-left:6px" title="Sự cố sẽ chuyển sang ca sau, counter tiếp tục đếm">🔴 SỰ CỐ MỞ → SẼ CHUYỂN TIẾP</span>'
         : '';
+      // Ưu tiên gợi ý tính lại từ KHSX tuần cho ca kế tiếp; máy nào không có
+      // dòng KHSX khớp (ma_may+ma_sp+ngày) mới fallback về KH ca của ca vừa
+      // xong (giữ hành vi cũ cho trường hợp không tra được KHSX).
+      const suggested = khCaSuggestions[r.ma_may];
+      const khCaMoi = suggested !== undefined ? suggested : (r.kh_ca || 0);
+      const suggestedBadge = suggested !== undefined
+        ? '<span style="display:block;font-size:9px;color:var(--text-muted)">theo KHSX tuần</span>'
+        : '<span style="display:block;font-size:9px;color:var(--text-muted)" title="Không có KHSX tuần khớp máy/mã cho ca kế tiếp — giữ tạm KH ca cũ, tự sửa nếu cần">⚠ giữ KH ca cũ</span>';
       const item = document.createElement('div');
       item.style.cssText = 'display:grid;grid-template-columns:24px 1fr 90px 120px;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px' +
         (hasOpen ? ';background:#FEF2F2' : '');
@@ -4460,8 +4525,8 @@ async function endShift(){
           '<div style="font-weight:600">' + escapeHtml(r.ma_may) + ' — <span style="font-family:\'JetBrains Mono\',monospace;font-size:11px">' + escapeHtml(r.ma_sp) + '</span>' + badgeOpen + extendBadge + '</div>' +
           '<div style="color:var(--text-muted);font-size:10px">KH ' + fmtNum(r.kh_ca) + ' · TT ' + fmtNum(r.tt_ca) + ' · ' + (r.kh_ca > 0 ? Math.round(r.tt_ca/r.kh_ca*100) : 0) + '%</div>' +
         '</div>' +
-        '<div style="text-align:right;font-size:11px;color:var(--text-muted)">KH ca mới:</div>' +
-        '<input type="number" data-idx="' + idx + '" min="0" value="' + (r.kh_ca || 0) + '" style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:4px;font-size:12px" class="es-kh-input">';
+        '<div style="text-align:right;font-size:11px;color:var(--text-muted)">KH ca mới:' + suggestedBadge + '</div>' +
+        '<input type="number" data-idx="' + idx + '" min="0" value="' + khCaMoi + '" style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:4px;font-size:12px" class="es-kh-input">';
       list.appendChild(item);
     });
     state.endShiftMachines = sorted;
