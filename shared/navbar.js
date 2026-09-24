@@ -24,6 +24,7 @@
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
       { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
+      { label: 'Bom', href: 'bom.html' },
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
@@ -41,6 +42,9 @@
     ] },
     { label: 'Chất lượng', items: [
       { label: 'IPQC', href: 'ipqc.html' },
+      { label: 'Duyệt tiếp tục SX IPQC', href: 'ipqc-approval.html' },
+      { label: 'IQC đầu vào', href: 'iqc.html' },
+      { label: 'OQC nhập kiểm tra', href: 'oqc-daily.html' },
       { label: 'QC Manager / NCP', href: 'qc-manager.html' },
     ] },
     { label: 'Kho & Truy xuất', items: [
@@ -73,6 +77,9 @@
     'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca', noTitleBar: true },
     'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
     'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh' },
+    'ipqc-approval.html': { icon: '⚠️', title: 'Duyệt tiếp tục sản xuất IPQC', desc: 'Tạo, duyệt và theo dõi yêu cầu tiếp tục chạy có điều kiện', noTitleBar: true },
+    'iqc.html': { icon: '📋', title: 'IQC — Dashboard đầu vào', desc: 'Theo dõi LOT, nhà cung cấp, lỗi và tỷ lệ NG theo thời gian' },
+    'oqc-daily.html': { icon: '✅', title: 'OQC — Kiểm tra xuất hàng', desc: 'Kiểm tra đầu ra trước khi xuất hàng', noTitleBar: true },
     'chuyencongdoan.html': { icon: '🔀', title: 'Chuyển công đoạn & Đóng gói', desc: 'Quét QR chuyển hàng, đóng gói lại, đổi mã SP', noTitleBar: true },
     'oqc.html': { icon: '📦', title: 'Đóng gói Pallet', desc: 'Quét tem, gom pallet, đóng gói — dùng cho mọi công đoạn cuối trước nhập kho', noTitleBar: true },
     'kho-thanh-pham.html': { icon: '🏬', title: 'Kho Thành Phẩm', desc: 'Nhập kho / Xuất hàng bằng QR', noTitleBar: true },
@@ -100,8 +107,10 @@
     'nang-luc-cnc.html': { icon: '🛠️', title: 'Năng Lực Máy Gia Công CNC', desc: 'Quy trình CNC theo SP, forecast tháng, tính số máy cần — chỉ Admin', noTitleBar: true },
     'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin', noTitleBar: true },
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },
+    'ncp-detail-v2.html': { icon: '📝', title: 'Chi Tiết NCP V2', desc: 'Nguyên nhân, đối sách và cách ly Task/LOT', noTitleBar: true },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
     'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
+    'bom.html': { icon: '🧾', title: 'BOM Sản Phẩm', desc: 'Nhôm, linh kiện và luồng công đoạn theo từng phiên bản BOM', noTitleBar: true },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
   };
@@ -126,6 +135,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-item{padding:9px 12px;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:600}
 .mnb-item:hover{background:#faf5f0;color:#C87941}
 .mnb-item.route-active{background:#f5e6d7;color:#a85e2a}
+.mnb-folder{padding:9px 12px;border-radius:6px;color:#333;font-size:13px;font-weight:600;cursor:default}
 .mnb-auth{flex-shrink:0;font-size:11.5px;color:#c9c2b6;display:flex;align-items:center;gap:8px;white-space:nowrap;padding-right:6px}
 .mnb-auth a{color:#C87941;text-decoration:none;font-weight:700}
 .mnb-burger{display:none;background:none;border:none;color:#fff;font-size:19px;cursor:pointer;padding:0 6px;flex-shrink:0}
@@ -176,10 +186,11 @@ body{padding-top:var(--navbar-h)}
 
   function groupsHtml(groups, cur) {
     return groups.map(g => {
-      const itemsHtml = g.items.map(it =>
-        `<a href="${it.href}" class="mnb-item${it.href.toLowerCase() === cur ? ' route-active' : ''}">${it.label}</a>`
+      const itemsHtml = g.items.map(it => it.folder
+        ? `<div class="mnb-folder" title="Thư mục Bom">${it.label}</div>`
+        : `<a href="${it.href}" class="mnb-item${it.href.toLowerCase() === cur ? ' route-active' : ''}">${it.label}</a>`
       ).join('');
-      const groupActive = g.items.some(it => it.href.toLowerCase() === cur);
+      const groupActive = g.items.some(it => it.href && it.href.toLowerCase() === cur);
       return `<div class="mnb-group${groupActive ? ' route-active' : ''}">
         <button type="button" class="mnb-group-btn">${g.label} <span class="mnb-caret">▾</span></button>
         <div class="mnb-dropdown">${itemsHtml}</div>
