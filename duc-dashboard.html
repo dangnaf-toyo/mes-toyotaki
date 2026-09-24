@@ -1726,8 +1726,10 @@ function onShiftContextChange(){
 // LOGIC GÁN KH CA (thay bản cũ "chia đều 50/50 khi 1 máy có 2 mã trong ngày"
 // — sai vì thực tế chạy tuần tự hết mã này mới đổi mã khác, không chạy song
 // song 2 mã trong 2 ca):
-//   1) nangLucCa(mã) = floor(số phút ca × 60 / cycle_time_s) × cavity — sản
-//      lượng tối đa lý thuyết 1 ca đúc được mã đó (dùng master_products).
+//   1) Năng lực ca của máy = tổng KH ngày của máy (KHSX tuần) / số ca trong
+//      ngày (nangLucCaTheoKhNgay_). Chỉ khi không có KH ngày mới dự phòng
+//      bằng nangLucCa_(mã) = floor(phút ca × 60 / cycle_time_s) × cavity (lý
+//      thuyết 100% hiệu suất — cao gấp ~2 lần thực tế, không dùng làm chính).
 //   2) Với mỗi máy có ≥2 mã KH ngày > 0: soi dữ liệu thực tế ĐÃ CHẠY trong
 //      ngày (duc_ca_hien_tai) để tìm mã đang chạy dở (dòng row_seq lớn nhất)
 //      — nếu lũy kế thực tế của mã đó CHƯA đạt KH ngày → tự động tiếp tục
@@ -1755,12 +1757,30 @@ function nangLucCa_(maSp, phuongAnCa, ca){
   return Math.floor((shiftMin * 60) / cycleTime) * cavity;
 }
 
-// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan }, remaining: phần KH ngày còn lại chưa chạy.
+// Năng lực 1 ca của MÁY theo KHSX tuần = tổng KH ngày của máy đó (mọi mã)
+// / số ca trong ngày. KH ngày do bộ phận kế hoạch lập đã tính theo năng lực
+// thật của máy, còn nangLucCa_() (CT × cavity, hiệu suất 100%) cao gấp ~2 lần
+// thực tế (đối chiếu lịch sử: sản lượng thực ≈ 40-50% lý thuyết) — bug DC 6
+// 24/09: KH ngày EXE-PLT-01 = 4200 bị dồn hết vào 1 ca vì "năng lực" 4500.
+function nangLucCaTheoKhNgay_(khNgayMay, phuongAnCa){
+  if (!(khNgayMay > 0)) return null;
+  const soCa = Object.keys(CONFIG.SHIFT_PLANS[phuongAnCa] || {}).length || 2;
+  return Math.round(khNgayMay / soCa);
+}
+
+// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan, kh_ngay_may, da_chiem_ca },
+// remaining: phần KH ngày còn lại chưa chạy của mã.
+//   kh_ngay_may: tổng KH ngày của máy (mọi mã) — xác định năng lực ca.
+//   da_chiem_ca: phần năng lực ca đã bị mã KHÁC của máy chiếm trong chính ca
+//                này (đổi mã giữa ca) — trừ ra khỏi năng lực.
 // phuongAnCa/ca: mặc định ca hiện tại (state) — truyền rõ khi tính cho MỘT CA
 // KHÁC (VD ca kế tiếp lúc Kết ca, xem computeCarryOverKhCaSuggestions_()).
 function buildKhsxSuggestion_(opt, remaining, phuongAnCa, ca){
-  const cap = nangLucCa_(opt.ma_sp, phuongAnCa || state.phuongAnCa, ca || state.ca);
-  const khCa = cap ? Math.min(remaining, cap) : Math.round(remaining / 2);
+  const pac = phuongAnCa || state.phuongAnCa;
+  let cap = nangLucCaTheoKhNgay_(opt.kh_ngay_may, pac);
+  if (cap != null) cap = Math.max(0, cap - (opt.da_chiem_ca || 0));
+  else cap = nangLucCa_(opt.ma_sp, pac, ca || state.ca);
+  const khCa = cap != null ? Math.min(remaining, cap) : Math.round(remaining / 2);
   return {
     conflict: false, ma_sp: opt.ma_sp, ten_sp: opt.ten_sp, so_khuon: opt.so_khuon,
     kh_ngay: opt.kh_ngay, kh_tuan: opt.kh_tuan, kh_ca: Math.max(0, Math.round(khCa)),
@@ -1797,7 +1817,12 @@ async function computeCarryOverKhCaSuggestions_(rows, nextNgayStr, nextCaStr, ph
     if (nextDayRes.error) throw nextDayRes.error;
 
     const khNgayByKey = {};
-    (khsxRes.data || []).forEach(r => { khNgayByKey[r.ma_may + '|' + r.ma_sp] = Number(r[dayCols[dayIdx]]) || 0; });
+    const khNgayMay = {};
+    (khsxRes.data || []).forEach(r => {
+      const qty = Number(r[dayCols[dayIdx]]) || 0;
+      khNgayByKey[r.ma_may + '|' + r.ma_sp] = qty;
+      khNgayMay[r.ma_may] = (khNgayMay[r.ma_may] || 0) + qty;
+    });
 
     const nextDayByMachine = {};
     (nextDayRes.data || []).forEach(r => {
@@ -1809,7 +1834,7 @@ async function computeCarryOverKhCaSuggestions_(rows, nextNgayStr, nextCaStr, ph
       const khNgay = khNgayByKey[r.ma_may + '|' + r.ma_sp];
       if (khNgay === undefined) return;   // không có KHSX tuần khớp máy+mã cho ngày đó — để caller fallback
       const remaining = Math.max(0, khNgay - daChiemChoTrongNgay_(nextDayByMachine[r.ma_may] || [], r.ma_sp));
-      result[r.ma_may] = buildKhsxSuggestion_({ ma_sp: r.ma_sp }, remaining, phuongAnCa, nextCaStr).kh_ca;
+      result[r.ma_may] = buildKhsxSuggestion_({ ma_sp: r.ma_sp, kh_ngay_may: khNgayMay[r.ma_may] }, remaining, phuongAnCa, nextCaStr).kh_ca;
     });
   } catch (e) {
     console.error('computeCarryOverKhCaSuggestions_ lỗi:', e);
@@ -1876,21 +1901,28 @@ async function loadWeeklyPlanSuggestions(){
       todayByMachine[r.ma_may].push(r);
     });
 
+    // Phần năng lực ca hiện tại đã bị các mã KHÁC của máy chiếm (đổi mã giữa ca).
+    const daChiemCa = (todayRows, maSp) => (todayRows || [])
+      .filter(r => r.ca === state.ca && r.ma_sp && r.ma_sp !== maSp)
+      .reduce((s, r) => s + Math.max(Number(r.tt_ca) || 0, Number(r.kh_ca) || 0), 0);
+
     const suggestions = {};
     Object.keys(byMachine).forEach(m => {
       const list = byMachine[m];
       const todayRows = todayByMachine[m] || [];
+      const khNgayMay = list.reduce((s, o) => s + o.kh_ngay, 0);
+      list.forEach(o => { o.kh_ngay_may = khNgayMay; });
 
       if (list.length === 1) {
         const opt = list[0];
         const remaining = opt.kh_ngay - daChiemChoTrongNgay_(todayRows, opt.ma_sp);
-        suggestions[m] = buildKhsxSuggestion_(opt, Math.max(0, remaining));
+        suggestions[m] = buildKhsxSuggestion_({ ...opt, da_chiem_ca: daChiemCa(todayRows, opt.ma_sp) }, Math.max(0, remaining));
         return;
       }
 
       const continued = resolveContinuingProduct_(todayRows, list);
       if (continued) {
-        suggestions[m] = buildKhsxSuggestion_(continued.opt, continued.remaining);
+        suggestions[m] = buildKhsxSuggestion_({ ...continued.opt, da_chiem_ca: daChiemCa(todayRows, continued.opt.ma_sp) }, continued.remaining);
       } else {
         suggestions[m] = { conflict: true, options: list };   // cần hỏi người dùng — xem applyWeeklyPlanSuggestion_
       }
