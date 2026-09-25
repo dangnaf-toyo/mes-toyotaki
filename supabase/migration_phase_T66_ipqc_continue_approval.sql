@@ -1,3 +1,6 @@
+-- [Đổi số 25/09/2026] Tên cũ: T36_ipqc_continue_approval.sql (trùng số phase / sai quy ước tên).
+--   Nội dung KHÔNG đổi — đã chạy trên staging thì KHÔNG cần chạy lại.
+--   Bản vá bảo mật + phân quyền: migration_phase_D61_bao_mat_phan_quyen_iqc_ipqc_oqc_bom_ncp.sql (chạy SAU file này).
 -- IPQC: yêu cầu tiếp tục sản xuất có điều kiện và audit bất biến.
 -- Giai đoạn này mọi tài khoản authenticated được thao tác; phân vai trò sẽ bổ sung sau.
 create table if not exists public.duc_ipqc_continue_request (

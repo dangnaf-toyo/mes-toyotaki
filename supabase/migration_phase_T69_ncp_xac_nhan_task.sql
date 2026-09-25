@@ -1,3 +1,6 @@
+-- [Đổi số 25/09/2026] Tên cũ: supabase/migrations/20260916120000_ncp_task_confirmation.sql (trùng số phase / sai quy ước tên).
+--   Nội dung KHÔNG đổi — đã chạy trên staging thì KHÔNG cần chạy lại.
+--   Bản vá bảo mật + phân quyền: migration_phase_D61_bao_mat_phan_quyen_iqc_ipqc_oqc_bom_ncp.sql (chạy SAU file này).
 -- Xác nhận Task No. trước khi cách ly NCP.
 -- Task No. của MES là duc_tem.tag_no; LOT được lưu riêng để truy vết.
 

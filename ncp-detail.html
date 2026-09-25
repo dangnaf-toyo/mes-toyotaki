@@ -120,12 +120,23 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 #qrReaderDiv{position:relative;flex:1;overflow:hidden}
 #qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
 .manual-tag-input{flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--border-strong);border-radius:7px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
-.cach-ly-list{display:flex;flex-direction:column;gap:6px}
+.task-entry{margin-top:10px;padding:12px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px}
+.task-entry label{display:block;font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:5px;letter-spacing:.05em}
+.task-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.task-result{display:none;margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid #A7E3C6;background:var(--run-bg);font-size:12px}
+.task-result.show{display:block}.task-result.error{display:block;background:var(--alarm-bg);border-color:#FCA5A5;color:var(--alarm-fg)}
+.task-info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin:8px 0}
+.task-info-grid div{background:#fff;border:1px solid var(--border);border-radius:6px;padding:7px}.task-info-grid small{display:block;color:var(--text-muted);font-size:10px}.task-info-grid b{display:block;margin-top:2px}
+.cach-ly-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}.cach-ly-table th,.cach-ly-table td{padding:7px;border:1px solid var(--border);text-align:left}.cach-ly-table th{background:var(--bg-sunken);color:var(--text-muted)}
+.cach-ly-list{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
 .cach-ly-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--alarm-bg);border:1px solid #FBD5D5;border-radius:7px;padding:8px 12px}
 .cach-ly-row.da_giai_toa{background:var(--bg-sunken);border-color:var(--border);opacity:.7}
 .cach-ly-row .tag{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--alarm-fg)}
 .cach-ly-row.da_giai_toa .tag{color:var(--text-muted)}
 .cach-ly-row .meta{font-size:11px;color:var(--text-muted)}
+.cach-ly-row .detail{font-size:11px;color:var(--text);margin-top:3px;line-height:1.45}
+.hold-badge{display:inline-block;margin-left:7px;padding:2px 7px;border-radius:999px;background:#B91C1C;color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em}
+.cach-ly-row.da_giai_toa .hold-badge{background:#64748B}
 .cach-ly-empty{font-size:12px;color:var(--text-dim);padding:6px 0}
 </style>
 </head>
@@ -171,6 +182,7 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
       <div class="info-item"><span class="k">Người đảm nhiệm xử lý</span><span class="v" id="i-nguoi-dam-nhiem">—</span></div>
     </div>
     <div class="info-item"><span class="k">Mô tả lỗi</span><span class="v" id="i-mo-ta">—</span></div>
+    <div class="field-row"><label>Ảnh lỗi từ lần kiểm IPQC</label><div class="img-gallery" id="ipqc-evidence"></div></div>
     <div class="field-row">
       <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
       <input type="text" autocomplete="off" id="f-nguoi-dam-nhiem">
@@ -178,11 +190,19 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
   </div>
 
   <div class="panel">
-    <div class="cause-title">🔒 Cách ly tem/thùng hàng <span style="font-weight:400;font-size:11px;color:var(--text-dim)">— chặn chuyển công đoạn / đóng gói lại / nhập kho / xuất hàng với tem thuộc diện nghi vấn</span></div>
+    <div class="cause-title">🔒 Cách ly item/thùng hàng <span style="font-weight:400;font-size:11px;color:var(--text-dim)">— xác nhận Task trước khi HOLD</span></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button type="button" class="btn btn-primary" id="btnScan">📷 Quét QR để cách ly</button>
-      <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
-      <input type="text" autocomplete="off" id="manualTagInput" class="manual-tag-input" placeholder="Hoặc gõ Tag No + Enter">
+      <button type="button" class="btn btn-primary" id="btnScan">📷 Quét QR bằng camera</button>
+      <button type="button" class="btn btn-outline" onclick="document.getElementById('qrFileInput').click()">🖼 Đọc QR từ ảnh</button>
+      <input type="file" id="qrFileInput" accept="image/*" style="display:none">
+    </div>
+    <div class="task-entry">
+      <label for="manualTagInput">TASK NO.</label>
+      <div class="task-actions">
+        <input type="text" autocomplete="off" id="manualTagInput" class="manual-tag-input" autofocus placeholder="Máy quét QR/Barcode USB hoặc nhập Task No.">
+        <button type="button" class="btn btn-primary" id="btnConfirmTask">✓ Xác nhận Task</button>
+      </div>
+      <div class="task-result" id="taskResult" role="status" aria-live="polite"></div>
     </div>
     <div class="cach-ly-list" id="cach-ly-list"></div>
   </div>
@@ -265,7 +285,7 @@ const state = {
   id: null, case: null, locked: false, currentUserEmail: '',
   images: { phat_sinh: [], luu_xuat: [] },
   doiSach: { ps_tam_thoi: [], ps_lau_dai: [], lx_tam_thoi: [], lx_lau_dai: [] },
-  cachLy: [],
+  cachLy: [], pendingTask: null, taskRequest: 0, holdingTask: false,
 };
 const DS_KEYS = ['ps_tam_thoi', 'ps_lau_dai', 'lx_tam_thoi', 'lx_lau_dai'];
 
@@ -302,6 +322,8 @@ async function load(){
   if (!data) return alert('Không tìm thấy phiếu: ' + state.id);
 
   state.case = data;
+  state.ipqcEvidence = [];
+  if(data.id_checkpoint_goc){const {data:cp}=await sb.from('duc_ipqc_checkpoint').select('anh_bang_chung_url').eq('id_checkpoint',data.id_checkpoint_goc).maybeSingle();state.ipqcEvidence=jsonArr(cp&&cp.anh_bang_chung_url)}
   state.currentUserEmail = (await MesAuth.getCurrentUserIdentity()) || '';
   state.images.phat_sinh = jsonArr(data.hinh_anh_phat_sinh_json).slice();
   state.images.luu_xuat = jsonArr(data.hinh_anh_luu_xuat_json).slice();
@@ -329,6 +351,7 @@ function renderAll(){
   document.getElementById('i-ma-sp').textContent = c.ma_sp;
   document.getElementById('i-so-luong').textContent = c.so_luong_nghi_van;
   document.getElementById('i-mo-ta').textContent = c.mo_ta_loi;
+  document.getElementById('ipqc-evidence').innerHTML=(state.ipqcEvidence||[]).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" onclick="showLightbox(\''+escapeHtml(u)+'\')"></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
   document.getElementById('i-nguoi-dam-nhiem').textContent = c.nguoi_dam_nhiem || '—';
   document.getElementById('f-nguoi-dam-nhiem').value = c.nguoi_dam_nhiem_doi_sach || '';
   document.getElementById('f-nn-phat-sinh').value = c.nguyen_nhan_phat_sinh || '';
@@ -574,24 +597,81 @@ async function reopen(){
 // ===================== Cách ly tem/thùng hàng =====================
 function renderCachLyList(){
   const el = document.getElementById('cach-ly-list');
-  if (!state.cachLy.length) { el.innerHTML = '<div class="cach-ly-empty">Chưa cách ly tem nào.</div>'; return; }
-  el.innerHTML = state.cachLy.map(r => {
+  if (!state.cachLy.length) { el.innerHTML = '<div class="cach-ly-empty">Chưa cách ly Task nào.</div>'; return; }
+  const rows = state.cachLy.map(r => {
     const dangCachLy = r.trang_thai === 'dang_cach_ly';
-    const meta = dangCachLy
-      ? 'Cách ly bởi ' + escapeHtml(r.nguoi_cach_ly || '?') + ' lúc ' + new Date(r.thoi_diem_cach_ly).toLocaleString('vi-VN', { hour12: false })
-      : 'Đã giải toả bởi ' + escapeHtml(r.nguoi_giai_toa || '?') + ' lúc ' + new Date(r.thoi_diem_giai_toa).toLocaleString('vi-VN', { hour12: false });
-    return `<div class="cach-ly-row ${dangCachLy ? '' : 'da_giai_toa'}">
-      <div><span class="tag">${escapeHtml(r.tag_no)}</span><div class="meta">${meta}</div></div>
-      ${dangCachLy ? `<button type="button" class="btn btn-outline" onclick="giaiToaTem('${r.tag_no.replace(/'/g, "\\'")}')">🔓 Giải toả</button>` : ''}
-    </div>`;
+    const canRelease = dangCachLy && state.case.rc_trang_thai_duyet === 'da_duyet';
+    const time = r.thoi_diem_cach_ly;
+    const user = r.nguoi_cach_ly;
+    return `<tr><td><b class="tag">${escapeHtml(r.tag_no)}</b><br><small>${escapeHtml(r.ma_sp || '')} ${escapeHtml(r.ten_sp || '')}</small></td>
+      <td>${escapeHtml(r.lot_no || '—')}</td><td>${Number(r.so_luong_cach_ly || 0).toLocaleString('vi-VN')}</td>
+      <td><span class="hold-badge">${dangCachLy ? 'HOLD / NCP' : 'RELEASED'}</span><br><small>${escapeHtml(r.cong_doan_hien_tai || '')}</small></td>
+      <td>${time ? new Date(time).toLocaleString('vi-VN', { hour12: false }) : '—'}</td><td>${escapeHtml(user || '—')}</td>
+      <td>${canRelease ? `<button type="button" class="btn btn-outline" onclick="giaiToaTem('${r.tag_no.replace(/'/g, "\\'")}')">🔓 Release</button>` : (dangCachLy ? '<small>Chờ duyệt đối sách</small>' : '')}</td></tr>`;
   }).join('');
+  el.innerHTML = `<table class="cach-ly-table"><thead><tr><th>Task No.</th><th>LOT</th><th>Số lượng</th><th>Trạng thái</th><th>Thời gian</th><th>Người cách ly</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function resetTaskConfirmation(clearInput){
+  state.taskRequest++;
+  state.pendingTask = null;
+  const box = document.getElementById('taskResult');
+  box.className = 'task-result'; box.innerHTML = '';
+  if (clearInput) document.getElementById('manualTagInput').value = '';
+}
+
+async function confirmTask(){
+  const input = document.getElementById('manualTagInput');
+  const taskNo = parseTagNo(input.value);
+  const box = document.getElementById('taskResult');
+  resetTaskConfirmation(false);
+  const request = state.taskRequest;
+  if (!taskNo) { box.className = 'task-result error'; box.textContent = '⚠ Vui lòng nhập hoặc quét Task No.'; return; }
+  if (!(await ensureAuth())) return;
+  showOverlay('Đang kiểm tra Task ' + taskNo + '...');
+  let data, error;
+  try { ({ data, error } = await sb.rpc('duc_ncp_xac_nhan_task', { p_task_no: taskNo })); }
+  catch (err) { error = err; }
+  finally { hideOverlay(); }
+  if (request !== state.taskRequest || parseTagNo(input.value) !== taskNo) return;
+  if (error || !data || data.ok !== true || data.task_no !== taskNo) {
+    box.className = 'task-result error';
+    box.textContent = '⚠ ' + (error ? error.message : (data && data.error) || 'Task No. không tồn tại hoặc không hợp lệ');
+    return;
+  }
+  state.pendingTask = data; input.value = data.task_no; box.className = 'task-result show';
+  box.innerHTML = `<b>✓ Task hợp lệ</b><div class="task-info-grid">
+    <div><small>Task No.</small><b>${escapeHtml(data.task_no)}</b></div><div><small>Mã SP</small><b>${escapeHtml(data.ma_sp || '—')}</b></div>
+    <div><small>Tên SP</small><b>${escapeHtml(data.ten_sp || '—')}</b></div><div><small>LOT</small><b>${escapeHtml(data.lot || '—')}</b></div>
+    <div><small>Máy / công đoạn</small><b>${escapeHtml(data.may_cong_doan || '—')}</b></div><div><small>Số lượng hiện tại</small><b>${Number(data.so_luong || 0).toLocaleString('vi-VN')}</b></div>
+  </div>${data.dang_hold ? `<div style="color:var(--alarm-fg);font-weight:700">⚠ Task đang HOLD theo NCP ${escapeHtml(data.id_ncp_hold || '')}</div>` : '<button type="button" class="btn btn-alarm" id="btnConfirmHold">🔒 Xác nhận cách ly</button>'}`;
+  const holdBtn = document.getElementById('btnConfirmHold'); if (holdBtn) holdBtn.addEventListener('click', confirmHoldTask);
+}
+
+async function confirmHoldTask(){
+  if (state.holdingTask) return;
+  const task = state.pendingTask;
+  if (!task || task.dang_hold || parseTagNo(document.getElementById('manualTagInput').value) !== task.task_no) return alert('Hãy xác nhận Task trước khi cách ly.');
+  state.holdingTask = true;
+  try {
+  if (!(await ensureAuth())) return;
+  showOverlay('Đang cách ly Task ' + task.task_no + '...');
+  const { data, error } = await sb.rpc('duc_ncp_cach_ly_task', { p_id_ncp: state.id, p_tag_no: task.task_no, p_user: state.currentUserEmail });
+  hideOverlay();
+  if (error || !data || data.ok !== true) return alert('Lỗi: ' + (error ? error.message : data?.error || 'Không nhận được xác nhận cách ly từ MES.'));
+  await loadCachLy(); renderCachLyList(); resetTaskConfirmation(true); document.getElementById('manualTagInput').focus();
+  } catch (err) { alert('Không thể hoàn tất cách ly: ' + err.message); }
+  finally { hideOverlay(); state.holdingTask = false; }
 }
 
 async function giaiToaTem(tagNo){
   if (!(await ensureAuth())) return;
-  if (!confirm('Giải toả cách ly cho tem ' + tagNo + '?')) return;
+  if (state.case.rc_trang_thai_duyet !== 'da_duyet') return alert('Chỉ được Release sau khi đối sách NCP đã được phê duyệt.');
+  const lyDo = prompt('Nhập lý do giải phóng cách ly cho tem ' + tagNo + ':', 'Đã hoàn thành xử lý theo đối sách được duyệt');
+  if (lyDo === null) return;
+  if (!lyDo.trim()) return alert('Bắt buộc nhập lý do Release.');
   showOverlay('Đang giải toả...');
-  const { data, error } = await sb.rpc('duc_ncp_giai_toa_tem', { p_id_ncp: state.id, p_tag_no: tagNo, p_user: state.currentUserEmail });
+  const { data, error } = await sb.rpc('duc_ncp_giai_toa_tem_v2', { p_id_ncp: state.id, p_tag_no: tagNo, p_user: state.currentUserEmail, p_ly_do: lyDo.trim() });
   hideOverlay();
   if (error) return alert('Lỗi: ' + error.message);
   if (data && data.ok === false) return alert('Lỗi: ' + data.error);
@@ -654,6 +734,10 @@ async function onScanSuccess(decodedText){
 }
 
 document.getElementById("btnScan").addEventListener("click", openCamera);
+document.getElementById("btnConfirmTask").addEventListener("click", confirmTask);
+document.getElementById("manualTagInput").addEventListener("input", (e) => {
+  resetTaskConfirmation(false);
+});
 document.getElementById("btnCloseQrModal").addEventListener("click", closeQrModal);
 document.getElementById("qrFileInput").addEventListener("change", onFileChosen);
 document.getElementById("manualTagInput").addEventListener("keydown", (e) => {
@@ -661,7 +745,6 @@ document.getElementById("manualTagInput").addEventListener("keydown", (e) => {
   e.preventDefault();
   const v = e.target.value.trim();
   if (!v) return;
-  e.target.value = "";
   onQrDecoded(v);
 });
 
@@ -700,15 +783,10 @@ function parseTagNo(raw){
 
 async function onQrDecoded(text){
   const tagNo = parseTagNo(text);
-  if (!tagNo) return alert("Không đọc được Tag No từ dữ liệu vừa quét/nhập.");
-  if (!(await ensureAuth())) return;
-  showOverlay('Đang cách ly tem ' + tagNo + '...');
-  const { data, error } = await sb.rpc('duc_ncp_cach_ly_tem', { p_id_ncp: state.id, p_tag_no: tagNo, p_user: state.currentUserEmail });
-  hideOverlay();
-  if (error) return alert('Lỗi: ' + error.message);
-  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
-  await loadCachLy();
-  renderCachLyList();
+  if (!tagNo) return alert("Không đọc được Task No. từ dữ liệu vừa quét/nhập.");
+  document.getElementById('manualTagInput').value = tagNo;
+  resetTaskConfirmation(false);
+  document.getElementById('btnConfirmTask').focus();
 }
 
 load();

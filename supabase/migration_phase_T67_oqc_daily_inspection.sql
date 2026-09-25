@@ -1,3 +1,6 @@
+-- [Đổi số 25/09/2026] Tên cũ: T38_oqc_daily_inspection.sql (trùng số phase / sai quy ước tên).
+--   Nội dung KHÔNG đổi — đã chạy trên staging thì KHÔNG cần chạy lại.
+--   Bản vá bảo mật + phân quyền: migration_phase_D61_bao_mat_phan_quyen_iqc_ipqc_oqc_bom_ncp.sql (chạy SAU file này).
 -- T38 - Master loi dung chung va phieu OQC kiem tra thanh pham.
 alter table public.master_employees add column if not exists ma_nv text;
 create unique index if not exists uq_master_employees_ma_nv on public.master_employees(ma_nv) where ma_nv is not null;

@@ -1,3 +1,6 @@
+-- [Đổi số 25/09/2026] Tên cũ: supabase/migrations/20260916103000_ncp_quarantine_mes_enforcement.sql (trùng số phase / sai quy ước tên).
+--   Nội dung KHÔNG đổi — đã chạy trên staging thì KHÔNG cần chạy lại.
+--   Bản vá bảo mật + phân quyền: migration_phase_D61_bao_mat_phan_quyen_iqc_ipqc_oqc_bom_ncp.sql (chạy SAU file này).
 -- Đồng bộ cách ly NCP vào MES và khóa mọi đường đi của tem/LOT đang HOLD.
 -- Mở rộng cấu trúc T35, không tạo một hệ trạng thái cách ly song song.
 
