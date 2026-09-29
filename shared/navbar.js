@@ -65,6 +65,7 @@
     { label: 'Tài khoản', href: 'quan-ly-tai-khoan.html' },
     { label: 'Danh mục', href: 'quan-ly-danh-muc.html' },
     { label: 'Năng lực máy CNC', href: 'nang-luc-cnc.html' },
+    { label: 'Bom', href: 'bom.html' },
   ] };
 
   // Tiêu đề chuẩn hoá cho từng trang — 1 nguồn duy nhất, thay cho header tự
@@ -108,6 +109,7 @@
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
     'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
+    'bom.html': { icon: '🧾', title: 'BOM Sản Phẩm', desc: 'Nhôm, linh kiện và luồng công đoạn theo từng phiên bản BOM', noTitleBar: true },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
   };
