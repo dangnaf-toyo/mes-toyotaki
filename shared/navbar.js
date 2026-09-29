@@ -24,7 +24,6 @@
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
       { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
-      { label: 'Bom', href: 'bom.html' },
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
@@ -66,6 +65,7 @@
     { label: 'Tài khoản', href: 'quan-ly-tai-khoan.html' },
     { label: 'Danh mục', href: 'quan-ly-danh-muc.html' },
     { label: 'Năng lực máy CNC', href: 'nang-luc-cnc.html' },
+    { label: 'Bom', href: 'bom.html' },
   ] };
 
   // Tiêu đề chuẩn hoá cho từng trang — 1 nguồn duy nhất, thay cho header tự
