@@ -53,7 +53,10 @@ const MesAuth = {
   },
 
   async signOut() {
-    await sb.auth.signOut();
+    // scope 'local': chỉ đăng xuất trình duyệt này. Mặc định 'global' thu hồi
+    // phiên của cùng tài khoản trên MỌI máy (trạm quét dùng chung tài khoản
+    // bị văng ra giữa ca → RPC chạy như anon → "permission denied").
+    await sb.auth.signOut({ scope: 'local' });
     window.location.href = 'shared/login.html';
   },
 

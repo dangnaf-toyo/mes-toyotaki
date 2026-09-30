@@ -581,6 +581,18 @@ async function loadNguoiKiem(){
 document.getElementById('btnGoLogin').addEventListener('click', () => {
   window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href);
 });
+// Trạm quét để mở cả ca — phiên có thể mất giữa chừng (đăng xuất ở tab khác,
+// refresh token hết hạn/bị thu hồi). Từ D61 các RPC ghi dữ liệu chặn anon →
+// hiện ngay màn "Cần đăng nhập" thay vì để người quét gặp "permission denied".
+function showAuthGate(){
+  document.getElementById('mainUI').style.display = 'none';
+  document.getElementById('authGate').classList.add('show');
+}
+sb.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_OUT' || !session) showAuthGate(); });
+function rpcErrText(error){
+  if (error && error.code === '42501') { showAuthGate(); return 'Phiên đăng nhập đã hết — bấm "Đến trang đăng nhập" để đăng nhập lại rồi quét lại tem.'; }
+  return (error && error.message) || String(error);
+}
 
 // ── Trạm đang hoạt động (không cần chọn ngày/ca — luôn hôm nay) ────────────
 async function loadTrams(){
@@ -944,7 +956,7 @@ async function ghiNhan(raw){
 
   try {
     const { data, error } = await sb.rpc('cd_ghi_nhan_tem_thanh_pham', { p_tag_no: tagNo, p_nguoi_kiem, p_id_tram });
-    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', error.message || String(error)]]); beep(false); showMsg('', ''); return; }
+    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', rpcErrText(error)]]); beep(false); showMsg('', ''); return; }
     if (!data || data.ok === false) {
       const isDup = data && data.da_ghi_nhan;
       renderResult(isDup ? 'warn' : 'err', isDup ? 'Tem đã được ghi nhận' : 'Không ghi nhận được',
@@ -1020,7 +1032,7 @@ async function ghiNhanKanban(raw){
 
   try {
     const { data, error } = await sb.rpc('duc_ghi_nhan_tem_kanban', { p_tag_no: tagNo, p_may_tt, p_nguoi_tt });
-    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', error.message || String(error)]]); beep(false); showMsg('', ''); return; }
+    if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', rpcErrText(error)]]); beep(false); showMsg('', ''); return; }
     if (!data || data.ok === false) {
       const isDup = data && data.da_ghi_nhan;
       renderResult(isDup ? 'warn' : 'err', isDup ? 'Tem đã được ghi nhận' : 'Không ghi nhận được',
