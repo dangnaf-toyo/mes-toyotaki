@@ -370,6 +370,7 @@
       <div class="nvl-toolbar">
         <input type="search" id="nvl-search" placeholder="Lọc nhanh: nhà cung cấp / mã / khách hàng…" autocomplete="off" aria-label="Lọc bảng nguyên vật liệu">
         <span class="nvl-count" id="nvl-count"></span>
+        <button type="button" class="btn-add" id="nvl-add">＋ Thêm mới</button>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -391,7 +392,7 @@
       <div class="modal-overlay" id="nvl-modal">
         <div class="modal">
           <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
-          <h2>Sửa nguyên vật liệu</h2>
+          <h2 id="nvl-form-title">Thêm nguyên vật liệu</h2>
           <div class="msg" id="nvl-msg"></div>
           <form id="nvl-form">
             <div class="form-grid">
@@ -402,7 +403,7 @@
               <div><label for="nvl-customer">Khách hàng sử dụng</label><input id="nvl-customer"></div>
               <div><label for="nvl-product">Sản phẩm sử dụng</label><input id="nvl-product"></div>
             </div>
-            <div class="form-actions"><button type="submit">Lưu thay đổi</button></div>
+            <div class="form-actions"><button type="submit" id="nvl-submit">Thêm nguyên vật liệu</button></div>
           </form>
         </div>
       </div>
@@ -527,12 +528,16 @@ function resetNvlForm(){
   nvlEditingIndex = null;
   clearMsg('nvl-msg');
   document.getElementById('nvl-form').reset();
+  document.getElementById('nvl-form-title').textContent = 'Thêm nguyên vật liệu';
+  document.getElementById('nvl-submit').textContent = 'Thêm nguyên vật liệu';
 }
 function openNvlEdit(index){
   const row = nvlRows[index];
   if (!row) return;
   nvlEditingIndex = index;
   clearMsg('nvl-msg');
+  document.getElementById('nvl-form-title').textContent = 'Sửa nguyên vật liệu';
+  document.getElementById('nvl-submit').textContent = 'Lưu thay đổi';
   document.getElementById('nvl-supplier').value = row.supplier;
   document.getElementById('nvl-name').value = row.name;
   document.getElementById('nvl-code').value = row.code;
@@ -552,6 +557,10 @@ const nvlModal = document.getElementById('nvl-modal');
 nvlModal._close = () => { closeModal('nvl-modal'); resetNvlForm(); };
 nvlModal.addEventListener('click', e => { if (e.target === nvlModal) nvlModal._close(); });
 nvlModal.querySelector('[data-close-modal]').addEventListener('click', nvlModal._close);
+document.getElementById('nvl-add').addEventListener('click', () => {
+  resetNvlForm();
+  openModal('nvl-modal');
+});
 document.getElementById('nvl-tbody').addEventListener('click', e => {
   const button = e.target.closest('button[data-nvl-action]');
   if (!button) return;
@@ -565,7 +574,7 @@ document.getElementById('nvl-tbody').addEventListener('click', e => {
 });
 document.getElementById('nvl-form').addEventListener('submit', e => {
   e.preventDefault();
-  if (nvlEditingIndex === null || !nvlRows[nvlEditingIndex]) return;
+  if (nvlEditingIndex !== null && !nvlRows[nvlEditingIndex]) return;
   const row = {
     supplier: document.getElementById('nvl-supplier').value.trim(),
     name: document.getElementById('nvl-name').value.trim(),
@@ -577,10 +586,11 @@ document.getElementById('nvl-form').addEventListener('submit', e => {
   if (nvlRows.some((item, index) => index !== nvlEditingIndex && item.toyotakiCode.toLowerCase() === row.toyotakiCode.toLowerCase())){
     return showMsg('nvl-msg', 'error', 'Mã NVL hệ thống Toyotaki đã tồn tại.');
   }
-  const nextRows = nvlRows.map((item, index) => index === nvlEditingIndex ? row : item);
+  const isNew = nvlEditingIndex === null;
+  const nextRows = isNew ? [...nvlRows, row] : nvlRows.map((item, index) => index === nvlEditingIndex ? row : item);
   if (!saveNvlRows(nextRows)) return;
   nvlModal._close();
-  toast('Đã lưu ' + row.toyotakiCode);
+  toast((isNew ? 'Đã thêm ' : 'Đã lưu ') + row.toyotakiCode);
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(ov => ov._close && ov._close());
