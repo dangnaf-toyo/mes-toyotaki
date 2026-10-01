@@ -546,15 +546,19 @@ async function loadTonKho(maSp){
   const allSteps = steps.concat(extra);
 
   if (!allSteps.length) { row.innerHTML = '<div class="empty">Mã SP này chưa có tem nào còn tồn.</div>'; return; }
+  // Ô "Xuất hàng" không hiển thị — hàng đã xuất không còn là tồn kho.
+  const TK_LABEL = { 'Đúc': 'Tồn kho sau đúc', 'Nhập kho': 'Tồn kho thành phẩm' };
   const tiles = [];
   allSteps.forEach(cd => {
+    if (cd === 'Xuất hàng') return;
     if (cd === 'Đánh bóng Kẽm') {
-      tiles.push(['Chờ đánh bóng', wipMap['Đánh bóng Kẽm'] || 0]);
-      tiles.push(['Đã đánh bóng', tpMap['Đánh bóng Kẽm'] || 0]);
+      tiles.push(['Tồn kho chờ đánh bóng', wipMap['Đánh bóng Kẽm'] || 0]);
+      tiles.push(['Tồn kho sau đánh bóng', tpMap['Đánh bóng Kẽm'] || 0]);
     } else {
-      tiles.push([cd, combined[cd] || 0]);
+      tiles.push([TK_LABEL[cd] || cd, combined[cd] || 0]);
     }
   });
+  if (!tiles.length) { row.innerHTML = '<div class="empty">Mã SP này chưa có tem nào còn tồn.</div>'; return; }
   row.innerHTML = tiles.map(([label, sl]) =>
     '<div class="tk-tile' + (sl > 0 ? ' here' : '') + '"><div class="tk-v">' + fmtNum(sl) + '</div><div class="tk-l">' + escapeHtml(label) + '</div></div>').join('');
 }
