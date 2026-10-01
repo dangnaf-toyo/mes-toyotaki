@@ -117,6 +117,12 @@ tr:hover td{background:var(--bg-sunken)}
 .log-item .lm{color:var(--text-dim);font-size:10.5px;margin-top:2px}
 .log-item .lr{color:var(--accent-hover);margin-top:3px;font-style:italic}
 .log-empty{color:var(--text-dim);font-size:12px;font-style:italic;padding:8px 0}
+.history-tools{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:6px}
+.history-tools .fg{min-width:150px}
+.history-results{display:none;margin:0 0 14px}
+.history-results.open{display:block}
+.history-results h3{font-size:12.5px;margin:0 0 8px}
+.history-total td{font-weight:700;background:var(--bg-sunken)}
 </style>
 </head>
 <body>
@@ -153,6 +159,21 @@ tr:hover td{background:var(--bg-sunken)}
     <div id="tongTuanBar" style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:10px"></div>
     <button type="button" class="log-toggle" id="logToggle">▸ Xem lịch sử thay đổi &amp; duyệt (0)</button>
     <div class="log-list" id="logList"></div>
+
+    <div class="history-tools">
+      <div class="fg"><label for="historyStart">Từ ngày</label><input id="historyStart" type="date"></div>
+      <div class="fg"><label for="historyEnd">Đến ngày</label><input id="historyEnd" type="date"></div>
+      <button type="button" class="btn" id="btnHistorySearch">Tra cứu</button>
+    </div>
+    <div class="history-results" id="historyResults">
+      <h3 id="historyTitle">Kết quả tra cứu</h3>
+      <div class="tbl-wrap">
+        <table id="tblHistory">
+          <thead><tr><th>Mã máy</th><th>Mã SP</th><th>Tên SP</th><th>Số khuôn</th><th>Tổng kế hoạch</th><th>Tổng thực tế</th><th>Ghi chú</th></tr></thead>
+          <tbody id="tbodyHistory"></tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- PANEL: Đúc (khoá theo máy) -->
     <div class="panel" id="panelDuc">
@@ -311,6 +332,10 @@ function fmtDate(d){
 function fmtDateVN(d){
   return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
 }
+function parseDateInput(value){
+  const parts = String(value || '').split('-').map(Number);
+  return parts.length === 3 && parts.every(Number.isFinite) ? new Date(parts[0], parts[1]-1, parts[2]) : null;
+}
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 // Ô ngày = 0 (không có kế hoạch) hiện dấu "—" cho dễ đọc thay vì số 0 lặp lại.
 function fmtDayNum(n){ return (Number(n)||0) === 0 ? '' : fmtNum(n); }
@@ -332,6 +357,7 @@ function renderTabs(){
 
 function onTabChange(){
   renderTabs();
+  document.getElementById('historyResults').classList.remove('open');
   const isDuc = activeTab === 'Đúc';
   document.getElementById('panelDuc').classList.toggle('active', isDuc);
   document.getElementById('panelCd').classList.toggle('active', !isDuc);
@@ -585,6 +611,122 @@ function renderTongTuanBar(){
   const rows = activeTab === 'Đúc' ? ducRows : cdRows;
   document.getElementById('tongTuanBar').textContent =
     '📊 Tổng sản lượng kế hoạch tuần (' + activeTab + '): ' + fmtNum(tongTuanCua(rows)) + ' sản phẩm';
+}
+
+async function searchPlanHistory(){
+  const startDate = parseDateInput(document.getElementById('historyStart').value);
+  const endDate = parseDateInput(document.getElementById('historyEnd').value);
+  if (!startDate || !endDate) return showMsg('Vui lòng chọn đầy đủ Từ ngày và Đến ngày', 'err', 3000);
+  if (startDate > endDate) return showMsg('Từ ngày không được lớn hơn Đến ngày', 'err', 3000);
+
+  const isDuc = activeTab === 'Đúc';
+  const table = isDuc ? 'duc_khsx_tuan_plan' : 'cd_khsx_tuan_plan';
+  const firstWeek = fmtDate(mondayOf(startDate));
+  const lastWeek = fmtDate(mondayOf(endDate));
+  const button = document.getElementById('btnHistorySearch');
+  const tbody = document.getElementById('tbodyHistory');
+  const results = document.getElementById('historyResults');
+  button.disabled = true;
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Đang tra cứu…</td></tr>';
+  results.classList.add('open');
+
+  const startISO = document.getElementById('historyStart').value;
+  const endISO = document.getElementById('historyEnd').value;
+  const todayISO = fmtDate(new Date());
+  const includesToday = startISO <= todayISO && todayISO <= endISO;
+  const [planResult, actualResult, liveResult, closedResult] = await Promise.all([
+    fetchAllHistoryRows(() => {
+      let query = sb.from(table).select('*').gte('tuan_bat_dau', firstWeek).lte('tuan_bat_dau', lastWeek).order('tuan_bat_dau');
+      if (!isDuc) query = query.eq('cong_doan', activeTab);
+      return query;
+    }),
+    fetchAllHistoryRows(() => isDuc
+      ? sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,tt_ca').gte('ngay', startISO).lte('ngay', endISO)
+      : sb.from('cd_bao_cao_ca').select('ngay,ca,cong_doan,ma_sp,ten_sp,so_luong_ok').eq('cong_doan', activeTab).gte('ngay', startISO).lte('ngay', endISO)),
+    includesToday ? fetchAllHistoryRows(() => isDuc
+      ? sb.from('duc_ca_hien_tai').select('ngay,ca,ma_may,ma_sp,ten_sp,tt_ca').eq('ngay', todayISO)
+      : sb.from('cd_tram_hien_tai').select('ngay,ca,cong_doan,ma_sp,ten_sp,so_luong_ok').eq('cong_doan', activeTab).eq('ngay', todayISO))
+      : Promise.resolve({ data: [], error: null }),
+    includesToday ? fetchAllHistoryRows(() => isDuc
+      ? sb.from('duc_bao_cao_ca').select('ngay,ca').eq('ngay', todayISO)
+      : sb.from('cd_bao_cao_ca').select('ngay,ca,cong_doan').eq('cong_doan', activeTab).eq('ngay', todayISO))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  button.disabled = false;
+  const error = planResult.error || actualResult.error || liveResult.error || closedResult.error;
+  if (error) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Không thể tải dữ liệu: ' + escapeHtml(error.message) + '</td></tr>';
+    return;
+  }
+
+  const totals = new Map();
+  const dayColumns = ['t2','t3','t4','t5','t6','t7','cn'];
+  function getItem(row){
+    const machine = isDuc ? String(row.ma_may || '') : '';
+    const product = String(row.ma_sp || '');
+    const key = machine + '\u0000' + product;
+    let item = totals.get(key);
+    if (!item) {
+      item = { ma_may: machine, ma_sp: product, ten_sp: row.ten_sp || '', so_khuon: new Set(), ghi_chu: new Set(), plan: 0, actual: 0 };
+      totals.set(key, item);
+    }
+    if (!item.ten_sp && row.ten_sp) item.ten_sp = row.ten_sp;
+    return item;
+  }
+
+  (planResult.data || []).forEach(row => {
+    const monday = parseDateInput(row.tuan_bat_dau);
+    if (!monday) return;
+    let quantity = 0;
+    dayColumns.forEach((column, dayIndex) => {
+      const day = new Date(monday);
+      day.setDate(day.getDate() + dayIndex);
+      if (day >= startDate && day <= endDate) quantity += Number(row[column]) || 0;
+    });
+    if (quantity === 0) return;
+    const item = getItem(row);
+    if (row.so_khuon) String(row.so_khuon).split(',').map(value => value.trim()).filter(Boolean).forEach(value => item.so_khuon.add(value));
+    if (row.ghi_chu) item.ghi_chu.add(String(row.ghi_chu).trim());
+    item.plan += quantity;
+  });
+
+  const closedShifts = new Set((closedResult.data || []).map(row => row.ca));
+  const actualRows = (actualResult.data || []).concat((liveResult.data || []).filter(row => !closedShifts.has(row.ca)));
+  actualRows.forEach(row => {
+    const quantity = Number(isDuc ? row.tt_ca : row.so_luong_ok) || 0;
+    if (quantity === 0) return;
+    getItem(row).actual += quantity;
+  });
+
+  const resultRows = [...totals.values()].sort((a, b) =>
+    a.ma_may.localeCompare(b.ma_may, 'vi', { numeric: true }) || a.ma_sp.localeCompare(b.ma_sp, 'vi', { numeric: true })
+  );
+  const totalPlan = resultRows.reduce((sum, item) => sum + item.plan, 0);
+  const totalActual = resultRows.reduce((sum, item) => sum + item.actual, 0);
+  document.getElementById('historyTitle').textContent = 'Kết quả ' + activeTab + ': ' + fmtDateVN(startDate) + ' – ' + fmtDateVN(endDate);
+  tbody.innerHTML = resultRows.length
+    ? resultRows.map(item => '<tr>'
+      + '<td>' + escapeHtml(item.ma_may || '—') + '</td>'
+      + '<td>' + escapeHtml(item.ma_sp) + '</td>'
+      + '<td>' + escapeHtml(item.ten_sp) + '</td>'
+      + '<td>' + escapeHtml([...item.so_khuon].join(', ') || '—') + '</td>'
+      + '<td class="num tong">' + fmtNum(item.plan) + '</td>'
+      + '<td class="num tong">' + fmtNum(item.actual) + '</td>'
+      + '<td>' + escapeHtml([...item.ghi_chu].join(' | ') || '—') + '</td></tr>').join('')
+      + '<tr class="history-total"><td colspan="4">Tổng cộng</td><td class="num">' + fmtNum(totalPlan) + '</td><td class="num">' + fmtNum(totalActual) + '</td><td></td></tr>'
+    : '<tr class="empty-row"><td colspan="7">Không có kế hoạch hoặc sản lượng thực tế trong khoảng thời gian này.</td></tr>';
+}
+
+async function fetchAllHistoryRows(createQuery){
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize){
+    const { data, error } = await createQuery().range(offset, offset + pageSize - 1);
+    if (error) return { data: null, error };
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < pageSize) return { data: rows, error: null };
+  }
 }
 
 // =============================================================================
@@ -1328,6 +1470,11 @@ document.getElementById('fileNhapExcel').addEventListener('change', async (e) =>
 document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()-7); onWeekChange(); });
 document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday.setDate(weekMonday.getDate()+7); onWeekChange(); });
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
+document.getElementById('historyStart').value = fmtDate(weekMonday);
+const initialWeekSunday = new Date(weekMonday);
+initialWeekSunday.setDate(initialWeekSunday.getDate() + 6);
+document.getElementById('historyEnd').value = fmtDate(initialWeekSunday);
+document.getElementById('btnHistorySearch').addEventListener('click', searchPlanHistory);
 function onWeekChange(){ updateWeekLabel(); loadActivePanel(); loadDuyetInfo(); loadChangeLog(); }
 
 function startHeaderClock(){
