@@ -226,7 +226,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
     <div class="field">
       <label>Số khuôn <span class="req">*</span></label>
       <div class="chip-row" id="pl-so-khuon-chips"></div>
-      <input type="text" autocomplete="off" id="pl-so-khuon" placeholder="Chọn mã SP trước để gợi ý khuôn" oninput="onSoKhuonManualInput('pl')">
+      <input type="text" autocomplete="off" id="pl-so-khuon" placeholder="Chọn khuôn ở trên" readonly>
       <div class="form-hint" id="pl-so-khuon-hint"></div>
     </div>
     <div class="field-row">
@@ -290,7 +290,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
     <div class="field">
       <label>Số khuôn mới <span class="req">*</span></label>
       <div class="chip-row" id="cp-so-khuon-chips"></div>
-      <input type="text" autocomplete="off" id="cp-so-khuon" placeholder="Chọn mã SP trước để gợi ý khuôn" oninput="onSoKhuonManualInput('cp')">
+      <input type="text" autocomplete="off" id="cp-so-khuon" placeholder="Chọn khuôn ở trên" readonly>
       <div class="form-hint" id="cp-so-khuon-hint"></div>
     </div>
     <div class="field-row">
@@ -623,12 +623,15 @@ function populateSoKhuonMobile(prefix, maSp, currentValue){
   const chipsEl = document.getElementById(prefix + '-so-khuon-chips');
   const inputEl = document.getElementById(prefix + '-so-khuon');
   const hintEl = document.getElementById(prefix + '-so-khuon-hint');
-  const molds = (maSp && state.moldsByProduct[maSp]) || [];
+  // Không cho nhập số khuôn tự do (T71) — chỉ chọn chip trong danh sách khuôn
+  // của SP. Dòng cũ đang mang khuôn ngoài danh sách vẫn giữ khuôn đó.
+  const molds = ((maSp && state.moldsByProduct[maSp]) || []).slice();
+  if (currentValue && molds.indexOf(currentValue) === -1) molds.push(currentValue);
 
   if (molds.length === 0) {
     chipsEl.innerHTML = '';
-    if (currentValue != null) inputEl.value = currentValue;
-    hintEl.textContent = maSp ? 'Chưa có khuôn khai báo cho SP ' + maSp + ' — nhập tay số khuôn' : '';
+    inputEl.value = '';
+    hintEl.textContent = maSp ? 'SP ' + maSp + ' chưa khai báo số khuôn — nhờ quản lý khai báo ở Quản lý danh mục → Sản phẩm.' : '';
     return;
   }
 
@@ -641,14 +644,8 @@ function populateSoKhuonMobile(prefix, maSp, currentValue){
   });
   inputEl.value = selected;
   hintEl.textContent = molds.length === 1
-    ? 'Tự động chọn khuôn duy nhất của SP này (có thể sửa tay nếu sai)'
-    : 'Chọn 1 trong ' + molds.length + ' khuôn đã biết, hoặc tự nhập khuôn khác bên dưới';
-}
-
-function onSoKhuonManualInput(prefix){
-  document.querySelectorAll('#' + prefix + '-so-khuon-chips .chip-opt').forEach(btn => {
-    btn.classList.toggle('sel', btn.dataset.mk === document.getElementById(prefix + '-so-khuon').value);
-  });
+    ? 'Tự động chọn khuôn duy nhất của SP này'
+    : 'Chọn 1 trong ' + molds.length + ' khuôn của SP này';
 }
 
 function addMoldToProductMapMobile(maSp, soKhuon){
