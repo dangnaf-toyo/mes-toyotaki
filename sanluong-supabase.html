@@ -329,17 +329,17 @@
         <div class="kpi-card">
           <div class="kpi-label" id="kpiFcNextLabel">Dự báo sản lượng tháng tới</div>
           <div class="kpi-value" id="kpiFcNext">—</div>
-          <div class="kpi-target" id="kpiFcNextSub">Pcs</div>
+          <div class="kpi-target" id="kpiFcNextSub">nghìn Pcs</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label" id="kpiFcYearLabel">Dự báo tổng sản lượng đến cuối năm</div>
           <div class="kpi-value" id="kpiFcYear">—</div>
-          <div class="kpi-target" id="kpiFcYearSub">Pcs</div>
+          <div class="kpi-target" id="kpiFcYearSub">nghìn Pcs</div>
         </div>
       </div>
 
       <div class="card" style="margin-top:22px;">
-        <h3>Forecast sản lượng theo khách hàng lớn (Pcs/tháng)</h3>
+        <h3>Forecast sản lượng theo khách hàng lớn (nghìn Pcs/tháng)</h3>
         <div class="card-sub">Tháng 1 – Tháng 12, 2026 · Đậm = Thực tế · Nhạt = Dự báo</div>
         <div class="chart-box wide"><canvas id="chartForecast"></canvas></div>
       </div>
@@ -663,9 +663,9 @@ function buildForecastChart(data){
       responsive:true, maintainAspectRatio:false,
       layout:{padding:{top:18}},
       plugins:{legend:{position:'bottom', labels:{boxWidth:12,font:{size:11}}}},
-      scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, title:{display:true,text:'Pcs'}, grid:{color:grid}} }
+      scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, title:{display:true,text:'Nghìn Pcs'}, grid:{color:grid}} }
     },
-    // Tổng Pcs của tháng ghi trên đỉnh mỗi cột chồng (chỉ cộng các khách hàng đang hiện).
+    // Tổng sản lượng (nghìn Pcs) của tháng ghi trên đỉnh mỗi cột chồng (chỉ cộng các khách hàng đang hiện).
     plugins:[{
       id:'forecastTotals',
       afterDatasetsDraw(c){
@@ -685,7 +685,7 @@ function buildForecastChart(data){
             const el = m.data[i];
             if (el) { top = Math.min(top, el.y, el.base); x = el.x; }
           });
-          if (has && sum && x != null) g.fillText(Math.round(sum).toLocaleString('vi-VN'), x, top - 3);
+          if (has && sum && x != null) g.fillText(fmtK(sum), x, top - 3);
         });
         g.restore();
       }
@@ -694,6 +694,9 @@ function buildForecastChart(data){
   chartsByTab.tab4 = [chart];
   renderForecastKpis(data);
 }
+
+// Số forecast nhập theo đơn vị nghìn Pcs — giữ nguyên đơn vị, tối đa 1 chữ số lẻ.
+function fmtK(n){ return n==null ? '—' : Number(n).toLocaleString('vi-VN',{maximumFractionDigits:1}); }
 
 // Tháng tới = tháng sau tháng hiện tại. Cả năm = tháng thực tế (số đã có) + tháng dự báo.
 function renderForecastKpis(data){
@@ -708,8 +711,8 @@ function renderForecastKpis(data){
   if (next <= 11) {
     set('kpiFcNextLabel', `Dự báo sản lượng tháng ${next + 1}/${year}`);
     const v = monthTotal(next);
-    set('kpiFcNext', v == null ? '—' : fmtInt(v));
-    set('kpiFcNextSub', v == null ? 'Chưa có số dự báo' : 'Pcs');
+    set('kpiFcNext', v == null ? '—' : fmtK(v));
+    set('kpiFcNextSub', v == null ? 'Chưa có số dự báo' : 'nghìn Pcs');
   } else {
     set('kpiFcNextLabel', `Dự báo sản lượng tháng 1/${year + 1}`);
     set('kpiFcNext', '—');
@@ -722,8 +725,8 @@ function renderForecastKpis(data){
     if (isForecastMonth(loai[i], i)) fc += v; else actual += v;
   }
   set('kpiFcYearLabel', `Dự báo tổng sản lượng năm ${year}`);
-  set('kpiFcYear', fmtInt(actual + fc));
-  set('kpiFcYearSub', `Thực tế ${fmtInt(actual)} + dự báo ${fmtInt(fc)} Pcs`);
+  set('kpiFcYear', fmtK(actual + fc));
+  set('kpiFcYearSub', `Thực tế ${fmtK(actual)} + dự báo ${fmtK(fc)} nghìn Pcs`);
 }
 buildForecastChart(DEMO_DATA.forecast);
 
