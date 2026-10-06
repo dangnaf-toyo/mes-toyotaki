@@ -325,7 +325,20 @@
         <span class="note">FCC · Exedy · Astemo · TTI · Khác</span>
       </div>
 
-      <div class="card">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label" id="kpiFcNextLabel">Dự báo sản lượng tháng tới</div>
+          <div class="kpi-value" id="kpiFcNext">—</div>
+          <div class="kpi-target" id="kpiFcNextSub">Pcs</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label" id="kpiFcYearLabel">Dự báo tổng sản lượng đến cuối năm</div>
+          <div class="kpi-value" id="kpiFcYear">—</div>
+          <div class="kpi-target" id="kpiFcYearSub">Pcs</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px;">
         <h3>Forecast sản lượng theo khách hàng lớn (Pcs/tháng)</h3>
         <div class="card-sub">Tháng 1 – Tháng 12, 2026 · Đậm = Thực tế · Nhạt = Dự báo</div>
         <div class="chart-box wide"><canvas id="chartForecast"></canvas></div>
@@ -679,6 +692,38 @@ function buildForecastChart(data){
     }]
   });
   chartsByTab.tab4 = [chart];
+  renderForecastKpis(data);
+}
+
+// Tháng tới = tháng sau tháng hiện tại. Cả năm = tháng thực tế (số đã có) + tháng dự báo.
+function renderForecastKpis(data){
+  const keys = Object.keys(forecastColorsHex), loai = data.loai || [];
+  const monthTotal = i => {
+    let s = 0, has = false;
+    keys.forEach(k => { const v = (data.values[k] || [])[i]; if (v != null && !isNaN(v)) { s += Number(v); has = true; } });
+    return has ? s : null;
+  };
+  const now = new Date(), year = now.getFullYear(), next = now.getMonth() + 1;
+  const set = (id, v) => { document.getElementById(id).textContent = v; };
+  if (next <= 11) {
+    set('kpiFcNextLabel', `Dự báo sản lượng tháng ${next + 1}/${year}`);
+    const v = monthTotal(next);
+    set('kpiFcNext', v == null ? '—' : fmtInt(v));
+    set('kpiFcNextSub', v == null ? 'Chưa có số dự báo' : 'Pcs');
+  } else {
+    set('kpiFcNextLabel', `Dự báo sản lượng tháng 1/${year + 1}`);
+    set('kpiFcNext', '—');
+    set('kpiFcNextSub', 'Chưa có dữ liệu năm sau');
+  }
+  let actual = 0, fc = 0;
+  for (let i = 0; i < 12; i++) {
+    const v = monthTotal(i);
+    if (v == null) continue;
+    if (isForecastMonth(loai[i], i)) fc += v; else actual += v;
+  }
+  set('kpiFcYearLabel', `Dự báo tổng sản lượng năm ${year}`);
+  set('kpiFcYear', fmtInt(actual + fc));
+  set('kpiFcYearSub', `Thực tế ${fmtInt(actual)} + dự báo ${fmtInt(fc)} Pcs`);
 }
 buildForecastChart(DEMO_DATA.forecast);
 
