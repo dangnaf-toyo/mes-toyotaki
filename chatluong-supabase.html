@@ -64,6 +64,7 @@
   @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
 
   .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;}
+  .kpi-span3{grid-column:span 3;}
   .kpi{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px;}
   .kpi .eyebrow{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600;}
   .kpi .big{font-family:'Inter',sans-serif; font-size:29px; font-weight:700; margin:6px 0 2px; display:flex; align-items:baseline; gap:8px;}
@@ -139,6 +140,9 @@
   @media (max-width:1000px){
     .kpi-row{grid-template-columns:repeat(2,1fr);}
     #batThuongKpiRow{grid-template-columns:repeat(3,1fr) !important;}
+    #baopheKpiRow{grid-template-columns:repeat(2,1fr) !important;}
+    .kpi-span3{grid-column:1 / -1;}
+    #baopheKpiRow .kpi:last-child:nth-child(odd){grid-column:1 / -1;}
     .grid-2{grid-template-columns:1fr;}
     .grid-3{grid-template-columns:1fr;}
     .proc-grid{grid-template-columns:1fr;}
@@ -212,7 +216,7 @@
   <!-- ================= CHI PHÍ PHẾ PHẨM ================= -->
   <section class="view" id="baophe">
 
-    <div class="kpi-row" id="baopheKpiRow"></div>
+    <div class="kpi-row" id="baopheKpiRow" style="grid-template-columns:repeat(5,1fr);"></div>
 
     <div class="grid-2">
       <div class="panel">
@@ -1391,7 +1395,7 @@ async function fetchBaoPheChiTietForMonth(thang){
 
 function renderBaophKpiRow(row){
   const el = document.getElementById('baopheKpiRow');
-  if (!row){ el.innerHTML = '<div class="kpi"><div class="eyebrow">Chưa có dữ liệu</div></div>'; return; }
+  if (!row){ el.innerHTML = '<div class="kpi kpi-span3"><div class="eyebrow">Chưa có dữ liệu chi phí báo phế cho tháng này</div></div>' + renderBaopheYtdKpis(); return; }
   const rate = (row.tong_chi_phi != null && row.tong_doanh_thu) ? (row.tong_chi_phi / row.tong_doanh_thu * 100) : null;
   const target = row.muc_tieu != null ? row.muc_tieu * 100 : null;
   const ok = rate != null && target != null ? rate <= target : null;
@@ -1408,6 +1412,31 @@ function renderBaophKpiRow(row){
     <div class="kpi">
       <div class="eyebrow">Đánh giá</div>
       <div class="big">${ok == null ? '–' : `<span class="pill ${ok ? 'good' : 'bad'}">${ok ? 'Đạt' : 'Không đạt'}</span>`}</div>
+    </div>${renderBaopheYtdKpis()}`;
+}
+
+// Lũy kế từ đầu năm + trung bình tháng — tính trên mọi tháng ĐÃ có số liệu của
+// năm (không phụ thuộc tháng đang chọn ở dropdown).
+function renderBaopheYtdKpis(){
+  const rows = baopheThangRows.filter(r => r.tong_chi_phi != null).sort((a, b) => a.thang.localeCompare(b.thang));
+  if (!rows.length) return '';
+  const tong = rows.reduce((s, r) => s + Number(r.tong_chi_phi), 0);
+  const doanhThu = rows.reduce((s, r) => s + (Number(r.tong_doanh_thu) || 0), 0);
+  const n = rows.length;
+  const tu = parseInt(rows[0].thang.slice(5), 10), den = parseInt(rows[n - 1].thang.slice(5), 10);
+  const nam = rows[0].thang.slice(0, 4);
+  const tyLe = doanhThu ? (tong / doanhThu * 100).toFixed(2).replace('.', ',') + '%' : '–';
+  const ty = (tong / 1e9).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `
+    <div class="kpi">
+      <div class="eyebrow">Lũy kế từ đầu năm · T${tu}–T${den}/${nam}</div>
+      <div class="big">${ty} tỷ đ</div>
+      <div class="sub">${fmtVND(tong)} · ${tyLe} doanh thu</div>
+    </div>
+    <div class="kpi">
+      <div class="eyebrow">Trung bình mỗi tháng</div>
+      <div class="big">${fmtVND(tong / n)}</div>
+      <div class="sub">Trung bình ${n} tháng có số liệu</div>
     </div>`;
 }
 
