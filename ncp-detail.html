@@ -158,6 +158,7 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
       <span class="co">Toyotaki</span>
       <span class="title">Chi Tiết NCP <span class="sub" id="h-id-ncp" style="margin-left:6px">—</span></span>
     </div>
+    <button type="button" class="btn btn-ghost" onclick="printQc02Ncp()">In đối sách A4</button>
     <button type="button" class="btn btn-ghost" onclick="window.close()">← Đóng</button>
     <div class="header-clock">
       <div class="date" id="header-date">—</div>
@@ -165,6 +166,7 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
     </div>
   </header>
 
+  <div class="panel"><h3>Thông tin đầy đủ của phiếu</h3><div id="qc02-ncp-detail"></div></div>
   <div class="banner nhap" id="banner">
     <div>
       <div class="msg" id="banner-msg">Đang tải...</div>
@@ -280,6 +282,9 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/qc02-view.js"></script>
+<script src="shared/qc02-data.js"></script>
+<script src="shared/qc02-ncp.js"></script>
 <script>
 const state = {
   id: null, case: null, locked: false, currentUserEmail: '',
@@ -292,7 +297,7 @@ const DS_KEYS = ['ps_tam_thoi', 'ps_lau_dai', 'lx_tam_thoi', 'lx_lau_dai'];
 function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function showOverlay(text){ const o = document.getElementById('overlay'); o.textContent = text || 'Đang xử lý...'; o.classList.add('show'); }
 function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
-function showLightbox(url){ document.getElementById('lightbox-img').src = url; document.getElementById('lightbox').classList.add('show'); }
+function showLightbox(url){ Qc02View.photo(url); }
 async function ensureAuth(){
   const session = await MesAuth.getSession();
   if (!session){
@@ -322,8 +327,8 @@ async function load(){
   if (!data) return alert('Không tìm thấy phiếu: ' + state.id);
 
   state.case = data;
-  state.ipqcEvidence = [];
-  if(data.id_checkpoint_goc){const {data:cp}=await sb.from('duc_ipqc_checkpoint').select('anh_bang_chung_url').eq('id_checkpoint',data.id_checkpoint_goc).maybeSingle();state.ipqcEvidence=jsonArr(cp&&cp.anh_bang_chung_url)}
+  state.ipqcEvidence = [];state.checkpoint = null;
+  if(data.id_checkpoint_goc){const {data:cp}=await sb.from('duc_ipqc_checkpoint').select('*').eq('id_checkpoint',data.id_checkpoint_goc).maybeSingle();state.checkpoint = cp;state.ipqcEvidence=jsonArr(cp&&cp.anh_bang_chung_url)}
   state.currentUserEmail = (await MesAuth.getCurrentUserIdentity()) || '';
   state.images.phat_sinh = jsonArr(data.hinh_anh_phat_sinh_json).slice();
   state.images.luu_xuat = jsonArr(data.hinh_anh_luu_xuat_json).slice();
@@ -342,6 +347,7 @@ async function loadCachLy(){
 
 function renderAll(){
   const c = state.case;
+  Qc02Ncp.render(document.getElementById('qc02-ncp-detail'),c,state.checkpoint);
   state.locked = c.rc_trang_thai_duyet === 'cho_duyet' || c.rc_trang_thai_duyet === 'da_duyet';
 
   document.getElementById('h-id-ncp').textContent = c.id_ncp;
@@ -351,7 +357,7 @@ function renderAll(){
   document.getElementById('i-ma-sp').textContent = c.ma_sp;
   document.getElementById('i-so-luong').textContent = c.so_luong_nghi_van;
   document.getElementById('i-mo-ta').textContent = c.mo_ta_loi;
-  document.getElementById('ipqc-evidence').innerHTML=(state.ipqcEvidence||[]).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" onclick="showLightbox(\''+escapeHtml(u)+'\')"></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
+  document.getElementById('ipqc-evidence').innerHTML=(state.ipqcEvidence||[]).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" data-qc-photo></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
   document.getElementById('i-nguoi-dam-nhiem').textContent = c.nguoi_dam_nhiem || '—';
   document.getElementById('f-nguoi-dam-nhiem').value = c.nguoi_dam_nhiem_doi_sach || '';
   document.getElementById('f-nn-phat-sinh').value = c.nguyen_nhan_phat_sinh || '';
@@ -405,7 +411,7 @@ function renderBanner(){
 function renderCauseImages(key){
   document.getElementById('img-' + key).innerHTML = state.images[key].map((u, i) => `
     <div class="img-thumb">
-      <img src="${u}" onclick="showLightbox('${u}')">
+      <img src="${escapeHtml(u)}" data-qc-photo>
       ${state.locked ? '' : `<button type="button" onclick="removeCauseImage('${key}',${i})">✕</button>`}
     </div>`).join('');
 }
@@ -479,7 +485,7 @@ function dsCardHtml(key, idx, item){
       ${dsImgThumbsHtml(item.hinh_anh, key, idx)}
       ${state.locked ? '' : `<label class="img-upload-btn" title="Thêm ảnh">📷<span>Thêm ảnh</span><input type="file" accept="image/*" class="hidden" onchange="onDsImageSelected(event,'${key}',${idx})"></label>`}
     </div></td>
-    <td><input type="text" autocomplete="off" ${ro} placeholder="Người thực hiện" value="${escapeHtml(item.nguoi_thuc_hien)}" oninput="updateDoiSachField('${key}',${idx},'nguoi_thuc_hien',this.value)"></td>
+    <td><input type="text" autocomplete="off" ${ro} list="qc02-employees" placeholder="Người thực hiện" value="${escapeHtml(item.nguoi_thuc_hien)}" oninput="updateDoiSachField('${key}',${idx},'nguoi_thuc_hien',this.value)"></td>
     <td><input type="date" ${dis} value="${item.thoi_han ? String(item.thoi_han).slice(0, 10) : ''}" onchange="updateDoiSachField('${key}',${idx},'thoi_han',this.value)"></td>
     <td><textarea ${ro} placeholder="Đánh giá hiệu quả..." oninput="autoGrowDs(this);updateDoiSachField('${key}',${idx},'danh_gia',this.value)">${escapeHtml(item.danh_gia)}</textarea></td>
     <td>${state.locked ? '' : `<button type="button" class="btn-remove" onclick="removeDoiSach('${key}',${idx})" title="Xoá">✕</button>`}</td>
@@ -489,7 +495,7 @@ function dsCardHtml(key, idx, item){
 function dsImgThumbsHtml(urls, key, idx){
   return (urls || []).map((u, i) => `
     <div class="img-thumb">
-      <img src="${u}" onclick="showLightbox('${u}')">
+      <img src="${escapeHtml(u)}" data-qc-photo>
       ${state.locked ? '' : `<button type="button" onclick="removeDsImage('${key}',${idx},${i})">✕</button>`}
     </div>`).join('');
 }
@@ -790,6 +796,12 @@ async function onQrDecoded(text){
 }
 
 load();
+</script>
+<script>
+Qc02Data.attachEmployees(['f-nguoi-dam-nhiem']);
+window.addEventListener('beforeprint',()=>{if(state.case && !document.getElementById('qc02-print'))Qc02Ncp.printable(state.case,state.checkpoint,state.ipqcEvidence,state.images,state.doiSach,state.cachLy);});
+window.addEventListener('afterprint',()=>document.getElementById('qc02-print')?.remove());
+function printQc02Ncp(){if(!state.case)return;const c={...state.case,nguoi_dam_nhiem_doi_sach:document.getElementById('f-nguoi-dam-nhiem').value,nguyen_nhan_phat_sinh:document.getElementById('f-nn-phat-sinh').value,nguyen_nhan_luu_xuat:document.getElementById('f-nn-luu-xuat').value};return Qc02Ncp.print(c,state.checkpoint,state.ipqcEvidence,state.images,state.doiSach,state.cachLy);}
 </script>
 </body>
 </html>

@@ -257,6 +257,7 @@ tr:last-child td{border-bottom:none}
 
   <!-- ===================== TAB: XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP ===================== -->
   <div class="tabpanel" id="tab-ncp">
+    <label>Tìm số phiếu <input id="qc02-ncp-search" placeholder="Nhập số phiếu hoặc một phần số phiếu" oninput="renderNcpList()"></label>
     <div class="panel">
       <div class="panel-head">🚧 Phiếu đang xử lý <span class="count" id="ncp-open-count">0</span></div>
       <div class="panel-actions"><button class="btn btn-primary" onclick="openNcpNewModal()">+ Mở phiếu mới</button></div>
@@ -431,6 +432,7 @@ tr:last-child td{border-bottom:none}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/qc02-view.js"></script>
+<script src="shared/qc02-data.js"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
 
@@ -705,7 +707,10 @@ function doneRowHtml(d){
   const failed = (d.checklist || []).filter(c => c && c.dat === false).map(c => c.muc);
   const ipqcNoteParts = [];
   if (failed.length) ipqcNoteParts.push('Không đạt: ' + failed.join('; '));
-  if (d.ghi_chu) ipqcNoteParts.push('Ghi chú: ' + d.ghi_chu);
+  const machineChecked = Qc02View.machineChecked(d.ghi_chu);
+  if(machineChecked !== null) ipqcNoteParts.push('Check điều kiện máy: ' + (machineChecked ? 'Đã check' : 'Chưa check'));
+  const note = String(d.ghi_chu || '').replace(/\n?\[QC02_MACHINE_CHECK:(?:0|1)\]/g,'');
+  if (note) ipqcNoteParts.push('Ghi chú: ' + note);
   // Gộp thành 1 badge duy nhất trong cột "Liên kết" (title = tooltip hover
   // xem đầy đủ) — trước đó hiện thẳng text nhiều dòng làm bảng bị lệch
   // chiều cao dòng, khó xem.
@@ -743,7 +748,7 @@ function doneRowHtml(d){
     <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
-      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a data-qc-photo class="link-btn" href="' + escapeHtml(u) + '" target="_blank" rel="noopener">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a data-qc-photo class="link-btn" href="' + escapeHtml(u) + '">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
       ${scBadge}
       ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
       ${ipqcNote}
@@ -904,8 +909,13 @@ const NCP_BADGE_LABEL = { do: '🔴 Đỏ', vang: '🟡 Vàng', xanh: '🟢 Xanh
 const NCP_RC_BADGE_LABEL = { nhap: 'Nháp', cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' };
 
 async function loadNcpList(){
-  const { data, error } = await sb.from('duc_ncp').select('*').order('ngay_tao', { ascending: false });
-  if (error) return;
+  const data = [];
+  for(let offset=0;;offset+=500){
+    const result=await sb.from('duc_ncp').select('*').order('ngay_tao',{ascending:false}).order('id_ncp').range(offset,offset+499);
+    if(result.error){console.error('Không tải được phiếu NCP',result.error);return;}
+    data.push(...(result.data||[]));
+    if(!result.data||result.data.length<500)break;
+  }
   state.ncpList = (data || []).map(c => Object.assign({ mau_the: NCP_MAU_THE[c.trang_thai] || 'do' }, c));
   const priority = { do: 0, vang: 1, xanh: 2 };
   state.ncpList.sort((a, b) => {
@@ -917,14 +927,16 @@ async function loadNcpList(){
 }
 
 function renderNcpList(){
-  const open = state.ncpList.filter(c => c.trang_thai !== 'dong');
-  const closed = state.ncpList.filter(c => c.trang_thai === 'dong');
+  const term = document.getElementById('qc02-ncp-search').value.trim().toLowerCase();
+  const list = state.ncpList.filter(c => !term || String(c.id_ncp).toLowerCase().includes(term));
+  const open = list.filter(c => c.trang_thai !== 'dong');
+  const closed = list.filter(c => c.trang_thai === 'dong');
 
   document.getElementById('ncp-open-count').textContent = open.length;
   document.getElementById('ncp-open-tbody').innerHTML = open.map(c => `
     <tr>
       <td><span class="ncp-badge ${c.mau_the}">${NCP_BADGE_LABEL[c.mau_the]}</span></td>
-      <td class="mono">${escapeHtml(c.id_ncp)}</td>
+      <td class="mono"><a href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}">${escapeHtml(c.id_ncp)}</a></td>
       <td><b>${escapeHtml(c.ma_may)}</b></td>
       <td class="mono">${escapeHtml(c.ma_sp)}</td>
       <td class="ncp-qty">${c.so_luong_nghi_van}</td>
@@ -947,7 +959,7 @@ function renderNcpList(){
   document.getElementById('ncp-closed-tbody').innerHTML = closed.map(c => `
     <tr>
       <td><span class="ncp-badge ${c.mau_the}">${NCP_BADGE_LABEL[c.mau_the]}</span></td>
-      <td class="mono">${escapeHtml(c.id_ncp)}</td>
+      <td class="mono"><a href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}">${escapeHtml(c.id_ncp)}</a></td>
       <td><b>${escapeHtml(c.ma_may)}</b></td>
       <td class="mono">${escapeHtml(c.ma_sp)}</td>
       <td class="ncp-qty">${c.so_luong_nghi_van}</td>
@@ -1226,7 +1238,8 @@ function editTieuChuan(maSp){
   document.getElementById('tc-ma-sp').value = maSp;
   document.getElementById('tc-muc-list').innerHTML = '';
   (t ? t.muc_kiem : []).forEach(m => addMucRow(m));
-  document.getElementById('tc-pdf-current').textContent = t && t.file_pdf_url ? '📄 Đã có PDF — upload file mới để thay thế' : 'Chưa có PDF';
+  const pdfTarget = document.getElementById('tc-pdf-current'); pdfTarget.replaceChildren();
+  if(t && t.file_pdf_url){const btn=document.createElement('button');btn.type='button';btn.textContent='Xem tiêu chuẩn';btn.onclick=()=>Qc02View.pdf(t.file_pdf_url);pdfTarget.append(btn);}else{pdfTarget.textContent='Chưa có file tiêu chuẩn';}
   state.pdfBase64 = null; state.pdfBlob = null;
   document.getElementById('tc-pdf-btn').disabled = true;
 }
@@ -1294,5 +1307,6 @@ loadBoard();
 loadQcFilters();
 setInterval(loadBoard, 15000);
 </script>
+<script>Qc02Data.attachEmployees(["ncp-nguoi-dam-nhiem","ncp-nguoi-dam-nhiem-doi-sach"]);</script>
 </body>
 </html>
