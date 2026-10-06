@@ -1416,7 +1416,7 @@ function renderBaopheThangChart(){
   baopheThangRows.forEach(r => { byMonth[r.thang] = r; });
   const year = baopheThangRows.length ? baopheThangRows[0].thang.slice(0, 4) : new Date().getFullYear();
   const monthKeys = Array.from({length: 12}, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
-  const labels = monthKeys.map(k => baopheMonthLabel(k));
+  const labels = monthKeys.map(k => 'T' + parseInt(k.slice(5), 10));
   const chiPhi = monthKeys.map(k => byMonth[k] ? byMonth[k].tong_chi_phi : null);
   const tyLe = monthKeys.map(k => {
     const r = byMonth[k];
@@ -1427,7 +1427,7 @@ function renderBaopheThangChart(){
 
   if (chartsByKey.baophe_thang) chartsByKey.baophe_thang.destroy();
   const datasets = [
-    {label: 'Tổng chi phí báo phế (VND)', data: chiPhi, backgroundColor: palette.bad, yAxisID: 'y', borderRadius: 4, barPercentage: 0.5, categoryPercentage: 0.6},
+    {label: 'Tổng chi phí báo phế (VND)', data: chiPhi, backgroundColor: palette.bad, yAxisID: 'y', borderRadius: 4, barPercentage: 0.85, categoryPercentage: 0.6},
     {label: 'Tỷ lệ % / doanh thu', data: tyLe, type: 'line', borderColor: palette.orange, backgroundColor: palette.orange, yAxisID: 'y1', tension: .3, pointRadius: 4, borderWidth: 2.5, spanGaps: false}
   ];
   if (targetData) datasets.push({label: 'Mục tiêu', data: targetData, type: 'line', yAxisID: 'y1', borderColor: palette.muted, borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false});
