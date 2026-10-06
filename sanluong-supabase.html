@@ -646,7 +646,7 @@ function hexToRgba(hex, alpha){
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
-function buildForecastChart(data){
+function buildForecastChart(data, keHoachNam){
   const ctx = document.getElementById('chartForecast');
   if (chartsByTab.tab4[0]) chartsByTab.tab4[0].destroy();
   const loai = data.loai || [];
@@ -693,14 +693,14 @@ function buildForecastChart(data){
     }]
   });
   chartsByTab.tab4 = [chart];
-  renderForecastKpis(data);
+  renderForecastKpis(data, keHoachNam);
 }
 
 // Số forecast nhập theo đơn vị nghìn Pcs — giữ nguyên đơn vị, tối đa 1 chữ số lẻ.
 function fmtK(n){ return n==null ? '—' : Number(n).toLocaleString('vi-VN',{maximumFractionDigits:1}); }
 
 // Tháng tới = tháng sau tháng hiện tại. Cả năm = tháng thực tế (số đã có) + tháng dự báo.
-function renderForecastKpis(data){
+function renderForecastKpis(data, keHoachNam){
   const keys = Object.keys(forecastColorsHex), loai = data.loai || [];
   const monthTotal = i => {
     let s = 0, has = false;
@@ -719,17 +719,31 @@ function renderForecastKpis(data){
     set('kpiFcNext', '—');
     set('kpiFcNextSub', 'Chưa có dữ liệu năm sau');
   }
-  let actual = 0, fc = 0;
+  let actual = 0, fc = 0, hasAny = false;
   for (let i = 0; i < 12; i++) {
     const v = monthTotal(i);
     if (v == null) continue;
+    hasAny = true;
     if (isForecastMonth(loai[i], i)) fc += v; else actual += v;
   }
   set('kpiFcYearLabel', `Dự báo tổng sản lượng năm ${year}`);
   set('kpiFcYear', fmtK(actual + fc));
-  set('kpiFcYearSub', `Thực tế ${fmtK(actual)} + dự báo ${fmtK(fc)} nghìn Pcs`);
+  // So với Kế hoạch năm (đơn vị Pcs) — forecast nhập theo nghìn Pcs nên nhân 1000.
+  const sub = document.getElementById('kpiFcYearSub');
+  if (!hasAny) {
+    set('kpiFcYear', '—');
+    sub.textContent = 'Chưa có số liệu';
+    sub.style.color = '';
+  } else if (keHoachNam > 0) {
+    const diff = (actual + fc) * 1000 / keHoachNam - 1;
+    sub.textContent = (diff >= 0 ? 'Vượt' : 'Thấp hơn') + ` mục tiêu ${(Math.abs(diff) * 100).toFixed(1)}%`;
+    sub.style.color = diff >= 0 ? 'var(--run-fg)' : 'var(--alarm-fg)';
+  } else {
+    sub.textContent = 'Chưa có kế hoạch năm';
+    sub.style.color = '';
+  }
 }
-buildForecastChart(DEMO_DATA.forecast);
+buildForecastChart(DEMO_DATA.forecast, DEMO_DATA.keHoachNam);
 
 /* ---------- Render data into KPI cards, chart datasets, comments ---------- */
 function fmtInt(n){ return n==null ? '—' : Math.round(n).toLocaleString('vi-VN'); }
@@ -909,7 +923,7 @@ function renderAll(data){
   });
 
   // Tab 4 forecast chart (rebuild — dataset shape/colors depend on data)
-  buildForecastChart(data.forecast);
+  buildForecastChart(data.forecast, data.keHoachNam);
 
   // Comments — lưu toàn bộ (mọi tháng đã tải); cập nhật qua setComment (có bảo vệ ô
   // đang gõ dở + vừa lưu xong) nên an toàn khi hàm này chạy lại mỗi 5 phút (auto-refresh).
