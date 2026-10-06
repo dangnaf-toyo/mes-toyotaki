@@ -195,6 +195,7 @@ button{cursor:pointer;font-family:inherit}
     </button>
     <input type="file" accept="image/*" capture="environment" id="ck-photo-input" class="hidden" onchange="onPhotoSelected(event)">
     <div class="photo-grid" id="ck-photo-grid"></div>
+    <label><input type="checkbox" id="ck-machine-condition"> Check điều kiện máy</label>
   </div>
 
   <div class="field">
@@ -611,6 +612,7 @@ async function openCheck(idCheckpoint){
   state.photos = [];
   renderPhotoGrid();
   document.getElementById('ck-ghi-chu').value = '';
+  document.getElementById('ck-machine-condition').checked = false;
 
   document.getElementById('ck-may').textContent = cp.ma_may;
   document.getElementById('ck-loai').textContent = LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem;
@@ -640,9 +642,10 @@ async function openCheck(idCheckpoint){
     const pdfBtn = document.getElementById('ck-pdf-btn');
     if (filePdfUrl) {
       pdfBtn.classList.remove('hidden');
-      pdfBtn.onclick = () => window.open(filePdfUrl, '_blank');
+      pdfBtn.disabled = false; pdfBtn.textContent = 'Xem tiêu chuẩn';
+      pdfBtn.onclick = () => Qc02View.pdf(filePdfUrl);
     } else {
-      pdfBtn.classList.add('hidden');
+      pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.textContent = 'Chưa có file tiêu chuẩn'; pdfBtn.onclick = null;
     }
   } catch (e) { onError(e); }
 }
@@ -838,7 +841,7 @@ async function submitCheck(ketQua){
       p_checklist: state.checklistAnswers,
       p_ket_qua: ketQua,
       p_anh_urls: anhUrls,
-      p_ghi_chu: ghiChu,
+      p_ghi_chu: Qc02View.machineNote(ghiChu, document.getElementById('ck-machine-condition').checked),
       p_thoi_gian_kiem_giay: thoiGianKiemGiay,
       p_nguoi_kiem: nguoiKiem,
     });
