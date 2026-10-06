@@ -326,22 +326,10 @@
         <span class="note">FCC · Exedy · Astemo · TTI · Khác</span>
       </div>
 
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-label" id="kpiFcNextLabel">Dự báo sản lượng tháng tới</div>
-          <div class="kpi-value" id="kpiFcNext">—</div>
-          <div class="kpi-target" id="kpiFcNextSub">nghìn Pcs</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label" id="kpiFcYearLabel">Dự báo tổng sản lượng đến cuối năm</div>
-          <div class="kpi-value" id="kpiFcYear">—</div>
-          <div class="kpi-target" id="kpiFcYearSub">nghìn Pcs</div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:22px;">
+      <div class="card">
         <h3>Forecast sản lượng theo khách hàng lớn (nghìn Pcs/tháng)</h3>
         <div class="card-sub">Tháng 1 – Tháng 12, 2026 · Đậm = Thực tế · Nhạt = Dự báo</div>
+        <div id="fcYearLine" style="margin-top:8px;font-size:13px;font-weight:600;"></div>
         <div class="chart-box wide"><canvas id="chartForecast"></canvas></div>
       </div>
 
@@ -699,49 +687,24 @@ function buildForecastChart(data, keHoachNam){
 // Số forecast nhập theo đơn vị nghìn Pcs — giữ nguyên đơn vị, tối đa 1 chữ số lẻ.
 function fmtK(n){ return n==null ? '—' : Number(n).toLocaleString('vi-VN',{maximumFractionDigits:1}); }
 
-// Tháng tới = tháng sau tháng hiện tại. Cả năm = tháng thực tế (số đã có) + tháng dự báo.
+// Dự báo cả năm = tháng thực tế (số đã có) + tháng dự báo, so với Kế hoạch năm (Pcs).
 function renderForecastKpis(data, keHoachNam){
-  const keys = Object.keys(forecastColorsHex), loai = data.loai || [];
-  const monthTotal = i => {
-    let s = 0, has = false;
-    keys.forEach(k => { const v = (data.values[k] || [])[i]; if (v != null && !isNaN(v)) { s += Number(v); has = true; } });
-    return has ? s : null;
-  };
-  const now = new Date(), year = now.getFullYear(), next = now.getMonth() + 1;
-  const set = (id, v) => { document.getElementById(id).textContent = v; };
-  if (next <= 11) {
-    set('kpiFcNextLabel', `Dự báo sản lượng tháng ${next + 1}/${year}`);
-    const v = monthTotal(next);
-    set('kpiFcNext', v == null ? '—' : fmtK(v));
-    set('kpiFcNextSub', v == null ? 'Chưa có số dự báo' : 'nghìn Pcs');
-  } else {
-    set('kpiFcNextLabel', `Dự báo sản lượng tháng 1/${year + 1}`);
-    set('kpiFcNext', '—');
-    set('kpiFcNextSub', 'Chưa có dữ liệu năm sau');
-  }
-  let actual = 0, fc = 0, hasAny = false;
+  const keys = Object.keys(forecastColorsHex);
+  let total = 0, hasAny = false;
   for (let i = 0; i < 12; i++) {
-    const v = monthTotal(i);
-    if (v == null) continue;
-    hasAny = true;
-    if (isForecastMonth(loai[i], i)) fc += v; else actual += v;
+    keys.forEach(k => { const v = (data.values[k] || [])[i]; if (v != null && !isNaN(v)) { total += Number(v); hasAny = true; } });
   }
-  set('kpiFcYearLabel', `Dự báo tổng sản lượng năm ${year}`);
-  set('kpiFcYear', fmtK(actual + fc));
-  // So với Kế hoạch năm (đơn vị Pcs) — forecast nhập theo nghìn Pcs nên nhân 1000.
-  const sub = document.getElementById('kpiFcYearSub');
-  if (!hasAny) {
-    set('kpiFcYear', '—');
-    sub.textContent = 'Chưa có số liệu';
-    sub.style.color = '';
-  } else if (keHoachNam > 0) {
-    const diff = (actual + fc) * 1000 / keHoachNam - 1;
-    sub.textContent = (diff >= 0 ? 'Vượt' : 'Thấp hơn') + ` mục tiêu ${(Math.abs(diff) * 100).toFixed(1)}%`;
-    sub.style.color = diff >= 0 ? 'var(--run-fg)' : 'var(--alarm-fg)';
-  } else {
-    sub.textContent = 'Chưa có kế hoạch năm';
-    sub.style.color = '';
+  const el = document.getElementById('fcYearLine');
+  if (!hasAny) { el.textContent = ''; return; }
+  let txt = `Dự báo tổng sản lượng năm ${new Date().getFullYear()}: ${fmtK(total)} nghìn Pcs`;
+  el.style.color = '';
+  if (keHoachNam > 0) {
+    // Forecast nhập theo nghìn Pcs nên nhân 1000 khi so với Kế hoạch năm.
+    const diff = total * 1000 / keHoachNam - 1;
+    txt += ` · ${diff >= 0 ? 'Vượt' : 'Thấp hơn'} mục tiêu ${(Math.abs(diff) * 100).toFixed(1)}%`;
+    el.style.color = diff >= 0 ? 'var(--run-fg)' : 'var(--alarm-fg)';
   }
+  el.textContent = txt;
 }
 buildForecastChart(DEMO_DATA.forecast, DEMO_DATA.keHoachNam);
 
