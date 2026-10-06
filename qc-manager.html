@@ -171,6 +171,7 @@ tr:last-child td{border-bottom:none}
 
   <!-- ===================== TAB: GIÁM SÁT REAL-TIME ===================== -->
   <div class="tabpanel active" id="tab-monitor">
+    <div class="panel"><div class="panel-head">Thống kê máy / lỗi (24h gần nhất)</div><div class="panel-body"><div id="qc02-machines"></div><p>Số lượt mục kiểm không đạt; một lần kiểm có thể có nhiều mục lỗi.</p><div id="qc02-defects"></div></div></div>
     <div class="grid2">
       <div class="panel">
         <div class="panel-head">🔴 Đang chờ kiểm tra <span class="count" id="pending-count">0</span></div>
@@ -429,6 +430,7 @@ tr:last-child td{border-bottom:none}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/qc02-view.js"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
 
@@ -566,7 +568,7 @@ async function loadBoard(){
     const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
     const [activeSet, cpRes, dinhKyRes, scRes] = await Promise.all([
       getActiveIdDongSet(),
-      sb.from('duc_ipqc_checkpoint').select('*').gte('thoi_diem_tao', cutoff),
+      sb.from('duc_ipqc_checkpoint').select('*').or(`trang_thai.eq.cho_kiem,thoi_diem_kiem_thuc_te.gte.${cutoff}`),
       sb.rpc('duc_get_ipqc_periodic_due'),
       sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,gio_tro_lai,van_de,thoi_gian_dung_phut').gte('gio_phat_sinh', new Date(Date.now() - 3 * 24 * 3600000).toISOString()),
     ]);
@@ -741,7 +743,7 @@ function doneRowHtml(d){
     <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td class="link-list">
-      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a data-qc-photo class="link-btn" href="' + escapeHtml(u) + '" target="_blank" rel="noopener">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
       ${scBadge}
       ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
       ${ipqcNote}
@@ -751,13 +753,16 @@ function doneRowHtml(d){
 }
 
 function renderBoard(b){
+  const summary = Qc02View.summarize(b.done);
+  Qc02View.table(document.getElementById("qc02-machines"), ["Máy", "Lượt kiểm", "OK", "NG", "Cảnh báo"], summary.machines.map(m => [m.machine,m.total,m.ok,m.ng,m.warning]));
+  Qc02View.table(document.getElementById("qc02-defects"), ["Mục không đạt", "Lượt ghi nhận"], summary.defects);
   document.getElementById('pending-count').textContent = b.pending.length;
   document.getElementById('pending-tbody').innerHTML = b.pending.map(p => `
-    <tr class="${p.da_den_han ? levelForMinutes(p.phut_da_troi) : ''}">
+    <tr class="${Qc02View.overdue(p.phut_da_troi) && p.loai_kiem === 'dinh_ky' ? 'row-alarm' : p.da_den_han ? levelForMinutes(p.phut_da_troi) : ''}">
       <td><b>${escapeHtml(p.ma_may)}</b></td>
       <td class="mono">${escapeHtml(p.ma_sp)}</td>
       <td>${escapeHtml(LOAI_LABEL[p.loai_kiem] || p.loai_kiem)}</td>
-      <td class="mono">${p.da_den_han ? ('Đang chờ ' + p.phut_da_troi + 'p') : ('<span class="pill neutral">Sắp tới · đã ' + p.phut_da_troi + 'p</span>')}</td>
+      <td class="mono">${p.da_den_han ? ((p.loai_kiem === 'dinh_ky' && Qc02View.overdue(p.phut_da_troi) ? 'QUÁ 2 GIỜ · ' : 'Đang chờ ') + p.phut_da_troi + 'p') : ('<span class="pill neutral">Sắp tới · đã ' + p.phut_da_troi + 'p</span>')}</td>
     </tr>`).join('');
   document.getElementById('pending-empty').classList.toggle('hidden', b.pending.length > 0);
 

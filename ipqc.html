@@ -149,9 +149,10 @@ button{cursor:pointer;font-family:inherit}
 
 <!-- ============ SCREEN: Hàng đợi ============ -->
 <div class="screen active" id="scr-queue">
+  <div style="padding:8px"><a href="qc-manager.html" target="_blank" rel="noopener">Tra cứu lịch sử IPQC và ảnh kiểm tra</a></div>
   <div class="appbar">
     <div style="flex:1;min-width:0">
-      <div class="title">🔍 IPQC — Hàng đợi kiểm tra</div>
+      <div class="title">🔍 IPQC — Hàng đợi kiểm tra (2 giờ/lần · 1 shot/lần)</div>
       <div class="sub" id="queue-user-label">…</div>
     </div>
     <button class="daynight-btn hidden" id="btn-ket-thuc-ngay" onclick="onKetThucNgay()">🌙 Kết thúc ngày</button>
@@ -213,6 +214,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/qc02-view.js"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 6;
@@ -507,7 +509,7 @@ function renderQueue(){
     // Thống nhất cách đếm cho cả 3 loại: luôn hiện "đã trôi qua bao lâu kể từ
     // khi có yêu cầu kiểm" — kể cả loại định kỳ chưa tới hạn (không hiện đếm
     // ngược "còn bao lâu" nữa, chỉ khác ở nhãn "sắp tới" + màu sắc).
-    const timeLabel = cp.phut_da_troi + 'p';
+    const timeLabel = (cp.loai_kiem === 'dinh_ky' && Qc02View.overdue(cp.phut_da_troi) ? 'QUÁ 2 GIỜ · ' : '') + cp.phut_da_troi + 'p';
     return `
       <div class="qcard" data-lvl="${lvl}" onclick="openCheck('${cp.id_checkpoint}')">
         <div class="qcard-main">
