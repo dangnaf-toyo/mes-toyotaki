@@ -53,23 +53,47 @@ const Qc02Ncp = (() => {
       return [labels[key] || key.replace(/_/g, ' '), display];
     }));
   }
-  function render(target, c, checkpoint) {
+  function history(target, log) {
+    const entries=String(log || '').split(/\r?\n/).filter(line=>line.trim()).reverse();
+    if(!entries.length)return;
+    target.append(text('h3','Lịch sử xử lý'));
+    const list=document.createElement('ul');
+    entries.slice(0,5).forEach(line=>list.append(text('li',line)));target.append(list);
+    const button=text('button','Xem toàn bộ lịch sử');button.type='button';
+    button.onclick=()=>{
+      const dialog=document.createElement('dialog');dialog.className='qc02-viewer';
+      dialog.style.cssText='width:min(900px,94vw);max-height:85vh;overflow:auto;border:0;padding:20px;border-radius:10px';
+      const close=text('button','Đóng');close.type='button';close.onclick=()=>dialog.close();
+      dialog.append(close,text('h2','Lịch sử xử lý'));
+      const all=document.createElement('ul');entries.forEach(line=>all.append(text('li',line)));dialog.append(all);
+      dialog.onclose=()=>dialog.remove();dialog.onclick=e=>{if(e.target===dialog)dialog.close();};
+      document.body.append(dialog);dialog.showModal();close.focus();
+    };target.append(button);
+  }
+  function render(target, c, checkpoint, compactOnly = false) {
     target.replaceChildren();
-    const base = document.createElement('div'); record(base, { ...c,
-      cong_doan:c.cong_doan || (checkpoint && checkpoint.cong_doan) || 'Chưa ghi nhận',
-      nguoi_phat_hien:c.nguoi_phat_hien || (checkpoint && checkpoint.nguoi_kiem) || 'Chưa ghi nhận' }); target.append(base);
-    if (checkpoint) {
-      target.append(text('h3', 'Thông tin lần kiểm phát hiện'));
-      const cp = document.createElement('div'); record(cp, checkpoint); target.append(cp);
-    }
+    const grid=document.createElement('div');grid.className='qc02-record-grid';target.append(grid);
+    const groups=[['Thông tin phiếu',['id_ncp','ma_sp','cong_doan','so_luong_ng_du_kien','mo_ta_loi','nguoi_mo_case','ngay_tao']],['Nguyên nhân & Đối sách',['nguyen_nhan_phat_sinh','nguyen_nhan_luu_xuat','nguoi_dam_nhiem_doi_sach','rc_thoi_diem_gui_duyet']],['Xác nhận',['rc_nguoi_duyet','rc_thoi_diem_duyet','rc_trang_thai_duyet','trang_thai']]];
+    c={...c,cong_doan:c.cong_doan || checkpoint?.cong_doan || 'Chưa ghi nhận'};
+    const used=new Set();for(const [title,keys] of groups){const section=document.createElement('section');section.className='qc02-record-group';section.append(text('h3',title));const data={};for(const key of keys){used.add(key);data[key]=c[key]??'—';}const info=document.createElement('div');record(info,data);section.append(info);
+      if(title==='Nguyên nhân & Đối sách')for(const [key,label] of Object.entries(dsLabels)){const entries=c['doi_sach_'+key+'_json'];if(Array.isArray(entries)&&entries.length)section.append(text('p',label+': '+entries.map(item=>item.noi_dung).filter(Boolean).join('; ')));}
+      grid.append(section);}
+    if(compactOnly)return;
+    const other=document.createElement('details');other.className='qc02-other';other.append(text('summary','Thông tin khác'));
+    const rest=Object.fromEntries(Object.entries(c).filter(([key])=>!used.has(key)&&key!=='ghi_chu'&&!key.startsWith('doi_sach_')&&!key.startsWith('hinh_anh_')));
+    const info=document.createElement('div');record(info,rest);other.append(info);
+    if(checkpoint){other.append(text('h3','Thông tin lần kiểm nguồn'));const cp=document.createElement('div');record(cp,checkpoint);other.append(cp);}
+    target.append(other);history(target,c.ghi_chu);
   }
   function printable(c, checkpoint, evidence, images, responses, isolation = []) {
     const old = document.getElementById('qc02-print'); if (old) old.remove();
     const root = document.createElement('section'); root.id = 'qc02-print';
     root.append(text('h1', 'TOYOTAKI — PHIẾU XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP'));
     root.append(text('h2', c.id_ncp));
-    const info = document.createElement('div'); render(info, c, checkpoint); root.append(info);
+    const info = document.createElement('div'); record(info, {id_ncp:c.id_ncp,ma_sp:c.ma_sp,ten_sp:c.ten_sp,cong_doan:c.cong_doan || checkpoint?.cong_doan || 'Chưa ghi nhận',so_luong_ng_du_kien:c.so_luong_ng_du_kien,mo_ta_loi:c.mo_ta_loi,nguoi_mo_case:c.nguoi_mo_case,ngay_tao:c.ngay_tao}); root.append(info);
     root.append(text('h3', 'Ảnh lỗi / bằng chứng kiểm tra')); photos(root, evidence);
+    if(c.nguyen_nhan_phat_sinh)root.append(text('p','Nguyên nhân phát sinh: '+c.nguyen_nhan_phat_sinh));
+    if(c.nguyen_nhan_luu_xuat)root.append(text('p','Nguyên nhân lưu xuất: '+c.nguyen_nhan_luu_xuat));
     for (const [key, title] of [['phat_sinh', 'Ảnh nguyên nhân phát sinh'], ['luu_xuat', 'Ảnh nguyên nhân lưu xuất']]) {
       root.append(text('h3', title)); photos(root, images[key]);
     }
@@ -84,10 +108,8 @@ const Qc02Ncp = (() => {
       });
     }
     root.append(text('p', 'Xác nhận: ' + (c.rc_nguoi_duyet || 'Chưa xác nhận') + ' · ' + (c.rc_thoi_diem_duyet || '—')));
-    if(isolation.length) {
-      root.append(text('h3','Thông tin tem cách ly'));
-      isolation.forEach(row => { const info=document.createElement('div');record(info,row);root.append(info); });
-    }
+    root.append(text('h3','Bộ phận liên quan trả lời (viết tay)'));
+    for(const [label,height] of [['Nguyên nhân','28mm'],['Đối sách','35mm'],['Người trả lời / Ngày trả lời','14mm'],['Xác nhận','18mm']]){const box=document.createElement('div');box.className='qc02-handwriting';box.style.minHeight=height;box.style.border='1px solid #888';box.style.padding='6px';box.style.marginTop='6px';box.style.breakInside='avoid';box.append(text('b',label));root.append(box);}
     document.body.append(root); return root;
   }
   async function print(c, checkpoint, evidence, images, responses, isolation = []) {

@@ -61,12 +61,12 @@ const Qc02View = (() => {
     const dialog = document.createElement('dialog');
     dialog.className = 'qc02-viewer';
     dialog.style.cssText = 'max-width:95vw;max-height:95vh;border:0;border-radius:8px;padding:12px';
-    const close = document.createElement('button'); close.textContent = 'Đóng';
+    const close = document.createElement('button'); close.textContent = '×'; close.setAttribute('aria-label','Đóng ảnh');
     const prev = document.createElement('button'); prev.textContent = '← Trước';
     const next = document.createElement('button'); next.textContent = 'Sau →';
     const count = document.createElement('span');
     const img = document.createElement('img'); img.alt = 'Ảnh QC';
-    img.style.cssText = 'display:block;max-width:85vw;max-height:80vh;object-fit:contain';
+    img.style.cssText = 'display:block;margin:0 auto;max-width:85vw;max-height:80vh;object-fit:contain';
     const update = () => { img.src = gallery[index]; count.textContent = ` ${index + 1}/${gallery.length} `; };
     prev.onclick = () => { index = (index + gallery.length - 1) % gallery.length; update(); };
     next.onclick = () => { index = (index + 1) % gallery.length; update(); };
@@ -74,8 +74,9 @@ const Qc02View = (() => {
     close.onclick = () => dialog.close();
     dialog.onclick = event => { if (event.target === dialog) dialog.close(); };
     dialog.onkeydown = event => {
-      if (event.key === 'ArrowLeft') prev.click();
-      if (event.key === 'ArrowRight') next.click();
+      if (event.key === 'ArrowLeft') { event.preventDefault(); prev.click(); }
+      if (event.key === 'ArrowRight') { event.preventDefault(); next.click(); }
+      if (event.key === 'Escape') { event.preventDefault(); dialog.close(); }
     };
     dialog.onclose = () => dialog.remove();
     dialog.append(close, prev, count, next, img); update(); openDialog(dialog); close.focus();
@@ -92,15 +93,52 @@ const Qc02View = (() => {
     dialog.onclose = () => dialog.remove(); dialog.append(close, frame); openDialog(dialog);close.focus();
   }
   const style = document.createElement('style');
-  style.textContent = '.qc02-viewer::backdrop{background:rgba(15,23,42,.85)}.qc02-viewer button{margin:4px;padding:8px 12px;cursor:pointer}img[data-qc-photo],.img-thumb img,.photo-thumb img{cursor:zoom-in}';
+  style.textContent = '[hidden]{display:none!important}.qc02-viewer::backdrop{background:rgba(15,23,42,.85)}.qc02-viewer button{margin:4px;padding:8px 12px;cursor:pointer}img[data-qc-photo],.img-thumb img,.photo-thumb img{cursor:zoom-in}';
   document.head.append(style);
+  function photoSource(element) {
+    return element.getAttribute('data-qc-image-url') || element.getAttribute('data-qc-photo') || element.href || element.src || '';
+  }
+  let hoverTarget = null, preview = null, previewImage = null;
+  function hidePreview() { hoverTarget=null; if(preview)preview.hidden=true; }
+  function movePreview(event) {
+    if(!preview || preview.hidden)return;
+    const rect=preview.getBoundingClientRect(), gap=16, margin=8;
+    let left=event.clientX+gap,top=event.clientY+gap;
+    if(left+rect.width>innerWidth-margin)left=event.clientX-gap-rect.width;
+    if(top+rect.height>innerHeight-margin)top=event.clientY-gap-rect.height;
+    preview.style.left=Math.max(margin,Math.min(left,innerWidth-rect.width-margin))+'px';
+    preview.style.top=Math.max(margin,Math.min(top,innerHeight-rect.height-margin))+'px';
+  }
+  // pointerover/out bubble, including buttons inserted after API loads.
+  document.addEventListener('pointerover',event=>{
+    if(event.pointerType==='touch')return;
+    const target=event.target.closest('[data-qc-image-url]');
+    if(!target || target===hoverTarget)return;
+    const url=safeUrl(photoSource(target),true);if(!url)return;
+    if(!preview){
+      preview=document.createElement('div');preview.id='qc02-image-preview';preview.setAttribute('aria-hidden','true');
+      preview.style.cssText='position:fixed;z-index:99999;pointer-events:none;opacity:1;visibility:visible;background:#fff;padding:6px;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.3);width:min(312px,calc(100vw - 16px))';
+      previewImage=document.createElement('img');previewImage.alt='Xem nhanh ảnh QC';
+      previewImage.style.cssText='display:block;width:300px;max-width:100%;height:300px;max-height:min(300px,calc(100vh - 28px));object-fit:contain;pointer-events:none';
+      preview.append(previewImage);document.body.append(preview);
+    }
+    hoverTarget=target;previewImage.src=url;preview.hidden=false;movePreview(event);
+  });
+  document.addEventListener('pointermove',movePreview);
+  document.addEventListener('pointerout',event=>{
+    if(hoverTarget && hoverTarget.contains(event.target) && !hoverTarget.contains(event.relatedTarget))hidePreview();
+  });
+  document.addEventListener('scroll',hidePreview,true);
+  window.addEventListener('blur',hidePreview);
   document.addEventListener('click', event => {
-    const link = event.target.closest('[data-qc-photo],.photo-thumb img,.img-thumb img');
+    const link = event.target.closest('[data-qc-photo],img');
     if (link) {
+      if (link.closest('.qc02-viewer,#qc02-print')) return;
+      hidePreview();
       event.preventDefault(); event.stopImmediatePropagation();
       const group = link.closest('[data-qc-gallery],.img-gallery,.ds-row-img,.photo-grid,td') || link.parentElement;
-      const urls = [...group.querySelectorAll('[data-qc-photo],.photo-thumb img,.img-thumb img')].map(el => el.href || el.src);
-      photo(link.href || link.src, urls);
+      const urls = [...group.querySelectorAll('[data-qc-photo],img')].map(photoSource);
+      photo(photoSource(link), urls);
     }
   }, true);
   function machineNote(note, checked) {
