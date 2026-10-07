@@ -376,10 +376,16 @@ function fmtTime(iso){
   const d = iso ? new Date(iso) : new Date();
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
 }
+// "Hôm nay" = ngày sản xuất: từ 06:00 hôm nay đến 06:00 hôm sau, giờ Việt Nam
+// (không phụ thuộc múi giờ của máy đang mở trang). Trước 06:00 vẫn tính là ngày
+// sản xuất hôm trước — ca đêm không bị cắt đôi lúc 00:00.
+const DAY_START_HOUR = 6;
 function getTodayString(){
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  const d = new Date(Date.now() + 7 * 3600e3 - DAY_START_HOUR * 3600e3);
+  return d.getUTCFullYear() + "-" + String(d.getUTCMonth()+1).padStart(2,"0") + "-" + String(d.getUTCDate()).padStart(2,"0");
 }
+// Mốc bắt đầu ngày sản xuất `ngay` (dạng timestamptz cho bộ lọc Supabase).
+function dayStartTs(ngay){ return ngay + 'T' + String(DAY_START_HOUR).padStart(2,'0') + ':00:00+07:00'; }
 function addDays(dateStr, n){
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
@@ -669,11 +675,11 @@ async function loadKpi(){
     sb.from('cd_khsx_tuan_plan').select(dowCol).eq('cong_doan', congDoan).eq('tuan_bat_dau', mon),
     sb.from('duc_tem').select('so_luong')
       .eq('trang_thai', 'Đã đóng gói TP').eq('tram_cong_doan', congDoan)
-      .gte('ngay_gio_ghi_nhan', ngay + 'T00:00:00+07:00')
-      .lt('ngay_gio_ghi_nhan', addDays(ngay, 1) + 'T00:00:00+07:00'),
+      .gte('ngay_gio_ghi_nhan', dayStartTs(ngay))
+      .lt('ngay_gio_ghi_nhan', dayStartTs(addDays(ngay, 1))),
     sb.from('cd_ng_khai_bao').select('so_luong').eq('cong_doan', congDoan)
-      .gte('ngay_gio', ngay + 'T00:00:00+07:00')
-      .lt('ngay_gio', addDays(ngay, 1) + 'T00:00:00+07:00'),
+      .gte('ngay_gio', dayStartTs(ngay))
+      .lt('ngay_gio', dayStartTs(addDays(ngay, 1))),
   ]);
   const khPcs = (khRes.data || []).reduce((s, r) => s + (Number(r[dowCol]) || 0), 0);
   const ttRows = ttRes.data || [];
@@ -708,8 +714,8 @@ async function loadKpiKanban(){
     sb.from('duc_khsx_tuan_plan').select('ma_sp,' + dowCol).eq('tuan_bat_dau', mon).in('ma_may', KEM_MACHINES),
     sb.from('duc_tem').select('so_luong')
       .eq('trang_thai', 'Đã sản xuất').in('may_tt', KEM_MACHINES)
-      .gte('ngay_gio_ghi_nhan', ngay + 'T00:00:00+07:00')
-      .lt('ngay_gio_ghi_nhan', addDays(ngay, 1) + 'T00:00:00+07:00'),
+      .gte('ngay_gio_ghi_nhan', dayStartTs(ngay))
+      .lt('ngay_gio_ghi_nhan', dayStartTs(addDays(ngay, 1))),
     sb.from('duc_kanban_ng_log').select('so_luong').eq('ngay', ngay),
   ]);
   const khRows = khRes.data || [];
