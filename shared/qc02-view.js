@@ -130,14 +130,16 @@ const Qc02View = (() => {
   });
   document.addEventListener('scroll',hidePreview,true);
   window.addEventListener('blur',hidePreview);
+  // Chỉ ảnh QC (gắn data-qc-photo hoặc thumbnail chụp/đính kèm) — không bắt click mọi <img> trên trang.
+  const PHOTO_SELECTOR = '[data-qc-photo],.photo-thumb img,.img-thumb img';
   document.addEventListener('click', event => {
-    const link = event.target.closest('[data-qc-photo],img');
+    const link = event.target.closest(PHOTO_SELECTOR);
     if (link) {
       if (link.closest('.qc02-viewer,#qc02-print')) return;
       hidePreview();
       event.preventDefault(); event.stopImmediatePropagation();
       const group = link.closest('[data-qc-gallery],.img-gallery,.ds-row-img,.photo-grid,td') || link.parentElement;
-      const urls = [...group.querySelectorAll('[data-qc-photo],img')].map(photoSource);
+      const urls = [...group.querySelectorAll(PHOTO_SELECTOR)].map(photoSource);
       photo(photoSource(link), urls);
     }
   }, true);
