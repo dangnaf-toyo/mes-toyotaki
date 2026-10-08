@@ -199,12 +199,13 @@ tr:last-child td{border-bottom:none}
       <div class="panel-head">📋 Kết quả kiểm tra gần đây <span class="count" id="done-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Điều kiện máy</th><th>Liên kết</th></tr></thead>
           <tbody id="done-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="done-empty">Chưa có kết quả kiểm tra nào.</div>
       </div>
     </div>
+    <div class="panel"><div class="panel-head">Thống kê máy / lỗi (24h gần nhất)</div><div class="panel-body"><div id="qc02-machines"></div><p>Số lượt mục kiểm không đạt; một lần kiểm có thể có nhiều mục lỗi.</p><div id="qc02-defects"></div></div></div>
   </div>
 
   <!-- ===================== TAB: TRA CỨU LỊCH SỬ ===================== -->
@@ -246,7 +247,7 @@ tr:last-child td{border-bottom:none}
       <div class="panel-head">📋 Kết quả tra cứu <span class="count" id="history-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Liên kết</th></tr></thead>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ (phút)</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Điều kiện máy</th><th>Liên kết</th></tr></thead>
           <tbody id="history-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="history-empty">Không tìm thấy kết quả nào khớp bộ lọc.</div>
@@ -256,6 +257,7 @@ tr:last-child td{border-bottom:none}
 
   <!-- ===================== TAB: XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP ===================== -->
   <div class="tabpanel" id="tab-ncp">
+    <label>Tìm số phiếu <input id="qc02-ncp-search" placeholder="Nhập số phiếu hoặc một phần số phiếu" oninput="renderNcpList()"></label>
     <div class="panel">
       <div class="panel-head">🚧 Phiếu đang xử lý <span class="count" id="ncp-open-count">0</span></div>
       <div class="panel-actions"><button class="btn btn-primary" onclick="openNcpNewModal()">+ Mở phiếu mới</button></div>
@@ -429,6 +431,8 @@ tr:last-child td{border-bottom:none}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
+<script src="shared/qc02-data.js"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
 
@@ -566,7 +570,7 @@ async function loadBoard(){
     const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
     const [activeSet, cpRes, dinhKyRes, scRes] = await Promise.all([
       getActiveIdDongSet(),
-      sb.from('duc_ipqc_checkpoint').select('*').gte('thoi_diem_tao', cutoff),
+      sb.from('duc_ipqc_checkpoint').select('*').or(`trang_thai.eq.cho_kiem,thoi_diem_kiem_thuc_te.gte.${cutoff}`),
       sb.rpc('duc_get_ipqc_periodic_due'),
       sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,gio_tro_lai,van_de,thoi_gian_dung_phut').gte('gio_phat_sinh', new Date(Date.now() - 3 * 24 * 3600000).toISOString()),
     ]);
@@ -696,20 +700,27 @@ function stopMinutesForRow(d){
   return incId ? { incId, approx: false, phut: null } : null;
 }
 
+
+const qc02Checks = new Map();
+document.addEventListener('click', event => {
+  const button=event.target.closest('[data-qc-check]');if(!button)return;
+  const d=qc02Checks.get(button.dataset.qcCheck);if(!d)return;
+  const dialog=document.createElement('dialog');dialog.className='qc02-viewer';
+  dialog.style.cssText='width:min(960px,94vw);max-height:90vh;overflow:auto;padding:20px;border:0;border-radius:10px';
+  const close=document.createElement('button');close.textContent='Đóng';close.onclick=()=>dialog.close();dialog.append(close);
+  const heading=document.createElement('h2');heading.textContent='Chi tiết lượt kiểm';dialog.append(heading);
+  const info=document.createElement('div');dialog.append(info);const checked=Qc02View.machineChecked(d.ghi_chu);
+  Qc02View.table(info,['Thông tin','Nội dung'],[['Máy',d.ma_may],['Model / mã SP',d.ma_sp],['Loại kiểm',LOAI_LABEL[d.loai_kiem]||d.loai_kiem],['Người kiểm',d.nguoi_kiem],['Thời gian',d.thoi_diem_kiem_thuc_te],['Kết quả',d.ket_qua],['Điều kiện máy',checked===true?'Đã kiểm điều kiện máy':checked===false?'Chưa kiểm điều kiện máy':'Chưa ghi nhận điều kiện máy'],['Ghi chú',String(d.ghi_chu||'').replace(/\n?\[QC02_MACHINE_CHECK:(?:0|1)\]/g,'')],['Vấn đề liên quan',d.id_van_de_lien_quan]]);
+  const list=document.createElement('div');dialog.append(list);Qc02View.table(list,['Mục kiểm','Kết quả'],(d.checklist||[]).map(x=>[x.muc||x.muc_kiem||x.ten,x.dat===true?'Đạt':x.dat===false?'Không đạt':'Chưa đánh giá']));
+  const gallery=document.createElement('div');gallery.dataset.qcGallery='';dialog.append(gallery);
+  for(const raw of d.anh_bang_chung_urls||[]){const url=Qc02View.safeUrl(raw,true);if(!url)continue;const img=document.createElement('img');img.src=url;img.dataset.qcPhoto='';img.style.cssText='max-width:140px;max-height:100px;margin:6px';gallery.append(img);}
+  const id=incidentIdForRow(d);if(id){const incident=document.createElement('div');incident.textContent='Sự cố: '+id;dialog.append(incident);const rows=(state.suCoLog||[]).filter(r=>r.id_su_co===id);if(rows.length)Qc02View.table(incident,['Máy','Nội dung','Phát sinh','Trở lại','Phút dừng'],rows.map(r=>[r.ma_may,r.van_de,r.gio_phat_sinh,r.gio_tro_lai,r.thoi_gian_dung_phut]));}
+  dialog.onclose=()=>dialog.remove();dialog.onclick=e=>{if(e.target===dialog)dialog.close();};document.body.append(dialog);dialog.showModal();
+});
 function doneRowHtml(d){
-  // NG/Cảnh báo — hạng mục checklist không đạt + ghi chú IPQC ghép ngay vào
-  // cột "Liên kết" (thay vì tách dòng riêng), để không phải mở lại từng bản
-  // ghi mới xem được.
-  const failed = (d.checklist || []).filter(c => c && c.dat === false).map(c => c.muc);
-  const ipqcNoteParts = [];
-  if (failed.length) ipqcNoteParts.push('Không đạt: ' + failed.join('; '));
-  if (d.ghi_chu) ipqcNoteParts.push('Ghi chú: ' + d.ghi_chu);
-  // Gộp thành 1 badge duy nhất trong cột "Liên kết" (title = tooltip hover
-  // xem đầy đủ) — trước đó hiện thẳng text nhiều dòng làm bảng bị lệch
-  // chiều cao dòng, khó xem.
-  const ipqcNote = (d.ket_qua !== 'OK' && ipqcNoteParts.length)
-    ? '<span class="pill warn" title="' + escapeHtml(ipqcNoteParts.join(' — ')) + '">🔻 Chi tiết</span>'
-    : '';
+  qc02Checks.set(String(d.id_checkpoint),d);
+  const machineChecked = Qc02View.machineChecked(d.ghi_chu);
+  const ipqcNote = '<button type="button" class="link-btn" data-qc-check="' + escapeHtml(d.id_checkpoint) + '">Chi tiết</button>';
   // Mã sự cố + số phút dừng chuyền do vấn đề chất lượng này gây ra. Với NG:
   // tra tổng thời_gian_dừng_phút theo mã sự cố; sự cố chưa kết thúc thì chưa
   // có bản ghi trong duc_su_co_log nên hiển thị "chưa chốt giờ dừng".
@@ -740,8 +751,9 @@ function doneRowHtml(d){
       : ''}>${d.tre_phut != null ? d.tre_phut : '—'}</td>
     <td class="mono">${fmtDurationSec(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
+    <td><span class="pill ${machineChecked === true ? 'ok' : 'neutral'}">${machineChecked === true ? 'Đã kiểm điều kiện máy' : machineChecked === false ? 'Chưa kiểm điều kiện máy' : 'Chưa ghi nhận điều kiện máy'}</span></td>
     <td class="link-list">
-      ${(d.anh_bang_chung_urls || []).map((u, i) => '<a class="link-btn" href="' + u + '" target="_blank">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</a>').join('')}
+      ${(d.anh_bang_chung_urls || []).map((u, i) => '<button type="button" data-qc-photo data-qc-image-url="' + escapeHtml(u) + '" data-qc-image-group="' + escapeHtml(d.id_checkpoint) + '" class="link-btn">Ảnh' + ((d.anh_bang_chung_urls.length > 1) ? ' ' + (i + 1) : '') + '</button>').join('')}
       ${scBadge}
       ${d.id_van_de_lien_quan ? '<span class="pill neutral" title="Đã tạo bản ghi vấn đề khuôn ' + escapeHtml(d.id_van_de_lien_quan) + '">Đã báo khuôn</span>' : ''}
       ${ipqcNote}
@@ -751,13 +763,16 @@ function doneRowHtml(d){
 }
 
 function renderBoard(b){
+  const summary = Qc02View.summarize(b.done);
+  Qc02View.table(document.getElementById("qc02-machines"), ["Máy", "Lượt kiểm", "OK", "NG", "Cảnh báo"], summary.machines.map(m => [m.machine,m.total,m.ok,m.ng,m.warning]));
+  Qc02View.table(document.getElementById("qc02-defects"), ["Mục không đạt", "Lượt ghi nhận"], summary.defects);
   document.getElementById('pending-count').textContent = b.pending.length;
   document.getElementById('pending-tbody').innerHTML = b.pending.map(p => `
-    <tr class="${p.da_den_han ? levelForMinutes(p.phut_da_troi) : ''}">
+    <tr class="${Qc02View.overdue(p.phut_da_troi) && p.loai_kiem === 'dinh_ky' ? 'row-alarm' : p.da_den_han ? levelForMinutes(p.phut_da_troi) : ''}">
       <td><b>${escapeHtml(p.ma_may)}</b></td>
       <td class="mono">${escapeHtml(p.ma_sp)}</td>
       <td>${escapeHtml(LOAI_LABEL[p.loai_kiem] || p.loai_kiem)}</td>
-      <td class="mono">${p.da_den_han ? ('Đang chờ ' + p.phut_da_troi + 'p') : ('<span class="pill neutral">Sắp tới · đã ' + p.phut_da_troi + 'p</span>')}</td>
+      <td class="mono">${p.da_den_han ? ((p.loai_kiem === 'dinh_ky' && Qc02View.overdue(p.phut_da_troi) ? 'QUÁ 2 GIỜ · ' : 'Đang chờ ') + p.phut_da_troi + 'p') : ('<span class="pill neutral">Sắp tới · đã ' + p.phut_da_troi + 'p</span>')}</td>
     </tr>`).join('');
   document.getElementById('pending-empty').classList.toggle('hidden', b.pending.length > 0);
 
@@ -899,8 +914,13 @@ const NCP_BADGE_LABEL = { do: '🔴 Đỏ', vang: '🟡 Vàng', xanh: '🟢 Xanh
 const NCP_RC_BADGE_LABEL = { nhap: 'Nháp', cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' };
 
 async function loadNcpList(){
-  const { data, error } = await sb.from('duc_ncp').select('*').order('ngay_tao', { ascending: false });
-  if (error) return;
+  const data = [];
+  for(let offset=0;;offset+=500){
+    const result=await sb.from('duc_ncp').select('*').order('ngay_tao',{ascending:false}).order('id_ncp').range(offset,offset+499);
+    if(result.error){console.error('Không tải được phiếu NCP',result.error);return;}
+    data.push(...(result.data||[]));
+    if(!result.data||result.data.length<500)break;
+  }
   state.ncpList = (data || []).map(c => Object.assign({ mau_the: NCP_MAU_THE[c.trang_thai] || 'do' }, c));
   const priority = { do: 0, vang: 1, xanh: 2 };
   state.ncpList.sort((a, b) => {
@@ -912,14 +932,16 @@ async function loadNcpList(){
 }
 
 function renderNcpList(){
-  const open = state.ncpList.filter(c => c.trang_thai !== 'dong');
-  const closed = state.ncpList.filter(c => c.trang_thai === 'dong');
+  const term = document.getElementById('qc02-ncp-search').value.trim().toLowerCase();
+  const list = state.ncpList.filter(c => !term || String(c.id_ncp).toLowerCase().includes(term));
+  const open = list.filter(c => c.trang_thai !== 'dong');
+  const closed = list.filter(c => c.trang_thai === 'dong');
 
   document.getElementById('ncp-open-count').textContent = open.length;
   document.getElementById('ncp-open-tbody').innerHTML = open.map(c => `
     <tr>
       <td><span class="ncp-badge ${c.mau_the}">${NCP_BADGE_LABEL[c.mau_the]}</span></td>
-      <td class="mono">${escapeHtml(c.id_ncp)}</td>
+      <td class="mono"><a href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}">${escapeHtml(c.id_ncp)}</a></td>
       <td><b>${escapeHtml(c.ma_may)}</b></td>
       <td class="mono">${escapeHtml(c.ma_sp)}</td>
       <td class="ncp-qty">${c.so_luong_nghi_van}</td>
@@ -942,7 +964,7 @@ function renderNcpList(){
   document.getElementById('ncp-closed-tbody').innerHTML = closed.map(c => `
     <tr>
       <td><span class="ncp-badge ${c.mau_the}">${NCP_BADGE_LABEL[c.mau_the]}</span></td>
-      <td class="mono">${escapeHtml(c.id_ncp)}</td>
+      <td class="mono"><a href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}">${escapeHtml(c.id_ncp)}</a></td>
       <td><b>${escapeHtml(c.ma_may)}</b></td>
       <td class="mono">${escapeHtml(c.ma_sp)}</td>
       <td class="ncp-qty">${c.so_luong_nghi_van}</td>
@@ -1221,7 +1243,8 @@ function editTieuChuan(maSp){
   document.getElementById('tc-ma-sp').value = maSp;
   document.getElementById('tc-muc-list').innerHTML = '';
   (t ? t.muc_kiem : []).forEach(m => addMucRow(m));
-  document.getElementById('tc-pdf-current').textContent = t && t.file_pdf_url ? '📄 Đã có PDF — upload file mới để thay thế' : 'Chưa có PDF';
+  const pdfTarget = document.getElementById('tc-pdf-current'); pdfTarget.replaceChildren();
+  if(t && t.file_pdf_url){const btn=document.createElement('button');btn.type='button';btn.textContent='Xem tiêu chuẩn';btn.onclick=()=>Qc02View.pdf(t.file_pdf_url);pdfTarget.append(btn);}else{pdfTarget.textContent='Chưa có file tiêu chuẩn';}
   state.pdfBase64 = null; state.pdfBlob = null;
   document.getElementById('tc-pdf-btn').disabled = true;
 }
@@ -1289,5 +1312,6 @@ loadBoard();
 loadQcFilters();
 setInterval(loadBoard, 15000);
 </script>
+<script>Qc02Data.attachEmployees(["ncp-nguoi-dam-nhiem","ncp-nguoi-dam-nhiem-doi-sach"]);</script>
 </body>
 </html>

@@ -149,9 +149,10 @@ button{cursor:pointer;font-family:inherit}
 
 <!-- ============ SCREEN: Hàng đợi ============ -->
 <div class="screen active" id="scr-queue">
+  <div style="padding:8px"><a href="qc-manager.html" target="_blank" rel="noopener">Tra cứu lịch sử IPQC và ảnh kiểm tra</a></div>
   <div class="appbar">
     <div style="flex:1;min-width:0">
-      <div class="title">🔍 IPQC — Hàng đợi kiểm tra</div>
+      <div class="title">🔍 IPQC — Hàng đợi kiểm tra (2 giờ/lần · 1 shot/lần)</div>
       <div class="sub" id="queue-user-label">…</div>
     </div>
     <button class="daynight-btn hidden" id="btn-ket-thuc-ngay" onclick="onKetThucNgay()">🌙 Kết thúc ngày</button>
@@ -194,6 +195,7 @@ button{cursor:pointer;font-family:inherit}
     </button>
     <input type="file" accept="image/*" capture="environment" id="ck-photo-input" class="hidden" onchange="onPhotoSelected(event)">
     <div class="photo-grid" id="ck-photo-grid"></div>
+    <label><input type="checkbox" id="ck-machine-condition"> Check điều kiện máy</label>
   </div>
 
   <div class="field">
@@ -213,6 +215,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 6;
@@ -507,7 +510,7 @@ function renderQueue(){
     // Thống nhất cách đếm cho cả 3 loại: luôn hiện "đã trôi qua bao lâu kể từ
     // khi có yêu cầu kiểm" — kể cả loại định kỳ chưa tới hạn (không hiện đếm
     // ngược "còn bao lâu" nữa, chỉ khác ở nhãn "sắp tới" + màu sắc).
-    const timeLabel = cp.phut_da_troi + 'p';
+    const timeLabel = (cp.loai_kiem === 'dinh_ky' && Qc02View.overdue(cp.phut_da_troi) ? 'QUÁ 2 GIỜ · ' : '') + cp.phut_da_troi + 'p';
     return `
       <div class="qcard" data-lvl="${lvl}" onclick="openCheck('${cp.id_checkpoint}')">
         <div class="qcard-main">
@@ -609,6 +612,7 @@ async function openCheck(idCheckpoint){
   state.photos = [];
   renderPhotoGrid();
   document.getElementById('ck-ghi-chu').value = '';
+  document.getElementById('ck-machine-condition').checked = false;
 
   document.getElementById('ck-may').textContent = cp.ma_may;
   document.getElementById('ck-loai').textContent = LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem;
@@ -638,9 +642,10 @@ async function openCheck(idCheckpoint){
     const pdfBtn = document.getElementById('ck-pdf-btn');
     if (filePdfUrl) {
       pdfBtn.classList.remove('hidden');
-      pdfBtn.onclick = () => window.open(filePdfUrl, '_blank');
+      pdfBtn.disabled = false; pdfBtn.textContent = 'Xem tiêu chuẩn';
+      pdfBtn.onclick = () => Qc02View.pdf(filePdfUrl);
     } else {
-      pdfBtn.classList.add('hidden');
+      pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.textContent = 'Chưa có file tiêu chuẩn'; pdfBtn.onclick = null;
     }
   } catch (e) { onError(e); }
 }
@@ -836,7 +841,7 @@ async function submitCheck(ketQua){
       p_checklist: state.checklistAnswers,
       p_ket_qua: ketQua,
       p_anh_urls: anhUrls,
-      p_ghi_chu: ghiChu,
+      p_ghi_chu: Qc02View.machineNote(ghiChu, document.getElementById('ck-machine-condition').checked),
       p_thoi_gian_kiem_giay: thoiGianKiemGiay,
       p_nguoi_kiem: nguoiKiem,
     });
