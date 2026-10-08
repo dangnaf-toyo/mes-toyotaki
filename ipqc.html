@@ -208,10 +208,21 @@ button{cursor:pointer;font-family:inherit}
       <button class="btn-result ok" onclick="submitCheck('OK')">✅ OK<br><span style="font-weight:500;font-size:.75rem">Cho phép SX</span></button>
       <button class="btn-result ng" onclick="submitCheck('NG')">❌ NG<br><span style="font-weight:500;font-size:.75rem">Dừng máy</span></button>
     </div>
-    <button class="btn-result warn" onclick="submitCheck('CANH_BAO')">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Sản xuất tạm đến hết chỉ thị hiện tại</span></button>
+    <button class="btn-result warn" onclick="MesIpqcWarning.open()">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Sản xuất tạm đến hết chỉ thị hiện tại</span></button>
   </div>
 </div>
 
+<dialog id="warningRequestDialog" style="width:min(760px,95vw);max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg-panel);color:var(--text)">
+<form id="warningRequestForm"><h3>Cảnh báo và đề nghị duyệt tiếp tục sản xuất</h3><p id="warningJobInfo"></p>
+<div class="field"><label>Loại lỗi</label><select id="warningDefectType"><option value="appearance">Ngoại quan</option><option value="dimension">Kích thước / thông số đo</option></select></div>
+<div class="field"><label>Số lượng lỗi (nếu có)</label><input id="warningDefectQty" type="number" min="0" step="1"></div>
+<div id="warningMeasurements" hidden><div class="field"><label>Giá trị thực tế</label><input id="warningActual"></div><div class="field"><label>Min / Max (nếu có tiêu chuẩn)</label><input id="warningMin" placeholder="Min"><input id="warningMax" placeholder="Max"></div></div>
+<div class="field"><label>Loại lý do</label><select id="warningReasonType"><option value="TIME">Tiếp tục theo thời gian</option><option value="PLAN_QTY">Chạy đủ KHSX</option><option value="DOWNSTREAM_REWORK">Công đoạn sau sửa / lựa</option><option value="EARLY_WARNING">Cảnh báo xu hướng</option></select></div>
+<div class="field"><label>Lý do đề nghị chi tiết *</label><textarea id="warningReason" required></textarea></div>
+<div id="warningTimeFields"><div class="field"><label>Chạy đến giờ hoặc số giờ chạy thêm</label><input id="warningUntil" type="datetime-local"><input id="warningHours" type="number" min="0.1" step="0.1" placeholder="Số giờ"></div></div>
+<div id="warningQtyFields" hidden><div class="field"><label>Số lượng được đề nghị chạy thêm</label><input id="warningAllowedQty" type="number" min="1" step="1"></div></div>
+<div id="warningRepairFields" hidden><div class="field"><label>Bộ phận sửa</label><input id="warningRepairDepartment"></div><div class="field"><label>Nội dung xử lý</label><textarea id="warningTreatment"></textarea></div><div class="field"><label>Thời hạn xử lý</label><input id="warningDeadline" type="datetime-local"></div></div>
+<p id="warningStatus" role="status"></p><button id="warningSend" type="submit" class="btn-result warn">Lưu cảnh báo và gửi yêu cầu duyệt</button><button id="warningClose" type="button">Đóng</button></form></dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
@@ -623,31 +634,34 @@ async function openCheck(idCheckpoint){
   if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
 
   showScreen('scr-check');
-  showOverlay('Đang tải tiêu chuẩn...');
+  // The original checklist remains independent of the reference document.
+  state.checklistAnswers = IPQC_DEFAULT_CHECKLIST.map(muc => ({ muc, dat: null }));
+  renderChecklist();
+  const request = state.referenceRequest = (state.referenceRequest || 0) + 1;
+  const pdfBtn = document.getElementById('ck-pdf-btn');
+  pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.onclick = null;
+  pdfBtn.textContent = 'Đang tải tiêu chuẩn...';
+  state.tieuChuan = { ma_sp: cp.ma_sp, muc_kiem: IPQC_DEFAULT_CHECKLIST.slice(), file_pdf_url: '' };
   try {
     const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').eq('ma_sp', cp.ma_sp).maybeSingle();
+    if (state.referenceRequest !== request || state.current?.id_checkpoint !== cp.id_checkpoint) return;
     if (error) throw new Error(error.message);
-    let mucKiem = IPQC_DEFAULT_CHECKLIST.slice();
-    let filePdfUrl = '';
-    if (data) {
-      const parsed = Array.isArray(data.danh_sach_muc_kiem_json) ? data.danh_sach_muc_kiem_json : [];
-      if (parsed.length) mucKiem = parsed;
-      filePdfUrl = data.file_pdf_url || '';
+    const process = data?.cong_doan || data?.process;
+    const filePdfUrl = data?.file_pdf_url || '';
+    if (process && process !== 'Đúc' && process !== 'IPQC') {
+      pdfBtn.textContent = 'Chưa có tiêu chuẩn cho công đoạn này'; return;
     }
-    hideOverlay();
-    state.tieuChuan = { ma_sp: cp.ma_sp, muc_kiem: mucKiem, file_pdf_url: filePdfUrl };
-    state.checklistAnswers = mucKiem.map(m => ({ muc: m, dat: null }));
-    renderChecklist();
-
-    const pdfBtn = document.getElementById('ck-pdf-btn');
-    if (filePdfUrl) {
-      pdfBtn.classList.remove('hidden');
+    state.tieuChuan.file_pdf_url = filePdfUrl;
+    if (filePdfUrl && Qc02View.safeUrl(filePdfUrl)) {
       pdfBtn.disabled = false; pdfBtn.textContent = 'Xem tiêu chuẩn';
+      pdfBtn.title = process ? 'Tiêu chuẩn ' + process : 'Tiêu chuẩn theo model; nguồn hiện chưa có mapping công đoạn';
       pdfBtn.onclick = () => Qc02View.pdf(filePdfUrl);
-    } else {
-      pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.textContent = 'Chưa có file tiêu chuẩn'; pdfBtn.onclick = null;
+    } else pdfBtn.textContent = 'Chưa có file tiêu chuẩn';
+  } catch (error) {
+    if (state.referenceRequest === request && state.current?.id_checkpoint === cp.id_checkpoint) {
+      pdfBtn.textContent = 'Không tải được tiêu chuẩn'; showToast(error.message, true);
     }
-  } catch (e) { onError(e); }
+  }
 }
 
 // Điểm kiểm "Sau sự cố" — hiện nội dung sự cố trưởng ca đã ghi trên Dashboard
@@ -806,6 +820,7 @@ async function uploadEvidencePhotos(maMay, maSp, ketQua){
 
 async function submitCheck(ketQua){
   if (!state.current) return;
+  const submittedCheckpoint = { ...state.current };
 
   const session = await MesAuth.getSession();
   if (!session){
@@ -837,7 +852,7 @@ async function submitCheck(ketQua){
     showOverlay('Đang lưu kết quả...');
     const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
     const { data, error } = await sb.rpc('duc_submit_ipqc_check', {
-      p_id_checkpoint: state.current.id_checkpoint,
+      p_id_checkpoint: submittedCheckpoint.id_checkpoint,
       p_checklist: state.checklistAnswers,
       p_ket_qua: ketQua,
       p_anh_urls: anhUrls,
@@ -857,10 +872,12 @@ async function submitCheck(ketQua){
     state.current = null;
     renderQueue();
     showScreen('scr-queue');
+    return { ok: true, checkpointId: submittedCheckpoint.id_checkpoint };
   } catch (e) {
     onError(e);
   }
 }
 </script>
+<script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
 </body>
 </html>
