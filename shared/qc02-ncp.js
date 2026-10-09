@@ -43,12 +43,14 @@ const Qc02Ncp = (() => {
     const rows = Object.entries(data || {}).filter(([key]) => !key.startsWith('doi_sach_') && !key.startsWith('hinh_anh_'));
     Qc02View.table(target, ['Thông tin', 'Nội dung'], rows.map(([key, value]) => {
       let display = value && typeof value === 'object' ? JSON.stringify(value) : value ?? '—';
+
+      if(key==='defects'&&Array.isArray(value))display=value.map(d=>MesQcFields.defectName(d)+': '+d.qty).join('\n');
       if(key === 'anh_bang_chung_url') display = (Array.isArray(value) ? value.length : value ? 1 : 0) + ' ảnh (xem phần ảnh bằng chứng)';
       if(key === 'checklist_json' && Array.isArray(value)) display = value.map(item =>
         (item.muc || item.muc_kiem || 'Mục kiểm') + ': ' + (item.dat === true ? 'Đạt' : item.dat === false ? 'Không đạt' : 'Chưa đánh giá')).join('\n');
       if(key.includes('trang_thai')) display = status[value] || display;
       if(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value))) {
-        display = new Date(value).toLocaleString('vi-VN',{hour12:false,timeZone:'Asia/Ho_Chi_Minh'});
+        display = MesQcFields.display(value);
       }
       return [labels[key] || key.replace(/_/g, ' '), display];
     }));

@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),crypto=require('node:crypto');
-const files=[...new Set([...cp.execFileSync('git',['ls-files','-z']).toString('utf8').split('\0'),'shared/mes-ipqc-flow.js','shared/mes-ipqc-warning.js','shared/mes-ipqc-approval.js','shared/mes-oqc-record.js'])].filter(f=>/^[^/]+\.html$/.test(f)||/^shared\/.+\.(html|js|css|ttf|woff2|txt)$/.test(f));
+const files=[...new Set([...cp.execFileSync('git',['ls-files','-z']).toString('utf8').split('\0'),'shared/mes-qc-fields.js','shared/mes-oqc-history.js','shared/mes-ipqc-flow.js','shared/mes-ipqc-warning.js','shared/mes-ipqc-approval.js','shared/mes-oqc-record.js'])].filter(f=>/^[^/]+\.html$/.test(f)||/^shared\/.+\.(html|js|css|ttf|woff2|txt)$/.test(f));
 const output=path.resolve('.review/build-'+new Date().toISOString().replace(/[:.]/g,'-'));fs.mkdirSync(output,{recursive:true});const manifest={};
 for(const file of files){const bytes=fs.readFileSync(file),dest=path.join(output,file);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,bytes);manifest[file]=crypto.createHash('sha256').update(bytes).digest('hex');}
 fs.writeFileSync(path.join(output,'manifest.json'),JSON.stringify(manifest,null,2));console.log(JSON.stringify({output,frontendFiles:files.length,sqlFiles:0,deploy:false}));
