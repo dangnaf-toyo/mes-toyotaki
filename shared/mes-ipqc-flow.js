@@ -1,9 +1,9 @@
 /* Current MES production rows are authoritative. No Task/LOT is inferred from a machine. */
 const MesIpqcFlow = (() => {
   const activeStatuses=['Chờ duyệt','Đang duyệt','Đã duyệt','Đang có hiệu lực'];
-  async function readRows(table,order) {
+  async function readRows(table,order,equals={},within={}) {
     const rows=[];
-    for(let offset=0;;offset+=500){const r=await sb.from(table).select('*').order(order).range(offset,offset+499);if(r.error)throw new Error(r.error.message);rows.push(...r.data||[]);if(!r.data||r.data.length<500)return rows;}
+    for(let offset=0;;offset+=500){let query=sb.from(table).select('*').order(order);for(const [key,value]of Object.entries(equals))query=query.eq(key,value);for(const [key,value]of Object.entries(within))query=query.in(key,value);const r=await query.range(offset,offset+499);if(r.error)throw new Error(r.error.message);rows.push(...r.data||[]);if(!r.data||r.data.length<500)return rows;}
   }
   function active(rows,reports) {
     const closed=new Set(reports.map(r=>r.ngay+'|'+r.ca)),latest=new Map(),all=new Map(rows.map(r=>[r.id_dong,r])),ids=new Set();
@@ -48,5 +48,15 @@ const MesIpqcFlow = (() => {
   }
   const stepRoles={1:['qc_manager'],2:['ke_hoach','qlsx_truong_phong'],3:['quan_ly_bo_phan','truong_ca'],4:['giam_doc_sx']};
   function canDecide(role,step,override=false){return role==='admin'||(override?role==='giam_doc_sx':(stepRoles[step]||[]).includes(role));}
-  return {jobs,active,signature,validate,data,create,reason,canDecide};
+  function canPropose(role){return ['admin','nhan_vien_duc','nhan_vien_bavia','nhan_vien_gia_cong','nhan_vien_danh_bong','truong_ca','quan_ly_bo_phan','qlsx_nhan_vien','qlsx_truong_phong','ke_hoach','giam_doc_sx'].includes(role);}
+  function defects(cp){return (Array.isArray(cp.checklist_json)?cp.checklist_json:[]).filter(r=>r.dat===false).map(r=>String(r.muc||r.label||'')).filter(Boolean);}
+  async function warnings(){
+    const checkpoints=await readRows('duc_ipqc_checkpoint','id_checkpoint',{ket_qua:'CANH_BAO',trang_thai:'da_kiem'}),requests=[],source=[];
+    const ids=checkpoints.map(cp=>cp.id_checkpoint),jobIds=[...new Set(checkpoints.map(cp=>cp.id_dong).filter(Boolean))];
+    for(let index=0;index<ids.length;index+=100)requests.push(...await readRows('duc_ipqc_continue_request','id',{}, {checkpoint_id:ids.slice(index,index+100)}));
+    for(let index=0;index<jobIds.length;index+=100)source.push(...await readRows('duc_ca_hien_tai','id_dong',{}, {id_dong:jobIds.slice(index,index+100)}));
+    const linked=new Set(requests.map(r=>r.checkpoint_id).filter(Boolean));
+    return checkpoints.filter(cp=>!linked.has(cp.id_checkpoint)).map(cp=>({checkpoint:cp,job:source.find(r=>r.id_dong===cp.id_dong&&r.ma_may===cp.ma_may&&r.ma_sp===cp.ma_sp)||null})).sort((a,b)=>String(b.checkpoint.thoi_diem_kiem_thuc_te||'').localeCompare(String(a.checkpoint.thoi_diem_kiem_thuc_te||'')));
+  }
+  return {jobs,active,signature,validate,data,create,reason,canDecide,canPropose,defects,warnings};
 })();

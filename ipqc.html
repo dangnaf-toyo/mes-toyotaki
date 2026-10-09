@@ -208,21 +208,10 @@ button{cursor:pointer;font-family:inherit}
       <button class="btn-result ok" onclick="submitCheck('OK')">✅ OK<br><span style="font-weight:500;font-size:.75rem">Cho phép SX</span></button>
       <button class="btn-result ng" onclick="submitCheck('NG')">❌ NG<br><span style="font-weight:500;font-size:.75rem">Dừng máy</span></button>
     </div>
-    <button class="btn-result warn" onclick="MesIpqcWarning.open()">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Sản xuất tạm đến hết chỉ thị hiện tại</span></button>
+    <button class="btn-result warn" id="ipqcWarningButton" onclick="MesIpqcWarning.open()">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Ghi nhận cảnh báo để Sản xuất xử lý</span></button>
   </div>
 </div>
 
-<dialog id="warningRequestDialog" style="width:min(760px,95vw);max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg-panel);color:var(--text)">
-<form id="warningRequestForm"><h3>Cảnh báo và đề nghị duyệt tiếp tục sản xuất</h3><p id="warningJobInfo"></p>
-<div class="field"><label>Loại lỗi</label><select id="warningDefectType"><option value="appearance">Ngoại quan</option><option value="dimension">Kích thước / thông số đo</option></select></div>
-<div class="field"><label>Số lượng lỗi (nếu có)</label><input id="warningDefectQty" type="number" min="0" step="1"></div>
-<div id="warningMeasurements" hidden><div class="field"><label>Giá trị thực tế</label><input id="warningActual"></div><div class="field"><label>Min / Max (nếu có tiêu chuẩn)</label><input id="warningMin" placeholder="Min"><input id="warningMax" placeholder="Max"></div></div>
-<div class="field"><label>Loại lý do</label><select id="warningReasonType"><option value="TIME">Tiếp tục theo thời gian</option><option value="PLAN_QTY">Chạy đủ KHSX</option><option value="DOWNSTREAM_REWORK">Công đoạn sau sửa / lựa</option><option value="EARLY_WARNING">Cảnh báo xu hướng</option></select></div>
-<div class="field"><label>Lý do đề nghị chi tiết *</label><textarea id="warningReason" required></textarea></div>
-<div id="warningTimeFields"><div class="field"><label>Chạy đến giờ hoặc số giờ chạy thêm</label><input id="warningUntil" type="datetime-local"><input id="warningHours" type="number" min="0.1" step="0.1" placeholder="Số giờ"></div></div>
-<div id="warningQtyFields" hidden><div class="field"><label>Số lượng được đề nghị chạy thêm</label><input id="warningAllowedQty" type="number" min="1" step="1"></div></div>
-<div id="warningRepairFields" hidden><div class="field"><label>Bộ phận sửa</label><input id="warningRepairDepartment"></div><div class="field"><label>Nội dung xử lý</label><textarea id="warningTreatment"></textarea></div><div class="field"><label>Thời hạn xử lý</label><input id="warningDeadline" type="datetime-local"></div></div>
-<p id="warningStatus" role="status"></p><button id="warningSend" type="submit" class="btn-result warn">Lưu cảnh báo và gửi yêu cầu duyệt</button><button id="warningClose" type="button">Đóng</button></form></dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
@@ -866,7 +855,7 @@ async function submitCheck(ketQua){
 
     const msg = ketQua === 'OK' ? '✓ Đã lưu — OK, cho phép sản xuất'
       : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
-      : '✓ Đã lưu — Cảnh báo ghi nhận, đã báo bộ phận bảo dưỡng khuôn';
+      : '✓ Đã ghi nhận cảnh báo — hiển thị tại Duyệt tiếp tục SX IPQC; chưa có đề nghị chạy tiếp';
     showToast(msg + (data && data.note ? ' (' + data.note + ')' : ''));
     state.queue = state.queue.filter(x => x.id_checkpoint !== state.current.id_checkpoint);
     state.current = null;
