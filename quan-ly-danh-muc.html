@@ -228,10 +228,12 @@
               <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
               <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
               <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
-              <div><label for="sp-sldonggoi">SL đóng gói chuẩn (pcs/thùng)</label><input type="number" step="any" id="sp-sldonggoi" placeholder="Dùng cho tem chỉ thị Kanban"></div>
               <div style="grid-column:1/-1">
-                <label>SL/thùng tem thành phẩm theo công đoạn (pcs/thùng — in trên tem ở intem.html, để trống = chưa in được tem công đoạn đó)</label>
-                <div id="sp-slthung-cd" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+                <label>SL đóng gói theo công đoạn (pcs/thùng — Đúc: tem chỉ thị Kanban; còn lại: tem thành phẩm, để trống = chưa in được tem công đoạn đó)</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <label style="font-weight:400;display:flex;align-items:center;gap:4px">Đúc <input type="number" step="any" id="sp-sldonggoi" style="width:90px" placeholder="pcs"></label>
+                  <div id="sp-slthung-cd" style="display:contents"></div>
+                </div>
               </div>
               <div style="grid-column:1/-1">
                 <label>Quy trình công đoạn (chọn theo đúng thứ tự — để trống bước nào thì dừng ở đó)</label>
@@ -808,8 +810,11 @@ function getSlThungCdValue(){
   }
   return Object.keys(out).length ? out : null;
 }
-function fmtSlThungCd(obj){
-  return obj ? Object.entries(obj).map(([cd, n]) => cd + ': ' + n).join(' · ') : '';
+// Cột "SL đóng gói/thùng" — gộp Đúc (sl_dong_goi_chuan) + các công đoạn TP.
+function fmtSlThungCd(r){
+  const parts = r.sl_dong_goi_chuan == null ? [] : ['Đúc: ' + r.sl_dong_goi_chuan];
+  Object.entries(r.sl_thung_cong_doan || {}).forEach(([cd, n]) => parts.push(cd + ': ' + n));
+  return parts.join(' · ');
 }
 function getQuyTrinhValue(){
   return [...document.querySelectorAll('.sp-quytrinh-step')].map(s => s.value).filter(Boolean).join(',');
@@ -896,8 +901,7 @@ initCatalog({
     { k: 'cycle_time_s', label: 'Cycle time (s)', sortable: true, sortVal: r => r.cycle_time_s == null ? -Infinity : Number(r.cycle_time_s), text: r => r.cycle_time_s == null ? '' : String(r.cycle_time_s), render: r => r.cycle_time_s ?? DASH },
     { k: 'nguyen_lieu', label: 'Nguyên liệu', sortable: true, sortVal: r => r.nguyen_lieu || '', text: r => r.nguyen_lieu || '', render: r => escapeHtml(r.nguyen_lieu) || DASH },
     { k: 'so_khuon', label: 'Số khuôn', sortable: true, sortVal: r => r.so_khuon || '', text: r => r.so_khuon || '', render: r => escapeHtml(r.so_khuon) || DASH },
-    { k: 'sl_dong_goi_chuan', label: 'SL đ.gói/thùng', sortable: true, sortVal: r => r.sl_dong_goi_chuan == null ? -Infinity : Number(r.sl_dong_goi_chuan), text: r => r.sl_dong_goi_chuan == null ? '' : String(r.sl_dong_goi_chuan), render: r => r.sl_dong_goi_chuan ?? DASH },
-    { k: 'sl_thung_cong_doan', label: 'SL/thùng TP theo công đoạn', sortable: true, sortVal: r => fmtSlThungCd(r.sl_thung_cong_doan), text: r => fmtSlThungCd(r.sl_thung_cong_doan), render: r => escapeHtml(fmtSlThungCd(r.sl_thung_cong_doan)) || DASH },
+    { k: 'sl_thung_cong_doan', label: 'SL đóng gói/thùng', sortable: true, sortVal: r => fmtSlThungCd(r), text: r => fmtSlThungCd(r), render: r => escapeHtml(fmtSlThungCd(r)) || DASH },
     { k: 'quy_trinh_cong_doan', label: 'Quy trình công đoạn', sortable: true, sortVal: r => r.quy_trinh_cong_doan || '', text: r => r.quy_trinh_cong_doan || '', render: r => escapeHtml(r.quy_trinh_cong_doan) || DASH },
   ],
 });
