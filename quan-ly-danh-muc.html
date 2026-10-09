@@ -225,6 +225,10 @@
               <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
               <div><label for="sp-sldonggoi">SL đóng gói chuẩn (pcs/thùng)</label><input type="number" step="any" id="sp-sldonggoi" placeholder="Dùng cho tem chỉ thị Kanban"></div>
               <div style="grid-column:1/-1">
+                <label>SL/thùng tem thành phẩm theo công đoạn (pcs/thùng — in trên tem ở intem.html, để trống = chưa in được tem công đoạn đó)</label>
+                <div id="sp-slthung-cd" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+              </div>
+              <div style="grid-column:1/-1">
                 <label>Quy trình công đoạn (chọn theo đúng thứ tự — để trống bước nào thì dừng ở đó)</label>
                 <div id="sp-quytrinh-steps" style="display:flex;gap:8px;flex-wrap:wrap">
                   <select class="sp-quytrinh-step"></select>
@@ -598,6 +602,33 @@ function setupQuyTrinhSteps(){
     sel.innerHTML = '<option value="">-- (dừng ở đây) --</option>' + CONG_DOAN_LIST.map(cd => `<option value="${cd}">Bước ${i + 1}: ${cd}</option>`).join('');
   });
 }
+// SL/thùng tem thành phẩm (T72) — master_products.sl_thung_cong_doan jsonb
+// {"Đánh bóng Kẽm":60,...}. Chỉ các công đoạn in tem thành phẩm ở intem.html.
+const TP_CONG_DOAN = ["Bavia", "Đánh bóng Kẽm", "OQC"];
+let spSlThungCdGoc = {};
+function setupSlThungCd(){
+  document.getElementById('sp-slthung-cd').innerHTML = TP_CONG_DOAN.map(cd =>
+    `<label style="font-weight:400;display:flex;align-items:center;gap:4px">${cd} <input type="number" min="1" step="1" class="sp-slthung-cd" data-cd="${cd}" style="width:90px" placeholder="pcs"></label>`).join('');
+}
+function setSlThungCdValue(obj){
+  spSlThungCdGoc = obj && typeof obj === 'object' ? obj : {};
+  document.querySelectorAll('.sp-slthung-cd').forEach(inp => { inp.value = spSlThungCdGoc[inp.dataset.cd] ?? ''; });
+}
+function getSlThungCdValue(){
+  // Giữ nguyên khoá công đoạn khác (nếu có) không hiển thị trên form.
+  const out = { ...spSlThungCdGoc };
+  for (const inp of document.querySelectorAll('.sp-slthung-cd')) {
+    const v = inp.value.trim();
+    if (v === '') { delete out[inp.dataset.cd]; continue; }
+    const n = Number(v);
+    if (!Number.isInteger(n) || n <= 0) throw new Error('SL/thùng ' + inp.dataset.cd + ' phải là số nguyên > 0');
+    out[inp.dataset.cd] = n;
+  }
+  return Object.keys(out).length ? out : null;
+}
+function fmtSlThungCd(obj){
+  return obj ? Object.entries(obj).map(([cd, n]) => cd + ': ' + n).join(' · ') : '';
+}
 function getQuyTrinhValue(){
   return [...document.querySelectorAll('.sp-quytrinh-step')].map(s => s.value).filter(Boolean).join(',');
 }
@@ -612,6 +643,7 @@ function spResetForm(){
   clearMsg('sp-msg');
   document.getElementById('sp-form').reset();
   setQuyTrinhValue('');
+  setSlThungCdValue(null);
   document.getElementById('sp-ma').disabled = false;
   document.getElementById('sp-form-title').textContent = 'Thêm sản phẩm';
   document.getElementById('sp-submit').textContent = 'Thêm sản phẩm';
@@ -631,6 +663,7 @@ function spFillForm(r){
   document.getElementById('sp-sokhuon').value = r.so_khuon || '';
   document.getElementById('sp-sldonggoi').value = r.sl_dong_goi_chuan ?? '';
   setQuyTrinhValue(r.quy_trinh_cong_doan);
+  setSlThungCdValue(r.sl_thung_cong_doan);
   document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
   document.getElementById('sp-submit').textContent = 'Lưu thay đổi';
 }
@@ -650,12 +683,14 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const slRaw = document.getElementById('sp-sldonggoi').value;
   const sl_dong_goi_chuan = slRaw === '' ? null : Number(slRaw);
   const quy_trinh_cong_doan = getQuyTrinhValue() || null;
+  let sl_thung_cong_doan;
+  try { sl_thung_cong_doan = getSlThungCdValue(); } catch (e) { return showMsg('sp-msg', 'error', e.message); }
   if (!ma_sp) return;
   let error;
   if (spEditing){
-    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }).eq('ma_sp', spEditing));
+    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan }).eq('ma_sp', spEditing));
   } else {
-    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan }));
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
   toast(spEditing ? 'Đã lưu ' + ma_sp : 'Đã thêm ' + ma_sp);
@@ -665,7 +700,7 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
 initCatalog({
   id: 'sp',
   emptyText: 'Chưa có sản phẩm nào.',
-  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan'),
+  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, sl_thung_cong_doan, quy_trinh_cong_doan'),
   pk: r => r.ma_sp,
   resetForm: spResetForm,
   fillForm: spFillForm,
@@ -680,6 +715,7 @@ initCatalog({
     { k: 'nguyen_lieu', label: 'Nguyên liệu', sortable: true, sortVal: r => r.nguyen_lieu || '', text: r => r.nguyen_lieu || '', render: r => escapeHtml(r.nguyen_lieu) || DASH },
     { k: 'so_khuon', label: 'Số khuôn', sortable: true, sortVal: r => r.so_khuon || '', text: r => r.so_khuon || '', render: r => escapeHtml(r.so_khuon) || DASH },
     { k: 'sl_dong_goi_chuan', label: 'SL đ.gói/thùng', sortable: true, sortVal: r => r.sl_dong_goi_chuan == null ? -Infinity : Number(r.sl_dong_goi_chuan), text: r => r.sl_dong_goi_chuan == null ? '' : String(r.sl_dong_goi_chuan), render: r => r.sl_dong_goi_chuan ?? DASH },
+    { k: 'sl_thung_cong_doan', label: 'SL/thùng TP theo công đoạn', sortable: true, sortVal: r => fmtSlThungCd(r.sl_thung_cong_doan), text: r => fmtSlThungCd(r.sl_thung_cong_doan), render: r => escapeHtml(fmtSlThungCd(r.sl_thung_cong_doan)) || DASH },
     { k: 'quy_trinh_cong_doan', label: 'Quy trình công đoạn', sortable: true, sortVal: r => r.quy_trinh_cong_doan || '', text: r => r.quy_trinh_cong_doan || '', render: r => escapeHtml(r.quy_trinh_cong_doan) || DASH },
   ],
 });
@@ -965,6 +1001,7 @@ async function main(){
   document.getElementById('adminArea').style.display = 'block';
   document.getElementById('adminTabs').style.display = 'flex';
   setupQuyTrinhSteps();
+  setupSlThungCd();
   loadNsLineMayOptions();
   catalogs.may.reload();
   catalogs.sp.reload();

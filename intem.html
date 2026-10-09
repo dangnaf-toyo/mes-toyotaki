@@ -299,8 +299,8 @@ textarea{resize:vertical;min-height:48px}
           <input id="tp_ngay" type="date" onchange="onTpKhsx()">
         </div>
         <div class="fg">
-          <label for="tp_slChuan">SL / thùng (theo công đoạn)</label>
-          <input id="tp_slChuan" type="text" disabled oninput="onTpKhsx()">
+          <label for="tp_slChuan">SL / thùng (theo danh mục SP)</label>
+          <input id="tp_slChuan" type="text" disabled>
         </div>
         <div class="fg">
           <label class="req" for="tp_soThung">Số thùng</label>
@@ -514,7 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
-    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan,ma_khach_hang,ten_khach_hang,ma_sp_khach_hang').order('ma_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan,sl_thung_cong_doan,ma_khach_hang,ten_khach_hang,ma_sp_khach_hang').order('ma_sp'),
     sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
@@ -525,6 +525,7 @@ async function loadMaster(){
   masterData = (prod.data || []).map(r => ({
     ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '', slDongGoiChuan: r.sl_dong_goi_chuan || '',
     maKhachHang: r.ma_khach_hang || '', tenKhachHang: r.ten_khach_hang || '', maSpKhachHang: r.ma_sp_khach_hang || '',
+    slThungCongDoan: r.sl_thung_cong_doan || {},
   }));
   masterMap = {};
   masterData.forEach(m => { masterMap[m.ma] = m; });
@@ -1184,19 +1185,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // =============================================================================
 // TEM THÀNH PHẨM — in trước lô (giống Kanban) + đóng gói theo công đoạn.
-// Định mức SL/thùng theo công đoạn — KHÔNG lấy master_products.sl_dong_goi_chuan
-// (cột đó giữ quy cách thùng Đúc/150). RIÊNG với CONFIG.PACKAGING bên
-// chuyencongdoan.html (Đóng gói lại thủ công — flow khác hẳn) — cùng công
-// đoạn "OQC" nhưng 2 nơi có thể khác định mức tuỳ mã SP/khách hàng (VD OQC
-// mặc định 100pcs cho SP khác, riêng BPH-SHO 60pcs qua Tem Thành Phẩm).
+// SL/thùng lấy theo MÃ SP × CÔNG ĐOẠN trong danh mục SP (T72 —
+// master_products.sl_thung_cong_doan, sửa ở quan-ly-danh-muc.html), KHÔNG
+// lấy sl_dong_goi_chuan (cột đó giữ quy cách thùng Đúc/Kanban). Công đoạn
+// chưa khai cho mã SP → chặn tạo lô. RIÊNG với CONFIG.PACKAGING bên
+// chuyencongdoan.html (Đóng gói lại thủ công — flow khác hẳn).
 // =============================================================================
-var TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
-// Bavia (T65) — cũng in tem trước như Đánh bóng Kẽm/OQC, nhưng SL/thùng CHƯA
-// chuẩn hoá (mỗi lô có thể khác nhau) nên KHÔNG có định mức cứng trong
-// TP_PACKAGING — người dùng tự nhập "SL/thùng" mỗi lần tạo lô (xem
-// onTpCongDoanChange()/tpSlThung()).
-var TP_CONG_DOAN_TUY_CHINH = ["Bavia"];
-var TP_CONG_DOAN_LIST = Object.keys(TP_PACKAGING).concat(TP_CONG_DOAN_TUY_CHINH);
+var TP_CONG_DOAN_LIST = ["Đánh bóng Kẽm", "OQC", "Bavia"];
 var lastTpBatch = null;
 var tpKhNgay = null;   // KH ngày tra được từ cd_khsx_tuan_plan của công đoạn đang chọn (gợi ý)
 
@@ -1210,23 +1205,16 @@ function buildTpForm(items){
 }
 
 function onTpCongDoanChange(){
-  var cd = document.getElementById('tp_congDoan').value;
-  var slChuanEl = document.getElementById('tp_slChuan');
-  if (TP_CONG_DOAN_TUY_CHINH.includes(cd)) {
-    // Bavia: SL/thùng chưa chuẩn hoá — cho nhập tay mỗi lần tạo lô.
-    slChuanEl.disabled = false;
-    slChuanEl.type = 'number';
-    slChuanEl.min = '1';
-    slChuanEl.value = '';
-    slChuanEl.placeholder = 'Nhập SL/thùng';
-  } else {
-    var sl = TP_PACKAGING[cd] || 0;
-    slChuanEl.disabled = true;
-    slChuanEl.type = 'text';
-    slChuanEl.placeholder = '';
-    slChuanEl.value = sl > 0 ? fmtInt(sl) + ' pcs' : '';
-  }
+  renderTpSlChuan();
   onTpKhsx();
+}
+
+function renderTpSlChuan(){
+  var cd = document.getElementById('tp_congDoan').value;
+  var ma = document.getElementById('tp_maSP').value;
+  var slChuanEl = document.getElementById('tp_slChuan');
+  var sl = tpSlThung();
+  slChuanEl.value = sl > 0 ? fmtInt(sl) + ' pcs' : ((cd && ma) ? 'Chưa khai trong danh mục SP' : '');
 }
 
 function onTpMaChange(){
@@ -1235,6 +1223,7 @@ function onTpMaChange(){
   document.getElementById('tp_tenSP').value = item ? item.ten : '';
   document.getElementById('tp_khachHang').value = item ? [item.maKhachHang, item.tenKhachHang].filter(Boolean).join(' — ') : '';
   document.getElementById('tp_maSpKh').value = item ? item.maSpKhachHang : '';
+  renderTpSlChuan();
   onTpKhsx();
 }
 
@@ -1271,16 +1260,14 @@ async function onTpKhsx(){
 
 function tpSlThung(){
   var cd = document.getElementById('tp_congDoan').value;
-  if (TP_CONG_DOAN_TUY_CHINH.includes(cd)) return Number(document.getElementById('tp_slChuan').value) || 0;
-  return TP_PACKAGING[cd] || 0;
+  var item = masterMap[document.getElementById('tp_maSP').value];
+  return (item && cd && Number(item.slThungCongDoan[cd])) || 0;
 }
 
 function clearTp(){
   ['tp_maSP', 'tp_congDoan'].forEach(function(i){ document.getElementById(i).value = ''; });
   ['tp_tenSP', 'tp_khachHang', 'tp_maSpKh', 'tp_slChuan', 'tp_soThung', 'tp_slThungCuoi']
     .forEach(function(i){ document.getElementById(i).value = ''; });
-  var slChuanEl = document.getElementById('tp_slChuan');
-  slChuanEl.disabled = true; slChuanEl.type = 'text'; slChuanEl.placeholder = '';
   tpKhNgay = null;
   document.getElementById('tp_khsxHint').textContent = '';
   document.getElementById('tp_batchCard').style.display = 'none';
@@ -1295,7 +1282,7 @@ async function taoLoTemThanhPham(){
   if (!cd) return err('Chọn Công đoạn');
   if (!ma) return err('Chọn Mã sản phẩm');
   if (!ngay) return err('Chọn Ngày sản xuất');
-  if (slThung <= 0) return err('Công đoạn "' + cd + '" chưa khai định mức SL/thùng');
+  if (slThung <= 0) return err('Mã ' + ma + ' chưa khai SL/thùng công đoạn "' + cd + '" — vào Master → Danh mục sản phẩm để khai báo');
   if (!soThung || isNaN(soThung) || +soThung <= 0 || +soThung % 1 !== 0) return err('Số thùng phải là số nguyên > 0');
   if (+soThung > 500) return err('Tối đa 500 tem / lô');
   if (slCuoi && (isNaN(slCuoi) || +slCuoi <= 0)) return err('SL thùng cuối không hợp lệ');

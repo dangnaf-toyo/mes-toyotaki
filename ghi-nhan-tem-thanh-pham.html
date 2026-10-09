@@ -414,20 +414,24 @@ function beep(okTone){
   } catch (e) { /* thiết bị không cho phát âm — bỏ qua */ }
 }
 
-// Công đoạn có quy cách đóng gói riêng cho tem thành phẩm — khớp TP_PACKAGING
-// bên intem.html. Đánh bóng Kẽm (EXE-SHO/BPH-SHO, T51 đổi tên từ "Đánh
-// bóng") và OQC (riêng BPH-SHO, quy trình dài hơn: Đúc→Đánh bóng Kẽm→Gia
-// Công→OQC→Nhập kho, đóng 150pcs suốt tới OQC mới gộp về 60pcs).
-const TP_PACKAGING = { "Đánh bóng Kẽm": 60, "OQC": 60 };
+// Công đoạn tem thành phẩm — khớp TP_CONG_DOAN_LIST bên intem.html. SL/thùng
+// lấy theo MÃ SP × CÔNG ĐOẠN trong danh mục SP (T72 —
+// master_products.sl_thung_cong_doan), xem slThungTp().
 // "Đúc Kẽm" (T52) không phải công đoạn đóng gói TP — chọn công đoạn này
-// chuyển hẳn màn hình sang chế độ Kanban (xem isKanban()/applyMode()), giữ
-// mặc định vẫn là công đoạn đầu tiên của TP_PACKAGING (không đổi hành vi cũ).
+// chuyển hẳn màn hình sang chế độ Kanban (xem isKanban()/applyMode()).
 const CONG_DOAN_KANBAN = "Đúc Kẽm";
-// Bavia (T65) — cũng in tem trước/quét ghi nhận như Đánh bóng Kẽm, nhưng SL/thùng
-// CHƯA chuẩn hoá nên không có trong TP_PACKAGING (người dùng tự nhập lúc in ở
-// intem.html) — TP_PACKAGING['Bavia'] luôn undefined, các chỗ đọc `TP_PACKAGING[congDoan] || 0`
-// tự trả 0 → không gate theo "đủ SL cần" cho Bavia (đúng ý, không cần đổi các chỗ đó).
-const CONG_DOAN_LIST = [...Object.keys(TP_PACKAGING), "Bavia", CONG_DOAN_KANBAN];
+const CONG_DOAN_LIST = ["Đánh bóng Kẽm", "OQC", "Bavia", CONG_DOAN_KANBAN];
+function slThungTp(maSp, congDoan){
+  const p = productMap[maSp];
+  return (p && p.sl_thung_cong_doan && Number(p.sl_thung_cong_doan[congDoan])) || 0;
+}
+// Mức chặn "đủ 1 thùng" phía client — theo mã SP đang chọn; chưa chọn mã thì
+// không chặn (RPC ghi nhận vẫn tự kiểm theo đúng SL của tem). Bavia (T65)
+// không chặn ở client như trước.
+function slThungCanGate(congDoan){
+  if (congDoan === 'Bavia') return 0;
+  return slThungTp(document.getElementById('spDangSx').value, congDoan);
+}
 function isKanban(){ return document.getElementById('congDoan').value === CONG_DOAN_KANBAN; }
 // Kẽm chỉ đúc trên đúng 2 máy này (T53) — dùng chung ô "Trạm/tổ" (đổi thành
 // "Máy đúc" ở chế độ Kanban) để chọn, KHÔNG dùng ô "Đổi máy đúc" riêng nữa.
@@ -513,7 +517,7 @@ async function suggestMayKem(maSp){
 
 // ── Mã SP đang sản xuất → tồn kho theo công đoạn (T48) ──────────────────────
 async function loadSpDangSx(){
-  const { data, error } = await sb.from('master_products').select('ma_sp,ten_sp,quy_trinh_cong_doan,sl_dong_goi_chuan').order('ma_sp');
+  const { data, error } = await sb.from('master_products').select('ma_sp,ten_sp,quy_trinh_cong_doan,sl_dong_goi_chuan,sl_thung_cong_doan').order('ma_sp');
   const sel = document.getElementById('spDangSx');
   if (error){ sel.innerHTML = '<option value="">-- Lỗi tải danh mục SP --</option>'; return; }
   (data || []).forEach(p => { productMap[p.ma_sp] = p; });
@@ -669,10 +673,9 @@ async function loadKpi(){
   const ngay = getTodayString();
   const mon = mondayOf(ngay);
   const dowCol = ['cn','t2','t3','t4','t5','t6','t7'][new Date(ngay + 'T00:00:00').getDay()];
-  const slThung = TP_PACKAGING[congDoan] || 0;
 
   const [khRes, ttRes, ngRes] = await Promise.all([
-    sb.from('cd_khsx_tuan_plan').select(dowCol).eq('cong_doan', congDoan).eq('tuan_bat_dau', mon),
+    sb.from('cd_khsx_tuan_plan').select('ma_sp,' + dowCol).eq('cong_doan', congDoan).eq('tuan_bat_dau', mon),
     sb.from('duc_tem').select('so_luong')
       .eq('trang_thai', 'Đã đóng gói TP').eq('tram_cong_doan', congDoan)
       .gte('ngay_gio_ghi_nhan', dayStartTs(ngay))
@@ -682,12 +685,17 @@ async function loadKpi(){
       .lt('ngay_gio', dayStartTs(addDays(ngay, 1))),
   ]);
   const khPcs = (khRes.data || []).reduce((s, r) => s + (Number(r[dowCol]) || 0), 0);
+  // KH thùng quy đổi theo SL/thùng riêng từng mã SP (T72) — mã chưa khai SL/thùng bỏ qua.
+  const khThung = (khRes.data || []).reduce((s, r) => {
+    const sl = slThungTp(r.ma_sp, congDoan);
+    return s + (sl ? (Number(r[dowCol]) || 0) / sl : 0);
+  }, 0);
   const ttRows = ttRes.data || [];
   const ttPcs = ttRows.reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
   const ngPcs = (ngRes.data || []).reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
   const ngRate = (ttPcs + ngPcs) > 0 ? (ngPcs / (ttPcs + ngPcs) * 100) : 0;
 
-  document.getElementById('kpiKhThung').textContent = fmtNum(slThung ? Math.round(khPcs / slThung) : 0);
+  document.getElementById('kpiKhThung').textContent = fmtNum(Math.round(khThung));
   document.getElementById('kpiKhPcs').textContent = fmtNum(khPcs);
   document.getElementById('kpiTtThung').textContent = fmtNum(ttRows.length);
   document.getElementById('kpiTtPcs').textContent = fmtNum(ttPcs);
@@ -696,7 +704,7 @@ async function loadKpi(){
 }
 
 // KPI cho Đúc Kẽm (T53) — công đoạn-rộng (cả 2 máy Kẽm, mọi mã SP), KHÔNG
-// lọc theo "Mã SP đang sản xuất" đang chọn, khớp cách TP_PACKAGING làm ở
+// lọc theo "Mã SP đang sản xuất" đang chọn, khớp cách KPI tem thành phẩm làm ở
 // trên. "TT thùng" = số tem chỉ thị đã quét (mỗi tem 1 lô, số lượng/lô có
 // thể khác nhau tuỳ lúc in). "KH thùng" (T60b) quy đổi KH ngày (pcs) sang
 // số thùng ước tính theo SL đóng gói chuẩn của TỪNG mã SP trong kế hoạch
@@ -786,7 +794,7 @@ const NG_OPTIONS_HTML = NG_TYPES.map(t => '<option value="' + escapeHtml(t) + '"
 let nguonTotal = 0;
 function updateGhiNhanGate(){
   const congDoan = document.getElementById('congDoan').value;
-  const required = TP_PACKAGING[congDoan] || 0;
+  const required = slThungCanGate(congDoan);
   const banner = document.getElementById('insufficientBanner');
   const btn = document.getElementById('btnGhiNhan');
   if (required > 0 && nguonTotal < required) {
@@ -951,7 +959,8 @@ async function ghiNhan(raw){
   var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
   const congDoan0 = document.getElementById('congDoan').value;
-  if ((TP_PACKAGING[congDoan0] || 0) > 0 && nguonTotal < TP_PACKAGING[congDoan0]) {
+  const required0 = slThungCanGate(congDoan0);
+  if (required0 > 0 && nguonTotal < required0) {
     showMsg('Số lượng sản phẩm hiện có không đủ 1 thùng thành phẩm.', 'err', 5000);
     beep(false);
     return;
@@ -1179,7 +1188,7 @@ function onFileChosen(evt, target){
 // ── Wire ───────────────────────────────────────────────────────────────────
 function wire(){
   document.getElementById('congDoan').addEventListener('change', onCongDoanChange);
-  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); });
+  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); if (!isKanban()) updateGhiNhanGate(); });
   document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
   document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
   document.getElementById('btnScanKanban').addEventListener('click', () => openCamera('kanban'));
