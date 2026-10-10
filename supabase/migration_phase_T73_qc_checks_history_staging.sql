@@ -1,4 +1,4 @@
--- STAGING ONLY: jcjbleugnclzsghfpmvk. Do NOT run on production fgghikpzcxjqzahfiiil.
+-- Đã chạy STAGING jcjbleugnclzsghfpmvk + PRODUCTION fgghikpzcxjqzahfiiil (2026-10-10, qua Supabase MCP).
 -- QC requirements 09/10/2026. Nullable additions; no backfill of old inspection/LOT data.
 -- Execute the complete transaction in the staging SQL Editor.
 begin;
