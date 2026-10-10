@@ -7,7 +7,8 @@ const MesQcFields=(()=>{
   function display(value){const text=input(value);return text?date(text.slice(0,10))+' '+text.slice(11,16):missing;}
   function time(row){const m=/^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(String(row?.inspection_time||''));return m&&+m[1]<24&&+m[2]<60?m[1]+':'+m[2]:missing;}
   function machine(row){const list=Array.isArray(row?.checklist_json)?row.checklist_json:Array.isArray(row?.checklist)?row.checklist:[];const item=list.find(x=>x.code==='machine_condition');return item?.dat===true?'PASS':item?.dat===false?'NG':null;}
+  function cleanText(value){return String(value??'').replace(/\[QC02_[^\]\r\n]*\]/gi,'').replace(/\bQC02_[A-Z0-9_]+(?::[A-Z0-9_-]+)?\b/gi,'').replace(/[ \t]+\n/g,'\n').trim();}
   function defectName(item,source=defects){const custom=String(item?.code||'').startsWith('ng_khac_')||item?.is_other===true;const known=!custom&&source.find(x=>x.code===item?.code);return String((known?.label||item?.label||item?.name||item?.code||missing));}
   async function loadDefects(){if(catalogPromise)return catalogPromise;catalogPromise=(async()=>{const all=[];for(let offset=0;;offset+=500){const r=await sb.from('quality_defect_catalog').select('*').order('code').range(offset,offset+499);if(r.error)throw Error(r.error.message);all.push(...r.data||[]);if(!r.data||r.data.length<500)break;}defects=all;catalogReady=true;return all;})();try{return await catalogPromise;}catch(e){catalogPromise=null;throw e;}}
-  return {missing,date,iso,input,display,time,machine,defectName,loadDefects,catalogReady:()=>catalogReady};
+  return {missing,date,iso,input,display,time,machine,cleanText,defectName,loadDefects,catalogReady:()=>catalogReady};
 })();

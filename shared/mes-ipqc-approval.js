@@ -10,11 +10,11 @@ const MesIpqcApproval = (() => {
   async function refresh(){available=await MesIpqcFlow.jobs();options();}
   function preview(){
     const source=MesIpqcFlow.data(selected,checkpoint);
-    el('proposalWarningFaults').textContent=checkpoint?'Loại lỗi đã ghi nhận: '+MesIpqcFlow.defects(checkpoint).join(' / '):'';
+    el('proposalWarningFaults').textContent=checkpoint?'Loại lỗi đã ghi nhận: '+MesIpqcFlow.defects(checkpoint).map(MesQcFields.cleanText).join(' / '):'';
     for(const id of ['approvalDefectType','approvalDefectQty','actualValue','standardMin','standardMax','warningLevel'])el(id).closest('.field').hidden=!!checkpoint;
     el('checkpointId').value=source.checkpoint_id||'';el('machine').value=source.machine||'';el('process').value=source.process||'';el('productCode').value=source.product_code||'';el('lotNo').value=source.lot_no||'';el('taskNo').value=source.task_no||'';
-    el('jobInfo').textContent='Phiên '+selected.id_dong+' · '+selected.ngay+' · '+selected.ca+' · Người đề nghị: '+identity+(source.inspection_by?' · Người kiểm: '+source.inspection_by:'')+(source.inspection_at?' · Kiểm lúc: '+new Date(source.inspection_at).toLocaleString('vi-VN',{hour12:false}):'');
-    const target=el('warningEvidence');target.replaceChildren();
+    el('jobInfo').textContent='Phiên '+selected.id_dong+' · '+selected.ngay+' · '+selected.ca+' · Người đề nghị: '+identity+(source.inspection_by?' · Người kiểm: '+source.inspection_by:'')+(source.inspection_at?' · Kiểm lúc: '+MesQcFields.display(source.inspection_at):'');
+    const target=el('warningEvidence');target.classList.add('warning-photos');target.replaceChildren();
     const urls=Array.isArray(source.inspection_evidence_urls)?source.inspection_evidence_urls:[];
     for(const url of urls){const safe=Qc02View.safeUrl(url,true);if(!safe)continue;const button=document.createElement('button');button.type='button';button.className='btn secondary';const img=document.createElement('img');img.src=safe;img.alt='Ảnh lỗi từ lần kiểm IPQC';img.style.cssText='width:90px;height:65px;object-fit:contain';button.append(img);button.onclick=()=>Qc02View.photo(safe,urls);target.append(button);}
   }
@@ -26,11 +26,11 @@ const MesIpqcApproval = (() => {
     if(response.error)throw new Error(response.error.message);if(request!==turn)return;
     const warnings=(response.data||[]).filter(r=>['NG','CANH_BAO'].includes(r.ket_qua));
     el('warningCheckpoint').replaceChildren(new Option('Phiếu trực tiếp cho phiên đang chọn',''));
-    for(const row of warnings)el('warningCheckpoint').add(new Option(row.id_checkpoint+' · '+(row.ghi_chu||row.ket_qua),row.id_checkpoint));
+    for(const row of warnings)el('warningCheckpoint').add(new Option(row.id_checkpoint+' · '+(MesQcFields.cleanText(row.ghi_chu)||row.ket_qua),row.id_checkpoint));
     if(requestedCheckpoint){checkpoint=warnings.find(r=>r.id_checkpoint===requestedCheckpoint);if(!checkpoint)throw new Error('Không tìm thấy cảnh báo của đúng phiên đang chạy.');}
     else if(warnings.length===1)checkpoint=warnings[0];
     selected=job;el('warningCheckpoint').value=checkpoint?.id_checkpoint||'';
-    el('warningCheckpoint').onchange=()=>{checkpoint=warnings.find(r=>r.id_checkpoint===val('warningCheckpoint'))||null;token=crypto.randomUUID();if(checkpoint)el('warningContent').value=checkpoint.ghi_chu||'';preview();};
+    el('warningCheckpoint').onchange=()=>{checkpoint=warnings.find(r=>r.id_checkpoint===val('warningCheckpoint'))||null;token=crypto.randomUUID();if(checkpoint)el('warningContent').value=MesQcFields.cleanText(checkpoint.ghi_chu);preview();};
     if(checkpoint)el('warningContent').value=checkpoint.ghi_chu||'';
     el('producedCurrent').value=job.tt_ca??0;preview();
   }
@@ -45,9 +45,9 @@ const MesIpqcApproval = (() => {
       const dimension=!checkpoint&&val('approvalDefectType')==='dimension',type=val('reasonType');
       if(proposalWarningId&&type==='EARLY_WARNING')throw new Error('Chọn giới hạn thời gian hoặc số lượng chạy thêm cho đề nghị.');
       if(dimension&&!val('actualValue'))throw new Error('Nhập giá trị thực tế của lỗi kích thước.');
-      if(!val('warningContent'))throw new Error('Nhập nội dung cảnh báo.');
+      if(!val('warningContent')&&!checkpoint)throw new Error('Nhập nội dung cảnh báo.');
       const qty=val('approvalDefectQty');if(qty&&(!Number.isInteger(Number(qty))||Number(qty)<0))throw new Error('Số lượng lỗi không hợp lệ.');
-      const details=MesIpqcFlow.reason({client_request_id:token,warning_content:val('warningContent'),warning_level:checkpoint?(checkpoint.ket_qua==='NG'?'NG':'RISK'):val('warningLevel'),reason_type:type,reason_detail:val('reasonDetail')+'\nĐối sách tạm thời: '+val('proposalCountermeasure')+'\nBộ phận đề nghị: '+val('proposalDepartment')+(val('proposalNote')?'\nGhi chú: '+val('proposalNote'):''),requester_department:val('proposalDepartment'),temporary_countermeasure:val('proposalCountermeasure'),requester_note:val('proposalNote'),defect_type:checkpoint?'inspection_checklist':dimension?'dimension':'appearance',inspection_defect_items:checkpoint?MesIpqcFlow.defects(checkpoint):[],defect_qty:checkpoint?null:qty?Number(qty):null,
+      const details=MesIpqcFlow.reason({client_request_id:token,warning_content:checkpoint?checkpoint.ghi_chu||'':val('warningContent'),warning_level:checkpoint?(checkpoint.ket_qua==='NG'?'NG':'RISK'):val('warningLevel'),reason_type:type,reason_detail:val('reasonDetail')+'\nĐối sách tạm thời: '+val('proposalCountermeasure')+'\nBộ phận đề nghị: '+val('proposalDepartment')+(val('proposalNote')?'\nGhi chú: '+val('proposalNote'):''),requester_department:val('proposalDepartment'),temporary_countermeasure:val('proposalCountermeasure'),requester_note:val('proposalNote'),defect_type:checkpoint?'inspection_checklist':dimension?'dimension':'appearance',inspection_defect_items:checkpoint?MesIpqcFlow.defects(checkpoint):[],defect_qty:checkpoint?null:qty?Number(qty):null,
         actual_value:dimension?val('actualValue'):'',standard_min:dimension?val('standardMin'):'',standard_max:dimension?val('standardMax'):'',
         allowed_until:type==='TIME'&&val('timeMode')==='until'?iso('allowedUntil'):null,allowed_hours:type==='TIME'&&val('timeMode')==='hours'?val('allowedHours'):null,allowed_qty:['PLAN_QTY','DOWNSTREAM_REWORK'].includes(type)?val('allowedQty'):null,produced_current:val('producedCurrent')||0,
         repair_department:type==='DOWNSTREAM_REWORK'?val('repairDepartment'):null,treatment_content:type==='DOWNSTREAM_REWORK'?val('treatmentContent'):null,treatment_deadline:type==='DOWNSTREAM_REWORK'?iso('treatmentDeadline'):null});
@@ -95,25 +95,22 @@ const MesIpqcApproval = (() => {
         const cell=text=>{const td=document.createElement('td');td.style.whiteSpace='pre-line';td.textContent=text;tr.append(td);return td;};
         cell(cp.id_checkpoint+'\nCÓ CẢNH BÁO - CHƯA CÓ ĐỀ NGHỊ TIẾP TỤC SX');
         cell([source.machine,source.product_code,source.process,'Task/tem: '+(source.task_no||'Chưa có liên kết xác minh'),'LOT: '+(source.lot_no||'Chưa có liên kết xác minh')].join('\n'));
-        const fault=cell(MesIpqcFlow.defects(cp).join(' / ')+'\n'+(cp.ghi_chu||''));photos(fault,cp);
-        cell((cp.nguoi_kiem||'Chưa có dữ liệu')+'\n'+(cp.thoi_diem_kiem_thuc_te?new Date(cp.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN',{hour12:false}):'Chưa có thời gian cảnh báo'));
-        const actions=cell(''),open=document.createElement('button');open.type='button';open.className='btn secondary';open.textContent='Xem cảnh báo';open.onclick=()=>detail(item);actions.append(open);
-        if(MesIpqcFlow.canPropose(role)){const propose=document.createElement('button');propose.type='button';propose.className='btn primary';propose.textContent='ĐỀ NGHỊ TIẾP TỤC SẢN XUẤT';propose.onclick=()=>startProposal(item).catch(error=>alert(error.message));actions.append(propose);}
+        const fault=cell('');fault.className='warning-faults';fault.textContent=faultText(cp);const images=cell('');photos(images,cp);
+        cell((cp.nguoi_kiem||'Chưa có dữ liệu')+'\n'+(cp.thoi_diem_kiem_thuc_te?MesQcFields.display(cp.thoi_diem_kiem_thuc_te):'Chưa có thời gian cảnh báo'));
+        const actions=cell(''),open=document.createElement('button');open.type='button';open.className='btn secondary';open.textContent='Xem cảnh báo';open.onclick=()=>detail(item);const buttons=document.createElement('div');buttons.className='warning-actions';actions.append(buttons);buttons.append(open);
+        if(MesIpqcFlow.canPropose(role)){const propose=document.createElement('button');propose.type='button';propose.className='btn primary';propose.textContent='ĐỀ NGHỊ TIẾP TỤC SẢN XUẤT';propose.onclick=()=>startProposal(item).catch(error=>alert(error.message));buttons.append(propose);}
         tbody.append(tr);
       }
-      if(!inbox.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=5;td.textContent='Chưa có cảnh báo chưa xử lý.';tr.append(td);tbody.append(tr);}
+      if(!inbox.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=6;td.textContent='Chưa có cảnh báo chưa xử lý.';tr.append(td);tbody.append(tr);}
     }catch(error){el('warningInboxStatus').textContent='Không tải được cảnh báo: '+error.message;el('warningInbox').replaceChildren();}
     finally{loadingWarnings=false;}
   }
-  function photos(target,cp){
-    const urls=Array.isArray(cp.anh_bang_chung_url)?cp.anh_bang_chung_url:[];
-    for(const url of urls){const safe=Qc02View.safeUrl(url,true);if(!safe)continue;const button=document.createElement('button');button.type='button';button.className='btn secondary';const image=document.createElement('img');image.src=safe;image.alt='Ảnh cảnh báo IPQC';image.style.cssText='width:90px;height:65px;object-fit:contain';button.append(image);button.onclick=()=>Qc02View.photo(safe,urls);target.append(button);}
+  function faultText(cp){const lines=[];for(const item of Array.isArray(cp.checklist_json)?cp.checklist_json:[]){if(item.dat!==false||item.code==='machine_condition')continue;const label=MesQcFields.cleanText(item.muc||item.label||'');if(!label)continue;const at=label.indexOf(' — ');lines.push(at>=0?label.slice(0,at)+'\n'+label.slice(at+3):label);}const note=MesQcFields.cleanText(cp.ghi_chu);if(note)lines.push('Nội dung cảnh báo: '+note);const machine=MesQcFields.machine(cp);lines.push('Điều kiện máy: '+(machine==='PASS'?'ĐẠT':machine==='NG'?'NG':'Chưa ghi nhận kết quả'));return lines.join('\n\n');}
+  function photos(target,cp){const gallery=document.createElement('div');gallery.className='warning-photos';target.append(gallery);const urls=Array.isArray(cp.anh_bang_chung_url)?cp.anh_bang_chung_url:[];for(const url of urls){const safe=Qc02View.safeUrl(url,true);if(!safe)continue;const button=document.createElement('button');button.type='button';button.className='btn secondary';const image=document.createElement('img');image.src=safe;image.alt='Ảnh cảnh báo IPQC';button.append(image);button.onclick=()=>Qc02View.photo(safe,urls);gallery.append(button);}if(!gallery.children.length)gallery.textContent='Chưa có ảnh';}
+  function detail(item){const target=el('warningDetailBody');target.replaceChildren();const cp=item.checkpoint,source=MesIpqcFlow.data(item.job||{id_dong:cp.id_dong,ma_may:cp.ma_may,ma_sp:cp.ma_sp,cong_doan:cp.cong_doan},cp);function block(title,body){const section=document.createElement('section');section.className='warning-block';const h=document.createElement('h3');h.textContent=title;section.append(h);if(body){const p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.textContent=body;section.append(p);}target.append(section);return section;}
+    block('Thông tin máy','Máy: '+source.machine+'\nModel: '+source.product_code+'\nCông đoạn: '+source.process+'\nTask/tem: '+(source.task_no||'Chưa có liên kết xác minh')+'\nLOT: '+(source.lot_no||'Chưa có liên kết xác minh'));block('Thông tin lỗi',faultText(cp));photos(block('Ảnh'),cp);block('Người IPQC / thời gian',(cp.nguoi_kiem||'Chưa ghi nhận')+'\n'+MesQcFields.display(cp.thoi_diem_kiem_thuc_te));const dialog=el('warningDetailDialog');if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
   }
-  function detail(item){
-    const target=el('warningDetailBody');target.replaceChildren();const cp=item.checkpoint;
-    for(const [label,text]of [['Cảnh báo',cp.id_checkpoint],['Máy / model',cp.ma_may+' / '+cp.ma_sp],['Công đoạn',item.job?.cong_doan||cp.cong_doan||'Đúc'],['Task / tem / LOT',item.job?.tag_no||item.job?.task_no||item.job?.lot||item.job?.lot_no||'Chưa có liên kết xác minh'],['Loại lỗi',MesIpqcFlow.defects(cp).join(' / ')||'Chưa có dữ liệu'],['Nội dung',cp.ghi_chu||''],['Người IPQC',cp.nguoi_kiem||''],['Thời gian',cp.thoi_diem_kiem_thuc_te?new Date(cp.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN',{hour12:false}):'Chưa có dữ liệu']]){const p=document.createElement('p');p.textContent=label+': '+text;target.append(p);}
-    photos(target,cp);const dialog=el('warningDetailDialog');if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
-  }
+  function auditText(detail){const labels={warning_content:'Nội dung cảnh báo',reason_detail:'Lý do',temporary_countermeasure:'Đối sách tạm thời',requester_department:'Bộ phận đề nghị',requester_note:'Ghi chú',inspection_by:'Người IPQC',inspection_at:'Thời gian kiểm',machine:'Máy',product_code:'Model',process:'Công đoạn',lot_no:'LOT',task_no:'Task/tem',allowed_hours:'Số giờ',allowed_qty:'Số lượng',allowed_until:'Đến thời gian',decision:'Quyết định',note:'Ghi chú',step_no:'Bước duyệt',status:'Trạng thái',reason_type:'Loại đề nghị',warning_level:'Mức cảnh báo',defect_type:'Loại lỗi',defect_qty:'Số lỗi',actual_value:'Giá trị thực tế',standard_min:'Giới hạn dưới',standard_max:'Giới hạn trên',produced_current:'Sản lượng',inspection_checklist:'Kết quả kiểm',inspection_evidence_urls:'Ảnh bằng chứng',inspection_defect_items:'Các mục không đạt',repair_department:'Bộ phận sửa',treatment_content:'Nội dung xử lý',treatment_deadline:'Thời hạn xử lý',requester_name:'Người đề nghị',production_day:'Ngày sản xuất',production_shift:'Ca',production_started_at:'Bắt đầu sản xuất',checkpoint_id:'Điểm kiểm',id_dong:'Phiên sản xuất',muc:'Mục kiểm',dat:'Kết quả'};const hidden=key=>/^QC02_/i.test(key)||['client_request_id','code','group'].includes(key);function value(input){if(Array.isArray(input))return input.map(value).join(' / ');if(input&&typeof input==='object')return Object.entries(input).filter(([key])=>!hidden(key)).map(([key,item])=>(labels[key]||key.replace(/_/g,' '))+': '+value(item)).join('; ');if(typeof input==='boolean')return input?'Đạt':'Không đạt';return MesQcFields.cleanText(input);}const rows=detail&&typeof detail==='object'?Object.entries(detail).filter(([key])=>!hidden(key)).map(([key,item])=>(labels[key]||key.replace(/_/g,' '))+': '+value(item)):[];return rows.join('\n')||'Đã ghi nhận thao tác.';}
   async function startProposal(item){
     if(busy)return;if(!MesIpqcFlow.canPropose(role))throw new Error('Chỉ bộ phận Sản xuất được lập đề nghị.');
     await refresh();const job=available.find(r=>r.id_dong===item.checkpoint.id_dong&&r.ma_may===item.checkpoint.ma_may&&r.ma_sp===item.checkpoint.ma_sp);
@@ -127,5 +124,5 @@ const MesIpqcApproval = (() => {
   el('refreshWarnings').onclick=()=>loadWarnings();
   el('warningDetailClose').onclick=()=>{const dialog=el('warningDetailDialog');if(typeof dialog.close==='function')dialog.close();else dialog.removeAttribute('open');};
   el('directProposal').onclick=()=>{if(!MesIpqcFlow.canPropose(role))return;resetForm();proposalWarningId='';el('runningJob').disabled=false;el('warningCheckpoint').disabled=false;el('warningContent').readOnly=false;el('proposalRequester').value=identity;el('proposalPanel').classList.remove('hidden');};
-  return {init,refresh,loadWarnings};
+  return {init,refresh,loadWarnings,auditText};
 })();

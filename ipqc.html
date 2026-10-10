@@ -695,9 +695,9 @@ function fillIncidentInfo(idSuCo, loai, gioPhatSinh, vanDe, xuLy, damNhiem){
 // mục không có "—" (vd "Kích thước...") hiện riêng, không thuộc nhóm nào.
 function renderChecklist(){
   const wrap=document.getElementById('ck-checklist'),groups=[['Kích thước',[]],['Ngoại quan',[]],['Điều kiện máy',[]]];
-  state.checklistAnswers.forEach((a,i)=>{if(a.code==='machine_condition')groups[2][1].push({i,label:'Điều kiện máy'});else{const sep=a.muc.indexOf(' — '),name=sep<0?'Kích thước':a.muc.slice(0,sep).trim();groups[name==='Ngoại quan'?1:0][1].push({i,label:sep<0?a.muc:a.muc.slice(sep+3).trim()});}});
+  state.checklistAnswers.forEach((a,i)=>{if(a.code==='machine_condition')groups[2][1].push({i,label:'Toàn bộ chữ màu đen'});else{const sep=a.muc.indexOf(' — '),name=sep<0?'Kích thước':a.muc.slice(0,sep).trim();groups[name==='Ngoại quan'?1:0][1].push({i,label:sep<0?a.muc:a.muc.slice(sep+3).trim()});}});
   const item=({i,label})=>'<div class="cl-item"><div class="cl-text" style="color:#000;font-weight:400">'+escapeHtml(label)+'</div><div class="cl-toggle"><button id="cl-ok-'+i+'" onclick="setChecklistAnswer('+i+',true)">Đạt</button><button id="cl-bad-'+i+'" onclick="setChecklistAnswer('+i+',false)">Không đạt</button></div></div>';
-  wrap.innerHTML=groups.map(([name,items])=>'<section data-check-group="'+escapeHtml(name)+'">'+(name==='Điều kiện máy'?'':'<div class="cl-group-title">'+escapeHtml(name)+'</div>')+items.map(item).join('')+'</section>').join('');
+  wrap.innerHTML=groups.map(([name,items])=>'<section data-check-group="'+escapeHtml(name)+'">'+'<div class="cl-group-title">'+escapeHtml(name)+'</div>'+items.map(item).join('')+'</section>').join('');
 }
 
 function setChecklistAnswer(i, dat){

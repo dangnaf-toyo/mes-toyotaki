@@ -52,7 +52,7 @@ const Qc02Ncp = (() => {
       if(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value))) {
         display = MesQcFields.display(value);
       }
-      return [labels[key] || key.replace(/_/g, ' '), display];
+      return [MesQcFields.cleanText(labels[key] || key.replace(/_/g, ' ')), MesQcFields.cleanText(display)];
     }));
   }
   function history(target, log) {
