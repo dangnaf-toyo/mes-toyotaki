@@ -14,7 +14,9 @@
   - ?tab=khuon : danh sách khuôn (duc_shot_khuon) — khai báo/sửa/xoá khuôn
     (duc_configure_mold / duc_rename_khuon / duc_xoa_khuon), tình trạng sử dụng
     (T79: tinh_trang qua duc_khuon_doi_tinh_trang, lịch sử
-    duc_khuon_tinh_trang_log). Ghi bảo dưỡng chỉ qua KH bảo dưỡng tuần + check
+    duc_khuon_tinh_trang_log), thứ tự ưu tiên khuôn cùng mã SP (T86: uu_tien qua
+    duc_khuon_dat_uu_tien — dashboard Đúc chọn khuôn mặc định theo thứ tự này).
+    Ghi bảo dưỡng chỉ qua KH bảo dưỡng tuần + check
     sheet (T81 bỏ "Ghi BD" tay / duc_ghi_lich_su_bao_duong).
   - ?tab=van-de: vấn đề khuôn (duc_van_de_khuon) — xử lý / xác nhận.
   - ?tab=mau&khuon=X: hạng mục check sheet bảo dưỡng (duc_khuon_cs_mau +
@@ -88,6 +90,14 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
 .tt-opt input{margin-top:3px}
 .tt-opt small{display:block;color:var(--text-muted);font-size:11.5px;margin-top:1px}
 .tt-opt.cur{opacity:.55;cursor:default}
+.ut{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:100px;background:#FEF3C7;color:#92400E;margin-left:5px;vertical-align:middle}
+.ut-list{display:flex;flex-direction:column;gap:6px}
+.ut-row{display:flex;align-items:center;gap:10px;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px}
+.ut-row .no{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;width:26px;text-align:center;color:#92400E}
+.ut-row .mk{font-weight:700;flex:1}
+.ut-row .mk small{display:block;font-weight:400;color:var(--text-muted);font-size:11.5px}
+.ut-row button{border:1px solid var(--border-strong);background:#fff;border-radius:5px;width:30px;height:28px;cursor:pointer;font-size:13px}
+.ut-row button:disabled{opacity:.3;cursor:default}
 .iss-tag{display:inline-block;font-size:10.5px;font-weight:700;margin-top:2px}
 .empty{padding:16px;text-align:center;color:var(--text-dim)}
 .issue{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff}
@@ -217,6 +227,21 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
   </div>
 </div>
 
+<!-- Hộp thoại: thứ tự ưu tiên khuôn của 1 mã SP -->
+<div class="dlg-mask" id="dlg-ut">
+  <div class="dlg">
+    <div class="dlg-head"><span>⇅ Thứ tự ưu tiên khuôn — mã <span id="ut-sp"></span></span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div class="hint">Bảng điều khiển Đúc sẽ tự chọn khuôn ưu tiên 1; nếu khuôn đó đang chạy trên máy khác thì chọn khuôn ưu tiên kế tiếp. Chỉ khuôn <b>Đang sản xuất</b> mới được xếp ưu tiên.</div>
+      <div class="ut-list" id="ut-list"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-outline" data-close>Huỷ</button>
+      <button type="button" class="btn" id="ut-save">Lưu thứ tự</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hộp thoại: đổi tình trạng khuôn -->
 <div class="dlg-mask" id="dlg-tt">
   <div class="dlg">
@@ -319,7 +344,8 @@ function normMold(m){
     shot_tai_lan_bao_duong_gan_nhat: shotBD, chu_ky_bao_duong_ngay: m.chu_ky_bao_duong_ngay || null,
     shots_since_maintenance: tong - shotBD, trang_thai_khuon: moldStatus(tong, shotBD, nguongBD, nguongLM),
     tinh_trang: TT[m.tinh_trang] ? m.tinh_trang : 'dang_sx', tinh_trang_ly_do: m.tinh_trang_ly_do || '',
-    tinh_trang_luc: m.tinh_trang_luc || null, tinh_trang_boi: m.tinh_trang_boi || '' };
+    tinh_trang_luc: m.tinh_trang_luc || null, tinh_trang_boi: m.tinh_trang_boi || '',
+    uu_tien: m.uu_tien || null, ma_sp: String(m.ten_sp_gan_nhat || '').split(' (')[0].trim() };
 }
 function nextDueLabel(m){
   if (!m.lan_bao_duong_gan_nhat || !m.chu_ky_bao_duong_ngay) return '—';
@@ -400,6 +426,8 @@ function renderMolds(){
   const q = document.getElementById('kSearch').value.trim().toLowerCase();
   const iss = openIssuesByMold();
   const canTT = laNguoiDoiTinhTrang();
+  const spDangSx = {};
+  molds.forEach(m => { if (m.tinh_trang === 'dang_sx' && m.ma_sp) spDangSx[m.ma_sp] = (spDangSx[m.ma_sp] || 0) + 1; });
   const list = scope.filter(m => (kFilter === 'all' || m.trang_thai_khuon === kFilter) &&
     (!q || m.ma_khuon.toLowerCase().includes(q) || m.ten_sp_gan_nhat.toLowerCase().includes(q)));
   const tb = document.getElementById('tbKhuon');
@@ -413,14 +441,17 @@ function renderMolds(){
       (pending ? '❓ Chờ xác nhận' : '⚠ Có vấn đề') + (ii.length > 1 ? ' (' + ii.length + ')' : '') + '</a></div>' : '';
     const ttCell = '<span class="tt ' + m.tinh_trang + '">' + TT[m.tinh_trang][0] + '</span>' +
       (m.tinh_trang_ly_do ? '<div class="tt-sub" title="' + escapeHtml(m.tinh_trang_ly_do + ' — ' + m.tinh_trang_boi + ' ' + fmtDate(m.tinh_trang_luc)) + '">' + escapeHtml(m.tinh_trang_ly_do) + '</div>' : '');
-    return '<tr class="' + (m.tinh_trang === 'dang_sx' ? '' : 'inactive') + '"><td class="mk">' + escapeHtml(m.ma_khuon) + '</td><td>' + ttCell + '</td><td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
+    const nhieuKhuon = m.tinh_trang === 'dang_sx' && m.ma_sp && (spDangSx[m.ma_sp] || 0) >= 2;
+    return '<tr class="' + (m.tinh_trang === 'dang_sx' ? '' : 'inactive') + '"><td class="mk">' + escapeHtml(m.ma_khuon) +
+      (m.uu_tien && m.tinh_trang === 'dang_sx' ? '<span class="ut" title="Thứ tự ưu tiên trong mã ' + escapeHtml(m.ma_sp) + '">ưu tiên ' + m.uu_tien + '</span>' : '') + '</td><td>' + ttCell + '</td><td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
       '<td class="num">' + fmtNum(m.tong_shot_luy_ke) + '</td>' +
       '<td class="num">' + fmtNum(m.shots_since_maintenance) + '<div class="bar"><i class="' + cls + '" style="width:' + pct + '%;background:' +
         ({ ok: 'var(--run-fg)', soon: 'var(--warn-fg)', due: 'var(--alarm-fg)', renew: '#9F1239' }[cls] || 'var(--text-dim)') + '"></i></div></td>' +
       '<td class="num">' + fmtNum(m.nguong_bao_duong) + '</td><td class="num">' + fmtNum(m.nguong_lam_moi) + '</td>' +
       '<td>' + fmtDate(m.lan_bao_duong_gan_nhat) + '</td><td>' + nextDueLabel(m) + '</td>' +
       '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
-      '<td class="act">' + (canTT ? '<button type="button" class="btn btn-outline btn-sm" data-tt="' + escapeHtml(m.ma_khuon) + '">🏷 Tình trạng</button> ' : '') +
+      '<td class="act">' + (canTT && nhieuKhuon ? '<button type="button" class="btn btn-outline btn-sm" data-ut="' + escapeHtml(m.ma_khuon) + '" title="Thứ tự ưu tiên các khuôn của mã ' + escapeHtml(m.ma_sp) + '">⇅ Ưu tiên</button> ' : '') +
+        (canTT ? '<button type="button" class="btn btn-outline btn-sm" data-tt="' + escapeHtml(m.ma_khuon) + '">🏷 Tình trạng</button> ' : '') +
         '<button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
         '<a class="btn btn-outline btn-sm" href="?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + escapeHtml(m.ma_khuon) + '">📋 Hạng mục</a></td></tr>';
   }).join('');
@@ -496,6 +527,44 @@ async function deleteCfg(){
     showMsg('✓ Đã xoá khuôn ' + cur.ma_khuon, 'okmsg');
     await loadMolds(); renderMolds();
   } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+
+// ── Thứ tự ưu tiên khuôn (T86) ────────────────────────────────────────────────
+// Khuôn Đang sản xuất của 1 mã, xếp theo ưu tiên (chưa đặt thì xuống cuối).
+function khuonDangSxCuaSp(maSp){
+  return molds.filter(m => m.ma_sp && m.ma_sp === maSp && m.tinh_trang === 'dang_sx')
+    .sort((a, b) => ((a.uu_tien || 1e9) - (b.uu_tien || 1e9)) || naturalCompare(a.ma_khuon, b.ma_khuon));
+}
+let utSp = '', utDs = [];
+function openUt(maKhuon){
+  const m = molds.find(x => x.ma_khuon === maKhuon);
+  if (!m) return;
+  utSp = m.ma_sp;
+  utDs = khuonDangSxCuaSp(utSp).map(x => x.ma_khuon);
+  document.getElementById('ut-sp').textContent = utSp;
+  renderUt();
+  openDlg('dlg-ut');
+}
+function renderUt(){
+  document.getElementById('ut-list').innerHTML = utDs.map((mk, i) => {
+    const m = molds.find(x => x.ma_khuon === mk);
+    return '<div class="ut-row"><span class="no">' + (i + 1) + '</span><span class="mk">' + escapeHtml(mk) +
+      '<small>' + fmtNum(m.shots_since_maintenance) + ' / ' + fmtNum(m.nguong_bao_duong) + ' shot từ lần BD · tổng ' + fmtNum(m.tong_shot_luy_ke) +
+      ' · <span class="st ' + (ST_CLS[m.trang_thai_khuon] || '') + '">' + escapeHtml(m.trang_thai_khuon) + '</span></small></span>' +
+      '<button type="button" data-ut-mv="-1" data-i="' + i + '"' + (i === 0 ? ' disabled' : '') + ' title="Lên">▲</button>' +
+      '<button type="button" data-ut-mv="1" data-i="' + i + '"' + (i === utDs.length - 1 ? ' disabled' : '') + ' title="Xuống">▼</button></div>';
+  }).join('');
+}
+async function saveUt(){
+  if (!(await ensureAuth())) return;
+  const btn = document.getElementById('ut-save'); btn.disabled = true;
+  try {
+    await rpcWrite('duc_khuon_dat_uu_tien', { p_ma_sp: utSp, p_ds_khuon: utDs });
+    closeDlg();
+    showMsg('✓ Đã lưu thứ tự ưu tiên khuôn mã ' + utSp + ': ' + utDs.join(' → '), 'okmsg', 4000);
+    await loadMolds(); renderMolds();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+  finally { btn.disabled = false; }
 }
 
 // ── Hộp thoại tình trạng khuôn (T79) ──────────────────────────────────────────
@@ -693,11 +762,12 @@ function bindAll(){
   document.getElementById('iSearch').addEventListener('input', renderIssues);
   document.getElementById('btnNewMold').onclick = () => openCfg(null);
   document.getElementById('sec-khuon').addEventListener('click', e => {
-    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-cfg],[data-gomau],[data-goissue]');
+    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-ut],[data-cfg],[data-gomau],[data-goissue]');
     if (!t) return;
     if (t.dataset.kf) { kFilter = t.dataset.kf; return renderMolds(); }
     if (t.dataset.ttf) { ttFilter = t.dataset.ttf; return renderMolds(); }
     if (t.dataset.tt) return openTt(t.dataset.tt);
+    if (t.dataset.ut) return openUt(t.dataset.ut);
     if (t.dataset.cfg) return openCfg(t.dataset.cfg);
     e.preventDefault();
     if (t.dataset.gomau) { mauKhuon = t.dataset.gomau; return setTab('mau', true); }
@@ -717,6 +787,14 @@ function bindAll(){
   document.getElementById('cfg-save').onclick = saveCfg;
   document.getElementById('cfg-del').onclick = deleteCfg;
   document.getElementById('tt-save').onclick = saveTt;
+  document.getElementById('ut-save').onclick = saveUt;
+  document.getElementById('ut-list').addEventListener('click', e => {
+    const b = e.target.closest('button[data-ut-mv]');
+    if (!b) return;
+    const i = Number(b.dataset.i), j = i + Number(b.dataset.utMv);
+    [utDs[i], utDs[j]] = [utDs[j], utDs[i]];
+    renderUt();
+  });
   bindMau();
 }
 
