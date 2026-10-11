@@ -69,8 +69,6 @@
   .empty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px;}
   .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
 
-  .fc-input{width:78px;padding:6px 7px;font-size:12.5px;text-align:right;}
-  .fc-cell-dirty{background:var(--warn-bg);}
 
   .cap-result-table td.gap-ok{color:var(--run-fg);font-weight:600;}
   .cap-result-table td.gap-bad{color:var(--alarm-fg);font-weight:700;background:var(--alarm-bg);}
@@ -151,7 +149,7 @@
             <input type="number" id="fc-nam" style="width:100px" step="1">
           </span>
         </h2>
-        <p class="muted">Chỉ hiện các mã SP đã khai báo quy trình CNC ở tab 1 (mã chưa khai báo thì chưa tính được năng lực). Nhập số lượng dự báo từng tháng rồi bấm Lưu.</p>
+        <p class="muted">Forecast lấy từ trang <a href="forecast-san-luong.html" id="fc-link">📈 Forecast sản lượng năm</a> (nhập / sửa ở đó — một nguồn chung cho cả Đúc và CNC). Chỉ hiện các mã SP đã khai báo quy trình CNC ở tab 1.</p>
         <div class="msg" id="fc-msg"></div>
         <div class="table-wrap">
           <table id="fc-table" style="display:none">
@@ -160,7 +158,6 @@
           </table>
         </div>
         <div class="empty" id="fc-empty" style="display:none">Chưa có mã SP nào khai báo quy trình CNC — sang tab 1 để khai báo trước.</div>
-        <div class="form-actions"><button type="button" id="fc-save">Lưu forecast</button></div>
       </div>
     </section>
 
@@ -228,7 +225,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).style.display = 'block';
-    if (btn.dataset.tab === 'forecast' && !Object.keys(forecastDirty).length) loadForecastTable();
+    if (btn.dataset.tab === 'forecast') loadForecastTable();
     if (btn.dataset.tab === 'capacity') computeAndRenderCapacity();
   });
 });
@@ -315,17 +312,31 @@ document.getElementById('rt-form').addEventListener('submit', async (e) => {
   loadRouting();
 });
 
-// ── Tab 2: Forecast sản lượng theo tháng ─────────────────────────────────
-let forecastDirty = {}; // "ma_sp|thang" -> so_luong
+// ── Tab 2: Forecast sản lượng theo tháng (chỉ xem) ──────────────────────
+// Nguồn: forecast_san_luong (forecast-san-luong.html, T83) — không nhập riêng
+// cho CNC nữa (bảng cnc_forecast cũ đã bỏ ở T84).
 function fcYear(){
   const v = Number(document.getElementById('fc-nam').value);
   return v || new Date().getFullYear();
 }
-document.getElementById('fc-nam').addEventListener('change', () => { forecastDirty = {}; loadForecastTable(); });
+document.getElementById('fc-nam').addEventListener('change', loadForecastTable);
+
+// PostgREST trả tối đa 1000 dòng/lần -> phân trang.
+async function fetchForecast(nam){
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('forecast_san_luong').select('ma_sp, thang, so_luong').eq('nam', nam).range(from, from + 999);
+    if (error) return { data: null, error };
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return { data: out, error: null };
+}
 
 async function loadForecastTable(){
   const nam = fcYear();
   document.getElementById('cap-nam-label').textContent = nam;
+  document.getElementById('fc-link').href = 'forecast-san-luong.html?nam=' + nam;
   const { data: routingSp, error: rErr } = await sb.from('master_cnc_routing').select('ma_sp').order('ma_sp');
   if (rErr){ showMsg('fc-msg', 'error', 'Không tải được: ' + rErr.message); return; }
   const spList = [...new Set((routingSp || []).map(r => r.ma_sp))].sort((a,b) => a.localeCompare(b, 'vi', {numeric:true}));
@@ -335,46 +346,27 @@ async function loadForecastTable(){
   empty.style.display = 'none'; table.style.display = 'table';
 
   const theadRow = document.getElementById('fc-thead-row');
-  theadRow.innerHTML = '<th>Mã SP</th><th>Tên SP</th>' + THANG_LABELS.map(l => '<th class="num">' + l + '</th>').join('');
+  theadRow.innerHTML = '<th>Mã SP</th><th>Tên SP</th>' + THANG_LABELS.map(l => '<th class="num">' + l + '</th>').join('') + '<th class="num">Tổng</th>';
 
-  const { data: fcRows, error: fErr } = await sb.from('cnc_forecast').select('ma_sp, thang, so_luong').eq('nam', nam);
+  const { data: fcRows, error: fErr } = await fetchForecast(nam);
   if (fErr){ showMsg('fc-msg', 'error', 'Không tải được forecast: ' + fErr.message); return; }
-  clearMsg('fc-msg');
   const fcMap = {};
-  (fcRows || []).forEach(r => { fcMap[r.ma_sp + '|' + r.thang] = r.so_luong; });
+  (fcRows || []).forEach(r => { fcMap[r.ma_sp + '|' + r.thang] = Number(r.so_luong); });
+  const coFc = spList.filter(sp => THANG_LABELS.some((_, i) => fcMap[sp + '|' + (i + 1)] != null)).length;
+  if (!coFc) showMsg('fc-msg', 'info', 'Chưa có forecast năm ' + nam + ' cho các mã CNC — nhập ở trang Forecast sản lượng năm.');
+  else clearMsg('fc-msg');
 
   tbody.innerHTML = spList.map(sp => {
+    let tot = 0;
     const cells = THANG_LABELS.map((_, i) => {
-      const thang = i + 1;
-      const key = sp + '|' + thang;
-      const val = fcMap[key] ?? '';
-      return '<td><input type="number" step="any" min="0" class="fc-input" data-sp="' + escapeHtml(sp) + '" data-thang="' + thang + '" value="' + val + '"></td>';
+      const v = fcMap[sp + '|' + (i + 1)];
+      if (v != null) tot += v;
+      return '<td class="num">' + (v == null ? '<span class="muted">—</span>' : v.toLocaleString('vi-VN')) + '</td>';
     }).join('');
-    return '<tr><td>' + escapeHtml(sp) + '</td><td>' + (escapeHtml(productMap[sp]) || '<span class="muted">—</span>') + '</td>' + cells + '</tr>';
+    return '<tr><td>' + escapeHtml(sp) + '</td><td>' + (escapeHtml(productMap[sp]) || '<span class="muted">—</span>') + '</td>' + cells +
+      '<td class="num"><b>' + (tot ? tot.toLocaleString('vi-VN') : '') + '</b></td></tr>';
   }).join('');
-
-  tbody.querySelectorAll('.fc-input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      inp.classList.add('fc-cell-dirty');
-      forecastDirty[inp.dataset.sp + '|' + inp.dataset.thang] = inp.value === '' ? 0 : Number(inp.value);
-    });
-  });
 }
-
-document.getElementById('fc-save').addEventListener('click', async () => {
-  const nam = fcYear();
-  const keys = Object.keys(forecastDirty);
-  if (!keys.length) return showMsg('fc-msg', 'info', 'Chưa có thay đổi nào để lưu.');
-  const rows = keys.map(k => {
-    const [ma_sp, thangStr] = k.split('|');
-    return { ma_sp, nam, thang: Number(thangStr), so_luong: forecastDirty[k] || 0 };
-  });
-  const { error } = await sb.from('cnc_forecast').upsert(rows, { onConflict: 'ma_sp,nam,thang' });
-  if (error) return showMsg('fc-msg', 'error', 'Lỗi lưu: ' + error.message);
-  showMsg('fc-msg', 'ok', '✓ Đã lưu forecast năm ' + nam + ' (' + rows.length + ' ô).');
-  forecastDirty = {};
-  document.querySelectorAll('.fc-cell-dirty').forEach(el => el.classList.remove('fc-cell-dirty'));
-});
 
 // ── Tab 3: Giả định năng lực & kết quả ───────────────────────────────────
 let capacityConfig = null;
@@ -417,7 +409,7 @@ async function computeAndRenderCapacity(){
 
   const [{ data: routing, error: rErr }, { data: fcRows, error: fErr }] = await Promise.all([
     sb.from('master_cnc_routing').select('ma_sp, loai_may, cycle_time_s'),
-    sb.from('cnc_forecast').select('ma_sp, thang, so_luong').eq('nam', nam),
+    fetchForecast(nam),
   ]);
   if (rErr || fErr){ showMsg('cap-msg', 'error', 'Lỗi tải dữ liệu: ' + ((rErr || fErr).message)); return; }
 
