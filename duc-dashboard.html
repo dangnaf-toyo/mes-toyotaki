@@ -146,7 +146,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .badge-ipqc-wait.ok{background:var(--bg-sunken);color:var(--text-muted)}
 .badge-ipqc-wait.warn{background:#FEF3C7;color:#B45309}
 .badge-ipqc-wait.alarm{background:#FEE2E2;color:#B91C1C;animation:pulse 2s ease-in-out infinite}
-.mold-badge{display:inline-flex;align-items:center;gap:2px;font-size:9px;padding:0 4px;border-radius:2px;margin-left:4px;font-weight:600;cursor:pointer;letter-spacing:.02em;font-family:'JetBrains Mono',monospace}
+.mold-badge{text-decoration:none;display:inline-flex;align-items:center;gap:2px;font-size:9px;padding:0 4px;border-radius:2px;margin-left:4px;font-weight:600;cursor:pointer;letter-spacing:.02em;font-family:'JetBrains Mono',monospace}
 .mold-badge:hover{filter:brightness(0.95);box-shadow:0 0 0 1px currentColor}
 .mold-badge.ok{background:#D1FAE5;color:#065F46}
 .mold-badge.warn{background:#FEF3C7;color:#B45309}
@@ -764,86 +764,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   </div>
 </div>
 
-<!-- MODAL: bảo dưỡng khuôn -->
-<div class="modal-mask" id="modal-mold-maintenance">
-  <div class="modal" style="max-width:540px">
-    <div class="modal-head">
-      <div class="modal-title">🔧 Bảo dưỡng khuôn <span class="machine-tag" id="mm-tag">—</span></div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div id="mm-status-box" style="border-radius:6px;padding:10px 12px;font-size:12px">
-        <div style="font-weight:600;font-size:13px;margin-bottom:6px" id="mm-status-title">—</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:11px">
-          <div>Tổng shot lũy kế: <b id="mm-total-shots">—</b></div>
-          <div>Shot từ lần BD gần nhất: <b id="mm-shots-since">—</b></div>
-          <div>Ngưỡng bảo dưỡng: <b id="mm-thresh-bd">—</b></div>
-          <div>Ngưỡng làm mới: <b id="mm-thresh-lm">—</b></div>
-          <div>Lần bảo dưỡng gần nhất: <b id="mm-last-maint">—</b></div>
-          <div>Mã SP: <b id="mm-last-sp">—</b></div>
-          <div>Hạn bảo dưỡng tiếp theo: <b id="mm-next-due">—</b></div>
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label class="req">Loại</label>
-          <select id="mm-loai" onchange="onMoldMaintTypeChange()">
-            <option value="Bảo dưỡng định kỳ">Bảo dưỡng định kỳ</option>
-            <option value="Sửa chữa">Sửa chữa</option>
-            <option value="Thay khuôn mới">Thay khuôn mới</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Ngày thực hiện</label>
-          <input type="date" id="mm-ngay">
-        </div>
-      </div>
-      <div class="field">
-        <label>Mô tả (thao tác, phụ tùng thay, người thực hiện...)</label>
-        <textarea id="mm-ghi-chu" placeholder="VD: Thay lò xo, vệ sinh khuôn, kiểm tra rãnh dẫn..." style="min-height:70px"></textarea>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Chi phí (VNĐ)</label>
-          <input type="number" id="mm-chi-phi" min="0" step="1000" placeholder="Không bắt buộc">
-        </div>
-        <div class="field">
-          <label>Thời gian dừng máy (phút)</label>
-          <input type="number" id="mm-dung-phut" min="0" step="1" placeholder="Không bắt buộc">
-        </div>
-      </div>
-      <details style="border:1px dashed var(--border);border-radius:4px;padding:8px 10px">
-        <summary style="cursor:pointer;font-size:11px;color:var(--text-muted);font-weight:600">⚙ Chỉnh ngưỡng/lịch khuôn này (nâng cao)</summary>
-        <div class="field-row" style="margin-top:8px">
-          <div class="field">
-            <label>Ngưỡng bảo dưỡng mới (shot)</label>
-            <input type="number" id="mm-nguong-bd-moi" min="0" step="100" placeholder="Để trống nếu giữ nguyên">
-          </div>
-          <div class="field">
-            <label>Ngưỡng làm mới mới (shot)</label>
-            <input type="number" id="mm-nguong-lm-moi" min="0" step="1000" placeholder="Để trống nếu giữ nguyên">
-          </div>
-        </div>
-        <div class="field" style="margin-top:8px">
-          <label>Chu kỳ bảo dưỡng theo thời gian (ngày)</label>
-          <input type="number" id="mm-chu-ky-ngay" min="0" step="1" placeholder="VD: 30 — để trống nếu chỉ theo dõi theo số shot">
-        </div>
-      </details>
-      <div class="field" style="margin-top:4px">
-        <label>Lịch sử gần đây</label>
-        <div id="mm-history" style="font-size:11px;color:var(--text-muted)">—</div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <span class="hint" id="mm-reset-hint">Bảo dưỡng định kỳ / Thay khuôn mới: reset đồng hồ đếm shot từ lần BD. Sửa chữa: chỉ ghi log, không reset.</span>
-      <div class="modal-actions">
-        <button class="btn-outline" onclick="closeModal()">Huỷ</button>
-        <button class="btn btn-primary" onclick="submitMoldMaintenance()">✓ Xác nhận</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL: báo vấn đề khuôn -->
 <div class="modal-mask" id="modal-mold-issue-report">
   <div class="modal" style="max-width:480px">
@@ -996,7 +916,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
  *   api_changeProductPaired → rpc duc_change_product_paired
  *   api_updateShiftInputs→ rpc duc_update_shift_inputs    api_endShift      → duc_end_shift
  *   api_extendMachineShift → rpc duc_extend_machine_shift
- *   api_getAllMolds      → đọc duc_shot_khuon             api_recordMoldMaintenance → duc_record_mold_maintenance
+ *   api_getAllMolds      → đọc duc_shot_khuon             (Ghi BD tay đã bỏ — chỉ qua check sheet bảo dưỡng)
  *   api_configureMold    → rpc duc_configure_mold         api_reportMoldIssue → duc_report_mold_issue
  *   api_resolveMoldIssuePending → rpc duc_resolve_mold_issue_pending
  *   api_confirmMoldIssueOutcome → rpc duc_confirm_mold_issue_outcome
@@ -3742,8 +3662,9 @@ function _renderMoldBadge(row){
     cls = 'ok'; icon = '✓'; label = fmtNum(shotsSince) + '/' + fmtNum(thresh);
     tooltip = 'Khuôn OK\nShot từ lần bảo dưỡng: ' + fmtNum(shotsSince) + ' / ngưỡng ' + fmtNum(thresh);
   }
-  return '<span class="mold-badge ' + cls + '" title="' + escapeHtml(tooltip) + '" onclick=\'openMoldMaintenanceModal(' +
-    JSON.stringify(row.so_khuon) + ')\'>' + icon + ' ' + label + '</span>';
+  // Bảo dưỡng khuôn chỉ ghi qua KH bảo dưỡng tuần + check sheet (đã bỏ "Ghi BD" tay).
+  return '<a class="mold-badge ' + cls + '" href="bao-duong-khuon-tuan.html" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="' +
+    escapeHtml(tooltip + '\nBấm để mở Kế hoạch bảo dưỡng khuôn tuần') + '">' + icon + ' ' + label + '</a>';
 }
 
 function _renderMoldIssueBadge(row){
@@ -3767,135 +3688,6 @@ function _renderMoldIssueConfirmBanner(row){
         '<button type="button" class="bad" onclick=\'confirmMoldIssueQuick(' + idJson + ', "Tai_phat")\'>✗ Vẫn còn/tái phát</button>' +
       '</div>' +
     '</div>';
-}
-
-// =============================================================================
-// Bảo dưỡng khuôn → duc_record_mold_maintenance
-// =============================================================================
-async function openMoldMaintenanceModal(ma_khuon){
-  if (!ma_khuon) return;
-  const mold = state.moldMap[String(ma_khuon).trim()];
-  if (!mold) return showToast('Khuôn ' + ma_khuon + ' chưa có dữ liệu shot — sản xuất 1 ca xong sẽ tự tạo.', true);
-  if (!(await ensureAuth())) return;
-
-  const row = state.rows.find(r => String(r.so_khuon).trim() === String(ma_khuon).trim());
-  _fillMoldMaintenanceModal(mold, row ? (row.ma_sp + ' (' + (row.ten_sp || '') + ')') : (mold.ten_sp_gan_nhat || '—'));
-  document.getElementById('modal-mold-maintenance').classList.add('open');
-}
-
-async function openMoldMaintenanceModalFromMold(mold){
-  if (!(await ensureAuth())) return;
-  _fillMoldMaintenanceModal(mold, mold.ten_sp_gan_nhat || '—');
-  document.getElementById('modal-mold-maintenance').classList.add('open');
-}
-
-function _fillMoldMaintenanceModal(mold, spLabel){
-  state.currentTarget = { ma_khuon: mold.ma_khuon };
-  document.getElementById('mm-tag').textContent = mold.ma_khuon;
-  document.getElementById('mm-total-shots').textContent = fmtNum(mold.tong_shot_luy_ke || 0);
-  document.getElementById('mm-shots-since').textContent = fmtNum(mold.shots_since_maintenance || 0);
-  document.getElementById('mm-thresh-bd').textContent = fmtNum(mold.nguong_bao_duong || CONFIG.MOLD.MAINTENANCE_SHOT);
-  document.getElementById('mm-thresh-lm').textContent = fmtNum(mold.nguong_lam_moi || CONFIG.MOLD.REPLACEMENT_SHOT);
-  document.getElementById('mm-last-maint').textContent = mold.lan_bao_duong_gan_nhat
-    ? formatDateShort(new Date(mold.lan_bao_duong_gan_nhat)) : '—';
-  document.getElementById('mm-last-sp').textContent = spLabel;
-  document.getElementById('mm-next-due').textContent = moldNextDueDateLabel(mold);
-  document.getElementById('mm-loai').value = 'Bảo dưỡng định kỳ';
-  document.getElementById('mm-ngay').value = getTodayDateString();
-  document.getElementById('mm-ghi-chu').value = '';
-  document.getElementById('mm-chi-phi').value = '';
-  document.getElementById('mm-dung-phut').value = '';
-  document.getElementById('mm-nguong-bd-moi').value = '';
-  document.getElementById('mm-nguong-lm-moi').value = '';
-  document.getElementById('mm-chu-ky-ngay').value = mold.chu_ky_bao_duong_ngay || '';
-  onMoldMaintTypeChange();
-  loadMoldMaintHistory(mold.ma_khuon);
-
-  const box = document.getElementById('mm-status-box');
-  const title = document.getElementById('mm-status-title');
-  const st = mold.trang_thai_khuon;
-  if (st === 'Cần làm mới') {
-    box.style.background = '#FCE7F3'; box.style.border = '1px solid #F472B6';
-    title.textContent = '⚠ CẦN LÀM MỚI KHUÔN — Đã vượt tuổi thọ'; title.style.color = '#9F1239';
-  } else if (st === 'Cần bảo dưỡng') {
-    box.style.background = '#FEE2E2'; box.style.border = '1px solid #F87171';
-    title.textContent = '🔧 CẦN BẢO DƯỠNG NGAY'; title.style.color = '#B91C1C';
-  } else if (st === 'Sắp bảo dưỡng') {
-    box.style.background = '#FEF3C7'; box.style.border = '1px solid #F59E0B';
-    title.textContent = '⏳ Sắp đến ngưỡng bảo dưỡng'; title.style.color = '#B45309';
-  } else {
-    box.style.background = '#D1FAE5'; box.style.border = '1px solid #6EE7B7';
-    title.textContent = '✓ Khuôn hoạt động tốt'; title.style.color = '#065F46';
-  }
-}
-
-function getTodayDateString(){
-  const d = new Date();
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-}
-
-function moldNextDueDateLabel(mold){
-  if (!mold.lan_bao_duong_gan_nhat || !mold.chu_ky_bao_duong_ngay) return '—';
-  const due = new Date(mold.lan_bao_duong_gan_nhat);
-  due.setDate(due.getDate() + Number(mold.chu_ky_bao_duong_ngay));
-  const overdue = due < new Date();
-  return formatDateShort(due) + (overdue ? ' (quá hạn)' : '');
-}
-
-function onMoldMaintTypeChange(){
-  const loai = document.getElementById('mm-loai').value;
-  const hint = document.getElementById('mm-reset-hint');
-  hint.textContent = (loai === 'Sửa chữa')
-    ? 'Sửa chữa: chỉ ghi lịch sử, KHÔNG reset đồng hồ đếm shot / hạn bảo dưỡng theo lịch cũ.'
-    : 'Reset đồng hồ đếm shot và hạn bảo dưỡng theo lịch kể từ hôm nay.';
-}
-
-async function loadMoldMaintHistory(maKhuon){
-  const box = document.getElementById('mm-history');
-  box.textContent = 'Đang tải...';
-  const { data, error } = await sb.from('duc_khuon_bao_duong_log')
-    .select('loai,ngay,mo_ta,chi_phi,nguoi_thuc_hien').eq('ma_khuon', maKhuon)
-    .order('ngay', { ascending: false }).limit(5);
-  if (error || !data || !data.length) { box.textContent = 'Chưa có lịch sử.'; return; }
-  box.innerHTML = data.map(r =>
-    '<div style="padding:4px 0;border-bottom:1px solid var(--border)">' +
-    '<b>' + formatDateShort(new Date(r.ngay)) + '</b> — ' + escapeHtml(r.loai) +
-    (r.chi_phi ? ' — ' + fmtNum(r.chi_phi) + 'đ' : '') +
-    (r.nguoi_thuc_hien ? ' — ' + escapeHtml(r.nguoi_thuc_hien) : '') +
-    (r.mo_ta ? '<div style="color:var(--text-muted)">' + escapeHtml(r.mo_ta) + '</div>' : '') +
-    '</div>'
-  ).join('');
-}
-
-async function submitMoldMaintenance(){
-  const t = state.currentTarget;
-  if (!t || !t.ma_khuon) return;
-  if (!(await ensureAuthOnSubmit('modal-mold-maintenance'))) return;
-
-  const nguongBD = Number(document.getElementById('mm-nguong-bd-moi').value);
-  const nguongLM = Number(document.getElementById('mm-nguong-lm-moi').value);
-  const chuKy = Number(document.getElementById('mm-chu-ky-ngay').value);
-  const chiPhi = Number(document.getElementById('mm-chi-phi').value);
-  const dungPhut = Number(document.getElementById('mm-dung-phut').value);
-  showOverlay('Đang ghi nhận...');
-  try {
-    const d = await rpcWrite('duc_ghi_lich_su_bao_duong', {
-      p_ma_khuon: t.ma_khuon,
-      p_loai: document.getElementById('mm-loai').value,
-      p_ngay: document.getElementById('mm-ngay').value || null,
-      p_mo_ta: document.getElementById('mm-ghi-chu').value.trim(),
-      p_chi_phi: chiPhi > 0 ? chiPhi : null,
-      p_thoi_gian_dung_phut: dungPhut > 0 ? dungPhut : null,
-      p_id_van_de_lien_quan: null,
-      p_nguong_bao_duong_moi: nguongBD > 0 ? nguongBD : null,
-      p_nguong_lam_moi_moi: nguongLM > 0 ? nguongLM : null,
-      p_chu_ky_ngay_moi: chuKy > 0 ? chuKy : null,
-      p_user: state.user,
-    });
-    hideOverlay(); closeModal();
-    showToast('✓ Đã ghi nhận ' + document.getElementById('mm-loai').value.toLowerCase() + ' cho khuôn ' + d.ma_khuon + ' (' + fmtNum(d.shot_tai_thoi_diem) + ' shot)');
-    loadShiftState(false);
-  } catch (e) { onError(e); }
 }
 
 // =============================================================================

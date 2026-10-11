@@ -12,9 +12,10 @@
   quan-ly-khuon.html — trang Quản lý khuôn (trước là modal "🧊 Quản lý khuôn"
   trong duc-dashboard.html). Độc lập ca/ngày, 3 mục:
   - ?tab=khuon : danh sách khuôn (duc_shot_khuon) — khai báo/sửa/xoá khuôn
-    (duc_configure_mold / duc_rename_khuon / duc_xoa_khuon), ghi bảo dưỡng tay
-    (duc_ghi_lich_su_bao_duong), tình trạng sử dụng (T79: tinh_trang qua
-    duc_khuon_doi_tinh_trang, lịch sử duc_khuon_tinh_trang_log).
+    (duc_configure_mold / duc_rename_khuon / duc_xoa_khuon), tình trạng sử dụng
+    (T79: tinh_trang qua duc_khuon_doi_tinh_trang, lịch sử
+    duc_khuon_tinh_trang_log). Ghi bảo dưỡng chỉ qua KH bảo dưỡng tuần + check
+    sheet (T81 bỏ "Ghi BD" tay / duc_ghi_lich_su_bao_duong).
   - ?tab=van-de: vấn đề khuôn (duc_van_de_khuon) — xử lý / xác nhận.
   - ?tab=mau&khuon=X: hạng mục check sheet bảo dưỡng (duc_khuon_cs_mau +
     duc_khuon_cs_mau_bo, T76/T78) — mục chung, bỏ mục chung cho 1 khuôn, mục
@@ -122,12 +123,7 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
 .fg textarea{min-height:60px;resize:vertical}
 .fg .sub{font-size:11px;color:var(--text-muted)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mm-status{border-radius:6px;padding:10px 12px;font-size:12px}
-.mm-status b.t{display:block;font-size:13px;margin-bottom:6px}
-.mm-status .g{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11.5px}
 .hist div{padding:4px 0;border-bottom:1px solid var(--border);font-size:11.5px}
-details.adv{border:1px dashed var(--border-strong);border-radius:6px;padding:8px 10px}
-details.adv summary{cursor:pointer;font-size:12px;color:var(--text-muted);font-weight:600}
 @media (max-width:640px){.row2{grid-template-columns:1fr}.toolbar input[type=search]{flex:1}}
 </style>
 </head>
@@ -209,10 +205,11 @@ details.adv summary{cursor:pointer;font-size:12px;color:var(--text-muted);font-w
         <div class="fg"><label>Ngưỡng bảo dưỡng (shot)</label><input type="number" id="cfg-nguong-bd" min="0" step="100" placeholder="Để trống nếu giữ nguyên"></div>
         <div class="fg"><label>Ngưỡng làm mới (shot)</label><input type="number" id="cfg-nguong-lm" min="0" step="1000" placeholder="Để trống nếu giữ nguyên"></div>
       </div>
+      <div class="fg"><label>Chu kỳ bảo dưỡng theo thời gian (ngày)</label><input type="number" id="cfg-chu-ky" min="0" step="1" placeholder="VD: 30 — để trống nếu chỉ theo dõi theo số shot"><div class="sub">Nhập 0 để bỏ chu kỳ theo ngày.</div></div>
       <div class="fg"><label>Ghi chú</label><textarea id="cfg-ghi-chu" placeholder="VD: Khai báo baseline từ Excel ngày 01/08/2026"></textarea></div>
     </div>
     <div class="dlg-foot">
-      <span class="hint">Không reset bộ đếm — dùng "🔧 Ghi BD" nếu muốn reset sau khi bảo dưỡng xong.</span>
+      <span class="hint">Bộ đếm shot tự reset khi check sheet bảo dưỡng hoàn thành ĐẠT.</span>
       <button type="button" class="btn btn-danger" id="cfg-del">🗑 Xoá khuôn</button>
       <button type="button" class="btn btn-outline" data-close>Huỷ</button>
       <button type="button" class="btn" id="cfg-save">Lưu</button>
@@ -233,38 +230,6 @@ details.adv summary{cursor:pointer;font-size:12px;color:var(--text-muted);font-w
     <div class="dlg-foot">
       <button type="button" class="btn btn-outline" data-close>Huỷ</button>
       <button type="button" class="btn" id="tt-save">Lưu tình trạng</button>
-    </div>
-  </div>
-</div>
-
-<!-- Hộp thoại: ghi bảo dưỡng tay -->
-<div class="dlg-mask" id="dlg-mm">
-  <div class="dlg">
-    <div class="dlg-head"><span>🔧 Ghi bảo dưỡng khuôn <span id="mm-tag"></span></span><button type="button" data-close>✕</button></div>
-    <div class="dlg-body">
-      <div class="mm-status" id="mm-status"></div>
-      <div class="row2">
-        <div class="fg"><label>Loại *</label><select id="mm-loai"><option>Bảo dưỡng định kỳ</option><option>Sửa chữa</option><option>Thay khuôn mới</option></select></div>
-        <div class="fg"><label>Ngày thực hiện</label><input type="date" id="mm-ngay"></div>
-      </div>
-      <div class="fg"><label>Mô tả (thao tác, phụ tùng thay, người thực hiện...)</label><textarea id="mm-ghi-chu" placeholder="VD: Thay lò xo, vệ sinh khuôn, kiểm tra rãnh dẫn..."></textarea></div>
-      <div class="row2">
-        <div class="fg"><label>Chi phí (VNĐ)</label><input type="number" id="mm-chi-phi" min="0" step="1000" placeholder="Không bắt buộc"></div>
-        <div class="fg"><label>Thời gian dừng máy (phút)</label><input type="number" id="mm-dung-phut" min="0" step="1" placeholder="Không bắt buộc"></div>
-      </div>
-      <details class="adv"><summary>⚙ Chỉnh ngưỡng/lịch khuôn này (nâng cao)</summary>
-        <div class="row2" style="margin-top:8px">
-          <div class="fg"><label>Ngưỡng bảo dưỡng mới (shot)</label><input type="number" id="mm-nguong-bd-moi" min="0" step="100" placeholder="Để trống nếu giữ nguyên"></div>
-          <div class="fg"><label>Ngưỡng làm mới mới (shot)</label><input type="number" id="mm-nguong-lm-moi" min="0" step="1000" placeholder="Để trống nếu giữ nguyên"></div>
-        </div>
-        <div class="fg" style="margin-top:8px"><label>Chu kỳ bảo dưỡng theo thời gian (ngày)</label><input type="number" id="mm-chu-ky-ngay" min="0" step="1" placeholder="VD: 30 — để trống nếu chỉ theo dõi theo số shot"></div>
-      </details>
-      <div class="fg"><label>Lịch sử gần đây</label><div class="hist" id="mm-history">—</div></div>
-    </div>
-    <div class="dlg-foot">
-      <span class="hint" id="mm-reset-hint"></span>
-      <button type="button" class="btn btn-outline" data-close>Huỷ</button>
-      <button type="button" class="btn" id="mm-save">✓ Xác nhận</button>
     </div>
   </div>
 </div>
@@ -299,7 +264,6 @@ function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 function pad(n){ return String(n).padStart(2, '0'); }
 function fmtDate(s){ if (!s) return '—'; const d = new Date(String(s).length <= 10 ? s + 'T00:00:00' : s); return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear(); }
-function todayStr(){ const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
 function naturalCompare(a, b){ return String(a).localeCompare(String(b), 'vi', { numeric: true, sensitivity: 'base' }); }
 function numOrNull(v){ return (v === '' || v == null) ? null : Number(v); }
 let msgTimer = null;
@@ -458,7 +422,6 @@ function renderMolds(){
       '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
       '<td class="act">' + (canTT ? '<button type="button" class="btn btn-outline btn-sm" data-tt="' + escapeHtml(m.ma_khuon) + '">🏷 Tình trạng</button> ' : '') +
         '<button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
-        '<button type="button" class="btn btn-outline btn-sm" data-mm="' + escapeHtml(m.ma_khuon) + '">🔧 Ghi BD</button> ' +
         '<a class="btn btn-outline btn-sm" href="?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + escapeHtml(m.ma_khuon) + '">📋 Hạng mục</a></td></tr>';
   }).join('');
 }
@@ -483,6 +446,7 @@ async function openCfg(maKhuon){
   document.getElementById('cfg-shot-since').value = m ? m.shots_since_maintenance : '';
   document.getElementById('cfg-nguong-bd').value = m ? m.nguong_bao_duong : '';
   document.getElementById('cfg-nguong-lm').value = m ? m.nguong_lam_moi : '';
+  document.getElementById('cfg-chu-ky').value = m && m.chu_ky_bao_duong_ngay ? m.chu_ky_bao_duong_ngay : '';
   document.getElementById('cfg-ghi-chu').value = '';
   document.getElementById('cfg-del').hidden = !m;
   openDlg('dlg-cfg');
@@ -508,6 +472,7 @@ async function saveCfg(){
       p_shots_since_maintenance: numOrNull(document.getElementById('cfg-shot-since').value),
       p_nguong_bao_duong_moi: numOrNull(document.getElementById('cfg-nguong-bd').value),
       p_nguong_lam_moi_moi: numOrNull(document.getElementById('cfg-nguong-lm').value),
+      p_chu_ky_bao_duong_ngay: numOrNull(document.getElementById('cfg-chu-ky').value),
       p_ghi_chu: document.getElementById('cfg-ghi-chu').value.trim() || null,
       p_user: userName,
     });
@@ -569,71 +534,6 @@ async function saveTt(){
     await rpcWrite('duc_khuon_doi_tinh_trang', { p_ma_khuon: cur.ma_khuon, p_tinh_trang: r.value, p_ly_do: lyDo });
     closeDlg();
     showMsg('✓ Khuôn ' + cur.ma_khuon + ': ' + TT[r.value][0], 'okmsg');
-    await loadMolds(); renderMolds();
-  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
-  finally { btn.disabled = false; }
-}
-
-// ── Hộp thoại ghi bảo dưỡng ───────────────────────────────────────────────────
-const MM_STATUS = {
-  'Cần làm mới': ['#FCE7F3', '#F472B6', '#9F1239', '⚠ CẦN LÀM MỚI KHUÔN — Đã vượt tuổi thọ'],
-  'Cần bảo dưỡng': ['#FEE2E2', '#F87171', '#B91C1C', '🔧 CẦN BẢO DƯỠNG NGAY'],
-  'Sắp bảo dưỡng': ['#FEF3C7', '#F59E0B', '#B45309', '⏳ Sắp đến ngưỡng bảo dưỡng'],
-  'OK': ['#D1FAE5', '#6EE7B7', '#065F46', '✓ Khuôn hoạt động tốt'],
-};
-function mmResetHint(){
-  document.getElementById('mm-reset-hint').textContent = document.getElementById('mm-loai').value === 'Sửa chữa'
-    ? 'Sửa chữa: chỉ ghi lịch sử, KHÔNG reset đồng hồ đếm shot / hạn bảo dưỡng.'
-    : 'Reset đồng hồ đếm shot và hạn bảo dưỡng theo lịch kể từ ngày thực hiện.';
-}
-async function openMm(maKhuon){
-  if (!(await ensureAuth())) return;
-  const m = molds.find(x => x.ma_khuon === maKhuon);
-  if (!m) return;
-  cur = m;
-  const s = MM_STATUS[m.trang_thai_khuon] || MM_STATUS.OK;
-  const box = document.getElementById('mm-status');
-  box.style.background = s[0]; box.style.border = '1px solid ' + s[1];
-  box.innerHTML = '<b class="t" style="color:' + s[2] + '">' + s[3] + '</b><div class="g">' +
-    '<div>Tổng shot lũy kế: <b>' + fmtNum(m.tong_shot_luy_ke) + '</b></div><div>Shot từ lần BD gần nhất: <b>' + fmtNum(m.shots_since_maintenance) + '</b></div>' +
-    '<div>Ngưỡng bảo dưỡng: <b>' + fmtNum(m.nguong_bao_duong) + '</b></div><div>Ngưỡng làm mới: <b>' + fmtNum(m.nguong_lam_moi) + '</b></div>' +
-    '<div>Lần BD gần nhất: <b>' + fmtDate(m.lan_bao_duong_gan_nhat) + '</b></div><div>Mã SP: <b>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</b></div>' +
-    '<div>Hạn BD tiếp theo: <b>' + nextDueLabel(m) + '</b></div></div>';
-  document.getElementById('mm-tag').textContent = m.ma_khuon;
-  document.getElementById('mm-loai').value = 'Bảo dưỡng định kỳ';
-  document.getElementById('mm-ngay').value = todayStr();
-  ['mm-ghi-chu', 'mm-chi-phi', 'mm-dung-phut', 'mm-nguong-bd-moi', 'mm-nguong-lm-moi'].forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('mm-chu-ky-ngay').value = m.chu_ky_bao_duong_ngay || '';
-  mmResetHint();
-  openDlg('dlg-mm');
-  const h = document.getElementById('mm-history');
-  h.textContent = 'Đang tải...';
-  const { data } = await sb.from('duc_khuon_bao_duong_log').select('loai,ngay,mo_ta,chi_phi,nguoi_thuc_hien')
-    .eq('ma_khuon', m.ma_khuon).order('ngay', { ascending: false }).limit(5);
-  h.innerHTML = data && data.length ? data.map(r => '<div><b>' + fmtDate(r.ngay) + '</b> — ' + escapeHtml(r.loai) +
-    (r.chi_phi ? ' — ' + fmtNum(r.chi_phi) + 'đ' : '') + (r.nguoi_thuc_hien ? ' — ' + escapeHtml(r.nguoi_thuc_hien) : '') +
-    (r.mo_ta ? '<div style="color:var(--text-muted);border:none;padding:0">' + escapeHtml(r.mo_ta) + '</div>' : '') + '</div>').join('') : 'Chưa có lịch sử.';
-}
-async function saveMm(){
-  if (!cur || !(await ensureAuth())) return;
-  const n = id => Number(document.getElementById(id).value);
-  const loai = document.getElementById('mm-loai').value;
-  const btn = document.getElementById('mm-save'); btn.disabled = true;
-  try {
-    const d = await rpcWrite('duc_ghi_lich_su_bao_duong', {
-      p_ma_khuon: cur.ma_khuon, p_loai: loai,
-      p_ngay: document.getElementById('mm-ngay').value || null,
-      p_mo_ta: document.getElementById('mm-ghi-chu').value.trim(),
-      p_chi_phi: n('mm-chi-phi') > 0 ? n('mm-chi-phi') : null,
-      p_thoi_gian_dung_phut: n('mm-dung-phut') > 0 ? n('mm-dung-phut') : null,
-      p_id_van_de_lien_quan: null,
-      p_nguong_bao_duong_moi: n('mm-nguong-bd-moi') > 0 ? n('mm-nguong-bd-moi') : null,
-      p_nguong_lam_moi_moi: n('mm-nguong-lm-moi') > 0 ? n('mm-nguong-lm-moi') : null,
-      p_chu_ky_ngay_moi: n('mm-chu-ky-ngay') > 0 ? n('mm-chu-ky-ngay') : null,
-      p_user: userName,
-    });
-    closeDlg();
-    showMsg('✓ Đã ghi nhận ' + loai.toLowerCase() + ' cho khuôn ' + d.ma_khuon + ' (' + fmtNum(d.shot_tai_thoi_diem) + ' shot)', 'okmsg', 4000);
     await loadMolds(); renderMolds();
   } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
   finally { btn.disabled = false; }
@@ -793,13 +693,12 @@ function bindAll(){
   document.getElementById('iSearch').addEventListener('input', renderIssues);
   document.getElementById('btnNewMold').onclick = () => openCfg(null);
   document.getElementById('sec-khuon').addEventListener('click', e => {
-    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-cfg],[data-mm],[data-gomau],[data-goissue]');
+    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-cfg],[data-gomau],[data-goissue]');
     if (!t) return;
     if (t.dataset.kf) { kFilter = t.dataset.kf; return renderMolds(); }
     if (t.dataset.ttf) { ttFilter = t.dataset.ttf; return renderMolds(); }
     if (t.dataset.tt) return openTt(t.dataset.tt);
     if (t.dataset.cfg) return openCfg(t.dataset.cfg);
-    if (t.dataset.mm) return openMm(t.dataset.mm);
     e.preventDefault();
     if (t.dataset.gomau) { mauKhuon = t.dataset.gomau; return setTab('mau', true); }
     document.getElementById('iSearch').value = t.dataset.goissue; iFilter = 'open'; setTab('van-de', true);
@@ -817,8 +716,6 @@ function bindAll(){
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDlg(); });
   document.getElementById('cfg-save').onclick = saveCfg;
   document.getElementById('cfg-del').onclick = deleteCfg;
-  document.getElementById('mm-loai').onchange = mmResetHint;
-  document.getElementById('mm-save').onclick = saveMm;
   document.getElementById('tt-save').onclick = saveTt;
   bindMau();
 }
