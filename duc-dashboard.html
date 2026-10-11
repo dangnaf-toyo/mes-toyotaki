@@ -270,6 +270,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .wallboard-mode .col-loi-ng input{pointer-events:none;background:transparent!important;border-color:transparent!important}
 .wallboard-mode .chip.editable{cursor:default;pointer-events:none}
 .wallboard-mode .mold-badge{cursor:default;pointer-events:none}
+.wallboard-mode .sca-badge{cursor:default;pointer-events:none}
 .wallboard-mode .mold-issue-badge{cursor:default;pointer-events:none}
 .wallboard-mode .mold-issue-report-btn{display:none!important}
 .wallboard-mode .mold-issue-confirm-banner button{display:none!important}
@@ -1832,6 +1833,7 @@ async function loadShiftState(showLoader){
     state.rows = data.rows;
     state.incidents = data.incidents;
     state.warnings = data.warnings;
+    state.anhSuCoCount = data.anhCount || {};
     renderTable(); updateSummary(); renderOpsWarnings();
     loadKanbanProgress();
     updateLiveStatus('OK — poll ' + (CONFIG.POLL_MS / 1000) + 's');
@@ -2012,7 +2014,9 @@ async function fetchShiftState(){
     warnings.chuaKetCa.push({ ma_may: r.ma_may, ngay: r.ngay, ca: r.ca, stdEnd: stdEnd.toISOString() });
   });
 
-  return { rows, incidents, warnings };
+  // Số ảnh sự cố (T87) cho biểu tượng 📷 trên danh sách sự cố.
+  const anhCount = await SuCoAnh.count(rows.map(r => r.open_id_su_co).concat(incidents.map(i => i.id_su_co)));
+  return { rows, incidents, warnings, anhCount };
 }
 
 function startPolling(){
@@ -2027,6 +2031,7 @@ function startPolling(){
       state.rows = data.rows;
       state.incidents = data.incidents;
       state.warnings = data.warnings;
+      state.anhSuCoCount = data.anhCount || {};
       renderTable();       // renderTable tự bảo toàn ô người dùng đang gõ dở
       updateSummary();
       renderOpsWarnings();
@@ -2283,6 +2288,7 @@ function makeRowHTML(row, stateClass, isActive){
         '<div class="issue-open-top">' +
           '<span class="issue-code">' + escapeHtml(row.open_loai_su_co || '—') + '</span>' +
           (row.open_id_su_co ? '<span class="issue-ma-su-co">' + escapeHtml(row.open_id_su_co) + '</span>' : '') +
+          SuCoAnh.badge((state.anhSuCoCount || {})[row.open_id_su_co], ' onclick=\'openEditOpenIncidentModal(' + idDongJson + ')\'') +
           '<span class="timer" data-start="' + startTime.toISOString() + '">--:--</span>' +
         '</div>' +
         '<div class="issue-detail">' + escapeHtml(row.open_van_de || '(chưa nhập mô tả)') + '</div>' +
@@ -2314,7 +2320,8 @@ function makeRowHTML(row, stateClass, isActive){
         const editedClass = i.van_de_edited === 'Yes' ? ' edited' : '';
         return '<span class="chip editable' + editedClass + '" title="' + escapeHtml(title) + '" onclick=\'openEditIncidentModal(' +
           JSON.stringify(i.id_ban_ghi) + ')\'><span class="chip-code">' + escapeHtml(shortCode) + '</span>' +
-          escapeHtml(shortName) + ' <span class="chip-time">' + i.thoi_gian_dung_phut + "'</span></span>";
+          escapeHtml(shortName) + ' <span class="chip-time">' + i.thoi_gian_dung_phut + "'</span>" +
+          SuCoAnh.badge((state.anhSuCoCount || {})[i.id_su_co]) + '</span>';
       }).join('') + '</div>';
 
   const closedClass = !isActive ? ' sp-closed' : '';
@@ -3130,7 +3137,8 @@ async function mountAnhSuCo(elId, kind, idSuCo, immediate){
   el.innerHTML = '<div class="hint">Đang tải ảnh...</div>';
   let ex = { truoc: [], sau: [] };
   try { if (idSuCo) ex = await SuCoAnh.load(idSuCo); } catch (e) { anhErr('Lỗi tải ảnh sự cố: ' + e.message); }
-  return SuCoAnh.picker(el, { kind, idSuCo, existing: ex[kind], immediate, canRemoveExisting: !!immediate, onError: anhErr });
+  return SuCoAnh.picker(el, { kind, idSuCo, existing: ex[kind], immediate, canRemoveExisting: !!immediate, onError: anhErr,
+    onChange: immediate ? () => loadShiftState(false) : null });
 }
 
 async function openResolveModal(idDong){

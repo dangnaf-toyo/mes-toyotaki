@@ -40,7 +40,9 @@
       '.sca-t.pending{outline:2px solid #F59E0B;outline-offset:-2px}' +
       '.sca-t .x{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:22px;cursor:pointer;padding:0}' +
       '.sca-busy{font-size:11.5px;color:#B45309;margin-top:6px}' +
-      '.sca-note{font-size:11px;color:#94A3B8;margin-top:6px}';
+      '.sca-note{font-size:11px;color:#94A3B8;margin-top:6px}' +
+      '.sca-badge{display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;padding:0 5px;border-radius:8px;background:#E0F2FE;color:#075985;margin-left:4px;white-space:nowrap;cursor:pointer;vertical-align:middle;line-height:16px}' +
+      '.sca-badge.co-sau{background:#DCFCE7;color:#166534}';
     document.head.appendChild(st);
   }
 
@@ -181,5 +183,27 @@
     } finally { p.busy = false; p.render(); }
   }
 
-  window.SuCoAnh = { picker, uploadPending, load, remove, compress, MAX, LABEL };
+  // Đếm ảnh theo mã sự cố: { id_su_co: { truoc, sau } }. Lỗi thì trả {} (chỉ để hiển thị).
+  async function count(ids){
+    const out = {};
+    const list = [...new Set((ids || []).filter(Boolean))];
+    try {
+      for (let i = 0; i < list.length; i += 150) {
+        const { data, error } = await sb.from('duc_su_co_anh').select('id_su_co,loai').in('id_su_co', list.slice(i, i + 150));
+        if (error) return {};
+        (data || []).forEach(r => { const c = out[r.id_su_co] || (out[r.id_su_co] = { truoc: 0, sau: 0 }); c[r.loai] = (c[r.loai] || 0) + 1; });
+      }
+    } catch (e) { return {}; }
+    return out;
+  }
+
+  // Biểu tượng "📷 n" (rỗng nếu chưa có ảnh). attrs: thuộc tính thêm cho thẻ span (VD onclick).
+  function badge(c, attrs){
+    if (!c || !(c.truoc + c.sau)) return '';
+    injectCss();
+    const t = (c.truoc ? c.truoc + ' ảnh hiện trạng' : '') + (c.truoc && c.sau ? ', ' : '') + (c.sau ? c.sau + ' ảnh sau xử lý' : '');
+    return '<span class="sca-badge' + (c.sau ? ' co-sau' : '') + '" title="' + esc(t) + '"' + (attrs || '') + '>📷 ' + (c.truoc + c.sau) + '</span>';
+  }
+
+  window.SuCoAnh = { picker, uploadPending, load, remove, compress, count, badge, MAX, LABEL };
 })();

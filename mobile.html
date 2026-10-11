@@ -815,6 +815,8 @@ async function loadShiftState(){
       incRows = data || [];
     }
     state.incidents = incRows;
+    // Số ảnh sự cố đang mở (T87) cho biểu tượng 📷.
+    state.anhSuCoCount = await SuCoAnh.count(state.rows.map(r => r.open_id_su_co));
 
     hideOverlay();
     updateCtxSummaryLine();
@@ -927,7 +929,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
     const elapsed = Math.round((nowServer() - start) / 60000);
     issueBox.classList.remove('hidden');
     issueBox.innerHTML = `
-      <div class="code">${escapeHtml(row.open_loai_su_co||'—')}</div>
+      <div class="code">${escapeHtml(row.open_loai_su_co||'—')}${SuCoAnh.badge((state.anhSuCoCount || {})[row.open_id_su_co], ' onclick="openResolveScreen()"')}</div>
       <div class="desc">${escapeHtml(row.open_van_de || '(chưa nhập mô tả)')}</div>
       <div class="timer">${elapsed}' đang dừng</div>`;
   } else {
