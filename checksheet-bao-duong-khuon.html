@@ -17,8 +17,9 @@
   - Lưu nháp / Hoàn thành qua RPC duc_khuon_cs_luu. Hoàn thành -> ghi sổ đời
     khuôn (duc_khuon_bao_duong_log), Đạt + BD định kỳ/Thay mới -> reset đồng
     hồ shot; sau đó khoá.
-  - Khung "🔎 Vấn đề của khuôn" (T88): sự cố (kèm ảnh, T87) + IPQC NG/Cảnh báo
-    (kèm ảnh bằng chứng) của khuôn từ lần bảo dưỡng trước — RPC duc_khuon_van_de_lich_su.
+  - Bảng "Vấn đề khuôn chưa đóng" (T90): duc_van_de_khuon chưa đóng + ảnh / hạng mục
+    NG của lần kiểm IPQC tạo ra vấn đề (duc_ipqc_checkpoint.id_van_de_lien_quan).
+    Lịch sử đầy đủ sự cố + IPQC: nút 🔎 Vấn đề ở quan-ly-khuon.html.
   - Mẫu hạng mục (chung + riêng từng khuôn, T78) sửa ở quan-ly-khuon.html?tab=mau
     (Quản lý bộ phận Đúc / admin).
   - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
@@ -60,7 +61,6 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .badge.warn{background:var(--warn-bg);color:var(--warn-fg)}
 .badge.bad{background:var(--alarm-bg);color:var(--alarm-fg)}
 .badge.muted{background:var(--bg-sunken);color:var(--text-muted)}
-.issues{margin-top:10px;font-size:12px;background:var(--warn-bg);border:1px solid #F3D98B;border-radius:6px;padding:6px 10px;color:var(--warn-fg)}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg.wide{grid-column:1/-1}
@@ -107,39 +107,20 @@ tr.row-ng td{background:#FFF5F5}
 .done-banner.dat{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
 .done-banner.khong_dat{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5}
 .tag-rieng{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#E0F2FE;color:#075985;vertical-align:middle}
-.vd-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.vd-bar select{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:12.5px}
-.vd-tabs{display:flex;gap:4px}
-.vd-tabs button{border:1px solid var(--border-strong);background:#fff;border-radius:100px;padding:5px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--text-muted)}
-.vd-tabs button.on{background:var(--text);color:#fff;border-color:var(--text)}
-.vd-top{font-size:12px;background:var(--bg-sunken);border-radius:6px;padding:7px 10px;margin-bottom:8px;line-height:1.6}
-.vd-top b{color:var(--alarm-fg)}
-.vd-wrap{overflow:auto;max-height:620px;border:1px solid var(--border);border-radius:6px}
-.vd-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
-.vd-tbl th{position:sticky;top:0;z-index:1;background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
-.vd-tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
-.vd-tbl td.tg{white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:11.5px}
-.vd-tbl td.tg small,.vd-tbl td small{display:block;font-family:'Inter',sans-serif;color:var(--text-muted);font-size:10.5px}
-.vd-tbl td.may{white-space:nowrap;font-weight:700}
-.vd-tbl td.loi{min-width:200px}
-.vd-tbl td.loi b{display:block}
-.vd-tbl td.dung{white-space:nowrap;text-align:right}
-.vd-tbl td.xl{min-width:160px;white-space:pre-line}
-.vd-tbl td.kq{min-width:120px}
-.vd-tbl tr.src-ipqc td.may{box-shadow:inset 3px 0 0 #7C3AED}
-.vd-tbl tr.src-su_co td.may{box-shadow:inset 3px 0 0 var(--warn-fg)}
-.vd-src{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-bottom:3px}
-.vd-src.su_co{background:var(--warn-bg);color:var(--warn-fg)}
-.vd-src.ipqc{background:#F3E8FF;color:#6B21A8}
-.vd-ng{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
-.vd-ng span{font-size:10.5px;background:var(--alarm-bg);color:var(--alarm-fg);border-radius:4px;padding:1px 5px}
-.vd-kq{font-weight:700;font-size:11.5px}
-.vd-kq.ok{color:var(--run-fg)}.vd-kq.ng{color:var(--alarm-fg)}.vd-kq.cb{color:var(--warn-fg)}.vd-kq.cho{color:var(--text-muted)}
-.vd-ph{display:flex;gap:4px;flex-wrap:wrap;align-items:center;min-width:110px}
-.vd-ph + .vd-ph{margin-top:4px}
-.vd-ph img{width:46px;height:46px;object-fit:cover;border-radius:5px;border:1px solid var(--border);display:block}
-.vd-ph .lb{font-size:10px;font-weight:700;color:var(--text-muted);width:100%}
-.kq-ng{color:var(--alarm-fg);font-weight:700}.kq-cb{color:var(--warn-fg);font-weight:700}
+.vdc-wrap{overflow:auto;max-height:520px;border:1px solid var(--border);border-radius:6px}
+.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.vdc th{position:sticky;top:0;z-index:1;background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.vdc td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.vdc td.tg{white-space:nowrap}
+.vdc td small{display:block;color:var(--text-muted);font-size:10.5px}
+.vdc td.may{white-space:nowrap;font-weight:700}
+.vdc td.loi{min-width:220px}
+.vdc .ng{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.vdc .ng span{font-size:10.5px;background:var(--alarm-bg);color:var(--alarm-fg);border-radius:4px;padding:1px 5px}
+.vdc .tt{font-weight:700;white-space:nowrap}
+.vdc .tt.mo{color:var(--alarm-fg)}.vdc .tt.cho{color:var(--warn-fg)}
+.vdc .ph{display:flex;gap:4px;flex-wrap:wrap;min-width:100px}
+.vdc .ph img{width:46px;height:46px;object-fit:cover;border-radius:5px;border:1px solid var(--border);display:block}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
 .okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
@@ -218,7 +199,7 @@ const MAX_PHOTOS = 10;
 const PHOTO_KIND = { truoc: 'Ảnh TRƯỚC bảo dưỡng', sau: 'Ảnh SAU bảo dưỡng' };
 let photos = { truoc: [], sau: [] };   // URL public bucket khuon-bao-duong
 let photoBusy = { truoc: false, sau: false };
-let vdData = null, vdTu = null, vdTab = 'all', vdChiAnh = false;   // khung Vấn đề của khuôn (T88)
+let anhVanDe = {};   // id_van_de -> lần kiểm IPQC gốc (ảnh, hạng mục NG) — T90
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
@@ -282,6 +263,13 @@ async function loadAll(){
   mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || []; mauBo = boRes.data || [];
   employees = empRes.data || [];
   issues = (issRes.data || []).filter(x => x.trang_thai !== 'Đã đóng');
+  anhVanDe = {};
+  const idsVd = issues.map(x => x.id_van_de).filter(Boolean);
+  for (let i = 0; i < idsVd.length; i += 150) {
+    const { data } = await sb.from('duc_ipqc_checkpoint').select('id_van_de_lien_quan,ket_qua,loai_kiem,thoi_diem_kiem_thuc_te,checklist_json,anh_bang_chung_url')
+      .in('id_van_de_lien_quan', idsVd.slice(i, i + 150));
+    (data || []).forEach(p => { anhVanDe[p.id_van_de_lien_quan] = p; });
+  }
 
   items = cs ? (cs.hang_muc || []).map(x => ({ ...x })) : itemsTheoMau([]);
   ketLuan = cs ? cs.ket_luan : '';
@@ -324,11 +312,9 @@ function render(){
     info('Kế hoạch tuần', '<span class="badge ' + tt[1] + '">' + tt[0] + '</span>') +
     '</div>' +
     (kh.ghi_chu ? '<div style="margin-top:8px;font-size:12px"><b>Nội dung KH:</b> ' + escapeHtml(kh.ghi_chu) + '</div>' : '') +
-    (issues.length ? '<div class="issues"><b>⚠ Vấn đề khuôn chưa đóng:</b>' + issues.slice(0, 5).map(a =>
-      '<div>• ' + (a.ngay_phat_hien ? fmtDateVN(String(a.ngay_phat_hien)) + ' — ' : '') + escapeHtml(a.mo_ta || '(không mô tả)') + '</div>').join('') + '</div>' : '') +
     '</div>';
 
-  html += '<div class="card no-print" id="vdCard"><div class="card-title">🔎 Vấn đề của khuôn — xem lại để đối sách khi bảo dưỡng</div><div id="vdBody"><div style="color:var(--text-dim)">Đang tải...</div></div></div>';
+  html += vanDeChuaDongHtml();
 
   html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
     '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
@@ -376,7 +362,6 @@ function render(){
   renderItems();
   renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
-  if (vdData) renderVanDe(); else loadVanDe();
   bindEvents();
 }
 
@@ -509,107 +494,28 @@ function collect(){
   };
 }
 
-// ── Vấn đề của khuôn (T88): sự cố + IPQC NG/Cảnh báo kèm ảnh ───────────────────
-function isoDate(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-function vdMacDinh(){
-  // Chưa hoàn thành: từ lần bảo dưỡng trước (mặc định). Đã hoàn thành (đồng hồ đã reset) / chưa từng BD: 90 ngày.
-  const lan = mold && mold.lan_bao_duong_gan_nhat ? String(mold.lan_bao_duong_gan_nhat).slice(0, 10) : null;
-  if (lan && !(cs && cs.trang_thai === 'hoan_thanh')) return 'bd';
-  return '90';
-}
-function vdTuNgay(v){
-  if (v === 'bd') return String(mold.lan_bao_duong_gan_nhat).slice(0, 10);
-  const d = parseDate(cs && cs.trang_thai === 'hoan_thanh' ? cs.ngay_thuc_hien : kh.ngay);
-  d.setDate(d.getDate() - Number(v));
-  return isoDate(d);
-}
-async function loadVanDe(){
-  if (!vdTu) vdTu = vdMacDinh();
-  const body = document.getElementById('vdBody');
-  if (body) body.innerHTML = '<div style="color:var(--text-dim)">Đang tải...</div>';
-  const { data, error } = await sb.rpc('duc_khuon_van_de_lich_su', { p_ma_khuon: kh.ma_khuon, p_tu_ngay: vdTuNgay(vdTu) });
-  if (error) { if (body) body.innerHTML = '<div class="err" style="display:block;padding:8px">Lỗi tải: ' + escapeHtml(error.message) + '</div>'; return; }
-  vdData = data || { su_co: [], ipqc: [] };
-  renderVanDe();
-}
-function vdAnh(urls, label){
-  if (!urls || !urls.length) return '';
-  return '<div class="vd-ph"><span class="lb">' + label + ' (' + urls.length + ')</span>' + urls.map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>';
-}
-function vdDem(arr, keyFn){
-  const m = {};
-  arr.forEach(x => [].concat(keyFn(x)).forEach(k => { if (k) m[k] = (m[k] || 0) + 1; }));
-  return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 6);
-}
-function vdTg(ts){ return ts ? new Date(ts).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
-function vdGio(ts){ return ts ? new Date(ts).toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''; }
-const VD_KQ = { OK: ['ok', '✓ OK'], NG: ['ng', '✗ NG'], CANH_BAO: ['cb', '⚠ Cảnh báo'] };
-function vdKq(k){ return VD_KQ[k] || ['cho', String(k || '')]; }
-const VD_LOAI_KIEM = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Đổi khuôn', dau_ca: 'Đầu ca' };
-// Gộp sự cố + IPQC thành các dòng bảng, mới nhất trước.
-function vdRows(){
-  const sc = (vdData.su_co || []).map(x => {
-    const ip = x.ipqc_sau;
-    let kq;
-    if (x.dang_mo) kq = '<span class="vd-kq ng">Đang xử lý</span>';
-    else if (ip && ip.ket_qua) kq = '<span class="vd-kq ' + vdKq(ip.ket_qua)[0] + '">IPQC sau sự cố: ' + vdKq(ip.ket_qua)[1] + '</span><small>' + vdTg(ip.thoi_diem) + (ip.nguoi_kiem ? ' · ' + escapeHtml(ip.nguoi_kiem) : '') + '</small>';
-    else if (ip) kq = '<span class="vd-kq cho">Đã SX lại — chờ IPQC kiểm</span>';
-    else kq = '<span class="vd-kq cho">Đã SX lại</span>';
-    return { src: 'su_co', t: x.gio_phat_sinh, ca: x.ca, may: x.ma_may,
-      nguon: '<span class="vd-src su_co">⚠ Sự cố</span>' + (x.id_su_co ? '<small>' + escapeHtml(x.id_su_co) + '</small>' : ''),
-      loi: '<b>' + escapeHtml(x.loai || '—') + '</b>' + escapeHtml(x.van_de || ''),
-      dung: x.dang_mo ? '<span class="vd-kq ng">đang dừng</span>' : (x.phut != null ? '<b>' + x.phut + "'</b>" : '—') + (x.gio_tro_lai ? '<small>SX lại ' + vdGio(x.gio_tro_lai) + '</small>' : ''),
-      xl: String(x.xu_ly || '').trim(), kq,
-      anh: vdAnh(x.anh_truoc, 'Hiện trạng') + vdAnh(x.anh_sau, 'Sau xử lý'),
-      soAnh: (x.anh_truoc || []).length + (x.anh_sau || []).length };
-  });
-  const iq = (vdData.ipqc || []).map(x => {
-    const kl = x.kiem_lai, kk = x.khuon_khac || [];
-    return { src: 'ipqc', t: x.thoi_diem, ca: x.ca, may: x.ma_may,
-      nguon: '<span class="vd-src ipqc">🔍 IPQC ' + escapeHtml(VD_LOAI_KIEM[x.loai_kiem] || String(x.loai_kiem || '').replace(/_/g, ' ')) + '</span>' +
-        (x.nguoi_kiem ? '<small>' + escapeHtml(x.nguoi_kiem) + '</small>' : '') +
-        (kk.length ? '<small class="vd-kq cb" title="Cùng ngày/ca máy này còn chạy khuôn khác">⚠ có thể là khuôn ' + escapeHtml(kk.join(', ')) + '</small>' : ''),
-      loi: '<span class="vd-kq ' + (x.ket_qua === 'NG' ? 'ng' : 'cb') + '">' + (x.ket_qua === 'NG' ? 'NG' : 'Cảnh báo') + '</span>' +
-        ((x.hang_muc_ng || []).length ? '<div class="vd-ng">' + x.hang_muc_ng.map(m => '<span>' + escapeHtml(m) + '</span>').join('') + '</div>' : ''),
-      dung: x.phut_dung != null ? '<b>' + x.phut_dung + "'</b><small>theo sự cố gốc</small>" : '—',
-      xl: String(x.ghi_chu || '').trim(),
-      kq: kl && kl.ket_qua ? '<span class="vd-kq ' + vdKq(kl.ket_qua)[0] + '">Kiểm lại: ' + vdKq(kl.ket_qua)[1] + '</span><small>' + vdTg(kl.thoi_diem) + (kl.loai_kiem ? ' · ' + escapeHtml(VD_LOAI_KIEM[kl.loai_kiem] || kl.loai_kiem) : '') + '</small>'
-        : '<span class="vd-kq cho">Chưa có lần kiểm lại</span>',
-      anh: vdAnh(x.anh, 'Ảnh IPQC'), soAnh: (x.anh || []).length };
-  });
-  return sc.concat(iq).sort((a, b) => new Date(b.t || 0) - new Date(a.t || 0));
-}
-function renderVanDe(){
-  const body = document.getElementById('vdBody');
-  if (!body || !vdData) return;
-  const sc = vdData.su_co || [], iq = vdData.ipqc || [];
-  const lan = mold && mold.lan_bao_duong_gan_nhat ? String(mold.lan_bao_duong_gan_nhat).slice(0, 10) : null;
-  const opts = (lan ? [['bd', 'Từ lần BD gần nhất (' + fmtDateVN(lan) + ')']] : []).concat([['30', '30 ngày'], ['90', '90 ngày'], ['180', '180 ngày'], ['365', '1 năm']]);
-  const all = vdRows();
-  const rows = all.filter(r => (vdTab === 'all' || r.src === vdTab) && (!vdChiAnh || r.soAnh > 0));
-  let h = '<div class="vd-bar"><select id="vdTu">' + opts.map(([v, l]) => '<option value="' + v + '"' + (v === vdTu ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
-    '<div class="vd-tabs">' + [['all', 'Tất cả (' + all.length + ')'], ['su_co', '⚠ Sự cố (' + sc.length + ')'], ['ipqc', '🔍 IPQC NG / Cảnh báo (' + iq.length + ')']]
-      .map(([k, l]) => '<button type="button" data-vdtab="' + k + '" class="' + (vdTab === k ? 'on' : '') + '">' + l + '</button>').join('') + '</div>' +
-    '<label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="vdChiAnh"' + (vdChiAnh ? ' checked' : '') + '> Chỉ dòng có ảnh (' + all.filter(r => r.soAnh > 0).length + ')</label></div>';
-  // Tóm tắt hay gặp — gợi ý đối sách
-  const topSc = vdDem(sc, x => x.loai), topNg = vdDem(iq, x => x.hang_muc_ng || []);
-  const tongDung = sc.reduce((t, x) => t + (Number(x.phut) || 0), 0);
-  if (topSc.length || topNg.length) h += '<div class="vd-top">' +
-    (topSc.length ? '<div>Sự cố hay gặp: ' + topSc.map(([k, n]) => escapeHtml(k) + ' <b>×' + n + '</b>').join(' · ') + ' — tổng dừng <b>' + fmtNum(tongDung) + "'</b></div>" : '') +
-    (topNg.length ? '<div>Lỗi IPQC hay gặp: ' + topNg.map(([k, n]) => escapeHtml(k) + ' <b>×' + n + '</b>').join(' · ') + '</div>' : '') + '</div>';
-  h += '<div class="vd-wrap"><table class="vd-tbl"><thead><tr><th>Ngày giờ</th><th>Máy</th><th>Nguồn</th><th>Lỗi phát hiện</th><th style="text-align:right">TG dừng</th><th>Nội dung xử lý</th><th>Kết quả xử lý</th><th>Hình ảnh</th></tr></thead><tbody>';
-  if (!rows.length) h += '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:14px">Không có vấn đề nào trong khoảng thời gian này.</td></tr>';
-  rows.forEach(r => {
-    h += '<tr class="src-' + r.src + '"><td class="tg">' + vdTg(r.t) + '<small>' + escapeHtml(r.ca || '') + '</small></td>' +
-      '<td class="may">' + escapeHtml(r.may || '—') + '</td><td>' + r.nguon + '</td><td class="loi">' + r.loi + '</td>' +
-      '<td class="dung">' + r.dung + '</td><td class="xl">' + (r.xl ? escapeHtml(r.xl) : '<span style="color:var(--text-dim)">—</span>') + '</td>' +
-      '<td class="kq">' + r.kq + '</td><td>' + (r.anh || '<span style="color:var(--text-dim)">—</span>') + '</td></tr>';
-  });
-  h += '</tbody></table></div>';
-  body.innerHTML = h;
-  document.getElementById('vdTu').onchange = e => { vdTu = e.target.value; loadVanDe(); };
-  body.querySelectorAll('[data-vdtab]').forEach(b => { b.onclick = () => { vdTab = b.dataset.vdtab; renderVanDe(); }; });
-  document.getElementById('vdChiAnh').onchange = e => { vdChiAnh = e.target.checked; renderVanDe(); };
+// ── Vấn đề khuôn chưa đóng (T90) ─────────────────────────────────────────────────
+function vanDeChuaDongHtml(){
+  const link = '<a class="btn btn-outline btn-sm no-print" href="quan-ly-khuon.html?vande=' + encodeURIComponent(kh.ma_khuon) + '" target="_blank" rel="noopener">🔎 Toàn bộ lịch sử sự cố + IPQC</a>';
+  let h = '<div class="card"><div class="card-title">⚠ Vấn đề khuôn chưa đóng (' + issues.length + ')' + link + '</div>';
+  if (!issues.length) return h + '<div style="color:var(--text-dim)">Không có vấn đề nào đang mở.</div></div>';
+  h += '<div class="vdc-wrap"><table class="vdc"><thead><tr><th>Ngày phát hiện</th><th>Máy</th><th>Lỗi phát hiện</th><th>Người phát hiện</th><th>Trạng thái</th><th>Nội dung xử lý</th><th class="no-print">Hình ảnh</th></tr></thead><tbody>' +
+    issues.map(a => {
+      const p = anhVanDe[a.id_van_de] || {};
+      const ng = (Array.isArray(p.checklist_json) ? p.checklist_json : []).filter(x => x && x.dat === false).map(x => x.muc);
+      const anh = Array.isArray(p.anh_bang_chung_url) ? p.anh_bang_chung_url : [];
+      // Mô tả tự sinh từ IPQC đã liệt kê hạng mục -> bỏ phần đó khi đã hiện nhãn đỏ.
+      const moTa = ng.length ? String(a.mo_ta || '').replace(/\s*—\s*Hạng mục không đạt:[\s\S]*$/, '') : String(a.mo_ta || '');
+      return '<tr><td class="tg">' + (a.ngay_phat_hien ? fmtDateVN(String(a.ngay_phat_hien)) : '—') + '<small>' + escapeHtml(a.ca_phat_hien || '') + '</small></td>' +
+        '<td class="may">' + escapeHtml(a.ma_may || '—') + '</td>' +
+        '<td class="loi">' + escapeHtml(moTa || '(không mô tả)') + (ng.length ? '<div class="ng">' + ng.map(m => '<span>' + escapeHtml(m) + '</span>').join('') + '</div>' : '') + '</td>' +
+        '<td>' + escapeHtml(a.nguoi_phat_hien || '—') + '</td>' +
+        '<td><span class="tt ' + (a.trang_thai === 'Chờ xác nhận' ? 'cho' : 'mo') + '">' + escapeHtml(a.trang_thai || '') + '</span>' +
+          (Number(a.lan_tai_phat) > 0 ? '<small style="color:var(--alarm-fg)">Tái phát ' + a.lan_tai_phat + ' lần</small>' : '') + '</td>' +
+        '<td>' + (a.noi_dung_xu_ly ? escapeHtml(a.noi_dung_xu_ly) + '<small>' + escapeHtml(a.nguoi_xu_ly || '') + (a.ngay_xu_ly ? ' · ' + fmtDateVN(String(a.ngay_xu_ly)) : '') + '</small>' : '<span style="color:var(--text-dim)">Chưa xử lý</span>') + '</td>' +
+        '<td class="no-print">' + (anh.length ? '<div class="ph">' + anh.map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>' : '<span style="color:var(--text-dim)">—</span>') + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>';
+  return h;
 }
 
 // ── Ảnh trước / sau ─────────────────────────────────────────────────────────────
