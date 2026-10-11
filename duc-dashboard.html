@@ -490,6 +490,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       </div>
       <div class="field"><label>Vấn đề</label><textarea id="ma-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
       <div class="field"><label>Nội dung xử lý</label><textarea id="ma-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
+      <div class="field" id="ma-anh"></div>
     </div>
     <div class="modal-foot">
       <span class="hint">Bản ghi chỉ lưu vĩnh viễn khi có "Giờ trở lại"</span>
@@ -753,6 +754,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field"><label>Tổng TG dừng</label><input type="text" autocomplete="off" id="mr-phut" disabled style="background:var(--bg-sunken);color:var(--alarm-fg);font-weight:600"></div>
       </div>
       <div class="field"><label>Bổ sung nội dung xử lý (nếu có)</label><textarea id="mr-bonus"></textarea></div>
+      <div class="field" id="mr-anh-truoc"></div>
+      <div class="field" id="mr-anh-sau"></div>
     </div>
     <div class="modal-foot">
       <span class="hint">✓ Sau khi lưu, bản ghi được ghi vào DB và không sửa được</span>
@@ -877,6 +880,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div class="field"><label>Vấn đề</label><textarea id="ei-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
       <div class="field"><label>Nội dung xử lý</label><textarea id="ei-xu-ly" placeholder="Cách xử lý đã/đang thực hiện"></textarea></div>
       <div class="field" id="ei-ghi-chu-wrap"><label>Ghi chú thêm</label><input type="text" autocomplete="off" id="ei-ghi-chu" placeholder="Note bổ sung"></div>
+      <div class="field" id="ei-anh-truoc"></div>
+      <div class="field" id="ei-anh-sau"></div>
     </div>
     <div class="modal-foot">
       <span class="hint" id="ei-hint">Mọi thay đổi sẽ được đánh dấu ✎ và log kèm ai + khi nào</span>
@@ -901,6 +906,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/su-co-anh.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
@@ -2999,6 +3005,7 @@ async function openAddIncidentModal(idDong){
   document.getElementById('ma-xu-ly').value = '';
   document.getElementById('ma-dam-nhiem').value = '';
   document.getElementById('modal-add').classList.add('open');
+  anhSuCo.add = await mountAnhSuCo('ma-anh', 'truoc', null, false);
 }
 
 async function submitAddIncident(){
@@ -3020,6 +3027,17 @@ async function submitAddIncident(){
     });
     hideOverlay(); closeModal();
     showToast('✓ Đã ghi nhận sự cố đang xử lý');
+    if (anhSuCo.add && anhSuCo.add.hasPending()) {
+      // Mã sự cố do duc_open_incident sinh -> đọc lại open_id_su_co của dòng rồi gắn ảnh.
+      const idDongAnh = state.currentTarget.id_dong;
+      try {
+        const { data: r } = await sb.from('duc_ca_hien_tai').select('open_id_su_co').eq('id_dong', idDongAnh).maybeSingle();
+        const n = await SuCoAnh.uploadPending(anhSuCo.add, r && r.open_id_su_co);
+        showToast('✓ Đã ghi nhận sự cố + ' + n + ' ảnh hiện trạng');
+      } catch (e) {
+        showToast('Sự cố đã ghi nhận nhưng chưa lưu được ảnh: ' + e.message + ' — thêm lại ảnh ở ✎ Sửa sự cố', true);
+      }
+    }
     addPersonnelToDatalist(damNhiem);
     loadShiftState(false);
   } catch (e) { onError(e); }
@@ -3100,6 +3118,21 @@ async function submitBulkIncident(){
 // =============================================================================
 // MODAL: Xử lý xong sự cố → duc_resolve_incident
 // =============================================================================
+// =============================================================================
+// Ảnh sự cố (T87, shared/su-co-anh.js) — hiện trạng lúc phát sinh / sau xử lý
+// =============================================================================
+const anhSuCo = { add: null, resolveTruoc: null, resolveSau: null };
+function anhErr(msg){ showToast(msg, true); }
+// Picker trong 1 khung: idSuCo có -> tải + lưu ngay; chưa có (báo mới) -> chờ lưu.
+async function mountAnhSuCo(elId, kind, idSuCo, immediate){
+  const el = document.getElementById(elId);
+  if (immediate && !idSuCo) { el.innerHTML = '<div class="hint">Sự cố này chưa có mã nên chưa gắn ảnh được.</div>'; return null; }
+  el.innerHTML = '<div class="hint">Đang tải ảnh...</div>';
+  let ex = { truoc: [], sau: [] };
+  try { if (idSuCo) ex = await SuCoAnh.load(idSuCo); } catch (e) { anhErr('Lỗi tải ảnh sự cố: ' + e.message); }
+  return SuCoAnh.picker(el, { kind, idSuCo, existing: ex[kind], immediate, canRemoveExisting: !!immediate, onError: anhErr });
+}
+
 async function openResolveModal(idDong){
   const row = state.rows.find(r => r.id_dong === idDong);
   if (!row || !row.open_gio_phat_sinh) return;
@@ -3121,6 +3154,9 @@ async function openResolveModal(idDong){
   document.getElementById('mr-bonus').value = '';
   updateResolveMinutes();
   document.getElementById('modal-resolve').classList.add('open');
+  anhSuCo.resolveTruoc = await mountAnhSuCo('mr-anh-truoc', 'truoc', row.open_id_su_co, true);
+  anhSuCo.resolveSau = row.open_id_su_co ? await mountAnhSuCo('mr-anh-sau', 'sau', row.open_id_su_co, false) : null;
+  if (!row.open_id_su_co) document.getElementById('mr-anh-sau').innerHTML = '';
 }
 
 function updateResolveMinutes(){
@@ -3148,6 +3184,12 @@ async function submitResolve(){
     return;
   }
 
+  // Ảnh sau xử lý: lưu TRƯỚC khi đóng sự cố (lỗi ảnh thì dừng để thử lại).
+  if (anhSuCo.resolveSau && anhSuCo.resolveSau.hasPending()) {
+    showOverlay('Đang tải ảnh sau xử lý...');
+    try { await SuCoAnh.uploadPending(anhSuCo.resolveSau, row.open_id_su_co); }
+    catch (e) { hideOverlay(); return showToast('Lỗi tải ảnh sau xử lý: ' + e.message + ' — thử lại hoặc bỏ ảnh', true); }
+  }
   showOverlay('Đang lưu bản ghi...');
   try {
     const d = await rpcWrite('duc_resolve_incident', {
@@ -3396,6 +3438,8 @@ async function openEditIncidentModal(idBanGhi){
   _updateEiPhutCalc();
   document.getElementById('ei-hint').textContent = 'Sửa xong bấm Lưu — chip sẽ có badge ✎ và audit log';
   document.getElementById('modal-edit-incident').classList.add('open');
+  await mountAnhSuCo('ei-anh-truoc', 'truoc', incident.id_su_co, true);
+  await mountAnhSuCo('ei-anh-sau', 'sau', incident.id_su_co, true);
 }
 
 async function openEditOpenIncidentModal(idDong){
@@ -3422,6 +3466,8 @@ async function openEditOpenIncidentModal(idDong){
 
   document.getElementById('ei-hint').textContent = 'Sự cố đang mở — sửa loại/giờ/mô tả để đúng thông tin trước khi bấm ✓ Xong';
   document.getElementById('modal-edit-incident').classList.add('open');
+  await mountAnhSuCo('ei-anh-truoc', 'truoc', row.open_id_su_co, true);
+  document.getElementById('ei-anh-sau').innerHTML = '';
 }
 
 async function submitEditIncident(){
