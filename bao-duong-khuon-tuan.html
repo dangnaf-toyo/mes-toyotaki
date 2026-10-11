@@ -103,7 +103,14 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 #tblNguoi td.cell{height:auto;font-size:11.5px}
 #tblNguoi .mk{display:inline-block;background:#E0EDFA;border-radius:4px;padding:1px 5px;margin:1px 2px 1px 0;font-weight:700}
 #tblNguoi .mk.done{background:var(--run-bg);color:var(--run-fg)}
-#tblNguoi .mk.late{background:var(--alarm-bg);color:var(--alarm-fg)}
+#tblNguoi .mk.late,#tblNguoi .mk.ng{background:var(--alarm-bg);color:var(--alarm-fg)}
+#tblNguoi .mk.doing{background:var(--warn-bg);color:var(--warn-fg)}
+#tblNguoi .mk{color:var(--text);text-decoration:none}
+#tblNguoi .mk:hover{outline:1.5px solid var(--accent)}
+.chip.ng{background:var(--alarm-bg);border-left-color:#7F1D1D}
+.chip.doing{background:var(--warn-bg);border-left-color:var(--warn-fg)}
+.cs-link{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;color:var(--accent);text-decoration:none;background:#fff;border:1px solid #BFDBFE;border-radius:4px;padding:1px 6px}
+.cs-link:hover{background:#DBEAFE}
 #tblNguoi td.khuon .cnt{font-weight:500;color:var(--text-muted);font-size:11px}
 
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
@@ -208,6 +215,8 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
         <span><i class="lg-box" style="background:#E0EDFA;border-left:3px solid var(--accent)"></i>Kế hoạch</span>
         <span><i class="lg-box" style="background:var(--run-bg);border-left:3px solid var(--run-fg)"></i>Đã làm</span>
         <span><i class="lg-box" style="background:var(--alarm-bg);border-left:3px solid var(--alarm-fg)"></i>Trễ</span>
+        <span><i class="lg-box" style="background:var(--warn-bg);border-left:3px solid var(--warn-fg)"></i>Đang làm</span>
+        <span><i class="lg-box" style="background:var(--alarm-bg);border-left:3px solid #7F1D1D"></i>✗ Không đạt</span>
         <span><i class="lg-box" style="border:1.5px dashed var(--warn-fg)"></i>Đề xuất ngày rảnh</span>
         <span><i class="lg-box" style="box-shadow:inset 0 -3px 0 #F87171;background:var(--bg-sunken)"></i>Khuôn chạy máy (KHSX)</span>
       </div>
@@ -287,7 +296,10 @@ const SU_KIEN_LABEL = { them: '➕ Thêm lịch', sua: '✏️ Sửa lịch', xo
 // CONFIG.MOLD mặc định — khớp duc-dashboard.html khi khuôn chưa tự set ngưỡng riêng.
 const MOLD_DEFAULT = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000 };
 
-let weekMonday = mondayOf(new Date());
+// ?tuan=YYYY-MM-DD (nút "← Kế hoạch" từ check sheet quay về đúng tuần).
+let weekMonday = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(location.search).get('tuan') || '')
+  ? new Date(new URLSearchParams(location.search).get('tuan') + 'T00:00:00') : new Date());
+let csByKh = {};           // id lịch -> {trang_thai, ket_luan} (duc_khuon_checksheet)
 let canEdit = false;
 let myRole = null, myBoPhan = [];
 let duyetInfo = null;      // duc_khuon_bd_duyet của tuần
@@ -403,6 +415,12 @@ async function loadAndRender(){
   });
 
   khRows = khRes.data || [];
+  csByKh = {};
+  if (khRows.length) {
+    const csRes = await sb.from('duc_khuon_checksheet').select('id_ke_hoach,trang_thai,ket_luan').in('id_ke_hoach', khRows.map(r => r.id));
+    if (csRes.error) return showMsg('Lỗi tải check sheet: ' + csRes.error.message, 'err');
+    (csRes.data || []).forEach(c => { csByKh[c.id_ke_hoach] = c; });
+  }
   duyetInfo = duyetRes.data || null;
   duyetLog = dLogRes.data || [];
   logsByMold = {};
@@ -438,12 +456,20 @@ async function loadAndRender(){
   render();
 }
 
-// "Đã làm" = khuôn có ghi nhận bảo dưỡng/sửa chữa trong tuần (duc_khuon_bao_duong_log).
+// Ưu tiên check sheet (T76) của lịch; lịch chưa có check sheet thì "Đã làm"
+// nếu khuôn có ghi nhận ở duc-dashboard trong tuần (duc_khuon_bao_duong_log).
 function statusOf(row){
-  const logs = logsByMold[row.ma_khuon] || [];
-  if (logs.length) return { cls: 'done', log: logs[0] };
-  if (row.ngay < todayStr()) return { cls: 'late' };
-  return { cls: '' };
+  const cs = csByKh[row.id];
+  if (cs && cs.trang_thai === 'hoan_thanh') return cs.ket_luan === 'dat' ? { cls: 'done', icon: '✓ ' } : { cls: 'ng', icon: '✗ NG · ' };
+  if ((logsByMold[row.ma_khuon] || []).length) return { cls: 'done', icon: '✓ ' };
+  if (cs) return { cls: 'doing', icon: '🔧 ' };
+  if (row.ngay < todayStr()) return { cls: 'late', icon: '⚠ ' };
+  return { cls: '', icon: '' };
+}
+function csLink(row){
+  const cs = csByKh[row.id];
+  const label = !cs ? '📋 Check sheet' : cs.trang_thai === 'hoan_thanh' ? '📋 Xem check sheet' : '📋 Tiếp tục check sheet';
+  return '<a class="cs-link" href="checksheet-bao-duong-khuon.html?id=' + row.id + '">' + label + '</a>';
 }
 
 function render(){
@@ -509,10 +535,10 @@ function render(){
         if (k) {
           const st = statusOf(k);
           inner = '<div class="chip ' + st.cls + (k.nguoi_phu_trach ? '' : ' no-person') + '">' +
-            '<div class="lo">' + (st.cls === 'done' ? '✓ ' : st.cls === 'late' ? '⚠ ' : '') + escapeHtml(LOAI_NGAN[k.loai] || k.loai) + '</div>' +
+            '<div class="lo">' + st.icon + escapeHtml(LOAI_NGAN[k.loai] || k.loai) + '</div>' +
             '<div class="ng">👤 ' + escapeHtml(k.nguoi_phu_trach || 'Chưa giao người') + '</div>' +
             (k.ghi_chu ? '<div class="gc" title="' + escapeHtml(k.ghi_chu) + '">' + escapeHtml(k.ghi_chu) + '</div>' : '') +
-            '</div>';
+            csLink(k) + '</div>';
         } else if (i === suggestIdx) {
           inner = '<div class="suggest">Đề xuất<br>(khuôn rảnh)</div>';
         } else if (run[i].length) {
@@ -536,6 +562,7 @@ function render(){
 }
 
 document.querySelector('#tblKhuon tbody').addEventListener('click', e => {
+  if (e.target.closest('a.cs-link')) return;
   const td = e.target.closest('td.cell');
   if (!td || !canEdit) return;
   openModal(td.dataset.id ? Number(td.dataset.id) : null, td.dataset.ma, td.dataset.ngay);
@@ -545,13 +572,17 @@ function renderSummary(){
   const st = khRows.map(statusOf);
   const done = st.filter(s => s.cls === 'done').length;
   const late = st.filter(s => s.cls === 'late').length;
+  const ng = st.filter(s => s.cls === 'ng').length;
+  const doing = st.filter(s => s.cls === 'doing').length;
   const noPerson = khRows.filter(r => !r.nguoi_phu_trach).length;
   const planned = new Set(khRows.map(r => r.ma_khuon));
   const chuaLen = molds.filter(m => m.severity && !planned.has(m.ma_khuon)).length;
   document.getElementById('summaryBar').innerHTML =
     '<span><b>' + khRows.length + '</b> lịch bảo dưỡng tuần (' + planned.size + ' khuôn)</span>' +
     '<span style="color:var(--run-fg)">Đã làm: <b>' + done + '</b></span>' +
-    '<span style="color:var(--accent)">Chưa làm: <b>' + (khRows.length - done - late) + '</b></span>' +
+    (ng ? '<span style="color:var(--alarm-fg)">Không đạt: <b>' + ng + '</b></span>' : '') +
+    (doing ? '<span style="color:var(--warn-fg)">Đang làm: <b>' + doing + '</b></span>' : '') +
+    '<span style="color:var(--accent)">Chưa làm: <b>' + (khRows.length - done - late - ng - doing) + '</b></span>' +
     '<span style="color:var(--alarm-fg)">Trễ: <b>' + late + '</b></span>' +
     (noPerson ? '<span style="color:var(--alarm-fg)">Chưa giao người: <b>' + noPerson + '</b></span>' : '') +
     '<span style="color:var(--warn-fg)">Khuôn cần chú ý chưa lên KH: <b>' + chuaLen + '</b></span>';
@@ -576,7 +607,7 @@ function renderNguoi(){
       dates.map(d => '<td class="cell' + (d === today ? ' today' : '') + '">' +
         (byPerson[p][d] || []).map(r => {
           const st = statusOf(r);
-          return '<span class="mk ' + st.cls + '" title="' + escapeHtml(r.loai + (r.ghi_chu ? ' — ' + r.ghi_chu : '')) + '">' + escapeHtml(r.ma_khuon) + '</span>';
+          return '<a class="mk ' + st.cls + '" href="checksheet-bao-duong-khuon.html?id=' + r.id + '" title="' + escapeHtml(r.loai + (r.ghi_chu ? ' — ' + r.ghi_chu : '') + ' — bấm để mở check sheet') + '">' + escapeHtml(r.ma_khuon) + '</a>';
         }).join('') + '</td>').join('') + '</tr>';
   }).join('');
 }
