@@ -103,6 +103,12 @@ tr.row-ng td{background:#FFF5F5}
 .mau-row td input{width:100%;border:1px solid var(--border-strong);border-radius:5px;padding:5px 6px;font-family:inherit;font-size:12px}
 .mau-row td.n input{width:60px}
 .mau-row.off td{opacity:.5}
+.mau-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 4px;font-size:13px;font-weight:600}
+.mau-bar select{border:1px solid var(--border-strong);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:13px;margin-left:6px}
+.mau-hint{font-size:12px;font-weight:400;color:var(--text-dim)}
+.mau-sec{font-weight:700;font-size:13px;margin:14px 0 6px}
+.mau-row td.ap{text-align:center;background:var(--bg-sunken)}
+.tag-rieng{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#E0F2FE;color:#075985;vertical-align:middle}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
 .okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
@@ -173,7 +179,8 @@ const KQ_LABEL = { OK: 'OK', NG: 'NG', NA: 'N/A' };
 
 const idKh = Number(new URLSearchParams(location.search).get('id')) || null;
 let myRole = null, myBoPhan = [];
-let kh = null, mold = null, duyet = null, cs = null, mau = [], employees = [], issues = [];
+let kh = null, mold = null, duyet = null, cs = null, mau = [], mauBo = [], employees = [], issues = [];
+let dsKhuon = [], mauKhuon = null;   // khuôn đang chọn trong khung sửa mẫu
 let items = [];          // [{nhom,noi_dung,tieu_chuan,ket_qua,ghi_chu}]
 let ketLuan = '';
 let canEdit = false;
@@ -229,23 +236,29 @@ async function loadAll(){
   if (!kh) { document.getElementById('main').innerHTML = '<div class="card">Không tìm thấy lịch bảo dưỡng #' + idKh + ' (có thể đã bị xoá).</div>'; return; }
   document.getElementById('lnkBack').href = 'bao-duong-khuon-tuan.html?tuan=' + kh.tuan_bat_dau;
 
-  const [moldRes, duyetRes, csRes, mauRes, empRes, issRes] = await Promise.all([
+  const [moldRes, duyetRes, csRes, mauRes, empRes, issRes, boRes] = await Promise.all([
     sb.from('duc_shot_khuon').select('*').eq('ma_khuon', kh.ma_khuon).maybeSingle(),
     sb.from('duc_khuon_bd_duyet').select('*').eq('tuan_bat_dau', kh.tuan_bat_dau).maybeSingle(),
     sb.from('duc_khuon_checksheet').select('*').eq('id_ke_hoach', idKh).maybeSingle(),
     sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id'),
     sb.from('master_employees').select('ten_nhan_vien,vai_tro').order('ten_nhan_vien'),
     sb.from('duc_van_de_khuon').select('*').eq('ma_khuon', kh.ma_khuon).order('ngay_phat_hien', { ascending: false }),
+    sb.from('duc_khuon_cs_mau_bo').select('ma_khuon,id_mau'),
   ]);
-  for (const [r, name] of [[moldRes,'khuôn'],[duyetRes,'trạng thái duyệt'],[csRes,'check sheet'],[mauRes,'mẫu hạng mục']]) {
+  for (const [r, name] of [[moldRes,'khuôn'],[duyetRes,'trạng thái duyệt'],[csRes,'check sheet'],[mauRes,'mẫu hạng mục'],[boRes,'mẫu hạng mục']]) {
     if (r.error) return showMsg('Lỗi tải ' + name + ': ' + r.error.message, 'err');
   }
-  mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || [];
+  mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || []; mauBo = boRes.data || [];
   employees = empRes.data || [];
   issues = (issRes.data || []).filter(x => x.trang_thai !== 'Đã đóng');
+  if (laNguoiSuaMau()) {
+    const { data } = await sb.from('duc_shot_khuon').select('ma_khuon').order('ma_khuon');
+    dsKhuon = (data || []).map(r => r.ma_khuon);
+    if (!dsKhuon.includes(kh.ma_khuon)) dsKhuon.unshift(kh.ma_khuon);
+    if (!mauKhuon) mauKhuon = kh.ma_khuon;
+  }
 
-  items = cs ? (cs.hang_muc || []).map(x => ({ ...x }))
-    : mau.filter(m => m.dang_dung).map(m => ({ nhom: m.nhom, noi_dung: m.noi_dung, tieu_chuan: m.tieu_chuan, ket_qua: null, ghi_chu: '' }));
+  items = cs ? (cs.hang_muc || []).map(x => ({ ...x })) : itemsTheoMau([]);
   ketLuan = cs ? cs.ket_luan : '';
   photos = { truoc: cs && cs.anh_truoc ? cs.anh_truoc.slice() : [], sau: cs && cs.anh_sau ? cs.anh_sau.slice() : [] };
   canEdit = EDIT_ROLES.includes(myRole) && !(cs && cs.trang_thai === 'hoan_thanh');
@@ -313,6 +326,7 @@ function render(){
 
   html += '<div class="card"><div class="card-title">Hạng mục kiểm tra' +
     (canEdit ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnAllOk">✓ Còn trống → OK</button>' : '') +
+    (canEdit && cs ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnTheoMau" title="Lấy lại danh sách hạng mục theo mẫu hiện tại của khuôn (giữ kết quả đã nhập)">↻ Cập nhật theo mẫu</button>' : '') +
     '<div class="tally" id="tally"></div></div>' +
     '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Kết quả</th><th>Ghi chú / xử lý</th></tr></thead><tbody id="tbItems"></tbody></table></div></div>';
 
@@ -333,8 +347,15 @@ function render(){
 
   if (laNguoiSuaMau()) {
     html += '<div class="card no-print"><details id="mauBox"><summary class="card-title" style="cursor:pointer;margin:0">⚙ Mẫu hạng mục check sheet (áp dụng cho check sheet mở mới)</summary>' +
-      '<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng</th><th></th></tr></thead><tbody id="tbMau"></tbody></table></div>' +
-      '<div style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" id="btnMauAdd">➕ Thêm hạng mục</button></div></details></div>';
+      '<div class="mau-bar"><label>Khuôn <select id="mauKhuon">' + dsKhuon.map(k => '<option' + (k === mauKhuon ? ' selected' : '') + '>' + escapeHtml(k) + '</option>').join('') + '</select></label>' +
+      '<span class="mau-hint" id="mauTong"></span></div>' +
+      '<div class="mau-sec">A. Hạng mục chung — bỏ tick cột <b>Áp dụng cho <span class="mau-mk"></span></b> nếu khuôn này không cần</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng (mọi khuôn)</th><th>Áp dụng cho <span class="mau-mk"></span></th><th></th></tr></thead><tbody id="tbMau"></tbody></table></div>' +
+      '<div style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-add="chung">➕ Thêm hạng mục chung</button></div>' +
+      '<div class="mau-sec">B. Hạng mục đặc thù riêng khuôn <span class="mau-mk"></span></div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng</th><th></th></tr></thead><tbody id="tbMauRieng"></tbody></table></div>' +
+      '<div style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-add="rieng">➕ Thêm hạng mục riêng khuôn <span class="mau-mk"></span></button></div>' +
+      '<div class="mau-hint" style="margin-top:10px">Thứ tự quyết định vị trí trong check sheet — mục riêng có thể chen giữa mục chung; đặt cùng tên Nhóm để vào chung nhóm. Check sheet đã lưu nháp: bấm ↻ Cập nhật theo mẫu để lấy thay đổi.</div></details></div>';
   }
 
   document.getElementById('main').innerHTML = html;
@@ -343,6 +364,22 @@ function render(){
   updateDuration();
   if (laNguoiSuaMau()) renderMau();
   bindEvents();
+}
+
+// Hạng mục của khuôn mk = mục chung đang dùng (trừ mục bị bỏ cho mk) + mục riêng của mk.
+function mauChoKhuon(mk){
+  const bo = new Set(mauBo.filter(b => b.ma_khuon === mk).map(b => Number(b.id_mau)));
+  return mau.filter(m => m.dang_dung && (m.ma_khuon ? m.ma_khuon === mk : !bo.has(Number(m.id))))
+    .sort((a, b) => a.thu_tu - b.thu_tu || a.id - b.id);
+}
+// Dựng danh sách hạng mục theo mẫu hiện tại, giữ lại kết quả đã nhập của mục trùng tên.
+function itemsTheoMau(cu){
+  const old = new Map(cu.map(it => [it.nhom + '|' + it.noi_dung, it]));
+  return mauChoKhuon(kh.ma_khuon).map(m => {
+    const o = old.get(m.nhom + '|' + m.noi_dung);
+    return { nhom: m.nhom, noi_dung: m.noi_dung, tieu_chuan: m.tieu_chuan, rieng: !!m.ma_khuon,
+      ket_qua: o ? o.ket_qua : null, ghi_chu: o ? o.ghi_chu || '' : '' };
+  });
 }
 
 function info(k, v){ return '<div><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; }
@@ -358,7 +395,8 @@ function renderItems(){
       ? KQ.map(k => '<button type="button" class="kq-btn ' + k + (it.ket_qua === k ? ' on' : '') + '" data-i="' + i + '" data-kq="' + k + '"' + dis + '>' + KQ_LABEL[k] + '</button>').join('')
       : '<span class="kq-text ' + (it.ket_qua || '') + '">' + (it.ket_qua ? KQ_LABEL[it.ket_qua] : '—') + '</span>';
     const need = it.ket_qua === 'NG' && !String(it.ghi_chu || '').trim();
-    return h + '<tr class="' + (it.ket_qua === 'NG' ? 'row-ng' : '') + '"><td class="stt">' + n + '</td><td>' + escapeHtml(it.noi_dung) + '</td>' +
+    return h + '<tr class="' + (it.ket_qua === 'NG' ? 'row-ng' : '') + '"><td class="stt">' + n + '</td><td>' + escapeHtml(it.noi_dung) +
+      (it.rieng ? ' <span class="tag-rieng" title="Hạng mục đặc thù của khuôn này">riêng</span>' : '') + '</td>' +
       '<td class="tc">' + escapeHtml(it.tieu_chuan) + '</td><td class="kq">' + btns + '</td>' +
       '<td class="gc"><input data-gc="' + i + '" class="' + (need ? 'need' : '') + '" value="' + escapeHtml(it.ghi_chu || '') + '"' +
       (it.ket_qua === 'NG' ? ' placeholder="Bắt buộc: tình trạng / cách xử lý"' : '') + dis + '></td></tr>';
@@ -424,6 +462,19 @@ function bindEvents(){
   document.getElementById('btnNowBd').onclick = () => { document.getElementById('f-bd').value = toLocalInput(new Date()); updateDuration(); };
   document.getElementById('btnNowKt').onclick = () => { document.getElementById('f-kt').value = toLocalInput(new Date()); updateDuration(); };
   document.getElementById('btnAllOk').onclick = () => { items.forEach(it => { if (!it.ket_qua) it.ket_qua = 'OK'; }); renderItems(); };
+  const btnTheoMau = document.getElementById('btnTheoMau');
+  if (btnTheoMau) btnTheoMau.onclick = () => {
+    const moi = itemsTheoMau(items);
+    const key = it => it.nhom + '|' + it.noi_dung, conMoi = new Set(moi.map(key)), cuDaCo = new Set(items.map(key));
+    const mat = items.filter(it => !conMoi.has(key(it))), them = moi.filter(it => !cuDaCo.has(key(it)));
+    if (!mat.length && !them.length) return showMsg('Hạng mục đã khớp mẫu hiện tại', 'okmsg', 2500);
+    const matKq = mat.filter(it => it.ket_qua);
+    if (!confirm('Cập nhật theo mẫu: thêm ' + them.length + ' hạng mục, bỏ ' + mat.length + ' hạng mục' +
+      (matKq.length ? ' (mất kết quả đã nhập của: ' + matKq.map(it => it.noi_dung).join(', ') + ')' : '') +
+      '.\nNhớ bấm Lưu nháp sau đó.')) return;
+    items = moi; renderItems();
+    showMsg('✓ Đã cập nhật hạng mục theo mẫu — bấm 💾 Lưu nháp để lưu', 'okmsg', 4000);
+  };
   document.getElementById('btnDraft').onclick = () => save(false);
   document.getElementById('btnDone').onclick = () => save(true);
 }
@@ -543,23 +594,63 @@ async function save(hoanThanh){
 }
 
 // ── Mẫu hạng mục (Quản lý bộ phận Đúc / admin) ─────────────────────────────────
-function renderMau(){
-  document.getElementById('tbMau').innerHTML = mau.map(m =>
-    '<tr class="mau-row' + (m.dang_dung ? '' : ' off') + '" data-id="' + m.id + '">' +
+// Mục chung: ma_khuon NULL; bỏ áp dụng cho 1 khuôn = 1 dòng duc_khuon_cs_mau_bo.
+// Mục riêng: ma_khuon = khuôn.
+function mauRow(m, mk){
+  const ap = m.ma_khuon ? null : !mauBo.some(b => b.ma_khuon === mk && Number(b.id_mau) === Number(m.id));
+  return '<tr class="mau-row' + (m.dang_dung && ap !== false ? '' : ' off') + '" data-id="' + m.id + '">' +
     '<td class="n"><input type="number" data-f="thu_tu" value="' + m.thu_tu + '"></td>' +
     '<td><input data-f="nhom" value="' + escapeHtml(m.nhom) + '"></td>' +
     '<td><input data-f="noi_dung" value="' + escapeHtml(m.noi_dung) + '"></td>' +
     '<td><input data-f="tieu_chuan" value="' + escapeHtml(m.tieu_chuan) + '"></td>' +
     '<td><input type="checkbox" data-f="dang_dung"' + (m.dang_dung ? ' checked' : '') + '></td>' +
-    '<td style="white-space:nowrap"><button type="button" class="btn btn-sm" data-act="save">Lưu</button> <button type="button" class="btn btn-sm btn-danger" data-act="del">Xoá</button></td></tr>'
-  ).join('');
-  const tb = document.getElementById('tbMau');
-  tb.onclick = async e => {
+    (ap === null ? '' : '<td class="ap"><input type="checkbox" data-ap' + (ap ? ' checked' : '') + ' title="Bỏ tick = khuôn ' + escapeHtml(mk) + ' không kiểm hạng mục này"></td>') +
+    '<td style="white-space:nowrap"><button type="button" class="btn btn-sm" data-act="save">Lưu</button> <button type="button" class="btn btn-sm btn-danger" data-act="del">Xoá</button></td></tr>';
+}
+
+function renderMau(){
+  const mk = mauKhuon;
+  document.querySelectorAll('.mau-mk').forEach(e => { e.textContent = mk; });
+  document.getElementById('tbMau').innerHTML = mau.filter(m => !m.ma_khuon).map(m => mauRow(m, mk)).join('');
+  const rieng = mau.filter(m => m.ma_khuon === mk);
+  document.getElementById('tbMauRieng').innerHTML = rieng.length ? rieng.map(m => mauRow(m, mk)).join('')
+    : '<tr><td colspan="6" style="color:var(--text-dim);text-align:center">Chưa có hạng mục riêng cho khuôn ' + escapeHtml(mk) + '</td></tr>';
+  const chung = mau.filter(m => !m.ma_khuon && m.dang_dung).length, tong = mauChoKhuon(mk);
+  document.getElementById('mauTong').textContent = 'Check sheet mới của khuôn ' + mk + ': ' + tong.length + ' hạng mục (' +
+    tong.filter(m => !m.ma_khuon).length + '/' + chung + ' mục chung + ' + tong.filter(m => m.ma_khuon).length + ' mục riêng)';
+
+  const box = document.getElementById('mauBox');
+  box.onchange = async e => {
+    if (e.target.id === 'mauKhuon') { mauKhuon = e.target.value; return renderMau(); }
+    const cb = e.target.closest('input[data-ap]');
+    if (!cb) return;
+    const id = Number(cb.closest('tr').dataset.id);
+    const { error } = cb.checked
+      ? await sb.from('duc_khuon_cs_mau_bo').delete().eq('ma_khuon', mk).eq('id_mau', id)
+      : await sb.from('duc_khuon_cs_mau_bo').insert({ ma_khuon: mk, id_mau: id });
+    if (error) { cb.checked = !cb.checked; return showMsg('Lỗi lưu: ' + error.message, 'err', 5000); }
+    showMsg(cb.checked ? '✓ Khuôn ' + mk + ' áp dụng lại hạng mục này' : '✓ Khuôn ' + mk + ' bỏ hạng mục này', 'okmsg', 2000);
+    await reloadMau();
+  };
+  box.onclick = async e => {
+    const add = e.target.closest('button[data-add]');
+    if (add) {
+      const maxTt = mau.reduce((s, m) => Math.max(s, m.thu_tu), 0);
+      const chungRows = mau.filter(m => !m.ma_khuon);
+      const row = add.dataset.add === 'rieng'
+        ? { ma_khuon: mk, nhom: 'Đặc thù khuôn', noi_dung: 'Hạng mục riêng mới', tieu_chuan: '', thu_tu: maxTt + 10 }
+        : { nhom: chungRows.length ? chungRows[chungRows.length - 1].nhom : '1. Chung', noi_dung: 'Hạng mục mới', tieu_chuan: '', thu_tu: maxTt + 10 };
+      const { error } = await sb.from('duc_khuon_cs_mau').insert(row);
+      if (error) return showMsg('Lỗi thêm: ' + error.message, 'err', 5000);
+      return reloadMau();
+    }
     const b = e.target.closest('button[data-act]');
     if (!b) return;
     const tr = b.closest('tr'), id = Number(tr.dataset.id);
+    const m = mau.find(x => Number(x.id) === id);
     if (b.dataset.act === 'del') {
-      if (!confirm('Xoá hạng mục này khỏi mẫu? (Check sheet đã tạo không bị ảnh hưởng)')) return;
+      if (!confirm(m && m.ma_khuon ? 'Xoá hạng mục riêng này của khuôn ' + mk + '?' :
+        'Xoá hạng mục chung này khỏi mẫu của MỌI khuôn?\n(Chỉ muốn bỏ cho khuôn ' + mk + ' thì bỏ tick cột "Áp dụng".)\nCheck sheet đã tạo không bị ảnh hưởng.')) return;
       const { error } = await sb.from('duc_khuon_cs_mau').delete().eq('id', id);
       if (error) return showMsg('Lỗi xoá: ' + error.message, 'err', 5000);
     } else {
@@ -573,18 +664,18 @@ function renderMau(){
     showMsg('✓ Đã cập nhật mẫu', 'okmsg', 2000);
     await reloadMau();
   };
-  document.getElementById('btnMauAdd').onclick = async () => {
-    const maxTt = mau.reduce((s, m) => Math.max(s, m.thu_tu), 0);
-    const { error } = await sb.from('duc_khuon_cs_mau').insert({ nhom: mau.length ? mau[mau.length - 1].nhom : '1. Chung', noi_dung: 'Hạng mục mới', tieu_chuan: '', thu_tu: maxTt + 10 });
-    if (error) return showMsg('Lỗi thêm: ' + error.message, 'err', 5000);
-    await reloadMau();
-  };
 }
+
 async function reloadMau(){
-  const { data } = await sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id');
-  mau = data || [];
+  const [m, b] = await Promise.all([
+    sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id'),
+    sb.from('duc_khuon_cs_mau_bo').select('ma_khuon,id_mau'),
+  ]);
+  if (m.error || b.error) return showMsg('Lỗi tải mẫu: ' + (m.error || b.error).message, 'err', 5000);
+  mau = m.data || []; mauBo = b.data || [];
   renderMau();
-  document.getElementById('mauBox').open = true;
+  // Check sheet chưa lưu lần nào thì hạng mục đi theo mẫu ngay.
+  if (!cs) { items = itemsTheoMau(items); renderItems(); }
 }
 
 startHeaderClock();
