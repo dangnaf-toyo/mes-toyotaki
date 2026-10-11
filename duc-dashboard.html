@@ -2529,12 +2529,17 @@ function addMoldToProductMap(maSp, soKhuon){
   if (state.moldsByProduct[maSp].indexOf(soKhuon) === -1) state.moldsByProduct[maSp].push(soKhuon);
 }
 
-// Tình trạng sử dụng khuôn (T79/T80, đổi ở quan-ly-khuon.html) — chỉ khuôn
-// "Đang sản xuất" mới gắn lên máy được; trigger duc_ca_hien_tai chặn ở server.
-const TINH_TRANG_KHUON = { moi_chua_sx: 'Mới — chưa vào SX', dung_het_tuoi_tho: 'Hết tuổi thọ — dừng SX', cho_tra_khach: 'Chờ trả khách hàng', cho_bao_phe: 'Chờ báo phế' };
+// Tình trạng sử dụng khuôn (T79/T80/T82, đổi ở quan-ly-khuon.html) — chỉ khuôn
+// "Đang sản xuất" hoặc "Mới — chưa vào SX" (đúc mẫu) gắn lên máy được; trigger
+// duc_ca_hien_tai chặn ở server.
+const TINH_TRANG_KHUON = { dung_het_tuoi_tho: 'Hết tuổi thọ — dừng SX', cho_tra_khach: 'Chờ trả khách hàng', cho_bao_phe: 'Chờ báo phế' };
 function moldNgungSx(maKhuon){
   const m = state.moldMap[String(maKhuon || '').trim()];
-  return m && m.tinh_trang && m.tinh_trang !== 'dang_sx' ? (TINH_TRANG_KHUON[m.tinh_trang] || m.tinh_trang) : '';
+  return m && m.tinh_trang && !['dang_sx', 'moi_chua_sx'].includes(m.tinh_trang) ? (TINH_TRANG_KHUON[m.tinh_trang] || m.tinh_trang) : '';
+}
+function moldMoiChuaSx(maKhuon){
+  const m = state.moldMap[String(maKhuon || '').trim()];
+  return !!(m && m.tinh_trang === 'moi_chua_sx');
 }
 
 // isExisting = currentValue là khuôn của dòng đang chạy (giữ lại kể cả khi khuôn
@@ -2552,7 +2557,7 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
   const ngung = all.filter(mk => mk !== keep && moldNgungSx(mk));
   const molds = all.filter(mk => ngung.indexOf(mk) === -1);
   if (currentValue && molds.indexOf(currentValue) === -1) currentValue = '';
-  const ngungNote = ngung.length ? 'Ẩn ' + ngung.length + ' khuôn không ở tình trạng Đang sản xuất: ' +
+  const ngungNote = ngung.length ? 'Ẩn ' + ngung.length + ' khuôn đã ngừng sản xuất: ' +
     ngung.map(mk => mk + ' (' + moldNgungSx(mk) + ')').join(', ') + ' — đổi ở Quản lý khuôn.' : '';
   inp.style.display = 'none';
   hint.style.color = '';
@@ -2561,7 +2566,7 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
     sel.style.display = 'none';
     inp.value = '';
     if (maSp && ngung.length) {
-      hint.textContent = 'SP ' + maSp + ' không có khuôn nào Đang sản xuất. ' + ngungNote;
+      hint.textContent = 'SP ' + maSp + ' không còn khuôn nào dùng được. ' + ngungNote;
       hint.style.color = 'var(--alarm-fg)';
     } else if (maSp) {
       hint.textContent = 'SP ' + maSp + ' chưa khai báo số khuôn — nhờ quản lý khai báo ở Quản lý danh mục → Sản phẩm.';
@@ -2581,7 +2586,7 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
   molds.forEach(mk => {
     const opt = document.createElement('option');
     const ng = moldNgungSx(mk);
-    opt.value = mk; opt.textContent = mk + (ng ? ' — ⛔ ' + ng : '');
+    opt.value = mk; opt.textContent = mk + (ng ? ' — ⛔ ' + ng : moldMoiChuaSx(mk) ? ' — 🆕 Khuôn mới (đúc mẫu)' : '');
     sel.appendChild(opt);
   });
 
