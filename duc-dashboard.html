@@ -1359,6 +1359,7 @@ function applyMoldList(rawMolds){
       chu_ky_bao_duong_ngay: m.chu_ky_bao_duong_ngay || null,
       ghi_chu: m.ghi_chu || '',
       tinh_trang: m.tinh_trang || 'dang_sx',
+      uu_tien: m.uu_tien || null,
       shots_since_maintenance: tongShot - shotBDGN,
       trang_thai_khuon: computeMoldStatus(tongShot, shotBDGN, nguongBD, nguongLM),
     };
@@ -2537,6 +2538,29 @@ function moldNgungSx(maKhuon){
   const m = state.moldMap[String(maKhuon || '').trim()];
   return m && m.tinh_trang && !['dang_sx', 'moi_chua_sx'].includes(m.tinh_trang) ? (TINH_TRANG_KHUON[m.tinh_trang] || m.tinh_trang) : '';
 }
+// Thứ tự ưu tiên khuôn trong cùng mã SP (T86, đặt ở quan-ly-khuon.html).
+function moldUuTien(maKhuon){
+  const m = state.moldMap[String(maKhuon || '').trim()];
+  return m && m.uu_tien ? Number(m.uu_tien) : null;
+}
+function sortMoldsByUuTien(list){
+  return list.map((mk, i) => [mk, i]).sort((a, b) =>
+    ((moldUuTien(a[0]) || 1e9) - (moldUuTien(b[0]) || 1e9)) || (a[1] - b[1])).map(x => x[0]);
+}
+// Máy khác (không phải maMay) đang chạy khuôn này -> mã máy, không thì ''.
+function moldBusyOn(maKhuon, maMay){
+  const r = getActiveMachineRows(state.rows).find(x => String(x.so_khuon || '').trim() === maKhuon && x.ma_may !== maMay);
+  return r ? r.ma_may : '';
+}
+// Khuôn mặc định = khuôn có ưu tiên cao nhất chưa chạy trên máy khác (và chưa
+// được chọn cho máy khác trong cùng đợt nạp - extraBusy). Không đặt ưu tiên -> ''.
+function pickDefaultMold(molds, maMay, extraBusy){
+  return sortMoldsByUuTien(molds).find(mk => moldUuTien(mk) && !moldBusyOn(mk, maMay) && !(extraBusy && extraBusy.has(mk))) || '';
+}
+function moldsDungDuocCuaSp(maSp){
+  return ((maSp && state.moldsByProduct[maSp]) || []).filter(mk => !moldNgungSx(mk));
+}
+
 function moldMoiChuaSx(maKhuon){
   const m = state.moldMap[String(maKhuon || '').trim()];
   return !!(m && m.tinh_trang === 'moi_chua_sx');
@@ -2555,7 +2579,8 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
   if (currentValue && all.indexOf(currentValue) === -1) all.push(currentValue);
   const keep = isExisting ? currentValue : null;
   const ngung = all.filter(mk => mk !== keep && moldNgungSx(mk));
-  const molds = all.filter(mk => ngung.indexOf(mk) === -1);
+  const molds = sortMoldsByUuTien(all.filter(mk => ngung.indexOf(mk) === -1));
+  const maMay = state.currentTarget ? state.currentTarget.ma_may : null;
   if (currentValue && molds.indexOf(currentValue) === -1) currentValue = '';
   const ngungNote = ngung.length ? 'Ẩn ' + ngung.length + ' khuôn đã ngừng sản xuất: ' +
     ngung.map(mk => mk + ' (' + moldNgungSx(mk) + ')').join(', ') + ' — đổi ở Quản lý khuôn.' : '';
@@ -2586,15 +2611,21 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
   molds.forEach(mk => {
     const opt = document.createElement('option');
     const ng = moldNgungSx(mk);
-    opt.value = mk; opt.textContent = mk + (ng ? ' — ⛔ ' + ng : moldMoiChuaSx(mk) ? ' — 🆕 Khuôn mới (đúc mẫu)' : '');
+    const ut = moldUuTien(mk), busy = moldBusyOn(mk, maMay);
+    opt.value = mk; opt.textContent = mk + (ut ? ' — ưu tiên ' + ut : '') + (busy ? ' — đang chạy ' + busy : '') +
+      (ng ? ' — ⛔ ' + ng : moldMoiChuaSx(mk) ? ' — 🆕 Khuôn mới (đúc mẫu)' : '');
     sel.appendChild(opt);
   });
 
-  const selectVal = currentValue || (molds.length === 1 ? molds[0] : '');
+  const macDinh = !currentValue && molds.length > 1 ? pickDefaultMold(molds, maMay) : '';
+  const selectVal = currentValue || (molds.length === 1 ? molds[0] : macDinh);
   sel.value = selectVal;
   sel.style.display = '';
   inp.value = selectVal;
-  hint.textContent = (molds.length === 1 ? 'Tự động chọn khuôn duy nhất của SP này. ' : '') + ngungNote;
+  const boQua = macDinh ? molds.filter(mk => moldUuTien(mk) && moldUuTien(mk) < moldUuTien(macDinh)) : [];
+  hint.textContent = (molds.length === 1 ? 'Tự động chọn khuôn duy nhất của SP này. ' : '') +
+    (macDinh ? 'Tự chọn theo thứ tự ưu tiên: ' + macDinh + ' (ưu tiên ' + moldUuTien(macDinh) + ')' +
+      (boQua.length ? ' — bỏ qua ' + boQua.map(mk => mk + ' đang chạy ' + moldBusyOn(mk, maMay)).join(', ') : '') + '. ' : '') + ngungNote;
 }
 
 function onSoKhuonSelectChange(prefix){
@@ -2690,6 +2721,7 @@ async function openKhsxBatchModal(){
   } else {
     list.style.display = '';
     empty.style.display = 'none';
+    const daChon = new Set();   // khuôn mặc định đã dành cho máy khác trong đợt nạp này
     candidates.forEach(m => {
       const sug = state.weeklyPlanSuggestions[m];
       const opts = sug.conflict ? sug.options : [sug];
@@ -2700,7 +2732,12 @@ async function openKhsxBatchModal(){
         '<option value="' + i + '">' + escapeHtml(o.ma_sp) + ' (KH ngày ' + fmtNum(o.kh_ngay) + ')</option>'
       ).join('');
 
-      const subText = o => (o.ten_sp || '') + (o.so_khuon ? ' · Khuôn ' + o.so_khuon : '') +
+      // KH tuần không ghi khuôn -> lấy khuôn theo thứ tự ưu tiên (T86).
+      const khuonOf = o => o.so_khuon || pickDefaultMold(moldsDungDuocCuaSp(o.ma_sp), m, daChon);
+      row.dataset.khuon = khuonOf(opts[0]);
+      if (row.dataset.khuon && !opts[0].so_khuon) daChon.add(row.dataset.khuon);
+      const subText = o => (o.ten_sp || '') + (o.so_khuon ? ' · Khuôn ' + o.so_khuon
+          : khuonOf(o) ? ' · Khuôn ' + khuonOf(o) + ' (ưu tiên ' + moldUuTien(khuonOf(o)) + ')' : '') +
         (moldNgungSx(o.so_khuon) ? ' · ⛔ khuôn ' + moldNgungSx(o.so_khuon) + ' — không nạp được, đổi tình trạng ở Quản lý khuôn' : '');
       row.innerHTML =
         '<input type="checkbox" class="kb-check" data-ma-may="' + escapeHtml(m) + '"' + (moldNgungSx(opts[0].so_khuon) ? '' : ' checked') + ' style="width:16px;height:16px;flex:none">'
@@ -2723,6 +2760,7 @@ async function openKhsxBatchModal(){
         const khInput = row.querySelector('.kb-kh-ca');
         selEl.addEventListener('change', () => {
           const o = opts[Number(selEl.value)];
+          row.dataset.khuon = khuonOf(o);
           subInfo.textContent = subText(o);
           subInfo.style.color = moldNgungSx(o.so_khuon) ? 'var(--alarm-fg)' : 'var(--text-muted)';
           khInput.value = buildKhsxSuggestion_(o, o.kh_ngay).kh_ca;
@@ -2752,7 +2790,7 @@ async function submitKhsxBatch(){
     const row = chk.closest('div');
     const chosen = sug.conflict ? sug.options[Number(row.querySelector('.kb-ma-sp-select').value)] : sug;
     const khCaInput = row.querySelector('.kb-kh-ca');
-    return { maMay, sug: chosen, khCa: Number(khCaInput.value) || Math.round((chosen.kh_ngay || 0) / 2) };
+    return { maMay, sug: chosen, soKhuon: chosen.so_khuon || row.dataset.khuon || '', khCa: Number(khCaInput.value) || Math.round((chosen.kh_ngay || 0) / 2) };
   });
 
   const btn = document.getElementById('kb-btn-save');
@@ -2764,10 +2802,10 @@ async function submitKhsxBatch(){
       await rpcWrite('duc_upsert_plan', {
         p_ngay: state.ngay, p_ca: state.ca, p_phuong_an_ca: state.phuongAnCa,
         p_ma_may: it.maMay, p_ma_sp: it.sug.ma_sp, p_ten_sp: it.sug.ten_sp || state.productMap[it.sug.ma_sp] || '',
-        p_so_khuon: it.sug.so_khuon || '', p_kh_ca: it.khCa, p_kh_tuan: Number(it.sug.kh_tuan) || 0,
+        p_so_khuon: it.soKhuon, p_kh_ca: it.khCa, p_kh_tuan: Number(it.sug.kh_tuan) || 0,
         p_nv_ca_ngay: '', p_nv_ca_dem: '', p_user: state.user,
       });
-      addMoldToProductMap(it.sug.ma_sp, it.sug.so_khuon || '');
+      addMoldToProductMap(it.sug.ma_sp, it.soKhuon);
       ok++;
     } catch (e) { fail.push(it.maMay + ': ' + e.message); }
   }
