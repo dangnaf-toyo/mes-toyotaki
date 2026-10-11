@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vấn đề khuôn — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  van-de-khuon.html?khuon=X&tab=chua-dong|lich-su — màn hình Vấn đề khuôn (T91).
+  Mở từ nút "⚠ Vấn đề chưa đóng" trên check sheet bảo dưỡng khuôn và trên
+  quan-ly-khuon.html (thay tab "Vấn đề khuôn" + hộp pop-up lịch sử cũ).
+  - Chưa đóng: duc_van_de_khuon (tự sinh từ IPQC NG/Cảnh báo) dạng bảng + hạng mục
+    NG / ảnh của lần kiểm IPQC tạo ra vấn đề (duc_ipqc_checkpoint.id_van_de_lien_quan);
+    ghi xử lý (duc_resolve_mold_issue_pending) / xác nhận (duc_confirm_mold_issue_outcome).
+  - Lịch sử sự cố + IPQC của 1 khuôn: shared/khuon-van-de.js (RPC duc_khuon_van_de_lich_su).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.header-select{background:#0F172A;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:6px 8px;font-family:inherit;font-size:13px;font-weight:600;min-width:160px}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{border:none;border-radius:5px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
+.btn-outline{background:#fff;border:1.5px solid var(--accent);color:var(--accent)}
+.btn-good{background:var(--run-fg)}
+.btn-danger{background:#FEE2E2;border:1px solid #F87171;color:#B91C1C}
+.btn-sm{padding:4px 9px;font-size:11.5px}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.tabs{display:flex;gap:4px;background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:4px;flex-wrap:wrap}
+.tabs a{padding:8px 16px;border-radius:6px;font-weight:600;font-size:13px;color:var(--text-muted);text-decoration:none}
+.tabs a:hover{background:var(--bg-sunken);color:var(--text)}
+.tabs a.on{background:var(--accent);color:#fff}
+.tabs a.dis{opacity:.45;pointer-events:none}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.toolbar input[type=search]{border:1.5px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:220px}
+.chip{border:1px solid var(--border-strong);background:#fff;border-radius:100px;padding:5px 11px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted)}
+.chip.on{background:var(--text);color:#fff;border-color:var(--text)}
+.hint{font-size:12px;color:var(--text-muted)}
+.empty{padding:18px;text-align:center;color:var(--text-dim)}
+.tw{overflow:auto;max-height:calc(100vh - 220px);border:1px solid var(--border);border-radius:6px}
+table.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.vdc th{position:sticky;top:0;z-index:1;background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.vdc td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.vdc td small{display:block;color:var(--text-muted);font-size:10.5px}
+.vdc td.tg,.vdc td.may,.vdc td.mk{white-space:nowrap}
+.vdc td.may,.vdc td.mk{font-weight:700}
+.vdc td.mk a{color:var(--accent);text-decoration:none}
+.vdc td.loi{min-width:220px}
+.vdc td.xl{min-width:200px}
+.vdc .ng{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.vdc .ng span{font-size:10.5px;background:var(--alarm-bg);color:var(--alarm-fg);border-radius:4px;padding:1px 5px}
+.vdc .tt{font-weight:700;white-space:nowrap}
+.vdc .tt.mo{color:var(--alarm-fg)}.vdc .tt.cho{color:var(--warn-fg)}.vdc .tt.dong{color:var(--run-fg)}
+.vdc .ph{display:flex;gap:4px;flex-wrap:wrap;min-width:100px}
+.vdc .ph img{width:46px;height:46px;object-fit:cover;border-radius:5px;border:1px solid var(--border);display:block}
+.vdc textarea{width:100%;min-width:180px;min-height:46px;border:1.5px solid var(--border-strong);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;margin-bottom:4px}
+.vdc .acts{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:200;max-width:min(560px,92vw);padding:11px 16px;border-radius:8px;font-size:13px;font-weight:600;display:none;box-shadow:var(--shadow-lg)}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+@media (max-width:640px){.toolbar input[type=search]{flex:1;min-width:0}.tw{max-height:none}}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">⚠ Vấn đề khuôn</div>
+    </div>
+    <div class="header-divider"></div>
+    <a class="btn btn-ghost" href="quan-ly-khuon.html">← Quản lý khuôn</a>
+    <select class="header-select" id="selKhuon" title="Chọn khuôn"></select>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <a href="?tab=chua-dong" data-tab="chua-dong">⚠ Vấn đề chưa đóng <span id="nOpen"></span></a>
+    <a href="?tab=lich-su" data-tab="lich-su" id="tabLichSu" title="Chọn 1 khuôn để xem lịch sử">🔎 Lịch sử sự cố + IPQC</a>
+  </nav>
+
+  <section class="card" id="sec-chua-dong" hidden>
+    <div class="toolbar">
+      <button type="button" class="chip on" data-if="open">Chưa đóng</button>
+      <button type="button" class="chip" data-if="all">Tất cả (kể cả đã đóng)</button>
+      <input type="search" id="q" placeholder="Lọc theo khuôn / máy / mô tả...">
+      <span class="hint" id="cnt"></span>
+    </div>
+    <div class="tw"><table class="vdc"><thead id="thead"></thead><tbody id="tbody"><tr><td class="empty">Đang tải...</td></tr></tbody></table></div>
+  </section>
+
+  <section class="card" id="sec-lich-su" hidden>
+    <div id="lsBody"></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="shared/khuon-van-de.js"></script>
+<script>
+const TABS = ['chua-dong', 'lich-su'];
+const qs = new URLSearchParams(location.search);
+let khuon = qs.get('khuon') || '';
+let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'chua-dong';
+let iFilter = qs.get('all') ? 'all' : 'open';
+let molds = [], issues = [], cpByVd = {}, userName = '';
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(s){ if (!s) return '—'; const [y, m, d] = String(s).slice(0, 10).split('-'); return d + '/' + m + '/' + y; }
+function naturalCompare(a, b){ return String(a).localeCompare(String(b), 'vi', { numeric: true, sensitivity: 'base' }); }
+let msgTimer = null;
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { el.className = ''; }, ms || 3500);
+}
+async function rpcWrite(fn, params){
+  const { data, error } = await sb.rpc(fn, params);
+  if (error) throw new Error(error.message || String(error));
+  if (data && typeof data === 'object' && data.ok === false) throw new Error(data.error || 'Lỗi không xác định');
+  return data;
+}
+async function ensureAuth(){
+  const session = await MesAuth.getSession();
+  if (!session) {
+    showMsg('Cần đăng nhập để thao tác — đang chuyển sang trang đăng nhập…', 'err');
+    setTimeout(() => { location.href = 'shared/login.html?returnTo=' + encodeURIComponent(location.href); }, 1200);
+    return false;
+  }
+  userName = (await MesAuth.getCurrentUserIdentity()) || '';
+  return true;
+}
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+function setUrl(){
+  const p = new URLSearchParams();
+  if (khuon) p.set('khuon', khuon);
+  p.set('tab', tab);
+  if (iFilter === 'all') p.set('all', '1');
+  history.replaceState(null, '', '?' + p.toString());
+}
+
+// ── Tải dữ liệu ───────────────────────────────────────────────────────────────
+async function loadIssues(){
+  let q = sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }).limit(1000);
+  if (khuon) q = q.eq('ma_khuon', khuon);
+  if (iFilter === 'open') q = q.neq('trang_thai', 'Đã đóng');
+  const { data, error } = await q;
+  if (error) return showMsg('Lỗi tải vấn đề khuôn: ' + error.message, 'err', 6000);
+  const prio = { 'Chờ xác nhận': 0, 'Mở': 1, 'Đã đóng': 2 };
+  issues = (data || []).sort((a, b) => ((prio[a.trang_thai] ?? 9) - (prio[b.trang_thai] ?? 9)) ||
+    String(b.ngay_phat_hien || '').localeCompare(String(a.ngay_phat_hien || '')));
+  // Hạng mục NG + ảnh của lần kiểm IPQC tạo ra vấn đề.
+  cpByVd = {};
+  const ids = issues.map(x => x.id_van_de).filter(Boolean);
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data: cp } = await sb.from('duc_ipqc_checkpoint').select('id_van_de_lien_quan,checklist_json,anh_bang_chung_url')
+      .in('id_van_de_lien_quan', ids.slice(i, i + 150));
+    (cp || []).forEach(p => { cpByVd[p.id_van_de_lien_quan] = p; });
+  }
+  if (iFilter === 'open') document.getElementById('nOpen').textContent = '(' + issues.length + ')';
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function setTab(t){
+  if (t === 'lich-su' && !khuon) t = 'chua-dong';
+  tab = t; setUrl();
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
+  document.getElementById('tabLichSu').classList.toggle('dis', !khuon);
+  TABS.forEach(x => { document.getElementById('sec-' + x).hidden = x !== tab; });
+  if (tab === 'chua-dong') renderIssues();
+  else {
+    const m = molds.find(x => x.ma_khuon === khuon);
+    KhuonVanDe.mount(document.getElementById('lsBody'), {
+      maKhuon: khuon, lanBd: m && m.lan_bao_duong_gan_nhat ? String(m.lan_bao_duong_gan_nhat).slice(0, 10) : null,
+    });
+  }
+}
+
+// ── Bảng vấn đề ───────────────────────────────────────────────────────────────
+function renderIssues(){
+  document.querySelectorAll('[data-if]').forEach(b => b.classList.toggle('on', b.dataset.if === iFilter));
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const list = issues.filter(x => !q || [x.ma_khuon, x.ma_may, x.ma_sp, x.mo_ta, x.nguoi_phat_hien].some(v => String(v || '').toLowerCase().includes(q)));
+  const coKhuon = !khuon;
+  document.getElementById('cnt').textContent = list.length + ' vấn đề' + (iFilter === 'open' ? ' chưa đóng' : '') + (khuon ? ' — khuôn ' + khuon : ' — tất cả khuôn');
+  document.getElementById('thead').innerHTML = '<tr>' + (coKhuon ? '<th>Khuôn</th>' : '') +
+    '<th>Ngày phát hiện</th><th>Máy</th><th>Lỗi phát hiện</th><th>Người phát hiện</th><th>Trạng thái</th><th>Nội dung xử lý</th><th>Hình ảnh</th><th>Thao tác</th></tr>';
+  const tb = document.getElementById('tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="9" class="empty">' + (iFilter === 'open' ? 'Không có vấn đề nào chưa đóng 👍' : 'Không có vấn đề nào') + '</td></tr>'; return; }
+  tb.innerHTML = list.map(a => {
+    const p = cpByVd[a.id_van_de] || {};
+    const ng = (Array.isArray(p.checklist_json) ? p.checklist_json : []).filter(x => x && x.dat === false).map(x => x.muc);
+    const anh = Array.isArray(p.anh_bang_chung_url) ? p.anh_bang_chung_url : [];
+    // Mô tả tự sinh từ IPQC đã liệt kê hạng mục -> bỏ phần đó khi đã hiện nhãn đỏ.
+    const moTa = ng.length ? String(a.mo_ta || '').replace(/\s*—\s*Hạng mục không đạt:[\s\S]*$/, '') : String(a.mo_ta || '');
+    const id = escapeHtml(a.id_van_de);
+    const cls = a.trang_thai === 'Chờ xác nhận' ? 'cho' : a.trang_thai === 'Đã đóng' ? 'dong' : 'mo';
+    let act;
+    if (a.trang_thai === 'Mở') {
+      act = '<textarea data-xuly="' + id + '" placeholder="Đã xử lý gì (xuống khuôn, sửa gì)..."></textarea>' +
+        '<button type="button" class="btn btn-sm" data-resolve="' + id + '">Đã xử lý — chờ xác nhận</button>';
+    } else if (a.trang_thai === 'Chờ xác nhận') {
+      act = '<div class="acts"><button type="button" class="btn btn-good btn-sm" data-confirm="' + id + '" data-kq="OK">✓ OK — đóng</button>' +
+        '<button type="button" class="btn btn-danger btn-sm" data-confirm="' + id + '" data-kq="Tai_phat">✗ Tái phát</button></div>';
+    } else {
+      act = '<small>Đóng bởi ' + escapeHtml(a.nguoi_xac_nhan || '—') + (a.ngay_xac_nhan ? ' · ' + fmtDate(a.ngay_xac_nhan) : '') + '</small>';
+    }
+    return '<tr>' + (coKhuon ? '<td class="mk"><a href="?khuon=' + encodeURIComponent(a.ma_khuon) + '" data-mk="' + escapeHtml(a.ma_khuon) + '">' + escapeHtml(a.ma_khuon) + '</a></td>' : '') +
+      '<td class="tg">' + fmtDate(a.ngay_phat_hien) + '<small>' + escapeHtml(a.ca_phat_hien || '') + '</small></td>' +
+      '<td class="may">' + escapeHtml(a.ma_may || '—') + '<small>' + escapeHtml(a.ma_sp || '') + '</small></td>' +
+      '<td class="loi">' + escapeHtml(moTa || '(không mô tả)') + (ng.length ? '<div class="ng">' + ng.map(m => '<span>' + escapeHtml(m) + '</span>').join('') + '</div>' : '') + '</td>' +
+      '<td>' + escapeHtml(a.nguoi_phat_hien || '—') + '</td>' +
+      '<td><span class="tt ' + cls + '">' + escapeHtml(a.trang_thai || '') + '</span>' +
+        (Number(a.lan_tai_phat) > 0 ? '<small style="color:var(--alarm-fg)">Tái phát ' + a.lan_tai_phat + ' lần</small>' : '') + '</td>' +
+      '<td class="xl">' + (a.noi_dung_xu_ly ? escapeHtml(a.noi_dung_xu_ly) + '<small>' + escapeHtml(a.nguoi_xu_ly || '') + (a.ngay_xu_ly ? ' · ' + fmtDate(a.ngay_xu_ly) : '') + '</small>' : '<span style="color:var(--text-dim)">Chưa xử lý</span>') + '</td>' +
+      '<td>' + (anh.length ? '<div class="ph">' + anh.map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>' : '<span style="color:var(--text-dim)">—</span>') + '</td>' +
+      '<td>' + act + '</td></tr>';
+  }).join('');
+}
+async function resolveIssue(id){
+  const el = [...document.querySelectorAll('textarea[data-xuly]')].find(t => t.dataset.xuly === id);
+  const noiDung = el ? el.value.trim() : '';
+  if (!noiDung) return showMsg('Chưa nhập nội dung đã xử lý', 'err');
+  if (!(await ensureAuth())) return;
+  try {
+    await rpcWrite('duc_resolve_mold_issue_pending', { p_id_van_de: id, p_noi_dung_xu_ly: noiDung, p_user: userName });
+    showMsg('✓ Đã lưu — chờ xác nhận lần sản xuất kế tiếp', 'okmsg');
+    await loadIssues(); renderIssues();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+async function confirmIssue(id, kq){
+  if (!(await ensureAuth())) return;
+  try {
+    await rpcWrite('duc_confirm_mold_issue_outcome', { p_id_van_de: id, p_ket_qua: kq, p_ghi_chu: '', p_user: userName });
+    showMsg(kq === 'OK' ? '✓ Đã đóng vấn đề khuôn' : '⚠ Đã ghi nhận tái phát — mở lại vấn đề', 'okmsg');
+    await loadIssues(); renderIssues();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+
+async function doiKhuon(mk){
+  khuon = mk;
+  await loadIssues();
+  setTab(tab);
+}
+
+async function init(){
+  startHeaderClock();
+  const { data } = await sb.from('duc_shot_khuon').select('ma_khuon,lan_bao_duong_gan_nhat');
+  molds = (data || []).filter(m => m.ma_khuon).sort((a, b) => naturalCompare(a.ma_khuon, b.ma_khuon));
+  const sel = document.getElementById('selKhuon');
+  const ds = molds.map(m => m.ma_khuon);
+  if (khuon && !ds.includes(khuon)) ds.unshift(khuon);
+  sel.innerHTML = '<option value="">Tất cả khuôn</option>' + ds.map(k => '<option' + (k === khuon ? ' selected' : '') + '>' + escapeHtml(k) + '</option>').join('');
+  sel.onchange = () => doiKhuon(sel.value);
+  document.getElementById('tabs').addEventListener('click', e => {
+    const a = e.target.closest('a[data-tab]');
+    if (!a) return;
+    e.preventDefault();
+    setTab(a.dataset.tab);
+  });
+  document.getElementById('q').addEventListener('input', renderIssues);
+  document.getElementById('sec-chua-dong').addEventListener('click', async e => {
+    const f = e.target.closest('[data-if]');
+    if (f) { iFilter = f.dataset.if; setUrl(); await loadIssues(); return renderIssues(); }
+    const mk = e.target.closest('a[data-mk]');
+    if (mk) { e.preventDefault(); sel.value = mk.dataset.mk; return doiKhuon(mk.dataset.mk); }
+    const r = e.target.closest('[data-resolve]');
+    if (r) return resolveIssue(r.dataset.resolve);
+    const c = e.target.closest('[data-confirm]');
+    if (c) return confirmIssue(c.dataset.confirm, c.dataset.kq);
+  });
+  await loadIssues();
+  setTab(tab);
+}
+init();
+</script>
+</body>
+</html>
