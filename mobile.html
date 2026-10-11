@@ -262,6 +262,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
       <input type="text" id="in-dam-nhiem" placeholder="Chạm để chọn hoặc gõ tìm" autocomplete="off">
       <div class="ac-dropdown hidden" id="in-dam-nhiem-dropdown"></div>
     </div>
+    <div class="field" id="in-anh"></div>
     <button class="btn-submit danger" onclick="submitIncidentMobile()">⚠ Ghi nhận sự cố</button>
   </div>
 </div>
@@ -273,6 +274,8 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
     <div class="field"><label>Giờ sản xuất trở lại <span class="req">*</span></label><input type="datetime-local" id="rs-gio"></div>
     <div class="field" id="rs-phut-wrap"><label>Thời gian dừng</label><input type="text" autocomplete="off" id="rs-phut" disabled></div>
     <div class="field"><label>Bổ sung nội dung xử lý</label><textarea id="rs-bonus"></textarea></div>
+    <div class="field" id="rs-anh-truoc"></div>
+    <div class="field" id="rs-anh-sau"></div>
     <button class="btn-submit" onclick="submitResolveMobile()">✓ Xác nhận xong</button>
   </div>
 </div>
@@ -339,6 +342,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/su-co-anh.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
 const TEM_PRINT_URL = 'intem.html';
@@ -992,6 +996,20 @@ async function submitPlanMobile(){
 }
 
 // =============================================================================
+// ẢNH SỰ CỐ (T87, shared/su-co-anh.js) — hiện trạng / sau xử lý
+// =============================================================================
+const anhSuCoM = { add: null, sau: null };
+function anhErrM(msg){ showToast(msg, true); }
+async function mountAnhSuCoM(elId, kind, idSuCo, immediate){
+  const el = document.getElementById(elId);
+  if (immediate && !idSuCo) { el.innerHTML = ''; return null; }
+  el.innerHTML = '<div class="form-hint">Đang tải ảnh...</div>';
+  let ex = { truoc: [], sau: [] };
+  try { if (idSuCo) ex = await SuCoAnh.load(idSuCo); } catch (e) { anhErrM('Lỗi tải ảnh sự cố: ' + e.message); }
+  return SuCoAnh.picker(el, { kind, idSuCo, existing: ex[kind], immediate, canRemoveExisting: !!immediate, onError: anhErrM });
+}
+
+// =============================================================================
 // BÁO SỰ CỐ
 // =============================================================================
 async function openIncidentScreen(){
@@ -1011,6 +1029,7 @@ async function openIncidentScreen(){
   document.getElementById('in-xu-ly').value = '';
   document.getElementById('in-dam-nhiem').value = '';
   showScreen('scr-incident');
+  anhSuCoM.add = await mountAnhSuCoM('in-anh', 'truoc', null, false);
 }
 async function submitIncidentMobile(){
   const loai = document.getElementById('in-loai').value;
@@ -1027,6 +1046,20 @@ async function submitIncidentMobile(){
       p_van_de: document.getElementById('in-van-de').value, p_noi_dung_xu_ly: document.getElementById('in-xu-ly').value,
       p_dam_nhiem: damNhiem, p_user: state.user,
     });
+    if (anhSuCoM.add && anhSuCoM.add.hasPending()) {
+      // Mã sự cố do duc_open_incident sinh -> đọc lại open_id_su_co rồi gắn ảnh.
+      showOverlay('Đang tải ảnh hiện trạng...');
+      try {
+        const { data: r } = await sb.from('duc_ca_hien_tai').select('open_id_su_co').eq('id_dong', state.currentIdDong).maybeSingle();
+        await SuCoAnh.uploadPending(anhSuCoM.add, r && r.open_id_su_co);
+      } catch (e) {
+        hideOverlay();
+        showToast('Sự cố đã ghi nhận nhưng chưa lưu được ảnh: ' + e.message + ' — thêm ảnh ở màn Xử lý xong', true);
+        showScreen('scr-list');
+        loadShiftState();
+        return;
+      }
+    }
     hideOverlay();
     showToast('✓ Đã ghi nhận sự cố');
     addPersonnelToListMobile(damNhiem);
@@ -1047,6 +1080,11 @@ async function openResolveScreen(){
   updateResolveMinutesMobile();
   document.getElementById('rs-gio').oninput = updateResolveMinutesMobile;
   showScreen('scr-resolve');
+  const rowAnh = state.rows.find(r => r.id_dong === state.currentIdDong);
+  const idSuCo = rowAnh && rowAnh.open_id_su_co;
+  await mountAnhSuCoM('rs-anh-truoc', 'truoc', idSuCo, true);
+  anhSuCoM.sau = idSuCo ? await mountAnhSuCoM('rs-anh-sau', 'sau', idSuCo, false) : null;
+  if (!idSuCo) document.getElementById('rs-anh-sau').innerHTML = '';
 }
 function updateResolveMinutesMobile(){
   const row = state.rows.find(r => r.id_dong === state.currentIdDong);
@@ -1061,6 +1099,13 @@ async function submitResolveMobile(){
   if (!gio) return showToast('Nhập giờ trở lại', true);
   if (!(await ensureAuth())) return;
 
+  // Ảnh sau xử lý: lưu TRƯỚC khi đóng sự cố (lỗi ảnh thì dừng để thử lại).
+  if (anhSuCoM.sau && anhSuCoM.sau.hasPending()) {
+    const rowAnh = state.rows.find(r => r.id_dong === state.currentIdDong);
+    showOverlay('Đang tải ảnh sau xử lý...');
+    try { await SuCoAnh.uploadPending(anhSuCoM.sau, rowAnh && rowAnh.open_id_su_co); }
+    catch (e) { hideOverlay(); return showToast('Lỗi tải ảnh sau xử lý: ' + e.message + ' — thử lại hoặc bỏ ảnh', true); }
+  }
   showOverlay('Đang lưu...');
   try {
     const d = await rpcWrite('duc_resolve_incident', {
