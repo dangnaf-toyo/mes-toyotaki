@@ -16,6 +16,8 @@
     (T79: tinh_trang qua duc_khuon_doi_tinh_trang, lịch sử
     duc_khuon_tinh_trang_log), thứ tự ưu tiên khuôn cùng mã SP (T86: uu_tien qua
     duc_khuon_dat_uu_tien — dashboard Đúc chọn khuôn mặc định theo thứ tự này).
+    Nút 🔎 Vấn đề (T90, ?vande=X mở thẳng): lịch sử sự cố + IPQC NG/Cảnh báo kèm
+    ảnh của khuôn (shared/khuon-van-de.js).
     Ghi bảo dưỡng chỉ qua KH bảo dưỡng tuần + check
     sheet (T81 bỏ "Ghi BD" tay / duc_ghi_lich_su_bao_duong).
   - ?tab=van-de: vấn đề khuôn (duc_van_de_khuon) — xử lý / xác nhận.
@@ -227,6 +229,14 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
   </div>
 </div>
 
+<!-- Hộp thoại: lịch sử vấn đề của khuôn (sự cố + IPQC) -->
+<div class="dlg-mask" id="dlg-vd">
+  <div class="dlg" style="width:min(1300px,100%)">
+    <div class="dlg-head"><span>🔎 Vấn đề của khuôn <span id="vd-mk"></span> — sự cố + IPQC NG / Cảnh báo</span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body"><div id="vd-body"></div></div>
+  </div>
+</div>
+
 <!-- Hộp thoại: thứ tự ưu tiên khuôn của 1 mã SP -->
 <div class="dlg-mask" id="dlg-ut">
   <div class="dlg">
@@ -262,6 +272,7 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/khuon-van-de.js"></script>
 <script>
 const MOLD = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000, WARN_RATIO: 0.8 };   // = CONFIG.MOLD ở duc-dashboard.html
 const ST_CLS = { 'OK': 'ok', 'Sắp bảo dưỡng': 'soon', 'Cần bảo dưỡng': 'due', 'Cần làm mới': 'renew' };
@@ -452,6 +463,7 @@ function renderMolds(){
       '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
       '<td class="act">' + (canTT && nhieuKhuon ? '<button type="button" class="btn btn-outline btn-sm" data-ut="' + escapeHtml(m.ma_khuon) + '" title="Thứ tự ưu tiên các khuôn của mã ' + escapeHtml(m.ma_sp) + '">⇅ Ưu tiên</button> ' : '') +
         (canTT ? '<button type="button" class="btn btn-outline btn-sm" data-tt="' + escapeHtml(m.ma_khuon) + '">🏷 Tình trạng</button> ' : '') +
+        '<button type="button" class="btn btn-outline btn-sm" data-vd="' + escapeHtml(m.ma_khuon) + '" title="Lịch sử sự cố + IPQC NG của khuôn">🔎 Vấn đề</button> ' +
         '<button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
         '<a class="btn btn-outline btn-sm" href="?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + escapeHtml(m.ma_khuon) + '">📋 Hạng mục</a></td></tr>';
   }).join('');
@@ -565,6 +577,16 @@ async function saveUt(){
     await loadMolds(); renderMolds();
   } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
   finally { btn.disabled = false; }
+}
+
+// ── Lịch sử vấn đề của khuôn (T90, shared/khuon-van-de.js) ────────────────────
+function openVanDe(maKhuon){
+  const m = molds.find(x => x.ma_khuon === maKhuon);
+  document.getElementById('vd-mk').textContent = maKhuon;
+  openDlg('dlg-vd');
+  KhuonVanDe.mount(document.getElementById('vd-body'), {
+    maKhuon, lanBd: m && m.lan_bao_duong_gan_nhat ? String(m.lan_bao_duong_gan_nhat).slice(0, 10) : null,
+  });
 }
 
 // ── Hộp thoại tình trạng khuôn (T79) ──────────────────────────────────────────
@@ -762,12 +784,13 @@ function bindAll(){
   document.getElementById('iSearch').addEventListener('input', renderIssues);
   document.getElementById('btnNewMold').onclick = () => openCfg(null);
   document.getElementById('sec-khuon').addEventListener('click', e => {
-    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-ut],[data-cfg],[data-gomau],[data-goissue]');
+    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-ut],[data-vd],[data-cfg],[data-gomau],[data-goissue]');
     if (!t) return;
     if (t.dataset.kf) { kFilter = t.dataset.kf; return renderMolds(); }
     if (t.dataset.ttf) { ttFilter = t.dataset.ttf; return renderMolds(); }
     if (t.dataset.tt) return openTt(t.dataset.tt);
     if (t.dataset.ut) return openUt(t.dataset.ut);
+    if (t.dataset.vd) return openVanDe(t.dataset.vd);
     if (t.dataset.cfg) return openCfg(t.dataset.cfg);
     e.preventDefault();
     if (t.dataset.gomau) { mauKhuon = t.dataset.gomau; return setTab('mau', true); }
@@ -807,6 +830,7 @@ async function init(){
     sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp')]);
   products = (p.data || []).filter(x => x.ma_sp);
   setTab(tab, false);
+  if (qs.get('vande')) openVanDe(qs.get('vande'));   // mở thẳng từ check sheet
 }
 init();
 </script>
