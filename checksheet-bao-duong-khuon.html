@@ -17,6 +17,8 @@
   - Lưu nháp / Hoàn thành qua RPC duc_khuon_cs_luu. Hoàn thành -> ghi sổ đời
     khuôn (duc_khuon_bao_duong_log), Đạt + BD định kỳ/Thay mới -> reset đồng
     hồ shot; sau đó khoá.
+  - Khung "🔎 Vấn đề của khuôn" (T88): sự cố (kèm ảnh, T87) + IPQC NG/Cảnh báo
+    (kèm ảnh bằng chứng) của khuôn từ lần bảo dưỡng trước — RPC duc_khuon_van_de_lich_su.
   - Mẫu hạng mục (chung + riêng từng khuôn, T78) sửa ở quan-ly-khuon.html?tab=mau
     (Quản lý bộ phận Đúc / admin).
   - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
@@ -105,6 +107,25 @@ tr.row-ng td{background:#FFF5F5}
 .done-banner.dat{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
 .done-banner.khong_dat{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5}
 .tag-rieng{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#E0F2FE;color:#075985;vertical-align:middle}
+.vd-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.vd-bar select{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:12.5px}
+.vd-tabs{display:flex;gap:4px}
+.vd-tabs button{border:1px solid var(--border-strong);background:#fff;border-radius:100px;padding:5px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--text-muted)}
+.vd-tabs button.on{background:var(--text);color:#fff;border-color:var(--text)}
+.vd-top{font-size:12px;background:var(--bg-sunken);border-radius:6px;padding:7px 10px;margin-bottom:8px;line-height:1.6}
+.vd-top b{color:var(--alarm-fg)}
+.vd-list{display:flex;flex-direction:column;gap:8px;max-height:560px;overflow-y:auto}
+.vd-item{border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.vd-item .m{display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--text-muted);align-items:center}
+.vd-item .code{font-weight:700;color:var(--text);font-size:12px}
+.vd-item .t{font-size:13px;margin-top:4px}
+.vd-item .x{font-size:12px;color:var(--text-muted);margin-top:2px;white-space:pre-line}
+.vd-item .ng{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.vd-item .ng span{font-size:11px;background:var(--alarm-bg);color:var(--alarm-fg);border-radius:4px;padding:1px 6px}
+.vd-ph{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.vd-ph img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block}
+.vd-ph .lb{font-size:10.5px;font-weight:700;color:var(--text-muted)}
+.kq-ng{color:var(--alarm-fg);font-weight:700}.kq-cb{color:var(--warn-fg);font-weight:700}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
 .okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
@@ -183,6 +204,7 @@ const MAX_PHOTOS = 10;
 const PHOTO_KIND = { truoc: 'Ảnh TRƯỚC bảo dưỡng', sau: 'Ảnh SAU bảo dưỡng' };
 let photos = { truoc: [], sau: [] };   // URL public bucket khuon-bao-duong
 let photoBusy = { truoc: false, sau: false };
+let vdData = null, vdTu = null, vdTab = 'su_co', vdChiAnh = false;   // khung Vấn đề của khuôn (T88)
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
@@ -292,6 +314,8 @@ function render(){
       '<div>• ' + (a.ngay_phat_hien ? fmtDateVN(String(a.ngay_phat_hien)) + ' — ' : '') + escapeHtml(a.mo_ta || '(không mô tả)') + '</div>').join('') + '</div>' : '') +
     '</div>';
 
+  html += '<div class="card no-print" id="vdCard"><div class="card-title">🔎 Vấn đề của khuôn — xem lại để đối sách khi bảo dưỡng</div><div id="vdBody"><div style="color:var(--text-dim)">Đang tải...</div></div></div>';
+
   html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
     '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
     '<div class="fg"><label>Người thực hiện</label><select id="f-nguoi"' + dis + '>' + nguoiOpts + '</select></div>' +
@@ -338,6 +362,7 @@ function render(){
   renderItems();
   renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
+  if (vdData) renderVanDe(); else loadVanDe();
   bindEvents();
 }
 
@@ -468,6 +493,90 @@ function collect(){
     anh_truoc: photos.truoc,
     anh_sau: photos.sau,
   };
+}
+
+// ── Vấn đề của khuôn (T88): sự cố + IPQC NG/Cảnh báo kèm ảnh ───────────────────
+function isoDate(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function vdMacDinh(){
+  // Chưa hoàn thành: từ lần bảo dưỡng trước (mặc định). Đã hoàn thành (đồng hồ đã reset) / chưa từng BD: 90 ngày.
+  const lan = mold && mold.lan_bao_duong_gan_nhat ? String(mold.lan_bao_duong_gan_nhat).slice(0, 10) : null;
+  if (lan && !(cs && cs.trang_thai === 'hoan_thanh')) return 'bd';
+  return '90';
+}
+function vdTuNgay(v){
+  if (v === 'bd') return String(mold.lan_bao_duong_gan_nhat).slice(0, 10);
+  const d = parseDate(cs && cs.trang_thai === 'hoan_thanh' ? cs.ngay_thuc_hien : kh.ngay);
+  d.setDate(d.getDate() - Number(v));
+  return isoDate(d);
+}
+async function loadVanDe(){
+  if (!vdTu) vdTu = vdMacDinh();
+  const body = document.getElementById('vdBody');
+  if (body) body.innerHTML = '<div style="color:var(--text-dim)">Đang tải...</div>';
+  const { data, error } = await sb.rpc('duc_khuon_van_de_lich_su', { p_ma_khuon: kh.ma_khuon, p_tu_ngay: vdTuNgay(vdTu) });
+  if (error) { if (body) body.innerHTML = '<div class="err" style="display:block;padding:8px">Lỗi tải: ' + escapeHtml(error.message) + '</div>'; return; }
+  vdData = data || { su_co: [], ipqc: [] };
+  renderVanDe();
+}
+function vdAnh(urls, label){
+  if (!urls || !urls.length) return '';
+  return '<div class="vd-ph"><span class="lb">' + label + '</span>' + urls.map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>';
+}
+function vdDem(arr, keyFn){
+  const m = {};
+  arr.forEach(x => [].concat(keyFn(x)).forEach(k => { if (k) m[k] = (m[k] || 0) + 1; }));
+  return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 6);
+}
+function renderVanDe(){
+  const body = document.getElementById('vdBody');
+  if (!body || !vdData) return;
+  const sc = vdData.su_co || [], iq = vdData.ipqc || [];
+  const lan = mold && mold.lan_bao_duong_gan_nhat ? String(mold.lan_bao_duong_gan_nhat).slice(0, 10) : null;
+  const opts = (lan ? [['bd', 'Từ lần BD gần nhất (' + fmtDateVN(lan) + ')']] : []).concat([['30', '30 ngày'], ['90', '90 ngày'], ['180', '180 ngày'], ['365', '1 năm']]);
+  const scAnh = sc.filter(x => (x.anh_truoc || []).length + (x.anh_sau || []).length > 0);
+  const scList = vdChiAnh ? scAnh : sc;
+  let h = '<div class="vd-bar"><select id="vdTu">' + opts.map(([v, l]) => '<option value="' + v + '"' + (v === vdTu ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
+    '<div class="vd-tabs"><button type="button" data-vdtab="su_co" class="' + (vdTab === 'su_co' ? 'on' : '') + '">⚠ Sự cố (' + sc.length + ')</button>' +
+    '<button type="button" data-vdtab="ipqc" class="' + (vdTab === 'ipqc' ? 'on' : '') + '">🔍 IPQC NG / Cảnh báo (' + iq.length + ')</button></div>' +
+    (vdTab === 'su_co' ? '<label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="vdChiAnh"' + (vdChiAnh ? ' checked' : '') + '> Chỉ sự cố có ảnh (' + scAnh.length + ')</label>' : '') + '</div>';
+  // Tóm tắt hay gặp — gợi ý đối sách
+  const topSc = vdDem(sc, x => x.loai), topNg = vdDem(iq, x => x.hang_muc_ng || []);
+  if (topSc.length || topNg.length) h += '<div class="vd-top">' +
+    (topSc.length ? '<div>Sự cố hay gặp: ' + topSc.map(([k, n]) => escapeHtml(k) + ' <b>×' + n + '</b>').join(' · ') + '</div>' : '') +
+    (topNg.length ? '<div>Lỗi IPQC hay gặp: ' + topNg.map(([k, n]) => escapeHtml(k) + ' <b>×' + n + '</b>').join(' · ') + '</div>' : '') + '</div>';
+  h += '<div class="vd-list">';
+  if (vdTab === 'su_co') {
+    if (!scList.length) h += '<div style="color:var(--text-dim);padding:8px">Không có sự cố nào trong khoảng thời gian này.</div>';
+    scList.forEach(x => {
+      const t = x.gio_phat_sinh ? new Date(x.gio_phat_sinh) : null;
+      h += '<div class="vd-item"><div class="m"><span class="code">' + escapeHtml(x.loai || '—') + '</span>' +
+        (x.dang_mo ? '<span class="kq-ng">đang mở</span>' : '') +
+        '<span>' + (t ? t.toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : fmtDateVN(x.ngay)) + ' · ' + escapeHtml(x.ca || '') + ' · ' + escapeHtml(x.ma_may || '') + '</span>' +
+        (x.phut != null ? '<span>dừng ' + x.phut + "'</span>" : '') + (x.id_su_co ? '<span>' + escapeHtml(x.id_su_co) + '</span>' : '') + '</div>' +
+        '<div class="t">' + escapeHtml(x.van_de || '(không mô tả)') + '</div>' +
+        (x.xu_ly ? '<div class="x">Xử lý: ' + escapeHtml(String(x.xu_ly).trim()) + '</div>' : '') +
+        vdAnh(x.anh_truoc, 'Hiện trạng') + vdAnh(x.anh_sau, 'Sau xử lý') + '</div>';
+    });
+  } else {
+    if (!iq.length) h += '<div style="color:var(--text-dim);padding:8px">Không có lần IPQC NG / Cảnh báo nào trong khoảng thời gian này.</div>';
+    iq.forEach(x => {
+      const t = x.thoi_diem ? new Date(x.thoi_diem) : null;
+      const kk = x.khuon_khac || [];
+      h += '<div class="vd-item"><div class="m"><span class="' + (x.ket_qua === 'NG' ? 'kq-ng' : 'kq-cb') + '">' + (x.ket_qua === 'NG' ? 'NG' : 'Cảnh báo') + '</span>' +
+        '<span>' + (t ? t.toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : fmtDateVN(x.ngay)) + ' · ' + escapeHtml(x.ca || '') + ' · ' + escapeHtml(x.ma_may || '') + '</span>' +
+        '<span>' + escapeHtml(String(x.loai_kiem || '').replace(/_/g, ' ')) + '</span>' + (x.nguoi_kiem ? '<span>' + escapeHtml(x.nguoi_kiem) + '</span>' : '') +
+        (kk.length ? '<span class="kq-cb" title="Cùng ngày/ca máy này còn chạy khuôn khác">⚠ có thể là khuôn ' + escapeHtml(kk.join(', ')) + '</span>' : '') + '</div>' +
+        ((x.hang_muc_ng || []).length ? '<div class="ng">' + x.hang_muc_ng.map(m => '<span>' + escapeHtml(m) + '</span>').join('') + '</div>' : '') +
+        (String(x.ghi_chu || '').trim() ? '<div class="t">' + escapeHtml(String(x.ghi_chu).trim()) + '</div>' : '') +
+        vdAnh(x.anh, 'Ảnh IPQC') + '</div>';
+    });
+  }
+  h += '</div>';
+  body.innerHTML = h;
+  document.getElementById('vdTu').onchange = e => { vdTu = e.target.value; loadVanDe(); };
+  body.querySelectorAll('[data-vdtab]').forEach(b => { b.onclick = () => { vdTab = b.dataset.vdtab; renderVanDe(); }; });
+  const ca = document.getElementById('vdChiAnh');
+  if (ca) ca.onchange = e => { vdChiAnh = e.target.checked; renderVanDe(); };
 }
 
 // ── Ảnh trước / sau ─────────────────────────────────────────────────────────────
