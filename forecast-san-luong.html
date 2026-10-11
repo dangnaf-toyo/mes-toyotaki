@@ -9,7 +9,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
-  forecast-san-luong.html?nam=YYYY&tab=fc|may|khuon — Forecast sản lượng năm (T83).
+  forecast-san-luong.html?nam=YYYY&tab=fc|tt|may|khuon — Forecast sản lượng năm (T83).
+  - "Thực tế vs Forecast" (T85): thực tế = sản lượng Đúc OK đã kết ca theo mã × tháng
+    (RPC forecast_thuc_te_duc ← duc_lich_su_san_xuat.tt_ca).
   - Bảng mã SP × 12 tháng (forecast_san_luong), sửa trực tiếp / dán từ Excel,
     lưu hàng loạt qua RPC forecast_luu (log forecast_san_luong_log).
     Quyền sửa: admin, ke_hoach, qlsx_truong_phong, giam_doc_sx. Phải đăng nhập mới xem.
@@ -103,6 +105,14 @@ td.heat{padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
 .dlg-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
 .dlg-foot .hint{margin-right:auto}
 .log-list div{padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+.cmp{padding:4px 8px;line-height:1.25;min-width:84px}
+.cmp b{display:block;font-family:'JetBrains Mono',monospace;font-size:12px}
+.cmp small{display:block;font-size:10.5px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.cmp.fut b{color:var(--text-dim);font-weight:500}
+.pct{font-weight:700}
+.pct.good{color:var(--run-fg)}.pct.mid{color:var(--warn-fg)}.pct.low{color:var(--alarm-fg)}.pct.over{color:#7C3AED}
+tfoot .cmp small{color:#CBD5E1}
+tfoot .pct.good{color:#6EE7B7}tfoot .pct.mid{color:#FCD34D}tfoot .pct.low{color:#FCA5A5}tfoot .pct.over{color:#C4B5FD}
 .need-login{padding:30px;text-align:center;font-size:14px}
 @media (max-width:640px){.toolbar input[type=search]{flex:1;min-width:0}.tbl-wrap{max-height:none}}
 </style>
@@ -131,6 +141,7 @@ td.heat{padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
 
   <nav class="tabs" id="tabs">
     <a href="?tab=fc" data-tab="fc">📈 Forecast theo mã</a>
+    <a href="?tab=tt" data-tab="tt">📊 Thực tế vs Forecast</a>
     <a href="?tab=may" data-tab="may">⚙ Giờ máy đúc</a>
     <a href="?tab=khuon" data-tab="khuon">🧊 Tuổi thọ khuôn</a>
   </nav>
@@ -174,7 +185,7 @@ td.heat{padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
 <script src="shared/navbar.js"></script>
 <script>
 const EDIT_ROLES = ['admin', 'ke_hoach', 'qlsx_truong_phong', 'giam_doc_sx'];
-const TABS = ['fc', 'may', 'khuon'];
+const TABS = ['fc', 'tt', 'may', 'khuon'];
 const MOLD_ACTIVE = ['dang_sx', 'moi_chua_sx'];   // tình trạng khuôn còn dùng (T79)
 const LS_GIO = 'forecast_gio_may_thang';
 
@@ -187,6 +198,8 @@ let products = [], molds = [];
 let fc = {};          // fc[ma_sp][thang] = số lượng (đã lưu) — năm đang xem
 let fcPrev = {};      // forecast các năm từ năm nay tới trước năm đang xem: {nam: {ma_sp: {thang: sl}}}
 let dirty = {};       // dirty['ma|th'] = số hoặc null (xoá)
+let tt = {};          // tt[ma_sp][thang] = sản lượng Đúc OK thực tế (năm đang xem)
+let ttCo = true;      // mục Thực tế: chỉ mã có forecast hoặc thực tế
 let q = '', nhom = '', chiCoFc = false;
 let gioMay = 520;
 try { gioMay = Number(localStorage.getItem(LS_GIO)) || 520; } catch (e) {}
@@ -245,6 +258,10 @@ async function loadAll(){
   document.querySelectorAll('.yrTxt').forEach(e => { e.textContent = nam; });
   try {
     fc = await loadFc(nam);
+    const { data: ttRows, error: ttErr } = await sb.rpc('forecast_thuc_te_duc', { p_nam: nam });
+    if (ttErr) throw new Error(ttErr.message);
+    tt = {};
+    (ttRows || []).forEach(r => { (tt[r.ma_sp] ||= {})[r.thang] = Number(r.so_luong) || 0; });
     fcPrev = {};
     for (let y = thisYear; y < nam; y++) fcPrev[y] = await loadFc(y);
   } catch (e) { return showMsg('Lỗi tải forecast: ' + e.message, 'err', 8000); }
@@ -256,6 +273,7 @@ async function loadAll(){
 function render(){
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   if (tab === 'fc') renderFc();
+  else if (tab === 'tt') renderTt();
   else if (tab === 'may') renderMay();
   else renderKhuon();
   updateSavebar();
@@ -462,6 +480,73 @@ async function openLog(){
   box.innerHTML = data && data.length ? data.map(r => '<div><b>' + new Date(r.thoi_diem).toLocaleString('vi-VN', { hour12: false }) + '</b> · ' + escapeHtml(r.nguoi) +
     ' · <b>' + escapeHtml(r.ma_sp) + ' T' + r.thang + '</b>: ' + (r.cu == null ? '(trống)' : fmtNum(r.cu)) + ' → ' + (r.moi == null ? '(xoá)' : fmtNum(r.moi)) +
     (r.ghi_chu ? ' <span class="hint">— ' + escapeHtml(r.ghi_chu) + '</span>' : '') + '</div>').join('') : 'Chưa có thay đổi nào.';
+}
+
+// ── Thực tế vs Forecast (T85) ─────────────────────────────────────────────────
+// Tháng "đã có số": tháng đã qua + tháng hiện tại (đang chạy); tháng tương lai chỉ có forecast.
+function thangDaCo(th){ return nam < thisYear || (nam === thisYear && th <= thisMonth); }
+function ttOf(ma, th){ return tt[ma] && tt[ma][th] != null ? tt[ma][th] : 0; }
+function pctHtml(a, f){
+  if (!f) return a ? '<span class="pct over">ngoài FC</span>' : '';
+  const p = a / f * 100;
+  const cls = p > 110 ? 'over' : p >= 95 ? 'good' : p >= 80 ? 'mid' : 'low';
+  return '<span class="pct ' + cls + '">' + fmtNum(p) + '%</span>';
+}
+function cmpCell(a, f, th, extra){
+  if (!thangDaCo(th)) return '<td class="cmp fut' + (extra || '') + '"><b>' + (f ? fmtNum(f) : '') + '</b><small>' + (f ? 'FC' : '') + '</small></td>';
+  if (!a && !f) return '<td class="cmp' + (extra || '') + '"></td>';
+  return '<td class="cmp' + (extra || '') + '"><b>' + fmtNum(a) + '</b><small>FC ' + (f ? fmtNum(f) : '—') + ' · ' + pctHtml(a, f) + '</small></td>';
+}
+function renderTt(){
+  const months = [...Array(12)].map((_, i) => i + 1);
+  const groups = [...new Set(products.map(p => nhomOf(p.ma_sp)))].sort(naturalCompare);
+  // Mã có thực tế nhưng không có trong danh mục SP vẫn phải hiện.
+  const known = new Set(products.map(p => p.ma_sp));
+  const extra = Object.keys(tt).filter(ma => !known.has(ma)).map(ma => ({ ma_sp: ma, ten_sp: '(không có trong danh mục SP)' }));
+  const qq = q.toLowerCase();
+  const fcOf = (ma, th) => Number(val(ma, th)) || 0;
+  const list = products.concat(extra).filter(p => (!nhom || nhomOf(p.ma_sp) === nhom) &&
+    (!qq || p.ma_sp.toLowerCase().includes(qq) || String(p.ten_sp || '').toLowerCase().includes(qq)) &&
+    (!ttCo || months.some(th => fcOf(p.ma_sp, th) || ttOf(p.ma_sp, th))));
+  const lkTh = months.filter(thangDaCo);
+  const sum = (ma, fn, ths) => ths.reduce((s, th) => s + fn(ma, th), 0);
+  const totA = months.map(th => list.reduce((s, p) => s + ttOf(p.ma_sp, th), 0));
+  const totF = months.map(th => list.reduce((s, p) => s + fcOf(p.ma_sp, th), 0));
+  const lkA = lkTh.reduce((s, th) => s + totA[th - 1], 0), lkF = lkTh.reduce((s, th) => s + totF[th - 1], 0);
+  const thTruoc = nam === thisYear ? thisMonth - 1 : nam < thisYear ? 12 : 0;
+  const ttCoSo = Object.keys(tt).length > 0;
+  const ngoaiFc = list.filter(p => sum(p.ma_sp, ttOf, lkTh) > 0 && !sum(p.ma_sp, fcOf, lkTh)).length;
+  const thieu = list.filter(p => { const f = sum(p.ma_sp, fcOf, lkTh); return f > 0 && sum(p.ma_sp, ttOf, lkTh) / f < 0.8; }).length;
+
+  let html = '<div class="card"><div class="kpis">' +
+    kpi('Lũy kế ' + (lkTh.length ? 'T1 → T' + lkTh[lkTh.length - 1] : '') + ' — thực tế', fmtNum(lkA), 'FC ' + fmtNum(lkF) + ' · ' + (pctHtml(lkA, lkF) || '—')) +
+    (thTruoc >= 1 ? kpi('Tháng ' + thTruoc + ' (đã xong)', fmtNum(totA[thTruoc - 1]), 'FC ' + fmtNum(totF[thTruoc - 1]) + ' · ' + (pctHtml(totA[thTruoc - 1], totF[thTruoc - 1]) || '—')) : '') +
+    (nam === thisYear ? kpi('Tháng ' + thisMonth + ' (đang chạy)', fmtNum(totA[thisMonth - 1]), 'FC ' + fmtNum(totF[thisMonth - 1]) + ' · ' + (pctHtml(totA[thisMonth - 1], totF[thisMonth - 1]) || '—')) : '') +
+    kpi('Mã đạt < 80% FC (lũy kế)', String(thieu), ngoaiFc + ' mã có sản xuất nhưng không có FC') + '</div>';
+  html += '<div class="toolbar">' +
+    '<input type="search" id="tq" placeholder="Tìm mã / tên SP..." value="' + escapeHtml(q) + '">' +
+    '<select id="tnhom"><option value="">Tất cả nhóm mã</option>' + groups.map(g => '<option' + (g === nhom ? ' selected' : '') + '>' + escapeHtml(g) + '</option>').join('') + '</select>' +
+    '<label class="chk"><input type="checkbox" id="tco"' + (ttCo ? ' checked' : '') + '> Chỉ mã có forecast hoặc thực tế</label></div>';
+  html += '<div class="hint" style="margin-bottom:8px">Thực tế = sản lượng <b>Đúc OK đã kết ca</b> (không gồm NG, chưa gồm ca đang chạy). Số liệu Đúc trên hệ thống có từ 08/2026. ' +
+    '% = thực tế ÷ forecast: <span class="pct good">≥ 95%</span> · <span class="pct mid">80–95%</span> · <span class="pct low">&lt; 80%</span> · <span class="pct over">&gt; 110%</span>.' +
+    (ttCoSo ? '' : ' <b>Năm ' + nam + ' chưa có số thực tế.</b>') + '</div>';
+  html += '<div class="tbl-wrap"><table><thead><tr><th class="sp">Mã SP</th>' +
+    months.map(th => '<th class="' + (nam === thisYear && th === thisMonth ? 'cur' : '') + '">T' + th + (nam === thisYear && th === thisMonth ? '<br><span style="font-weight:500;text-transform:none">đang chạy</span>' : '') + '</th>').join('') +
+    '<th>Lũy kế' + (lkTh.length ? '<br><span style="font-weight:500;text-transform:none">T1–T' + lkTh[lkTh.length - 1] + '</span>' : '') + '</th><th>FC cả năm</th></tr></thead><tbody>';
+  if (!list.length) html += '<tr><td colspan="15" class="empty">Không có mã nào khớp bộ lọc</td></tr>';
+  list.forEach(p => {
+    const a = sum(p.ma_sp, ttOf, lkTh), f = sum(p.ma_sp, fcOf, lkTh);
+    html += '<tr><td class="sp"><b>' + escapeHtml(p.ma_sp) + '</b><small title="' + escapeHtml(p.ten_sp || '') + '">' + escapeHtml(p.ten_sp || '') + '</small></td>' +
+      months.map(th => cmpCell(ttOf(p.ma_sp, th), fcOf(p.ma_sp, th), th, nam === thisYear && th === thisMonth ? ' cur' : '')).join('') +
+      '<td class="cmp tot"><b>' + fmtNum(a) + '</b><small>FC ' + fmtNum(f) + ' · ' + (pctHtml(a, f) || '—') + '</small></td>' +
+      '<td class="num">' + fmtNum(sum(p.ma_sp, fcOf, months)) + '</td></tr>';
+  });
+  html += '</tbody><tfoot><tr><td class="sp">Tổng</td>' + months.map(th => cmpCell(totA[th - 1], totF[th - 1], th)).join('') +
+    '<td class="cmp"><b>' + fmtNum(lkA) + '</b><small>FC ' + fmtNum(lkF) + ' · ' + (pctHtml(lkA, lkF) || '—') + '</small></td><td>' + fmtNum(totF.reduce((x, y) => x + y, 0)) + '</td></tr></tfoot></table></div></div>';
+  document.getElementById('main').innerHTML = html;
+  document.getElementById('tq').oninput = e => { q = e.target.value; renderTt(); document.getElementById('tq').focus(); };
+  document.getElementById('tnhom').onchange = e => { nhom = e.target.value; renderTt(); };
+  document.getElementById('tco').onchange = e => { ttCo = e.target.checked; renderTt(); };
 }
 
 // ── Giờ máy đúc ───────────────────────────────────────────────────────────────
