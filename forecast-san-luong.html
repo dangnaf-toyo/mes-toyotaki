@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forecast sản lượng năm — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  forecast-san-luong.html?nam=YYYY&tab=fc|may|khuon — Forecast sản lượng năm (T83).
+  - Bảng mã SP × 12 tháng (forecast_san_luong), sửa trực tiếp / dán từ Excel,
+    lưu hàng loạt qua RPC forecast_luu (log forecast_san_luong_log).
+    Quyền sửa: admin, ke_hoach, qlsx_truong_phong, giam_doc_sx. Phải đăng nhập mới xem.
+  - "Giờ máy đúc": shot = SL / cavity, giờ = shot × cycle_time_s / 3600 (master_products)
+    -> giờ máy cần mỗi tháng, quy ra số máy theo "giờ chạy/máy/tháng" nhập tay.
+  - "Tuổi thọ khuôn": shot còn lại = Σ(nguong_lam_moi − tong_shot_luy_ke) các khuôn
+    còn dùng của SP (duc_shot_khuon, tình trạng dang_sx/moi_chua_sx), trừ dần theo
+    shot forecast từ tháng hiện tại -> tháng dự kiến hết tuổi thọ (cần khuôn mới).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.yr{display:flex;align-items:center;gap:4px}
+.yr b{font-family:'JetBrains Mono',monospace;font-size:18px;color:#fff;min-width:56px;text-align:center}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{border:none;border-radius:5px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
+.btn-outline{background:#fff;border:1.5px solid var(--accent);color:var(--accent)}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-good{background:var(--run-fg)}
+.btn-good:hover{background:#036049}
+.btn-sm{padding:4px 9px;font-size:11.5px}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.tabs{display:flex;gap:4px;background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:4px;flex-wrap:wrap}
+.tabs a{padding:8px 16px;border-radius:6px;font-weight:600;font-size:13px;color:var(--text-muted);text-decoration:none}
+.tabs a:hover{background:var(--bg-sunken);color:var(--text)}
+.tabs a.on{background:var(--accent);color:#fff}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.toolbar input,.toolbar select{border:1.5px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px}
+.toolbar input[type=search]{min-width:200px}
+.toolbar label.chk{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text-muted);font-weight:600}
+.spacer{flex:1}
+.hint{font-size:12px;color:var(--text-muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-bottom:10px}
+.kpi{background:var(--bg-sunken);border-radius:8px;padding:9px 12px}
+.kpi .k{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.kpi .v{font-size:19px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-top:2px}
+.kpi .s{font-size:11px;color:var(--text-muted)}
+.tbl-wrap{overflow:auto;max-height:calc(100vh - 290px);border:1px solid var(--border);border-radius:6px}
+table{border-collapse:separate;border-spacing:0;font-size:12.5px;width:100%}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;text-align:right;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2}
+th.l,td.l{text-align:left}
+td{padding:0;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right}
+td.sp{padding:5px 8px;position:sticky;left:0;background:#fff;z-index:1;border-right:1px solid var(--border);min-width:170px}
+th.sp{position:sticky;left:0;z-index:3;text-align:left}
+td.sp b{display:block;font-size:12.5px}
+td.sp small{display:block;font-size:10.5px;color:var(--text-muted);max-width:220px;overflow:hidden;text-overflow:ellipsis}
+td.num{padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+td.tot{font-weight:700;background:var(--bg-sunken)}
+td input.c{width:100%;min-width:74px;border:none;border-left:1px solid #EEF1F5;padding:7px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;background:transparent;color:var(--text)}
+td input.c:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#F0F7FF}
+td input.c.dirty{background:#FEF9C3}
+td input.c:disabled{color:var(--text)}
+td.cur,th.cur{box-shadow:inset 0 0 0 9999px rgba(15,95,165,.05)}
+tr.grp td{background:#EEF2F7;font-weight:700;padding:6px 8px;font-size:12px}
+tr.grp td.sp{background:#EEF2F7}
+tfoot td{position:sticky;bottom:0;background:#1E293B;color:#fff;font-weight:700;padding:7px 8px;font-family:'JetBrains Mono',monospace;font-size:12px;z-index:2}
+tfoot td.sp{background:#1E293B;color:#fff;font-family:inherit}
+.empty{padding:16px;text-align:center;color:var(--text-dim)}
+.warn-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:100px;background:var(--warn-bg);color:var(--warn-fg)}
+.bad-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:100px;background:var(--alarm-bg);color:var(--alarm-fg)}
+.ok-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:100px;background:var(--run-bg);color:var(--run-fg)}
+td.heat{padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.ro-note{background:var(--warn-bg);color:var(--warn-fg);border:1px solid #F3D98B;border-radius:6px;padding:8px 12px;font-weight:600;margin-bottom:10px}
+.savebar{position:sticky;bottom:8px;z-index:20;display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#FEF9C3;border:1px solid #FDE047;border-radius:8px;padding:8px 12px;box-shadow:var(--shadow-lg)}
+.savebar.show{display:flex}
+.savebar input{flex:1;min-width:200px;border:1.5px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:200;max-width:min(560px,92vw);padding:11px 16px;border-radius:8px;font-size:13px;font-weight:600;display:none;box-shadow:var(--shadow-lg)}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+.dlg-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:5vh 10px;overflow-y:auto}
+.dlg-mask.open{display:flex}
+.dlg{background:#fff;border-radius:10px;box-shadow:var(--shadow-lg);width:min(760px,100%)}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
+.dlg-head button{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text-muted)}
+.dlg-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.dlg-body textarea{width:100%;min-height:200px;border:1.5px solid var(--border-strong);border-radius:6px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.dlg-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.dlg-foot .hint{margin-right:auto}
+.log-list div{padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+.need-login{padding:30px;text-align:center;font-size:14px}
+@media (max-width:640px){.toolbar input[type=search]{flex:1;min-width:0}.tbl-wrap{max-height:none}}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">📈 Forecast sản lượng năm</div>
+    </div>
+    <div class="header-divider"></div>
+    <div class="yr">
+      <button type="button" class="btn btn-ghost btn-sm" id="yrPrev" title="Năm trước">◀</button>
+      <b id="yrLbl"></b>
+      <button type="button" class="btn btn-ghost btn-sm" id="yrNext" title="Năm sau">▶</button>
+    </div>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <a href="?tab=fc" data-tab="fc">📈 Forecast theo mã</a>
+    <a href="?tab=may" data-tab="may">⚙ Giờ máy đúc</a>
+    <a href="?tab=khuon" data-tab="khuon">🧊 Tuổi thọ khuôn</a>
+  </nav>
+
+  <div id="main"><div class="card empty">Đang tải...</div></div>
+  <div class="savebar" id="savebar">
+    <b id="dirtyCnt"></b>
+    <input id="saveNote" maxlength="200" placeholder="Ghi chú đợt cập nhật (VD: FC khách gửi 10/2026)">
+    <button type="button" class="btn btn-outline btn-sm" id="btnUndo">Huỷ thay đổi</button>
+    <button type="button" class="btn btn-good" id="btnSave">💾 Lưu</button>
+  </div>
+</div>
+
+<!-- Nhập từ Excel -->
+<div class="dlg-mask" id="dlg-imp">
+  <div class="dlg">
+    <div class="dlg-head"><span>📋 Nhập forecast từ Excel — năm <span class="yrTxt"></span></span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div class="hint">Trong Excel, chọn vùng gồm cột <b>Mã SP</b> và <b>12 cột tháng (T1 → T12)</b>, Copy rồi dán vào ô dưới. Dòng tiêu đề (nếu có) tự bỏ qua. Ô trống = giữ nguyên, ô <b>0</b> = forecast 0.</div>
+      <textarea id="impText" placeholder="OKA-GJT-08&#9;12000&#9;12000&#9;15000 ..."></textarea>
+      <div id="impPreview" class="hint"></div>
+    </div>
+    <div class="dlg-foot">
+      <span class="hint">Sau khi áp dụng, các ô đổi được tô vàng — kiểm tra rồi bấm 💾 Lưu.</span>
+      <button type="button" class="btn btn-outline" data-close>Huỷ</button>
+      <button type="button" class="btn" id="impApply" disabled>Áp dụng vào bảng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lịch sử -->
+<div class="dlg-mask" id="dlg-log">
+  <div class="dlg">
+    <div class="dlg-head"><span>🕘 Lịch sử thay đổi forecast năm <span class="yrTxt"></span></span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body"><div class="log-list" id="logList">Đang tải...</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+const EDIT_ROLES = ['admin', 'ke_hoach', 'qlsx_truong_phong', 'giam_doc_sx'];
+const TABS = ['fc', 'may', 'khuon'];
+const MOLD_ACTIVE = ['dang_sx', 'moi_chua_sx'];   // tình trạng khuôn còn dùng (T79)
+const LS_GIO = 'forecast_gio_may_thang';
+
+const qs = new URLSearchParams(location.search);
+const now = new Date(), thisYear = now.getFullYear(), thisMonth = now.getMonth() + 1;
+let nam = Number(qs.get('nam')) || thisYear;
+let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'fc';
+let myRole = null, canEdit = false, session = null;
+let products = [], molds = [];
+let fc = {};          // fc[ma_sp][thang] = số lượng (đã lưu) — năm đang xem
+let fcPrev = {};      // forecast các năm từ năm nay tới trước năm đang xem: {nam: {ma_sp: {thang: sl}}}
+let dirty = {};       // dirty['ma|th'] = số hoặc null (xoá)
+let q = '', nhom = '', chiCoFc = false;
+let gioMay = 520;
+try { gioMay = Number(localStorage.getItem(LS_GIO)) || 520; } catch (e) {}
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n, d){ return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: d || 0 }); }
+function naturalCompare(a, b){ return String(a).localeCompare(String(b), 'vi', { numeric: true, sensitivity: 'base' }); }
+let msgTimer = null;
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { el.className = ''; }, ms || 3500);
+}
+// Số lượng nhập/dán: số nguyên chiếc; bỏ dấu phân cách nghìn (. , khoảng trắng).
+function parseQty(v){
+  const s = String(v ?? '').trim();
+  if (s === '' || s === '-') return '';
+  const n = Number(s.replace(/[\s.,]/g, ''));
+  return Number.isFinite(n) && n >= 0 ? n : NaN;
+}
+function nhomOf(maSp){ return String(maSp).split('-')[0] || '(khác)'; }
+function val(ma, th){
+  const k = ma + '|' + th;
+  if (k in dirty) return dirty[k];
+  return fc[ma] && fc[ma][th] != null ? fc[ma][th] : null;
+}
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+function setUrl(){
+  const p = new URLSearchParams({ nam: String(nam), tab });
+  history.replaceState(null, '', '?' + p.toString());
+}
+
+// ── Tải dữ liệu ───────────────────────────────────────────────────────────────
+async function loadFc(year){
+  const out = {};
+  // PostgREST trả tối đa 1000 dòng/lần -> phân trang (80 mã × 12 tháng ≈ 960).
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('forecast_san_luong').select('ma_sp,thang,so_luong').eq('nam', year).range(from, from + 999);
+    if (error) throw new Error(error.message);
+    (data || []).forEach(r => { (out[r.ma_sp] ||= {})[r.thang] = Number(r.so_luong); });
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+async function loadAll(){
+  document.getElementById('yrLbl').textContent = nam;
+  document.querySelectorAll('.yrTxt').forEach(e => { e.textContent = nam; });
+  try {
+    fc = await loadFc(nam);
+    fcPrev = {};
+    for (let y = thisYear; y < nam; y++) fcPrev[y] = await loadFc(y);
+  } catch (e) { return showMsg('Lỗi tải forecast: ' + e.message, 'err', 8000); }
+  dirty = {};
+  render();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function render(){
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
+  if (tab === 'fc') renderFc();
+  else if (tab === 'may') renderMay();
+  else renderKhuon();
+  updateSavebar();
+}
+
+// ── Forecast theo mã ──────────────────────────────────────────────────────────
+function visibleProducts(){
+  const qq = q.toLowerCase();
+  return products.filter(p => (!nhom || nhomOf(p.ma_sp) === nhom) &&
+    (!qq || p.ma_sp.toLowerCase().includes(qq) || String(p.ten_sp || '').toLowerCase().includes(qq)) &&
+    (!chiCoFc || [...Array(12)].some((_, i) => val(p.ma_sp, i + 1) != null)));
+}
+function renderFc(){
+  const groups = [...new Set(products.map(p => nhomOf(p.ma_sp)))].sort(naturalCompare);
+  const list = visibleProducts();
+  const months = [...Array(12)].map((_, i) => i + 1);
+  const curCls = th => (nam === thisYear && th === thisMonth) ? ' cur' : '';
+  // tổng
+  const totM = months.map(th => list.reduce((s, p) => s + (Number(val(p.ma_sp, th)) || 0), 0));
+  const totY = totM.reduce((a, b) => a + b, 0);
+  const coFc = products.filter(p => months.some(th => val(p.ma_sp, th) != null)).length;
+  const peak = totM.indexOf(Math.max(...totM));
+
+  let html = '<div class="card">';
+  if (!canEdit) html += '<div class="ro-note">🔒 Chỉ xem — Kế hoạch / Trưởng phòng QLSX / Giám đốc SX / admin mới sửa được forecast.</div>';
+  html += '<div class="kpis">' +
+    kpi('Tổng forecast ' + nam, fmtNum(totY), 'chiếc' + (nhom || q || chiCoFc ? ' (theo bộ lọc)' : '')) +
+    kpi('Trung bình / tháng', fmtNum(totY / 12), 'chiếc') +
+    kpi('Tháng cao nhất', totY ? 'T' + (peak + 1) : '—', totY ? fmtNum(totM[peak]) + ' chiếc' : '') +
+    kpi('Mã có forecast', coFc + ' / ' + products.length, 'mã SP') + '</div>';
+  html += '<div class="toolbar">' +
+    '<input type="search" id="fq" placeholder="Tìm mã / tên SP..." value="' + escapeHtml(q) + '">' +
+    '<select id="fnhom"><option value="">Tất cả nhóm mã</option>' + groups.map(g => '<option' + (g === nhom ? ' selected' : '') + '>' + escapeHtml(g) + '</option>').join('') + '</select>' +
+    '<label class="chk"><input type="checkbox" id="fco"' + (chiCoFc ? ' checked' : '') + '> Chỉ mã có forecast</label>' +
+    '<span class="spacer"></span>' +
+    (canEdit ? '<button type="button" class="btn btn-outline btn-sm" id="btnImp">📋 Nhập từ Excel</button>' : '') +
+    '<button type="button" class="btn btn-outline btn-sm" id="btnCsv">⬇ Xuất Excel (CSV)</button>' +
+    '<button type="button" class="btn btn-outline btn-sm" id="btnLog">🕘 Lịch sử</button></div>';
+  if (canEdit) html += '<div class="hint" style="margin-bottom:8px">Gõ số trực tiếp vào ô (đơn vị: chiếc). Có thể copy một vùng nhiều ô trong Excel rồi dán vào ô bắt đầu. Ô đổi tô vàng — bấm 💾 Lưu ở thanh dưới.</div>';
+  html += '<div class="tbl-wrap"><table><thead><tr><th class="sp">Mã SP</th>' + months.map(th => '<th class="' + curCls(th).trim() + '">T' + th + '</th>').join('') + '<th>Tổng năm</th></tr></thead><tbody>';
+  if (!list.length) html += '<tr><td colspan="14" class="empty">Không có mã nào khớp bộ lọc</td></tr>';
+  let lastG = null, rowIdx = 0;
+  const dis = canEdit ? '' : ' disabled';
+  for (const p of list) {
+    const g = nhomOf(p.ma_sp);
+    if (g !== lastG) {
+      lastG = g;
+      const gl = list.filter(x => nhomOf(x.ma_sp) === g);
+      const gm = months.map(th => gl.reduce((s, x) => s + (Number(val(x.ma_sp, th)) || 0), 0));
+      html += '<tr class="grp"><td class="sp">' + escapeHtml(g) + ' <span class="hint">(' + gl.length + ' mã)</span></td>' +
+        gm.map((v, i) => '<td class="num' + curCls(i + 1) + '">' + (v ? fmtNum(v) : '') + '</td>').join('') +
+        '<td class="num">' + fmtNum(gm.reduce((a, b) => a + b, 0)) + '</td></tr>';
+    }
+    const tot = months.reduce((s, th) => s + (Number(val(p.ma_sp, th)) || 0), 0);
+    html += '<tr><td class="sp"><b>' + escapeHtml(p.ma_sp) + '</b><small title="' + escapeHtml(p.ten_sp || '') + '">' + escapeHtml(p.ten_sp || '') + '</small></td>' +
+      months.map(th => {
+        const v = val(p.ma_sp, th), d = (p.ma_sp + '|' + th) in dirty;
+        return '<td class="' + curCls(th).trim() + '"><input class="c' + (d ? ' dirty' : '') + '" inputmode="numeric" data-r="' + rowIdx + '" data-th="' + th + '" data-ma="' + escapeHtml(p.ma_sp) + '" value="' + (v == null ? '' : fmtNum(v)) + '"' + dis + '></td>';
+      }).join('') +
+      '<td class="num tot">' + (tot ? fmtNum(tot) : '') + '</td></tr>';
+    rowIdx++;
+  }
+  html += '</tbody><tfoot><tr><td class="sp">Tổng</td>' + totM.map(v => '<td>' + fmtNum(v) + '</td>').join('') + '<td>' + fmtNum(totY) + '</td></tr></tfoot></table></div></div>';
+  document.getElementById('main').innerHTML = html;
+  bindFc();
+}
+function kpi(k, v, s){ return '<div class="kpi"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="s">' + (s || '') + '</div></div>'; }
+
+function setCell(ma, th, raw){
+  const n = parseQty(raw);
+  if (Number.isNaN(n)) return false;
+  const saved = fc[ma] && fc[ma][th] != null ? fc[ma][th] : null;
+  const nv = n === '' ? null : n;
+  const k = ma + '|' + th;
+  if (nv === saved) delete dirty[k]; else dirty[k] = nv;
+  return true;
+}
+function bindFc(){
+  const main = document.getElementById('main');
+  const rr = () => { const a = document.activeElement; const pos = a && a.dataset && a.dataset.r != null ? [a.dataset.r, a.dataset.th] : null;
+    renderFc(); updateSavebar();
+    if (pos) { const el = main.querySelector('input.c[data-r="' + pos[0] + '"][data-th="' + pos[1] + '"]'); if (el) el.focus(); } };
+  document.getElementById('fq').oninput = e => { q = e.target.value; renderFc(); document.getElementById('fq').focus(); };
+  document.getElementById('fnhom').onchange = e => { nhom = e.target.value; renderFc(); };
+  document.getElementById('fco').onchange = e => { chiCoFc = e.target.checked; renderFc(); };
+  document.getElementById('btnCsv').onclick = exportCsv;
+  document.getElementById('btnLog').onclick = openLog;
+  const bi = document.getElementById('btnImp');
+  if (bi) bi.onclick = openImp;
+  if (!canEdit) return;
+  main.querySelectorAll('input.c').forEach(inp => {
+    inp.addEventListener('focus', () => { const v = val(inp.dataset.ma, Number(inp.dataset.th)); inp.value = v == null ? '' : String(v); inp.select(); });
+    inp.addEventListener('blur', () => { const v = val(inp.dataset.ma, Number(inp.dataset.th)); if (parseQty(inp.value) === (v == null ? '' : v)) inp.value = v == null ? '' : fmtNum(v); });
+    inp.addEventListener('change', () => {
+      if (!setCell(inp.dataset.ma, Number(inp.dataset.th), inp.value)) { showMsg('Số lượng không hợp lệ: ' + inp.value, 'err'); inp.value = ''; return; }
+      rr();
+    });
+    inp.addEventListener('keydown', e => {
+      const r = Number(inp.dataset.r), th = Number(inp.dataset.th);
+      const mv = { ArrowDown: [1, 0], Enter: [1, 0], ArrowUp: [-1, 0] }[e.key] || (e.key === 'ArrowRight' && inp.selectionEnd === inp.value.length ? [0, 1] : null) ||
+        (e.key === 'ArrowLeft' && inp.selectionStart === 0 ? [0, -1] : null);
+      if (!mv) return;
+      const nx = main.querySelector('input.c[data-r="' + (r + mv[0]) + '"][data-th="' + (th + mv[1]) + '"]');
+      if (nx) { e.preventDefault(); inp.dispatchEvent(new Event('change')); setTimeout(() => { const el = main.querySelector('input.c[data-r="' + (r + mv[0]) + '"][data-th="' + (th + mv[1]) + '"]'); if (el) el.focus(); }, 0); }
+    });
+    // Dán vùng nhiều ô từ Excel (tab / xuống dòng) bắt đầu từ ô này.
+    inp.addEventListener('paste', e => {
+      const t = (e.clipboardData || window.clipboardData).getData('text');
+      if (!/[\t\n]/.test(t.trim())) return;
+      e.preventDefault();
+      const rows = t.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(l => l.split('\t'));
+      const vis = visibleProducts(), r0 = Number(inp.dataset.r), th0 = Number(inp.dataset.th);
+      let n = 0, bad = 0;
+      rows.forEach((cols, i) => {
+        const p = vis[r0 + i];
+        if (!p) return;
+        cols.forEach((c, j) => { const th = th0 + j; if (th > 12) return; if (setCell(p.ma_sp, th, c)) n++; else bad++; });
+      });
+      rr();
+      showMsg('Đã dán ' + n + ' ô' + (bad ? ', bỏ qua ' + bad + ' ô không phải số' : '') + ' — kiểm tra rồi bấm 💾 Lưu', bad ? 'err' : 'okmsg', 4000);
+    });
+  });
+}
+
+function updateSavebar(){
+  const n = Object.keys(dirty).length;
+  document.getElementById('savebar').classList.toggle('show', n > 0 && canEdit);
+  document.getElementById('dirtyCnt').textContent = n + ' ô chưa lưu';
+}
+async function save(){
+  const rows = Object.entries(dirty).map(([k, v]) => { const [ma_sp, th] = k.split('|'); return { ma_sp, thang: Number(th), so_luong: v }; });
+  if (!rows.length) return;
+  const btn = document.getElementById('btnSave'); btn.disabled = true;
+  const { data, error } = await sb.rpc('forecast_luu', { p_nam: nam, p_rows: rows, p_ghi_chu: document.getElementById('saveNote').value.trim() });
+  btn.disabled = false;
+  if (error || !data || !data.ok) return showMsg('Lỗi lưu: ' + (error ? error.message : (data && data.error) || 'không rõ'), 'err', 7000);
+  showMsg('✓ Đã lưu ' + data.so_o_doi + ' ô forecast năm ' + nam, 'okmsg');
+  document.getElementById('saveNote').value = '';
+  await loadAll();
+}
+
+function exportCsv(){
+  const list = visibleProducts();
+  const head = ['Ma SP', 'Ten SP', ...[...Array(12)].map((_, i) => 'T' + (i + 1)), 'Tong nam'];
+  const lines = [head].concat(list.map(p => {
+    const m = [...Array(12)].map((_, i) => val(p.ma_sp, i + 1));
+    return [p.ma_sp, p.ten_sp || '', ...m.map(v => v == null ? '' : v), m.reduce((s, v) => s + (Number(v) || 0), 0)];
+  }));
+  const csv = '﻿' + lines.map(r => r.map(c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'forecast-san-luong-' + nam + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── Nhập từ Excel ─────────────────────────────────────────────────────────────
+let impRows = [];
+function openImp(){
+  document.getElementById('impText').value = '';
+  document.getElementById('impPreview').textContent = '';
+  document.getElementById('impApply').disabled = true;
+  document.getElementById('dlg-imp').classList.add('open');
+  document.getElementById('impText').focus();
+}
+function parseImp(){
+  const known = new Map(products.map(p => [p.ma_sp.toUpperCase(), p.ma_sp]));
+  const lines = document.getElementById('impText').value.replace(/\r/g, '').split('\n').filter(l => l.trim());
+  impRows = []; const unknown = [], badNum = [];
+  lines.forEach((l, i) => {
+    const cols = l.split('\t');
+    const ma = known.get(String(cols[0] || '').trim().toUpperCase());
+    // Dòng đầu là tiêu đề nếu các cột tháng không phải số (VD "Mã SP | T1 | T2...").
+    const laTieuDe = i === 0 && cols.slice(1).every(c => String(c).trim() === '' || Number.isNaN(parseQty(c)));
+    if (!ma) { if (!laTieuDe) unknown.push(String(cols[0] || '').trim()); return; }
+    for (let th = 1; th <= 12; th++) {
+      const raw = cols[th];
+      if (raw == null || String(raw).trim() === '') continue;
+      const n = parseQty(raw);
+      if (Number.isNaN(n)) { badNum.push(ma + ' T' + th); continue; }
+      impRows.push([ma, th, n]);
+    }
+  });
+  const nMa = new Set(impRows.map(r => r[0])).size;
+  document.getElementById('impPreview').innerHTML = (impRows.length ? '<span class="ok-tag">' + nMa + ' mã · ' + impRows.length + ' ô</span> ' : '') +
+    (unknown.length ? '<span class="bad-tag">' + unknown.length + ' mã không có trong danh mục</span> ' + escapeHtml(unknown.slice(0, 8).join(', ')) + (unknown.length > 8 ? '…' : '') + ' ' : '') +
+    (badNum.length ? '<span class="warn-tag">' + badNum.length + ' ô không phải số</span> ' + escapeHtml(badNum.slice(0, 6).join(', ')) : '');
+  document.getElementById('impApply').disabled = !impRows.length;
+}
+function applyImp(){
+  impRows.forEach(([ma, th, n]) => setCell(ma, th, n));
+  document.getElementById('dlg-imp').classList.remove('open');
+  chiCoFc = false; q = ''; nhom = '';
+  renderFc(); updateSavebar();
+  showMsg('Đã áp dụng ' + impRows.length + ' ô — kiểm tra ô vàng rồi bấm 💾 Lưu', 'okmsg', 4000);
+}
+
+async function openLog(){
+  document.getElementById('dlg-log').classList.add('open');
+  const box = document.getElementById('logList');
+  box.textContent = 'Đang tải...';
+  const { data, error } = await sb.from('forecast_san_luong_log').select('*').eq('nam', nam).order('thoi_diem', { ascending: false }).limit(300);
+  if (error) { box.textContent = 'Lỗi: ' + error.message; return; }
+  box.innerHTML = data && data.length ? data.map(r => '<div><b>' + new Date(r.thoi_diem).toLocaleString('vi-VN', { hour12: false }) + '</b> · ' + escapeHtml(r.nguoi) +
+    ' · <b>' + escapeHtml(r.ma_sp) + ' T' + r.thang + '</b>: ' + (r.cu == null ? '(trống)' : fmtNum(r.cu)) + ' → ' + (r.moi == null ? '(xoá)' : fmtNum(r.moi)) +
+    (r.ghi_chu ? ' <span class="hint">— ' + escapeHtml(r.ghi_chu) + '</span>' : '') + '</div>').join('') : 'Chưa có thay đổi nào.';
+}
+
+// ── Giờ máy đúc ───────────────────────────────────────────────────────────────
+function shotsOf(p, sl){ return p.cavity > 0 ? sl / p.cavity : 0; }
+function hoursOf(p, sl){ return p.cycle_time_s > 0 ? shotsOf(p, sl) * p.cycle_time_s / 3600 : 0; }
+function renderMay(){
+  const months = [...Array(12)].map((_, i) => i + 1);
+  const rows = products.map(p => {
+    const h = months.map(th => hoursOf(p, Number(val(p.ma_sp, th)) || 0));
+    const sl = months.reduce((s, th) => s + (Number(val(p.ma_sp, th)) || 0), 0);
+    return { p, h, tot: h.reduce((a, b) => a + b, 0), sl, thieu: sl > 0 && !(p.cycle_time_s > 0 && p.cavity > 0) };
+  }).filter(r => r.sl > 0).sort((a, b) => b.tot - a.tot);
+  const hM = months.map((_, i) => rows.reduce((s, r) => s + r.h[i], 0));
+  const maxH = Math.max(...hM, 1), thieu = rows.filter(r => r.thieu);
+  const may = h => h / (gioMay || 1);
+  let html = '<div class="card"><div class="toolbar"><label class="chk" style="color:var(--text)">Giờ chạy thực tế / 1 máy / tháng <input type="number" id="gioMay" min="1" step="10" value="' + gioMay + '" style="width:90px"></label>' +
+    '<span class="hint">VD: 2 ca × 11h × 26 ngày × hiệu suất ≈ 520h. Dùng quy đổi giờ máy cần → số máy cần.</span></div>';
+  html += '<div class="kpis">' +
+    kpi('Giờ máy cần cả năm', fmtNum(hM.reduce((a, b) => a + b, 0)), 'giờ') +
+    kpi('Tháng cao điểm', 'T' + (hM.indexOf(Math.max(...hM)) + 1), fmtNum(Math.max(...hM)) + ' giờ ≈ ' + fmtNum(may(Math.max(...hM)), 1) + ' máy') +
+    kpi('Trung bình / tháng', fmtNum(may(hM.reduce((a, b) => a + b, 0) / 12), 1) + ' máy', fmtNum(hM.reduce((a, b) => a + b, 0) / 12) + ' giờ') + '</div>';
+  if (thieu.length) html += '<div class="ro-note">⚠ ' + thieu.length + ' mã có forecast nhưng thiếu cavity / cycle time trong Danh mục SP nên chưa tính giờ máy: ' + escapeHtml(thieu.map(r => r.p.ma_sp).join(', ')) + '</div>';
+  html += '<div class="tbl-wrap"><table><thead><tr><th class="sp">Mã SP</th><th>Cavity</th><th>Cycle (s)</th>' + months.map(th => '<th>T' + th + '</th>').join('') + '<th>Tổng giờ</th></tr></thead><tbody>';
+  html += '<tr class="grp"><td class="sp">Số máy cần (≈)</td><td></td><td></td>' + hM.map(h => '<td class="num"' + heat(h, maxH) + '>' + fmtNum(may(h), 1) + '</td>').join('') + '<td class="num">' + fmtNum(may(hM.reduce((a, b) => a + b, 0) / 12), 1) + ' TB</td></tr>';
+  if (!rows.length) html += '<tr><td colspan="16" class="empty">Chưa có forecast năm ' + nam + '</td></tr>';
+  rows.forEach(r => {
+    html += '<tr><td class="sp"><b>' + escapeHtml(r.p.ma_sp) + '</b>' + (r.thieu ? '<span class="bad-tag">thiếu cavity/cycle</span>' : '') + '</td>' +
+      '<td class="num">' + (r.p.cavity || '—') + '</td><td class="num">' + (r.p.cycle_time_s || '—') + '</td>' +
+      r.h.map(h => '<td class="num">' + (h ? fmtNum(h, 1) : '') + '</td>').join('') + '<td class="num tot">' + fmtNum(r.tot, 1) + '</td></tr>';
+  });
+  html += '</tbody><tfoot><tr><td class="sp">Tổng giờ máy</td><td></td><td></td>' + hM.map(h => '<td>' + fmtNum(h) + '</td>').join('') + '<td>' + fmtNum(hM.reduce((a, b) => a + b, 0)) + '</td></tr></tfoot></table></div></div>';
+  document.getElementById('main').innerHTML = html;
+  document.getElementById('gioMay').onchange = e => { gioMay = Number(e.target.value) || 520; try { localStorage.setItem(LS_GIO, String(gioMay)); } catch (er) {} renderMay(); };
+}
+function heat(v, max){ const a = Math.min(1, v / max); return ' style="background:rgba(15,95,165,' + (0.06 + a * 0.3).toFixed(2) + ')"'; }
+
+// ── Tuổi thọ khuôn ────────────────────────────────────────────────────────────
+function moldsOfProduct(p){
+  const ds = new Set(String(p.so_khuon || '').split(/[,;]/).map(s => s.trim()).filter(Boolean));
+  molds.forEach(m => { if (String(m.ten_sp_gan_nhat || '').split(' (')[0].trim() === p.ma_sp) ds.add(m.ma_khuon); });
+  return [...ds].map(mk => molds.find(m => m.ma_khuon === mk) || { ma_khuon: mk, _chuaCo: true });
+}
+function renderKhuon(){
+  const startY = Math.min(thisYear, nam);
+  const rows = [];
+  products.forEach(p => {
+    const slNam = [...Array(12)].reduce((s, _, i) => s + (Number(val(p.ma_sp, i + 1)) || 0), 0);
+    if (!slNam) return;
+    const all = moldsOfProduct(p);
+    const active = all.filter(m => !m._chuaCo && MOLD_ACTIVE.includes(m.tinh_trang || 'dang_sx'));
+    const conLai = active.reduce((s, m) => s + Math.max(0, (Number(m.nguong_lam_moi) || 100000) - (Number(m.tong_shot_luy_ke) || 0)), 0);
+    // Trừ dần shot forecast từ tháng hiện tại (bỏ qua tháng đã qua) tới hết năm đang xem.
+    let rem = conLai, het = null;
+    const shotNam = shotsOf(p, slNam);
+    for (let y = Math.max(startY, thisYear); y <= nam && !het; y++) {
+      for (let th = (y === thisYear ? thisMonth : 1); th <= 12; th++) {
+        const sl = y === nam ? (Number(val(p.ma_sp, th)) || 0) : (((fcPrev[y] || {})[p.ma_sp] || {})[th] || 0);
+        rem -= shotsOf(p, sl);
+        if (rem < 0) { het = { y, th }; break; }
+      }
+    }
+    rows.push({ p, active, all, conLai, het, shotNam, slNam, thangCon: shotNam > 0 ? conLai / (shotNam / 12) : null });
+  });
+  rows.sort((a, b) => (a.het ? a.het.y * 100 + a.het.th : 999999) - (b.het ? b.het.y * 100 + b.het.th : 999999) || naturalCompare(a.p.ma_sp, b.p.ma_sp));
+  const nHet = rows.filter(r => r.het).length, nKhong = rows.filter(r => !r.active.length).length;
+  let html = '<div class="card">';
+  if (nam < thisYear) html += '<div class="ro-note">Năm ' + nam + ' đã qua — dự báo tuổi thọ khuôn chỉ tính từ tháng hiện tại trở đi.</div>';
+  html += '<div class="kpis">' +
+    kpi('Mã cần khuôn mới trong ' + nam, String(rows.filter(r => r.het && r.het.y === nam).length), 'khuôn hết tuổi thọ theo forecast') +
+    kpi('Hết trước năm ' + nam, String(rows.filter(r => r.het && r.het.y < nam).length), 'theo forecast các năm trước đó') +
+    kpi('Mã không còn khuôn dùng được', String(nKhong), 'có forecast nhưng không có khuôn Đang SX / Mới') + '</div>';
+  html += '<div class="hint" style="margin-bottom:8px">Shot còn lại = Σ (ngưỡng làm mới − tổng shot) của các khuôn Đang sản xuất / Mới của mã. Trừ dần theo shot forecast (SL ÷ cavity) từ tháng ' + thisMonth + '/' + thisYear + '. Khuôn dùng chung nhiều mã được tính riêng cho từng mã.</div>';
+  html += '<div class="tbl-wrap"><table><thead><tr><th class="sp">Mã SP</th><th class="l">Khuôn còn dùng</th><th>Shot còn lại</th><th>Shot forecast ' + nam + '</th><th>Đủ dùng ≈</th><th class="l">Dự kiến hết tuổi thọ</th></tr></thead><tbody>';
+  if (!rows.length) html += '<tr><td colspan="6" class="empty">Chưa có forecast năm ' + nam + '</td></tr>';
+  rows.forEach(r => {
+    const tag = !r.active.length ? '<span class="bad-tag">Không có khuôn dùng được</span>'
+      : r.het ? '<span class="' + (r.het.y === nam ? 'warn-tag' : 'bad-tag') + '">⚠ T' + r.het.th + '/' + r.het.y + ' — cần khuôn mới</span>'
+      : '<span class="ok-tag">Đủ trong ' + nam + '</span>';
+    html += '<tr><td class="sp"><b>' + escapeHtml(r.p.ma_sp) + '</b><small>cavity ' + (r.p.cavity || '—') + '</small></td>' +
+      '<td class="num l" style="font-family:inherit">' + (r.active.map(m => escapeHtml(m.ma_khuon) + (m.tinh_trang === 'moi_chua_sx' ? ' 🆕' : '')).join(', ') || '—') +
+        (r.all.length > r.active.length ? ' <span class="hint">(+' + (r.all.length - r.active.length) + ' ngừng/chưa khai báo)</span>' : '') + '</td>' +
+      '<td class="num">' + fmtNum(r.conLai) + '</td><td class="num">' + fmtNum(r.shotNam) + '</td>' +
+      '<td class="num">' + (r.thangCon == null ? '—' : r.thangCon > 120 ? '> 10 năm' : fmtNum(r.thangCon, 1) + ' tháng') + '</td>' +
+      '<td class="num l" style="font-family:inherit">' + tag + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  document.getElementById('main').innerHTML = html;
+}
+
+// ── Khởi động ─────────────────────────────────────────────────────────────────
+async function init(){
+  startHeaderClock();
+  session = await MesAuth.getSession();
+  if (!session) {
+    document.getElementById('main').innerHTML = '<div class="card need-login">🔒 Forecast là số liệu nội bộ — cần <a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">đăng nhập</a> để xem.</div>';
+    return;
+  }
+  const { data: ur } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
+  myRole = ur ? ur.role : null;
+  canEdit = EDIT_ROLES.includes(myRole);
+  const [pRes, mRes] = await Promise.all([
+    sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s,so_khuon').order('ma_sp'),
+    sb.from('duc_shot_khuon').select('ma_khuon,ten_sp_gan_nhat,tong_shot_luy_ke,nguong_lam_moi,tinh_trang'),
+  ]);
+  if (pRes.error) return showMsg('Lỗi tải danh mục SP: ' + pRes.error.message, 'err', 8000);
+  products = (pRes.data || []).filter(p => p.ma_sp).map(p => ({ ...p, cavity: Number(p.cavity) || 0, cycle_time_s: Number(p.cycle_time_s) || 0 }))
+    .sort((a, b) => naturalCompare(nhomOf(a.ma_sp), nhomOf(b.ma_sp)) || naturalCompare(a.ma_sp, b.ma_sp));
+  molds = mRes.data || [];
+
+  document.getElementById('tabs').addEventListener('click', e => {
+    const a = e.target.closest('a[data-tab]');
+    if (!a) return;
+    e.preventDefault();
+    tab = a.dataset.tab; setUrl(); render();
+  });
+  const doiNam = d => {
+    if (Object.keys(dirty).length && !confirm('Có ' + Object.keys(dirty).length + ' ô chưa lưu — bỏ thay đổi và chuyển năm?')) return;
+    nam += d; setUrl(); loadAll();
+  };
+  document.getElementById('yrPrev').onclick = () => doiNam(-1);
+  document.getElementById('yrNext').onclick = () => doiNam(1);
+  document.getElementById('btnSave').onclick = save;
+  document.getElementById('btnUndo').onclick = () => { if (confirm('Huỷ ' + Object.keys(dirty).length + ' ô chưa lưu?')) { dirty = {}; render(); } };
+  document.getElementById('impText').addEventListener('input', parseImp);
+  document.getElementById('impApply').onclick = applyImp;
+  document.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => b.closest('.dlg-mask').classList.remove('open'); });
+  document.querySelectorAll('.dlg-mask').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+  window.addEventListener('beforeunload', e => { if (Object.keys(dirty).length) { e.preventDefault(); e.returnValue = ''; } });
+  setUrl();
+  await loadAll();
+}
+init();
+</script>
+</body>
+</html>

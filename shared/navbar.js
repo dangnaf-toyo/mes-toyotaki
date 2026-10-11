@@ -24,6 +24,7 @@
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
       { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
+      { label: 'Forecast sản lượng năm', href: 'forecast-san-luong.html' },
       { label: 'Bom', href: 'bom.html' },
     ] },
     { label: 'Sản xuất', items: [
@@ -89,6 +90,7 @@
     'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo Cáo Cuối Ca — Ngoài Đúc', desc: 'Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC', noTitleBar: true },
     'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time', noTitleBar: true },
     'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Kế Hoạch Bảo Dưỡng Khuôn Tuần', desc: 'Lịch bảo dưỡng theo khuôn × ngày, người phụ trách', noTitleBar: true },
+    'forecast-san-luong.html': { icon: '📈', title: 'Forecast Sản Lượng Năm', desc: 'Dự báo sản lượng từng mã SP theo tháng — giờ máy, tuổi thọ khuôn', noTitleBar: true },
     'quan-ly-khuon.html': { icon: '🧊', title: 'Quản Lý Khuôn', desc: 'Danh sách khuôn, vấn đề khuôn, hạng mục check sheet bảo dưỡng', noTitleBar: true },
     'checksheet-bao-duong-khuon.html': { icon: '📋', title: 'Check Sheet Bảo Dưỡng Khuôn', desc: 'Ghi kết quả bảo dưỡng từng khuôn theo hạng mục', noTitleBar: true },
     'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
