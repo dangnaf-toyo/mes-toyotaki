@@ -18,6 +18,9 @@
     khuôn (duc_khuon_bao_duong_log), Đạt + BD định kỳ/Thay mới -> reset đồng
     hồ shot; sau đó khoá.
   - Quản lý bộ phận Đúc / admin sửa mẫu hạng mục ở khối "⚙ Mẫu hạng mục".
+  - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
+    khuon-bao-duong rồi tự lưu nháp (không mất ảnh nếu thoát trang). Hoàn
+    thành cần ≥1 ảnh mỗi loại, tối đa 10.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -103,6 +106,20 @@ tr.row-ng td{background:#FFF5F5}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
 .okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+.photo-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.photo-col{border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--bg-sunken)}
+.photo-col h4{font-size:12.5px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.photo-col h4 .cnt{font-weight:600;color:var(--text-muted);font-size:11.5px}
+.photo-col.need{border-color:#FCA5A5;background:var(--alarm-bg)}
+.photo-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.photo-btns .btn{padding:10px 14px;font-size:13px}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.photo-thumb{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:#fff}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-thumb .rm{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(15,23,42,.75);color:#fff;font-size:13px;cursor:pointer;line-height:24px;padding:0}
+.photo-empty{font-size:12px;color:var(--text-dim);font-style:italic;padding:6px 0}
+.photo-busy{font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px}
+@media (max-width:700px){.photo-cols{grid-template-columns:1fr}}
 .print-only{display:none}
 .sign-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px;text-align:center;font-size:12px}
 .sign-row div{border-top:1px dotted #999;padding-top:6px;min-height:70px}
@@ -112,6 +129,8 @@ tr.row-ng td{background:#FFF5F5}
   .print-only{display:block}
   .card{box-shadow:none;border:1px solid #999;break-inside:avoid}
   .kq-btn:not(.on){display:none}
+  .photo-grid{grid-template-columns:repeat(4,1fr)}
+  .photo-thumb .rm{display:none}
   .kq-btn.on{background:#fff!important;color:#000!important;border-color:#000!important}
   tr.grp td{background:#eee!important;color:#000}
 }
@@ -158,6 +177,10 @@ let kh = null, mold = null, duyet = null, cs = null, mau = [], employees = [], i
 let items = [];          // [{nhom,noi_dung,tieu_chuan,ket_qua,ghi_chu}]
 let ketLuan = '';
 let canEdit = false;
+const MAX_PHOTOS = 10;
+const PHOTO_KIND = { truoc: 'Ảnh TRƯỚC bảo dưỡng', sau: 'Ảnh SAU bảo dưỡng' };
+let photos = { truoc: [], sau: [] };   // URL public bucket khuon-bao-duong
+let photoBusy = { truoc: false, sau: false };
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
@@ -224,6 +247,7 @@ async function loadAll(){
   items = cs ? (cs.hang_muc || []).map(x => ({ ...x }))
     : mau.filter(m => m.dang_dung).map(m => ({ nhom: m.nhom, noi_dung: m.noi_dung, tieu_chuan: m.tieu_chuan, ket_qua: null, ghi_chu: '' }));
   ketLuan = cs ? cs.ket_luan : '';
+  photos = { truoc: cs && cs.anh_truoc ? cs.anh_truoc.slice() : [], sau: cs && cs.anh_sau ? cs.anh_sau.slice() : [] };
   canEdit = EDIT_ROLES.includes(myRole) && !(cs && cs.trang_thai === 'hoan_thanh');
   render();
 }
@@ -276,6 +300,17 @@ function render(){
     (canEdit ? '<div class="no-print" style="margin-top:8px;display:flex;gap:6px"><button type="button" class="btn btn-outline btn-sm" id="btnNowBd">⏱ Bắt đầu = bây giờ</button><button type="button" class="btn btn-outline btn-sm" id="btnNowKt">⏱ Kết thúc = bây giờ</button></div>' : '') +
     '</div>';
 
+  html += '<div class="card"><div class="card-title">Ảnh trước / sau bảo dưỡng</div><div class="photo-cols">' +
+    ['truoc', 'sau'].map(kind => '<div class="photo-col" id="pc-' + kind + '"><h4>📷 ' + PHOTO_KIND[kind] + ' <span class="cnt" id="pcnt-' + kind + '"></span></h4>' +
+      (canEdit ? '<div class="photo-btns no-print">' +
+        '<button type="button" class="btn" data-pick="cam" data-kind="' + kind + '">📷 Chụp ảnh</button>' +
+        '<button type="button" class="btn btn-outline" data-pick="album" data-kind="' + kind + '">🖼 Chọn từ album</button>' +
+        '<input type="file" accept="image/*" capture="environment" hidden id="pin-cam-' + kind + '">' +
+        '<input type="file" accept="image/*" multiple hidden id="pin-album-' + kind + '"></div>' : '') +
+      '<div class="photo-busy" id="pbusy-' + kind + '" hidden>⏳ Đang tải ảnh lên...</div>' +
+      '<div class="photo-grid" id="pgrid-' + kind + '"></div></div>').join('') +
+    '</div></div>';
+
   html += '<div class="card"><div class="card-title">Hạng mục kiểm tra' +
     (canEdit ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnAllOk">✓ Còn trống → OK</button>' : '') +
     '<div class="tally" id="tally"></div></div>' +
@@ -304,6 +339,7 @@ function render(){
 
   document.getElementById('main').innerHTML = html;
   renderItems();
+  renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
   if (laNguoiSuaMau()) renderMau();
   bindEvents();
@@ -374,6 +410,17 @@ function bindEvents(){
   const nguoi = document.getElementById('f-nguoi');
   nguoi.value = cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach;
   if (!canEdit) return;
+  document.querySelectorAll('button[data-pick]').forEach(b => {
+    b.onclick = () => document.getElementById('pin-' + b.dataset.pick + '-' + b.dataset.kind).click();
+  });
+  ['truoc', 'sau'].forEach(kind => ['cam', 'album'].forEach(src => {
+    document.getElementById('pin-' + src + '-' + kind).onchange = e => onPhotoSelected(kind, e);
+  }));
+  // onclick (không addEventListener) vì #main giữ nguyên qua các lần render lại.
+  document.getElementById('main').onclick = e => {
+    const rm = e.target.closest('button.rm[data-kind]');
+    if (rm) removePhoto(rm.dataset.kind, Number(rm.dataset.i));
+  };
   document.getElementById('btnNowBd').onclick = () => { document.getElementById('f-bd').value = toLocalInput(new Date()); updateDuration(); };
   document.getElementById('btnNowKt').onclick = () => { document.getElementById('f-kt').value = toLocalInput(new Date()); updateDuration(); };
   document.getElementById('btnAllOk').onclick = () => { items.forEach(it => { if (!it.ket_qua) it.ket_qua = 'OK'; }); renderItems(); };
@@ -392,7 +439,85 @@ function collect(){
     chi_phi: document.getElementById('f-chi-phi').value,
     ghi_chu: document.getElementById('f-ghi-chu').value.trim(),
     ket_luan: ketLuan,
+    anh_truoc: photos.truoc,
+    anh_sau: photos.sau,
   };
+}
+
+// ── Ảnh trước / sau ─────────────────────────────────────────────────────────────
+function renderPhotos(kind){
+  const list = photos[kind];
+  document.getElementById('pgrid-' + kind).innerHTML = list.length
+    ? list.map((url, i) => '<div class="photo-thumb"><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(url) + '" alt="' + PHOTO_KIND[kind] + ' ' + (i + 1) + '" loading="lazy"></a>' +
+        (canEdit ? '<button type="button" class="rm" data-kind="' + kind + '" data-i="' + i + '" title="Xoá ảnh">✕</button>' : '') + '</div>').join('')
+    : '<div class="photo-empty">Chưa có ảnh' + (canEdit ? ' — bắt buộc ít nhất 1 ảnh để hoàn thành' : '') + '</div>';
+  document.getElementById('pcnt-' + kind).textContent = list.length + '/' + MAX_PHOTOS;
+  document.getElementById('pc-' + kind).classList.toggle('need', canEdit && !list.length);
+  document.getElementById('pbusy-' + kind).hidden = !photoBusy[kind];
+  document.querySelectorAll('button[data-pick][data-kind="' + kind + '"]').forEach(b => { b.disabled = photoBusy[kind] || list.length >= MAX_PHOTOS; });
+}
+
+function compressPhoto(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ev => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('toBlob')), 'image/jpeg', 0.82);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onPhotoSelected(kind, e){
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+  const room = MAX_PHOTOS - photos[kind].length;
+  if (room <= 0) return showMsg('Đã đủ tối đa ' + MAX_PHOTOS + ' ảnh', 'err', 3000);
+  if (files.length > room) showMsg('Chỉ thêm được ' + room + ' ảnh nữa (tối đa ' + MAX_PHOTOS + ')', 'err', 3000);
+  photoBusy[kind] = true; renderPhotos(kind);
+  const safeKhuon = String(kh.ma_khuon).replace(/[^a-zA-Z0-9_-]/g, '_');
+  let added = 0;
+  for (const file of files.slice(0, room)) {
+    try {
+      const blob = await compressPhoto(file);
+      const path = safeKhuon + '/' + idKh + '/' + kind + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6) + '.jpg';
+      const { error } = await sb.storage.from('khuon-bao-duong').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+      if (error) throw new Error(error.message);
+      photos[kind].push(sb.storage.from('khuon-bao-duong').getPublicUrl(path).data.publicUrl);
+      added++;
+      renderPhotos(kind);
+    } catch (err) {
+      showMsg('Lỗi tải ảnh ' + (file.name || '') + ': ' + (err.message || err), 'err', 6000);
+    }
+  }
+  photoBusy[kind] = false; renderPhotos(kind);
+  if (added) autoSave('✓ Đã lưu ' + added + ' ảnh');
+}
+
+function removePhoto(kind, i){
+  if (!confirm('Xoá ảnh này khỏi check sheet?')) return;
+  photos[kind].splice(i, 1);
+  renderPhotos(kind);
+  autoSave('✓ Đã xoá ảnh');
+}
+
+// Lưu nháp ngầm sau khi thêm/xoá ảnh để không mất ảnh nếu thoát trang — không
+// tải lại trang (giữ nguyên những gì đang nhập dở).
+async function autoSave(okText){
+  const { data: res, error } = await sb.rpc('duc_khuon_cs_luu', { p_id_ke_hoach: idKh, p_data: collect(), p_hoan_thanh: false });
+  if (error || !res || !res.ok) return showMsg('Ảnh đã tải lên nhưng chưa lưu được vào check sheet: ' + rpcErr(res, error) + ' — bấm Lưu nháp', 'err', 8000);
+  showMsg(okText, 'okmsg', 2000);
 }
 
 async function save(hoanThanh){
@@ -401,6 +526,8 @@ async function save(hoanThanh){
     const chua = items.filter(it => !it.ket_qua).length;
     if (chua) return showMsg('Còn ' + chua + ' hạng mục chưa đánh giá OK / NG / N/A', 'err', 4000);
     if (items.some(it => it.ket_qua === 'NG' && !String(it.ghi_chu || '').trim())) return showMsg('Hạng mục NG phải ghi chú tình trạng / cách xử lý', 'err', 4000);
+    if (!photos.truoc.length || !photos.sau.length) return showMsg('Cần ít nhất 1 ảnh TRƯỚC và 1 ảnh SAU bảo dưỡng', 'err', 4000);
+    if (photoBusy.truoc || photoBusy.sau) return showMsg('Đang tải ảnh lên — đợi xong rồi hoàn thành', 'err', 3000);
     if (!data.nguoi_thuc_hien) return showMsg('Chọn người thực hiện', 'err', 3000);
     if (!ketLuan) return showMsg('Chọn kết luận ĐẠT / KHÔNG ĐẠT', 'err', 3000);
     const ng = items.filter(it => it.ket_qua === 'NG').length;
