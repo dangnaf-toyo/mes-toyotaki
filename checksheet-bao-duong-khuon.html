@@ -17,9 +17,8 @@
   - Lưu nháp / Hoàn thành qua RPC duc_khuon_cs_luu. Hoàn thành -> ghi sổ đời
     khuôn (duc_khuon_bao_duong_log), Đạt + BD định kỳ/Thay mới -> reset đồng
     hồ shot; sau đó khoá.
-  - Bảng "Vấn đề khuôn chưa đóng" (T90): duc_van_de_khuon chưa đóng + ảnh / hạng mục
-    NG của lần kiểm IPQC tạo ra vấn đề (duc_ipqc_checkpoint.id_van_de_lien_quan).
-    Lịch sử đầy đủ sự cố + IPQC: nút 🔎 Vấn đề ở quan-ly-khuon.html.
+  - Nút "⚠ Vấn đề chưa đóng (n)" trên thanh tiêu đề (T91) mở màn hình
+    van-de-khuon.html?khuon=X (bảng vấn đề chưa đóng + lịch sử sự cố / IPQC).
   - Mẫu hạng mục (chung + riêng từng khuôn, T78) sửa ở quan-ly-khuon.html?tab=mau
     (Quản lý bộ phận Đúc / admin).
   - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
@@ -107,20 +106,6 @@ tr.row-ng td{background:#FFF5F5}
 .done-banner.dat{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
 .done-banner.khong_dat{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5}
 .tag-rieng{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#E0F2FE;color:#075985;vertical-align:middle}
-.vdc-wrap{overflow:auto;max-height:520px;border:1px solid var(--border);border-radius:6px}
-.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
-.vdc th{position:sticky;top:0;z-index:1;background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
-.vdc td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
-.vdc td.tg{white-space:nowrap}
-.vdc td small{display:block;color:var(--text-muted);font-size:10.5px}
-.vdc td.may{white-space:nowrap;font-weight:700}
-.vdc td.loi{min-width:220px}
-.vdc .ng{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
-.vdc .ng span{font-size:10.5px;background:var(--alarm-bg);color:var(--alarm-fg);border-radius:4px;padding:1px 5px}
-.vdc .tt{font-weight:700;white-space:nowrap}
-.vdc .tt.mo{color:var(--alarm-fg)}.vdc .tt.cho{color:var(--warn-fg)}
-.vdc .ph{display:flex;gap:4px;flex-wrap:wrap;min-width:100px}
-.vdc .ph img{width:46px;height:46px;object-fit:cover;border-radius:5px;border:1px solid var(--border);display:block}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
 .okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
@@ -166,6 +151,7 @@ tr.row-ng td{background:#FFF5F5}
     </div>
     <div class="header-divider"></div>
     <a class="btn btn-ghost" id="lnkBack" href="bao-duong-khuon-tuan.html">← Kế hoạch bảo dưỡng tuần</a>
+    <a class="btn btn-ghost" id="lnkVanDe" href="van-de-khuon.html" target="_blank" rel="noopener" title="Mở màn hình vấn đề khuôn (tab mới)">⚠ Vấn đề chưa đóng</a>
     <button type="button" class="btn btn-ghost" onclick="window.print()">🖨 In</button>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
@@ -199,7 +185,6 @@ const MAX_PHOTOS = 10;
 const PHOTO_KIND = { truoc: 'Ảnh TRƯỚC bảo dưỡng', sau: 'Ảnh SAU bảo dưỡng' };
 let photos = { truoc: [], sau: [] };   // URL public bucket khuon-bao-duong
 let photoBusy = { truoc: false, sau: false };
-let anhVanDe = {};   // id_van_de -> lần kiểm IPQC gốc (ảnh, hạng mục NG) — T90
 
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
@@ -263,13 +248,10 @@ async function loadAll(){
   mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || []; mauBo = boRes.data || [];
   employees = empRes.data || [];
   issues = (issRes.data || []).filter(x => x.trang_thai !== 'Đã đóng');
-  anhVanDe = {};
-  const idsVd = issues.map(x => x.id_van_de).filter(Boolean);
-  for (let i = 0; i < idsVd.length; i += 150) {
-    const { data } = await sb.from('duc_ipqc_checkpoint').select('id_van_de_lien_quan,ket_qua,loai_kiem,thoi_diem_kiem_thuc_te,checklist_json,anh_bang_chung_url')
-      .in('id_van_de_lien_quan', idsVd.slice(i, i + 150));
-    (data || []).forEach(p => { anhVanDe[p.id_van_de_lien_quan] = p; });
-  }
+  const lnkVd = document.getElementById('lnkVanDe');
+  lnkVd.href = 'van-de-khuon.html?khuon=' + encodeURIComponent(kh.ma_khuon);
+  lnkVd.textContent = '⚠ Vấn đề chưa đóng (' + issues.length + ')';
+  lnkVd.style.borderColor = issues.length ? '#F87171' : '';
 
   items = cs ? (cs.hang_muc || []).map(x => ({ ...x })) : itemsTheoMau([]);
   ketLuan = cs ? cs.ket_luan : '';
@@ -313,8 +295,6 @@ function render(){
     '</div>' +
     (kh.ghi_chu ? '<div style="margin-top:8px;font-size:12px"><b>Nội dung KH:</b> ' + escapeHtml(kh.ghi_chu) + '</div>' : '') +
     '</div>';
-
-  html += vanDeChuaDongHtml();
 
   html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
     '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
@@ -492,30 +472,6 @@ function collect(){
     anh_truoc: photos.truoc,
     anh_sau: photos.sau,
   };
-}
-
-// ── Vấn đề khuôn chưa đóng (T90) ─────────────────────────────────────────────────
-function vanDeChuaDongHtml(){
-  const link = '<a class="btn btn-outline btn-sm no-print" href="quan-ly-khuon.html?vande=' + encodeURIComponent(kh.ma_khuon) + '" target="_blank" rel="noopener">🔎 Toàn bộ lịch sử sự cố + IPQC</a>';
-  let h = '<div class="card"><div class="card-title">⚠ Vấn đề khuôn chưa đóng (' + issues.length + ')' + link + '</div>';
-  if (!issues.length) return h + '<div style="color:var(--text-dim)">Không có vấn đề nào đang mở.</div></div>';
-  h += '<div class="vdc-wrap"><table class="vdc"><thead><tr><th>Ngày phát hiện</th><th>Máy</th><th>Lỗi phát hiện</th><th>Người phát hiện</th><th>Trạng thái</th><th>Nội dung xử lý</th><th class="no-print">Hình ảnh</th></tr></thead><tbody>' +
-    issues.map(a => {
-      const p = anhVanDe[a.id_van_de] || {};
-      const ng = (Array.isArray(p.checklist_json) ? p.checklist_json : []).filter(x => x && x.dat === false).map(x => x.muc);
-      const anh = Array.isArray(p.anh_bang_chung_url) ? p.anh_bang_chung_url : [];
-      // Mô tả tự sinh từ IPQC đã liệt kê hạng mục -> bỏ phần đó khi đã hiện nhãn đỏ.
-      const moTa = ng.length ? String(a.mo_ta || '').replace(/\s*—\s*Hạng mục không đạt:[\s\S]*$/, '') : String(a.mo_ta || '');
-      return '<tr><td class="tg">' + (a.ngay_phat_hien ? fmtDateVN(String(a.ngay_phat_hien)) : '—') + '<small>' + escapeHtml(a.ca_phat_hien || '') + '</small></td>' +
-        '<td class="may">' + escapeHtml(a.ma_may || '—') + '</td>' +
-        '<td class="loi">' + escapeHtml(moTa || '(không mô tả)') + (ng.length ? '<div class="ng">' + ng.map(m => '<span>' + escapeHtml(m) + '</span>').join('') + '</div>' : '') + '</td>' +
-        '<td>' + escapeHtml(a.nguoi_phat_hien || '—') + '</td>' +
-        '<td><span class="tt ' + (a.trang_thai === 'Chờ xác nhận' ? 'cho' : 'mo') + '">' + escapeHtml(a.trang_thai || '') + '</span>' +
-          (Number(a.lan_tai_phat) > 0 ? '<small style="color:var(--alarm-fg)">Tái phát ' + a.lan_tai_phat + ' lần</small>' : '') + '</td>' +
-        '<td>' + (a.noi_dung_xu_ly ? escapeHtml(a.noi_dung_xu_ly) + '<small>' + escapeHtml(a.nguoi_xu_ly || '') + (a.ngay_xu_ly ? ' · ' + fmtDateVN(String(a.ngay_xu_ly)) : '') + '</small>' : '<span style="color:var(--text-dim)">Chưa xử lý</span>') + '</td>' +
-        '<td class="no-print">' + (anh.length ? '<div class="ph">' + anh.map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>' : '<span style="color:var(--text-dim)">—</span>') + '</td></tr>';
-    }).join('') + '</tbody></table></div></div>';
-  return h;
 }
 
 // ── Ảnh trước / sau ─────────────────────────────────────────────────────────────

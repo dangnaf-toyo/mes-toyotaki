@@ -16,11 +16,10 @@
     (T79: tinh_trang qua duc_khuon_doi_tinh_trang, lịch sử
     duc_khuon_tinh_trang_log), thứ tự ưu tiên khuôn cùng mã SP (T86: uu_tien qua
     duc_khuon_dat_uu_tien — dashboard Đúc chọn khuôn mặc định theo thứ tự này).
-    Nút 🔎 Vấn đề (T90, ?vande=X mở thẳng): lịch sử sự cố + IPQC NG/Cảnh báo kèm
-    ảnh của khuôn (shared/khuon-van-de.js).
+    Vấn đề khuôn (chưa đóng, lịch sử sự cố + IPQC) ở màn hình riêng
+    van-de-khuon.html (T91) — nút trên thanh tiêu đề và nút 🔎 Vấn đề mỗi khuôn.
     Ghi bảo dưỡng chỉ qua KH bảo dưỡng tuần + check
     sheet (T81 bỏ "Ghi BD" tay / duc_ghi_lich_su_bao_duong).
-  - ?tab=van-de: vấn đề khuôn (duc_van_de_khuon) — xử lý / xác nhận.
   - ?tab=mau&khuon=X: hạng mục check sheet bảo dưỡng (duc_khuon_cs_mau +
     duc_khuon_cs_mau_bo, T76/T78) — mục chung, bỏ mục chung cho 1 khuôn, mục
     riêng của khuôn. Chỉ Quản lý bộ phận Đúc / admin sửa (RLS).
@@ -102,11 +101,6 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
 .ut-row button:disabled{opacity:.3;cursor:default}
 .iss-tag{display:inline-block;font-size:10.5px;font-weight:700;margin-top:2px}
 .empty{padding:16px;text-align:center;color:var(--text-dim)}
-.issue{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff}
-.issue .meta{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--text-muted);flex-wrap:wrap}
-.issue .mt{font-size:13px;margin-top:5px}
-.issue textarea{width:100%;min-height:50px;margin-top:8px;border:1.5px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px}
-.issue .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .mau-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;font-size:13px;font-weight:600}
 .mau-bar select{border:1.5px solid var(--border-strong);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;margin-left:6px;min-width:140px}
 .mau-sec{font-weight:700;font-size:13px;margin:16px 0 6px}
@@ -152,6 +146,7 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
     <div class="header-divider"></div>
     <a class="btn btn-ghost" href="duc-dashboard.html">← Bảng điều khiển Đúc</a>
     <a class="btn btn-ghost" href="bao-duong-khuon-tuan.html">🔧 Kế hoạch bảo dưỡng tuần</a>
+    <a class="btn btn-ghost" id="lnkVanDe" href="van-de-khuon.html">⚠ Vấn đề khuôn chưa đóng</a>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
       <div class="time" id="hdrClockTime"></div>
@@ -160,7 +155,6 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
 
   <nav class="tabs" id="tabs">
     <a href="?tab=khuon" data-tab="khuon">🧊 Danh sách khuôn</a>
-    <a href="?tab=van-de" data-tab="van-de">⚠ Vấn đề khuôn <span class="n" id="nIssue" hidden></span></a>
     <a href="?tab=mau" data-tab="mau">📋 Hạng mục check sheet bảo dưỡng</a>
   </nav>
 
@@ -177,15 +171,6 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
         <th style="text-align:right">Ngưỡng BD</th><th style="text-align:right">Ngưỡng LM</th><th>BD gần nhất</th><th>Hạn BD (theo ngày)</th><th>Trạng thái</th><th></th></tr></thead>
       <tbody id="tbKhuon"><tr><td colspan="11" class="empty">Đang tải...</td></tr></tbody>
     </table></div>
-  </section>
-
-  <section class="card" id="sec-van-de" hidden>
-    <div class="toolbar">
-      <button type="button" class="chip on" data-if="open">Chưa đóng</button>
-      <button type="button" class="chip" data-if="all">Tất cả (kể cả đã đóng)</button>
-      <input type="search" id="iSearch" placeholder="Lọc theo mã khuôn / máy / mô tả...">
-    </div>
-    <div id="issueList"><div class="empty">Đang tải...</div></div>
   </section>
 
   <section class="card" id="sec-mau" hidden>
@@ -229,14 +214,6 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
   </div>
 </div>
 
-<!-- Hộp thoại: lịch sử vấn đề của khuôn (sự cố + IPQC) -->
-<div class="dlg-mask" id="dlg-vd">
-  <div class="dlg" style="width:min(1300px,100%)">
-    <div class="dlg-head"><span>🔎 Vấn đề của khuôn <span id="vd-mk"></span> — sự cố + IPQC NG / Cảnh báo</span><button type="button" data-close>✕</button></div>
-    <div class="dlg-body"><div id="vd-body"></div></div>
-  </div>
-</div>
-
 <!-- Hộp thoại: thứ tự ưu tiên khuôn của 1 mã SP -->
 <div class="dlg-mask" id="dlg-ut">
   <div class="dlg">
@@ -272,12 +249,11 @@ tr.inactive .st,tr.inactive .bar{opacity:.45}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/khuon-van-de.js"></script>
 <script>
 const MOLD = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000, WARN_RATIO: 0.8 };   // = CONFIG.MOLD ở duc-dashboard.html
 const ST_CLS = { 'OK': 'ok', 'Sắp bảo dưỡng': 'soon', 'Cần bảo dưỡng': 'due', 'Cần làm mới': 'renew' };
 const ST_PRIO = { 'Cần làm mới': 0, 'Cần bảo dưỡng': 1, 'Sắp bảo dưỡng': 2, 'OK': 3 };
-const TABS = ['khuon', 'van-de', 'mau'];
+const TABS = ['khuon', 'mau'];
 // Tình trạng sử dụng (T79) — thứ tự = thứ tự hiển thị / sắp xếp.
 const TT = {
   dang_sx:           ['🟢 Đang sản xuất', 'Khuôn đang dùng cho sản xuất'],
@@ -289,10 +265,14 @@ const TT = {
 const TT_KEYS = Object.keys(TT);
 
 const qs = new URLSearchParams(location.search);
+if (qs.get('tab') === 'van-de' || qs.get('vande')) {   // link cũ (trước T91)
+  const k = qs.get('vande') || qs.get('q');
+  location.replace('van-de-khuon.html' + (k ? '?khuon=' + encodeURIComponent(k) + (qs.get('vande') ? '&tab=lich-su' : '') : ''));
+}
 let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'khuon';
 let myRole = null, myBoPhan = [], userName = '';
 let molds = [], products = [], issues = [], mau = [], mauBo = [];
-let kFilter = 'all', ttFilter = 'all', iFilter = 'open';
+let kFilter = 'all', ttFilter = 'all';
 let mauKhuon = qs.get('khuon') || null;
 let cur = null;   // khuôn đang mở trong hộp thoại
 
@@ -389,8 +369,7 @@ async function loadIssues(){
   issues = (data || []).slice().sort((a, b) => ((prio[a.trang_thai] ?? 9) - (prio[b.trang_thai] ?? 9)) ||
     (new Date(b.ngay_phat_hien) - new Date(a.ngay_phat_hien)));
   const open = issues.filter(x => x.trang_thai !== 'Đã đóng').length;
-  const n = document.getElementById('nIssue');
-  n.hidden = !open; n.textContent = open;
+  document.getElementById('lnkVanDe').textContent = '⚠ Vấn đề khuôn chưa đóng (' + open + ')';
 }
 async function loadMau(){
   const [m, b] = await Promise.all([
@@ -412,7 +391,6 @@ function setTab(t, push){
     history.replaceState(null, '', '?' + p.toString());
   }
   if (t === 'khuon') renderMolds();
-  else if (t === 'van-de') renderIssues();
   else renderMau();
 }
 
@@ -448,7 +426,7 @@ function renderMolds(){
     const cls = ST_CLS[m.trang_thai_khuon] || '';
     const ii = iss[m.ma_khuon] || [];
     const pending = ii.some(x => x.trang_thai === 'Chờ xác nhận');
-    const issTag = ii.length ? '<div><a href="?tab=van-de&q=' + encodeURIComponent(m.ma_khuon) + '" data-goissue="' + escapeHtml(m.ma_khuon) + '" class="iss-tag" style="color:' + (pending ? 'var(--warn-fg)' : '#C2410C') + '">' +
+    const issTag = ii.length ? '<div><a href="van-de-khuon.html?khuon=' + encodeURIComponent(m.ma_khuon) + '" class="iss-tag" style="color:' + (pending ? 'var(--warn-fg)' : '#C2410C') + '">' +
       (pending ? '❓ Chờ xác nhận' : '⚠ Có vấn đề') + (ii.length > 1 ? ' (' + ii.length + ')' : '') + '</a></div>' : '';
     const ttCell = '<span class="tt ' + m.tinh_trang + '">' + TT[m.tinh_trang][0] + '</span>' +
       (m.tinh_trang_ly_do ? '<div class="tt-sub" title="' + escapeHtml(m.tinh_trang_ly_do + ' — ' + m.tinh_trang_boi + ' ' + fmtDate(m.tinh_trang_luc)) + '">' + escapeHtml(m.tinh_trang_ly_do) + '</div>' : '');
@@ -463,7 +441,7 @@ function renderMolds(){
       '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
       '<td class="act">' + (canTT && nhieuKhuon ? '<button type="button" class="btn btn-outline btn-sm" data-ut="' + escapeHtml(m.ma_khuon) + '" title="Thứ tự ưu tiên các khuôn của mã ' + escapeHtml(m.ma_sp) + '">⇅ Ưu tiên</button> ' : '') +
         (canTT ? '<button type="button" class="btn btn-outline btn-sm" data-tt="' + escapeHtml(m.ma_khuon) + '">🏷 Tình trạng</button> ' : '') +
-        '<button type="button" class="btn btn-outline btn-sm" data-vd="' + escapeHtml(m.ma_khuon) + '" title="Lịch sử sự cố + IPQC NG của khuôn">🔎 Vấn đề</button> ' +
+        '<a class="btn btn-outline btn-sm" href="van-de-khuon.html?khuon=' + encodeURIComponent(m.ma_khuon) + '&tab=lich-su" title="Lịch sử sự cố + IPQC NG của khuôn">🔎 Vấn đề</a> ' +
         '<button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
         '<a class="btn btn-outline btn-sm" href="?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + escapeHtml(m.ma_khuon) + '">📋 Hạng mục</a></td></tr>';
   }).join('');
@@ -579,16 +557,6 @@ async function saveUt(){
   finally { btn.disabled = false; }
 }
 
-// ── Lịch sử vấn đề của khuôn (T90, shared/khuon-van-de.js) ────────────────────
-function openVanDe(maKhuon){
-  const m = molds.find(x => x.ma_khuon === maKhuon);
-  document.getElementById('vd-mk').textContent = maKhuon;
-  openDlg('dlg-vd');
-  KhuonVanDe.mount(document.getElementById('vd-body'), {
-    maKhuon, lanBd: m && m.lan_bao_duong_gan_nhat ? String(m.lan_bao_duong_gan_nhat).slice(0, 10) : null,
-  });
-}
-
 // ── Hộp thoại tình trạng khuôn (T79) ──────────────────────────────────────────
 async function openTt(maKhuon){
   if (!(await ensureAuth())) return;
@@ -628,57 +596,6 @@ async function saveTt(){
     await loadMolds(); renderMolds();
   } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
   finally { btn.disabled = false; }
-}
-
-// ── Vấn đề khuôn ──────────────────────────────────────────────────────────────
-function renderIssues(){
-  document.querySelectorAll('[data-if]').forEach(b => b.classList.toggle('on', b.dataset.if === iFilter));
-  const q = document.getElementById('iSearch').value.trim().toLowerCase();
-  const list = issues.filter(x => (iFilter === 'all' || x.trang_thai !== 'Đã đóng') &&
-    (!q || [x.ma_khuon, x.ma_may, x.ma_sp, x.mo_ta].some(v => String(v || '').toLowerCase().includes(q))));
-  const wrap = document.getElementById('issueList');
-  if (!list.length) { wrap.innerHTML = '<div class="empty">Không có vấn đề nào.</div>'; return; }
-  wrap.innerHTML = list.map(x => {
-    const id = escapeHtml(x.id_van_de);
-    let color = '#C2410C', act;
-    if (x.trang_thai === 'Mở') {
-      act = '<textarea data-xuly="' + id + '" placeholder="Nội dung đã xử lý (khuôn đã xuống, đã sửa gì)..."></textarea>' +
-        '<div class="acts"><button type="button" class="btn btn-sm" data-resolve="' + id + '">Đã xử lý xong — chờ xác nhận lần sau</button></div>';
-    } else if (x.trang_thai === 'Chờ xác nhận') {
-      color = 'var(--warn-fg)';
-      act = '<div style="margin-top:6px;font-size:12px"><b>Đã xử lý:</b> ' + escapeHtml(x.noi_dung_xu_ly || '—') +
-        ' <span class="hint">(bởi ' + escapeHtml(x.nguoi_xu_ly || '—') + ')</span></div>' +
-        '<div class="acts"><button type="button" class="btn btn-good btn-sm" data-confirm="' + id + '" data-kq="OK">✓ Xác nhận OK — đóng vấn đề</button>' +
-        '<button type="button" class="btn btn-danger btn-sm" data-confirm="' + id + '" data-kq="Tai_phat">✗ Vẫn còn/tái phát</button></div>';
-    } else {
-      color = 'var(--run-fg)';
-      act = '<div class="hint" style="margin-top:6px">Đóng bởi ' + escapeHtml(x.nguoi_xac_nhan || '—') + (x.ngay_xac_nhan ? ' · ' + fmtDate(x.ngay_xac_nhan) : '') + '</div>';
-    }
-    return '<div class="issue"><div class="meta"><span><b style="color:var(--text)">' + escapeHtml(x.ma_khuon) + '</b> · ' +
-      (x.ngay_phat_hien ? fmtDate(x.ngay_phat_hien) : '—') + ' · ' + escapeHtml(x.ma_may || '—') + ' · ' + escapeHtml(x.ma_sp || '—') + ' · ' + escapeHtml(x.nguoi_phat_hien || '—') + '</span>' +
-      '<span style="font-weight:700;color:' + color + '">' + escapeHtml(x.trang_thai) +
-      (x.lan_tai_phat > 0 ? ' · <span style="color:var(--alarm-fg)">Tái phát ' + x.lan_tai_phat + ' lần</span>' : '') + '</span></div>' +
-      '<div class="mt">' + escapeHtml(x.mo_ta) + '</div>' + act + '</div>';
-  }).join('');
-}
-async function resolveIssue(id){
-  const el = [...document.querySelectorAll('textarea[data-xuly]')].find(t => t.dataset.xuly === id);
-  const noiDung = el ? el.value.trim() : '';
-  if (!noiDung) return showMsg('Chưa nhập nội dung đã xử lý', 'err');
-  if (!(await ensureAuth())) return;
-  try {
-    await rpcWrite('duc_resolve_mold_issue_pending', { p_id_van_de: id, p_noi_dung_xu_ly: noiDung, p_user: userName });
-    showMsg('✓ Đã lưu — chờ xác nhận lần sản xuất kế tiếp', 'okmsg');
-    await loadIssues(); renderIssues();
-  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
-}
-async function confirmIssue(id, kq){
-  if (!(await ensureAuth())) return;
-  try {
-    await rpcWrite('duc_confirm_mold_issue_outcome', { p_id_van_de: id, p_ket_qua: kq, p_ghi_chu: '', p_user: userName });
-    showMsg(kq === 'OK' ? '✓ Đã đóng vấn đề khuôn' : '⚠ Đã ghi nhận tái phát — mở lại vấn đề', 'okmsg');
-    await loadIssues(); renderIssues();
-  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
 }
 
 // ── Hạng mục check sheet bảo dưỡng (T76/T78) ──────────────────────────────────
@@ -781,28 +698,17 @@ function bindAll(){
     setTab(a.dataset.tab, true);
   });
   document.getElementById('kSearch').addEventListener('input', renderMolds);
-  document.getElementById('iSearch').addEventListener('input', renderIssues);
   document.getElementById('btnNewMold').onclick = () => openCfg(null);
   document.getElementById('sec-khuon').addEventListener('click', e => {
-    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-ut],[data-vd],[data-cfg],[data-gomau],[data-goissue]');
+    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-ut],[data-cfg],[data-gomau]');
     if (!t) return;
     if (t.dataset.kf) { kFilter = t.dataset.kf; return renderMolds(); }
     if (t.dataset.ttf) { ttFilter = t.dataset.ttf; return renderMolds(); }
     if (t.dataset.tt) return openTt(t.dataset.tt);
     if (t.dataset.ut) return openUt(t.dataset.ut);
-    if (t.dataset.vd) return openVanDe(t.dataset.vd);
     if (t.dataset.cfg) return openCfg(t.dataset.cfg);
     e.preventDefault();
     if (t.dataset.gomau) { mauKhuon = t.dataset.gomau; return setTab('mau', true); }
-    document.getElementById('iSearch').value = t.dataset.goissue; iFilter = 'open'; setTab('van-de', true);
-  });
-  document.getElementById('sec-van-de').addEventListener('click', e => {
-    const f = e.target.closest('[data-if]');
-    if (f) { iFilter = f.dataset.if; return renderIssues(); }
-    const r = e.target.closest('[data-resolve]');
-    if (r) return resolveIssue(r.dataset.resolve);
-    const c = e.target.closest('[data-confirm]');
-    if (c) return confirmIssue(c.dataset.confirm, c.dataset.kq);
   });
   document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeDlg; });
   document.querySelectorAll('.dlg-mask').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeDlg(); }));
@@ -824,13 +730,11 @@ function bindAll(){
 async function init(){
   startHeaderClock();
   bindAll();
-  if (qs.get('q')) document.getElementById('iSearch').value = qs.get('q');
   await loadRole();
   const [, , , p] = await Promise.all([loadMolds(), loadIssues(), loadMau(),
     sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp')]);
   products = (p.data || []).filter(x => x.ma_sp);
   setTab(tab, false);
-  if (qs.get('vande')) openVanDe(qs.get('vande'));   // mở thẳng từ check sheet
 }
 init();
 </script>
