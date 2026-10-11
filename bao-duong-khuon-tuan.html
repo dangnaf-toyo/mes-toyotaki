@@ -83,6 +83,7 @@ td.status{font-size:11px;color:var(--text-muted);min-width:170px;max-width:240px
 .sev.sap{background:var(--warn-bg);color:var(--warn-fg)}
 .sev.vande{background:#FFF7ED;color:#C2410C}
 .sev.ok{background:var(--run-bg);color:var(--run-fg)}
+.sev.ngung{background:#F1F5F9;color:#475569}
 tr.goi-y td.khuon::after{content:'chưa lên KH';display:block;font-size:9.5px;font-weight:700;color:var(--warn-fg)}
 td.cell{height:44px;position:relative}
 td.cell.editable{cursor:pointer}
@@ -304,6 +305,8 @@ let canEdit = false;
 let myRole = null, myBoPhan = [];
 let duyetInfo = null;      // duc_khuon_bd_duyet của tuần
 let duyetLog = [];
+// = TT ở quan-ly-khuon.html (T79).
+const TINH_TRANG_KHUON = { moi_chua_sx: 'Mới — chưa vào SX', dung_het_tuoi_tho: 'Hết tuổi thọ — dừng SX', cho_tra_khach: 'Chờ trả khách hàng', cho_bao_phe: 'Chờ báo phế' };
 let molds = [];            // [{ma_khuon, ..., severity, lyDo}]
 let moldMap = {};
 let khRows = [];           // duc_khuon_bd_kh_tuan của tuần
@@ -445,10 +448,13 @@ async function loadAndRender(){
     if (due && due < mondayD) { if (severity !== 'lammoi') severity = 'baoduong'; lyDo.push('Quá hạn lịch ' + fmtDM(due)); }
     else if (due && due <= sundayD) { severity = severity || 'sap'; lyDo.push('Đến hạn ' + fmtDM(due)); }
     if (openIssues.length) { severity = severity || 'vande'; lyDo.push(openIssues.length + ' vấn đề mở'); }
+    // Khuôn không còn/chưa sản xuất (T79, quan-ly-khuon.html) thì không cần chú ý bảo dưỡng.
+    const tinhTrang = m.tinh_trang || 'dang_sx';
+    if (tinhTrang !== 'dang_sx') { severity = null; lyDo.length = 0; }
 
     return {
       ma_khuon: ma, tong_shot: tongShot, since: tongShot - shotBdgn, nguong_bd: nguongBd,
-      lan_bd: m.lan_bao_duong_gan_nhat, due, severity, lyDo, openIssues,
+      lan_bd: m.lan_bao_duong_gan_nhat, due, severity, lyDo, openIssues, tinhTrang,
     };
   }).sort((a, b) => a.ma_khuon.localeCompare(b.ma_khuon, 'vi', { numeric: true }));
   moldMap = Object.fromEntries(molds.map(m => [m.ma_khuon, m]));
@@ -495,6 +501,8 @@ function render(){
       const fa = Object.keys(a.kh).sort()[0], fb = Object.keys(b.kh).sort()[0];
       if (fa !== fb) return fa < fb ? -1 : 1;
     } else {
+      const ngung = r => (r.mold && r.mold.tinhTrang !== 'dang_sx') ? 1 : 0;
+      if (ngung(a) !== ngung(b)) return ngung(a) - ngung(b);
       const sa = sevOrder[a.mold?.severity] ?? 9, sb2 = sevOrder[b.mold?.severity] ?? 9;
       if (sa !== sb2) return sa - sb2;
     }
@@ -520,7 +528,8 @@ function render(){
       if (!hasKh && m && m.severity) suggestIdx = dates.findIndex((d, i) => d >= today && !run[i].length);
 
       const statusHtml = m
-        ? (m.lyDo.length ? m.lyDo.map(t => '<span class="sev ' + m.severity + '">' + escapeHtml(t) + '</span>').join('') : '<span class="sev ok">OK</span>') +
+        ? (m.tinhTrang !== 'dang_sx' ? '<span class="sev ngung">' + (TINH_TRANG_KHUON[m.tinhTrang] || m.tinhTrang) + '</span>'
+          : m.lyDo.length ? m.lyDo.map(t => '<span class="sev ' + m.severity + '">' + escapeHtml(t) + '</span>').join('') : '<span class="sev ok">OK</span>') +
           '<div>Shot từ lần BD: ' + fmtNum(m.since) + '/' + fmtNum(m.nguong_bd) + '</div>'
         : '<span class="sev vande">Không có trong danh mục khuôn</span>';
 
@@ -631,7 +640,8 @@ function openModal(id, ma, ngay){
     (maVal ? '' : '<option value="">— Chọn khuôn —</option>') +
     maList.map(x => {
       const m = moldMap[x];
-      return '<option value="' + escapeHtml(x) + '">' + escapeHtml(x) + (m && m.severity ? ' ⚠ ' + m.lyDo.join(', ') : '') + '</option>';
+      return '<option value="' + escapeHtml(x) + '">' + escapeHtml(x) + (m && m.severity ? ' ⚠ ' + m.lyDo.join(', ') : '') +
+        (m && m.tinhTrang !== 'dang_sx' ? ' — ' + (TINH_TRANG_KHUON[m.tinhTrang] || m.tinhTrang) : '') + '</option>';
     }).join(''), maVal || '');
   fillSelect(document.getElementById('f-ngay'),
     dates.map((d, i) => '<option value="' + d + '">' + THU_LABEL[i] + ' — ' + fmtDateVN(parseDate(d)) + '</option>').join(''), ngayVal);

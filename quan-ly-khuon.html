@@ -13,7 +13,8 @@
   trong duc-dashboard.html). Độc lập ca/ngày, 3 mục:
   - ?tab=khuon : danh sách khuôn (duc_shot_khuon) — khai báo/sửa/xoá khuôn
     (duc_configure_mold / duc_rename_khuon / duc_xoa_khuon), ghi bảo dưỡng tay
-    (duc_ghi_lich_su_bao_duong).
+    (duc_ghi_lich_su_bao_duong), tình trạng sử dụng (T79: tinh_trang qua
+    duc_khuon_doi_tinh_trang, lịch sử duc_khuon_tinh_trang_log).
   - ?tab=van-de: vấn đề khuôn (duc_van_de_khuon) — xử lý / xác nhận.
   - ?tab=mau&khuon=X: hạng mục check sheet bảo dưỡng (duc_khuon_cs_mau +
     duc_khuon_cs_mau_bo, T76/T78) — mục chung, bỏ mục chung cho 1 khuôn, mục
@@ -69,6 +70,23 @@ td.act{white-space:nowrap;text-align:right}
 .st.ok{color:var(--run-fg)}.st.soon{color:var(--warn-fg)}.st.due{color:var(--alarm-fg)}.st.renew{color:#9F1239}
 .bar{height:5px;border-radius:3px;background:var(--bg-sunken);margin-top:3px;overflow:hidden;min-width:70px}
 .bar i{display:block;height:100%}
+.tt{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:100px;white-space:nowrap}
+.tt.dang_sx{background:var(--run-bg);color:var(--run-fg)}
+.tt.moi_chua_sx{background:#E0F2FE;color:#075985}
+.tt.dung_het_tuoi_tho{background:#F1F5F9;color:#475569}
+.tt.cho_tra_khach{background:#F3E8FF;color:#6B21A8}
+.tt.cho_bao_phe{background:var(--alarm-bg);color:var(--alarm-fg)}
+.tt-sub{font-size:10.5px;color:var(--text-dim);margin-top:2px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr.inactive td{color:var(--text-muted)}
+tr.inactive .st,tr.inactive .bar{opacity:.45}
+.chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chips .lbl{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;min-width:78px}
+.tt-opts{display:flex;flex-direction:column;gap:6px}
+.tt-opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer}
+.tt-opt:has(input:checked){border-color:var(--accent);background:#F0F7FF}
+.tt-opt input{margin-top:3px}
+.tt-opt small{display:block;color:var(--text-muted);font-size:11.5px;margin-top:1px}
+.tt-opt.cur{opacity:.55;cursor:default}
 .iss-tag{display:inline-block;font-size:10.5px;font-weight:700;margin-top:2px}
 .empty{padding:16px;text-align:center;color:var(--text-dim)}
 .issue{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff}
@@ -141,14 +159,15 @@ details.adv summary{cursor:pointer;font-size:12px;color:var(--text-muted);font-w
   <section class="card" id="sec-khuon" hidden>
     <div class="toolbar">
       <input type="search" id="kSearch" placeholder="Tìm mã khuôn / mã SP...">
-      <span id="kChips"></span>
       <span class="spacer"></span>
       <button type="button" class="btn" id="btnNewMold">＋ Khai báo khuôn mới</button>
     </div>
+    <div class="toolbar chips" id="ttChips"></div>
+    <div class="toolbar chips" id="kChips"></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Khuôn</th><th>Mã SP</th><th style="text-align:right">Tổng shot</th><th style="text-align:right">Từ lần BD</th>
+      <thead><tr><th>Khuôn</th><th>Tình trạng</th><th>Mã SP</th><th style="text-align:right">Tổng shot</th><th style="text-align:right">Từ lần BD</th>
         <th style="text-align:right">Ngưỡng BD</th><th style="text-align:right">Ngưỡng LM</th><th>BD gần nhất</th><th>Hạn BD (theo ngày)</th><th>Trạng thái</th><th></th></tr></thead>
-      <tbody id="tbKhuon"><tr><td colspan="10" class="empty">Đang tải...</td></tr></tbody>
+      <tbody id="tbKhuon"><tr><td colspan="11" class="empty">Đang tải...</td></tr></tbody>
     </table></div>
   </section>
 
@@ -201,6 +220,23 @@ details.adv summary{cursor:pointer;font-size:12px;color:var(--text-muted);font-w
   </div>
 </div>
 
+<!-- Hộp thoại: đổi tình trạng khuôn -->
+<div class="dlg-mask" id="dlg-tt">
+  <div class="dlg">
+    <div class="dlg-head"><span>🏷 Tình trạng khuôn <span id="tt-tag"></span></span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div class="hint" id="tt-shot"></div>
+      <div class="tt-opts" id="tt-opts"></div>
+      <div class="fg"><label>Lý do / ghi chú *</label><textarea id="tt-ly-do" placeholder="VD: Đạt 100.000 shot, khách yêu cầu trả khuôn theo PO 123..."></textarea></div>
+      <div class="fg"><label>Lịch sử tình trạng</label><div class="hist" id="tt-history">—</div></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-outline" data-close>Huỷ</button>
+      <button type="button" class="btn" id="tt-save">Lưu tình trạng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hộp thoại: ghi bảo dưỡng tay -->
 <div class="dlg-mask" id="dlg-mm">
   <div class="dlg">
@@ -241,12 +277,21 @@ const MOLD = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000, WARN_RATIO: 0.
 const ST_CLS = { 'OK': 'ok', 'Sắp bảo dưỡng': 'soon', 'Cần bảo dưỡng': 'due', 'Cần làm mới': 'renew' };
 const ST_PRIO = { 'Cần làm mới': 0, 'Cần bảo dưỡng': 1, 'Sắp bảo dưỡng': 2, 'OK': 3 };
 const TABS = ['khuon', 'van-de', 'mau'];
+// Tình trạng sử dụng (T79) — thứ tự = thứ tự hiển thị / sắp xếp.
+const TT = {
+  dang_sx:           ['🟢 Đang sản xuất', 'Khuôn đang dùng cho sản xuất'],
+  moi_chua_sx:       ['🆕 Mới — chưa vào SX', 'Khuôn mới nhận, chưa đưa vào sản xuất'],
+  dung_het_tuoi_tho: ['⛔ Hết tuổi thọ — dừng SX', 'Đã dừng sản xuất, chưa quyết định trả khách hay báo phế'],
+  cho_tra_khach:     ['📦 Chờ trả khách hàng', 'Hết tuổi thọ, chờ trả khuôn về khách hàng'],
+  cho_bao_phe:       ['🗑 Chờ báo phế', 'Hết tuổi thọ, chờ làm thủ tục báo phế'],
+};
+const TT_KEYS = Object.keys(TT);
 
 const qs = new URLSearchParams(location.search);
 let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'khuon';
 let myRole = null, myBoPhan = [], userName = '';
 let molds = [], products = [], issues = [], mau = [], mauBo = [];
-let kFilter = 'all', iFilter = 'open';
+let kFilter = 'all', ttFilter = 'all', iFilter = 'open';
 let mauKhuon = qs.get('khuon') || null;
 let cur = null;   // khuôn đang mở trong hộp thoại
 
@@ -264,6 +309,7 @@ function showMsg(text, cls, ms){
   clearTimeout(msgTimer);
   msgTimer = setTimeout(() => { el.className = ''; }, ms || 3500);
 }
+function laNguoiDoiTinhTrang(){ return ['admin', 'nhan_vien_bao_duong_khuon'].includes(myRole) || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
 function laNguoiSuaMau(){ return myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
 
 async function rpcWrite(fn, params){
@@ -307,7 +353,9 @@ function normMold(m){
   return { ma_khuon: String(m.ma_khuon).trim(), ten_sp_gan_nhat: m.ten_sp_gan_nhat || '', tong_shot_luy_ke: tong,
     nguong_bao_duong: nguongBD, nguong_lam_moi: nguongLM, lan_bao_duong_gan_nhat: m.lan_bao_duong_gan_nhat || null,
     shot_tai_lan_bao_duong_gan_nhat: shotBD, chu_ky_bao_duong_ngay: m.chu_ky_bao_duong_ngay || null,
-    shots_since_maintenance: tong - shotBD, trang_thai_khuon: moldStatus(tong, shotBD, nguongBD, nguongLM) };
+    shots_since_maintenance: tong - shotBD, trang_thai_khuon: moldStatus(tong, shotBD, nguongBD, nguongLM),
+    tinh_trang: TT[m.tinh_trang] ? m.tinh_trang : 'dang_sx', tinh_trang_ly_do: m.tinh_trang_ly_do || '',
+    tinh_trang_luc: m.tinh_trang_luc || null, tinh_trang_boi: m.tinh_trang_boi || '' };
 }
 function nextDueLabel(m){
   if (!m.lan_bao_duong_gan_nhat || !m.chu_ky_bao_duong_ngay) return '—';
@@ -330,6 +378,7 @@ async function loadMolds(){
   const { data, error } = await sb.from('duc_shot_khuon').select('*');
   if (error) return showMsg('Lỗi tải khuôn: ' + error.message, 'err', 6000);
   molds = (data || []).filter(m => m.ma_khuon).map(normMold).sort((a, b) =>
+    (TT_KEYS.indexOf(a.tinh_trang) - TT_KEYS.indexOf(b.tinh_trang)) ||
     (ST_PRIO[a.trang_thai_khuon] - ST_PRIO[b.trang_thai_khuon]) || naturalCompare(a.ma_khuon, b.ma_khuon));
 }
 async function loadIssues(){
@@ -373,16 +422,24 @@ function openIssuesByMold(){
   return map;
 }
 function renderMolds(){
-  const counts = { all: molds.length };
-  molds.forEach(m => { counts[m.trang_thai_khuon] = (counts[m.trang_thai_khuon] || 0) + 1; });
-  document.getElementById('kChips').innerHTML = [['all', 'Tất cả'], ['Cần làm mới'], ['Cần bảo dưỡng'], ['Sắp bảo dưỡng'], ['OK']]
-    .map(([k, l]) => '<button type="button" class="chip' + (kFilter === k ? ' on' : '') + '" data-kf="' + escapeHtml(k) + '">' + escapeHtml(l || k) + ' ' + (counts[k] || 0) + '</button>').join(' ');
+  const ttCounts = { all: molds.length };
+  molds.forEach(m => { ttCounts[m.tinh_trang] = (ttCounts[m.tinh_trang] || 0) + 1; });
+  document.getElementById('ttChips').innerHTML = '<span class="lbl">Tình trạng</span>' +
+    [['all', 'Tất cả'], ...TT_KEYS.map(k => [k, TT[k][0]])].map(([k, l]) =>
+      '<button type="button" class="chip' + (ttFilter === k ? ' on' : '') + '" data-ttf="' + k + '">' + escapeHtml(l) + ' ' + (ttCounts[k] || 0) + '</button>').join('');
+  // Đếm trạng thái bảo dưỡng trong phạm vi tình trạng đang lọc.
+  const scope = molds.filter(m => ttFilter === 'all' || m.tinh_trang === ttFilter);
+  const counts = { all: scope.length };
+  scope.forEach(m => { counts[m.trang_thai_khuon] = (counts[m.trang_thai_khuon] || 0) + 1; });
+  document.getElementById('kChips').innerHTML = '<span class="lbl">Bảo dưỡng</span>' + [['all', 'Tất cả'], ['Cần làm mới'], ['Cần bảo dưỡng'], ['Sắp bảo dưỡng'], ['OK']]
+    .map(([k, l]) => '<button type="button" class="chip' + (kFilter === k ? ' on' : '') + '" data-kf="' + escapeHtml(k) + '">' + escapeHtml(l || k) + ' ' + (counts[k] || 0) + '</button>').join('');
   const q = document.getElementById('kSearch').value.trim().toLowerCase();
   const iss = openIssuesByMold();
-  const list = molds.filter(m => (kFilter === 'all' || m.trang_thai_khuon === kFilter) &&
+  const canTT = laNguoiDoiTinhTrang();
+  const list = scope.filter(m => (kFilter === 'all' || m.trang_thai_khuon === kFilter) &&
     (!q || m.ma_khuon.toLowerCase().includes(q) || m.ten_sp_gan_nhat.toLowerCase().includes(q)));
   const tb = document.getElementById('tbKhuon');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="empty">' + (molds.length ? 'Không có khuôn khớp bộ lọc' : 'Chưa có khuôn nào — bấm ＋ Khai báo khuôn mới, hoặc khuôn tự xuất hiện sau khi chạy xong 1 ca.') + '</td></tr>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="11" class="empty">' + (molds.length ? 'Không có khuôn khớp bộ lọc' : 'Chưa có khuôn nào — bấm ＋ Khai báo khuôn mới, hoặc khuôn tự xuất hiện sau khi chạy xong 1 ca.') + '</td></tr>'; return; }
   tb.innerHTML = list.map(m => {
     const pct = Math.min(100, Math.round(m.shots_since_maintenance / m.nguong_bao_duong * 100));
     const cls = ST_CLS[m.trang_thai_khuon] || '';
@@ -390,14 +447,17 @@ function renderMolds(){
     const pending = ii.some(x => x.trang_thai === 'Chờ xác nhận');
     const issTag = ii.length ? '<div><a href="?tab=van-de&q=' + encodeURIComponent(m.ma_khuon) + '" data-goissue="' + escapeHtml(m.ma_khuon) + '" class="iss-tag" style="color:' + (pending ? 'var(--warn-fg)' : '#C2410C') + '">' +
       (pending ? '❓ Chờ xác nhận' : '⚠ Có vấn đề') + (ii.length > 1 ? ' (' + ii.length + ')' : '') + '</a></div>' : '';
-    return '<tr><td class="mk">' + escapeHtml(m.ma_khuon) + '</td><td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
+    const ttCell = '<span class="tt ' + m.tinh_trang + '">' + TT[m.tinh_trang][0] + '</span>' +
+      (m.tinh_trang_ly_do ? '<div class="tt-sub" title="' + escapeHtml(m.tinh_trang_ly_do + ' — ' + m.tinh_trang_boi + ' ' + fmtDate(m.tinh_trang_luc)) + '">' + escapeHtml(m.tinh_trang_ly_do) + '</div>' : '');
+    return '<tr class="' + (m.tinh_trang === 'dang_sx' ? '' : 'inactive') + '"><td class="mk">' + escapeHtml(m.ma_khuon) + '</td><td>' + ttCell + '</td><td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
       '<td class="num">' + fmtNum(m.tong_shot_luy_ke) + '</td>' +
       '<td class="num">' + fmtNum(m.shots_since_maintenance) + '<div class="bar"><i class="' + cls + '" style="width:' + pct + '%;background:' +
         ({ ok: 'var(--run-fg)', soon: 'var(--warn-fg)', due: 'var(--alarm-fg)', renew: '#9F1239' }[cls] || 'var(--text-dim)') + '"></i></div></td>' +
       '<td class="num">' + fmtNum(m.nguong_bao_duong) + '</td><td class="num">' + fmtNum(m.nguong_lam_moi) + '</td>' +
       '<td>' + fmtDate(m.lan_bao_duong_gan_nhat) + '</td><td>' + nextDueLabel(m) + '</td>' +
       '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
-      '<td class="act"><button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
+      '<td class="act">' + (canTT ? '<button type="button" class="btn btn-outline btn-sm" data-tt="' + escapeHtml(m.ma_khuon) + '">🏷 Tình trạng</button> ' : '') +
+        '<button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
         '<button type="button" class="btn btn-outline btn-sm" data-mm="' + escapeHtml(m.ma_khuon) + '">🔧 Ghi BD</button> ' +
         '<a class="btn btn-outline btn-sm" href="?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + escapeHtml(m.ma_khuon) + '">📋 Hạng mục</a></td></tr>';
   }).join('');
@@ -471,6 +531,47 @@ async function deleteCfg(){
     showMsg('✓ Đã xoá khuôn ' + cur.ma_khuon, 'okmsg');
     await loadMolds(); renderMolds();
   } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+
+// ── Hộp thoại tình trạng khuôn (T79) ──────────────────────────────────────────
+async function openTt(maKhuon){
+  if (!(await ensureAuth())) return;
+  const m = molds.find(x => x.ma_khuon === maKhuon);
+  if (!m) return;
+  cur = m;
+  document.getElementById('tt-tag').textContent = m.ma_khuon;
+  document.getElementById('tt-shot').innerHTML = 'Tổng shot <b>' + fmtNum(m.tong_shot_luy_ke) + '</b> / ngưỡng làm mới ' + fmtNum(m.nguong_lam_moi) +
+    ' — <span class="st ' + (ST_CLS[m.trang_thai_khuon] || '') + '">' + escapeHtml(m.trang_thai_khuon) + '</span>';
+  document.getElementById('tt-opts').innerHTML = TT_KEYS.map(k => '<label class="tt-opt' + (k === m.tinh_trang ? ' cur' : '') + '">' +
+    '<input type="radio" name="tt" value="' + k + '"' + (k === m.tinh_trang ? ' disabled' : '') + '>' +
+    '<span><span class="tt ' + k + '">' + TT[k][0] + '</span>' + (k === m.tinh_trang ? ' <b style="font-size:11px">(hiện tại)</b>' : '') +
+    '<small>' + TT[k][1] + '</small></span></label>').join('');
+  document.getElementById('tt-ly-do').value = '';
+  openDlg('dlg-tt');
+  const h = document.getElementById('tt-history');
+  h.textContent = 'Đang tải...';
+  const { data } = await sb.from('duc_khuon_tinh_trang_log').select('tu,sang,ly_do,nguoi,thoi_diem')
+    .eq('ma_khuon', m.ma_khuon).order('thoi_diem', { ascending: false }).limit(10);
+  const lb = k => TT[k] ? TT[k][0] : (k || '—');
+  h.innerHTML = data && data.length ? data.map(r => '<div><b>' + fmtDate(r.thoi_diem) + '</b> — ' + escapeHtml(lb(r.tu)) + ' → <b>' + escapeHtml(lb(r.sang)) + '</b>' +
+    (r.nguoi ? ' — ' + escapeHtml(r.nguoi) : '') + (r.ly_do ? '<div style="color:var(--text-muted);border:none;padding:0">' + escapeHtml(r.ly_do) + '</div>' : '') + '</div>').join('')
+    : 'Chưa đổi tình trạng lần nào.';
+}
+async function saveTt(){
+  if (!cur) return;
+  const r = document.querySelector('#tt-opts input[name="tt"]:checked');
+  if (!r) return showMsg('Chọn tình trạng mới', 'err');
+  const lyDo = document.getElementById('tt-ly-do').value.trim();
+  if (!lyDo) return showMsg('Nhập lý do / ghi chú', 'err');
+  if (!(await ensureAuth())) return;
+  const btn = document.getElementById('tt-save'); btn.disabled = true;
+  try {
+    await rpcWrite('duc_khuon_doi_tinh_trang', { p_ma_khuon: cur.ma_khuon, p_tinh_trang: r.value, p_ly_do: lyDo });
+    closeDlg();
+    showMsg('✓ Khuôn ' + cur.ma_khuon + ': ' + TT[r.value][0], 'okmsg');
+    await loadMolds(); renderMolds();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+  finally { btn.disabled = false; }
 }
 
 // ── Hộp thoại ghi bảo dưỡng ───────────────────────────────────────────────────
@@ -692,9 +793,11 @@ function bindAll(){
   document.getElementById('iSearch').addEventListener('input', renderIssues);
   document.getElementById('btnNewMold').onclick = () => openCfg(null);
   document.getElementById('sec-khuon').addEventListener('click', e => {
-    const t = e.target.closest('[data-kf],[data-cfg],[data-mm],[data-gomau],[data-goissue]');
+    const t = e.target.closest('[data-kf],[data-ttf],[data-tt],[data-cfg],[data-mm],[data-gomau],[data-goissue]');
     if (!t) return;
     if (t.dataset.kf) { kFilter = t.dataset.kf; return renderMolds(); }
+    if (t.dataset.ttf) { ttFilter = t.dataset.ttf; return renderMolds(); }
+    if (t.dataset.tt) return openTt(t.dataset.tt);
     if (t.dataset.cfg) return openCfg(t.dataset.cfg);
     if (t.dataset.mm) return openMm(t.dataset.mm);
     e.preventDefault();
@@ -716,6 +819,7 @@ function bindAll(){
   document.getElementById('cfg-del').onclick = deleteCfg;
   document.getElementById('mm-loai').onchange = mmResetHint;
   document.getElementById('mm-save').onclick = saveMm;
+  document.getElementById('tt-save').onclick = saveTt;
   bindMau();
 }
 
