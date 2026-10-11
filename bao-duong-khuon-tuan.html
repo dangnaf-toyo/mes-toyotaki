@@ -9,89 +9,123 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
-  bao-duong-khuon-tuan.html — trang tổng hợp, KHÔNG phải nơi ghi nhận bảo
-  dưỡng (việc ghi nhận thực tế vẫn làm ở duc-dashboard.html → Quản lý khuôn,
-  xem migration_phase_D15_so_doi_khuon.sql). Trang này tự tính (không lưu gì
-  mới) danh sách khuôn cần chú ý trong 1 tuần, dựa trên 3 nguồn:
-    1) duc_shot_khuon — trạng thái khuôn (shot) + hạn bảo dưỡng theo ngày
-       (chu_ky_bao_duong_ngay, thêm ở D15).
-    2) duc_van_de_khuon — vấn đề khuôn còn tồn đọng (chưa đóng) + vài vấn đề
-       gần nhất đã đóng, làm "điểm cần chú ý" từ lần sản xuất trước.
-    3) duc_khsx_tuan_plan — kế hoạch sản xuất tuần (cột T2..CN theo máy/SP,
-       so_khuon có thể là danh sách nhiều khuôn cách nhau dấu phẩy) — dùng để
-       tìm NGÀY RẢNH của khuôn trong tuần (ngày không máy nào chạy khuôn đó)
-       để đề xuất ngày bảo dưỡng không cắt vào kế hoạch.
-  Đọc công khai (giống các trang report khác) — không có thao tác ghi ở đây.
+  bao-duong-khuon-tuan.html — kế hoạch bảo dưỡng khuôn tuần dạng lưới
+  Khuôn × Ngày (giống KHSX tuần), 1 màn hình:
+    - Lưới chính: mỗi ô = khuôn X bảo dưỡng ngày Y, loại việc + người thao
+      tác chịu trách nhiệm. Lưu ở duc_khuon_bd_kh_tuan (T74).
+    - Bảng "Phân công theo người": người × ngày → các khuôn phải làm.
+  Nguồn phụ trợ (chỉ đọc):
+    - duc_shot_khuon — shot/ngưỡng/hạn theo ngày → "khuôn cần chú ý" (gợi ý
+      đưa vào KH, kèm ngày rảnh đề xuất).
+    - duc_van_de_khuon — vấn đề khuôn tồn đọng, hiện trong form.
+    - duc_khsx_tuan_plan — ngày khuôn đang chạy máy (vạch đỏ dưới ô).
+    - duc_khuon_bao_duong_log — "Đã làm": có ghi nhận bảo dưỡng của khuôn
+      trong tuần. Ghi nhận thực tế vẫn ở duc-dashboard.html → Quản lý khuôn.
+  Ghi: admin / trưởng ca / kế hoạch / QLSX / quản lý (RLS T74).
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
 body{padding:6px 6px 60px}
-.wrap{max-width:none;margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
 header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
 .brand{display:flex;flex-direction:column;line-height:1.2}
 .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
 .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
 .header-group{display:flex;align-items:center;gap:6px}
 .header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500}
-.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;outline:none}
+.header-select{cursor:pointer}
 .header-select:hover{background:#3F5266}
+.header-input::placeholder{color:#94A3B8}
 .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
 .header-clock .date{font-size:10px;color:#94A3B8}
 .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
 .week-nav{display:flex;align-items:center;gap:6px}
-.week-nav button{border:1px solid #475569;background:#334155;border-radius:6px;padding:6px 10px;font-family:inherit;font-size:12.5px;cursor:pointer;font-weight:600;color:#F1F5F9}
-.week-nav button:hover{background:#3F5266;border-color:#93C5FD}
-.week-label{font-size:12.5px;font-weight:700;min-width:150px;text-align:center;color:#F1F5F9}
-.btn{border:none;border-radius:6px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff}
+.week-nav button{border:1px solid #475569;background:#334155;border-radius:5px;padding:6px 10px;font-family:inherit;font-size:12.5px;cursor:pointer;font-weight:600;color:#F1F5F9}
+.week-nav button:hover{background:#3F5266}
+.week-label{font-size:12.5px;font-weight:700;min-width:140px;text-align:center;color:#F1F5F9}
+.btn{border:none;border-radius:5px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none}
 .btn:hover{background:var(--accent-hover)}
-.btn-outline{background:transparent;border:1.5px solid var(--accent);color:var(--accent);border-radius:6px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
-.btn-outline:hover{background:var(--bg-sunken)}
-header .btn-outline{border-color:#475569;color:#F1F5F9}
-header .btn-outline:hover{background:#334155}
-.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;border-radius:6px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
 .btn-ghost:hover{background:#334155}
-.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:14px 16px}
-.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
-.summary-bar{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 4px;font-size:12px;color:var(--text-muted)}
+.btn-outline{background:transparent;border:1.5px solid var(--accent);color:var(--accent)}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-danger{background:#FEE2E2;border:1px solid #F87171;color:#B91C1C}
+.btn-danger:hover{background:#FECACA}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:10px 12px}
+.card-title{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.summary-bar{display:flex;gap:18px;flex-wrap:wrap;align-items:baseline;font-size:12px;color:var(--text-muted)}
 .summary-bar b{font-size:15px;font-family:'JetBrains Mono',monospace}
-.empty-note{padding:28px;text-align:center;color:var(--run-fg);font-weight:600;font-size:13px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text-muted);margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.lg-box{width:12px;height:12px;border-radius:3px;display:inline-block}
 
-.mold-list{display:flex;flex-direction:column;gap:10px}
-.mold-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-left-width:5px;background:var(--bg-panel);box-shadow:var(--shadow-sm)}
-.mold-card.sev-lammoi{border-left-color:#9F1239;background:#FCE7F3}
-.mold-card.sev-baoduong{border-left-color:var(--alarm-fg);background:var(--alarm-bg)}
-.mold-card.sev-sap{border-left-color:var(--warn-fg);background:var(--warn-bg)}
-.mold-card.sev-vande{border-left-color:#C2410C;background:#FFF7ED}
-.mold-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
-.mold-head .ma{font-size:15px;font-weight:800}
-.mold-head .ly-do{font-size:12px;font-weight:700}
-.mold-head .ly-do.lammoi{color:#9F1239}
-.mold-head .ly-do.baoduong{color:var(--alarm-fg)}
-.mold-head .ly-do.sap{color:var(--warn-fg)}
-.mold-head .ly-do.vande{color:#C2410C}
-.mold-meta{font-size:11.5px;color:var(--text-muted);margin-bottom:8px}
-.mold-suggest{font-size:12.5px;font-weight:700;padding:6px 10px;border-radius:7px;display:inline-block;margin-bottom:8px}
-.mold-suggest.ok{background:var(--run-bg);color:var(--run-fg)}
-.mold-suggest.warn{background:var(--alarm-bg);color:var(--alarm-fg)}
-.mold-suggest.none{background:var(--bg-sunken);color:var(--text-muted)}
-.mold-usage{font-size:11.5px;color:var(--text-muted);margin-bottom:6px}
-.mold-usage code{background:var(--bg-sunken);padding:1px 5px;border-radius:4px}
-.attention-list{font-size:12px;background:var(--bg-panel);border:1px dashed var(--border);border-radius:8px;padding:8px 10px}
-.attention-list .no-issue{color:var(--text-dim);font-style:italic}
-.attention-item{padding:4px 0;border-bottom:1px solid var(--bg-sunken)}
-.attention-item:last-child{border-bottom:none}
-.attention-item .tag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-right:6px}
-.attention-item .tag.mo{background:var(--alarm-bg);color:var(--alarm-fg)}
-.attention-item .tag.cho{background:var(--warn-bg);color:var(--warn-fg)}
-.attention-item .tag.dong{background:var(--bg-sunken);color:var(--text-muted)}
-.day-chips{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
-.day-chip{font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--bg-sunken);color:var(--text-dim)}
-.day-chip.busy{background:var(--alarm-bg);color:#9F1239}
-.day-chip.free{background:var(--run-bg);color:var(--run-fg)}
-#msg{max-width:none;margin:0 0 12px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.tbl-wrap{overflow:auto;border-radius:8px;border:1px solid var(--border);max-height:calc(100vh - 330px);min-height:220px}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--border);border-right:1px solid var(--bg-sunken);padding:5px 6px;text-align:left;vertical-align:top}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;position:sticky;top:0;z-index:2;white-space:nowrap}
+th.day{text-align:center;min-width:118px}
+th.day .d{display:block;font-size:10px;font-weight:600;color:var(--text-dim);text-transform:none}
+th.today{background:#DBEAFE;color:var(--accent)}
+td.today{background:#F5F9FF}
+td.khuon{font-weight:800;white-space:nowrap;position:sticky;left:0;background:var(--bg-panel);z-index:1}
+td.status{font-size:11px;color:var(--text-muted);min-width:170px;max-width:240px}
+.sev{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin:0 3px 2px 0}
+.sev.lammoi{background:#FCE7F3;color:#9F1239}
+.sev.baoduong{background:var(--alarm-bg);color:var(--alarm-fg)}
+.sev.sap{background:var(--warn-bg);color:var(--warn-fg)}
+.sev.vande{background:#FFF7ED;color:#C2410C}
+.sev.ok{background:var(--run-bg);color:var(--run-fg)}
+tr.goi-y td.khuon::after{content:'chưa lên KH';display:block;font-size:9.5px;font-weight:700;color:var(--warn-fg)}
+td.cell{height:44px;position:relative}
+td.cell.editable{cursor:pointer}
+td.cell.editable:hover{background:#EFF6FF}
+td.cell.editable:empty:hover::after,td.cell.editable .add-hint{content:'+';color:var(--accent);font-weight:700}
+td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
+.chip{border-radius:6px;padding:3px 6px;font-size:11px;line-height:1.25;border-left:4px solid var(--accent);background:#E0EDFA}
+.chip .lo{font-weight:700}
+.chip .ng{color:var(--text);font-weight:600}
+.chip .gc{color:var(--text-muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.chip.done{background:var(--run-bg);border-left-color:var(--run-fg)}
+.chip.late{background:var(--alarm-bg);border-left-color:var(--alarm-fg)}
+.chip.no-person .ng{color:var(--alarm-fg);font-style:italic}
+.suggest{border:1.5px dashed var(--warn-fg);color:var(--warn-fg);border-radius:6px;padding:3px 6px;font-size:10.5px;font-weight:700;text-align:center}
+.run-lbl{position:absolute;right:3px;bottom:4px;font-size:9px;color:#B91C1C;font-weight:600}
+.empty-row td{text-align:center;color:var(--text-dim);padding:24px;font-style:italic}
+
+#tblNguoi td.cell{height:auto;font-size:11.5px}
+#tblNguoi .mk{display:inline-block;background:#E0EDFA;border-radius:4px;padding:1px 5px;margin:1px 2px 1px 0;font-weight:700}
+#tblNguoi .mk.done{background:var(--run-bg);color:var(--run-fg)}
+#tblNguoi .mk.late{background:var(--alarm-bg);color:var(--alarm-fg)}
+#tblNguoi td.khuon .cnt{font-weight:500;color:var(--text-muted);font-size:11px}
+
+#msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.ok{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+.ro-note{font-size:11.5px;color:var(--warn-fg);font-weight:600;text-transform:none;letter-spacing:0}
+
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);align-items:center;justify-content:center;z-index:50;padding:14px}
+.modal-mask.open{display:flex}
+.modal{background:var(--bg-panel);border-radius:10px;max-width:620px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:14.5px;font-weight:700}
+.modal-close{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text-dim)}
+.modal-body{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-body .full{grid-column:1/-1}
+.modal-foot{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
+.modal-foot .sp{flex:1}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%;color:var(--text);background:#fff}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+.info-box{font-size:12px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px;padding:8px 10px;line-height:1.5}
+.info-box .warn{color:var(--alarm-fg);font-weight:700}
+.info-box .iss{border-top:1px dashed var(--border);padding-top:3px;margin-top:3px}
+@media (max-width:700px){.modal-body{grid-template-columns:1fr}.tbl-wrap{max-height:none}}
 </style>
 </head>
 <body>
@@ -104,15 +138,23 @@ header .btn-outline:hover{background:#334155}
       <div class="co">Toyotaki</div>
       <div class="title">Kế hoạch bảo dưỡng khuôn tuần</div>
     </div>
+    <div class="header-divider"></div>
     <div class="week-nav">
       <button type="button" id="btnPrevWeek">‹ Tuần trước</button>
       <div class="week-label" id="weekLabel">—</div>
       <button type="button" id="btnNextWeek">Tuần sau ›</button>
     </div>
-    <button type="button" class="btn-outline" id="btnThisWeek">Tuần này</button>
-    <button type="button" class="btn-outline" id="btnNextWeekQuick">Tuần sau</button>
-    <div style="flex:1"></div>
-    <a class="btn btn-ghost" href="duc-dashboard.html" target="_blank" rel="noopener">🔧 Mở Quản lý khuôn (ghi nhận) →</a>
+    <button type="button" class="btn btn-ghost" id="btnThisWeek">Tuần này</button>
+    <div class="header-group">
+      <span class="header-label">Hiển thị</span>
+      <select class="header-select" id="selView">
+        <option value="kh">KH + khuôn cần chú ý</option>
+        <option value="all">Tất cả khuôn</option>
+      </select>
+    </div>
+    <input class="header-input" id="txtSearch" placeholder="Tìm khuôn / người…" style="width:150px">
+    <button type="button" class="btn" id="btnAdd">➕ Thêm lịch bảo dưỡng</button>
+    <a class="btn btn-ghost" href="duc-dashboard.html" target="_blank" rel="noopener">🔧 Ghi nhận đã làm →</a>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
       <div class="time" id="hdrClockTime"></div>
@@ -123,7 +165,72 @@ header .btn-outline:hover{background:#334155}
     <div class="summary-bar" id="summaryBar"></div>
   </div>
 
-  <div id="moldList" class="mold-list"></div>
+  <div class="card">
+    <div class="card-title">
+      Lịch bảo dưỡng theo khuôn
+      <span class="ro-note" id="roNote"></span>
+      <div class="legend">
+        <span><i class="lg-box" style="background:#E0EDFA;border-left:3px solid var(--accent)"></i>Kế hoạch</span>
+        <span><i class="lg-box" style="background:var(--run-bg);border-left:3px solid var(--run-fg)"></i>Đã làm</span>
+        <span><i class="lg-box" style="background:var(--alarm-bg);border-left:3px solid var(--alarm-fg)"></i>Trễ</span>
+        <span><i class="lg-box" style="border:1.5px dashed var(--warn-fg)"></i>Đề xuất ngày rảnh</span>
+        <span><i class="lg-box" style="box-shadow:inset 0 -3px 0 #F87171;background:var(--bg-sunken)"></i>Khuôn chạy máy (KHSX)</span>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="tblKhuon"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Phân công theo người thao tác</div>
+    <div class="tbl-wrap" style="max-height:none;min-height:0">
+      <table id="tblNguoi"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="modalKh">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">Lịch bảo dưỡng khuôn</div>
+      <button class="modal-close" type="button" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Khuôn</label>
+        <select id="f-khuon"></select>
+      </div>
+      <div class="fg">
+        <label>Ngày dự kiến</label>
+        <select id="f-ngay"></select>
+      </div>
+      <div class="fg">
+        <label>Loại công việc</label>
+        <select id="f-loai">
+          <option>Bảo dưỡng định kỳ</option>
+          <option>Sửa chữa</option>
+          <option>Thay khuôn mới</option>
+          <option>Kiểm tra</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Người thao tác chịu trách nhiệm</label>
+        <select id="f-nguoi"></select>
+      </div>
+      <div class="fg full">
+        <label>Ghi chú / nội dung cần làm</label>
+        <input id="f-ghi-chu" maxlength="300" placeholder="VD: đánh bóng lòng khuôn, thay ty đẩy…">
+      </div>
+      <div class="info-box full" id="f-info"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-danger" id="btnDelete">🗑️ Xoá</button>
+      <div class="sp"></div>
+      <button type="button" class="btn btn-outline" onclick="closeModal()">Huỷ</button>
+      <button type="button" class="btn" id="btnSave">💾 Lưu</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -132,35 +239,59 @@ header .btn-outline:hover{background:#334155}
 <script>
 const THU_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
 const THU_LABEL = ['T2','T3','T4','T5','T6','T7','CN'];
+const LOAI_NGAN = { 'Bảo dưỡng định kỳ': 'BD định kỳ', 'Sửa chữa': 'Sửa chữa', 'Thay khuôn mới': 'Thay mới', 'Kiểm tra': 'Kiểm tra' };
+// Khớp RLS T74.
+const EDIT_ROLES = ['admin','truong_ca','ke_hoach','qlsx_nhan_vien','qlsx_truong_phong','quan_ly_bo_phan','giam_doc_sx'];
+// CONFIG.MOLD mặc định — khớp duc-dashboard.html khi khuôn chưa tự set ngưỡng riêng.
+const MOLD_DEFAULT = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000 };
+
 let weekMonday = mondayOf(new Date());
+let canEdit = false;
+let molds = [];            // [{ma_khuon, ..., severity, lyDo}]
+let moldMap = {};
+let khRows = [];           // duc_khuon_bd_kh_tuan của tuần
+let logsByMold = {};       // ma_khuon -> [log trong tuần]
+let issuesByMold = {};     // ma_khuon -> [vấn đề]
+let runByMold = {};        // ma_khuon -> [7 x [label máy/SP]]
+let employees = [];        // [{ten_nhan_vien, vai_tro}]
+let editingId = null;
 
 function mondayOf(d){
   const x = new Date(d);
   const day = x.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
+  x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day));
   x.setHours(0,0,0,0);
   return x;
 }
 function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function fmtDate(d){
-  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 function fmtDateVN(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }
+function fmtDM(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
+function parseDate(s){ const [y,m,d] = String(s).slice(0,10).split('-').map(Number); return new Date(y, m-1, d); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function showMsg(text, cls){ const el = document.getElementById('msg'); el.textContent = text; el.className = cls; }
+let msgTimer = null;
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  clearTimeout(msgTimer);
+  if (ms) msgTimer = setTimeout(() => { el.className = ''; }, ms);
+}
+function weekDates(){ return THU_COLS.map((_, i) => fmtDate(addDays(weekMonday, i))); }
+function todayStr(){ return fmtDate(new Date()); }
 
 function updateWeekLabel(){
-  const sunday = addDays(weekMonday, 6);
-  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday) + ' — ' + fmtDateVN(sunday);
+  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday) + ' — ' + fmtDateVN(addDays(weekMonday, 6));
 }
 function onWeekChange(){ updateWeekLabel(); loadAndRender(); }
 document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday = addDays(weekMonday, -7); onWeekChange(); });
 document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday = addDays(weekMonday, 7); onWeekChange(); });
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
-document.getElementById('btnNextWeekQuick').addEventListener('click', () => { weekMonday = addDays(mondayOf(new Date()), 7); onWeekChange(); });
+document.getElementById('selView').addEventListener('change', render);
+document.getElementById('txtSearch').addEventListener('input', render);
+document.getElementById('btnAdd').addEventListener('click', () => openModal(null, null, null));
 
 function startHeaderClock(){
   function tick(){
@@ -172,9 +303,6 @@ function startHeaderClock(){
   setInterval(tick, 1000);
 }
 
-// CONFIG.MOLD mặc định — khớp duc-dashboard.html khi khuôn chưa tự set ngưỡng riêng.
-const MOLD_DEFAULT = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000 };
-
 function computeMoldStatus(tongShot, shotBdgn, nguongBd, nguongLm){
   const sinceLast = tongShot - shotBdgn;
   if (tongShot >= nguongLm) return 'Cần làm mới';
@@ -183,165 +311,337 @@ function computeMoldStatus(tongShot, shotBdgn, nguongBd, nguongLm){
   return 'OK';
 }
 
-function nextDueDate(mold){
-  if (!mold.lan_bao_duong_gan_nhat || !mold.chu_ky_bao_duong_ngay) return null;
-  const due = new Date(mold.lan_bao_duong_gan_nhat);
-  due.setDate(due.getDate() + Number(mold.chu_ky_bao_duong_ngay));
-  return due;
+async function loadPermission(){
+  const session = await MesAuth.getSession();
+  if (!session) { canEdit = false; return; }
+  const { data } = await sb.from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle();
+  canEdit = !!(data && EDIT_ROLES.includes(data.role));
+}
+
+async function loadEmployees(){
+  const { data } = await sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan').order('ten_nhan_vien');
+  employees = data || [];
 }
 
 async function loadAndRender(){
-  document.getElementById('moldList').innerHTML = '<div class="empty-note" style="color:#999">Đang tải...</div>';
-  document.getElementById('summaryBar').innerHTML = '';
-  const weekEnd = addDays(weekMonday, 6);
-  const [moldsRes, issuesRes, planRes] = await Promise.all([
+  document.querySelector('#tblKhuon tbody').innerHTML = '<tr class="empty-row"><td colspan="9">Đang tải...</td></tr>';
+  const tuan = fmtDate(weekMonday);
+  const weekEnd = fmtDate(addDays(weekMonday, 6));
+  const [moldsRes, issuesRes, planRes, khRes, logRes] = await Promise.all([
     sb.from('duc_shot_khuon').select('*'),
     sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }),
-    sb.from('duc_khsx_tuan_plan').select('*').eq('tuan_bat_dau', fmtDate(weekMonday)),
+    sb.from('duc_khsx_tuan_plan').select('ma_may,ma_sp,so_khuon,t2,t3,t4,t5,t6,t7,cn').eq('tuan_bat_dau', tuan),
+    sb.from('duc_khuon_bd_kh_tuan').select('*').eq('tuan_bat_dau', tuan),
+    sb.from('duc_khuon_bao_duong_log').select('ma_khuon,loai,ngay,nguoi_thuc_hien').gte('ngay', tuan).lte('ngay', weekEnd),
   ]);
-  if (moldsRes.error) return showMsg('Lỗi tải khuôn: ' + moldsRes.error.message, 'err');
-  if (issuesRes.error) return showMsg('Lỗi tải vấn đề khuôn: ' + issuesRes.error.message, 'err');
-  if (planRes.error) return showMsg('Lỗi tải kế hoạch tuần: ' + planRes.error.message, 'err');
+  for (const [r, name] of [[moldsRes,'khuôn'],[issuesRes,'vấn đề khuôn'],[planRes,'KHSX tuần'],[khRes,'kế hoạch bảo dưỡng'],[logRes,'lịch sử bảo dưỡng']]) {
+    if (r.error) return showMsg('Lỗi tải ' + name + ': ' + r.error.message, 'err');
+  }
 
-  // Gom vấn đề theo khuôn (mở/chờ xác nhận trước, rồi tới gần nhất đã đóng).
-  const issuesByMold = {};
+  issuesByMold = {};
   (issuesRes.data || []).forEach(x => {
     const k = String(x.ma_khuon || '').trim();
-    if (!k) return;
-    (issuesByMold[k] = issuesByMold[k] || []).push(x);
+    if (k) (issuesByMold[k] = issuesByMold[k] || []).push(x);
   });
 
-  // Gom kế hoạch tuần theo khuôn — 1 khuôn có thể dùng ở nhiều dòng máy/SP
-  // (khuôn kép, hoặc dùng chung nhiều máy), so_khuon có thể là danh sách
-  // "A, B" cách nhau dấu phẩy (xem migration_phase_S7_sokhuon_real.sql).
-  const planByMold = {};
+  // so_khuon có thể là "A, B" (khuôn kép / dùng chung nhiều máy).
+  runByMold = {};
   (planRes.data || []).forEach(r => {
     String(r.so_khuon || '').split(',').map(s => s.trim()).filter(Boolean).forEach(mk => {
-      (planByMold[mk] = planByMold[mk] || []).push(r);
+      const days = runByMold[mk] = runByMold[mk] || THU_COLS.map(() => []);
+      THU_COLS.forEach((c, i) => { if (Number(r[c]) > 0) days[i].push(r.ma_may + ' (' + r.ma_sp + ')'); });
     });
   });
 
-  const molds = (moldsRes.data || []).filter(m => m.ma_khuon).map(m => {
+  khRows = khRes.data || [];
+  logsByMold = {};
+  (logRes.data || []).forEach(l => { (logsByMold[l.ma_khuon] = logsByMold[l.ma_khuon] || []).push(l); });
+
+  const mondayD = weekMonday, sundayD = addDays(weekMonday, 6);
+  molds = (moldsRes.data || []).filter(m => m.ma_khuon).map(m => {
     const nguongBd = Number(m.nguong_bao_duong) || MOLD_DEFAULT.MAINTENANCE_SHOT;
     const nguongLm = Number(m.nguong_lam_moi) || MOLD_DEFAULT.REPLACEMENT_SHOT;
     const tongShot = Number(m.tong_shot_luy_ke) || 0;
     const shotBdgn = Number(m.shot_tai_lan_bao_duong_gan_nhat) || 0;
+    const ma = String(m.ma_khuon).trim();
+    const tt = computeMoldStatus(tongShot, shotBdgn, nguongBd, nguongLm);
+    const due = (m.lan_bao_duong_gan_nhat && m.chu_ky_bao_duong_ngay)
+      ? addDays(parseDate(m.lan_bao_duong_gan_nhat), Number(m.chu_ky_bao_duong_ngay)) : null;
+    const openIssues = (issuesByMold[ma] || []).filter(x => x.trang_thai !== 'Đã đóng');
+
+    let severity = null; const lyDo = [];
+    if (tt === 'Cần làm mới') { severity = 'lammoi'; lyDo.push('Cần làm mới'); }
+    else if (tt === 'Cần bảo dưỡng') { severity = 'baoduong'; lyDo.push('Cần BD (shot)'); }
+    else if (tt === 'Sắp bảo dưỡng') { severity = 'sap'; lyDo.push('Sắp BD (shot)'); }
+    if (due && due < mondayD) { if (severity !== 'lammoi') severity = 'baoduong'; lyDo.push('Quá hạn lịch ' + fmtDM(due)); }
+    else if (due && due <= sundayD) { severity = severity || 'sap'; lyDo.push('Đến hạn ' + fmtDM(due)); }
+    if (openIssues.length) { severity = severity || 'vande'; lyDo.push(openIssues.length + ' vấn đề mở'); }
+
     return {
-      ma_khuon: String(m.ma_khuon).trim(),
-      lan_bao_duong_gan_nhat: m.lan_bao_duong_gan_nhat,
-      chu_ky_bao_duong_ngay: m.chu_ky_bao_duong_ngay,
-      tong_shot_luy_ke: tongShot,
-      shots_since_maintenance: tongShot - shotBdgn,
-      nguong_bao_duong: nguongBd,
-      trang_thai_khuon: computeMoldStatus(tongShot, shotBdgn, nguongBd, nguongLm),
-      due: nextDueDate(m),
+      ma_khuon: ma, tong_shot: tongShot, since: tongShot - shotBdgn, nguong_bd: nguongBd,
+      lan_bd: m.lan_bao_duong_gan_nhat, due, severity, lyDo, openIssues,
     };
-  });
+  }).sort((a, b) => a.ma_khuon.localeCompare(b.ma_khuon, 'vi', { numeric: true }));
+  moldMap = Object.fromEntries(molds.map(m => [m.ma_khuon, m]));
 
-  const attentionItems = [];
-  molds.forEach(m => {
-    const issues = issuesByMold[m.ma_khuon] || [];
-    const openIssues = issues.filter(x => x.trang_thai !== 'Đã đóng');
-    const dueInWeek = m.due && m.due >= weekMonday && m.due <= weekEnd;
-    const overdue = m.due && m.due < weekMonday;
+  render();
+}
 
-    let severity = null, lyDo = [];
-    if (m.trang_thai_khuon === 'Cần làm mới') { severity = 'lammoi'; lyDo.push('CẦN LÀM MỚI — đã đạt ' + fmtNum(m.tong_shot_luy_ke) + ' shot tổng'); }
-    else if (m.trang_thai_khuon === 'Cần bảo dưỡng') { severity = 'baoduong'; lyDo.push('Cần bảo dưỡng — đã chạy ' + fmtNum(m.shots_since_maintenance) + '/' + fmtNum(m.nguong_bao_duong) + ' shot từ lần BD trước'); }
-    else if (m.trang_thai_khuon === 'Sắp bảo dưỡng') { severity = severity || 'sap'; lyDo.push('Sắp đến ngưỡng shot bảo dưỡng (' + fmtNum(m.shots_since_maintenance) + '/' + fmtNum(m.nguong_bao_duong) + ')'); }
-    if (overdue) { severity = severity === 'lammoi' ? severity : 'baoduong'; lyDo.push('QUÁ HẠN bảo dưỡng theo lịch từ ' + fmtDateVN(m.due)); }
-    else if (dueInWeek) { severity = severity || 'sap'; lyDo.push('Đến hạn bảo dưỡng theo lịch vào ' + fmtDateVN(m.due)); }
-    if (openIssues.length) { severity = severity || 'vande'; lyDo.push(openIssues.length + ' vấn đề khuôn chưa đóng'); }
+// "Đã làm" = khuôn có ghi nhận bảo dưỡng/sửa chữa trong tuần (duc_khuon_bao_duong_log).
+function statusOf(row){
+  const logs = logsByMold[row.ma_khuon] || [];
+  if (logs.length) return { cls: 'done', log: logs[0] };
+  if (row.ngay < todayStr()) return { cls: 'late' };
+  return { cls: '' };
+}
 
-    if (!severity) return; // khuôn ổn, không cần đưa vào kế hoạch tuần này
+function render(){
+  const view = document.getElementById('selView').value;
+  const q = document.getElementById('txtSearch').value.trim().toLowerCase();
+  const dates = weekDates();
+  const today = todayStr();
 
-    const planRows = planByMold[m.ma_khuon] || [];
-    const busyByDay = THU_COLS.map(col => planRows.some(r => Number(r[col]) > 0));
-    const usageLabel = planRows.length
-      ? [...new Set(planRows.map(r => r.ma_may + ' (' + r.ma_sp + ')'))].join(', ')
-      : null;
+  const khByMold = {};
+  khRows.forEach(r => { (khByMold[r.ma_khuon] = khByMold[r.ma_khuon] || {})[r.ngay] = r; });
 
-    let suggest, suggestCls;
-    if (!planRows.length) {
-      suggest = 'Không có lịch chạy tuần này — bảo dưỡng ngày nào cũng được'; suggestCls = 'ok';
-    } else {
-      const freeIdx = busyByDay.findIndex(b => !b);
-      if (freeIdx === -1) {
-        suggest = 'Chạy đủ 7/7 ngày trong tuần — KHÔNG có ngày trống, cần trưởng ca chủ động sắp xếp dừng máy ngắn'; suggestCls = 'warn';
-      } else {
-        suggest = 'Đề xuất bảo dưỡng ' + THU_LABEL[freeIdx] + ' (' + fmtDateVN(addDays(weekMonday, freeIdx)) + ') — ngày khuôn không chạy'; suggestCls = 'ok';
-      }
-    }
-
-    // Điểm cần chú ý: ưu tiên vấn đề còn mở/chờ xác nhận, rồi tới 2 vấn đề gần nhất đã đóng (lịch sử lần SX trước).
-    const attention = issues
-      .slice()
-      .sort((a, b) => (a.trang_thai === 'Đã đóng') - (b.trang_thai === 'Đã đóng'))
-      .slice(0, 3);
-
-    attentionItems.push({ mold: m, severity, lyDo, planRows, busyByDay, usageLabel, suggest, suggestCls, attention });
-  });
-
+  // Khuôn có trong KH nhưng không còn trong danh mục vẫn phải hiện.
+  const allMa = new Set([...molds.map(m => m.ma_khuon), ...Object.keys(khByMold)]);
   const sevOrder = { lammoi: 0, baoduong: 1, sap: 2, vande: 3 };
-  attentionItems.sort((a, b) => (sevOrder[a.severity] - sevOrder[b.severity]) || a.mold.ma_khuon.localeCompare(b.mold.ma_khuon));
+  let rows = [...allMa].map(ma => ({ ma, mold: moldMap[ma], kh: khByMold[ma] || {} }));
+  if (view === 'kh') rows = rows.filter(r => Object.keys(r.kh).length || (r.mold && r.mold.severity));
+  if (q) rows = rows.filter(r => r.ma.toLowerCase().includes(q) ||
+    Object.values(r.kh).some(k => (k.nguoi_phu_trach || '').toLowerCase().includes(q)));
+  rows.sort((a, b) => {
+    const ka = Object.keys(a.kh).length ? 0 : 1, kb = Object.keys(b.kh).length ? 0 : 1;
+    if (ka !== kb) return ka - kb;
+    if (ka === 0) {
+      const fa = Object.keys(a.kh).sort()[0], fb = Object.keys(b.kh).sort()[0];
+      if (fa !== fb) return fa < fb ? -1 : 1;
+    } else {
+      const sa = sevOrder[a.mold?.severity] ?? 9, sb2 = sevOrder[b.mold?.severity] ?? 9;
+      if (sa !== sb2) return sa - sb2;
+    }
+    return a.ma.localeCompare(b.ma, 'vi', { numeric: true });
+  });
 
-  renderSummary(attentionItems);
-  renderList(attentionItems);
-}
+  // Header
+  document.querySelector('#tblKhuon thead').innerHTML = '<tr><th>Khuôn</th><th>Tình trạng</th>' +
+    dates.map((d, i) => '<th class="day' + (d === today ? ' today' : '') + '">' + THU_LABEL[i] +
+      '<span class="d">' + fmtDM(parseDate(d)) + '</span></th>').join('') + '</tr>';
 
-function renderSummary(items){
-  const count = { lammoi: 0, baoduong: 0, sap: 0, vande: 0 };
-  items.forEach(x => count[x.severity]++);
-  document.getElementById('summaryBar').innerHTML =
-    '<span><b>' + items.length + '</b> khuôn cần chú ý tuần này</span>' +
-    '<span style="color:#9F1239">Cần làm mới: <b>' + count.lammoi + '</b></span>' +
-    '<span style="color:#B91C1C">Cần bảo dưỡng: <b>' + count.baoduong + '</b></span>' +
-    '<span style="color:#B45309">Sắp bảo dưỡng: <b>' + count.sap + '</b></span>' +
-    '<span style="color:#C2410C">Chỉ có vấn đề tồn đọng: <b>' + count.vande + '</b></span>';
-}
+  const tbody = document.querySelector('#tblKhuon tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">' +
+      (q ? 'Không có khuôn khớp tìm kiếm.' : '✓ Tuần này chưa có lịch và không có khuôn nào cần chú ý.') + '</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(r => {
+      const m = r.mold;
+      const hasKh = Object.keys(r.kh).length > 0;
+      const run = runByMold[r.ma] || THU_COLS.map(() => []);
+      // Gợi ý ngày rảnh đầu tiên (từ hôm nay trở đi) cho khuôn cần chú ý chưa lên KH.
+      let suggestIdx = -1;
+      if (!hasKh && m && m.severity) suggestIdx = dates.findIndex((d, i) => d >= today && !run[i].length);
 
-function renderList(items){
-  const wrap = document.getElementById('moldList');
-  if (!items.length) {
-    wrap.innerHTML = '<div class="card empty-note">✓ Không có khuôn nào cần chú ý trong tuần này.</div>';
-    return;
-  }
-  wrap.innerHTML = items.map(it => {
-    const attentionHtml = it.attention.length
-      ? it.attention.map(a => {
-          const tag = a.trang_thai === 'Đã đóng' ? '<span class="tag dong">Lịch sử</span>'
-            : a.trang_thai === 'Chờ xác nhận' ? '<span class="tag cho">Chờ xác nhận</span>'
-            : '<span class="tag mo">Đang mở</span>';
-          return '<div class="attention-item">' + tag +
-            (a.ngay_phat_hien ? fmtDateVN(new Date(a.ngay_phat_hien)) + ' — ' : '') +
-            escapeHtml(a.mo_ta || '(không có mô tả)') +
-            (a.ma_may ? ' <span style="color:#999">(' + escapeHtml(a.ma_may) + (a.ma_sp ? '/' + escapeHtml(a.ma_sp) : '') + ')</span>' : '') +
+      const statusHtml = m
+        ? (m.lyDo.length ? m.lyDo.map(t => '<span class="sev ' + m.severity + '">' + escapeHtml(t) + '</span>').join('') : '<span class="sev ok">OK</span>') +
+          '<div>Shot từ lần BD: ' + fmtNum(m.since) + '/' + fmtNum(m.nguong_bd) + '</div>'
+        : '<span class="sev vande">Không có trong danh mục khuôn</span>';
+
+      const cells = dates.map((d, i) => {
+        const k = r.kh[d];
+        const cls = ['cell'];
+        if (d === today) cls.push('today');
+        if (run[i].length) cls.push('run');
+        if (canEdit) cls.push('editable');
+        const title = run[i].length ? 'Khuôn chạy: ' + run[i].join(', ') : '';
+        let inner = '';
+        if (k) {
+          const st = statusOf(k);
+          inner = '<div class="chip ' + st.cls + (k.nguoi_phu_trach ? '' : ' no-person') + '">' +
+            '<div class="lo">' + (st.cls === 'done' ? '✓ ' : st.cls === 'late' ? '⚠ ' : '') + escapeHtml(LOAI_NGAN[k.loai] || k.loai) + '</div>' +
+            '<div class="ng">👤 ' + escapeHtml(k.nguoi_phu_trach || 'Chưa giao người') + '</div>' +
+            (k.ghi_chu ? '<div class="gc" title="' + escapeHtml(k.ghi_chu) + '">' + escapeHtml(k.ghi_chu) + '</div>' : '') +
             '</div>';
-        }).join('')
-      : '<span class="no-issue">Không có vấn đề nào ghi nhận trước đây.</span>';
+        } else if (i === suggestIdx) {
+          inner = '<div class="suggest">Đề xuất<br>(khuôn rảnh)</div>';
+        } else if (run[i].length) {
+          inner = '<span class="run-lbl">' + escapeHtml(run[i].map(x => x.split(' ')[0]).join(',')) + '</span>';
+        }
+        return '<td class="' + cls.join(' ') + '" title="' + escapeHtml(title) + '" data-ma="' + escapeHtml(r.ma) + '" data-ngay="' + d + '"' +
+          (k ? ' data-id="' + k.id + '"' : '') + '>' + inner + '</td>';
+      }).join('');
 
-    const dayChips = it.planRows.length
-      ? '<div class="day-chips">' + THU_LABEL.map((lbl, i) =>
-          '<span class="day-chip ' + (it.busyByDay[i] ? 'busy' : 'free') + '">' + lbl + (it.busyByDay[i] ? ' chạy' : ' rảnh') + '</span>'
-        ).join('') + '</div>'
-      : '';
+      return '<tr class="' + (hasKh ? '' : 'goi-y') + '"><td class="khuon">' + escapeHtml(r.ma) + '</td><td class="status">' + statusHtml + '</td>' + cells + '</tr>';
+    }).join('');
+  }
 
-    return '<div class="mold-card sev-' + it.severity + '">' +
-      '<div class="mold-head"><span class="ma">' + escapeHtml(it.mold.ma_khuon) + '</span>' +
-      '<span class="ly-do ' + it.severity + '">' + escapeHtml(it.lyDo.join(' · ')) + '</span></div>' +
-      '<div class="mold-meta">Tổng shot: ' + fmtNum(it.mold.tong_shot_luy_ke) + ' · Shot từ lần BD: ' + fmtNum(it.mold.shots_since_maintenance) +
-      (it.mold.chu_ky_bao_duong_ngay ? ' · Chu kỳ theo lịch: ' + it.mold.chu_ky_bao_duong_ngay + ' ngày' : '') + '</div>' +
-      '<div class="mold-suggest ' + it.suggestCls + '">📅 ' + escapeHtml(it.suggest) + '</div>' +
-      (it.usageLabel ? '<div class="mold-usage">Dùng ở: <code>' + escapeHtml(it.usageLabel) + '</code></div>' : '') +
-      dayChips +
-      '<div class="attention-list" style="margin-top:8px"><b style="font-size:11px;color:#556">⚠ Điểm cần chú ý (lịch sử vấn đề khuôn):</b>' + attentionHtml + '</div>' +
-      '</div>';
+  renderSummary();
+  renderNguoi();
+  document.getElementById('roNote').textContent = canEdit ? 'Bấm vào ô để lên lịch / sửa' : '🔒 Chỉ xem — trưởng ca / kế hoạch / QLSX / admin mới sửa được';
+  document.getElementById('btnAdd').style.display = canEdit ? '' : 'none';
+}
+
+document.querySelector('#tblKhuon tbody').addEventListener('click', e => {
+  const td = e.target.closest('td.cell');
+  if (!td || !canEdit) return;
+  openModal(td.dataset.id ? Number(td.dataset.id) : null, td.dataset.ma, td.dataset.ngay);
+});
+
+function renderSummary(){
+  const st = khRows.map(statusOf);
+  const done = st.filter(s => s.cls === 'done').length;
+  const late = st.filter(s => s.cls === 'late').length;
+  const noPerson = khRows.filter(r => !r.nguoi_phu_trach).length;
+  const planned = new Set(khRows.map(r => r.ma_khuon));
+  const chuaLen = molds.filter(m => m.severity && !planned.has(m.ma_khuon)).length;
+  document.getElementById('summaryBar').innerHTML =
+    '<span><b>' + khRows.length + '</b> lịch bảo dưỡng tuần (' + planned.size + ' khuôn)</span>' +
+    '<span style="color:var(--run-fg)">Đã làm: <b>' + done + '</b></span>' +
+    '<span style="color:var(--accent)">Chưa làm: <b>' + (khRows.length - done - late) + '</b></span>' +
+    '<span style="color:var(--alarm-fg)">Trễ: <b>' + late + '</b></span>' +
+    (noPerson ? '<span style="color:var(--alarm-fg)">Chưa giao người: <b>' + noPerson + '</b></span>' : '') +
+    '<span style="color:var(--warn-fg)">Khuôn cần chú ý chưa lên KH: <b>' + chuaLen + '</b></span>';
+}
+
+function renderNguoi(){
+  const dates = weekDates();
+  const today = todayStr();
+  const byPerson = {};
+  khRows.forEach(r => {
+    const p = r.nguoi_phu_trach || '(Chưa giao người)';
+    ((byPerson[p] = byPerson[p] || {})[r.ngay] = byPerson[p][r.ngay] || []).push(r);
+  });
+  const people = Object.keys(byPerson).sort((a, b) => (a[0] === '(') - (b[0] === '(') || a.localeCompare(b, 'vi'));
+  document.querySelector('#tblNguoi thead').innerHTML = '<tr><th>Người thao tác</th>' +
+    dates.map((d, i) => '<th class="day' + (d === today ? ' today' : '') + '">' + THU_LABEL[i] + '<span class="d">' + fmtDM(parseDate(d)) + '</span></th>').join('') + '</tr>';
+  const tbody = document.querySelector('#tblNguoi tbody');
+  if (!people.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có phân công nào trong tuần.</td></tr>'; return; }
+  tbody.innerHTML = people.map(p => {
+    const total = Object.values(byPerson[p]).reduce((s, a) => s + a.length, 0);
+    return '<tr><td class="khuon">' + escapeHtml(p) + ' <span class="cnt">(' + total + ')</span></td>' +
+      dates.map(d => '<td class="cell' + (d === today ? ' today' : '') + '">' +
+        (byPerson[p][d] || []).map(r => {
+          const st = statusOf(r);
+          return '<span class="mk ' + st.cls + '" title="' + escapeHtml(r.loai + (r.ghi_chu ? ' — ' + r.ghi_chu : '')) + '">' + escapeHtml(r.ma_khuon) + '</span>';
+        }).join('') + '</td>').join('') + '</tr>';
   }).join('');
 }
 
+// ── Form ─────────────────────────────────────────────────────────────────────
+function fillSelect(el, options, value){
+  el.innerHTML = options;
+  if (value != null) el.value = value;
+}
+
+function openModal(id, ma, ngay){
+  editingId = id;
+  const row = id ? khRows.find(r => r.id === id) : null;
+  const dates = weekDates();
+  const maVal = row ? row.ma_khuon : ma;
+  const ngayVal = row ? row.ngay : (ngay || (dates.find(d => d >= todayStr()) || dates[0]));
+
+  const maList = molds.map(m => m.ma_khuon);
+  if (maVal && !maList.includes(maVal)) maList.unshift(maVal);
+  fillSelect(document.getElementById('f-khuon'),
+    (maVal ? '' : '<option value="">— Chọn khuôn —</option>') +
+    maList.map(x => {
+      const m = moldMap[x];
+      return '<option value="' + escapeHtml(x) + '">' + escapeHtml(x) + (m && m.severity ? ' ⚠ ' + m.lyDo.join(', ') : '') + '</option>';
+    }).join(''), maVal || '');
+  fillSelect(document.getElementById('f-ngay'),
+    dates.map((d, i) => '<option value="' + d + '">' + THU_LABEL[i] + ' — ' + fmtDateVN(parseDate(d)) + '</option>').join(''), ngayVal);
+  document.getElementById('f-loai').value = row ? row.loai : 'Bảo dưỡng định kỳ';
+
+  const bd = employees.filter(e => e.vai_tro === 'bao_duong_khuon');
+  const khac = employees.filter(e => e.vai_tro !== 'bao_duong_khuon');
+  let nguoiOpts = '<option value="">— Chưa giao —</option>' +
+    (bd.length ? '<optgroup label="Bảo dưỡng khuôn">' + bd.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '') +
+    (khac.length ? '<optgroup label="Nhân sự khác">' + khac.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '');
+  const nguoiVal = row ? row.nguoi_phu_trach : '';
+  if (nguoiVal && !employees.some(e => e.ten_nhan_vien === nguoiVal)) nguoiOpts += '<option>' + escapeHtml(nguoiVal) + '</option>';
+  fillSelect(document.getElementById('f-nguoi'), nguoiOpts, nguoiVal);
+  document.getElementById('f-ghi-chu').value = row ? row.ghi_chu : '';
+
+  document.getElementById('modalTitle').textContent = row ? 'Sửa lịch bảo dưỡng — ' + row.ma_khuon : 'Thêm lịch bảo dưỡng khuôn';
+  document.getElementById('btnDelete').style.display = row ? '' : 'none';
+  renderInfo();
+  document.getElementById('modalKh').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalKh').classList.remove('open'); }
+document.getElementById('f-khuon').addEventListener('change', renderInfo);
+document.getElementById('f-ngay').addEventListener('change', renderInfo);
+
+function renderInfo(){
+  const ma = document.getElementById('f-khuon').value;
+  const ngay = document.getElementById('f-ngay').value;
+  const box = document.getElementById('f-info');
+  if (!ma) { box.innerHTML = 'Chọn khuôn để xem tình trạng và lịch chạy trong tuần.'; return; }
+  const m = moldMap[ma];
+  const run = runByMold[ma] || THU_COLS.map(() => []);
+  const idx = weekDates().indexOf(ngay);
+  let h = '';
+  if (m) {
+    h += '<div><b>Tình trạng:</b> ' + (m.lyDo.length ? escapeHtml(m.lyDo.join(' · ')) : 'OK') +
+      ' — shot từ lần BD ' + fmtNum(m.since) + '/' + fmtNum(m.nguong_bd) +
+      (m.lan_bd ? ', BD gần nhất ' + fmtDateVN(parseDate(m.lan_bd)) : '') + '</div>';
+  }
+  const runDays = THU_LABEL.filter((_, i) => run[i].length);
+  h += '<div><b>Chạy máy trong tuần (KHSX):</b> ' + (runDays.length ? runDays.join(', ') : 'không có') + '</div>';
+  if (idx >= 0 && run[idx].length) h += '<div class="warn">⚠ Ngày này khuôn đang có kế hoạch chạy: ' + escapeHtml(run[idx].join(', ')) + ' — cần sắp xếp dừng máy.</div>';
+  const dup = khRows.find(r => r.ma_khuon === ma && r.ngay === ngay && r.id !== editingId);
+  if (dup) h += '<div class="warn">⚠ Khuôn này đã có lịch ngày này (' + escapeHtml(dup.nguoi_phu_trach || 'chưa giao') + ').</div>';
+  const iss = (issuesByMold[ma] || []).slice().sort((a, b) => (a.trang_thai === 'Đã đóng') - (b.trang_thai === 'Đã đóng')).slice(0, 3);
+  if (iss.length) {
+    h += '<div class="iss"><b>Vấn đề khuôn cần chú ý:</b>' + iss.map(a =>
+      '<div>• [' + escapeHtml(a.trang_thai || '') + '] ' + (a.ngay_phat_hien ? fmtDateVN(new Date(a.ngay_phat_hien)) + ' — ' : '') +
+      escapeHtml(a.mo_ta || '(không có mô tả)') + '</div>').join('') + '</div>';
+  }
+  box.innerHTML = h;
+}
+
+document.getElementById('btnSave').addEventListener('click', async () => {
+  const ma = document.getElementById('f-khuon').value;
+  const ngay = document.getElementById('f-ngay').value;
+  if (!ma) return showMsg('Chọn khuôn', 'err', 2500);
+  const payload = {
+    tuan_bat_dau: fmtDate(weekMonday),
+    ngay,
+    ma_khuon: ma,
+    loai: document.getElementById('f-loai').value,
+    nguoi_phu_trach: document.getElementById('f-nguoi').value,
+    ghi_chu: document.getElementById('f-ghi-chu').value.trim(),
+    updated_by: await MesAuth.getCurrentUserIdentity() || '',
+    updated_at: new Date().toISOString(),
+  };
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
+  const { error } = editingId
+    ? await sb.from('duc_khuon_bd_kh_tuan').update(payload).eq('id', editingId)
+    : await sb.from('duc_khuon_bd_kh_tuan').insert(payload);
+  btn.disabled = false;
+  if (error) {
+    const msg = error.code === '23505' ? 'Khuôn ' + ma + ' đã có lịch vào ngày này — sửa ô đó thay vì thêm mới.'
+      : error.code === '42501' ? 'Tài khoản không có quyền sửa kế hoạch bảo dưỡng.'
+      : error.message;
+    return showMsg('Lỗi lưu: ' + msg, 'err', 5000);
+  }
+  showMsg('✓ Đã lưu', 'ok', 2000);
+  closeModal();
+  loadAndRender();
+});
+
+document.getElementById('btnDelete').addEventListener('click', async () => {
+  if (!editingId || !confirm('Xoá lịch bảo dưỡng này?')) return;
+  const { error } = await sb.from('duc_khuon_bd_kh_tuan').delete().eq('id', editingId);
+  if (error) return showMsg('Lỗi xoá: ' + error.message, 'err', 5000);
+  showMsg('✓ Đã xoá', 'ok', 2000);
+  closeModal();
+  loadAndRender();
+});
+
 startHeaderClock();
 updateWeekLabel();
-loadAndRender();
+Promise.all([loadPermission(), loadEmployees()]).then(loadAndRender);
 </script>
 </body>
 </html>
