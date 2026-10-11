@@ -61,6 +61,9 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg.wide{grid-column:1/-1}
+.lbl-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.btn-now{border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap}
+.btn-now:hover{background:var(--accent);color:#fff}
 .fg label{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
 .fg input,.fg select,.fg textarea{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%;color:var(--text);background:#fff}
 .fg textarea{min-height:56px;resize:vertical}
@@ -306,11 +309,10 @@ function render(){
   html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
     '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
     '<div class="fg"><label>Người thực hiện</label><select id="f-nguoi"' + dis + '>' + nguoiOpts + '</select></div>' +
-    '<div class="fg"><label>Bắt đầu</label><input type="datetime-local" id="f-bd" value="' + toLocalInput(cs && cs.gio_bat_dau) + '"' + dis + '></div>' +
-    '<div class="fg"><label>Kết thúc</label><input type="datetime-local" id="f-kt" value="' + toLocalInput(cs && cs.gio_ket_thuc) + '"' + dis + '></div>' +
+    '<div class="fg"><div class="lbl-row"><label for="f-bd">Bắt đầu</label>' + (canEdit ? '<button type="button" class="btn-now no-print" id="btnNowBd">⏱ Bây giờ</button>' : '') + '</div><input type="datetime-local" id="f-bd" value="' + toLocalInput(cs && cs.gio_bat_dau) + '"' + dis + '></div>' +
+    '<div class="fg"><div class="lbl-row"><label for="f-kt">Kết thúc</label>' + (canEdit ? '<button type="button" class="btn-now no-print" id="btnNowKt">⏱ Bây giờ</button>' : '') + '</div><input type="datetime-local" id="f-kt" value="' + toLocalInput(cs && cs.gio_ket_thuc) + '"' + dis + '></div>' +
     '<div class="fg"><label>Thời gian</label><div class="dur" id="f-dur">—</div></div>' +
     '</div>' +
-    (canEdit ? '<div class="no-print" style="margin-top:8px;display:flex;gap:6px"><button type="button" class="btn btn-outline btn-sm" id="btnNowBd">⏱ Bắt đầu = bây giờ</button><button type="button" class="btn btn-outline btn-sm" id="btnNowKt">⏱ Kết thúc = bây giờ</button></div>' : '') +
     '</div>';
 
   html += '<div class="card"><div class="card-title">Ảnh trước / sau bảo dưỡng</div><div class="photo-cols">' +
