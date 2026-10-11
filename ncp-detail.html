@@ -279,6 +279,7 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
 <script src="shared/qc02-data.js"></script>
 <script src="shared/qc02-ncp.js"></script>
@@ -316,6 +317,7 @@ tickClock();
 setInterval(tickClock, 1000);
 
 async function load(){
+  try{await MesQcFields.loadDefects();}catch(e){console.warn("Không tải được danh mục lỗi; giữ tên đã lưu",e.message);}
   state.id = new URLSearchParams(location.search).get('id');
   if (!state.id) { document.body.innerHTML = '<p style="padding:20px">Thiếu id phiếu trên URL.</p>'; return; }
 
@@ -353,7 +355,7 @@ function renderAll(){
   document.getElementById('i-ma-may').textContent = c.ma_may;
   document.getElementById('i-ma-sp').textContent = c.ma_sp;
   document.getElementById('i-so-luong').textContent = c.so_luong_nghi_van;
-  document.getElementById('i-mo-ta').textContent = c.mo_ta_loi;
+  document.getElementById('i-mo-ta').textContent = MesQcFields.cleanText(c.mo_ta_loi);
   document.getElementById('ipqc-evidence').innerHTML=(state.ipqcEvidence||[]).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" data-qc-photo></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
   document.getElementById('i-nguoi-dam-nhiem').textContent = c.nguoi_dam_nhiem || '—';
   document.getElementById('f-nguoi-dam-nhiem').value = c.nguoi_dam_nhiem_doi_sach || '';

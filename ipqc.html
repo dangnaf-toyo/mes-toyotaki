@@ -203,7 +203,6 @@ button{cursor:pointer;font-family:inherit}
     <input type="file" accept="image/*" capture="environment" id="ck-photo-input" class="hidden" onchange="onPhotoSelected(event)">
     <input type="file" accept="image/*" multiple id="ck-album-input" class="hidden" onchange="onPhotoSelected(event)">
     <div class="photo-grid" id="ck-photo-grid"></div>
-    <label><input type="checkbox" id="ck-machine-condition"> Check điều kiện máy</label>
   </div>
 
   <div class="field">
@@ -216,13 +215,14 @@ button{cursor:pointer;font-family:inherit}
       <button class="btn-result ok" onclick="submitCheck('OK')">✅ OK<br><span style="font-weight:500;font-size:.75rem">Cho phép SX</span></button>
       <button class="btn-result ng" onclick="submitCheck('NG')">❌ NG<br><span style="font-weight:500;font-size:.75rem">Dừng máy</span></button>
     </div>
-    <button class="btn-result warn" onclick="submitCheck('CANH_BAO')">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Sản xuất tạm đến hết chỉ thị hiện tại</span></button>
+    <button class="btn-result warn" id="ipqcWarningButton" onclick="MesIpqcWarning.open()">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.7rem">Ghi nhận cảnh báo để Sản xuất xử lý</span></button>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
@@ -620,7 +620,7 @@ async function openCheck(idCheckpoint){
   state.photos = [];
   renderPhotoGrid();
   document.getElementById('ck-ghi-chu').value = '';
-  document.getElementById('ck-machine-condition').checked = false;
+
 
   document.getElementById('ck-may').textContent = cp.ma_may;
   document.getElementById('ck-loai').textContent = LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem;
@@ -631,31 +631,34 @@ async function openCheck(idCheckpoint){
   if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
 
   showScreen('scr-check');
-  showOverlay('Đang tải tiêu chuẩn...');
+  // The original checklist remains independent of the reference document.
+  state.checklistAnswers = [...IPQC_DEFAULT_CHECKLIST.map(muc => ({ muc, dat: null })),{code:'machine_condition',group:'Điều kiện máy',muc:'Điều kiện máy',dat:null}];
+  renderChecklist();
+  const request = state.referenceRequest = (state.referenceRequest || 0) + 1;
+  const pdfBtn = document.getElementById('ck-pdf-btn');
+  pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.onclick = null;
+  pdfBtn.textContent = 'Đang tải tiêu chuẩn...';
+  state.tieuChuan = { ma_sp: cp.ma_sp, muc_kiem: IPQC_DEFAULT_CHECKLIST.slice(), file_pdf_url: '' };
   try {
     const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').eq('ma_sp', cp.ma_sp).maybeSingle();
+    if (state.referenceRequest !== request || state.current?.id_checkpoint !== cp.id_checkpoint) return;
     if (error) throw new Error(error.message);
-    let mucKiem = IPQC_DEFAULT_CHECKLIST.slice();
-    let filePdfUrl = '';
-    if (data) {
-      const parsed = Array.isArray(data.danh_sach_muc_kiem_json) ? data.danh_sach_muc_kiem_json : [];
-      if (parsed.length) mucKiem = parsed;
-      filePdfUrl = data.file_pdf_url || '';
+    const process = data?.cong_doan || data?.process;
+    const filePdfUrl = data?.file_pdf_url || '';
+    if (process && process !== 'Đúc' && process !== 'IPQC') {
+      pdfBtn.textContent = 'Chưa có tiêu chuẩn cho công đoạn này'; return;
     }
-    hideOverlay();
-    state.tieuChuan = { ma_sp: cp.ma_sp, muc_kiem: mucKiem, file_pdf_url: filePdfUrl };
-    state.checklistAnswers = mucKiem.map(m => ({ muc: m, dat: null }));
-    renderChecklist();
-
-    const pdfBtn = document.getElementById('ck-pdf-btn');
-    if (filePdfUrl) {
-      pdfBtn.classList.remove('hidden');
+    state.tieuChuan.file_pdf_url = filePdfUrl;
+    if (filePdfUrl && Qc02View.safeUrl(filePdfUrl)) {
       pdfBtn.disabled = false; pdfBtn.textContent = 'Xem tiêu chuẩn';
+      pdfBtn.title = process ? 'Tiêu chuẩn ' + process : 'Tiêu chuẩn theo model; nguồn hiện chưa có mapping công đoạn';
       pdfBtn.onclick = () => Qc02View.pdf(filePdfUrl);
-    } else {
-      pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.textContent = 'Chưa có file tiêu chuẩn'; pdfBtn.onclick = null;
+    } else pdfBtn.textContent = 'Chưa có file tiêu chuẩn';
+  } catch (error) {
+    if (state.referenceRequest === request && state.current?.id_checkpoint === cp.id_checkpoint) {
+      pdfBtn.textContent = 'Không tải được tiêu chuẩn'; showToast(error.message, true);
     }
-  } catch (e) { onError(e); }
+  }
 }
 
 // Điểm kiểm "Sau sự cố" — hiện nội dung sự cố trưởng ca đã ghi trên Dashboard
@@ -699,31 +702,10 @@ function fillIncidentInfo(idSuCo, loai, gioPhatSinh, vanDe, xuLy, damNhiem){
 // gom theo Nhóm, chỉ hiện tiêu đề nhóm 1 lần thay vì lặp lại ở từng dòng —
 // mục không có "—" (vd "Kích thước...") hiện riêng, không thuộc nhóm nào.
 function renderChecklist(){
-  const wrap = document.getElementById('ck-checklist');
-  const ungrouped = [];
-  const groups = [];
-  const byName = {};
-  state.checklistAnswers.forEach((a, i) => {
-    const sep = a.muc.indexOf(' — ');
-    if (sep < 0) { ungrouped.push({ i, label: a.muc }); return; }
-    const name = a.muc.slice(0, sep).trim();
-    const label = a.muc.slice(sep + 3).trim();
-    if (!byName[name]) { byName[name] = { name, items: [] }; groups.push(byName[name]); }
-    byName[name].items.push({ i, label });
-  });
-
-  const itemHtml = ({ i, label }) => `
-    <div class="cl-item">
-      <div class="cl-text">${escapeHtml(label)}</div>
-      <div class="cl-toggle">
-        <button id="cl-ok-${i}" onclick="setChecklistAnswer(${i}, true)">Đạt</button>
-        <button id="cl-bad-${i}" onclick="setChecklistAnswer(${i}, false)">Không đạt</button>
-      </div>
-    </div>`;
-
-  wrap.innerHTML = ungrouped.map(itemHtml).join('') + groups.map(g =>
-    `<div class="cl-group-title">${escapeHtml(g.name)}</div>` + g.items.map(itemHtml).join('')
-  ).join('');
+  const wrap=document.getElementById('ck-checklist'),groups=[['Kích thước',[]],['Ngoại quan',[]],['Điều kiện máy',[]]];
+  state.checklistAnswers.forEach((a,i)=>{if(a.code==='machine_condition')groups[2][1].push({i,label:'Toàn bộ chữ màu đen'});else{const sep=a.muc.indexOf(' — '),name=sep<0?'Kích thước':a.muc.slice(0,sep).trim();groups[name==='Ngoại quan'?1:0][1].push({i,label:sep<0?a.muc:a.muc.slice(sep+3).trim()});}});
+  const item=({i,label})=>'<div class="cl-item"><div class="cl-text" style="color:#000;font-weight:400">'+escapeHtml(label)+'</div><div class="cl-toggle"><button id="cl-ok-'+i+'" onclick="setChecklistAnswer('+i+',true)">Đạt</button><button id="cl-bad-'+i+'" onclick="setChecklistAnswer('+i+',false)">Không đạt</button></div></div>';
+  wrap.innerHTML=groups.map(([name,items])=>'<section data-check-group="'+escapeHtml(name)+'">'+'<div class="cl-group-title">'+escapeHtml(name)+'</div>'+items.map(item).join('')+'</section>').join('');
 }
 
 function setChecklistAnswer(i, dat){
@@ -831,6 +813,8 @@ async function uploadEvidencePhotos(maMay, maSp, ketQua){
 
 async function submitCheck(ketQua){
   if (!state.current) return;
+  const submittedCheckpoint = { ...state.current };
+  if(!state.checklistAnswers.some(a=>a.code==='machine_condition'&&typeof a.dat==='boolean'))return showToast('Chọn Đạt hoặc Không đạt cho Điều kiện máy.',true);
 
   const session = await MesAuth.getSession();
   if (!session){
@@ -862,11 +846,11 @@ async function submitCheck(ketQua){
     showOverlay('Đang lưu kết quả...');
     const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
     const { data, error } = await sb.rpc('duc_submit_ipqc_check', {
-      p_id_checkpoint: state.current.id_checkpoint,
+      p_id_checkpoint: submittedCheckpoint.id_checkpoint,
       p_checklist: state.checklistAnswers,
       p_ket_qua: ketQua,
       p_anh_urls: anhUrls,
-      p_ghi_chu: Qc02View.machineNote(ghiChu, document.getElementById('ck-machine-condition').checked),
+      p_ghi_chu: ghiChu,
       p_thoi_gian_kiem_giay: thoiGianKiemGiay,
       p_nguoi_kiem: nguoiKiem,
     });
@@ -876,16 +860,18 @@ async function submitCheck(ketQua){
 
     const msg = ketQua === 'OK' ? '✓ Đã lưu — OK, cho phép sản xuất'
       : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
-      : '✓ Đã lưu — Cảnh báo ghi nhận, đã báo bộ phận bảo dưỡng khuôn';
+      : '✓ Đã ghi nhận cảnh báo — hiển thị tại Duyệt tiếp tục SX IPQC; chưa có đề nghị chạy tiếp';
     showToast(msg + (data && data.note ? ' (' + data.note + ')' : ''));
     state.queue = state.queue.filter(x => x.id_checkpoint !== state.current.id_checkpoint);
     state.current = null;
     renderQueue();
     showScreen('scr-queue');
+    return { ok: true, checkpointId: submittedCheckpoint.id_checkpoint };
   } catch (e) {
     onError(e);
   }
 }
 </script>
+<script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
 </body>
 </html>
