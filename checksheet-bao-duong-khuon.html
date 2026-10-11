@@ -17,7 +17,8 @@
   - Lưu nháp / Hoàn thành qua RPC duc_khuon_cs_luu. Hoàn thành -> ghi sổ đời
     khuôn (duc_khuon_bao_duong_log), Đạt + BD định kỳ/Thay mới -> reset đồng
     hồ shot; sau đó khoá.
-  - Quản lý bộ phận Đúc / admin sửa mẫu hạng mục ở khối "⚙ Mẫu hạng mục".
+  - Mẫu hạng mục (chung + riêng từng khuôn, T78) sửa ở quan-ly-khuon.html?tab=mau
+    (Quản lý bộ phận Đúc / admin).
   - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
     khuon-bao-duong rồi tự lưu nháp (không mất ảnh nếu thoát trang). Hoàn
     thành cần ≥1 ảnh mỗi loại, tối đa 10.
@@ -103,14 +104,6 @@ tr.row-ng td{background:#FFF5F5}
 .done-banner{border-radius:8px;padding:10px 14px;font-weight:700;font-size:13px}
 .done-banner.dat{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
 .done-banner.khong_dat{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5}
-.mau-row td input{width:100%;border:1px solid var(--border-strong);border-radius:5px;padding:5px 6px;font-family:inherit;font-size:12px}
-.mau-row td.n input{width:60px}
-.mau-row.off td{opacity:.5}
-.mau-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 4px;font-size:13px;font-weight:600}
-.mau-bar select{border:1px solid var(--border-strong);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:13px;margin-left:6px}
-.mau-hint{font-size:12px;font-weight:400;color:var(--text-dim)}
-.mau-sec{font-weight:700;font-size:13px;margin:14px 0 6px}
-.mau-row td.ap{text-align:center;background:var(--bg-sunken)}
 .tag-rieng{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:#E0F2FE;color:#075985;vertical-align:middle}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
@@ -183,7 +176,6 @@ const KQ_LABEL = { OK: 'OK', NG: 'NG', NA: 'N/A' };
 const idKh = Number(new URLSearchParams(location.search).get('id')) || null;
 let myRole = null, myBoPhan = [];
 let kh = null, mold = null, duyet = null, cs = null, mau = [], mauBo = [], employees = [], issues = [];
-let dsKhuon = [], mauKhuon = null;   // khuôn đang chọn trong khung sửa mẫu
 let items = [];          // [{nhom,noi_dung,tieu_chuan,ket_qua,ghi_chu}]
 let ketLuan = '';
 let canEdit = false;
@@ -254,12 +246,6 @@ async function loadAll(){
   mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || []; mauBo = boRes.data || [];
   employees = empRes.data || [];
   issues = (issRes.data || []).filter(x => x.trang_thai !== 'Đã đóng');
-  if (laNguoiSuaMau()) {
-    const { data } = await sb.from('duc_shot_khuon').select('ma_khuon').order('ma_khuon');
-    dsKhuon = (data || []).map(r => r.ma_khuon);
-    if (!dsKhuon.includes(kh.ma_khuon)) dsKhuon.unshift(kh.ma_khuon);
-    if (!mauKhuon) mauKhuon = kh.ma_khuon;
-  }
 
   items = cs ? (cs.hang_muc || []).map(x => ({ ...x })) : itemsTheoMau([]);
   ketLuan = cs ? cs.ket_luan : '';
@@ -328,6 +314,7 @@ function render(){
 
   html += '<div class="card"><div class="card-title">Hạng mục kiểm tra' +
     (canEdit ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnAllOk">✓ Còn trống → OK</button>' : '') +
+    (laNguoiSuaMau() ? '<a class="btn btn-outline btn-sm no-print" href="quan-ly-khuon.html?tab=mau&khuon=' + encodeURIComponent(kh.ma_khuon) + '">⚙ Sửa hạng mục khuôn này</a>' : '') +
     (canEdit && cs ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnTheoMau" title="Lấy lại danh sách hạng mục theo mẫu hiện tại của khuôn (giữ kết quả đã nhập)">↻ Cập nhật theo mẫu</button>' : '') +
     '<div class="tally" id="tally"></div></div>' +
     '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Kết quả</th><th>Ghi chú / xử lý</th></tr></thead><tbody id="tbItems"></tbody></table></div></div>';
@@ -347,24 +334,10 @@ function render(){
     '<div class="print-only sign-row"><div>Người thực hiện</div><div>Người kiểm tra</div><div>Quản lý bộ phận</div></div>' +
     '</div>';
 
-  if (laNguoiSuaMau()) {
-    html += '<div class="card no-print"><details id="mauBox"><summary class="card-title" style="cursor:pointer;margin:0">⚙ Mẫu hạng mục check sheet (áp dụng cho check sheet mở mới)</summary>' +
-      '<div class="mau-bar"><label>Khuôn <select id="mauKhuon">' + dsKhuon.map(k => '<option' + (k === mauKhuon ? ' selected' : '') + '>' + escapeHtml(k) + '</option>').join('') + '</select></label>' +
-      '<span class="mau-hint" id="mauTong"></span></div>' +
-      '<div class="mau-sec">A. Hạng mục chung — bỏ tick cột <b>Áp dụng cho <span class="mau-mk"></span></b> nếu khuôn này không cần</div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng (mọi khuôn)</th><th>Áp dụng cho <span class="mau-mk"></span></th><th></th></tr></thead><tbody id="tbMau"></tbody></table></div>' +
-      '<div style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-add="chung">➕ Thêm hạng mục chung</button></div>' +
-      '<div class="mau-sec">B. Hạng mục đặc thù riêng khuôn <span class="mau-mk"></span></div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng</th><th></th></tr></thead><tbody id="tbMauRieng"></tbody></table></div>' +
-      '<div style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-add="rieng">➕ Thêm hạng mục riêng khuôn <span class="mau-mk"></span></button></div>' +
-      '<div class="mau-hint" style="margin-top:10px">Thứ tự quyết định vị trí trong check sheet — mục riêng có thể chen giữa mục chung; đặt cùng tên Nhóm để vào chung nhóm. Check sheet đã lưu nháp: bấm ↻ Cập nhật theo mẫu để lấy thay đổi.</div></details></div>';
-  }
-
   document.getElementById('main').innerHTML = html;
   renderItems();
   renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
-  if (laNguoiSuaMau()) renderMau();
   bindEvents();
 }
 
@@ -593,91 +566,6 @@ async function save(hoanThanh){
   if (error || !res || !res.ok) return showMsg('Lỗi lưu: ' + rpcErr(res, error), 'err', 6000);
   showMsg(hoanThanh ? '✓ Đã hoàn thành' + (res.reset_dong_ho ? ' — đã reset bộ đếm shot của khuôn' : '') : '✓ Đã lưu nháp', 'okmsg', 3500);
   await loadAll();
-}
-
-// ── Mẫu hạng mục (Quản lý bộ phận Đúc / admin) ─────────────────────────────────
-// Mục chung: ma_khuon NULL; bỏ áp dụng cho 1 khuôn = 1 dòng duc_khuon_cs_mau_bo.
-// Mục riêng: ma_khuon = khuôn.
-function mauRow(m, mk){
-  const ap = m.ma_khuon ? null : !mauBo.some(b => b.ma_khuon === mk && Number(b.id_mau) === Number(m.id));
-  return '<tr class="mau-row' + (m.dang_dung && ap !== false ? '' : ' off') + '" data-id="' + m.id + '">' +
-    '<td class="n"><input type="number" data-f="thu_tu" value="' + m.thu_tu + '"></td>' +
-    '<td><input data-f="nhom" value="' + escapeHtml(m.nhom) + '"></td>' +
-    '<td><input data-f="noi_dung" value="' + escapeHtml(m.noi_dung) + '"></td>' +
-    '<td><input data-f="tieu_chuan" value="' + escapeHtml(m.tieu_chuan) + '"></td>' +
-    '<td><input type="checkbox" data-f="dang_dung"' + (m.dang_dung ? ' checked' : '') + '></td>' +
-    (ap === null ? '' : '<td class="ap"><input type="checkbox" data-ap' + (ap ? ' checked' : '') + ' title="Bỏ tick = khuôn ' + escapeHtml(mk) + ' không kiểm hạng mục này"></td>') +
-    '<td style="white-space:nowrap"><button type="button" class="btn btn-sm" data-act="save">Lưu</button> <button type="button" class="btn btn-sm btn-danger" data-act="del">Xoá</button></td></tr>';
-}
-
-function renderMau(){
-  const mk = mauKhuon;
-  document.querySelectorAll('.mau-mk').forEach(e => { e.textContent = mk; });
-  document.getElementById('tbMau').innerHTML = mau.filter(m => !m.ma_khuon).map(m => mauRow(m, mk)).join('');
-  const rieng = mau.filter(m => m.ma_khuon === mk);
-  document.getElementById('tbMauRieng').innerHTML = rieng.length ? rieng.map(m => mauRow(m, mk)).join('')
-    : '<tr><td colspan="6" style="color:var(--text-dim);text-align:center">Chưa có hạng mục riêng cho khuôn ' + escapeHtml(mk) + '</td></tr>';
-  const chung = mau.filter(m => !m.ma_khuon && m.dang_dung).length, tong = mauChoKhuon(mk);
-  document.getElementById('mauTong').textContent = 'Check sheet mới của khuôn ' + mk + ': ' + tong.length + ' hạng mục (' +
-    tong.filter(m => !m.ma_khuon).length + '/' + chung + ' mục chung + ' + tong.filter(m => m.ma_khuon).length + ' mục riêng)';
-
-  const box = document.getElementById('mauBox');
-  box.onchange = async e => {
-    if (e.target.id === 'mauKhuon') { mauKhuon = e.target.value; return renderMau(); }
-    const cb = e.target.closest('input[data-ap]');
-    if (!cb) return;
-    const id = Number(cb.closest('tr').dataset.id);
-    const { error } = cb.checked
-      ? await sb.from('duc_khuon_cs_mau_bo').delete().eq('ma_khuon', mk).eq('id_mau', id)
-      : await sb.from('duc_khuon_cs_mau_bo').insert({ ma_khuon: mk, id_mau: id });
-    if (error) { cb.checked = !cb.checked; return showMsg('Lỗi lưu: ' + error.message, 'err', 5000); }
-    showMsg(cb.checked ? '✓ Khuôn ' + mk + ' áp dụng lại hạng mục này' : '✓ Khuôn ' + mk + ' bỏ hạng mục này', 'okmsg', 2000);
-    await reloadMau();
-  };
-  box.onclick = async e => {
-    const add = e.target.closest('button[data-add]');
-    if (add) {
-      const maxTt = mau.reduce((s, m) => Math.max(s, m.thu_tu), 0);
-      const chungRows = mau.filter(m => !m.ma_khuon);
-      const row = add.dataset.add === 'rieng'
-        ? { ma_khuon: mk, nhom: 'Đặc thù khuôn', noi_dung: 'Hạng mục riêng mới', tieu_chuan: '', thu_tu: maxTt + 10 }
-        : { nhom: chungRows.length ? chungRows[chungRows.length - 1].nhom : '1. Chung', noi_dung: 'Hạng mục mới', tieu_chuan: '', thu_tu: maxTt + 10 };
-      const { error } = await sb.from('duc_khuon_cs_mau').insert(row);
-      if (error) return showMsg('Lỗi thêm: ' + error.message, 'err', 5000);
-      return reloadMau();
-    }
-    const b = e.target.closest('button[data-act]');
-    if (!b) return;
-    const tr = b.closest('tr'), id = Number(tr.dataset.id);
-    const m = mau.find(x => Number(x.id) === id);
-    if (b.dataset.act === 'del') {
-      if (!confirm(m && m.ma_khuon ? 'Xoá hạng mục riêng này của khuôn ' + mk + '?' :
-        'Xoá hạng mục chung này khỏi mẫu của MỌI khuôn?\n(Chỉ muốn bỏ cho khuôn ' + mk + ' thì bỏ tick cột "Áp dụng".)\nCheck sheet đã tạo không bị ảnh hưởng.')) return;
-      const { error } = await sb.from('duc_khuon_cs_mau').delete().eq('id', id);
-      if (error) return showMsg('Lỗi xoá: ' + error.message, 'err', 5000);
-    } else {
-      const v = f => tr.querySelector('[data-f="' + f + '"]');
-      const row = { thu_tu: Number(v('thu_tu').value) || 0, nhom: v('nhom').value.trim(), noi_dung: v('noi_dung').value.trim(),
-        tieu_chuan: v('tieu_chuan').value.trim(), dang_dung: v('dang_dung').checked, updated_at: new Date().toISOString() };
-      if (!row.nhom || !row.noi_dung) return showMsg('Nhóm và hạng mục không được trống', 'err', 3000);
-      const { error } = await sb.from('duc_khuon_cs_mau').update(row).eq('id', id);
-      if (error) return showMsg('Lỗi lưu mẫu: ' + error.message, 'err', 5000);
-    }
-    showMsg('✓ Đã cập nhật mẫu', 'okmsg', 2000);
-    await reloadMau();
-  };
-}
-
-async function reloadMau(){
-  const [m, b] = await Promise.all([
-    sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id'),
-    sb.from('duc_khuon_cs_mau_bo').select('ma_khuon,id_mau'),
-  ]);
-  if (m.error || b.error) return showMsg('Lỗi tải mẫu: ' + (m.error || b.error).message, 'err', 5000);
-  mau = m.data || []; mauBo = b.data || [];
-  renderMau();
-  // Check sheet chưa lưu lần nào thì hạng mục đi theo mẫu ngay.
-  if (!cs) { items = itemsTheoMau(items); renderItems(); }
 }
 
 startHeaderClock();

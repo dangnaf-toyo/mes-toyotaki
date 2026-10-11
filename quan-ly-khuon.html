@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quản lý khuôn — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  quan-ly-khuon.html — trang Quản lý khuôn (trước là modal "🧊 Quản lý khuôn"
+  trong duc-dashboard.html). Độc lập ca/ngày, 3 mục:
+  - ?tab=khuon : danh sách khuôn (duc_shot_khuon) — khai báo/sửa/xoá khuôn
+    (duc_configure_mold / duc_rename_khuon / duc_xoa_khuon), ghi bảo dưỡng tay
+    (duc_ghi_lich_su_bao_duong).
+  - ?tab=van-de: vấn đề khuôn (duc_van_de_khuon) — xử lý / xác nhận.
+  - ?tab=mau&khuon=X: hạng mục check sheet bảo dưỡng (duc_khuon_cs_mau +
+    duc_khuon_cs_mau_bo, T76/T78) — mục chung, bỏ mục chung cho 1 khuôn, mục
+    riêng của khuôn. Chỉ Quản lý bộ phận Đúc / admin sửa (RLS).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{border:none;border-radius:5px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
+.btn-outline{background:#fff;border:1.5px solid var(--accent);color:var(--accent)}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-good{background:var(--run-fg)}
+.btn-good:hover{background:#036049}
+.btn-sm{padding:4px 9px;font-size:11.5px}
+.btn-danger{background:#FEE2E2;border:1px solid #F87171;color:#B91C1C}
+.btn-danger:hover{background:#FECACA}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.tabs{display:flex;gap:4px;background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:4px;flex-wrap:wrap}
+.tabs a{padding:8px 16px;border-radius:6px;font-weight:600;font-size:13px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:6px}
+.tabs a:hover{background:var(--bg-sunken);color:var(--text)}
+.tabs a.on{background:var(--accent);color:#fff}
+.tabs .n{font-size:11px;font-weight:700;padding:0 7px;border-radius:10px;background:var(--alarm-bg);color:var(--alarm-fg)}
+.tabs a.on .n{background:#fff}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.toolbar input[type=search],.toolbar select{border:1.5px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:180px}
+.chip{border:1px solid var(--border-strong);background:#fff;border-radius:100px;padding:5px 11px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted)}
+.chip.on{background:var(--text);color:#fff;border-color:var(--text)}
+.spacer{flex:1}
+.hint{font-size:12px;color:var(--text-muted)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+td.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px}
+td.mk{font-weight:700;white-space:nowrap}
+td.act{white-space:nowrap;text-align:right}
+.st{font-weight:700;font-size:12px}
+.st.ok{color:var(--run-fg)}.st.soon{color:var(--warn-fg)}.st.due{color:var(--alarm-fg)}.st.renew{color:#9F1239}
+.bar{height:5px;border-radius:3px;background:var(--bg-sunken);margin-top:3px;overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%}
+.iss-tag{display:inline-block;font-size:10.5px;font-weight:700;margin-top:2px}
+.empty{padding:16px;text-align:center;color:var(--text-dim)}
+.issue{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.issue .meta{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--text-muted);flex-wrap:wrap}
+.issue .mt{font-size:13px;margin-top:5px}
+.issue textarea{width:100%;min-height:50px;margin-top:8px;border:1.5px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px}
+.issue .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.mau-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;font-size:13px;font-weight:600}
+.mau-bar select{border:1.5px solid var(--border-strong);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:13px;margin-left:6px;min-width:140px}
+.mau-sec{font-weight:700;font-size:13px;margin:16px 0 6px}
+.mau-row td input{width:100%;border:1px solid var(--border-strong);border-radius:5px;padding:5px 6px;font-family:inherit;font-size:12px}
+.mau-row td input:disabled{background:var(--bg-sunken);color:var(--text)}
+.mau-row td.n input{width:64px}
+.mau-row td input[type=checkbox]{width:16px;height:16px}
+.mau-row.off td{opacity:.5}
+.mau-row td.ap{text-align:center;background:var(--bg-sunken)}
+.ro-note{background:var(--warn-bg);color:var(--warn-fg);border:1px solid #F3D98B;border-radius:6px;padding:8px 12px;font-weight:600;margin-bottom:10px}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:200;max-width:min(560px,92vw);padding:11px 16px;border-radius:8px;font-size:13px;font-weight:600;display:none;box-shadow:var(--shadow-lg)}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+/* Hộp thoại sửa 1 khuôn / ghi bảo dưỡng */
+.dlg-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:5vh 10px;overflow-y:auto}
+.dlg-mask.open{display:flex}
+.dlg{background:#fff;border-radius:10px;box-shadow:var(--shadow-lg);width:min(540px,100%)}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
+.dlg-head button{border:none;background:none;font-size:18px;cursor:pointer;color:var(--text-muted)}
+.dlg-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.dlg-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.dlg-foot .hint{margin-right:auto;max-width:260px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select,.fg textarea{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%;color:var(--text);background:#fff}
+.fg textarea{min-height:60px;resize:vertical}
+.fg .sub{font-size:11px;color:var(--text-muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mm-status{border-radius:6px;padding:10px 12px;font-size:12px}
+.mm-status b.t{display:block;font-size:13px;margin-bottom:6px}
+.mm-status .g{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11.5px}
+.hist div{padding:4px 0;border-bottom:1px solid var(--border);font-size:11.5px}
+details.adv{border:1px dashed var(--border-strong);border-radius:6px;padding:8px 10px}
+details.adv summary{cursor:pointer;font-size:12px;color:var(--text-muted);font-weight:600}
+@media (max-width:640px){.row2{grid-template-columns:1fr}.toolbar input[type=search]{flex:1}}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">🧊 Quản lý khuôn</div>
+    </div>
+    <div class="header-divider"></div>
+    <a class="btn btn-ghost" href="duc-dashboard.html">← Bảng điều khiển Đúc</a>
+    <a class="btn btn-ghost" href="bao-duong-khuon-tuan.html">🔧 Kế hoạch bảo dưỡng tuần</a>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <a href="?tab=khuon" data-tab="khuon">🧊 Danh sách khuôn</a>
+    <a href="?tab=van-de" data-tab="van-de">⚠ Vấn đề khuôn <span class="n" id="nIssue" hidden></span></a>
+    <a href="?tab=mau" data-tab="mau">📋 Hạng mục check sheet bảo dưỡng</a>
+  </nav>
+
+  <section class="card" id="sec-khuon" hidden>
+    <div class="toolbar">
+      <input type="search" id="kSearch" placeholder="Tìm mã khuôn / mã SP...">
+      <span id="kChips"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="btnNewMold">＋ Khai báo khuôn mới</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Khuôn</th><th>Mã SP</th><th style="text-align:right">Tổng shot</th><th style="text-align:right">Từ lần BD</th>
+        <th style="text-align:right">Ngưỡng BD</th><th style="text-align:right">Ngưỡng LM</th><th>BD gần nhất</th><th>Hạn BD (theo ngày)</th><th>Trạng thái</th><th></th></tr></thead>
+      <tbody id="tbKhuon"><tr><td colspan="10" class="empty">Đang tải...</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card" id="sec-van-de" hidden>
+    <div class="toolbar">
+      <button type="button" class="chip on" data-if="open">Chưa đóng</button>
+      <button type="button" class="chip" data-if="all">Tất cả (kể cả đã đóng)</button>
+      <input type="search" id="iSearch" placeholder="Lọc theo mã khuôn / máy / mô tả...">
+    </div>
+    <div id="issueList"><div class="empty">Đang tải...</div></div>
+  </section>
+
+  <section class="card" id="sec-mau" hidden>
+    <div id="mauRo"></div>
+    <div class="mau-bar"><label>Khuôn <select id="mauKhuon"></select></label><span class="hint" id="mauTong"></span></div>
+    <div class="mau-sec">A. Hạng mục chung (mọi khuôn) — bỏ tick cột <b>Áp dụng cho <span class="mau-mk"></span></b> nếu khuôn này không cần</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng (mọi khuôn)</th><th>Áp dụng cho <span class="mau-mk"></span></th><th></th></tr></thead><tbody id="tbMau"></tbody></table></div>
+    <div class="mau-edit" style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-add="chung">➕ Thêm hạng mục chung</button></div>
+    <div class="mau-sec">B. Hạng mục đặc thù riêng khuôn <span class="mau-mk"></span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng</th><th></th></tr></thead><tbody id="tbMauRieng"></tbody></table></div>
+    <div class="mau-edit" style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" data-add="rieng">➕ Thêm hạng mục riêng khuôn <span class="mau-mk"></span></button></div>
+    <div class="hint" style="margin-top:12px">Áp dụng cho check sheet mở mới. Thứ tự quyết định vị trí trong check sheet — mục riêng có thể chen giữa mục chung; đặt cùng tên Nhóm để vào chung nhóm. Check sheet đã lưu nháp: bấm ↻ Cập nhật theo mẫu trong check sheet để lấy thay đổi.</div>
+  </section>
+</div>
+
+<!-- Hộp thoại: khai báo / sửa khuôn -->
+<div class="dlg-mask" id="dlg-cfg">
+  <div class="dlg">
+    <div class="dlg-head"><span>✏ <span id="cfg-title">Sửa khuôn</span></span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div class="hint" style="background:var(--bg-sunken);border-radius:6px;padding:8px 10px">Để trống ô nào thì giữ nguyên giá trị hiện tại của ô đó. Dùng khi cần khai báo baseline hoặc sửa ngưỡng riêng cho khuôn này.</div>
+      <div class="fg"><label>Mã khuôn *</label><input id="cfg-ma-khuon" placeholder="VD: K-DC5-01"><div class="sub" id="cfg-ma-khuon-hint"></div></div>
+      <div class="fg"><label>Mã sản phẩm <span id="cfg-sp-req">*</span></label><select id="cfg-ma-sp"></select><div class="sub">Mỗi khuôn đúc đúng 1 mã SP cố định.</div></div>
+      <div class="row2">
+        <div class="fg"><label>Tổng shot lũy kế</label><input type="number" id="cfg-tong-shot" min="0" step="1" placeholder="Để trống nếu giữ nguyên"></div>
+        <div class="fg"><label>Shot từ lần BD gần nhất</label><input type="number" id="cfg-shot-since" min="0" step="1" placeholder="Để trống nếu giữ nguyên"></div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Ngưỡng bảo dưỡng (shot)</label><input type="number" id="cfg-nguong-bd" min="0" step="100" placeholder="Để trống nếu giữ nguyên"></div>
+        <div class="fg"><label>Ngưỡng làm mới (shot)</label><input type="number" id="cfg-nguong-lm" min="0" step="1000" placeholder="Để trống nếu giữ nguyên"></div>
+      </div>
+      <div class="fg"><label>Ghi chú</label><textarea id="cfg-ghi-chu" placeholder="VD: Khai báo baseline từ Excel ngày 01/08/2026"></textarea></div>
+    </div>
+    <div class="dlg-foot">
+      <span class="hint">Không reset bộ đếm — dùng "🔧 Ghi BD" nếu muốn reset sau khi bảo dưỡng xong.</span>
+      <button type="button" class="btn btn-danger" id="cfg-del">🗑 Xoá khuôn</button>
+      <button type="button" class="btn btn-outline" data-close>Huỷ</button>
+      <button type="button" class="btn" id="cfg-save">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hộp thoại: ghi bảo dưỡng tay -->
+<div class="dlg-mask" id="dlg-mm">
+  <div class="dlg">
+    <div class="dlg-head"><span>🔧 Ghi bảo dưỡng khuôn <span id="mm-tag"></span></span><button type="button" data-close>✕</button></div>
+    <div class="dlg-body">
+      <div class="mm-status" id="mm-status"></div>
+      <div class="row2">
+        <div class="fg"><label>Loại *</label><select id="mm-loai"><option>Bảo dưỡng định kỳ</option><option>Sửa chữa</option><option>Thay khuôn mới</option></select></div>
+        <div class="fg"><label>Ngày thực hiện</label><input type="date" id="mm-ngay"></div>
+      </div>
+      <div class="fg"><label>Mô tả (thao tác, phụ tùng thay, người thực hiện...)</label><textarea id="mm-ghi-chu" placeholder="VD: Thay lò xo, vệ sinh khuôn, kiểm tra rãnh dẫn..."></textarea></div>
+      <div class="row2">
+        <div class="fg"><label>Chi phí (VNĐ)</label><input type="number" id="mm-chi-phi" min="0" step="1000" placeholder="Không bắt buộc"></div>
+        <div class="fg"><label>Thời gian dừng máy (phút)</label><input type="number" id="mm-dung-phut" min="0" step="1" placeholder="Không bắt buộc"></div>
+      </div>
+      <details class="adv"><summary>⚙ Chỉnh ngưỡng/lịch khuôn này (nâng cao)</summary>
+        <div class="row2" style="margin-top:8px">
+          <div class="fg"><label>Ngưỡng bảo dưỡng mới (shot)</label><input type="number" id="mm-nguong-bd-moi" min="0" step="100" placeholder="Để trống nếu giữ nguyên"></div>
+          <div class="fg"><label>Ngưỡng làm mới mới (shot)</label><input type="number" id="mm-nguong-lm-moi" min="0" step="1000" placeholder="Để trống nếu giữ nguyên"></div>
+        </div>
+        <div class="fg" style="margin-top:8px"><label>Chu kỳ bảo dưỡng theo thời gian (ngày)</label><input type="number" id="mm-chu-ky-ngay" min="0" step="1" placeholder="VD: 30 — để trống nếu chỉ theo dõi theo số shot"></div>
+      </details>
+      <div class="fg"><label>Lịch sử gần đây</label><div class="hist" id="mm-history">—</div></div>
+    </div>
+    <div class="dlg-foot">
+      <span class="hint" id="mm-reset-hint"></span>
+      <button type="button" class="btn btn-outline" data-close>Huỷ</button>
+      <button type="button" class="btn" id="mm-save">✓ Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+const MOLD = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000, WARN_RATIO: 0.8 };   // = CONFIG.MOLD ở duc-dashboard.html
+const ST_CLS = { 'OK': 'ok', 'Sắp bảo dưỡng': 'soon', 'Cần bảo dưỡng': 'due', 'Cần làm mới': 'renew' };
+const ST_PRIO = { 'Cần làm mới': 0, 'Cần bảo dưỡng': 1, 'Sắp bảo dưỡng': 2, 'OK': 3 };
+const TABS = ['khuon', 'van-de', 'mau'];
+
+const qs = new URLSearchParams(location.search);
+let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'khuon';
+let myRole = null, myBoPhan = [], userName = '';
+let molds = [], products = [], issues = [], mau = [], mauBo = [];
+let kFilter = 'all', iFilter = 'open';
+let mauKhuon = qs.get('khuon') || null;
+let cur = null;   // khuôn đang mở trong hộp thoại
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function pad(n){ return String(n).padStart(2, '0'); }
+function fmtDate(s){ if (!s) return '—'; const d = new Date(String(s).length <= 10 ? s + 'T00:00:00' : s); return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear(); }
+function todayStr(){ const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+function naturalCompare(a, b){ return String(a).localeCompare(String(b), 'vi', { numeric: true, sensitivity: 'base' }); }
+function numOrNull(v){ return (v === '' || v == null) ? null : Number(v); }
+let msgTimer = null;
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { el.className = ''; }, ms || 3500);
+}
+function laNguoiSuaMau(){ return myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
+
+async function rpcWrite(fn, params){
+  const { data, error } = await sb.rpc(fn, params);
+  if (error) throw new Error(error.message || String(error));
+  if (data && typeof data === 'object' && data.ok === false) throw new Error(data.error || 'Lỗi không xác định');
+  return data;
+}
+async function ensureAuth(){
+  const session = await MesAuth.getSession();
+  if (!session) {
+    showMsg('Cần đăng nhập để thao tác — đang chuyển sang trang đăng nhập…', 'err');
+    setTimeout(() => { location.href = 'shared/login.html?returnTo=' + encodeURIComponent(location.href); }, 1200);
+    return false;
+  }
+  userName = (await MesAuth.getCurrentUserIdentity()) || '';
+  return true;
+}
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// _computeMoldStatus (ShotKhuon.js) / duc_compute_mold_status (SQL) — giữ đồng bộ.
+function moldStatus(tong, shotBD, nguongBD, nguongLM){
+  if (tong >= nguongLM) return 'Cần làm mới';
+  if ((tong - shotBD) >= nguongBD) return 'Cần bảo dưỡng';
+  if ((tong - shotBD) >= nguongBD * MOLD.WARN_RATIO) return 'Sắp bảo dưỡng';
+  return 'OK';
+}
+function normMold(m){
+  const nguongBD = Number(m.nguong_bao_duong) || MOLD.MAINTENANCE_SHOT;
+  const nguongLM = Number(m.nguong_lam_moi) || MOLD.REPLACEMENT_SHOT;
+  const tong = Number(m.tong_shot_luy_ke) || 0, shotBD = Number(m.shot_tai_lan_bao_duong_gan_nhat) || 0;
+  return { ma_khuon: String(m.ma_khuon).trim(), ten_sp_gan_nhat: m.ten_sp_gan_nhat || '', tong_shot_luy_ke: tong,
+    nguong_bao_duong: nguongBD, nguong_lam_moi: nguongLM, lan_bao_duong_gan_nhat: m.lan_bao_duong_gan_nhat || null,
+    shot_tai_lan_bao_duong_gan_nhat: shotBD, chu_ky_bao_duong_ngay: m.chu_ky_bao_duong_ngay || null,
+    shots_since_maintenance: tong - shotBD, trang_thai_khuon: moldStatus(tong, shotBD, nguongBD, nguongLM) };
+}
+function nextDueLabel(m){
+  if (!m.lan_bao_duong_gan_nhat || !m.chu_ky_bao_duong_ngay) return '—';
+  const due = new Date(String(m.lan_bao_duong_gan_nhat).slice(0, 10) + 'T00:00:00');
+  due.setDate(due.getDate() + Number(m.chu_ky_bao_duong_ngay));
+  return fmtDate(due.getFullYear() + '-' + pad(due.getMonth()+1) + '-' + pad(due.getDate())) +
+    (due < new Date() ? ' <span class="st due">(quá hạn)</span>' : '');
+}
+
+// ── Tải dữ liệu ───────────────────────────────────────────────────────────────
+async function loadRole(){
+  const session = await MesAuth.getSession();
+  if (!session) return;
+  userName = (await MesAuth.getCurrentUserIdentity()) || '';
+  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
+  myRole = data ? data.role : null;
+  myBoPhan = data && Array.isArray(data.bo_phan_phu_trach) ? data.bo_phan_phu_trach : [];
+}
+async function loadMolds(){
+  const { data, error } = await sb.from('duc_shot_khuon').select('*');
+  if (error) return showMsg('Lỗi tải khuôn: ' + error.message, 'err', 6000);
+  molds = (data || []).filter(m => m.ma_khuon).map(normMold).sort((a, b) =>
+    (ST_PRIO[a.trang_thai_khuon] - ST_PRIO[b.trang_thai_khuon]) || naturalCompare(a.ma_khuon, b.ma_khuon));
+}
+async function loadIssues(){
+  const { data, error } = await sb.from('duc_van_de_khuon').select('*');
+  if (error) return showMsg('Lỗi tải vấn đề khuôn: ' + error.message, 'err', 6000);
+  const prio = { 'Chờ xác nhận': 0, 'Mở': 1, 'Đã đóng': 2 };
+  issues = (data || []).slice().sort((a, b) => ((prio[a.trang_thai] ?? 9) - (prio[b.trang_thai] ?? 9)) ||
+    (new Date(b.ngay_phat_hien) - new Date(a.ngay_phat_hien)));
+  const open = issues.filter(x => x.trang_thai !== 'Đã đóng').length;
+  const n = document.getElementById('nIssue');
+  n.hidden = !open; n.textContent = open;
+}
+async function loadMau(){
+  const [m, b] = await Promise.all([
+    sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id'),
+    sb.from('duc_khuon_cs_mau_bo').select('ma_khuon,id_mau'),
+  ]);
+  if (m.error || b.error) return showMsg('Lỗi tải hạng mục: ' + (m.error || b.error).message, 'err', 6000);
+  mau = m.data || []; mauBo = b.data || [];
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function setTab(t, push){
+  tab = t;
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  TABS.forEach(x => { document.getElementById('sec-' + x).hidden = x !== t; });
+  if (push) {
+    const p = new URLSearchParams({ tab: t });
+    if (t === 'mau' && mauKhuon) p.set('khuon', mauKhuon);
+    history.replaceState(null, '', '?' + p.toString());
+  }
+  if (t === 'khuon') renderMolds();
+  else if (t === 'van-de') renderIssues();
+  else renderMau();
+}
+
+// ── Danh sách khuôn ───────────────────────────────────────────────────────────
+function openIssuesByMold(){
+  const map = {};
+  issues.filter(x => x.trang_thai !== 'Đã đóng').forEach(x => { (map[String(x.ma_khuon).trim()] ||= []).push(x); });
+  return map;
+}
+function renderMolds(){
+  const counts = { all: molds.length };
+  molds.forEach(m => { counts[m.trang_thai_khuon] = (counts[m.trang_thai_khuon] || 0) + 1; });
+  document.getElementById('kChips').innerHTML = [['all', 'Tất cả'], ['Cần làm mới'], ['Cần bảo dưỡng'], ['Sắp bảo dưỡng'], ['OK']]
+    .map(([k, l]) => '<button type="button" class="chip' + (kFilter === k ? ' on' : '') + '" data-kf="' + escapeHtml(k) + '">' + escapeHtml(l || k) + ' ' + (counts[k] || 0) + '</button>').join(' ');
+  const q = document.getElementById('kSearch').value.trim().toLowerCase();
+  const iss = openIssuesByMold();
+  const list = molds.filter(m => (kFilter === 'all' || m.trang_thai_khuon === kFilter) &&
+    (!q || m.ma_khuon.toLowerCase().includes(q) || m.ten_sp_gan_nhat.toLowerCase().includes(q)));
+  const tb = document.getElementById('tbKhuon');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="empty">' + (molds.length ? 'Không có khuôn khớp bộ lọc' : 'Chưa có khuôn nào — bấm ＋ Khai báo khuôn mới, hoặc khuôn tự xuất hiện sau khi chạy xong 1 ca.') + '</td></tr>'; return; }
+  tb.innerHTML = list.map(m => {
+    const pct = Math.min(100, Math.round(m.shots_since_maintenance / m.nguong_bao_duong * 100));
+    const cls = ST_CLS[m.trang_thai_khuon] || '';
+    const ii = iss[m.ma_khuon] || [];
+    const pending = ii.some(x => x.trang_thai === 'Chờ xác nhận');
+    const issTag = ii.length ? '<div><a href="?tab=van-de&q=' + encodeURIComponent(m.ma_khuon) + '" data-goissue="' + escapeHtml(m.ma_khuon) + '" class="iss-tag" style="color:' + (pending ? 'var(--warn-fg)' : '#C2410C') + '">' +
+      (pending ? '❓ Chờ xác nhận' : '⚠ Có vấn đề') + (ii.length > 1 ? ' (' + ii.length + ')' : '') + '</a></div>' : '';
+    return '<tr><td class="mk">' + escapeHtml(m.ma_khuon) + '</td><td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
+      '<td class="num">' + fmtNum(m.tong_shot_luy_ke) + '</td>' +
+      '<td class="num">' + fmtNum(m.shots_since_maintenance) + '<div class="bar"><i class="' + cls + '" style="width:' + pct + '%;background:' +
+        ({ ok: 'var(--run-fg)', soon: 'var(--warn-fg)', due: 'var(--alarm-fg)', renew: '#9F1239' }[cls] || 'var(--text-dim)') + '"></i></div></td>' +
+      '<td class="num">' + fmtNum(m.nguong_bao_duong) + '</td><td class="num">' + fmtNum(m.nguong_lam_moi) + '</td>' +
+      '<td>' + fmtDate(m.lan_bao_duong_gan_nhat) + '</td><td>' + nextDueLabel(m) + '</td>' +
+      '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
+      '<td class="act"><button type="button" class="btn btn-outline btn-sm" data-cfg="' + escapeHtml(m.ma_khuon) + '">✏ Sửa</button> ' +
+        '<button type="button" class="btn btn-outline btn-sm" data-mm="' + escapeHtml(m.ma_khuon) + '">🔧 Ghi BD</button> ' +
+        '<a class="btn btn-outline btn-sm" href="?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + escapeHtml(m.ma_khuon) + '">📋 Hạng mục</a></td></tr>';
+  }).join('');
+}
+
+// ── Hộp thoại sửa khuôn ───────────────────────────────────────────────────────
+function openDlg(id){ document.getElementById(id).classList.add('open'); }
+function closeDlg(){ document.querySelectorAll('.dlg-mask').forEach(d => d.classList.remove('open')); }
+
+async function openCfg(maKhuon){
+  if (!(await ensureAuth())) return;
+  const m = maKhuon ? molds.find(x => x.ma_khuon === maKhuon) : null;
+  cur = m;
+  document.getElementById('cfg-title').textContent = m ? 'Sửa khuôn ' + m.ma_khuon : 'Khai báo khuôn mới';
+  document.getElementById('cfg-ma-khuon').value = m ? m.ma_khuon : '';
+  document.getElementById('cfg-ma-khuon-hint').textContent = m
+    ? 'Đổi mã ở đây = đổi tên khuôn — chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai, không sửa lại lịch sử (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in).' : '';
+  const sel = document.getElementById('cfg-ma-sp');
+  sel.innerHTML = '<option value="">— Chọn mã SP —</option>' + products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp + ' — ' + (p.ten_sp || '')) + '</option>').join('');
+  sel.value = m ? String(m.ten_sp_gan_nhat || '').split(' (')[0].trim() : '';
+  document.getElementById('cfg-sp-req').hidden = !!m;
+  document.getElementById('cfg-tong-shot').value = m ? m.tong_shot_luy_ke : '';
+  document.getElementById('cfg-shot-since').value = m ? m.shots_since_maintenance : '';
+  document.getElementById('cfg-nguong-bd').value = m ? m.nguong_bao_duong : '';
+  document.getElementById('cfg-nguong-lm').value = m ? m.nguong_lam_moi : '';
+  document.getElementById('cfg-ghi-chu').value = '';
+  document.getElementById('cfg-del').hidden = !m;
+  openDlg('dlg-cfg');
+}
+
+async function saveCfg(){
+  const maMoi = document.getElementById('cfg-ma-khuon').value.trim();
+  if (!maMoi) return showMsg('Cần nhập mã khuôn', 'err');
+  const maSp = document.getElementById('cfg-ma-sp').value.trim();
+  if (!cur && !maSp) return showMsg('Khuôn mới cần khai báo mã sản phẩm', 'err');
+  if (!(await ensureAuth())) return;
+  const btn = document.getElementById('cfg-save'); btn.disabled = true;
+  try {
+    // Đổi tên TRƯỚC nếu mã bị sửa (khuôn mới thì duc_configure_mold tự tạo đúng mã).
+    let ma = cur ? cur.ma_khuon : maMoi;
+    if (cur && maMoi !== cur.ma_khuon) {
+      const r = await rpcWrite('duc_rename_khuon', { p_ma_khuon_cu: cur.ma_khuon, p_ma_khuon_moi: maMoi, p_user: userName });
+      ma = r.ma_khuon_moi;
+    }
+    const d = await rpcWrite('duc_configure_mold', {
+      p_ma_khuon: ma, p_ma_sp: maSp || null,
+      p_tong_shot_luy_ke: numOrNull(document.getElementById('cfg-tong-shot').value),
+      p_shots_since_maintenance: numOrNull(document.getElementById('cfg-shot-since').value),
+      p_nguong_bao_duong_moi: numOrNull(document.getElementById('cfg-nguong-bd').value),
+      p_nguong_lam_moi_moi: numOrNull(document.getElementById('cfg-nguong-lm').value),
+      p_ghi_chu: document.getElementById('cfg-ghi-chu').value.trim() || null,
+      p_user: userName,
+    });
+    closeDlg();
+    showMsg('✓ Đã lưu khuôn ' + d.ma_khuon, 'okmsg');
+    await loadMolds(); renderMolds();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+  finally { btn.disabled = false; }
+}
+
+// Chỉ xoá khỏi danh sách chọn, KHÔNG đụng lịch sử (migration_phase_D36). Bị chặn
+// nếu khuôn đang gán trạm đang chạy / có trong KH tuần hiện tại-tương lai.
+async function deleteCfg(){
+  if (!cur || !(await ensureAuth())) return;
+  if (!confirm('Xoá khuôn "' + cur.ma_khuon + '" khỏi danh sách chọn?\n\n' +
+    'Chỉ xoá được khuôn không đang gán cho trạm nào và không có trong kế hoạch tuần hiện tại/tương lai.\n' +
+    'Lịch sử bảo dưỡng/vấn đề/hàng NG/tem cũ (nếu có) vẫn được giữ nguyên.')) return;
+  try {
+    await rpcWrite('duc_xoa_khuon', { p_ma_khuon: cur.ma_khuon, p_user: userName });
+    closeDlg();
+    showMsg('✓ Đã xoá khuôn ' + cur.ma_khuon, 'okmsg');
+    await loadMolds(); renderMolds();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+
+// ── Hộp thoại ghi bảo dưỡng ───────────────────────────────────────────────────
+const MM_STATUS = {
+  'Cần làm mới': ['#FCE7F3', '#F472B6', '#9F1239', '⚠ CẦN LÀM MỚI KHUÔN — Đã vượt tuổi thọ'],
+  'Cần bảo dưỡng': ['#FEE2E2', '#F87171', '#B91C1C', '🔧 CẦN BẢO DƯỠNG NGAY'],
+  'Sắp bảo dưỡng': ['#FEF3C7', '#F59E0B', '#B45309', '⏳ Sắp đến ngưỡng bảo dưỡng'],
+  'OK': ['#D1FAE5', '#6EE7B7', '#065F46', '✓ Khuôn hoạt động tốt'],
+};
+function mmResetHint(){
+  document.getElementById('mm-reset-hint').textContent = document.getElementById('mm-loai').value === 'Sửa chữa'
+    ? 'Sửa chữa: chỉ ghi lịch sử, KHÔNG reset đồng hồ đếm shot / hạn bảo dưỡng.'
+    : 'Reset đồng hồ đếm shot và hạn bảo dưỡng theo lịch kể từ ngày thực hiện.';
+}
+async function openMm(maKhuon){
+  if (!(await ensureAuth())) return;
+  const m = molds.find(x => x.ma_khuon === maKhuon);
+  if (!m) return;
+  cur = m;
+  const s = MM_STATUS[m.trang_thai_khuon] || MM_STATUS.OK;
+  const box = document.getElementById('mm-status');
+  box.style.background = s[0]; box.style.border = '1px solid ' + s[1];
+  box.innerHTML = '<b class="t" style="color:' + s[2] + '">' + s[3] + '</b><div class="g">' +
+    '<div>Tổng shot lũy kế: <b>' + fmtNum(m.tong_shot_luy_ke) + '</b></div><div>Shot từ lần BD gần nhất: <b>' + fmtNum(m.shots_since_maintenance) + '</b></div>' +
+    '<div>Ngưỡng bảo dưỡng: <b>' + fmtNum(m.nguong_bao_duong) + '</b></div><div>Ngưỡng làm mới: <b>' + fmtNum(m.nguong_lam_moi) + '</b></div>' +
+    '<div>Lần BD gần nhất: <b>' + fmtDate(m.lan_bao_duong_gan_nhat) + '</b></div><div>Mã SP: <b>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</b></div>' +
+    '<div>Hạn BD tiếp theo: <b>' + nextDueLabel(m) + '</b></div></div>';
+  document.getElementById('mm-tag').textContent = m.ma_khuon;
+  document.getElementById('mm-loai').value = 'Bảo dưỡng định kỳ';
+  document.getElementById('mm-ngay').value = todayStr();
+  ['mm-ghi-chu', 'mm-chi-phi', 'mm-dung-phut', 'mm-nguong-bd-moi', 'mm-nguong-lm-moi'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('mm-chu-ky-ngay').value = m.chu_ky_bao_duong_ngay || '';
+  mmResetHint();
+  openDlg('dlg-mm');
+  const h = document.getElementById('mm-history');
+  h.textContent = 'Đang tải...';
+  const { data } = await sb.from('duc_khuon_bao_duong_log').select('loai,ngay,mo_ta,chi_phi,nguoi_thuc_hien')
+    .eq('ma_khuon', m.ma_khuon).order('ngay', { ascending: false }).limit(5);
+  h.innerHTML = data && data.length ? data.map(r => '<div><b>' + fmtDate(r.ngay) + '</b> — ' + escapeHtml(r.loai) +
+    (r.chi_phi ? ' — ' + fmtNum(r.chi_phi) + 'đ' : '') + (r.nguoi_thuc_hien ? ' — ' + escapeHtml(r.nguoi_thuc_hien) : '') +
+    (r.mo_ta ? '<div style="color:var(--text-muted);border:none;padding:0">' + escapeHtml(r.mo_ta) + '</div>' : '') + '</div>').join('') : 'Chưa có lịch sử.';
+}
+async function saveMm(){
+  if (!cur || !(await ensureAuth())) return;
+  const n = id => Number(document.getElementById(id).value);
+  const loai = document.getElementById('mm-loai').value;
+  const btn = document.getElementById('mm-save'); btn.disabled = true;
+  try {
+    const d = await rpcWrite('duc_ghi_lich_su_bao_duong', {
+      p_ma_khuon: cur.ma_khuon, p_loai: loai,
+      p_ngay: document.getElementById('mm-ngay').value || null,
+      p_mo_ta: document.getElementById('mm-ghi-chu').value.trim(),
+      p_chi_phi: n('mm-chi-phi') > 0 ? n('mm-chi-phi') : null,
+      p_thoi_gian_dung_phut: n('mm-dung-phut') > 0 ? n('mm-dung-phut') : null,
+      p_id_van_de_lien_quan: null,
+      p_nguong_bao_duong_moi: n('mm-nguong-bd-moi') > 0 ? n('mm-nguong-bd-moi') : null,
+      p_nguong_lam_moi_moi: n('mm-nguong-lm-moi') > 0 ? n('mm-nguong-lm-moi') : null,
+      p_chu_ky_ngay_moi: n('mm-chu-ky-ngay') > 0 ? n('mm-chu-ky-ngay') : null,
+      p_user: userName,
+    });
+    closeDlg();
+    showMsg('✓ Đã ghi nhận ' + loai.toLowerCase() + ' cho khuôn ' + d.ma_khuon + ' (' + fmtNum(d.shot_tai_thoi_diem) + ' shot)', 'okmsg', 4000);
+    await loadMolds(); renderMolds();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+  finally { btn.disabled = false; }
+}
+
+// ── Vấn đề khuôn ──────────────────────────────────────────────────────────────
+function renderIssues(){
+  document.querySelectorAll('[data-if]').forEach(b => b.classList.toggle('on', b.dataset.if === iFilter));
+  const q = document.getElementById('iSearch').value.trim().toLowerCase();
+  const list = issues.filter(x => (iFilter === 'all' || x.trang_thai !== 'Đã đóng') &&
+    (!q || [x.ma_khuon, x.ma_may, x.ma_sp, x.mo_ta].some(v => String(v || '').toLowerCase().includes(q))));
+  const wrap = document.getElementById('issueList');
+  if (!list.length) { wrap.innerHTML = '<div class="empty">Không có vấn đề nào.</div>'; return; }
+  wrap.innerHTML = list.map(x => {
+    const id = escapeHtml(x.id_van_de);
+    let color = '#C2410C', act;
+    if (x.trang_thai === 'Mở') {
+      act = '<textarea data-xuly="' + id + '" placeholder="Nội dung đã xử lý (khuôn đã xuống, đã sửa gì)..."></textarea>' +
+        '<div class="acts"><button type="button" class="btn btn-sm" data-resolve="' + id + '">Đã xử lý xong — chờ xác nhận lần sau</button></div>';
+    } else if (x.trang_thai === 'Chờ xác nhận') {
+      color = 'var(--warn-fg)';
+      act = '<div style="margin-top:6px;font-size:12px"><b>Đã xử lý:</b> ' + escapeHtml(x.noi_dung_xu_ly || '—') +
+        ' <span class="hint">(bởi ' + escapeHtml(x.nguoi_xu_ly || '—') + ')</span></div>' +
+        '<div class="acts"><button type="button" class="btn btn-good btn-sm" data-confirm="' + id + '" data-kq="OK">✓ Xác nhận OK — đóng vấn đề</button>' +
+        '<button type="button" class="btn btn-danger btn-sm" data-confirm="' + id + '" data-kq="Tai_phat">✗ Vẫn còn/tái phát</button></div>';
+    } else {
+      color = 'var(--run-fg)';
+      act = '<div class="hint" style="margin-top:6px">Đóng bởi ' + escapeHtml(x.nguoi_xac_nhan || '—') + (x.ngay_xac_nhan ? ' · ' + fmtDate(x.ngay_xac_nhan) : '') + '</div>';
+    }
+    return '<div class="issue"><div class="meta"><span><b style="color:var(--text)">' + escapeHtml(x.ma_khuon) + '</b> · ' +
+      (x.ngay_phat_hien ? fmtDate(x.ngay_phat_hien) : '—') + ' · ' + escapeHtml(x.ma_may || '—') + ' · ' + escapeHtml(x.ma_sp || '—') + ' · ' + escapeHtml(x.nguoi_phat_hien || '—') + '</span>' +
+      '<span style="font-weight:700;color:' + color + '">' + escapeHtml(x.trang_thai) +
+      (x.lan_tai_phat > 0 ? ' · <span style="color:var(--alarm-fg)">Tái phát ' + x.lan_tai_phat + ' lần</span>' : '') + '</span></div>' +
+      '<div class="mt">' + escapeHtml(x.mo_ta) + '</div>' + act + '</div>';
+  }).join('');
+}
+async function resolveIssue(id){
+  const el = [...document.querySelectorAll('textarea[data-xuly]')].find(t => t.dataset.xuly === id);
+  const noiDung = el ? el.value.trim() : '';
+  if (!noiDung) return showMsg('Chưa nhập nội dung đã xử lý', 'err');
+  if (!(await ensureAuth())) return;
+  try {
+    await rpcWrite('duc_resolve_mold_issue_pending', { p_id_van_de: id, p_noi_dung_xu_ly: noiDung, p_user: userName });
+    showMsg('✓ Đã lưu — chờ xác nhận lần sản xuất kế tiếp', 'okmsg');
+    await loadIssues(); renderIssues();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+async function confirmIssue(id, kq){
+  if (!(await ensureAuth())) return;
+  try {
+    await rpcWrite('duc_confirm_mold_issue_outcome', { p_id_van_de: id, p_ket_qua: kq, p_ghi_chu: '', p_user: userName });
+    showMsg(kq === 'OK' ? '✓ Đã đóng vấn đề khuôn' : '⚠ Đã ghi nhận tái phát — mở lại vấn đề', 'okmsg');
+    await loadIssues(); renderIssues();
+  } catch (e) { showMsg('Lỗi: ' + e.message, 'err', 6000); }
+}
+
+// ── Hạng mục check sheet bảo dưỡng (T76/T78) ──────────────────────────────────
+// Mục chung: ma_khuon NULL; bỏ áp dụng cho 1 khuôn = 1 dòng duc_khuon_cs_mau_bo.
+// Mục riêng: ma_khuon = khuôn. Check sheet mở mới của khuôn X = mauChoKhuon(X).
+function mauChoKhuon(mk){
+  const bo = new Set(mauBo.filter(b => b.ma_khuon === mk).map(b => Number(b.id_mau)));
+  return mau.filter(m => m.dang_dung && (m.ma_khuon ? m.ma_khuon === mk : !bo.has(Number(m.id))));
+}
+function mauRow(m, mk, ro){
+  const dis = ro ? ' disabled' : '';
+  const ap = m.ma_khuon ? null : !mauBo.some(b => b.ma_khuon === mk && Number(b.id_mau) === Number(m.id));
+  return '<tr class="mau-row' + (m.dang_dung && ap !== false ? '' : ' off') + '" data-id="' + m.id + '">' +
+    '<td class="n"><input type="number" data-f="thu_tu" value="' + m.thu_tu + '"' + dis + '></td>' +
+    '<td><input data-f="nhom" value="' + escapeHtml(m.nhom) + '"' + dis + '></td>' +
+    '<td><input data-f="noi_dung" value="' + escapeHtml(m.noi_dung) + '"' + dis + '></td>' +
+    '<td><input data-f="tieu_chuan" value="' + escapeHtml(m.tieu_chuan) + '"' + dis + '></td>' +
+    '<td style="text-align:center"><input type="checkbox" data-f="dang_dung"' + (m.dang_dung ? ' checked' : '') + dis + '></td>' +
+    (ap === null ? '' : '<td class="ap"><input type="checkbox" data-ap' + (ap ? ' checked' : '') + dis + ' title="Bỏ tick = khuôn ' + escapeHtml(mk) + ' không kiểm hạng mục này"></td>') +
+    '<td class="act">' + (ro ? '' : '<button type="button" class="btn btn-sm" data-act="save">Lưu</button> <button type="button" class="btn btn-sm btn-danger" data-act="del">Xoá</button>') + '</td></tr>';
+}
+function renderMau(){
+  const ro = !laNguoiSuaMau();
+  const ds = molds.map(m => m.ma_khuon).sort(naturalCompare);
+  if (mauKhuon && !ds.includes(mauKhuon)) ds.unshift(mauKhuon);
+  if (!mauKhuon) mauKhuon = ds[0] || '';
+  document.getElementById('mauKhuon').innerHTML = ds.map(k => '<option' + (k === mauKhuon ? ' selected' : '') + '>' + escapeHtml(k) + '</option>').join('');
+  document.getElementById('mauRo').innerHTML = ro ? '<div class="ro-note">🔒 Chỉ xem — Quản lý bộ phận Đúc hoặc admin mới sửa được hạng mục' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>' : '';
+  document.querySelectorAll('#sec-mau .mau-edit').forEach(e => { e.hidden = ro; });
+  const mk = mauKhuon;
+  document.querySelectorAll('.mau-mk').forEach(e => { e.textContent = mk; });
+  document.getElementById('tbMau').innerHTML = mau.filter(m => !m.ma_khuon).map(m => mauRow(m, mk, ro)).join('') ||
+    '<tr><td colspan="7" class="empty">Chưa có hạng mục chung</td></tr>';
+  const rieng = mau.filter(m => m.ma_khuon === mk);
+  document.getElementById('tbMauRieng').innerHTML = rieng.length ? rieng.map(m => mauRow(m, mk, ro)).join('')
+    : '<tr><td colspan="6" class="empty">Chưa có hạng mục riêng cho khuôn ' + escapeHtml(mk) + '</td></tr>';
+  const chung = mau.filter(m => !m.ma_khuon && m.dang_dung).length, tong = mauChoKhuon(mk);
+  document.getElementById('mauTong').textContent = mk ? 'Check sheet mới của khuôn ' + mk + ': ' + tong.length + ' hạng mục (' +
+    tong.filter(m => !m.ma_khuon).length + '/' + chung + ' mục chung + ' + tong.filter(m => m.ma_khuon).length + ' mục riêng)' : '';
+}
+async function reloadMau(){ await loadMau(); renderMau(); }
+
+function bindMau(){
+  const sec = document.getElementById('sec-mau');
+  sec.addEventListener('change', async e => {
+    if (e.target.id === 'mauKhuon') { mauKhuon = e.target.value; history.replaceState(null, '', '?tab=mau&khuon=' + encodeURIComponent(mauKhuon)); return renderMau(); }
+    const cb = e.target.closest('input[data-ap]');
+    if (!cb || !laNguoiSuaMau()) return;
+    const mk = mauKhuon, id = Number(cb.closest('tr').dataset.id);
+    const { error } = cb.checked
+      ? await sb.from('duc_khuon_cs_mau_bo').delete().eq('ma_khuon', mk).eq('id_mau', id)
+      : await sb.from('duc_khuon_cs_mau_bo').insert({ ma_khuon: mk, id_mau: id });
+    if (error) { cb.checked = !cb.checked; return showMsg('Lỗi lưu: ' + error.message, 'err', 5000); }
+    showMsg(cb.checked ? '✓ Khuôn ' + mk + ' áp dụng lại hạng mục này' : '✓ Khuôn ' + mk + ' bỏ hạng mục này', 'okmsg', 2000);
+    await reloadMau();
+  });
+  sec.addEventListener('click', async e => {
+    if (!laNguoiSuaMau()) return;
+    const mk = mauKhuon;
+    const add = e.target.closest('button[data-add]');
+    if (add) {
+      if (!mk) return showMsg('Chưa có khuôn nào', 'err');
+      const maxTt = mau.reduce((s, m) => Math.max(s, m.thu_tu), 0);
+      const chungRows = mau.filter(m => !m.ma_khuon);
+      const row = add.dataset.add === 'rieng'
+        ? { ma_khuon: mk, nhom: 'Đặc thù khuôn', noi_dung: 'Hạng mục riêng mới', tieu_chuan: '', thu_tu: maxTt + 10 }
+        : { nhom: chungRows.length ? chungRows[chungRows.length - 1].nhom : '1. Chung', noi_dung: 'Hạng mục mới', tieu_chuan: '', thu_tu: maxTt + 10 };
+      const { error } = await sb.from('duc_khuon_cs_mau').insert(row);
+      if (error) return showMsg('Lỗi thêm: ' + error.message, 'err', 5000);
+      return reloadMau();
+    }
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const tr = b.closest('tr'), id = Number(tr.dataset.id);
+    const m = mau.find(x => Number(x.id) === id);
+    if (b.dataset.act === 'del') {
+      if (!confirm(m && m.ma_khuon ? 'Xoá hạng mục riêng này của khuôn ' + mk + '?' :
+        'Xoá hạng mục chung này khỏi mẫu của MỌI khuôn?\n(Chỉ muốn bỏ cho khuôn ' + mk + ' thì bỏ tick cột "Áp dụng".)\nCheck sheet đã tạo không bị ảnh hưởng.')) return;
+      const { error } = await sb.from('duc_khuon_cs_mau').delete().eq('id', id);
+      if (error) return showMsg('Lỗi xoá: ' + error.message, 'err', 5000);
+    } else {
+      const v = f => tr.querySelector('[data-f="' + f + '"]');
+      const row = { thu_tu: Number(v('thu_tu').value) || 0, nhom: v('nhom').value.trim(), noi_dung: v('noi_dung').value.trim(),
+        tieu_chuan: v('tieu_chuan').value.trim(), dang_dung: v('dang_dung').checked, updated_at: new Date().toISOString() };
+      if (!row.nhom || !row.noi_dung) return showMsg('Nhóm và hạng mục không được trống', 'err', 3000);
+      const { error } = await sb.from('duc_khuon_cs_mau').update(row).eq('id', id);
+      if (error) return showMsg('Lỗi lưu: ' + error.message, 'err', 5000);
+    }
+    showMsg('✓ Đã cập nhật hạng mục', 'okmsg', 2000);
+    await reloadMau();
+  });
+}
+
+// ── Gắn sự kiện ───────────────────────────────────────────────────────────────
+function bindAll(){
+  document.getElementById('tabs').addEventListener('click', e => {
+    const a = e.target.closest('a[data-tab]');
+    if (!a) return;
+    e.preventDefault();
+    setTab(a.dataset.tab, true);
+  });
+  document.getElementById('kSearch').addEventListener('input', renderMolds);
+  document.getElementById('iSearch').addEventListener('input', renderIssues);
+  document.getElementById('btnNewMold').onclick = () => openCfg(null);
+  document.getElementById('sec-khuon').addEventListener('click', e => {
+    const t = e.target.closest('[data-kf],[data-cfg],[data-mm],[data-gomau],[data-goissue]');
+    if (!t) return;
+    if (t.dataset.kf) { kFilter = t.dataset.kf; return renderMolds(); }
+    if (t.dataset.cfg) return openCfg(t.dataset.cfg);
+    if (t.dataset.mm) return openMm(t.dataset.mm);
+    e.preventDefault();
+    if (t.dataset.gomau) { mauKhuon = t.dataset.gomau; return setTab('mau', true); }
+    document.getElementById('iSearch').value = t.dataset.goissue; iFilter = 'open'; setTab('van-de', true);
+  });
+  document.getElementById('sec-van-de').addEventListener('click', e => {
+    const f = e.target.closest('[data-if]');
+    if (f) { iFilter = f.dataset.if; return renderIssues(); }
+    const r = e.target.closest('[data-resolve]');
+    if (r) return resolveIssue(r.dataset.resolve);
+    const c = e.target.closest('[data-confirm]');
+    if (c) return confirmIssue(c.dataset.confirm, c.dataset.kq);
+  });
+  document.querySelectorAll('[data-close]').forEach(b => { b.onclick = closeDlg; });
+  document.querySelectorAll('.dlg-mask').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeDlg(); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDlg(); });
+  document.getElementById('cfg-save').onclick = saveCfg;
+  document.getElementById('cfg-del').onclick = deleteCfg;
+  document.getElementById('mm-loai').onchange = mmResetHint;
+  document.getElementById('mm-save').onclick = saveMm;
+  bindMau();
+}
+
+async function init(){
+  startHeaderClock();
+  bindAll();
+  if (qs.get('q')) document.getElementById('iSearch').value = qs.get('q');
+  await loadRole();
+  const [, , , p] = await Promise.all([loadMolds(), loadIssues(), loadMau(),
+    sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp')]);
+  products = (p.data || []).filter(x => x.ma_sp);
+  setTab(tab, false);
+}
+init();
+</script>
+</body>
+</html>

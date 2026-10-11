@@ -170,7 +170,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .col-mold .mold{font-size:10px;font-weight:600;color:var(--text);line-height:1.2}
 .pair-badge{display:inline-flex;align-self:flex-start;align-items:center;gap:2px;font-size:9px;padding:0 4px;border-radius:2px;font-weight:600;letter-spacing:.02em;font-family:'JetBrains Mono',monospace;background:#EDE9FE;color:#6D28D9}
 .btn-tiny{background:transparent;border:1px dashed var(--border-strong);color:var(--text-muted);padding:1px 5px;border-radius:3px;font-family:inherit;font-size:9px;cursor:pointer;align-self:flex-start;margin-top:1px}
-.km-issue-filter.active{background:var(--accent,#2563eb);color:#fff;border-style:solid;border-color:var(--accent,#2563eb)}
 .btn-tiny:hover{background:var(--bg-sunken);color:var(--text)}
 .col-prod .stats{display:grid;grid-template-columns:1fr 1fr;gap:0 8px;font-size:9px;color:var(--text-muted);line-height:1.1}
 .col-prod .num{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--text);letter-spacing:-.02em}
@@ -320,7 +319,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <div style="display:flex;gap:6px">
       <button class="btn btn-ghost" id="btn-khsx-batch" onclick="openKhsxBatchModal()">⚡ Nạp kế hoạch từ KHSX tuần</button>
       <button class="btn btn-ghost" id="btn-bulk-incident" onclick="openBulkIncidentModal()">⚡ Sự cố nhiều máy</button>
-      <button class="btn btn-ghost" id="btn-khuon-manage" onclick="openKhuonManageModal()">🧊 Quản lý khuôn</button>
+      <a class="btn btn-ghost" id="btn-khuon-manage" href="quan-ly-khuon.html" style="text-decoration:none">🧊 Quản lý khuôn</a>
       <button class="btn btn-ghost" onclick="window.open('bao-duong-khuon-tuan.html','_blank')">🔧 Kế hoạch bảo dưỡng khuôn</button>
       <button class="btn btn-ghost" id="btn-weekly-report" onclick="openWeeklyReportFull()">📅 Báo cáo tuần</button>
       <button class="btn btn-ghost" onclick="window.open('chuyencongdoan.html?tab=confirm&dept=' + encodeURIComponent('Đúc'),'_blank')">✅ Xác nhận giao hàng</button>
@@ -887,97 +886,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   </div>
 </div>
 
-<!-- MODAL: Quản lý khuôn -->
-<div class="modal-mask" id="modal-khuon-manage">
-  <div class="modal" style="width:min(1200px, 95vw);max-width:1200px;max-height:92vh">
-    <div class="modal-head">
-      <div class="modal-title">🧊 Quản lý khuôn</div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body" style="max-height:none">
-      <div style="display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:10px">
-        <button type="button" class="km-tab active" id="km-tab-issues" onclick="switchKhuonManageTab('issues')" style="padding:6px 14px;border:none;background:none;cursor:pointer;font-weight:600;font-size:12px;border-bottom:2px solid var(--accent, #2563eb)">Vấn đề khuôn</button>
-        <button type="button" class="km-tab" id="km-tab-molds" onclick="switchKhuonManageTab('molds')" style="padding:6px 14px;border:none;background:none;cursor:pointer;font-weight:600;font-size:12px;border-bottom:2px solid transparent;color:var(--text-muted)">Danh sách khuôn</button>
-      </div>
-
-      <div id="km-panel-issues">
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <button type="button" class="btn-tiny km-issue-filter active" data-filter="open" onclick="filterKhuonIssues('open')">Chưa đóng</button>
-          <button type="button" class="btn-tiny km-issue-filter" data-filter="all" onclick="filterKhuonIssues('all')">Tất cả (kể cả đã đóng)</button>
-        </div>
-        <div id="km-issues-list" style="max-height:64vh;overflow-y:auto">Đang tải...</div>
-      </div>
-
-      <div id="km-panel-molds" style="display:none">
-        <div id="km-molds-list" style="max-height:66vh;overflow-y:auto">Đang tải...</div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <span class="hint">Danh sách khuôn không phụ thuộc ca/ngày đang chọn — dùng cho tổ khuôn quản lý xuyên suốt.</span>
-      <div class="modal-actions">
-        <button class="btn-outline" onclick="closeModal()">Đóng</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: cấu hình khuôn -->
-<div class="modal-mask" id="modal-mold-configure">
-  <div class="modal" style="max-width:460px">
-    <div class="modal-head">
-      <div class="modal-title">✏ Sửa khuôn <span class="machine-tag" id="mc-tag">—</span></div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:var(--bg-sunken);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text-muted)">
-        Để trống ô nào thì giữ nguyên giá trị hiện tại của ô đó. Dùng khi cần khai báo baseline từ Excel hoặc sửa ngưỡng riêng cho khuôn này.
-      </div>
-      <div class="field">
-        <label>Mã khuôn <span class="req">*</span></label>
-        <input type="text" id="mc-ma-khuon" placeholder="VD: K-DC5-01">
-        <div style="font-size:10px;color:var(--text-muted);margin-top:3px" id="mc-ma-khuon-hint"></div>
-      </div>
-      <div class="field">
-        <label id="mc-ma-sp-label">Mã sản phẩm <span class="req" id="mc-ma-sp-req" style="display:none">*</span></label>
-        <select id="mc-ma-sp"><option value="">— Chọn mã SP —</option></select>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Mỗi khuôn đúc đúng 1 mã SP cố định.</div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Tổng shot lũy kế</label>
-          <input type="number" id="mc-tong-shot" min="0" step="1" placeholder="Để trống nếu giữ nguyên">
-        </div>
-        <div class="field">
-          <label>Shot từ lần BD gần nhất</label>
-          <input type="number" id="mc-shot-since" min="0" step="1" placeholder="Để trống nếu giữ nguyên">
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Ngưỡng bảo dưỡng (shot)</label>
-          <input type="number" id="mc-nguong-bd" min="0" step="100" placeholder="Để trống nếu giữ nguyên">
-        </div>
-        <div class="field">
-          <label>Ngưỡng làm mới (shot)</label>
-          <input type="number" id="mc-nguong-lm" min="0" step="1000" placeholder="Để trống nếu giữ nguyên">
-        </div>
-      </div>
-      <div class="field">
-        <label>Ghi chú</label>
-        <textarea id="mc-ghi-chu" placeholder="VD: Khai báo baseline từ Excel ngày 01/08/2026"></textarea>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <span class="hint">Không reset bộ đếm — dùng nút "🔧 Bảo dưỡng" nếu muốn reset sau khi bảo dưỡng xong.</span>
-      <div class="modal-actions">
-        <button class="btn-outline" id="mc-btn-delete" style="color:#B91C1C;border-color:#FCA5A5;display:none" onclick="deleteKhuonPrompt()">🗑 Xoá khuôn</button>
-        <button class="btn-outline" onclick="closeModal()">Huỷ</button>
-        <button class="btn btn-primary" onclick="submitMoldConfigure()">Lưu cấu hình</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL: tăng ca máy đơn lẻ -->
 <div class="modal-mask" id="modal-extend-shift">
   <div class="modal" style="max-width:520px">
@@ -1153,7 +1061,6 @@ const state = {
   requestCounter: 0, currentRequestId: 0,
   downtimeCostPerMin: CONFIG.DOWNTIME_COST_PER_MIN,
   endShiftMachines: [],
-  khuonManageMoldsCache: null, khuonManageIssuesCache: null,
   moldIssueRefresh: null,
   weeklyPlanSuggestions: {}, weeklyPlanSuggestionsForNgay: null,
 };
@@ -3964,7 +3871,6 @@ async function submitMoldMaintenance(){
     });
     hideOverlay(); closeModal();
     showToast('✓ Đã ghi nhận ' + document.getElementById('mm-loai').value.toLowerCase() + ' cho khuôn ' + d.ma_khuon + ' (' + fmtNum(d.shot_tai_thoi_diem) + ' shot)');
-    state.khuonManageMoldsCache = null;
     loadShiftState(false);
   } catch (e) { onError(e); }
 }
@@ -4000,7 +3906,6 @@ async function submitMoldIssueReport(){
     if (error) throw new Error(error.message);
     hideOverlay(); closeModal();
     showToast('⚠ Đã ghi nhận vấn đề khuôn ' + t.ma_khuon);
-    state.khuonManageIssuesCache = null;
     loadShiftState(false);
   } catch (e) { onError(e); }
 }
@@ -4088,7 +3993,6 @@ async function submitResolveMoldIssuePending(id_van_de){
     });
     hideOverlay();
     showToast('✓ Đã lưu — chờ xác nhận lần sản xuất kế tiếp');
-    state.khuonManageIssuesCache = null;
     if (typeof state.moldIssueRefresh === 'function') state.moldIssueRefresh();
     loadShiftState(false);
   } catch (e) { onError(e); }
@@ -4103,7 +4007,6 @@ async function submitConfirmMoldIssue(id_van_de, ketQua){
     });
     hideOverlay();
     showToast(ketQua === 'OK' ? '✓ Đã đóng vấn đề khuôn' : '⚠ Đã ghi nhận tái phát — mở lại vấn đề');
-    state.khuonManageIssuesCache = null;
     if (typeof state.moldIssueRefresh === 'function') state.moldIssueRefresh();
     loadShiftState(false);
   } catch (e) { onError(e); }
@@ -4118,225 +4021,7 @@ async function confirmMoldIssueQuick(id_van_de, ketQua){
     });
     hideOverlay();
     showToast(ketQua === 'OK' ? '✓ Đã đóng vấn đề khuôn' : '⚠ Đã ghi nhận tái phát — mở lại vấn đề');
-    state.khuonManageIssuesCache = null;
     loadShiftState(false);
-  } catch (e) { onError(e); }
-}
-
-// =============================================================================
-// Màn "Quản lý khuôn" — độc lập ca/ngày đang chọn
-// =============================================================================
-function openKhuonManageModal(){
-  document.getElementById('modal-khuon-manage').classList.add('open');
-  state.khuonManageMoldsCache = null;
-  state.khuonManageIssuesCache = null;
-  switchKhuonManageTab('issues');
-  loadKhuonManageIssues();
-}
-
-function switchKhuonManageTab(tab){
-  const isMolds = tab === 'molds';
-  document.getElementById('km-panel-molds').style.display = isMolds ? '' : 'none';
-  document.getElementById('km-panel-issues').style.display = isMolds ? 'none' : '';
-  document.getElementById('km-tab-molds').style.borderBottomColor = isMolds ? 'var(--accent, #2563eb)' : 'transparent';
-  document.getElementById('km-tab-molds').style.color = isMolds ? '' : 'var(--text-muted)';
-  document.getElementById('km-tab-issues').style.borderBottomColor = !isMolds ? 'var(--accent, #2563eb)' : 'transparent';
-  document.getElementById('km-tab-issues').style.color = !isMolds ? '' : 'var(--text-muted)';
-  if (isMolds && !state.khuonManageMoldsCache) loadKhuonManageMolds();
-  if (!isMolds && !state.khuonManageIssuesCache) loadKhuonManageIssues();
-}
-
-async function loadKhuonManageMolds(){
-  const wrap = document.getElementById('km-molds-list');
-  wrap.innerHTML = 'Đang tải...';
-  const { data, error } = await sb.from('duc_shot_khuon').select('*');
-  if (error) { wrap.innerHTML = '<div style="color:var(--alarm-fg);font-size:12px">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
-  applyMoldList(data || []);
-  // Sắp xếp theo mức ưu tiên xử lý (readAllMolds/api_getAllMolds bản cũ)
-  const priority = { 'Cần làm mới': 0, 'Cần bảo dưỡng': 1, 'Sắp bảo dưỡng': 2, 'OK': 3 };
-  const molds = state.molds.slice().sort((a, b) => {
-    const pa = priority[a.trang_thai_khuon] != null ? priority[a.trang_thai_khuon] : 9;
-    const pb = priority[b.trang_thai_khuon] != null ? priority[b.trang_thai_khuon] : 9;
-    if (pa !== pb) return pa - pb;
-    return naturalCompare(a.ma_khuon, b.ma_khuon);
-  });
-  state.khuonManageMoldsCache = molds;
-
-  let issuesByMold = {};
-  if (state.khuonManageIssuesCache) {
-    issuesByMold = _issuesByMoldFromList(state.khuonManageIssuesCache);
-  } else {
-    const q = await sb.from('duc_van_de_khuon').select('*').neq('trang_thai', 'Đã đóng');
-    if (!q.error) issuesByMold = _issuesByMoldFromList(q.data || []);
-  }
-  _renderKhuonManageMoldsList(molds, issuesByMold);
-}
-
-function _issuesByMoldFromList(list){
-  const map = {};
-  (list || []).filter(x => x.trang_thai !== 'Đã đóng').forEach(x => {
-    const k = String(x.ma_khuon).trim();
-    if (!map[k]) map[k] = [];
-    map[k].push(x);
-  });
-  return map;
-}
-
-function _renderKhuonManageMoldsList(molds, issuesByMold){
-  issuesByMold = issuesByMold || {};
-  const wrap = document.getElementById('km-molds-list');
-  if (molds.length === 0) {
-    wrap.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-style:italic;font-size:12px">Chưa có khuôn nào trong hệ thống. Bấm "＋ Khai báo khuôn mới" bên dưới, hoặc khuôn sẽ tự xuất hiện sau khi chạy xong 1 ca.</div>' +
-      '<button class="btn-outline" style="margin-top:8px;font-size:11px" onclick="openMoldConfigureModal(null)">＋ Khai báo khuôn mới</button>';
-    return;
-  }
-  const statusColor = { 'OK': '#065F46', 'Sắp bảo dưỡng': '#B45309', 'Cần bảo dưỡng': '#B91C1C', 'Cần làm mới': '#9F1239' };
-  wrap.innerHTML =
-    '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
-      '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);color:var(--text-muted)">' +
-        '<th style="padding:4px 6px">Khuôn</th><th>Mã SP</th><th>Tổng shot</th><th>Từ lần BD</th>' +
-        '<th>Ngưỡng BD</th><th>Ngưỡng LM</th><th>Hạn BD tiếp theo</th><th>Trạng thái</th><th></th>' +
-      '</tr></thead><tbody>' +
-      molds.map(m => {
-        const issues = issuesByMold[String(m.ma_khuon).trim()] || [];
-        const pending = issues.find(x => x.trang_thai === 'Chờ xác nhận');
-        let issueBadge = '';
-        if (pending) issueBadge = '<div style="color:#B45309;font-weight:600;font-size:10px;margin-top:2px">❓ Chờ xác nhận' + (issues.length > 1 ? ' (' + issues.length + ')' : '') + '</div>';
-        else if (issues.length > 0) issueBadge = '<div style="color:#C2410C;font-weight:600;font-size:10px;margin-top:2px">⚠ Có vấn đề' + (issues.length > 1 ? ' (' + issues.length + ')' : '') + '</div>';
-        return '<tr style="border-bottom:1px solid var(--border)">' +
-            '<td style="padding:4px 6px;font-weight:600">' + escapeHtml(m.ma_khuon) + '</td>' +
-            '<td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
-            '<td>' + fmtNum(m.tong_shot_luy_ke) + '</td>' +
-            '<td>' + fmtNum(m.shots_since_maintenance) + '</td>' +
-            '<td>' + fmtNum(m.nguong_bao_duong) + '</td>' +
-            '<td>' + fmtNum(m.nguong_lam_moi) + '</td>' +
-            '<td>' + moldNextDueDateLabel(m) + '</td>' +
-            '<td><div style="color:' + (statusColor[m.trang_thai_khuon] || '') + ';font-weight:600">' + escapeHtml(m.trang_thai_khuon) + '</div>' + issueBadge + '</td>' +
-            '<td style="white-space:nowrap">' +
-              '<button class="btn-tiny" onclick=\'openMoldConfigureModal(' + JSON.stringify(m) + ')\'>✏ Sửa</button> ' +
-              '<button class="btn-tiny" onclick=\'openMoldMaintenanceModalFromMold(' + JSON.stringify(m) + ')\'>🔧 Bảo dưỡng</button>' +
-            '</td>' +
-          '</tr>';
-      }).join('') +
-    '</tbody></table>' +
-    '<button class="btn-outline" style="margin-top:8px;font-size:11px" onclick="openMoldConfigureModal(null)">＋ Khai báo khuôn mới</button>';
-}
-
-async function loadKhuonManageIssues(){
-  const wrap = document.getElementById('km-issues-list');
-  wrap.innerHTML = 'Đang tải...';
-  const { data, error } = await sb.from('duc_van_de_khuon').select('*');
-  if (error) { wrap.innerHTML = '<div style="color:var(--alarm-fg);font-size:12px">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
-  state.khuonManageIssuesCache = _sortMoldIssues(data || []);
-  const activeBtn = document.querySelector('.km-issue-filter.active');
-  filterKhuonIssues(activeBtn ? activeBtn.dataset.filter : 'open');
-}
-
-function filterKhuonIssues(filter){
-  document.querySelectorAll('.km-issue-filter').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
-  const all = state.khuonManageIssuesCache || [];
-  const issues = filter === 'open' ? all.filter(x => x.trang_thai !== 'Đã đóng') : all;
-  state.moldIssueRefresh = () => loadKhuonManageIssues();
-  _renderMoldIssueList(document.getElementById('km-issues-list'), issues, true);
-}
-
-// =============================================================================
-// Cấu hình khuôn → duc_configure_mold
-// =============================================================================
-function _populateMcMaSpSelect(){
-  const sel = document.getElementById('mc-ma-sp');
-  sel.innerHTML = '<option value="">— Chọn mã SP —</option>';
-  state.products.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.ma_sp;
-    opt.textContent = p.ma_sp + ' — ' + (p.ten_sp || '');
-    sel.appendChild(opt);
-  });
-}
-
-async function openMoldConfigureModal(mold){
-  if (!(await ensureAuth())) return;
-  state.currentTarget = { ma_khuon: mold ? mold.ma_khuon : null, isNewMold: !mold };
-  document.getElementById('mc-tag').textContent = mold ? mold.ma_khuon : '(khuôn mới)';
-  document.getElementById('mc-ma-khuon').value = mold ? mold.ma_khuon : '';
-  document.getElementById('mc-ma-khuon-hint').textContent = mold
-    ? 'Đổi mã ở đây = đổi tên khuôn — chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai, không sửa lại lịch sử (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in).'
-    : '';
-  document.getElementById('mc-btn-delete').style.display = mold ? '' : 'none';
-  _populateMcMaSpSelect();
-  const currentMaSp = mold ? String(mold.ten_sp_gan_nhat || '').split(' (')[0].trim() : '';
-  document.getElementById('mc-ma-sp').value = currentMaSp;
-  document.getElementById('mc-ma-sp-req').style.display = mold ? 'none' : '';
-  document.getElementById('mc-tong-shot').value = mold ? mold.tong_shot_luy_ke : '';
-  document.getElementById('mc-shot-since').value = mold ? mold.shots_since_maintenance : '';
-  document.getElementById('mc-nguong-bd').value = mold ? mold.nguong_bao_duong : '';
-  document.getElementById('mc-nguong-lm').value = mold ? mold.nguong_lam_moi : '';
-  document.getElementById('mc-ghi-chu').value = '';
-  document.getElementById('modal-mold-configure').classList.add('open');
-}
-
-async function submitMoldConfigure(){
-  const t = state.currentTarget;
-  if (!t) return;
-  const maKhuonMoi = document.getElementById('mc-ma-khuon').value.trim();
-  if (!maKhuonMoi) return showToast('Cần nhập mã khuôn', true);
-  const maSp = document.getElementById('mc-ma-sp').value.trim();
-  if (t.isNewMold && !maSp) return showToast('Khuôn mới cần khai báo mã sản phẩm', true);
-  if (!(await ensureAuthOnSubmit('modal-mold-configure'))) return;
-
-  showOverlay(t.isNewMold ? 'Đang tạo khuôn...' : 'Đang lưu...');
-  try {
-    // đổi tên khuôn TRƯỚC nếu mã bị sửa (chỉ khi sửa khuôn có sẵn — khuôn mới
-    // thì duc_configure_mold tự insert đúng mã mới nhập, không cần đổi tên)
-    let maKhuonHienTai = t.ma_khuon;
-    if (!t.isNewMold && maKhuonMoi !== t.ma_khuon) {
-      const r = await rpcWrite('duc_rename_khuon', { p_ma_khuon_cu: t.ma_khuon, p_ma_khuon_moi: maKhuonMoi, p_user: state.user });
-      maKhuonHienTai = r.ma_khuon_moi;
-    } else if (t.isNewMold) {
-      maKhuonHienTai = maKhuonMoi;
-    }
-
-    const d = await rpcWrite('duc_configure_mold', {
-      p_ma_khuon: maKhuonHienTai,
-      p_ma_sp: maSp || null,
-      p_tong_shot_luy_ke: numOrNull(document.getElementById('mc-tong-shot').value),
-      p_shots_since_maintenance: numOrNull(document.getElementById('mc-shot-since').value),
-      p_nguong_bao_duong_moi: numOrNull(document.getElementById('mc-nguong-bd').value),
-      p_nguong_lam_moi_moi: numOrNull(document.getElementById('mc-nguong-lm').value),
-      p_ghi_chu: document.getElementById('mc-ghi-chu').value.trim() || null,
-      p_user: state.user,
-    });
-    hideOverlay();
-    document.getElementById('modal-mold-configure').classList.remove('open');
-    showToast('✓ Đã lưu khuôn ' + d.ma_khuon);
-    state.khuonManageMoldsCache = null;
-    loadKhuonManageMolds();
-    loadShiftState(false);
-    document.getElementById('modal-khuon-manage').classList.add('open');
-  } catch (e) { onError(e); }
-}
-
-// Xoá khuôn thừa/không dùng khỏi sổ đời khuôn (duc_xoa_khuon) — chỉ xoá khỏi
-// danh sách chọn, KHÔNG đụng lịch sử/audit trail đã có (log bảo dưỡng, vấn đề
-// khuôn, hàng NG, tem cũ). Bị chặn nếu khuôn đang gán cho trạm đang chạy hoặc
-// có trong kế hoạch tuần hiện tại/tương lai — xem migration_phase_D36.
-async function deleteKhuonPrompt(){
-  const maKhuon = state.currentTarget && state.currentTarget.ma_khuon;
-  if (!maKhuon) return;
-  if (!(await ensureAuth())) return;
-  if (!confirm('Xoá khuôn "' + maKhuon + '" khỏi danh sách chọn?\n\n' +
-    'Chỉ xoá được khuôn không đang gán cho trạm nào và không có trong kế hoạch tuần hiện tại/tương lai.\n' +
-    'Lịch sử bảo dưỡng/vấn đề/hàng NG/tem cũ (nếu có) vẫn được giữ nguyên.')) return;
-  showOverlay('Đang xoá khuôn...');
-  try {
-    await rpcWrite('duc_xoa_khuon', { p_ma_khuon: maKhuon, p_user: state.user });
-    hideOverlay();
-    document.getElementById('modal-mold-configure').classList.remove('open');
-    showToast('✓ Đã xoá khuôn ' + maKhuon);
-    state.khuonManageMoldsCache = null;
-    loadKhuonManageMolds();
-    loadShiftState(false);
-    document.getElementById('modal-khuon-manage').classList.add('open');
   } catch (e) { onError(e); }
 }
 
