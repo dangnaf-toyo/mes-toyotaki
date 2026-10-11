@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Check sheet bảo dưỡng khuôn — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  checksheet-bao-duong-khuon.html?id=<id lịch> — check sheet ghi kết quả bảo
+  dưỡng cho 1 lịch trong Kế hoạch bảo dưỡng khuôn tuần (bấm 📋 trên ô lịch
+  ở bao-duong-khuon-tuan.html).
+  - Hạng mục lấy từ mẫu duc_khuon_cs_mau lúc mở lần đầu, lưu bản chụp vào
+    duc_khuon_checksheet.hang_muc (T76).
+  - Lưu nháp / Hoàn thành qua RPC duc_khuon_cs_luu. Hoàn thành -> ghi sổ đời
+    khuôn (duc_khuon_bao_duong_log), Đạt + BD định kỳ/Thay mới -> reset đồng
+    hồ shot; sau đó khoá.
+  - Quản lý bộ phận Đúc / admin sửa mẫu hạng mục ở khối "⚙ Mẫu hạng mục".
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.btn{border:none;border-radius:5px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none}
+.btn:hover{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
+.btn-outline{background:#fff;border:1.5px solid var(--accent);color:var(--accent)}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-good{background:var(--run-fg)}
+.btn-good:hover{background:#036049}
+.btn-sm{padding:4px 9px;font-size:11.5px}
+.btn-danger{background:#FEE2E2;border:1px solid #F87171;color:#B91C1C}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.card-title{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 16px}
+.info-grid .k{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.info-grid .v{font-size:14px;font-weight:700}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px}
+.badge.ok{background:var(--run-bg);color:var(--run-fg)}
+.badge.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.badge.bad{background:var(--alarm-bg);color:var(--alarm-fg)}
+.badge.muted{background:var(--bg-sunken);color:var(--text-muted)}
+.issues{margin-top:10px;font-size:12px;background:var(--warn-bg);border:1px solid #F3D98B;border-radius:6px;padding:6px 10px;color:var(--warn-fg)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.wide{grid-column:1/-1}
+.fg label{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select,.fg textarea{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%;color:var(--text);background:#fff}
+.fg textarea{min-height:56px;resize:vertical}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent)}
+.fg input:disabled,.fg select:disabled,.fg textarea:disabled{background:var(--bg-sunken);color:var(--text)}
+.dur{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;padding:8px 0}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{border-bottom:1px solid var(--border);padding:7px 8px;text-align:left;vertical-align:middle}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+tr.grp td{background:#E0EDFA;font-weight:800;color:var(--accent-hover);font-size:12px}
+td.stt{width:34px;text-align:center;color:var(--text-muted)}
+td.tc{color:var(--text-muted);font-size:11.5px;min-width:180px}
+td.kq{white-space:nowrap;width:1%}
+td.gc{min-width:180px}
+td.gc input{width:100%;border:1px solid var(--border-strong);border-radius:5px;padding:6px 7px;font-family:inherit;font-size:12.5px}
+td.gc input.need{border-color:var(--alarm-fg);background:var(--alarm-bg)}
+tr.row-ng td{background:#FFF5F5}
+.kq-btn{border:1.5px solid var(--border-strong);background:#fff;border-radius:6px;padding:7px 11px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer;color:var(--text-muted);min-width:44px}
+.kq-btn + .kq-btn{margin-left:4px}
+.kq-btn.on.OK{background:var(--run-fg);border-color:var(--run-fg);color:#fff}
+.kq-btn.on.NG{background:var(--alarm-fg);border-color:var(--alarm-fg);color:#fff}
+.kq-btn.on.NA{background:#64748B;border-color:#64748B;color:#fff}
+.kq-btn:disabled{cursor:default}
+.kq-text{font-weight:800}
+.kq-text.OK{color:var(--run-fg)}.kq-text.NG{color:var(--alarm-fg)}.kq-text.NA{color:var(--text-muted)}
+.tally{display:flex;gap:14px;font-size:12px;color:var(--text-muted);font-weight:600;margin-left:auto;text-transform:none;letter-spacing:0}
+.tally b{font-family:'JetBrains Mono',monospace;font-size:14px}
+.kl{display:flex;gap:8px}
+.kl button{flex:1;border:2px solid var(--border-strong);background:#fff;border-radius:8px;padding:12px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;color:var(--text-muted)}
+.kl button.on.dat{background:var(--run-fg);border-color:var(--run-fg);color:#fff}
+.kl button.on.khong_dat{background:var(--alarm-fg);border-color:var(--alarm-fg);color:#fff}
+.kl button:disabled{cursor:default}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.actions .hint{font-size:11.5px;color:var(--text-muted);margin-right:auto}
+.done-banner{border-radius:8px;padding:10px 14px;font-weight:700;font-size:13px}
+.done-banner.dat{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
+.done-banner.khong_dat{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5}
+.mau-row td input{width:100%;border:1px solid var(--border-strong);border-radius:5px;padding:5px 6px;font-family:inherit;font-size:12px}
+.mau-row td.n input{width:60px}
+.mau-row.off td{opacity:.5}
+#msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.okmsg{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0;display:block!important}
+.print-only{display:none}
+.sign-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px;text-align:center;font-size:12px}
+.sign-row div{border-top:1px dotted #999;padding-top:6px;min-height:70px}
+@media print{
+  body{background:#fff;padding:0}
+  header,.no-print,#msg,.navbar,nav{display:none!important}
+  .print-only{display:block}
+  .card{box-shadow:none;border:1px solid #999;break-inside:avoid}
+  .kq-btn:not(.on){display:none}
+  .kq-btn.on{background:#fff!important;color:#000!important;border-color:#000!important}
+  tr.grp td{background:#eee!important;color:#000}
+}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Check sheet bảo dưỡng khuôn</div>
+    </div>
+    <div class="header-divider"></div>
+    <a class="btn btn-ghost" id="lnkBack" href="bao-duong-khuon-tuan.html">← Kế hoạch bảo dưỡng tuần</a>
+    <button type="button" class="btn btn-ghost" onclick="window.print()">🖨 In</button>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <div class="print-only" style="text-align:center;font-weight:800;font-size:16px;margin:6px 0">CHECK SHEET BẢO DƯỠNG KHUÔN</div>
+
+  <div id="main" style="display:flex;flex-direction:column;gap:6px">
+    <div class="card"><div style="color:var(--text-dim)">Đang tải...</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script>
+const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','admin'];
+const TT_KH = { nhap: ['Nháp — chưa gửi duyệt','warn'], cho_kiem_tra: ['Chờ kiểm tra','warn'], cho_phe_duyet: ['Chờ phê duyệt','warn'], da_duyet: ['Đã phê duyệt','ok'] };
+const KQ = ['OK','NG','NA'];
+const KQ_LABEL = { OK: 'OK', NG: 'NG', NA: 'N/A' };
+
+const idKh = Number(new URLSearchParams(location.search).get('id')) || null;
+let myRole = null, myBoPhan = [];
+let kh = null, mold = null, duyet = null, cs = null, mau = [], employees = [], issues = [];
+let items = [];          // [{nhom,noi_dung,tieu_chuan,ket_qua,ghi_chu}]
+let ketLuan = '';
+let canEdit = false;
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function parseDate(s){ const [y,m,d] = String(s).slice(0,10).split('-').map(Number); return new Date(y, m-1, d); }
+function fmtDateVN(s){ if (!s) return ''; const d = parseDate(s); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }
+function fmtTs(ts){ return ts ? new Date(ts).toLocaleString('vi-VN', { hour12: false }) : ''; }
+// timestamptz -> giá trị cho <input type="datetime-local"> theo giờ máy
+function toLocalInput(ts){
+  if (!ts) return '';
+  const d = new Date(ts), p = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function fromLocalInput(v){ return v ? new Date(v).toISOString() : ''; }
+let msgTimer = null;
+function showMsg(text, cls, ms){
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = cls;
+  clearTimeout(msgTimer);
+  if (ms) msgTimer = setTimeout(() => { el.className = ''; }, ms);
+  if (cls === 'err') window.scrollTo(0, 0);
+}
+function rpcErr(data, error){ return error ? error.message : (data && data.error) || 'không rõ'; }
+function laNguoiSuaMau(){ return myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+async function loadAll(){
+  if (!idKh) { document.getElementById('main').innerHTML = '<div class="card">Thiếu mã lịch bảo dưỡng — mở trang này từ nút 📋 trên Kế hoạch bảo dưỡng khuôn tuần.</div>'; return; }
+  const session = await MesAuth.getSession();
+  if (session) {
+    const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
+    myRole = data ? data.role : null;
+    myBoPhan = data && Array.isArray(data.bo_phan_phu_trach) ? data.bo_phan_phu_trach : [];
+  }
+  const khRes = await sb.from('duc_khuon_bd_kh_tuan').select('*').eq('id', idKh).maybeSingle();
+  if (khRes.error) return showMsg('Lỗi tải lịch: ' + khRes.error.message, 'err');
+  kh = khRes.data;
+  if (!kh) { document.getElementById('main').innerHTML = '<div class="card">Không tìm thấy lịch bảo dưỡng #' + idKh + ' (có thể đã bị xoá).</div>'; return; }
+  document.getElementById('lnkBack').href = 'bao-duong-khuon-tuan.html?tuan=' + kh.tuan_bat_dau;
+
+  const [moldRes, duyetRes, csRes, mauRes, empRes, issRes] = await Promise.all([
+    sb.from('duc_shot_khuon').select('*').eq('ma_khuon', kh.ma_khuon).maybeSingle(),
+    sb.from('duc_khuon_bd_duyet').select('*').eq('tuan_bat_dau', kh.tuan_bat_dau).maybeSingle(),
+    sb.from('duc_khuon_checksheet').select('*').eq('id_ke_hoach', idKh).maybeSingle(),
+    sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id'),
+    sb.from('master_employees').select('ten_nhan_vien,vai_tro').order('ten_nhan_vien'),
+    sb.from('duc_van_de_khuon').select('*').eq('ma_khuon', kh.ma_khuon).order('ngay_phat_hien', { ascending: false }),
+  ]);
+  for (const [r, name] of [[moldRes,'khuôn'],[duyetRes,'trạng thái duyệt'],[csRes,'check sheet'],[mauRes,'mẫu hạng mục']]) {
+    if (r.error) return showMsg('Lỗi tải ' + name + ': ' + r.error.message, 'err');
+  }
+  mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || [];
+  employees = empRes.data || [];
+  issues = (issRes.data || []).filter(x => x.trang_thai !== 'Đã đóng');
+
+  items = cs ? (cs.hang_muc || []).map(x => ({ ...x }))
+    : mau.filter(m => m.dang_dung).map(m => ({ nhom: m.nhom, noi_dung: m.noi_dung, tieu_chuan: m.tieu_chuan, ket_qua: null, ghi_chu: '' }));
+  ketLuan = cs ? cs.ket_luan : '';
+  canEdit = EDIT_ROLES.includes(myRole) && !(cs && cs.trang_thai === 'hoan_thanh');
+  render();
+}
+
+function render(){
+  const done = cs && cs.trang_thai === 'hoan_thanh';
+  const tt = TT_KH[duyet ? duyet.trang_thai : 'nhap'];
+  const since = mold ? (Number(mold.tong_shot_luy_ke)||0) - (Number(mold.shot_tai_lan_bao_duong_gan_nhat)||0) : null;
+  const dis = canEdit ? '' : ' disabled';
+
+  const bd = employees.filter(e => e.vai_tro === 'bao_duong_khuon');
+  const khac = employees.filter(e => e.vai_tro !== 'bao_duong_khuon');
+  const nguoiVal = cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach;
+  let nguoiOpts = '<option value="">— Chọn —</option>' +
+    (bd.length ? '<optgroup label="Bảo dưỡng khuôn">' + bd.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '') +
+    (khac.length ? '<optgroup label="Nhân sự khác">' + khac.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '');
+  if (nguoiVal && !employees.some(e => e.ten_nhan_vien === nguoiVal)) nguoiOpts += '<option>' + escapeHtml(nguoiVal) + '</option>';
+
+  let html = '';
+  if (done) {
+    html += '<div class="done-banner ' + cs.ket_luan + '">' + (cs.ket_luan === 'dat' ? '✅ ĐẠT' : '❌ KHÔNG ĐẠT') +
+      ' — hoàn thành bởi ' + escapeHtml(cs.nguoi_hoan_thanh) + ' lúc ' + fmtTs(cs.thoi_diem_hoan_thanh) +
+      (cs.id_log ? ' · đã ghi sổ đời khuôn' : '') + '</div>';
+  } else if (!EDIT_ROLES.includes(myRole)) {
+    html += '<div class="card no-print" style="color:var(--warn-fg);font-weight:600">🔒 Chỉ xem — nhân viên bảo dưỡng khuôn mới ghi được check sheet' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>';
+  }
+
+  html += '<div class="card"><div class="card-title">Thông tin khuôn & kế hoạch</div><div class="info-grid">' +
+    info('Khuôn', escapeHtml(kh.ma_khuon)) +
+    info('Loại công việc', escapeHtml(kh.loai)) +
+    info('Ngày kế hoạch', fmtDateVN(kh.ngay)) +
+    info('Người phụ trách (KH)', escapeHtml(kh.nguoi_phu_trach || '—')) +
+    info('Tổng shot', mold ? fmtNum(mold.tong_shot_luy_ke) : '—') +
+    info('Shot từ lần BD', mold ? fmtNum(since) + (mold.nguong_bao_duong ? ' / ' + fmtNum(mold.nguong_bao_duong) : '') : '—') +
+    info('BD gần nhất', mold && mold.lan_bao_duong_gan_nhat ? fmtDateVN(mold.lan_bao_duong_gan_nhat) : '—') +
+    info('Kế hoạch tuần', '<span class="badge ' + tt[1] + '">' + tt[0] + '</span>') +
+    '</div>' +
+    (kh.ghi_chu ? '<div style="margin-top:8px;font-size:12px"><b>Nội dung KH:</b> ' + escapeHtml(kh.ghi_chu) + '</div>' : '') +
+    (issues.length ? '<div class="issues"><b>⚠ Vấn đề khuôn chưa đóng:</b>' + issues.slice(0, 5).map(a =>
+      '<div>• ' + (a.ngay_phat_hien ? fmtDateVN(String(a.ngay_phat_hien)) + ' — ' : '') + escapeHtml(a.mo_ta || '(không mô tả)') + '</div>').join('') + '</div>' : '') +
+    '</div>';
+
+  html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
+    '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
+    '<div class="fg"><label>Người thực hiện</label><select id="f-nguoi"' + dis + '>' + nguoiOpts + '</select></div>' +
+    '<div class="fg"><label>Bắt đầu</label><input type="datetime-local" id="f-bd" value="' + toLocalInput(cs && cs.gio_bat_dau) + '"' + dis + '></div>' +
+    '<div class="fg"><label>Kết thúc</label><input type="datetime-local" id="f-kt" value="' + toLocalInput(cs && cs.gio_ket_thuc) + '"' + dis + '></div>' +
+    '<div class="fg"><label>Thời gian</label><div class="dur" id="f-dur">—</div></div>' +
+    '</div>' +
+    (canEdit ? '<div class="no-print" style="margin-top:8px;display:flex;gap:6px"><button type="button" class="btn btn-outline btn-sm" id="btnNowBd">⏱ Bắt đầu = bây giờ</button><button type="button" class="btn btn-outline btn-sm" id="btnNowKt">⏱ Kết thúc = bây giờ</button></div>' : '') +
+    '</div>';
+
+  html += '<div class="card"><div class="card-title">Hạng mục kiểm tra' +
+    (canEdit ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnAllOk">✓ Còn trống → OK</button>' : '') +
+    '<div class="tally" id="tally"></div></div>' +
+    '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Kết quả</th><th>Ghi chú / xử lý</th></tr></thead><tbody id="tbItems"></tbody></table></div></div>';
+
+  html += '<div class="card"><div class="card-title">Kết luận</div><div class="form-grid">' +
+    '<div class="fg"><label>Phụ tùng thay thế</label><input id="f-phu-tung" maxlength="300" value="' + escapeHtml(cs ? cs.phu_tung_thay : '') + '" placeholder="VD: 2 ty đẩy Ø6, 1 gioăng"' + dis + '></div>' +
+    '<div class="fg"><label>Chi phí (VNĐ)</label><input type="number" id="f-chi-phi" min="0" step="1000" value="' + (cs && cs.chi_phi != null ? cs.chi_phi : '') + '"' + dis + '></div>' +
+    '<div class="fg wide"><label>Ghi chú chung</label><textarea id="f-ghi-chu" maxlength="1000"' + dis + '>' + escapeHtml(cs ? cs.ghi_chu : '') + '</textarea></div>' +
+    '<div class="fg wide"><label>Kết luận khuôn</label><div class="kl">' +
+      '<button type="button" class="dat' + (ketLuan === 'dat' ? ' on' : '') + '" data-kl="dat"' + dis + '>✅ ĐẠT — khuôn sẵn sàng sản xuất</button>' +
+      '<button type="button" class="khong_dat' + (ketLuan === 'khong_dat' ? ' on' : '') + '" data-kl="khong_dat"' + dis + '>❌ KHÔNG ĐẠT — cần xử lý tiếp</button>' +
+    '</div></div></div>' +
+    (canEdit ? '<div class="actions no-print" style="margin-top:12px"><span class="hint">Hoàn thành sẽ ghi vào sổ đời khuôn' +
+      (['Bảo dưỡng định kỳ','Thay khuôn mới'].includes(kh.loai) ? ' và reset bộ đếm shot nếu ĐẠT' : '') + ' — sau đó không sửa được nữa.</span>' +
+      '<button type="button" class="btn btn-outline" id="btnDraft">💾 Lưu nháp</button>' +
+      '<button type="button" class="btn btn-good" id="btnDone">✅ Hoàn thành</button></div>' : '') +
+    '<div class="print-only sign-row"><div>Người thực hiện</div><div>Người kiểm tra</div><div>Quản lý bộ phận</div></div>' +
+    '</div>';
+
+  if (laNguoiSuaMau()) {
+    html += '<div class="card no-print"><details id="mauBox"><summary class="card-title" style="cursor:pointer;margin:0">⚙ Mẫu hạng mục check sheet (áp dụng cho check sheet mở mới)</summary>' +
+      '<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Thứ tự</th><th>Nhóm</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Dùng</th><th></th></tr></thead><tbody id="tbMau"></tbody></table></div>' +
+      '<div style="margin-top:8px"><button type="button" class="btn btn-outline btn-sm" id="btnMauAdd">➕ Thêm hạng mục</button></div></details></div>';
+  }
+
+  document.getElementById('main').innerHTML = html;
+  renderItems();
+  updateDuration();
+  if (laNguoiSuaMau()) renderMau();
+  bindEvents();
+}
+
+function info(k, v){ return '<div><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; }
+
+function renderItems(){
+  let lastNhom = null, n = 0;
+  const dis = canEdit ? '' : ' disabled';
+  document.getElementById('tbItems').innerHTML = items.map((it, i) => {
+    let h = '';
+    if (it.nhom !== lastNhom) { lastNhom = it.nhom; h += '<tr class="grp"><td colspan="5">' + escapeHtml(it.nhom) + '</td></tr>'; }
+    n++;
+    const btns = canEdit
+      ? KQ.map(k => '<button type="button" class="kq-btn ' + k + (it.ket_qua === k ? ' on' : '') + '" data-i="' + i + '" data-kq="' + k + '"' + dis + '>' + KQ_LABEL[k] + '</button>').join('')
+      : '<span class="kq-text ' + (it.ket_qua || '') + '">' + (it.ket_qua ? KQ_LABEL[it.ket_qua] : '—') + '</span>';
+    const need = it.ket_qua === 'NG' && !String(it.ghi_chu || '').trim();
+    return h + '<tr class="' + (it.ket_qua === 'NG' ? 'row-ng' : '') + '"><td class="stt">' + n + '</td><td>' + escapeHtml(it.noi_dung) + '</td>' +
+      '<td class="tc">' + escapeHtml(it.tieu_chuan) + '</td><td class="kq">' + btns + '</td>' +
+      '<td class="gc"><input data-gc="' + i + '" class="' + (need ? 'need' : '') + '" value="' + escapeHtml(it.ghi_chu || '') + '"' +
+      (it.ket_qua === 'NG' ? ' placeholder="Bắt buộc: tình trạng / cách xử lý"' : '') + dis + '></td></tr>';
+  }).join('');
+  renderTally();
+}
+
+function renderTally(){
+  const c = { OK: 0, NG: 0, NA: 0, none: 0 };
+  items.forEach(it => { c[it.ket_qua || 'none']++; });
+  document.getElementById('tally').innerHTML =
+    '<span style="color:var(--run-fg)">OK <b>' + c.OK + '</b></span><span style="color:var(--alarm-fg)">NG <b>' + c.NG + '</b></span>' +
+    '<span>N/A <b>' + c.NA + '</b></span>' + (c.none ? '<span style="color:var(--warn-fg)">Chưa đánh giá <b>' + c.none + '</b></span>' : '');
+}
+
+function updateDuration(){
+  const bd = document.getElementById('f-bd').value, kt = document.getElementById('f-kt').value;
+  const el = document.getElementById('f-dur');
+  if (!bd || !kt) { el.textContent = '—'; return; }
+  const m = Math.round((new Date(kt) - new Date(bd)) / 60000);
+  el.textContent = m < 0 ? 'Kết thúc trước bắt đầu!' : (Math.floor(m / 60) + ' giờ ' + (m % 60) + ' phút');
+  el.style.color = m < 0 ? 'var(--alarm-fg)' : '';
+}
+
+function bindEvents(){
+  const tb = document.getElementById('tbItems');
+  tb.addEventListener('click', e => {
+    const b = e.target.closest('.kq-btn');
+    if (!b || !canEdit) return;
+    const i = Number(b.dataset.i);
+    items[i].ket_qua = items[i].ket_qua === b.dataset.kq ? null : b.dataset.kq;
+    renderItems();
+    if (items[i].ket_qua === 'NG') { const inp = tb.querySelector('input[data-gc="' + i + '"]'); if (inp) inp.focus(); }
+  });
+  tb.addEventListener('input', e => {
+    const inp = e.target.closest('input[data-gc]');
+    if (!inp) return;
+    const it = items[Number(inp.dataset.gc)];
+    it.ghi_chu = inp.value;
+    inp.classList.toggle('need', it.ket_qua === 'NG' && !inp.value.trim());
+  });
+  document.getElementById('f-bd').addEventListener('input', updateDuration);
+  document.getElementById('f-kt').addEventListener('input', updateDuration);
+  document.querySelectorAll('.kl button').forEach(b => b.addEventListener('click', () => {
+    if (!canEdit) return;
+    ketLuan = ketLuan === b.dataset.kl ? '' : b.dataset.kl;
+    document.querySelectorAll('.kl button').forEach(x => x.classList.toggle('on', x.dataset.kl === ketLuan));
+  }));
+  const nguoi = document.getElementById('f-nguoi');
+  nguoi.value = cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach;
+  if (!canEdit) return;
+  document.getElementById('btnNowBd').onclick = () => { document.getElementById('f-bd').value = toLocalInput(new Date()); updateDuration(); };
+  document.getElementById('btnNowKt').onclick = () => { document.getElementById('f-kt').value = toLocalInput(new Date()); updateDuration(); };
+  document.getElementById('btnAllOk').onclick = () => { items.forEach(it => { if (!it.ket_qua) it.ket_qua = 'OK'; }); renderItems(); };
+  document.getElementById('btnDraft').onclick = () => save(false);
+  document.getElementById('btnDone').onclick = () => save(true);
+}
+
+function collect(){
+  return {
+    ngay_thuc_hien: document.getElementById('f-ngay').value,
+    nguoi_thuc_hien: document.getElementById('f-nguoi').value,
+    gio_bat_dau: fromLocalInput(document.getElementById('f-bd').value),
+    gio_ket_thuc: fromLocalInput(document.getElementById('f-kt').value),
+    hang_muc: items,
+    phu_tung_thay: document.getElementById('f-phu-tung').value.trim(),
+    chi_phi: document.getElementById('f-chi-phi').value,
+    ghi_chu: document.getElementById('f-ghi-chu').value.trim(),
+    ket_luan: ketLuan,
+  };
+}
+
+async function save(hoanThanh){
+  const data = collect();
+  if (hoanThanh) {
+    const chua = items.filter(it => !it.ket_qua).length;
+    if (chua) return showMsg('Còn ' + chua + ' hạng mục chưa đánh giá OK / NG / N/A', 'err', 4000);
+    if (items.some(it => it.ket_qua === 'NG' && !String(it.ghi_chu || '').trim())) return showMsg('Hạng mục NG phải ghi chú tình trạng / cách xử lý', 'err', 4000);
+    if (!data.nguoi_thuc_hien) return showMsg('Chọn người thực hiện', 'err', 3000);
+    if (!ketLuan) return showMsg('Chọn kết luận ĐẠT / KHÔNG ĐẠT', 'err', 3000);
+    const ng = items.filter(it => it.ket_qua === 'NG').length;
+    if (!confirm('Hoàn thành check sheet khuôn ' + kh.ma_khuon + ' — kết luận ' + (ketLuan === 'dat' ? 'ĐẠT' : 'KHÔNG ĐẠT') +
+      (ng ? ' (' + ng + ' hạng mục NG)' : '') + '?\nSau khi hoàn thành sẽ không sửa được nữa.')) return;
+  }
+  document.querySelectorAll('#btnDraft,#btnDone').forEach(b => b.disabled = true);
+  const { data: res, error } = await sb.rpc('duc_khuon_cs_luu', { p_id_ke_hoach: idKh, p_data: data, p_hoan_thanh: hoanThanh });
+  document.querySelectorAll('#btnDraft,#btnDone').forEach(b => b.disabled = false);
+  if (error || !res || !res.ok) return showMsg('Lỗi lưu: ' + rpcErr(res, error), 'err', 6000);
+  showMsg(hoanThanh ? '✓ Đã hoàn thành' + (res.reset_dong_ho ? ' — đã reset bộ đếm shot của khuôn' : '') : '✓ Đã lưu nháp', 'okmsg', 3500);
+  await loadAll();
+}
+
+// ── Mẫu hạng mục (Quản lý bộ phận Đúc / admin) ─────────────────────────────────
+function renderMau(){
+  document.getElementById('tbMau').innerHTML = mau.map(m =>
+    '<tr class="mau-row' + (m.dang_dung ? '' : ' off') + '" data-id="' + m.id + '">' +
+    '<td class="n"><input type="number" data-f="thu_tu" value="' + m.thu_tu + '"></td>' +
+    '<td><input data-f="nhom" value="' + escapeHtml(m.nhom) + '"></td>' +
+    '<td><input data-f="noi_dung" value="' + escapeHtml(m.noi_dung) + '"></td>' +
+    '<td><input data-f="tieu_chuan" value="' + escapeHtml(m.tieu_chuan) + '"></td>' +
+    '<td><input type="checkbox" data-f="dang_dung"' + (m.dang_dung ? ' checked' : '') + '></td>' +
+    '<td style="white-space:nowrap"><button type="button" class="btn btn-sm" data-act="save">Lưu</button> <button type="button" class="btn btn-sm btn-danger" data-act="del">Xoá</button></td></tr>'
+  ).join('');
+  const tb = document.getElementById('tbMau');
+  tb.onclick = async e => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const tr = b.closest('tr'), id = Number(tr.dataset.id);
+    if (b.dataset.act === 'del') {
+      if (!confirm('Xoá hạng mục này khỏi mẫu? (Check sheet đã tạo không bị ảnh hưởng)')) return;
+      const { error } = await sb.from('duc_khuon_cs_mau').delete().eq('id', id);
+      if (error) return showMsg('Lỗi xoá: ' + error.message, 'err', 5000);
+    } else {
+      const v = f => tr.querySelector('[data-f="' + f + '"]');
+      const row = { thu_tu: Number(v('thu_tu').value) || 0, nhom: v('nhom').value.trim(), noi_dung: v('noi_dung').value.trim(),
+        tieu_chuan: v('tieu_chuan').value.trim(), dang_dung: v('dang_dung').checked, updated_at: new Date().toISOString() };
+      if (!row.nhom || !row.noi_dung) return showMsg('Nhóm và hạng mục không được trống', 'err', 3000);
+      const { error } = await sb.from('duc_khuon_cs_mau').update(row).eq('id', id);
+      if (error) return showMsg('Lỗi lưu mẫu: ' + error.message, 'err', 5000);
+    }
+    showMsg('✓ Đã cập nhật mẫu', 'okmsg', 2000);
+    await reloadMau();
+  };
+  document.getElementById('btnMauAdd').onclick = async () => {
+    const maxTt = mau.reduce((s, m) => Math.max(s, m.thu_tu), 0);
+    const { error } = await sb.from('duc_khuon_cs_mau').insert({ nhom: mau.length ? mau[mau.length - 1].nhom : '1. Chung', noi_dung: 'Hạng mục mới', tieu_chuan: '', thu_tu: maxTt + 10 });
+    if (error) return showMsg('Lỗi thêm: ' + error.message, 'err', 5000);
+    await reloadMau();
+  };
+}
+async function reloadMau(){
+  const { data } = await sb.from('duc_khuon_cs_mau').select('*').order('thu_tu').order('id');
+  mau = data || [];
+  renderMau();
+  document.getElementById('mauBox').open = true;
+}
+
+startHeaderClock();
+loadAll();
+</script>
+</body>
+</html>
