@@ -132,7 +132,7 @@ tr.row-ng td{background:#FFF5F5}
 .photo-busy{font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px}
 @media (max-width:700px){.photo-cols{grid-template-columns:1fr}}
 .print-only{display:none}
-.sign-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px;text-align:center;font-size:12px}
+.sign-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;text-align:center;font-size:12px}
 .sign-row div{border-top:1px dotted #999;padding-top:6px;min-height:70px}
 @media print{
   body{background:#fff;padding:0}
@@ -278,11 +278,11 @@ function render(){
 
   const bd = employees.filter(e => e.vai_tro === 'bao_duong_khuon');
   const khac = employees.filter(e => e.vai_tro !== 'bao_duong_khuon');
-  const nguoiVal = cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach;
-  let nguoiOpts = '<option value="">— Chọn —</option>' +
+  // T102: đảm nhiệm chính (nguoi_thuc_hien) + đảm nhiệm phụ (nguoi_thuc_hien_phu).
+  const nguoiOpts = val => '<option value="">— Chọn —</option>' +
     (bd.length ? '<optgroup label="Bảo dưỡng khuôn">' + bd.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '') +
-    (khac.length ? '<optgroup label="Nhân sự khác">' + khac.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '');
-  if (nguoiVal && !employees.some(e => e.ten_nhan_vien === nguoiVal)) nguoiOpts += '<option>' + escapeHtml(nguoiVal) + '</option>';
+    (khac.length ? '<optgroup label="Nhân sự khác">' + khac.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '') +
+    (val && !employees.some(e => e.ten_nhan_vien === val) ? '<option>' + escapeHtml(val) + '</option>' : '');
 
   let html = '';
   if (done) {
@@ -308,7 +308,8 @@ function render(){
 
   html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
     '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
-    '<div class="fg"><label>Người thực hiện</label><select id="f-nguoi"' + dis + '>' + nguoiOpts + '</select></div>' +
+    '<div class="fg"><label>Đảm nhiệm chính</label><select id="f-nguoi"' + dis + '>' + nguoiOpts(cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach) + '</select></div>' +
+    '<div class="fg"><label>Đảm nhiệm phụ</label><select id="f-nguoi-phu"' + dis + '>' + nguoiOpts(cs ? cs.nguoi_thuc_hien_phu : '') + '</select></div>' +
     '<div class="fg"><div class="lbl-row"><label for="f-bd">Bắt đầu</label>' + (canEdit ? '<button type="button" class="btn-now no-print" id="btnNowBd">⏱ Bây giờ</button>' : '') + '</div><input type="datetime-local" id="f-bd" value="' + toLocalInput(cs && cs.gio_bat_dau) + '"' + dis + '></div>' +
     '<div class="fg"><div class="lbl-row"><label for="f-kt">Kết thúc</label>' + (canEdit ? '<button type="button" class="btn-now no-print" id="btnNowKt">⏱ Bây giờ</button>' : '') + '</div><input type="datetime-local" id="f-kt" value="' + toLocalInput(cs && cs.gio_ket_thuc) + '"' + dis + '></div>' +
     '<div class="fg"><label>Thời gian</label><div class="dur" id="f-dur">—</div></div>' +
@@ -345,7 +346,7 @@ function render(){
       (['Bảo dưỡng định kỳ','Thay khuôn mới'].includes(kh.loai) ? ' và reset bộ đếm shot nếu ĐẠT' : '') + ' — sau đó không sửa được nữa.</span>' +
       '<button type="button" class="btn btn-outline" id="btnDraft">💾 Lưu nháp</button>' +
       '<button type="button" class="btn btn-good" id="btnDone">✅ Hoàn thành</button></div>' : '') +
-    '<div class="print-only sign-row"><div>Người thực hiện</div><div>Người kiểm tra</div><div>Quản lý bộ phận</div></div>' +
+    '<div class="print-only sign-row"><div>Đảm nhiệm chính</div><div>Đảm nhiệm phụ</div><div>Người kiểm tra</div><div>Quản lý bộ phận</div></div>' +
     '</div>';
 
   // T96: kết quả sau bảo dưỡng = IPQC kiểm sản phẩm đầu khi khuôn lên máy.
@@ -475,6 +476,7 @@ function bindEvents(){
   }));
   const nguoi = document.getElementById('f-nguoi');
   nguoi.value = cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach;
+  document.getElementById('f-nguoi-phu').value = cs ? cs.nguoi_thuc_hien_phu || '' : '';
   if (!canEdit) return;
   document.querySelectorAll('button[data-pick]').forEach(b => {
     b.onclick = () => document.getElementById('pin-' + b.dataset.pick + '-' + b.dataset.kind).click();
@@ -511,6 +513,7 @@ function collect(){
   return {
     ngay_thuc_hien: document.getElementById('f-ngay').value,
     nguoi_thuc_hien: document.getElementById('f-nguoi').value,
+    nguoi_thuc_hien_phu: document.getElementById('f-nguoi-phu').value,
     gio_bat_dau: fromLocalInput(document.getElementById('f-bd').value),
     gio_ket_thuc: fromLocalInput(document.getElementById('f-kt').value),
     hang_muc: items,
@@ -601,13 +604,15 @@ async function autoSave(okText){
 
 async function save(hoanThanh){
   const data = collect();
+  if (data.nguoi_thuc_hien_phu && data.nguoi_thuc_hien_phu === data.nguoi_thuc_hien) return showMsg('Đảm nhiệm phụ phải khác đảm nhiệm chính', 'err', 3500);
   if (hoanThanh) {
     const chua = items.filter(it => !it.ket_qua).length;
     if (chua) return showMsg('Còn ' + chua + ' hạng mục chưa đánh giá OK / NG / N/A', 'err', 4000);
     if (items.some(it => it.ket_qua === 'NG' && !String(it.ghi_chu || '').trim())) return showMsg('Hạng mục NG phải ghi chú tình trạng / cách xử lý', 'err', 4000);
     if (!photos.truoc.length || !photos.sau.length) return showMsg('Cần ít nhất 1 ảnh TRƯỚC và 1 ảnh SAU bảo dưỡng', 'err', 4000);
     if (photoBusy.truoc || photoBusy.sau) return showMsg('Đang tải ảnh lên — đợi xong rồi hoàn thành', 'err', 3000);
-    if (!data.nguoi_thuc_hien) return showMsg('Chọn người thực hiện', 'err', 3000);
+    if (!data.nguoi_thuc_hien) return showMsg('Chọn người đảm nhiệm chính', 'err', 3000);
+    if (!data.nguoi_thuc_hien_phu && !confirm('Chưa chọn người đảm nhiệm phụ — hoàn thành với 1 người thực hiện?')) return;
     if (!ketLuan) return showMsg('Chọn kết luận ĐẠT / KHÔNG ĐẠT', 'err', 3000);
     const ng = items.filter(it => it.ket_qua === 'NG').length;
     if (!confirm('Hoàn thành check sheet khuôn ' + kh.ma_khuon + ' — kết luận ' + (ketLuan === 'dat' ? 'ĐẠT' : 'KHÔNG ĐẠT') +
