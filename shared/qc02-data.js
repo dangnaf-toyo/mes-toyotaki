@@ -4,9 +4,8 @@ const Qc02Data = (() => {
   async function readAll(table) {
     const rows = [];
     for (let offset = 0; ; offset += 500) {
-      const sort = table === 'master_products' ? 'ma_sp' : table === 'user_roles' ? 'user_id' : 'ten_nhan_vien';
-      const columns = table === 'user_roles' ? 'user_id,username,full_name,role,bo_phan_phu_trach' : '*';
-      const { data, error } = await sb.from(table).select(columns).order(sort).range(offset, offset + 499);
+      const sort = table === 'master_products' ? 'ma_sp' : 'ten_nhan_vien';
+      const { data, error } = await sb.from(table).select('*').order(sort).range(offset, offset + 499);
       if (error) throw error;
       rows.push(...(data || []));
       if (!data || data.length < 500) return rows;
@@ -24,10 +23,15 @@ const Qc02Data = (() => {
       const code = String(r.ma_nv || r.ten_nhan_vien || '').trim();
       if (code) byCode.set(code.toLowerCase(), { ...r, code, name:r.ten_nhan_vien, roles:[String(r.vai_tro || '').toLowerCase()], departments:r.bo_phan ? [r.bo_phan] : [] });
     }
-    // Existing RLS may expose only the current account to non-admins.
-    // Accessible account rows supplement the master; no privileged RPC is used.
+    // RLS user_roles chỉ cho admin đọc mọi tài khoản → dùng RPC chỉ đọc
+    // qc_danh_sach_tai_khoan (D65: mã NV, họ tên, vai trò, bộ phận — không email)
+    // để QC manager / OQC... cũng thấy đủ nhân viên có tài khoản.
     let accounts = [];
-    try { accounts = await readAll('user_roles'); }
+    try {
+      const { data, error } = await sb.rpc('qc_danh_sach_tai_khoan');
+      if (error) throw error;
+      accounts = data || [];
+    }
     catch (e) { console.warn('Không đọc được tài khoản; dùng danh mục nhân sự hiện có:', e.message); }
     for (const r of accounts.filter(active)) {
       const code = String(r.username || r.user_id || '').trim();
