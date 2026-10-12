@@ -121,6 +121,14 @@ tr.off td{color:var(--text-dim)}
 .radios input{width:auto;margin:0}
 .ton-box{background:var(--bg-sunken);border-radius:6px;padding:8px 10px;font-size:12.5px}
 .ton-box b{font-family:'JetBrains Mono',monospace}
+.rule{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--bg-sunken)}
+.rule summary{cursor:pointer;padding:8px 12px;font-weight:700;font-size:13px}
+.rule .rb{padding:0 12px 12px;font-size:12.5px;line-height:1.55}
+.rule .rb h4{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin:10px 0 4px}
+.rule .rb code{font-family:'JetBrains Mono',monospace;font-size:12px;background:#fff;border:1px solid var(--border);border-radius:4px;padding:0 5px}
+.rule .rb table{width:auto;font-size:12px;background:#fff}
+.rule .rb td,.rule .rb th{padding:4px 8px}
+.rule .rb ul{margin:2px 0 0 18px}
 .ck-row{display:flex;align-items:center;gap:6px;font-size:13px}
 @media (max-width:640px){.row2,.row3{grid-template-columns:1fr}.toolbar input[type=search]{flex:1}}
 </style>
@@ -199,6 +207,25 @@ tr.off td{color:var(--text-dim)}
       <input type="file" id="dFile" accept=".xlsx,.xls" hidden>
       <button type="button" class="btn" id="dAdd" hidden>＋ Thêm linh kiện</button>
     </div>
+    <details class="rule" id="dRule">
+      <summary>📏 Quy tắc đặt mã &amp; tên linh kiện</summary>
+      <div class="rb">
+        <h4>Mã linh kiện</h4>
+        <ul>
+          <li><b>Linh kiện riêng khuôn:</b> <code>NHÓM-MÃ SP-STT</code> — VD <code>INS-TTI-MOT-02-01</code>, <code>PIN-EXE-SHO-01-03</code>. Dùng <b>mã sản phẩm</b> (không dùng mã khuôn) để các khuôn giống hệt nhau (#1, #2) dùng chung 1 mã; khuôn ra 2 SP thì lấy mã SP chính. STT 2 số đánh theo vị trí trên khuôn (lòng 1 = 01...), số đã bỏ không dùng lại.</li>
+          <li><b>Linh kiện dùng chung:</b> <code>NHÓM-QUY CÁCH</code> — đường kính <code>D</code> + 2 số (số lẻ giữ nguyên: Ø3.2 → <code>D3.2</code>), chiều dài <code>L</code>: Ø6×150 → <code>EJP-D06-L150</code>; lò xo Ø20×50 → <code>SPR-D20-L50</code>. Cùng kích thước nhưng khác vật liệu / xử lý thì thêm hậu tố <code>-A</code>, <code>-B</code> (ghi rõ ở cột Vật liệu).</li>
+          <li>Chỉ dùng <b>chữ HOA không dấu, số và dấu gạch ngang</b> — không dấu cách, không ký tự Ø × # / . Tối đa ~20 ký tự. Mã đã dùng thì không đổi (lịch sử giao dịch bám theo mã).</li>
+        </ul>
+        <h4>Mã nhóm theo loại</h4>
+        <table><tbody id="dRuleNhom"></tbody></table>
+        <h4>Tên linh kiện</h4>
+        <ul>
+          <li><code>Loại + vị trí / chức năng + quy cách</code>, linh kiện riêng thêm <code>– mã SP</code> ở cuối. Bắt đầu bằng tên loại để danh sách tự gom nhóm khi sắp xếp.</li>
+          <li>VD: <code>Insert lòng 1 tấm di động – TTI-MOT-02</code>, <code>Pin tạo lỗ Ø3.2×45 – EXE-SHO-01</code>, <code>Ejector pin Ø6×150</code>, <code>Lò xo hồi Ø20×50</code>. Tên được viết có dấu, dùng ký hiệu Ø, ×.</li>
+        </ul>
+        <div class="hint" style="margin-top:6px">Trong hộp thoại Thêm linh kiện, bấm <b>✨ Gợi ý mã &amp; tên</b> để hệ thống tự đặt theo quy tắc này.</div>
+      </div>
+    </details>
     <div id="dKetQua"></div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Mã LK</th><th>Tên</th><th>Loại</th><th>Phạm vi</th><th>Quy cách</th><th>Vật liệu</th><th>Bản vẽ / catalog</th><th>Nhà cung cấp</th>
@@ -231,6 +258,7 @@ tr.off td{color:var(--text-dim)}
 
 <datalist id="dlKhuon"></datalist>
 <datalist id="dlLk"></datalist>
+<datalist id="dlSp"></datalist>
 <datalist id="dlMucDich"></datalist>
 
 <!-- Hộp thoại: thêm / sửa linh kiện -->
@@ -246,6 +274,11 @@ tr.off td{color:var(--text-dim)}
         <div class="fg"><label>Loại *</label><select id="lk-loai"></select></div>
         <div class="fg"><label>Phạm vi *</label><select id="lk-pham-vi"><option value="rieng">Riêng khuôn</option><option value="chung">Dùng chung</option></select></div>
       </div>
+      <div class="row2" style="align-items:end">
+        <div class="fg"><label>Mã SP (để đặt mã linh kiện riêng)</label><input id="lk-sp" list="dlSp" placeholder="VD: TTI-MOT-02"></div>
+        <div class="fg"><button type="button" class="btn btn-outline" id="lk-goi-y">✨ Gợi ý mã &amp; tên theo quy tắc</button></div>
+      </div>
+      <div class="sub" id="lk-quy-tac" style="font-size:11.5px;color:var(--text-muted);margin-top:-4px"></div>
       <div class="row2">
         <div class="fg"><label>Quy cách</label><input id="lk-quy-cach" placeholder="VD: Ø6×150"></div>
         <div class="fg"><label>Vật liệu / xử lý</label><input id="lk-vat-lieu" placeholder="VD: SKD61, thấm nitơ"></div>
@@ -360,6 +393,13 @@ const LOAI = {
   lo_xo: 'Lò xo', dau_noi_nuoc: 'Đầu nối nước', khac: 'Khác',
 };
 const PHAM_VI = { rieng: 'Riêng khuôn', chung: 'Dùng chung' };
+// Quy tắc đặt mã (hộp 📏 ở tab Danh mục): mã nhóm 3 chữ theo loại.
+const LOAI_MA = {
+  insert: 'INS', pin_tao_lo: 'PIN', loi_truot: 'SLC', ejector_pin: 'EJP', return_pin: 'RTP',
+  co_khuon: 'SPB', plunger_tip: 'PLG', sleeve: 'SLV', lo_xo: 'SPR', dau_noi_nuoc: 'WTC', khac: 'OTH',
+};
+const LOAI_MA_EN = { INS: 'Insert', PIN: 'Core pin', SLC: 'Slide core', EJP: 'Ejector pin', RTP: 'Return pin',
+  SPB: 'Sprue bush', PLG: 'Plunger tip', SLV: 'Sleeve', SPR: 'Spring', WTC: 'Water connector', OTH: 'Other' };
 const GD = {
   nhap:      ['📥 Nhập', 'quan_ly'],
   xuat_thay: ['🔧 Xuất thay vào khuôn', 'thay'],
@@ -448,6 +488,8 @@ async function loadAll(){
   (l.data || []).forEach(x => { const k = x.ma_khuon + '|' + x.id_lk; if (!lastThay[k]) lastThay[k] = x; });
   document.getElementById('dlKhuon').innerHTML = Object.keys(molds).sort(naturalCmp).map(k =>
     '<option value="' + escapeHtml(k) + '">' + escapeHtml(molds[k].ma_sp + ' · ' + (TT_LABEL[molds[k].tinh_trang] || '')) + '</option>').join('');
+  document.getElementById('dlSp').innerHTML = [...new Set(Object.values(molds).map(m => m.ma_sp).filter(Boolean))].sort(naturalCmp)
+    .map(sp => '<option value="' + escapeHtml(sp) + '">').join('');
   document.getElementById('dlLk').innerHTML = dm.filter(x => x.dang_dung).map(x =>
     '<option value="' + escapeHtml(x.ma_lk) + '">' + escapeHtml(x.ten_lk + (x.quy_cach ? ' · ' + x.quy_cach : '')) + '</option>').join('');
 }
@@ -573,6 +615,56 @@ function renderDm(){
     '<td>' + escapeHtml(x.don_vi) + '</td><td>' + escapeHtml(x.vi_tri_kho) + '</td><td class="num">' + fmtNum(x.ton_toi_thieu) + '</td>' +
     '<td class="act">' + (canQL() ? '<button type="button" class="btn btn-outline btn-sm" data-sualk="' + x.id + '">✏ Sửa</button>' : '') + '</td></tr>').join('');
 }
+// ── Quy tắc đặt mã ───────────────────────────────────────────────────────────
+function khongDau(s){ return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D'); }
+// Ø6×150 → D06-L150 ; Ø70 → D70 ; M8x1.25 → M8-L1.25 (giữ số thập phân)
+function chuanQuyCach(q){
+  let t = khongDau(String(q || '').replace(/[Øø]/g, 'D')).toUpperCase().replace(/PHI|DIA/g, 'D').replace(/\s+/g, '');
+  t = t.replace(/[×X*]/g, '-L').replace(/[^A-Z0-9.\-]/g, '');
+  t = t.replace(/(^|-)D(\d)(?![\d.])/g, '$1D0$2');   // Ø6 → D06, Ø3.2 giữ D3.2
+  return t.replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+function maHopLe(ma, loai, phamVi){
+  const pre = LOAI_MA[loai];
+  if (!/^[A-Z0-9]+(-[A-Z0-9.]+)+$/.test(ma)) return 'Mã chỉ gồm chữ HOA không dấu, số, dấu gạch ngang (VD ' + pre + '-...)';
+  if (pre && !ma.startsWith(pre + '-')) return 'Loại "' + LOAI[loai] + '" phải bắt đầu bằng ' + pre + '-';
+  if (phamVi === 'rieng' && (!/-\d{2}$/.test(ma) || ma.split('-').length < 5)) return 'Linh kiện riêng khuôn kết thúc bằng STT 2 số (VD ' + pre + '-TTI-MOT-02-01)';
+  return '';
+}
+function goiYMa(){
+  const loai = document.getElementById('lk-loai').value, pv = document.getElementById('lk-pham-vi').value;
+  const sp = khongDau(document.getElementById('lk-sp').value).toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+  const qc = document.getElementById('lk-quy-cach').value.trim();
+  const pre = LOAI_MA[loai];
+  const dangCo = new Set(dm.filter(x => !lkEditing || x.id !== lkEditing.id).map(x => x.ma_lk.toUpperCase()));
+  let ma;
+  if (pv === 'rieng') {
+    if (!sp) return showMsg('Linh kiện riêng: nhập Mã SP của khuôn để gợi ý mã', 'err');
+    let n = 1;
+    while (dangCo.has(pre + '-' + sp + '-' + String(n).padStart(2, '0'))) n++;
+    ma = pre + '-' + sp + '-' + String(n).padStart(2, '0');
+  } else {
+    const q = chuanQuyCach(qc);
+    if (!q) return showMsg('Linh kiện dùng chung: nhập Quy cách (VD Ø6×150) để gợi ý mã', 'err');
+    ma = pre + '-' + q;
+    for (let i = 0; dangCo.has(ma); i++) ma = pre + '-' + q + '-' + String.fromCharCode(65 + i);
+  }
+  document.getElementById('lk-ma').value = ma;
+  const ten = document.getElementById('lk-ten');
+  if (!ten.value.trim()) ten.value = LOAI[loai] + (qc ? ' ' + qc : '') + (pv === 'rieng' && sp ? ' – ' + sp : '');
+  else if (pv === 'rieng' && sp && !ten.value.includes(sp)) ten.value = ten.value.trim() + ' – ' + sp;
+  capNhatQuyTac();
+}
+function capNhatQuyTac(){
+  const loai = document.getElementById('lk-loai').value, pv = document.getElementById('lk-pham-vi').value;
+  const ma = document.getElementById('lk-ma').value.trim(), pre = LOAI_MA[loai];
+  const loi = ma ? maHopLe(ma, loai, pv) : '';
+  const el = document.getElementById('lk-quy-tac');
+  el.style.color = loi ? 'var(--warn-fg)' : 'var(--text-muted)';
+  el.textContent = loi ? '⚠ ' + loi : 'Quy tắc: ' + (pv === 'rieng' ? pre + '-<Mã SP>-<STT 2 số>, VD ' + pre + '-TTI-MOT-02-01' : pre + '-<Quy cách>, VD ' + pre + '-D06-L150 (Ø6×150)') +
+    ' · Tên: ' + LOAI[loai] + ' + vị trí / quy cách' + (pv === 'rieng' ? ' – mã SP' : '');
+}
+
 function openLk(id){
   const x = id ? lkById(id) : null;
   lkEditing = x;
@@ -585,6 +677,8 @@ function openLk(id){
   document.getElementById('lk-sua').checked = !!(x && x.sua_duoc);
   document.getElementById('lk-dung').checked = !x || x.dang_dung;
   document.getElementById('lk-del').hidden = !x;
+  document.getElementById('lk-sp').value = '';
+  capNhatQuyTac();
   openDlg('dlg-lk');
 }
 async function saveLk(btn){
@@ -595,6 +689,10 @@ async function saveLk(btn){
     ton_toi_thieu: v('lk-min'), ghi_chu: v('lk-ghi-chu'),
     sua_duoc: document.getElementById('lk-sua').checked, dang_dung: document.getElementById('lk-dung').checked };
   if (!data.ma_lk || !data.ten_lk) return showMsg('Nhập mã và tên linh kiện', 'err');
+  data.ma_lk = data.ma_lk.toUpperCase();
+  const loiMa = maHopLe(data.ma_lk, data.loai, data.pham_vi);
+  if (loiMa && !(lkEditing && lkEditing.ma_lk === data.ma_lk) &&
+    !confirm('Mã "' + data.ma_lk + '" chưa đúng quy tắc đặt mã:\n' + loiMa + '\n\nVẫn lưu?')) return;
   btn.disabled = true;
   try {
     await rpcWrite('khuon_lk_luu', { p_data: data });
@@ -620,12 +718,15 @@ function taiMau(){
   const wb = XLSX.utils.book_new();
   const dmRows = [X_DM, ...dm.map(x => [x.ma_lk, x.ten_lk, LOAI[x.loai] || x.loai, x.pham_vi === 'chung' ? 'Chung' : 'Riêng', x.quy_cach, x.vat_lieu, x.ban_ve,
     x.nha_cung_cap, x.lead_time_ngay ?? '', x.tuoi_tho_shot ?? '', x.sua_duoc ? 'C' : 'K', x.don_vi, x.vi_tri_kho, Number(x.ton_toi_thieu) || 0, ''])];
-  if (!dm.length) dmRows.push(['INS-9002-01', 'Insert lòng 1', 'Insert tạo hình', 'Riêng', '', 'SKD61', 'BV-9002-11', '', 30, 50000, 'C', 'cái', 'Tủ A-1', 0, 2],
-    ['EJP-6-150', 'Ejector pin Ø6×150', 'Ejector pin', 'Chung', 'Ø6×150', 'SKD61', 'Misumi EPH6-150', 'Misumi', 7, '', 'K', 'cái', 'Tủ B-2', 20, 50]);
+  if (!dm.length) dmRows.push(['INS-TTI-MOT-02-01', 'Insert lòng 1 tấm di động – TTI-MOT-02', 'Insert tạo hình', 'Riêng', '', 'SKD61', 'BV-9002-11', '', 30, 50000, 'C', 'cái', 'Tủ A-1', 0, 2],
+    ['EJP-D06-L150', 'Ejector pin Ø6×150', 'Ejector pin', 'Chung', 'Ø6×150', 'SKD61', 'Misumi EPH6-150', 'Misumi', 7, '', 'K', 'cái', 'Tủ B-2', 20, 50]);
   const ganRows = [X_GAN, ...gan.map(g => { const lk = lkById(g.id_lk); return [g.ma_khuon, lk ? lk.ma_lk : '', Number(g.so_luong_lap), g.vi_tri_lap, Number(g.du_phong_toi_thieu) || 0, g.ghi_chu]; })];
-  if (!gan.length) ganRows.push(['9002 #1', 'INS-9002-01', 1, 'Lòng 1 - tấm di động', 1, ''], ['9002 #1', 'EJP-6-150', 12, 'Tấm đẩy', 0, '']);
+  if (!gan.length) ganRows.push(['9002 #2', 'INS-TTI-MOT-02-01', 1, 'Lòng 1 - tấm di động', 1, ''], ['9002 #2', 'EJP-D06-L150', 12, 'Tấm đẩy', 0, '']);
   const huongDan = [['Hướng dẫn'], [''],
     ['Sheet "Danh mục": mỗi dòng 1 linh kiện. Mã LK đã có thì CẬP NHẬT, chưa có thì THÊM.'],
+    ['Mã LK: riêng khuôn = NHÓM-MÃ SP-STT (VD INS-TTI-MOT-02-01); dùng chung = NHÓM-QUY CÁCH (VD EJP-D06-L150 cho Ø6×150). Chữ HOA không dấu, số, dấu "-".'],
+    ['Mã nhóm: ' + Object.entries(LOAI_MA).map(([k, m]) => m + ' = ' + LOAI[k]).join(', ')],
+    ['Tên LK: Loại + vị trí / chức năng + quy cách, linh kiện riêng thêm "– mã SP" (VD "Insert lòng 1 tấm di động – TTI-MOT-02").'],
     ['Loại: ' + Object.values(LOAI).join(' / ')],
     ['Phạm vi: Riêng (đặc thù 1 khuôn / các khuôn giống nhau) hoặc Chung (ejector pin, lò xo...).'],
     ['Tồn đầu kỳ: chỉ áp dụng cho linh kiện CHƯA có giao dịch nào (ghi 1 phiếu Nhập "Tồn đầu kỳ"). Sau đó điều chỉnh tồn bằng phiếu Kiểm kê.'],
@@ -872,6 +973,8 @@ function bindAll(){
   document.getElementById('hLk').addEventListener('keydown', e => { if (e.key === 'Enter') { qs.delete('lk'); loadLichSu(); } });
   document.getElementById('hXuat').onclick = xuatLichSu;
   document.getElementById('lk-save').onclick = e => saveLk(e.currentTarget);
+  document.getElementById('lk-goi-y').onclick = goiYMa;
+  ['lk-loai', 'lk-pham-vi', 'lk-ma'].forEach(id => document.getElementById(id).addEventListener(id === 'lk-ma' ? 'input' : 'change', capNhatQuyTac));
   document.getElementById('lk-del').onclick = delLk;
   document.getElementById('gan-save').onclick = e => saveGan(e.currentTarget);
   document.getElementById('copy-save').onclick = e => saveCopy(e.currentTarget);
@@ -892,6 +995,8 @@ async function init(){
   const opt = Object.entries(LOAI).map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('');
   document.getElementById('tLoai').innerHTML = '<option value="">Loại: tất cả</option>' + opt;
   document.getElementById('lk-loai').innerHTML = opt;
+  document.getElementById('dRuleNhom').innerHTML = '<tr><th>Mã nhóm</th><th>Loại</th><th>Tiếng Anh</th></tr>' +
+    Object.entries(LOAI_MA).map(([k, m]) => '<tr><td><code>' + m + '</code></td><td>' + LOAI[k] + '</td><td>' + LOAI_MA_EN[m] + '</td></tr>').join('');
   document.getElementById('hLoai').innerHTML = '<option value="">Loại phiếu: tất cả</option>' + Object.entries(GD).map(([k, v]) => '<option value="' + k + '">' + v[0] + '</option>').join('');
   const d = new Date(); document.getElementById('hDen').value = isoDate(d);
   d.setDate(d.getDate() - 30); document.getElementById('hTu').value = qs.get('lk') ? '' : isoDate(d);
