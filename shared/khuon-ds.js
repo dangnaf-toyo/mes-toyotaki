@@ -295,6 +295,7 @@
             (admin ? '<button type="button" class="kb ol sm" data-tt="' + mk + '">🏷 Tình trạng</button> ' : '') +
             '<a class="kb ol sm" href="van-de-khuon.html?khuon=' + encodeURIComponent(m.ma_khuon) + '&tab=lich-su" title="Lịch sử sự cố + IPQC NG của khuôn">🔎 Vấn đề</a> ' +
             (admin ? '<button type="button" class="kb ol sm" data-cfg="' + mk + '">✏ Sửa</button> ' : '') +
+            '<a class="kb ol sm" href="linh-kien-khuon.html?tab=khuon&khuon=' + encodeURIComponent(m.ma_khuon) + '" title="Linh kiện dự phòng của khuôn">🔩 Linh kiện</a> ' +
             '<a class="kb ol sm" href="quan-ly-khuon.html?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + mk + '">📋 Hạng mục</a></td></tr>';
       }).join('');
     }
