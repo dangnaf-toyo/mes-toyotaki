@@ -192,6 +192,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
       <span class="header-label">Hiển thị</span>
       <select class="header-select" id="selView">
         <option value="kh">KH + khuôn cần chú ý</option>
+        <option value="co_kh">Chỉ khuôn có KH bảo dưỡng tuần này</option>
         <option value="all">Tất cả khuôn</option>
       </select>
     </div>
@@ -359,7 +360,12 @@ function onWeekChange(){ updateWeekLabel(); loadAndRender(); }
 document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday = addDays(weekMonday, -7); onWeekChange(); });
 document.getElementById('btnNextWeek').addEventListener('click', () => { weekMonday = addDays(weekMonday, 7); onWeekChange(); });
 document.getElementById('btnThisWeek').addEventListener('click', () => { weekMonday = mondayOf(new Date()); onWeekChange(); });
-document.getElementById('selView').addEventListener('change', render);
+// Nhớ lựa chọn "Hiển thị" trên máy này (chỉ là tiện ích, lỗi storage thì bỏ qua).
+try { const v = localStorage.getItem('bdkt_view'); if (v && document.querySelector('#selView option[value="' + v + '"]')) document.getElementById('selView').value = v; } catch (e) {}
+document.getElementById('selView').addEventListener('change', () => {
+  try { localStorage.setItem('bdkt_view', document.getElementById('selView').value); } catch (e) {}
+  render();
+});
 document.getElementById('txtSearch').addEventListener('input', render);
 document.getElementById('btnAdd').addEventListener('click', () => openModal(null, null, null));
 
@@ -522,6 +528,7 @@ function render(){
     return { ma, sp, plan, mold: moldMap[ma], kh: khByMold[ma] || {} };
   });
   if (view === 'kh') rows = rows.filter(r => Object.keys(r.kh).length || (r.mold && r.mold.severity));
+  else if (view === 'co_kh') rows = rows.filter(r => Object.keys(r.kh).length);
   if (q) rows = rows.filter(r => r.ma.toLowerCase().includes(q) ||
     Object.values(r.kh).some(k => (k.nguoi_phu_trach || '').toLowerCase().includes(q)));
   // T93: mã có KHSX tuần trước (theo ngày chạy sớm nhất → máy → mã SP, các khuôn
@@ -555,7 +562,7 @@ function render(){
   const tbody = document.querySelector('#tblKhuon tbody');
   if (!rows.length) {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="10">' +
-      (q ? 'Không có khuôn khớp tìm kiếm.' : '✓ Tuần này chưa có lịch và không có khuôn nào cần chú ý.') + '</td></tr>';
+      (q ? 'Không có khuôn khớp tìm kiếm.' : view === 'co_kh' ? 'Tuần này chưa có lịch bảo dưỡng nào.' : '✓ Tuần này chưa có lịch và không có khuôn nào cần chú ý.') + '</td></tr>';
   } else {
     tbody.innerHTML = rows.map(r => {
       const m = r.mold;
