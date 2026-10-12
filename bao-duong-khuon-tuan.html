@@ -294,8 +294,8 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 const THU_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
 const THU_LABEL = ['T2','T3','T4','T5','T6','T7','CN'];
 const LOAI_NGAN = { 'Bảo dưỡng định kỳ': 'BD định kỳ', 'Sửa chữa': 'Sửa chữa', 'Thay khuôn mới': 'Thay mới', 'Kiểm tra': 'Kiểm tra' };
-// Khớp RPC T75/D66: người lập = nhân viên bảo dưỡng khuôn hoặc Quản lý bộ phận Đúc (admin sửa hộ
-// được). QLBP Đúc đã lập/sửa kế hoạch tuần thì không tự kiểm tra — admin kiểm tra thay (D66).
+// Khớp RPC T75/D66/D67: người lập = nhân viên bảo dưỡng khuôn hoặc Quản lý bộ phận Đúc (admin sửa
+// hộ được). QLBP Đúc kiểm tra được cả kế hoạch mình lập (D67); admin không duyệt hộ.
 const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','admin'];
 const TT_LABEL = { nhap: 'Nháp — đang lập', cho_kiem_tra: 'Chờ kiểm tra', cho_phe_duyet: 'Chờ phê duyệt', da_duyet: 'Đã phê duyệt' };
 const SU_KIEN_LABEL = { them: '➕ Thêm lịch', sua: '✏️ Sửa lịch', xoa: '🗑️ Xoá lịch', gui_duyet: '📤 Gửi kiểm tra',
@@ -308,7 +308,6 @@ let weekMonday = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(locatio
   ? new Date(new URLSearchParams(location.search).get('tuan') + 'T00:00:00') : new Date());
 let csByKh = {};           // id lịch -> {trang_thai, ket_luan} (duc_khuon_checksheet)
 let canEdit = false;
-let myTen = '';
 let myRole = null, myBoPhan = [];
 let duyetInfo = null;      // duc_khuon_bd_duyet của tuần
 let duyetLog = [];
@@ -385,11 +384,9 @@ function computeMoldStatus(tongShot, shotBdgn, nguongBd, nguongLm){
 async function loadPermission(){
   const session = await MesAuth.getSession();
   if (!session) { canEdit = false; return; }
-  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach,full_name,username,email').eq('user_id', session.user.id).maybeSingle();
+  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
   myRole = data ? data.role : null;
   myBoPhan = data && Array.isArray(data.bo_phan_phu_trach) ? data.bo_phan_phu_trach : [];
-  // = tên server ghi vào duc_khuon_bd_duyet_log.nguoi (duc_khuon_bd_nguoi_hien_tai)
-  myTen = data ? (String(data.full_name || '').trim() || String(data.username || '').trim() || data.email || '') : '';
   canEdit = EDIT_ROLES.includes(myRole) || laNguoiKiemTra();
 }
 
@@ -779,8 +776,6 @@ function trangThai(){ return duyetInfo ? duyetInfo.trang_thai : 'nhap'; }
 function fmtTs(ts){ return ts ? new Date(ts).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
 function laNguoiKiemTra(){ return myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc'); }
 function laNguoiPheDuyet(){ return myRole === 'giam_doc_sx'; }
-// QLBP Đúc đã thêm / sửa / xoá / gửi duyệt kế hoạch tuần này → không tự kiểm tra (D66).
-function daThamGiaLap(){ return duyetLog.some(l => ['them', 'sua', 'xoa', 'gui_duyet'].includes(l.su_kien) && l.nguoi === myTen); }
 
 function renderDuyet(){
   const tt = trangThai();
@@ -790,8 +785,7 @@ function renderDuyet(){
     '<span class="n">' + (name ? '✓ ' + escapeHtml(name) : waiting ? '⏳ Đang chờ' : '') + '</span><span class="tm">' + fmtTs(ts) + '</span></div>';
   let actions = '';
   if (tt === 'nhap' && canEdit) actions = '<button type="button" class="btn" id="btnGuiDuyet">📤 Gửi kiểm tra</button>';
-  else if (tt === 'cho_kiem_tra' && laNguoiKiemTra() && daThamGiaLap()) actions = '<span style="font-size:12px;color:var(--warn-fg);font-weight:600">Bạn đã lập / sửa kế hoạch tuần này nên không tự kiểm tra — admin kiểm tra thay.</span>';
-  else if (tt === 'cho_kiem_tra' && (laNguoiKiemTra() || myRole === 'admin')) actions = '<button type="button" class="btn btn-good" id="btnDuyet">✅ Kiểm tra đạt</button><button type="button" class="btn btn-reject" id="btnTuChoi">❌ Từ chối</button>';
+  else if (tt === 'cho_kiem_tra' && laNguoiKiemTra()) actions = '<button type="button" class="btn btn-good" id="btnDuyet">✅ Kiểm tra đạt</button><button type="button" class="btn btn-reject" id="btnTuChoi">❌ Từ chối</button>';
   else if (tt === 'cho_phe_duyet' && laNguoiPheDuyet()) actions = '<button type="button" class="btn btn-good" id="btnDuyet">✅ Phê duyệt</button><button type="button" class="btn btn-reject" id="btnTuChoi">❌ Từ chối</button>';
 
   document.getElementById('duyetBar').innerHTML =
