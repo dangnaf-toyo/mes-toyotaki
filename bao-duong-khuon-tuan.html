@@ -34,8 +34,8 @@
 html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
 body{padding:6px 6px 60px}
 .wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
-header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
-.brand{display:flex;flex-direction:column;line-height:1.2}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2;white-space:nowrap}
 .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
 .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
 .header-divider{width:1px;height:28px;background:#334155}
@@ -50,7 +50,8 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .week-nav{display:flex;align-items:center;gap:6px}
 .week-nav button{border:1px solid #475569;background:#334155;border-radius:5px;padding:6px 10px;font-family:inherit;font-size:12.5px;cursor:pointer;font-weight:600;color:#F1F5F9}
 .week-nav button:hover{background:#3F5266}
-.week-label{font-size:12.5px;font-weight:700;min-width:140px;text-align:center;color:#F1F5F9}
+.week-label{font-size:12.5px;font-weight:700;text-align:center;color:#F1F5F9;white-space:nowrap}
+header .btn{padding:6px 11px}
 .btn{border:none;border-radius:5px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none}
 .btn:hover{background:var(--accent-hover)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -181,25 +182,25 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
   <header>
     <div class="brand">
       <div class="co">Toyotaki</div>
-      <div class="title">Kế hoạch bảo dưỡng khuôn tuần</div>
+      <div class="title">KH bảo dưỡng khuôn</div>
     </div>
     <div class="header-divider"></div>
     <div class="week-nav">
-      <button type="button" id="btnPrevWeek">‹ Tuần trước</button>
+      <button type="button" id="btnPrevWeek" title="Tuần trước">‹ Trước</button>
       <div class="week-label" id="weekLabel">—</div>
-      <button type="button" id="btnNextWeek">Tuần sau ›</button>
+      <button type="button" id="btnNextWeek" title="Tuần sau">Sau ›</button>
     </div>
     <button type="button" class="btn btn-ghost" id="btnThisWeek">Tuần này</button>
     <div class="header-group">
       <span class="header-label">Hiển thị</span>
       <select class="header-select" id="selView">
-        <option value="kh">KH + khuôn cần chú ý</option>
-        <option value="co_kh">Chỉ khuôn có KH tuần này</option>
+        <option value="kh">KH + cần chú ý</option>
+        <option value="co_kh">Chỉ có KH tuần này</option>
         <option value="all">Tất cả khuôn</option>
       </select>
     </div>
-    <a class="btn btn-ghost" href="quan-ly-khuon.html">🧊 Quản lý khuôn</a>
-    <a class="btn btn-ghost" href="linh-kien-khuon.html">🔩 Linh kiện dự phòng</a>
+    <a class="btn btn-ghost" href="quan-ly-khuon.html" title="Quản lý khuôn">🧊 Khuôn</a>
+    <a class="btn btn-ghost" href="linh-kien-khuon.html" title="Linh kiện dự phòng khuôn">🔩 Linh kiện</a>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
       <div class="time" id="hdrClockTime"></div>
@@ -361,7 +362,7 @@ function weekDates(){ return THU_COLS.map((_, i) => fmtDate(addDays(weekMonday, 
 function todayStr(){ return fmtDate(new Date()); }
 
 function updateWeekLabel(){
-  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday) + ' — ' + fmtDateVN(addDays(weekMonday, 6));
+  document.getElementById('weekLabel').textContent = fmtDateVN(weekMonday).slice(0, 5) + ' – ' + fmtDateVN(addDays(weekMonday, 6));
 }
 function onWeekChange(){ updateWeekLabel(); loadAndRender(); }
 document.getElementById('btnPrevWeek').addEventListener('click', () => { weekMonday = addDays(weekMonday, -7); onWeekChange(); });
