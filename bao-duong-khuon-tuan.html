@@ -18,7 +18,9 @@
     - duc_shot_khuon — shot/ngưỡng/hạn theo ngày → "khuôn cần chú ý" (gợi ý
       đưa vào KH, kèm ngày rảnh đề xuất).
     - duc_van_de_khuon — vấn đề khuôn tồn đọng, hiện trong form.
-    - duc_khsx_tuan_plan — ngày khuôn đang chạy máy (vạch đỏ dưới ô).
+    - duc_khsx_tuan_plan — ngày khuôn đang chạy máy (vạch đỏ dưới ô); thứ tự
+      dòng (T93): mã SP có KHSX tuần trước, theo ngày chạy sớm nhất → máy,
+      mã không có KHSX sau.
     - duc_khuon_bao_duong_log — "Đã làm": có ghi nhận bảo dưỡng của khuôn
       trong tuần. Danh sách/vấn đề khuôn + hạng mục check sheet ở quan-ly-khuon.html.
   Phê duyệt theo tuần (T75): Người lập (nhân viên bảo dưỡng khuôn) → Người
@@ -76,6 +78,8 @@ th.day .d{display:block;font-size:10px;font-weight:600;color:var(--text-dim);tex
 th.today{background:#DBEAFE;color:var(--accent)}
 td.today{background:#F5F9FF}
 td.khuon{font-weight:800;white-space:nowrap;position:sticky;left:0;background:var(--bg-panel);z-index:1}
+td.sp{font-weight:600;white-space:nowrap;font-size:12px}
+td.sp small{display:block;font-weight:500;color:var(--text-muted);font-size:10.5px}
 td.status{font-size:11px;color:var(--text-muted);min-width:170px;max-width:240px}
 .sev{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin:0 3px 2px 0}
 .sev.lammoi{background:#FCE7F3;color:#9F1239}
@@ -313,6 +317,9 @@ let khRows = [];           // duc_khuon_bd_kh_tuan của tuần
 let logsByMold = {};       // ma_khuon -> [log trong tuần]
 let issuesByMold = {};     // ma_khuon -> [vấn đề]
 let runByMold = {};        // ma_khuon -> [7 x [label máy/SP]]
+let spByMoldPlan = {};     // ma_khuon -> mã SP theo KHSX tuần (khuôn không có trong danh mục)
+let planBySp = {};         // ma_sp -> {day, may} lần chạy sớm nhất trong KHSX tuần
+let planByMold = {};       // ma_khuon -> {day, may} lần chạy sớm nhất trong KHSX tuần
 let employees = [];        // [{ten_nhan_vien, vai_tro}]
 let editingId = null;
 
@@ -331,6 +338,7 @@ function fmtDateVN(d){ return String(d.getDate()).padStart(2,'0') + '/' + String
 function fmtDM(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
 function parseDate(s){ const [y,m,d] = String(s).slice(0,10).split('-').map(Number); return new Date(y, m-1, d); }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function naturalCmp(a, b){ return String(a ?? '').localeCompare(String(b ?? ''), 'vi', { numeric: true }); }
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 let msgTimer = null;
 function showMsg(text, cls, ms){
@@ -386,7 +394,7 @@ async function loadEmployees(){
 }
 
 async function loadAndRender(){
-  document.querySelector('#tblKhuon tbody').innerHTML = '<tr class="empty-row"><td colspan="9">Đang tải...</td></tr>';
+  document.querySelector('#tblKhuon tbody').innerHTML = '<tr class="empty-row"><td colspan="10">Đang tải...</td></tr>';
   const tuan = fmtDate(weekMonday);
   const weekEnd = fmtDate(addDays(weekMonday, 6));
   const [moldsRes, issuesRes, planRes, khRes, logRes, duyetRes, dLogRes] = await Promise.all([
@@ -409,11 +417,22 @@ async function loadAndRender(){
   });
 
   // so_khuon có thể là "A, B" (khuôn kép / dùng chung nhiều máy).
-  runByMold = {};
+  // planBySp: lần chạy SỚM NHẤT của mã SP trong KHSX tuần (ngày + máy) — để
+  // sắp khuôn theo thứ tự chạy (T93).
+  runByMold = {}; spByMoldPlan = {}; planBySp = {}; planByMold = {};
+  const sonHon = (map, k, day, may) => {
+    const cur = map[k];
+    if (!cur || day < cur.day || (day === cur.day && naturalCmp(may, cur.may) < 0)) map[k] = { day, may };
+  };
   (planRes.data || []).forEach(r => {
+    const first = THU_COLS.findIndex(c => Number(r[c]) > 0);
+    const sp = String(r.ma_sp || '').trim();
+    if (sp && first >= 0) sonHon(planBySp, sp, first, r.ma_may || '');
     String(r.so_khuon || '').split(',').map(s => s.trim()).filter(Boolean).forEach(mk => {
       const days = runByMold[mk] = runByMold[mk] || THU_COLS.map(() => []);
       THU_COLS.forEach((c, i) => { if (Number(r[c]) > 0) days[i].push(r.ma_may + ' (' + r.ma_sp + ')'); });
+      if (sp) spByMoldPlan[mk] = spByMoldPlan[mk] || sp;
+      if (first >= 0) sonHon(planByMold, mk, first, r.ma_may || '');
     });
   });
 
@@ -455,6 +474,7 @@ async function loadAndRender(){
     return {
       ma_khuon: ma, tong_shot: tongShot, since: tongShot - shotBdgn, nguong_bd: nguongBd,
       lan_bd: m.lan_bao_duong_gan_nhat, due, severity, lyDo, openIssues, tinhTrang,
+      ma_sp: String(m.ten_sp_gan_nhat || '').split(' (')[0].trim(),
     };
   }).sort((a, b) => a.ma_khuon.localeCompare(b.ma_khuon, 'vi', { numeric: true }));
   moldMap = Object.fromEntries(molds.map(m => [m.ma_khuon, m]));
@@ -490,33 +510,49 @@ function render(){
   // Khuôn có trong KH nhưng không còn trong danh mục vẫn phải hiện.
   const allMa = new Set([...molds.map(m => m.ma_khuon), ...Object.keys(khByMold)]);
   const sevOrder = { lammoi: 0, baoduong: 1, sap: 2, vande: 3 };
-  let rows = [...allMa].map(ma => ({ ma, mold: moldMap[ma], kh: khByMold[ma] || {} }));
+  let rows = [...allMa].map(ma => {
+    const sp = (moldMap[ma] && moldMap[ma].ma_sp) || spByMoldPlan[ma] || '';
+    // Thứ tự chạy trong KHSX tuần: ngày sớm nhất khuôn chạy, hoặc mã SP của khuôn
+    // chạy (bằng khuôn khác cùng mã) — lấy cái sớm hơn.
+    const p = planBySp[sp];
+    let plan = planByMold[ma] || null;
+    if (p && (!plan || p.day < plan.day)) plan = p;
+    return { ma, sp, plan, mold: moldMap[ma], kh: khByMold[ma] || {} };
+  });
   if (view === 'kh') rows = rows.filter(r => Object.keys(r.kh).length || (r.mold && r.mold.severity));
   if (q) rows = rows.filter(r => r.ma.toLowerCase().includes(q) ||
     Object.values(r.kh).some(k => (k.nguoi_phu_trach || '').toLowerCase().includes(q)));
+  // T93: mã có KHSX tuần trước (theo ngày chạy sớm nhất → máy → mã SP, các khuôn
+  // cùng mã đứng liền nhau), mã không có KHSX sau (khuôn ngừng SX cuối cùng).
+  // Cùng mã: khuôn tự chạy trong tuần trước, rồi theo mức cần chú ý.
   rows.sort((a, b) => {
-    const ka = Object.keys(a.kh).length ? 0 : 1, kb = Object.keys(b.kh).length ? 0 : 1;
-    if (ka !== kb) return ka - kb;
-    if (ka === 0) {
-      const fa = Object.keys(a.kh).sort()[0], fb = Object.keys(b.kh).sort()[0];
-      if (fa !== fb) return fa < fb ? -1 : 1;
+    const pa = a.plan ? 0 : 1, pb = b.plan ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    if (a.plan) {
+      if (a.plan.day !== b.plan.day) return a.plan.day - b.plan.day;
+      const c = naturalCmp(a.plan.may, b.plan.may);
+      if (c) return c;
     } else {
       const ngung = r => (r.mold && r.mold.tinhTrang !== 'dang_sx') ? 1 : 0;
       if (ngung(a) !== ngung(b)) return ngung(a) - ngung(b);
-      const sa = sevOrder[a.mold?.severity] ?? 9, sb2 = sevOrder[b.mold?.severity] ?? 9;
-      if (sa !== sb2) return sa - sb2;
     }
-    return a.ma.localeCompare(b.ma, 'vi', { numeric: true });
+    const c = naturalCmp(a.sp || '~', b.sp || '~');
+    if (c) return c;
+    const ra = runByMold[a.ma] ? 0 : 1, rb = runByMold[b.ma] ? 0 : 1;
+    if (ra !== rb) return ra - rb;
+    const sa = sevOrder[a.mold?.severity] ?? 9, sb2 = sevOrder[b.mold?.severity] ?? 9;
+    if (sa !== sb2) return sa - sb2;
+    return naturalCmp(a.ma, b.ma);
   });
 
   // Header
-  document.querySelector('#tblKhuon thead').innerHTML = '<tr><th>Khuôn</th><th>Tình trạng</th>' +
+  document.querySelector('#tblKhuon thead').innerHTML = '<tr><th>Khuôn</th><th>Mã SP</th><th>Tình trạng</th>' +
     dates.map((d, i) => '<th class="day' + (d === today ? ' today' : '') + '">' + THU_LABEL[i] +
       '<span class="d">' + fmtDM(parseDate(d)) + '</span></th>').join('') + '</tr>';
 
   const tbody = document.querySelector('#tblKhuon tbody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">' +
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">' +
       (q ? 'Không có khuôn khớp tìm kiếm.' : '✓ Tuần này chưa có lịch và không có khuôn nào cần chú ý.') + '</td></tr>';
   } else {
     tbody.innerHTML = rows.map(r => {
@@ -551,13 +587,15 @@ function render(){
         } else if (i === suggestIdx) {
           inner = '<div class="suggest">Đề xuất<br>(khuôn rảnh)</div>';
         } else if (run[i].length) {
-          inner = '<span class="run-lbl">' + escapeHtml(run[i].map(x => x.split(' ')[0]).join(',')) + '</span>';
+          inner = '<span class="run-lbl">' + escapeHtml(run[i].map(x => x.replace(/ \(.*\)$/, '')).join(',')) + '</span>';
         }
         return '<td class="' + cls.join(' ') + '" title="' + escapeHtml(title) + '" data-ma="' + escapeHtml(r.ma) + '" data-ngay="' + d + '"' +
           (k ? ' data-id="' + k.id + '"' : '') + '>' + inner + '</td>';
       }).join('');
 
-      return '<tr class="' + (hasKh ? '' : 'goi-y') + '"><td class="khuon">' + escapeHtml(r.ma) + '</td><td class="status">' + statusHtml + '</td>' + cells + '</tr>';
+      return '<tr class="' + (hasKh ? '' : 'goi-y') + '"><td class="khuon">' + escapeHtml(r.ma) + '</td><td class="sp">' + (escapeHtml(r.sp) || '—') +
+        (r.plan ? '<small title="Lần chạy sớm nhất trong KHSX tuần">▶ ' + THU_LABEL[r.plan.day] + ' · ' + escapeHtml(r.plan.may) + '</small>' : '<small>Không có KHSX</small>') +
+        '</td><td class="status">' + statusHtml + '</td>' + cells + '</tr>';
     }).join('');
   }
 
