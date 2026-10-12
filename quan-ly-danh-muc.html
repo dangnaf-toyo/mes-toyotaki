@@ -325,45 +325,9 @@
 
     <!-- ── Tab Khuôn ───────────────────────────────────────────────────── -->
     <section id="tab-khuon" class="tab-pane" style="display:none">
-      <div class="pane-toolbar">
-        <input type="search" class="list-search" id="khuon-search" placeholder="Lọc nhanh: mã khuôn / SP…" autocomplete="off">
-        <select class="list-filter" id="khuon-filt-trang_thai_khuon"></select>
-        <button type="button" class="btn-reset" id="khuon-clear">Xoá lọc</button>
-        <span class="list-count" id="khuon-count"></span>
-        <button type="button" class="btn-add" id="khuon-add">＋ Thêm mới</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table id="khuon-table" style="display:none">
-            <thead id="khuon-thead"></thead>
-            <tbody id="khuon-tbody"></tbody>
-          </table>
-        </div>
-        <div class="empty" id="khuon-empty" style="display:none">Chưa có khuôn nào.</div>
-      </div>
-
-      <div class="modal-overlay" id="khuon-modal">
-        <div class="modal">
-          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
-          <h2 id="khuon-form-title">Thêm khuôn</h2>
-          <p class="muted" style="margin:-6px 0 14px">Lưu ý: số shot luỹ kế/trạng thái khuôn cũng được hệ thống tự cập nhật mỗi khi kết ca — chỉnh ở đây chỉ dùng để hiệu chỉnh thủ công.</p>
-          <div class="msg" id="khuon-msg"></div>
-          <form id="khuon-form">
-            <div class="form-grid">
-              <div><label for="khuon-ma">Mã khuôn</label><input type="text" autocomplete="off" id="khuon-ma" required></div>
-              <div><label for="khuon-sp">Mã sản phẩm</label><input type="text" autocomplete="off" id="khuon-sp"></div>
-              <div><label for="khuon-tongshot">Tổng shot luỹ kế</label><input type="number" step="any" id="khuon-tongshot"></div>
-              <div><label for="khuon-nguongbd">Ngưỡng bảo dưỡng (shot)</label><input type="number" step="any" id="khuon-nguongbd"></div>
-              <div><label for="khuon-nguonglm">Ngưỡng làm mới (shot)</label><input type="number" step="any" id="khuon-nguonglm"></div>
-              <div><label for="khuon-langanbd">Lần bảo dưỡng gần nhất</label><input type="date" id="khuon-langanbd"></div>
-              <div><label for="khuon-shotbd">Shot tại lần BD gần nhất</label><input type="number" step="any" id="khuon-shotbd"></div>
-              <div><label for="khuon-trangthai">Trạng thái</label><input type="text" autocomplete="off" id="khuon-trangthai" placeholder="binh_thuong / can_bao_duong / can_lam_moi"></div>
-              <div style="grid-column:1/-1"><label for="khuon-ghichu">Ghi chú</label><input type="text" autocomplete="off" id="khuon-ghichu"></div>
-            </div>
-            <div class="form-actions"><button type="submit" id="khuon-submit">Thêm khuôn</button></div>
-          </form>
-        </div>
-      </div>
+      <!-- T92: danh sách khuôn + khai báo/sửa/đổi mã/xoá, tình trạng, thứ tự ưu tiên
+           (shared/khuon-ds.js, chế độ admin). quan-ly-khuon.html dùng cùng module chỉ xem. -->
+      <div class="card" style="padding:12px 14px"><div id="khuon-ds"></div></div>
     </section>
 
     <!-- ── Tab Phân quyền tài liệu kỹ thuật (T62) ─────────────────────────── -->
@@ -384,6 +348,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/khuon-ds.js"></script>
 <script>
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -426,6 +391,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-' + btn.dataset.tab).style.display = 'block';
   });
 });
+{ const t = new URLSearchParams(location.search).get('tab');   // ?tab=khuon (link từ quan-ly-khuon.html)
+  const btn = t && document.querySelector('.tab-btn[data-tab="' + t + '"]');
+  if (btn) btn.click(); }
 
 // ── Danh mục dùng chung: lọc + sắp xếp + bảng + modal thêm/sửa ───────────
 function cmp(a, b){
@@ -832,79 +800,6 @@ initCatalog({
   ],
 });
 
-// ══ Tab Khuôn ═════════════════════════════════════════════════════════════
-let khuonEditing = null;
-function khuonResetForm(){
-  khuonEditing = null;
-  clearMsg('khuon-msg');
-  document.getElementById('khuon-form').reset();
-  document.getElementById('khuon-ma').disabled = false;
-  document.getElementById('khuon-form-title').textContent = 'Thêm khuôn';
-  document.getElementById('khuon-submit').textContent = 'Thêm khuôn';
-}
-function khuonFillForm(r){
-  khuonEditing = r.ma_khuon;
-  clearMsg('khuon-msg');
-  document.getElementById('khuon-ma').value = r.ma_khuon;
-  document.getElementById('khuon-ma').disabled = true;
-  document.getElementById('khuon-sp').value = r.ten_sp_gan_nhat || '';
-  document.getElementById('khuon-tongshot').value = r.tong_shot_luy_ke ?? '';
-  document.getElementById('khuon-nguongbd').value = r.nguong_bao_duong ?? '';
-  document.getElementById('khuon-nguonglm').value = r.nguong_lam_moi ?? '';
-  document.getElementById('khuon-langanbd').value = r.lan_bao_duong_gan_nhat || '';
-  document.getElementById('khuon-shotbd').value = r.shot_tai_lan_bao_duong_gan_nhat ?? '';
-  document.getElementById('khuon-trangthai').value = r.trang_thai_khuon || '';
-  document.getElementById('khuon-ghichu').value = r.ghi_chu || '';
-  document.getElementById('khuon-form-title').textContent = 'Sửa khuôn: ' + r.ma_khuon;
-  document.getElementById('khuon-submit').textContent = 'Lưu thay đổi';
-}
-document.getElementById('khuon-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const ma_khuon = document.getElementById('khuon-ma').value.trim();
-  if (!ma_khuon) return;
-  const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
-  const str = (id) => document.getElementById(id).value.trim() || null;
-  const payload = {
-    ten_sp_gan_nhat: str('khuon-sp'),
-    tong_shot_luy_ke: num('khuon-tongshot'),
-    nguong_bao_duong: num('khuon-nguongbd'),
-    nguong_lam_moi: num('khuon-nguonglm'),
-    lan_bao_duong_gan_nhat: str('khuon-langanbd'),
-    shot_tai_lan_bao_duong_gan_nhat: num('khuon-shotbd'),
-    trang_thai_khuon: str('khuon-trangthai'),
-    ghi_chu: str('khuon-ghichu'),
-    last_updated_at: new Date().toISOString(),
-  };
-  let error;
-  if (khuonEditing){
-    ({ error } = await sb.from('duc_shot_khuon').update(payload).eq('ma_khuon', khuonEditing));
-  } else {
-    ({ error } = await sb.from('duc_shot_khuon').insert({ ma_khuon, ...payload }));
-  }
-  if (error) return showMsg('khuon-msg', 'error', 'Lỗi: ' + error.message);
-  toast(khuonEditing ? 'Đã lưu ' + ma_khuon : 'Đã thêm ' + ma_khuon);
-  catalogs.khuon.close();
-  catalogs.khuon.reload();
-});
-initCatalog({
-  id: 'khuon',
-  emptyText: 'Chưa có khuôn nào.',
-  fetch: () => sb.from('duc_shot_khuon').select('ma_khuon, ten_sp_gan_nhat, tong_shot_luy_ke, nguong_bao_duong, nguong_lam_moi, lan_bao_duong_gan_nhat, shot_tai_lan_bao_duong_gan_nhat, trang_thai_khuon, ghi_chu'),
-  pk: r => r.ma_khuon,
-  resetForm: khuonResetForm,
-  fillForm: khuonFillForm,
-  remove: r => sb.from('duc_shot_khuon').delete().eq('ma_khuon', r.ma_khuon),
-  filters: [{ k: 'trang_thai_khuon', label: 'Trạng thái', valOf: r => r.trang_thai_khuon }],
-  columns: [
-    { k: 'ma_khuon', label: 'Mã khuôn', sortable: true, sortVal: r => r.ma_khuon, text: r => r.ma_khuon, render: r => escapeHtml(r.ma_khuon) },
-    { k: 'ten_sp_gan_nhat', label: 'Mã sản phẩm', sortable: true, sortVal: r => r.ten_sp_gan_nhat || '', text: r => r.ten_sp_gan_nhat || '', render: r => escapeHtml(r.ten_sp_gan_nhat) || DASH },
-    { k: 'tong_shot_luy_ke', label: 'Tổng shot', sortable: true, sortVal: r => r.tong_shot_luy_ke == null ? -Infinity : Number(r.tong_shot_luy_ke), text: r => r.tong_shot_luy_ke == null ? '' : String(r.tong_shot_luy_ke), render: r => r.tong_shot_luy_ke ?? DASH },
-    { k: 'nguong_bao_duong', label: 'Ngưỡng BD', sortable: true, sortVal: r => r.nguong_bao_duong == null ? -Infinity : Number(r.nguong_bao_duong), text: r => r.nguong_bao_duong == null ? '' : String(r.nguong_bao_duong), render: r => r.nguong_bao_duong ?? DASH },
-    { k: 'nguong_lam_moi', label: 'Ngưỡng LM', sortable: true, sortVal: r => r.nguong_lam_moi == null ? -Infinity : Number(r.nguong_lam_moi), text: r => r.nguong_lam_moi == null ? '' : String(r.nguong_lam_moi), render: r => r.nguong_lam_moi ?? DASH },
-    { k: 'trang_thai_khuon', label: 'Trạng thái', sortable: true, sortVal: r => r.trang_thai_khuon || '', text: r => r.trang_thai_khuon || '', render: r => escapeHtml(r.trang_thai_khuon) || DASH },
-  ],
-});
-
 // ══ Tab Phân quyền tài liệu kỹ thuật (T62) ════════════════════════════════
 // BO_PHAN_LIST — copy đúng danh sách dùng trong supabase/functions/admin-create-user
 // (T62 yêu cầu) — không tự bịa thêm bộ phận nào khác.
@@ -1010,7 +905,7 @@ async function main(){
   catalogs.may.reload();
   catalogs.sp.reload();
   catalogs.ns.reload();
-  catalogs.khuon.reload();
+  KhuonDs.mount(document.getElementById('khuon-ds'), { admin: true, userName: (await MesAuth.getCurrentUserIdentity()) || '' });
   loadDocPermissions();
 }
 
