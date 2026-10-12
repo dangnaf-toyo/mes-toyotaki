@@ -178,6 +178,7 @@ tr.row-ng td{background:#FFF5F5}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
+// Người ghi check sheet = NV bảo dưỡng khuôn / Quản lý bộ phận Đúc (D68) / admin — khớp RPC duc_khuon_cs_luu.
 const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','admin'];
 const TT_KH = { nhap: ['Nháp — chưa gửi duyệt','warn'], cho_kiem_tra: ['Chờ kiểm tra','warn'], cho_phe_duyet: ['Chờ phê duyệt','warn'], da_duyet: ['Đã phê duyệt','ok'] };
 const KQ = ['OK','NG','NA'];
@@ -216,6 +217,7 @@ function showMsg(text, cls, ms){
 }
 function rpcErr(data, error){ return error ? error.message : (data && data.error) || 'không rõ'; }
 function laNguoiSuaMau(){ return myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
+function laNguoiGhi(){ return EDIT_ROLES.includes(myRole) || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
 
 function startHeaderClock(){
   function tick(){
@@ -264,7 +266,7 @@ async function loadAll(){
   items = cs ? (cs.hang_muc || []).map(x => ({ ...x })) : itemsTheoMau([]);
   ketLuan = cs ? cs.ket_luan : '';
   photos = { truoc: cs && cs.anh_truoc ? cs.anh_truoc.slice() : [], sau: cs && cs.anh_sau ? cs.anh_sau.slice() : [] };
-  canEdit = EDIT_ROLES.includes(myRole) && !(cs && cs.trang_thai === 'hoan_thanh');
+  canEdit = laNguoiGhi() && !(cs && cs.trang_thai === 'hoan_thanh');
   render();
 }
 
@@ -287,8 +289,8 @@ function render(){
     html += '<div class="done-banner ' + cs.ket_luan + '">' + (cs.ket_luan === 'dat' ? '✅ ĐẠT' : '❌ KHÔNG ĐẠT') +
       ' — hoàn thành bởi ' + escapeHtml(cs.nguoi_hoan_thanh) + ' lúc ' + fmtTs(cs.thoi_diem_hoan_thanh) +
       (cs.id_log ? ' · đã ghi sổ đời khuôn' : '') + '</div>';
-  } else if (!EDIT_ROLES.includes(myRole)) {
-    html += '<div class="card no-print" style="color:var(--warn-fg);font-weight:600">🔒 Chỉ xem — nhân viên bảo dưỡng khuôn mới ghi được check sheet' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>';
+  } else if (!laNguoiGhi()) {
+    html += '<div class="card no-print" style="color:var(--warn-fg);font-weight:600">🔒 Chỉ xem — nhân viên bảo dưỡng khuôn / Quản lý bộ phận Đúc mới ghi được check sheet' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>';
   }
 
   html += '<div class="card"><div class="card-title">Thông tin khuôn & kế hoạch</div><div class="info-grid">' +
