@@ -981,6 +981,8 @@ const state = {
   loaiSuCo: CONFIG.LOAI_SU_CO,
   shiftPlans: {},
   molds: [], moldsByProduct: {}, moldMap: {},
+  moldBd: { bat: false, khuon: {} },   // T100: trạng thái bảo dưỡng khuôn (duc_khuon_ds_trang_thai_bd)
+  myRole: null, myBoPhan: [],
   rows: [], incidents: [],
   currentTarget: null,
   pollTimer: null, clockTimer: null,
@@ -1073,6 +1075,12 @@ const DRAFT_KEY = 'ducdash_draft_v1';
 // last_updated_by ở các RPC ghi dữ liệu).
 async function initAuthStatus(){
   state.user = (await MesAuth.getCurrentUserIdentity()) || '';
+  const session = await MesAuth.getSession();
+  if (session) {
+    const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
+    state.myRole = data ? data.role : null;
+    state.myBoPhan = data && Array.isArray(data.bo_phan_phu_trach) ? data.bo_phan_phu_trach : [];
+  }
 }
 
 function gotoLogin(){
@@ -1317,6 +1325,7 @@ async function loadMasterData(){
     sb.from('master_products').select('ma_sp,ten_sp,cavity,cycle_time_s,so_khuon'),
     sb.from('master_employees').select('ten_nhan_vien,vai_tro,bo_phan'),
     sb.from('duc_shot_khuon').select('*'),
+    loadMoldBd(),
   ]);
   for (const r of [mMachines, mProducts, mEmployees, mMolds]) {
     if (r.error) throw new Error('Không tải được danh mục: ' + r.error.message);
@@ -1860,6 +1869,7 @@ async function fetchShiftState(){
     sb.from('duc_shot_khuon').select('*'),
     sb.from('duc_van_de_khuon').select('*').neq('trang_thai', 'Đã đóng'),
     sb.rpc('duc_get_ipqc_due_by_id_dong'),
+    loadMoldBd(),
   ]);
   for (const r of [liteRes, baoCaoRes, qMolds, qIssues]) {
     if (r.error) throw new Error(r.error.message);
@@ -2551,6 +2561,68 @@ function moldNgungSx(maKhuon){
   const m = state.moldMap[String(maKhuon || '').trim()];
   return m && m.tinh_trang && !['dang_sx', 'moi_chua_sx'].includes(m.tinh_trang) ? (TINH_TRANG_KHUON[m.tinh_trang] || m.tinh_trang) : '';
 }
+// T100: chỉ khuôn bảo dưỡng ĐẠT mới lên máy được (trigger duc_ca_hien_tai chặn ở
+// server). Khuôn chạy tiếp trên cùng máy (đang có dòng ca / có tem, sự cố cùng
+// máy trong 1 ngày gần nhất) không bị chặn; QLBP Đúc / admin "Cho phép chạy tạm".
+async function loadMoldBd(){
+  const { data, error } = await sb.rpc('duc_khuon_ds_trang_thai_bd');
+  if (!error && data) state.moldBd = { bat: !!data.bat, khuon: data.khuon || {} };
+  return { data: null, error: null };
+}
+function laQlbpDuc(){ return state.myRole === 'admin' || (state.myRole === 'quan_ly_bo_phan' && (state.myBoPhan || []).includes('Đúc')); }
+function fmtDM_(d){ if (!d) return ''; const x = new Date(String(d).length <= 10 ? d + 'T00:00:00' : d); return String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0'); }
+// -> { chan, nhan, chiTiet }
+function moldBdInfo(maKhuon, maMay){
+  const mk = String(maKhuon || '').trim();
+  const d = state.moldBd.khuon[mk];
+  const may = String(maMay || '').replace(/\s+/g, '');
+  const tiep = d && (d.may_gan_day || []).some(m => String(m || '').replace(/\s+/g, '') === may);
+  let nhan, chiTiet, ok;
+  if (d && d.ket_luan === 'dat') { ok = true; nhan = '✅ BD đạt ' + fmtDM_(d.ngay); chiTiet = 'Bảo dưỡng gần nhất ' + fmtDM_(d.ngay) + ' (' + (d.loai || '') + '): ĐẠT.'; }
+  else if (d && d.ket_luan === 'khong_dat') { ok = false; nhan = '⛔ BD không đạt ' + fmtDM_(d.ngay); chiTiet = 'Bảo dưỡng gần nhất ' + fmtDM_(d.ngay) + ' (' + (d.loai || '') + '): KHÔNG ĐẠT.'; }
+  else { ok = false; nhan = '⛔ Chưa bảo dưỡng'; chiTiet = 'Khuôn chưa có lần bảo dưỡng ĐẠT nào (check sheet bảo dưỡng).'; }
+  if (ok || !state.moldBd.bat) return { chan: false, nhan, chiTiet };
+  if (tiep) return { chan: false, nhan: nhan + ' · đang trên máy này', chiTiet: chiTiet + ' Khuôn đang nằm trên máy này nên được chạy tiếp.' };
+  const cp = d && d.cho_phep_tam;
+  if (cp && (!cp.ma_may || String(cp.ma_may).replace(/\s+/g, '') === may)) {
+    return { chan: false, nhan: '🔓 Cho phép chạy tạm', chiTiet: chiTiet + ' ' + cp.nguoi + ' cho phép chạy tạm (' + cp.ly_do + '), hiệu lực 1 lần lên khuôn đến ' +
+      new Date(cp.het_han).toLocaleString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) + '.' };
+  }
+  return { chan: true, nhan, chiTiet: chiTiet + ' Không được đưa vào sản xuất.' };
+}
+// Hiện trạng thái BD của khuôn đang chọn dưới ô số khuôn (+ nút cho phép tạm).
+function renderMoldBdStatus(prefix){
+  const hint = document.getElementById(prefix + '-so-khuon-hint');
+  if (!hint) return;
+  let box = document.getElementById(prefix + '-so-khuon-bd');
+  if (!box) { box = document.createElement('div'); box.id = prefix + '-so-khuon-bd'; box.style.cssText = 'margin-top:4px;font-size:11px;font-weight:600;line-height:1.4'; hint.after(box); }
+  const mk = document.getElementById(prefix + '-so-khuon').value.trim();
+  const maMay = state.currentTarget ? state.currentTarget.ma_may : '';
+  if (!mk) { box.innerHTML = ''; return; }
+  const info = moldBdInfo(mk, maMay);
+  box.style.color = info.chan ? 'var(--alarm-fg)' : 'var(--run-fg)';
+  box.innerHTML = '<span>Bảo dưỡng: ' + escapeHtml(info.chiTiet) + '</span>' +
+    (info.chan && laQlbpDuc() ? ' <button type="button" class="btn-sm" data-cho-phep-tam="' + escapeHtml(mk) + '" style="margin-left:4px;padding:2px 8px;border:1px solid var(--alarm-fg);background:#fff;color:var(--alarm-fg);border-radius:4px;cursor:pointer;font-weight:700;font-size:11px">🔓 Cho phép chạy tạm</button>' : '') +
+    (info.chan && !laQlbpDuc() ? '<span style="display:block;font-weight:500">Báo Quản lý bộ phận Đúc để bảo dưỡng hoặc cho phép chạy tạm.</span>' : '');
+  const btn = box.querySelector('[data-cho-phep-tam]');
+  if (btn) btn.onclick = async () => {
+    const lyDo = (prompt('Cho phép khuôn ' + mk + ' chạy tạm trên máy ' + maMay + ' (1 lần lên khuôn, hiệu lực 12 giờ).\nLý do:') || '').trim();
+    if (!lyDo) return;
+    const { data, error } = await sb.rpc('duc_khuon_cho_phep_chay_tam', { p_ma_khuon: mk, p_ma_may: maMay, p_ly_do: lyDo });
+    if (error || (data && data.ok === false)) return showToast('Lỗi: ' + (error ? error.message : data.error), true);
+    showToast('Đã cho phép khuôn ' + mk + ' chạy tạm trên ' + maMay);
+    await loadMoldBd();
+    renderMoldBdStatus(prefix);
+  };
+}
+// Chặn trước khi gửi (server cũng chặn): true = được lưu.
+function kiemTraKhuonBd(soKhuon){
+  const info = moldBdInfo(soKhuon, state.currentTarget ? state.currentTarget.ma_may : '');
+  if (!info.chan) return true;
+  showToast('Khuôn ' + soKhuon + ': ' + info.chiTiet + (laQlbpDuc() ? ' Bấm "Cho phép chạy tạm" nếu cần chạy gấp.' : ' Báo Quản lý bộ phận Đúc.'), true);
+  return false;
+}
+
 // Thứ tự ưu tiên khuôn trong cùng mã SP (T86, đặt ở quan-ly-khuon.html).
 function moldUuTien(maKhuon){
   const m = state.moldMap[String(maKhuon || '').trim()];
@@ -2568,7 +2640,8 @@ function moldBusyOn(maKhuon, maMay){
 // Khuôn mặc định = khuôn có ưu tiên cao nhất chưa chạy trên máy khác (và chưa
 // được chọn cho máy khác trong cùng đợt nạp - extraBusy). Không đặt ưu tiên -> ''.
 function pickDefaultMold(molds, maMay, extraBusy){
-  return sortMoldsByUuTien(molds).find(mk => moldUuTien(mk) && !moldBusyOn(mk, maMay) && !(extraBusy && extraBusy.has(mk))) || '';
+  const ung = sortMoldsByUuTien(molds).filter(mk => moldUuTien(mk) && !moldBusyOn(mk, maMay) && !(extraBusy && extraBusy.has(mk)));
+  return ung.find(mk => !moldBdInfo(mk, maMay).chan) || ung[0] || '';
 }
 function moldsDungDuocCuaSp(maSp){
   return ((maSp && state.moldsByProduct[maSp]) || []).filter(mk => !moldNgungSx(mk));
@@ -2626,7 +2699,8 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
     const ng = moldNgungSx(mk);
     const ut = moldUuTien(mk), busy = moldBusyOn(mk, maMay);
     opt.value = mk; opt.textContent = mk + (ut ? ' — ưu tiên ' + ut : '') + (busy ? ' — đang chạy ' + busy : '') +
-      (ng ? ' — ⛔ ' + ng : moldMoiChuaSx(mk) ? ' — 🆕 Khuôn mới (đúc mẫu)' : '');
+      (ng ? ' — ⛔ ' + ng : moldMoiChuaSx(mk) ? ' — 🆕 Khuôn mới (đúc mẫu)' : '') +
+      (ng ? '' : ' — ' + moldBdInfo(mk, maMay).nhan);
     sel.appendChild(opt);
   });
 
@@ -2639,10 +2713,12 @@ function populateSoKhuonField(prefix, maSp, currentValue, isExisting){
   hint.textContent = (molds.length === 1 ? 'Tự động chọn khuôn duy nhất của SP này. ' : '') +
     (macDinh ? 'Tự chọn theo thứ tự ưu tiên: ' + macDinh + ' (ưu tiên ' + moldUuTien(macDinh) + ')' +
       (boQua.length ? ' — bỏ qua ' + boQua.map(mk => mk + ' đang chạy ' + moldBusyOn(mk, maMay)).join(', ') : '') + '. ' : '') + ngungNote;
+  renderMoldBdStatus(prefix);
 }
 
 function onSoKhuonSelectChange(prefix){
   document.getElementById(prefix + '-so-khuon').value = document.getElementById(prefix + '-so-khuon-select').value;
+  renderMoldBdStatus(prefix);
 }
 
 // =============================================================================
@@ -2892,6 +2968,7 @@ async function submitPlan(){
   if (!maSp) return showToast('Nhập mã SP', true);
   if (!khCa || khCa <= 0) return showToast('Nhập KH ca hợp lệ', true);
   if (!soKhuon) return showToast('Chưa chọn số khuôn', true);
+  if (!kiemTraKhuonBd(soKhuon)) return;
 
   if (document.getElementById('mp-pair-toggle').checked) return submitPairedPlan(maSp, khCa, soKhuon);
 
@@ -3291,6 +3368,7 @@ async function submitChangeProduct(){
   if (!khCa || khCa <= 0) return showToast('Nhập KH ca cho SP mới', true);
   if (!gioBatDau) return showToast('Nhập giờ bắt đầu đổi khuôn', true);
   if (!soKhuon) return showToast('Chưa chọn số khuôn', true);
+  if (!kiemTraKhuonBd(soKhuon)) return;
 
   if (state.currentTarget.isPairOut) {
     return submitChangeProductPairOut(newMaSp, khCa, gioBatDau, soKhuon);
