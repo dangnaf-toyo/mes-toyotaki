@@ -24,6 +24,9 @@
   - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
     khuon-bao-duong rồi tự lưu nháp (không mất ảnh nếu thoát trang). Hoàn
     thành cần ≥1 ảnh mỗi loại, tối đa 10.
+  - Kết quả sau bảo dưỡng (T96): không còn hạng mục "7. Sau bảo dưỡng" — lấy
+    lần IPQC kiểm sản phẩm đầu khi khuôn lên máy (điểm kiểm đổi khuôn / sau
+    sự cố C3) đầu tiên sau giờ kết thúc bảo dưỡng, RPC duc_khuon_cs_ipqc_sau_bd.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -120,6 +123,11 @@ tr.row-ng td{background:#FFF5F5}
 .photo-thumb{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:#fff}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .photo-thumb .rm{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(15,23,42,.75);color:#fff;font-size:13px;cursor:pointer;line-height:24px;padding:0}
+.sau-bd{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.sau-bd .kq{font-size:15px;font-weight:800}
+.sau-bd .kq.OK{color:var(--run-fg)}.sau-bd .kq.CANH_BAO{color:var(--warn-fg)}.sau-bd .kq.NG{color:var(--alarm-fg)}
+.sau-bd .meta{color:var(--text-muted);font-size:12px}
+.sau-bd .ng span{display:inline-block;font-size:11px;background:var(--alarm-bg);color:var(--alarm-fg);border-radius:4px;padding:1px 6px;margin:2px 3px 0 0}
 .photo-empty{font-size:12px;color:var(--text-dim);font-style:italic;padding:6px 0}
 .photo-busy{font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px}
 @media (max-width:700px){.photo-cols{grid-template-columns:1fr}}
@@ -338,7 +346,14 @@ function render(){
     '<div class="print-only sign-row"><div>Người thực hiện</div><div>Người kiểm tra</div><div>Quản lý bộ phận</div></div>' +
     '</div>';
 
+  // T96: kết quả sau bảo dưỡng = IPQC kiểm sản phẩm đầu khi khuôn lên máy.
+  html += '<div class="card"><div class="card-title">Kết quả sau bảo dưỡng — IPQC kiểm sản phẩm đầu khi lên khuôn</div>' +
+    '<div class="sau-bd" id="sauBd">' + (done ? 'Đang tải...' :
+      '<span class="meta">Sau khi hoàn thành check sheet, kết quả IPQC kiểm sản phẩm đầu ở lần đầu tiên khuôn được lắp lên máy (đổi khuôn / sự cố C3) sẽ tự hiện ở đây — NV bảo dưỡng không cần chờ đúc thử.</span>') +
+    '</div></div>';
+
   document.getElementById('main').innerHTML = html;
+  if (done) loadSauBd();
   renderItems();
   renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
@@ -359,6 +374,38 @@ function itemsTheoMau(cu){
     return { nhom: m.nhom, noi_dung: m.noi_dung, tieu_chuan: m.tieu_chuan, rieng: !!m.ma_khuon,
       ket_qua: o ? o.ket_qua : null, ghi_chu: o ? o.ghi_chu || '' : '' };
   });
+}
+
+async function loadSauBd(){
+  const el = document.getElementById('sauBd');
+  const { data, error } = await sb.rpc('duc_khuon_cs_ipqc_sau_bd', { p_id_checksheet: cs.id });
+  if (!el) return;
+  if (error) { el.innerHTML = '<span class="meta">Lỗi tải kết quả IPQC: ' + escapeHtml(error.message) + '</span>'; return; }
+  const q = data && data.ipqc;
+  if (!q) {
+    el.innerHTML = '<span class="kq">⏳ Khuôn chưa lên máy</span><span class="meta">Chưa có lần lắp khuôn nào sau ' + fmtTs(data && data.moc) +
+      ' — kết quả sẽ tự hiện khi IPQC kiểm sản phẩm đầu.</span>';
+    return;
+  }
+  const kqLabel = { OK: '✅ OK', CANH_BAO: '⚠ CẢNH BÁO', NG: '❌ NG' };
+  const lenMay = 'Lên máy <b>' + escapeHtml(q.ma_may) + '</b> · ' + escapeHtml(q.ma_sp) + ' · ' + escapeHtml(q.ca || '') + ' — ' + fmtTs(q.thoi_diem_tao) +
+    (q.loai_kiem === 'sau_su_co' ? ' (sau sự cố C3 - Đổi khuôn)' : ' (đổi khuôn)');
+  let h;
+  if (q.trang_thai !== 'da_kiem') {
+    h = '<span class="kq">⏳ Chờ IPQC kiểm sản phẩm đầu</span><span class="meta">' + lenMay + ' · hạn kiểm ' + fmtTs(q.han_kiem) + '</span>';
+  } else {
+    h = '<span class="kq ' + escapeHtml(q.ket_qua) + '">' + (kqLabel[q.ket_qua] || escapeHtml(q.ket_qua)) + '</span>' +
+      '<span class="meta">' + lenMay + '</span>' +
+      '<span class="meta">IPQC kiểm: <b>' + escapeHtml(q.nguoi_kiem || '—') + '</b> lúc ' + fmtTs(q.thoi_diem_kiem) + '</span>' +
+      ((q.hang_muc_ng || []).length ? '<div class="ng">Hạng mục không đạt: ' + q.hang_muc_ng.map(x => '<span>' + escapeHtml(x) + '</span>').join('') + '</div>' : '') +
+      (q.ghi_chu ? '<span class="meta">Ghi chú IPQC: ' + escapeHtml(q.ghi_chu) + '</span>' : '') +
+      ((q.anh || []).length ? '<div class="photo-grid">' + q.anh.map(u => '<a class="photo-thumb" href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>' : '') +
+      (q.ket_qua === 'NG' ? '<span class="meta" style="color:var(--alarm-fg)">Sản phẩm đầu NG sau bảo dưỡng — xem xử lý ở màn hình Vấn đề khuôn.</span>' : '');
+  }
+  if (q.cach_khop === 'tem' && (q.khuon_khac || []).length) {
+    h += '<span class="meta">Xác định khuôn theo tem cùng ngày / máy / mã SP — cùng lúc còn khuôn ' + q.khuon_khac.map(escapeHtml).join(', ') + ', cần đối chiếu.</span>';
+  }
+  el.innerHTML = h;
 }
 
 function info(k, v){ return '<div><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; }
