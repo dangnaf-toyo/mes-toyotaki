@@ -339,8 +339,11 @@ function render(){
     '<div class="fg"><label>Chi phí (VNĐ)</label><input type="number" id="f-chi-phi" min="0" step="1000" value="' + (cs && cs.chi_phi != null ? cs.chi_phi : '') + '"' + dis + '></div>' +
     '<div class="fg wide"><label>Ghi chú chung</label><textarea id="f-ghi-chu" maxlength="1000"' + dis + '>' + escapeHtml(cs ? cs.ghi_chu : '') + '</textarea></div>' +
     '<div class="fg wide"><label>Kết luận khuôn</label><div class="kl">' +
-      '<button type="button" class="dat' + (ketLuan === 'dat' ? ' on' : '') + '" data-kl="dat"' + dis + '>✅ ĐẠT — khuôn sẵn sàng sản xuất</button>' +
-      '<button type="button" class="khong_dat' + (ketLuan === 'khong_dat' ? ' on' : '') + '" data-kl="khong_dat"' + dis + '>❌ KHÔNG ĐẠT — cần xử lý tiếp</button>' +
+      // Đã hoàn thành: chỉ hiện kết luận đã chọn.
+      (done && ketLuan !== 'dat' ? '' :
+        '<button type="button" class="dat' + (ketLuan === 'dat' ? ' on' : '') + '" data-kl="dat"' + dis + '>✅ ĐẠT — khuôn sẵn sàng sản xuất</button>') +
+      (done && ketLuan !== 'khong_dat' ? '' :
+        '<button type="button" class="khong_dat' + (ketLuan === 'khong_dat' ? ' on' : '') + '" data-kl="khong_dat"' + dis + '>❌ KHÔNG ĐẠT — cần xử lý tiếp</button>') +
     '</div></div></div>' +
     (canEdit ? '<div class="actions no-print" style="margin-top:12px"><span class="hint">Hoàn thành sẽ ghi vào sổ đời khuôn' +
       (['Bảo dưỡng định kỳ','Thay khuôn mới'].includes(kh.loai) ? ' và reset bộ đếm shot nếu ĐẠT' : '') + ' — sau đó không sửa được nữa.</span>' +
