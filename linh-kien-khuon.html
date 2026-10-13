@@ -229,8 +229,8 @@ tr.off td{color:var(--text-dim)}
     <div id="dKetQua"></div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Mã LK</th><th>Tên</th><th>Loại</th><th>Phạm vi</th><th>Quy cách</th><th>Vật liệu</th><th>Bản vẽ / catalog</th><th>Nhà cung cấp</th>
-        <th class="num">Lead time (ngày)</th><th class="num">Tuổi thọ (shot)</th><th>Sửa được</th><th>ĐV</th><th>Vị trí kho</th><th class="num">Tồn tối thiểu</th><th></th></tr></thead>
-      <tbody id="tbDm"><tr><td colspan="15" class="empty">Đang tải...</td></tr></tbody>
+        <th class="num">Lead time (ngày)</th><th class="num">Tuổi thọ (shot)</th><th>Sửa được</th><th>ĐV</th><th>Vị trí kho</th><th class="num">Tồn tối thiểu</th><th class="num">Tồn tối đa</th><th></th></tr></thead>
+      <tbody id="tbDm"><tr><td colspan="16" class="empty">Đang tải...</td></tr></tbody>
     </table></div>
   </section>
 
@@ -295,6 +295,10 @@ tr.off td{color:var(--text-dim)}
       <div class="row2">
         <div class="fg"><label>Vị trí lưu kho</label><input id="lk-vi-tri" placeholder="VD: Tủ A - ngăn 3"></div>
         <div class="fg"><label>Tồn tối thiểu</label><input type="number" id="lk-min" min="0" step="1"><div class="sub">Với linh kiện riêng có thể để 0 — mức tối thiểu lấy theo dự phòng tối thiểu từng khuôn.</div></div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Tồn tối đa</label><input type="number" id="lk-max" min="0" step="1"><div class="sub">Mức tồn cao nhất khi đặt hàng / xin cấp. Để trống nếu chưa đặt.</div></div>
+        <div class="fg"></div>
       </div>
       <div class="fg"><label>Ghi chú</label><textarea id="lk-ghi-chu"></textarea></div>
       <div class="ck-row"><label class="ck-row"><input type="checkbox" id="lk-sua"> Sửa / tái sử dụng được</label></div>
@@ -556,7 +560,8 @@ function renderTon(){
       '<td>' + khuonChips(x) + '</td>' +
       '<td class="num csd">' + fmtNum(x.ton_cho_su_dung) + ' <small>' + escapeHtml(x.don_vi) + '</small></td>' +
       '<td class="num">' + fmtNum(x.ton_cho_sua) + '</td>' +
-      '<td class="num">' + fmtNum(min) + (isThieu(x) ? ' <span class="tag thieu">thiếu ' + fmtNum(min - Number(x.ton_cho_su_dung)) + '</span>' : '') + '</td>' +
+      '<td class="num">' + fmtNum(min) + (isThieu(x) ? ' <span class="tag thieu">thiếu ' + fmtNum(min - Number(x.ton_cho_su_dung)) + '</span>' : '') +
+        (x.ton_toi_da != null ? '<small>tối đa ' + fmtNum(x.ton_toi_da) + '</small>' : '') + '</td>' +
       '<td>' + escapeHtml(x.vi_tri_kho || '—') + '</td>' +
       '<td class="act">' + (canThay() ? '<button type="button" class="btn btn-outline btn-sm" data-gd="' + x.id + '">📝 Ghi phiếu</button> ' : '') +
         '<a class="btn btn-outline btn-sm" href="?tab=lich-su&lk=' + x.id + '" data-ls="' + x.id + '">🕘</a></td></tr>';
@@ -607,12 +612,13 @@ function renderDm(){
   const q = document.getElementById('dSearch').value.trim().toLowerCase();
   const list = dm.filter(x => !q || [x.ma_lk, x.ten_lk, x.quy_cach, x.vat_lieu, x.ban_ve, x.nha_cung_cap].some(v => String(v || '').toLowerCase().includes(q)));
   const tb = document.getElementById('tbDm');
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="15" class="empty">' + (dm.length ? 'Không có linh kiện khớp' : 'Chưa có linh kiện nào' + (canQL() ? ' — bấm ＋ Thêm linh kiện, hoặc tải file Excel mẫu, điền rồi ⬆ Nhập từ Excel.' : '.')) + '</td></tr>'; return; }
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="16" class="empty">' + (dm.length ? 'Không có linh kiện khớp' : 'Chưa có linh kiện nào' + (canQL() ? ' — bấm ＋ Thêm linh kiện, hoặc tải file Excel mẫu, điền rồi ⬆ Nhập từ Excel.' : '.')) + '</td></tr>'; return; }
   tb.innerHTML = list.map(x => '<tr class="' + (x.dang_dung ? '' : 'off') + '"><td class="mk">' + escapeHtml(x.ma_lk) + '</td><td>' + escapeHtml(x.ten_lk) + (x.dang_dung ? '' : '<small>Ngừng dùng</small>') + '</td>' +
     '<td>' + escapeHtml(LOAI[x.loai] || x.loai) + '</td><td><span class="tag ' + x.pham_vi + '">' + PHAM_VI[x.pham_vi] + '</span></td>' +
     '<td>' + escapeHtml(x.quy_cach) + '</td><td>' + escapeHtml(x.vat_lieu) + '</td><td>' + escapeHtml(x.ban_ve) + '</td><td>' + escapeHtml(x.nha_cung_cap) + '</td>' +
     '<td class="num">' + fmtNum(x.lead_time_ngay) + '</td><td class="num">' + fmtNum(x.tuoi_tho_shot) + '</td><td>' + (x.sua_duoc ? '✓' : '') + '</td>' +
     '<td>' + escapeHtml(x.don_vi) + '</td><td>' + escapeHtml(x.vi_tri_kho) + '</td><td class="num">' + fmtNum(x.ton_toi_thieu) + '</td>' +
+    '<td class="num">' + (x.ton_toi_da != null ? fmtNum(x.ton_toi_da) : '') + '</td>' +
     '<td class="act">' + (canQL() ? '<button type="button" class="btn btn-outline btn-sm" data-sualk="' + x.id + '">✏ Sửa</button>' : '') + '</td></tr>').join('');
 }
 // ── Quy tắc đặt mã ───────────────────────────────────────────────────────────
@@ -673,7 +679,7 @@ function openLk(id){
   set('lk-ma', x && x.ma_lk); set('lk-ten', x && x.ten_lk); set('lk-loai', x ? x.loai : 'insert'); set('lk-pham-vi', x ? x.pham_vi : 'rieng');
   set('lk-quy-cach', x && x.quy_cach); set('lk-vat-lieu', x && x.vat_lieu); set('lk-ban-ve', x && x.ban_ve); set('lk-ncc', x && x.nha_cung_cap);
   set('lk-lead', x && x.lead_time_ngay); set('lk-tuoi-tho', x && x.tuoi_tho_shot); set('lk-dv', x ? x.don_vi : 'cái');
-  set('lk-vi-tri', x && x.vi_tri_kho); set('lk-min', x ? x.ton_toi_thieu : 0); set('lk-ghi-chu', x && x.ghi_chu);
+  set('lk-vi-tri', x && x.vi_tri_kho); set('lk-min', x ? x.ton_toi_thieu : 0); set('lk-max', x && x.ton_toi_da); set('lk-ghi-chu', x && x.ghi_chu);
   document.getElementById('lk-sua').checked = !!(x && x.sua_duoc);
   document.getElementById('lk-dung').checked = !x || x.dang_dung;
   document.getElementById('lk-del').hidden = !x;
@@ -686,9 +692,10 @@ async function saveLk(btn){
   const data = { id: lkEditing ? lkEditing.id : null, ma_lk: v('lk-ma'), ten_lk: v('lk-ten'), loai: v('lk-loai'), pham_vi: v('lk-pham-vi'),
     quy_cach: v('lk-quy-cach'), vat_lieu: v('lk-vat-lieu'), ban_ve: v('lk-ban-ve'), nha_cung_cap: v('lk-ncc'),
     lead_time_ngay: v('lk-lead'), tuoi_tho_shot: v('lk-tuoi-tho'), don_vi: v('lk-dv'), vi_tri_kho: v('lk-vi-tri'),
-    ton_toi_thieu: v('lk-min'), ghi_chu: v('lk-ghi-chu'),
+    ton_toi_thieu: v('lk-min'), ton_toi_da: v('lk-max'), ghi_chu: v('lk-ghi-chu'),
     sua_duoc: document.getElementById('lk-sua').checked, dang_dung: document.getElementById('lk-dung').checked };
   if (!data.ma_lk || !data.ten_lk) return showMsg('Nhập mã và tên linh kiện', 'err');
+  if (data.ton_toi_da !== '' && Number(data.ton_toi_da) < Number(data.ton_toi_thieu || 0)) return showMsg('Tồn tối đa phải ≥ tồn tối thiểu', 'err');
   data.ma_lk = data.ma_lk.toUpperCase();
   const loiMa = maHopLe(data.ma_lk, data.loai, data.pham_vi);
   if (loiMa && !(lkEditing && lkEditing.ma_lk === data.ma_lk) &&
@@ -712,14 +719,14 @@ async function delLk(){
 
 // ── Excel ─────────────────────────────────────────────────────────────────────
 const X_DM = ['Mã LK *', 'Tên LK *', 'Loại *', 'Phạm vi *', 'Quy cách', 'Vật liệu / xử lý', 'Số bản vẽ / mã catalog', 'Nhà cung cấp',
-  'Lead time (ngày)', 'Tuổi thọ (shot)', 'Sửa được (C/K)', 'Đơn vị', 'Vị trí kho', 'Tồn tối thiểu', 'Tồn đầu kỳ'];
+  'Lead time (ngày)', 'Tuổi thọ (shot)', 'Sửa được (C/K)', 'Đơn vị', 'Vị trí kho', 'Tồn tối thiểu', 'Tồn tối đa', 'Tồn đầu kỳ'];
 const X_GAN = ['Mã khuôn *', 'Mã LK *', 'SL lắp', 'Vị trí lắp', 'Dự phòng tối thiểu', 'Ghi chú'];
 function taiMau(){
   const wb = XLSX.utils.book_new();
   const dmRows = [X_DM, ...dm.map(x => [x.ma_lk, x.ten_lk, LOAI[x.loai] || x.loai, x.pham_vi === 'chung' ? 'Chung' : 'Riêng', x.quy_cach, x.vat_lieu, x.ban_ve,
-    x.nha_cung_cap, x.lead_time_ngay ?? '', x.tuoi_tho_shot ?? '', x.sua_duoc ? 'C' : 'K', x.don_vi, x.vi_tri_kho, Number(x.ton_toi_thieu) || 0, ''])];
-  if (!dm.length) dmRows.push(['INS-TTI-MOT-02-01', 'Insert lòng 1 tấm di động – TTI-MOT-02', 'Insert tạo hình', 'Riêng', '', 'SKD61', 'BV-9002-11', '', 30, 50000, 'C', 'cái', 'Tủ A-1', 0, 2],
-    ['EJP-D06-L150', 'Ejector pin Ø6×150', 'Ejector pin', 'Chung', 'Ø6×150', 'SKD61', 'Misumi EPH6-150', 'Misumi', 7, '', 'K', 'cái', 'Tủ B-2', 20, 50]);
+    x.nha_cung_cap, x.lead_time_ngay ?? '', x.tuoi_tho_shot ?? '', x.sua_duoc ? 'C' : 'K', x.don_vi, x.vi_tri_kho, Number(x.ton_toi_thieu) || 0, x.ton_toi_da ?? '', ''])];
+  if (!dm.length) dmRows.push(['INS-TTI-MOT-02-01', 'Insert lòng 1 tấm di động – TTI-MOT-02', 'Insert tạo hình', 'Riêng', '', 'SKD61', 'BV-9002-11', '', 30, 50000, 'C', 'cái', 'Tủ A-1', 0, 3, 2],
+    ['EJP-D06-L150', 'Ejector pin Ø6×150', 'Ejector pin', 'Chung', 'Ø6×150', 'SKD61', 'Misumi EPH6-150', 'Misumi', 7, '', 'K', 'cái', 'Tủ B-2', 20, 60, 50]);
   const ganRows = [X_GAN, ...gan.map(g => { const lk = lkById(g.id_lk); return [g.ma_khuon, lk ? lk.ma_lk : '', Number(g.so_luong_lap), g.vi_tri_lap, Number(g.du_phong_toi_thieu) || 0, g.ghi_chu]; })];
   if (!gan.length) ganRows.push(['9002 #2', 'INS-TTI-MOT-02-01', 1, 'Lòng 1 - tấm di động', 1, ''], ['9002 #2', 'EJP-D06-L150', 12, 'Tấm đẩy', 0, '']);
   const huongDan = [['Hướng dẫn'], [''],
@@ -756,12 +763,17 @@ async function nhapExcel(file){
     const s1 = sheet('Danh mục'), s2 = sheet('Gán khuôn');
     if (!s1 && !s2) throw new Error('File không có sheet "Danh mục" / "Gán khuôn" — hãy dùng file mẫu tải từ trang này');
     const str = v => String(v ?? '').trim();
+    const hdr = (s1 && s1[0] || []).map(h => str(h).toLowerCase());
+    const iMax = hdr.findIndex(h => h.startsWith('tồn tối đa'));
+    const iDk = hdr.findIndex(h => h.startsWith('tồn đầu kỳ'));
+    const cDk = iDk >= 0 ? iDk : 14;
     const pDm = (s1 || []).slice(1).filter(r => r.some(c => str(c))).map(r => ({
       ma_lk: str(r[0]), ten_lk: str(r[1]), loai: parseLoai(r[2]), pham_vi: /chung/i.test(str(r[3])) ? 'chung' : 'rieng',
       quy_cach: str(r[4]), vat_lieu: str(r[5]), ban_ve: str(r[6]), nha_cung_cap: str(r[7]),
       lead_time_ngay: str(r[8]).replace(/[^\d]/g, ''), tuoi_tho_shot: str(r[9]).replace(/[^\d]/g, ''),
       sua_duoc: parseBool(r[10]), don_vi: str(r[11]) || 'cái', vi_tri_kho: str(r[12]),
-      ton_toi_thieu: str(r[13]).replace(/[^\d.]/g, ''), ton_dau_ky: str(r[14]).replace(/[^\d.]/g, ''), dang_dung: true }));
+      ton_toi_thieu: str(r[13]).replace(/[^\d.]/g, ''), ton_dau_ky: str(r[cDk]).replace(/[^\d.]/g, ''), dang_dung: true,
+      ...(iMax >= 0 ? { ton_toi_da: str(r[iMax]).replace(/[^\d.]/g, '') } : {}) }));
     const pGan = (s2 || []).slice(1).filter(r => r.some(c => str(c))).map(r => ({
       ma_khuon: str(r[0]), ma_lk: str(r[1]), so_luong_lap: str(r[2]).replace(/[^\d.]/g, ''), vi_tri_lap: str(r[3]),
       du_phong_toi_thieu: str(r[4]).replace(/[^\d.]/g, ''), ghi_chu: str(r[5]) }));
