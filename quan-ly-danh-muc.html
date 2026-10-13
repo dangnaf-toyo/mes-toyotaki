@@ -453,49 +453,88 @@ function toast(text, isErr){
 }
 const DASH = '<span class="muted">—</span>';
 
-const NVL_STORAGE_KEY = 'toyotaki-material-catalog-v1';
-const nvlSeedRows = [
-  { supplier: 'Daikin', name: 'Nhôm', code: 'HD2- ADC12', toyotakiCode: 'K-NHN-12-001', customer: 'FCC', product: 'K09,HPH,KFM,Pressure' },
-  { supplier: 'Chiến thắng', name: 'Nhôm', code: 'ADC 12', toyotakiCode: 'K-NHN-12-002', customer: 'Exedy,Ghế okaya,TTI', product: 'Center/plat/pply/ outer' },
-  { supplier: 'Tân Quang', name: 'Nhôm', code: 'ADC 12', toyotakiCode: 'K-NHN-12-003', customer: 'Khác', product: '9001/9002/8001/8002....' },
-  { supplier: 'Honda trading', name: 'Nhôm', code: 'HD2- BS1', toyotakiCode: 'K-NHN-S1-001', customer: 'ASTEMO, Fomeco', product: 'Fr' },
-  { supplier: 'Nhôm thái lan', name: 'Nhôm', code: 'ADC 12', toyotakiCode: 'K-NHN-12-004', customer: 'Exedy', product: 'Center/plat/pply/ outer' },
-  { supplier: 'Honda trading', name: 'Nhôm', code: 'ADC 6', toyotakiCode: 'K-NHN-06-001', customer: 'Iwatani', product: '118,119' },
-  { supplier: 'Honda trading', name: 'Kẽm', code: 'EZDA3', toyotakiCode: 'K-KEN-A3-001', customer: 'Exedy', product: '3B54,53,69' },
-  { supplier: 'Metal', name: 'Kẽm', code: 'EZDA3-Metal', toyotakiCode: 'K-KEN-A3-002', customer: 'Bảo Phương', product: '3B54,53,69' },
-  { supplier: 'Astemo', name: 'Pin Brake', code: '008-D39-117', toyotakiCode: 'C-PIN-39-001', customer: 'Astemo', product: 'Fr' },
-  { supplier: 'Astemo', name: 'Sleev Brake', code: '008-D19-126', toyotakiCode: 'C-BAC-19-001', customer: 'Astemo', product: 'Fr' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài S', code: '27L024 - 002P01', toyotakiCode: 'C-ONN-OS-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài L', code: '27L025 - 001P01', toyotakiCode: 'C-ONN-OL-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài LL', code: '27L026 - 001P01', toyotakiCode: 'C-ONN-LL-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài SS', code: '27L031 - 003P01', toyotakiCode: 'C-ONN-SS-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài S (Không đục lỗ)', code: '27L024 - 002P01A', toyotakiCode: 'C-ONN-OS-002', customer: 'Ghế okaya', product: 'Nòng khuôn' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài L (Không đục lỗ)', code: '27L025 - 001P01A', toyotakiCode: 'C-ONN-OL-002', customer: 'Ghế okaya', product: 'Nòng khuôn' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài LL (Không đục lỗ)', code: '27L026 - 001P01A', toyotakiCode: 'C-ONN-LL-002', customer: 'Ghế okaya', product: 'Nòng khuôn' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía ngoài SS (Không đục lỗ)', code: '27L031 - 002P01A', toyotakiCode: 'C-ONN-SS-002', customer: 'Ghế okaya', product: 'Nòng khuôn' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía Trong S', code: '0395049-249', toyotakiCode: 'C-ONT-OS-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía Trong L', code: '0395049-250', toyotakiCode: 'C-ONT-OL-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Việt pháp', name: 'Ống nhôm phía Trong LL', code: '0395049-251', toyotakiCode: 'C-ONT-LL-001', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'BRT/Ming ann', name: 'Chốt kim loại', code: '0395049-229', toyotakiCode: 'C-CKL-29-001', customer: 'Ghế okaya', product: 'Xuất khẩu' },
-  { supplier: 'Thời Đại', name: 'Sơn bột tĩnh điện', code: 'EA212-80', toyotakiCode: 'S-BOT-TR-002', customer: 'Ghế okaya', product: 'Ghế okaya' },
-  { supplier: 'Thời Đại', name: 'Sơn bột tĩnh điện', code: 'EA11129', toyotakiCode: 'S-BOT-TR-001', customer: 'SVP', product: 'Lock, Bản lề, đinh vít' },
-  { supplier: 'Thời Đại', name: 'Sơn bột tĩnh điện', code: 'ME010V', toyotakiCode: 'S-BOT-CA-001', customer: 'Iwatani', product: '114' },
-];
-let nvlRows = nvlSeedRows.map(row => ({ ...row }));
+const LEGACY_NVL_STORAGE_KEY = 'toyotaki-material-catalog-v1';
+let nvlRows = [];
 let nvlSortKey = 'supplier', nvlSortDir = 1;
-function loadNvlRows(){
+async function importLegacyNvlRows(existingRows){
+  let legacyRows;
   try {
-    const saved = localStorage.getItem(NVL_STORAGE_KEY);
-    const keys = ['supplier', 'name', 'code', 'toyotakiCode', 'customer', 'product'];
-    const rows = saved === null ? null : JSON.parse(saved);
-    if (Array.isArray(rows) && rows.every(row => row && keys.every(key => typeof row[key] === 'string'))) nvlRows = rows;
-  } catch(e){}
+    const saved = localStorage.getItem(LEGACY_NVL_STORAGE_KEY);
+    if (saved === null) return 0;
+    legacyRows = JSON.parse(saved);
+  } catch(e){ return null; }
+  const keys = ['supplier', 'name', 'code', 'toyotakiCode', 'customer', 'product'];
+  if (!Array.isArray(legacyRows) || !legacyRows.every(row => row && keys.every(key => typeof row[key] === 'string'))) return null;
+  const existingCodes = new Set(existingRows.map(row => row.ma_nvl.toLocaleLowerCase('vi')));
+  let imported = 0;
+  for (const row of legacyRows){
+    const code = row.toyotakiCode.trim();
+    if (!code || existingCodes.has(code.toLocaleLowerCase('vi'))) continue;
+    const { data, error } = await sb.rpc('nvl_catalog_upsert', {
+      p_ma_nvl: code,
+      p_ten_nvl: row.name,
+      p_nha_cung_cap: row.supplier,
+      p_ma_nvl_ncc: row.code,
+      p_khach_hang: row.customer,
+      p_san_pham: row.product,
+    });
+    if (error || data?.ok === false){
+      toast('Chưa chuyển hết danh mục NVL cũ: ' + (error?.message || data?.error || 'Không thể lưu dữ liệu.'), true);
+      return null;
+    }
+    existingCodes.add(code.toLocaleLowerCase('vi'));
+    imported++;
+  }
+  try { localStorage.removeItem(LEGACY_NVL_STORAGE_KEY); }
+  catch(e){ toast('Đã đồng bộ danh mục nhưng không xóa được bản lưu cũ trên trình duyệt.', true); }
+  return imported;
 }
-function saveNvlRows(rows){
-  try { localStorage.setItem(NVL_STORAGE_KEY, JSON.stringify(rows)); }
-  catch(e){ toast('Không lưu được thay đổi trên trình duyệt này.', true); return false; }
-  nvlRows = rows;
+async function loadNvlRows(){
+  let { data, error } = await sb.from('nvl_materials')
+    .select('ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham')
+    .order('nha_cung_cap').order('ma_nvl');
+  if (error){ toast('Không tải được danh mục nguyên vật liệu: ' + error.message, true); return; }
+  const imported = await importLegacyNvlRows(data || []);
+  if (imported){
+    const refreshed = await sb.from('nvl_materials')
+      .select('ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham')
+      .order('nha_cung_cap').order('ma_nvl');
+    if (refreshed.error){ toast('Không tải được danh mục nguyên vật liệu: ' + refreshed.error.message, true); return; }
+    data = refreshed.data;
+  }
+  nvlRows = (data || []).map(row => ({
+    supplier: row.nha_cung_cap || '',
+    name: row.ten_nvl || '',
+    code: row.ma_nvl_ncc || '',
+    toyotakiCode: row.ma_nvl || '',
+    customer: row.khach_hang || '',
+    product: row.san_pham || '',
+  }));
   renderNvlTable();
+}
+async function saveNvlRow(row){
+  const { data, error } = await sb.rpc('nvl_catalog_upsert', {
+    p_ma_nvl: row.toyotakiCode,
+    p_ten_nvl: row.name,
+    p_nha_cung_cap: row.supplier,
+    p_ma_nvl_ncc: row.code,
+    p_khach_hang: row.customer,
+    p_san_pham: row.product,
+  });
+  if (error || data?.ok === false){
+    showMsg('nvl-msg', 'error', error?.message || data?.error || 'Không thể lưu nguyên vật liệu.');
+    return false;
+  }
+  await loadNvlRows();
+  return true;
+}
+async function deleteNvlRow(row){
+  const { data, error } = await sb.rpc('nvl_catalog_delete', { p_ma_nvl: row.toyotakiCode });
+  if (error || data?.ok === false){
+    toast(error?.message || data?.error || 'Không thể xóa nguyên vật liệu.', true);
+    return false;
+  }
+  await loadNvlRows();
   return true;
 }
 function renderNvlTable(){
@@ -547,6 +586,7 @@ function openNvlEdit(index){
   document.getElementById('nvl-name').value = row.name;
   document.getElementById('nvl-code').value = row.code;
   document.getElementById('nvl-toyotaki-code').value = row.toyotakiCode;
+  document.getElementById('nvl-toyotaki-code').readOnly = true;
   document.getElementById('nvl-customer').value = row.customer;
   document.getElementById('nvl-product').value = row.product;
   openModal('nvl-modal');
@@ -557,6 +597,7 @@ nvlModal.addEventListener('click', e => { if (e.target === nvlModal) nvlModal._c
 nvlModal.querySelector('[data-close-modal]').addEventListener('click', nvlModal._close);
 document.getElementById('nvl-add').addEventListener('click', () => {
   resetNvlForm();
+  document.getElementById('nvl-toyotaki-code').readOnly = false;
   openModal('nvl-modal');
 });
 document.getElementById('nvl-tbody').addEventListener('click', e => {
@@ -567,9 +608,9 @@ document.getElementById('nvl-tbody').addEventListener('click', e => {
   if (button.dataset.nvlAction === 'edit') return openNvlEdit(index);
   const row = nvlRows[index];
   if (!confirm('Xóa nguyên vật liệu "' + row.toyotakiCode + '"?')) return;
-  if (saveNvlRows(nvlRows.filter((_, rowIndex) => rowIndex !== index))) toast('Đã xóa ' + row.toyotakiCode);
+  deleteNvlRow(row).then(ok => { if (ok) toast('Đã xóa ' + row.toyotakiCode); });
 });
-document.getElementById('nvl-form').addEventListener('submit', e => {
+document.getElementById('nvl-form').addEventListener('submit', async e => {
   e.preventDefault();
   if (nvlEditingIndex !== null && !nvlRows[nvlEditingIndex]) return;
   const row = {
@@ -584,8 +625,10 @@ document.getElementById('nvl-form').addEventListener('submit', e => {
     return showMsg('nvl-msg', 'error', 'Mã NVL hệ thống Toyotaki đã tồn tại.');
   }
   const isNew = nvlEditingIndex === null;
-  const nextRows = isNew ? [...nvlRows, row] : nvlRows.map((item, index) => index === nvlEditingIndex ? row : item);
-  if (!saveNvlRows(nextRows)) return;
+  const button = document.getElementById('nvl-submit');
+  button.disabled = true;
+  if (!await saveNvlRow(row)){ button.disabled = false; return; }
+  button.disabled = false;
   nvlModal._close();
   toast((isNew ? 'Đã thêm ' : 'Đã lưu ') + row.toyotakiCode);
 });
@@ -1152,8 +1195,7 @@ async function main(){
   catalogs.sp.reload();
   catalogs.ns.reload();
   catalogs.khuon.reload();
-  loadNvlRows();
-  renderNvlTable();
+  await loadNvlRows();
   loadDocPermissions();
 }
 
