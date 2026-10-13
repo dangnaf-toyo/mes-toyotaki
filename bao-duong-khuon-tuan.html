@@ -3,14 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kế hoạch bảo dưỡng khuôn tuần — TOYOTAKI</title>
+<title>Dashboard tổ khuôn — TOYOTAKI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
-  bao-duong-khuon-tuan.html — kế hoạch bảo dưỡng khuôn tuần dạng lưới
-  Khuôn × Ngày (giống KHSX tuần), 1 màn hình:
+  bao-duong-khuon-tuan.html — DASHBOARD TỔ KHUÔN (T103):
+    - Công việc theo kế hoạch: KH bảo dưỡng khuôn tuần (bên dưới).
+    - Công việc không theo kế hoạch: xử lý bất thường từ sự cố A2 (khuôn),
+      B1 (chất lượng SP), F1 (IPQC NG) — RPC duc_khuon_xlbt_danh_sach /
+      duc_khuon_xlbt_luu, phiếu ở duc_khuon_xu_ly_bat_thuong (tách riêng sự
+      cố: hoàn thành KHÔNG đóng sự cố), ảnh dùng chung duc_su_co_anh (T87).
+  KH bảo dưỡng khuôn tuần dạng lưới Khuôn × Ngày (giống KHSX tuần):
     - Lưới chính: mỗi ô = khuôn X bảo dưỡng ngày Y, loại việc + người thao
       tác chịu trách nhiệm. Lưu ở duc_khuon_bd_kh_tuan (T74).
     - Bảng "Phân công theo người": người × ngày → các khuôn phải làm.
@@ -171,6 +176,25 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 .log-item .lh{display:flex;justify-content:space-between;gap:8px;font-weight:700}
 .log-item .lm{color:var(--text-muted);font-weight:500}
 .log-item .lr{color:var(--accent-hover);font-style:italic}
+/* Xử lý bất thường (T103) */
+.tabs{display:inline-flex;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;text-transform:none;letter-spacing:0}
+.tabs button{border:none;background:#fff;padding:4px 10px;font:inherit;font-size:11.5px;font-weight:700;color:var(--text-muted);cursor:pointer}
+.tabs button.on{background:var(--accent);color:#fff}
+.xl-sel{border:1.5px solid var(--border-strong);border-radius:6px;padding:3px 6px;font:inherit;font-size:11.5px;text-transform:none;letter-spacing:0}
+#tblXl td{font-size:12px}
+#tblXl tr.xl-row{cursor:pointer}
+#tblXl tr.xl-row:hover td{background:#EFF6FF}
+#tblXl td.vd{min-width:180px;max-width:320px}
+#tblXl td.vd small{display:block;color:var(--text-muted);font-size:10.5px}
+.loai{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.loai.A2{background:#FCE7F3;color:#9F1239}.loai.B1{background:#FFF7ED;color:#C2410C}.loai.F1{background:#EDE9FE;color:#5B21B6}
+.mst{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:100px;white-space:nowrap}
+.mst.dung{background:var(--alarm-bg);color:var(--alarm-fg)}.mst.chay{background:var(--run-bg);color:var(--run-fg)}
+.xst{font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;display:inline-block}
+.xst.cho{background:var(--alarm-bg);color:var(--alarm-fg)}.xst.dang{background:var(--warn-bg);color:var(--warn-fg)}.xst.xong{background:var(--run-bg);color:var(--run-fg)}
+.fg textarea{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%;min-height:64px;resize:vertical}
+.fg .row2{display:flex;gap:6px}.fg .row2 input{flex:1}
+.btn-now{border:1px solid var(--border-strong);background:var(--bg-sunken);border-radius:6px;padding:0 8px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
 @media (max-width:700px){.modal-body{grid-template-columns:1fr}.tbl-wrap{max-height:none}}
 </style>
 </head>
@@ -182,7 +206,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
   <header>
     <div class="brand">
       <div class="co">Toyotaki</div>
-      <div class="title">KH bảo dưỡng khuôn</div>
+      <div class="title">Dashboard tổ khuôn</div>
     </div>
     <div class="header-divider"></div>
     <div class="week-nav">
@@ -219,7 +243,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 
   <div class="card">
     <div class="card-title">
-      Lịch bảo dưỡng theo khuôn
+      Công việc theo kế hoạch — lịch bảo dưỡng theo khuôn
       <span class="ro-note" id="roNote"></span>
       <div class="legend">
         <span><i class="lg-box" style="background:#E0EDFA;border-left:3px solid var(--accent)"></i>Kế hoạch</span>
@@ -240,6 +264,18 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
     <div class="card-title">Phân công theo người thao tác</div>
     <div class="tbl-wrap" style="max-height:none;min-height:0">
       <table id="tblNguoi"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="card" id="cardXl">
+    <div class="card-title">
+      Công việc không theo kế hoạch — xử lý bất thường (A2 · B1 · F1)
+      <div class="tabs" id="xlTabs"><button type="button" data-tab="can" class="on">Cần xử lý</button><button type="button" data-tab="ls">Đã xong trong tuần đang xem</button></div>
+      <select class="xl-sel" id="xlLoai"><option value="">Tất cả loại</option><option value="A2">A2 · Sự cố khuôn</option><option value="B1">B1 · Chất lượng SP</option><option value="F1">F1 · IPQC NG</option></select>
+      <span class="ro-note" id="xlNote"></span>
+    </div>
+    <div class="tbl-wrap" style="max-height:none;min-height:0">
+      <table id="tblXl"><thead><tr><th>Mã sự cố</th><th>Loại</th><th>Máy</th><th>Khuôn / SP</th><th>Phát sinh</th><th>Vấn đề</th><th>Máy SX</th><th>Tổ khuôn xử lý</th><th>Đảm nhiệm</th><th>Bắt đầu → Kết thúc</th><th>Ảnh</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 
@@ -296,9 +332,51 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
   </div>
 </div>
 
+<div class="modal-mask" id="modalXl">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="xlTitle">Xử lý bất thường</div>
+      <button class="modal-close" type="button" onclick="closeXl()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-box full" id="xl-info"></div>
+      <div class="fg">
+        <label>Đảm nhiệm chính</label>
+        <select id="xl-chinh"></select>
+      </div>
+      <div class="fg">
+        <label>Đảm nhiệm phụ (không bắt buộc)</label>
+        <select id="xl-phu"></select>
+      </div>
+      <div class="fg">
+        <label>Bắt đầu xử lý</label>
+        <div class="row2"><input type="datetime-local" id="xl-bd"><button type="button" class="btn-now" data-now="xl-bd">Bây giờ</button></div>
+      </div>
+      <div class="fg">
+        <label>Kết thúc xử lý</label>
+        <div class="row2"><input type="datetime-local" id="xl-kt"><button type="button" class="btn-now" data-now="xl-kt">Bây giờ</button></div>
+      </div>
+      <div class="fg full">
+        <label>Nguyên nhân / nội dung xử lý</label>
+        <textarea id="xl-nd" maxlength="1000" placeholder="VD: đánh bóng lòng khuôn, thay ty đẩy gãy…"></textarea>
+      </div>
+      <div class="full" id="xl-anh-truoc"></div>
+      <div class="full" id="xl-anh-sau"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-outline" id="xlMoLai">↺ Mở lại</button>
+      <div class="sp"></div>
+      <button type="button" class="btn btn-outline" onclick="closeXl()">Đóng</button>
+      <button type="button" class="btn" id="xlLuu">💾 Lưu (đang xử lý)</button>
+      <button type="button" class="btn btn-good" id="xlXong">✅ Hoàn thành</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/su-co-anh.js"></script>
 <script>
 const THU_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
 const THU_LABEL = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -413,6 +491,7 @@ async function loadAndRender(){
   document.querySelector('#tblKhuon tbody').innerHTML = '<tr class="empty-row"><td colspan="10">Đang tải...</td></tr>';
   const tuan = fmtDate(weekMonday);
   const weekEnd = fmtDate(addDays(weekMonday, 6));
+  loadXl();
   const [moldsRes, issuesRes, planRes, khRes, logRes, duyetRes, dLogRes] = await Promise.all([
     sb.from('duc_shot_khuon').select('*'),
     sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }),
@@ -619,6 +698,7 @@ function render(){
   renderSummary();
   renderNguoi();
   renderDuyet();
+  renderXl();
   document.getElementById('roNote').textContent = !canEdit ? '🔒 Chỉ xem — nhân viên bảo dưỡng khuôn / Quản lý bộ phận Đúc (người lập) mới sửa được'
     : trangThai() === 'nhap' ? 'Bấm vào ô để lên lịch / sửa'
     : '⚠ Kế hoạch đã gửi — sửa phải nhập lý do và kiểm tra/duyệt lại';
@@ -649,7 +729,7 @@ function renderSummary(){
     '<span style="color:var(--accent)">Chưa làm: <b>' + (khRows.length - done - late - ng - doing) + '</b></span>' +
     '<span style="color:var(--alarm-fg)">Trễ: <b>' + late + '</b></span>' +
     (noPerson ? '<span style="color:var(--alarm-fg)">Chưa giao người: <b>' + noPerson + '</b></span>' : '') +
-    '<span style="color:var(--warn-fg)">Khuôn cần chú ý chưa lên KH: <b>' + chuaLen + '</b></span>';
+    '<span style="color:var(--warn-fg)">Khuôn cần chú ý chưa lên KH: <b>' + chuaLen + '</b></span>' + xlSummaryHtml();
 }
 
 function renderNguoi(){
@@ -845,6 +925,206 @@ async function onXuLyDuyet(dongY){
   showMsg(!dongY ? '✓ Đã từ chối, trả về người lập' : data.trang_thai_moi === 'da_duyet' ? '✓ Đã phê duyệt' : '✓ Đã kiểm tra, chuyển Giám đốc SX', 'ok', 2500);
   loadAndRender();
 }
+
+// ── Công việc không theo kế hoạch: xử lý bất thường A2/B1/F1 (T103) ─────────
+const LOAI_XL = { A2: 'Sự cố khuôn', B1: 'Chất lượng SP', F1: 'IPQC NG' };
+let xlCan = [];            // chưa xong + xong trong 7 ngày (RPC p_lich_su=false)
+let xlLs = [];             // xong trong tuần đang xem
+let xlTab = 'can';
+let xlAnh = {};            // id_su_co -> {truoc, sau}
+let xlEditing = null;
+let xlPickers = [];
+let xlLoading = false;
+
+function xlState(r){
+  const x = r.xl;
+  if (!x) return { cls: 'cho', label: 'Chờ nhận' };
+  return x.trang_thai === 'hoan_thanh' ? { cls: 'xong', label: '✓ Hoàn thành' } : { cls: 'dang', label: '🔧 Đang xử lý' };
+}
+function xlLoaiMa(r){ return String(r.loai_su_co || '').slice(0, 2); }
+function toLocalInput(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return fmtDate(d) + 'T' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fromLocalInput(v){ return v ? new Date(v).toISOString() : null; }
+const SUB = s => '<div style="font-size:10.5px;color:var(--text-muted)">' + s + '</div>';
+
+async function loadXl(){
+  if (xlLoading) return;
+  xlLoading = true;
+  try {
+    const calls = [sb.rpc('duc_khuon_xlbt_danh_sach', { p_lich_su: false })];
+    if (xlTab === 'ls') calls.push(sb.rpc('duc_khuon_xlbt_danh_sach', { p_lich_su: true, p_tu: fmtDate(weekMonday), p_den: fmtDate(addDays(weekMonday, 6)) }));
+    const res = await Promise.all(calls);
+    for (const r of res) {
+      if (r.error || !r.data || !r.data.ok) {
+        document.querySelector('#tblXl tbody').innerHTML = '<tr class="empty-row"><td colspan="11">Lỗi tải xử lý bất thường: ' + escapeHtml(rpcErr(r.data, r.error)) + '</td></tr>';
+        return;
+      }
+    }
+    xlCan = res[0].data.rows || [];
+    if (res[1]) xlLs = res[1].data.rows || [];
+    xlAnh = await SuCoAnh.count([...xlCan, ...xlLs].map(r => r.id_su_co));
+    document.getElementById('xlNote').textContent = 'Sự cố phát sinh từ ' + fmtTs(res[0].data.tu_thoi_diem) +
+      (canEdit ? ' · bấm vào dòng để xử lý' : ' · 🔒 chỉ xem — NV bảo dưỡng khuôn / QLBP Đúc mới ghi được');
+    renderXl();
+    renderSummary();
+  } finally { xlLoading = false; }
+}
+
+function xlSummaryHtml(){
+  const cho = xlCan.filter(r => !r.xl).length;
+  const dang = xlCan.filter(r => r.xl && r.xl.trang_thai !== 'hoan_thanh').length;
+  if (!cho && !dang) return '<span style="color:var(--run-fg)">Bất thường tồn: <b>0</b></span>';
+  return '<a href="#cardXl" style="color:var(--alarm-fg);text-decoration:none">Bất thường chờ nhận: <b>' + cho + '</b></a>' +
+    (dang ? '<span style="color:var(--warn-fg)">Bất thường đang xử lý: <b>' + dang + '</b></span>' : '');
+}
+
+function renderXl(){
+  const tbody = document.querySelector('#tblXl tbody');
+  const q = document.getElementById('txtSearch').value.trim().toLowerCase();
+  const loai = document.getElementById('xlLoai').value;
+  let rows = (xlTab === 'ls' ? xlLs : xlCan).filter(r => !loai || xlLoaiMa(r) === loai);
+  if (q) rows = rows.filter(r => [r.id_su_co, r.ma_may, r.so_khuon, r.ma_sp, r.van_de, r.xl && r.xl.nguoi_dam_nhiem, r.xl && r.xl.nguoi_dam_nhiem_phu]
+    .some(v => String(v || '').toLowerCase().includes(q)));
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">' + (xlTab === 'ls' ? 'Không có vụ nào hoàn thành trong tuần này.' : '✓ Không có bất thường nào cần xử lý.') + '</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const x = r.xl || {};
+    const st = xlState(r);
+    const ma = xlLoaiMa(r);
+    const may = r.dang_dung_may
+      ? '<span class="mst dung">⛔ Đang dừng ' + fmtNum(r.phut_dung) + 'p</span>'
+      : '<span class="mst chay">▶ Chạy lại ' + fmtTs(r.gio_tro_lai) + '</span>' + SUB('Dừng ' + fmtNum(r.phut_dung) + 'p');
+    return '<tr class="xl-row" data-id="' + escapeHtml(r.id_su_co) + '">' +
+      '<td class="khuon">' + escapeHtml(r.id_su_co) + '</td>' +
+      '<td><span class="loai ' + ma + '">' + ma + '</span>' + SUB(escapeHtml(LOAI_XL[ma] || '')) + '</td>' +
+      '<td style="font-weight:700">' + escapeHtml(r.ma_may || '') + '</td>' +
+      '<td style="white-space:nowrap"><b>' + escapeHtml(r.so_khuon || '—') + '</b>' + SUB(escapeHtml(r.ma_sp || '')) + '</td>' +
+      '<td style="white-space:nowrap">' + fmtTs(r.gio_phat_sinh) + SUB('Ca ' + escapeHtml(r.ca || '')) + '</td>' +
+      '<td class="vd">' + escapeHtml(r.van_de || '') + (r.noi_dung_sx ? '<small>SX: ' + escapeHtml(r.noi_dung_sx) + '</small>' : '') + '</td>' +
+      '<td>' + may + '</td>' +
+      '<td><span class="xst ' + st.cls + '">' + st.label + '</span></td>' +
+      '<td>' + (x.nguoi_dam_nhiem ? '<b>' + escapeHtml(x.nguoi_dam_nhiem) + '</b>' + (x.nguoi_dam_nhiem_phu ? SUB('+ ' + escapeHtml(x.nguoi_dam_nhiem_phu)) : '') : '—') + '</td>' +
+      '<td style="white-space:nowrap">' + (x.bat_dau ? fmtTs(x.bat_dau) : '—') + ' → ' + (x.ket_thuc ? fmtTs(x.ket_thuc) : '…') +
+        (x.bat_dau && x.ket_thuc ? SUB(fmtNum(Math.round((new Date(x.ket_thuc) - new Date(x.bat_dau)) / 60000)) + ' phút') : '') + '</td>' +
+      '<td>' + (SuCoAnh.badge(xlAnh[r.id_su_co]) || '—') + '</td></tr>';
+  }).join('');
+}
+
+document.getElementById('xlTabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (!b || b.dataset.tab === xlTab) return;
+  xlTab = b.dataset.tab;
+  document.querySelectorAll('#xlTabs button').forEach(x => x.classList.toggle('on', x === b));
+  if (xlTab === 'ls') { xlLs = []; document.querySelector('#tblXl tbody').innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải...</td></tr>'; loadXl(); }
+  else renderXl();
+});
+document.getElementById('xlLoai').addEventListener('change', renderXl);
+document.querySelector('#tblXl tbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr.xl-row');
+  if (tr) openXl(tr.dataset.id);
+});
+document.querySelectorAll('[data-now]').forEach(b => b.addEventListener('click', () => {
+  document.getElementById(b.dataset.now).value = toLocalInput(new Date());
+}));
+
+function nguoiOptions(selected, emptyLabel){
+  const bd = employees.filter(e => e.vai_tro === 'bao_duong_khuon');
+  const khac = employees.filter(e => e.vai_tro !== 'bao_duong_khuon');
+  let h = '<option value="">' + emptyLabel + '</option>' +
+    (bd.length ? '<optgroup label="Bảo dưỡng khuôn">' + bd.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '') +
+    (khac.length ? '<optgroup label="Nhân sự khác">' + khac.map(e => '<option>' + escapeHtml(e.ten_nhan_vien) + '</option>').join('') + '</optgroup>' : '');
+  if (selected && !employees.some(e => e.ten_nhan_vien === selected)) h += '<option>' + escapeHtml(selected) + '</option>';
+  return h;
+}
+
+async function openXl(id){
+  const r = [...xlCan, ...xlLs].find(z => z.id_su_co === id);
+  if (!r) return;
+  xlEditing = r;
+  const x = r.xl || {};
+  const xong = x.trang_thai === 'hoan_thanh';
+  const sua = canEdit && !xong;
+  const ma = xlLoaiMa(r);
+  document.getElementById('xlTitle').textContent = ma + ' · ' + (LOAI_XL[ma] || '') + ' — ' + r.id_su_co;
+  document.getElementById('xl-info').innerHTML =
+    '<div><b>Máy:</b> ' + escapeHtml(r.ma_may || '') + ' · <b>Khuôn:</b> ' + escapeHtml(r.so_khuon || '—') + ' · <b>SP:</b> ' + escapeHtml(r.ma_sp || '') +
+      ' · <b>Phát sinh:</b> ' + fmtTs(r.gio_phat_sinh) + ' (ca ' + escapeHtml(r.ca || '') + ')</div>' +
+    '<div><b>Vấn đề:</b> ' + escapeHtml(r.van_de || '—') + '</div>' +
+    (r.noi_dung_sx ? '<div><b>Sản xuất đã xử lý:</b> ' + escapeHtml(r.noi_dung_sx) + (r.dam_nhiem_sx ? ' (' + escapeHtml(r.dam_nhiem_sx) + ')' : '') + '</div>' : '') +
+    '<div>' + (r.dang_dung_may ? '<span class="warn">⛔ Máy đang dừng ' + fmtNum(r.phut_dung) + ' phút</span>'
+      : 'Máy đã chạy lại lúc ' + fmtTs(r.gio_tro_lai) + ' (dừng ' + fmtNum(r.phut_dung) + ' phút)') + '</div>' +
+    (xong ? '<div style="color:var(--run-fg);font-weight:700">✓ Hoàn thành bởi ' + escapeHtml(x.nguoi_hoan_thanh) + ' lúc ' + fmtTs(x.hoan_thanh_luc) + '</div>'
+      : x.nguoi_cap_nhat ? '<div style="color:var(--text-muted)">Cập nhật: ' + escapeHtml(x.nguoi_cap_nhat) + ' · ' + fmtTs(x.cap_nhat_luc) + '</div>' : '') +
+    '<div style="color:var(--text-muted);font-size:11px">Hoàn thành ở đây không đóng sự cố trên dashboard Đúc (trưởng ca vẫn đóng như cũ). Hoàn thành cần ≥1 ảnh trước + ≥1 ảnh sau.</div>';
+  document.getElementById('xl-chinh').innerHTML = nguoiOptions(x.nguoi_dam_nhiem, '— Chọn người —');
+  document.getElementById('xl-chinh').value = x.nguoi_dam_nhiem || '';
+  document.getElementById('xl-phu').innerHTML = nguoiOptions(x.nguoi_dam_nhiem_phu, '— Không có —');
+  document.getElementById('xl-phu').value = x.nguoi_dam_nhiem_phu || '';
+  document.getElementById('xl-bd').value = toLocalInput(x.bat_dau);
+  document.getElementById('xl-kt').value = toLocalInput(x.ket_thuc);
+  document.getElementById('xl-nd').value = x.noi_dung_xu_ly || '';
+  ['xl-chinh','xl-phu','xl-bd','xl-kt','xl-nd'].forEach(k => { document.getElementById(k).disabled = !sua; });
+  document.querySelectorAll('[data-now]').forEach(b => { b.disabled = !sua; });
+  document.getElementById('xlLuu').style.display = sua ? '' : 'none';
+  document.getElementById('xlXong').style.display = sua ? '' : 'none';
+  document.getElementById('xlMoLai').style.display = canEdit && xong ? '' : 'none';
+
+  const anhTruoc = document.getElementById('xl-anh-truoc'), anhSau = document.getElementById('xl-anh-sau');
+  anhTruoc.innerHTML = anhSau.innerHTML = '<div class="info-box">Đang tải ảnh…</div>';
+  xlPickers = [];
+  document.getElementById('modalXl').classList.add('open');
+  let anh = { truoc: [], sau: [] };
+  try { anh = await SuCoAnh.load(r.id_su_co); } catch (er) { showMsg('Lỗi tải ảnh: ' + er.message, 'err', 4000); }
+  if (xlEditing !== r) return;
+  const mk = (el, kind, title) => {
+    if (!sua) {
+      el.innerHTML = '<div class="info-box"><b>📷 ' + title + ':</b> ' + (anh[kind].length ? '<br>' + anh[kind].map(a =>
+        '<a href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(a.url) + '" alt="" loading="lazy" style="width:70px;height:70px;object-fit:cover;border-radius:6px;margin:4px 4px 0 0"></a>').join('') : 'chưa có') + '</div>';
+      return null;
+    }
+    return SuCoAnh.picker(el, { kind, title, idSuCo: r.id_su_co, existing: anh[kind], immediate: true, canRemoveExisting: true, onError: m => showMsg(m, 'err', 4000) });
+  };
+  xlPickers = [mk(anhTruoc, 'truoc', 'Ảnh trước xử lý (hiện trạng)'), mk(anhSau, 'sau', 'Ảnh sau xử lý')].filter(Boolean);
+}
+function closeXl(){
+  if (xlPickers.some(p => p.busy) && !confirm('Ảnh đang tải lên — vẫn đóng?')) return;
+  document.getElementById('modalXl').classList.remove('open');
+  xlEditing = null; xlPickers = [];
+  loadXl();
+}
+
+async function luuXl(hanhDong){
+  const r = xlEditing;
+  if (!r) return;
+  if (xlPickers.some(p => p.busy)) return showMsg('Chờ ảnh tải lên xong', 'err', 2500);
+  const chinh = document.getElementById('xl-chinh').value, phu = document.getElementById('xl-phu').value;
+  if (hanhDong !== 'mo_lai' && phu && phu === chinh) return showMsg('Đảm nhiệm phụ phải khác đảm nhiệm chính', 'err', 3000);
+  if (hanhDong === 'hoan_thanh' && !confirm('Xác nhận hoàn thành xử lý ' + r.id_su_co + '?')) return;
+  if (hanhDong === 'mo_lai' && !confirm('Mở lại phiếu đã hoàn thành để sửa?')) return;
+  const btns = ['xlLuu','xlXong','xlMoLai'].map(k => document.getElementById(k));
+  btns.forEach(b => { b.disabled = true; });
+  const { data, error } = await sb.rpc('duc_khuon_xlbt_luu', {
+    p_id_su_co: r.id_su_co, p_hanh_dong: hanhDong, p_nguoi_dam_nhiem: chinh, p_nguoi_dam_nhiem_phu: phu,
+    p_bat_dau: fromLocalInput(document.getElementById('xl-bd').value),
+    p_ket_thuc: fromLocalInput(document.getElementById('xl-kt').value),
+    p_noi_dung: document.getElementById('xl-nd').value.trim(),
+  });
+  btns.forEach(b => { b.disabled = false; });
+  if (error || !data || !data.ok) return showMsg('Lỗi: ' + rpcErr(data, error), 'err', 5000);
+  showMsg(hanhDong === 'hoan_thanh' ? '✓ Đã hoàn thành xử lý' : hanhDong === 'mo_lai' ? '✓ Đã mở lại phiếu' : '✓ Đã lưu', 'ok', 2500);
+  if (hanhDong === 'mo_lai') { await loadXl(); return openXl(r.id_su_co); }
+  closeXl();
+}
+document.getElementById('xlLuu').addEventListener('click', () => luuXl('luu'));
+document.getElementById('xlXong').addEventListener('click', () => luuXl('hoan_thanh'));
+document.getElementById('xlMoLai').addEventListener('click', () => luuXl('mo_lai'));
+// Tự làm mới danh sách bất thường mỗi phút (bỏ qua khi đang mở form / tab ẩn).
+setInterval(() => { if (!document.getElementById('modalXl').classList.contains('open') && !document.hidden) loadXl(); }, 60000);
 
 startHeaderClock();
 updateWeekLabel();

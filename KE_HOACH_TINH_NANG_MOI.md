@@ -109,6 +109,7 @@
 - [ ] **Gia công ngoài / mạ / rửa / leak test / lắp ráp** — quản lý nhà cung cấp, lot, chất lượng nhập/xuất và hàng thuê ngoài.
 - [ ] **Phòng đo & dụng cụ đo** — hiệu chuẩn, trạng thái dụng cụ, lịch hiệu chuẩn và kết quả đo gắn với lot.
 - [ ] **Quy trình quản lý tài khoản & audit log** — ghi rõ ai sửa gì lúc nào, phân quyền theo vai trò và kiểm soát vận hành.
+- [x] **Dashboard tổ khuôn** (T103, 2026-10-13 — prod + staging) — `bao-duong-khuon-tuan.html` thành dashboard: công việc theo kế hoạch (KH bảo dưỡng tuần) + công việc không theo kế hoạch (sự cố A2 / B1 / F1 phát sinh từ lúc bật). NV BD khuôn / QLBP Đúc nhận xử lý: đảm nhiệm chính + phụ, giờ bắt đầu / kết thúc, nội dung, ảnh trước / sau (dùng chung `duc_su_co_anh`); hoàn thành không đóng sự cố. `migration_phase_T103_xu_ly_bat_thuong_to_khuon.sql`.
 - [ ] **Giám sát job nền / cron / automation** — hệ thống tự động quét và cảnh báo lỗi trong job nền, không để mất dữ liệu hoặc job chết âm thầm.
 
 ## Cách làm việc tiếp
