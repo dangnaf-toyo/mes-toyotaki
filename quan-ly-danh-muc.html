@@ -80,11 +80,6 @@
   .pane-toolbar .btn-add{margin-left:auto;flex:0 0 auto;}
   .pane-toolbar .btn-reset{background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:8px 12px;}
   .pane-toolbar .btn-reset:hover{background:var(--bg-sunken);color:var(--text);}
-  .nvl-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-  .nvl-toolbar input{max-width:360px;}
-  .nvl-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
-  #nvl-table{min-width:1120px;}
-
   /* Modal thêm / sửa */
   .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:900;overflow-y:auto;}
   .modal-overlay.open{display:flex;}
@@ -335,49 +330,6 @@
       <div class="card" style="padding:12px 14px"><div id="khuon-ds"></div></div>
     </section>
 
-    <section id="tab-nvl" class="tab-pane" style="display:none">
-      <div class="nvl-toolbar">
-        <input type="search" id="nvl-search" placeholder="Lọc nhanh: nhà cung cấp / mã / khách hàng…" autocomplete="off" aria-label="Lọc bảng nguyên vật liệu">
-        <span class="nvl-count" id="nvl-count"></span>
-        <button type="button" class="btn-add" id="nvl-add">＋ Thêm mới</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table id="nvl-table">
-            <thead><tr>
-              <th class="sortable" data-nvl-key="supplier">Nhà cung cấp</th>
-              <th class="sortable" data-nvl-key="name">Tên NVL</th>
-              <th class="sortable" data-nvl-key="code">Mã NVL NCC</th>
-              <th class="sortable" data-nvl-key="toyotakiCode">Mã NVL hệ thống Toyotaki</th>
-              <th class="sortable" data-nvl-key="customer">Khách hàng sử dụng</th>
-              <th class="sortable" data-nvl-key="product">Sản phẩm sử dụng</th>
-              <th class="col-actions">Thao tác</th>
-            </tr></thead>
-            <tbody id="nvl-tbody"></tbody>
-          </table>
-          <div class="empty" id="nvl-empty" style="display:none">Không có nguyên vật liệu khớp bộ lọc.</div>
-        </div>
-      </div>
-      <div class="modal-overlay" id="nvl-modal">
-        <div class="modal">
-          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
-          <h2 id="nvl-form-title">Thêm nguyên vật liệu</h2>
-          <div class="msg" id="nvl-msg"></div>
-          <form id="nvl-form">
-            <div class="form-grid">
-              <div><label for="nvl-supplier">Nhà cung cấp</label><input id="nvl-supplier" required></div>
-              <div><label for="nvl-name">Tên NVL</label><input id="nvl-name" required></div>
-              <div><label for="nvl-code">Mã NVL</label><input id="nvl-code" required></div>
-              <div><label for="nvl-toyotaki-code">Mã NVL hệ thống Toyotaki</label><input id="nvl-toyotaki-code" required></div>
-              <div><label for="nvl-customer">Khách hàng sử dụng</label><input id="nvl-customer"></div>
-              <div><label for="nvl-product">Sản phẩm sử dụng</label><input id="nvl-product"></div>
-            </div>
-            <div class="form-actions"><button type="submit" id="nvl-submit">Thêm nguyên vật liệu</button></div>
-          </form>
-        </div>
-      </div>
-    </section>
-
     <!-- ── Tab Phân quyền tài liệu kỹ thuật (T62) ─────────────────────────── -->
     <section id="tab-taillieu" class="tab-pane" style="display:none">
       <p class="muted" style="margin-bottom:12px">Hàng = loại tài liệu, cột = bộ phận. Tick "Ghi" hoặc "Tải gốc" sẽ tự tick kèm "Đọc" (không thể bật Ghi/Tải gốc mà tắt Đọc).</p>
@@ -423,185 +375,9 @@ function toast(text, isErr){
 }
 const DASH = '<span class="muted">—</span>';
 
-const LEGACY_NVL_STORAGE_KEY = 'toyotaki-material-catalog-v1';
-let nvlRows = [];
-let nvlSortKey = 'supplier', nvlSortDir = 1;
-async function importLegacyNvlRows(existingRows){
-  let legacyRows;
-  try {
-    const saved = localStorage.getItem(LEGACY_NVL_STORAGE_KEY);
-    if (saved === null) return 0;
-    legacyRows = JSON.parse(saved);
-  } catch(e){ return null; }
-  const keys = ['supplier', 'name', 'code', 'toyotakiCode', 'customer', 'product'];
-  if (!Array.isArray(legacyRows) || !legacyRows.every(row => row && keys.every(key => typeof row[key] === 'string'))) return null;
-  const existingCodes = new Set(existingRows.map(row => row.ma_nvl.toLocaleLowerCase('vi')));
-  let imported = 0;
-  for (const row of legacyRows){
-    const code = row.toyotakiCode.trim();
-    if (!code || existingCodes.has(code.toLocaleLowerCase('vi'))) continue;
-    const { data, error } = await sb.rpc('nvl_catalog_upsert', {
-      p_ma_nvl: code,
-      p_ten_nvl: row.name,
-      p_nha_cung_cap: row.supplier,
-      p_ma_nvl_ncc: row.code,
-      p_khach_hang: row.customer,
-      p_san_pham: row.product,
-    });
-    if (error || data?.ok === false){
-      toast('Chưa chuyển hết danh mục NVL cũ: ' + (error?.message || data?.error || 'Không thể lưu dữ liệu.'), true);
-      return null;
-    }
-    existingCodes.add(code.toLocaleLowerCase('vi'));
-    imported++;
-  }
-  try { localStorage.removeItem(LEGACY_NVL_STORAGE_KEY); }
-  catch(e){ toast('Đã đồng bộ danh mục nhưng không xóa được bản lưu cũ trên trình duyệt.', true); }
-  return imported;
-}
-async function loadNvlRows(){
-  let { data, error } = await sb.from('nvl_materials')
-    .select('ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham')
-    .order('nha_cung_cap').order('ma_nvl');
-  if (error){ toast('Không tải được danh mục nguyên vật liệu: ' + error.message, true); return; }
-  const imported = await importLegacyNvlRows(data || []);
-  if (imported){
-    const refreshed = await sb.from('nvl_materials')
-      .select('ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham')
-      .order('nha_cung_cap').order('ma_nvl');
-    if (refreshed.error){ toast('Không tải được danh mục nguyên vật liệu: ' + refreshed.error.message, true); return; }
-    data = refreshed.data;
-  }
-  nvlRows = (data || []).map(row => ({
-    supplier: row.nha_cung_cap || '',
-    name: row.ten_nvl || '',
-    code: row.ma_nvl_ncc || '',
-    toyotakiCode: row.ma_nvl || '',
-    customer: row.khach_hang || '',
-    product: row.san_pham || '',
-  }));
-  renderNvlTable();
-}
-async function saveNvlRow(row){
-  const { data, error } = await sb.rpc('nvl_catalog_upsert', {
-    p_ma_nvl: row.toyotakiCode,
-    p_ten_nvl: row.name,
-    p_nha_cung_cap: row.supplier,
-    p_ma_nvl_ncc: row.code,
-    p_khach_hang: row.customer,
-    p_san_pham: row.product,
-  });
-  if (error || data?.ok === false){
-    showMsg('nvl-msg', 'error', error?.message || data?.error || 'Không thể lưu nguyên vật liệu.');
-    return false;
-  }
-  await loadNvlRows();
-  return true;
-}
-async function deleteNvlRow(row){
-  const { data, error } = await sb.rpc('nvl_catalog_delete', { p_ma_nvl: row.toyotakiCode });
-  if (error || data?.ok === false){
-    toast(error?.message || data?.error || 'Không thể xóa nguyên vật liệu.', true);
-    return false;
-  }
-  await loadNvlRows();
-  return true;
-}
-function renderNvlTable(){
-  const query = document.getElementById('nvl-search').value.trim().toLocaleLowerCase('vi');
-  const rows = nvlRows.map((row, index) => ({ row, index }))
-    .filter(({ row }) => [row.supplier, row.name, row.code, row.toyotakiCode, row.customer, row.product]
-      .some(value => value.toLocaleLowerCase('vi').includes(query)));
-  rows.sort((a, b) => a.row[nvlSortKey].localeCompare(b.row[nvlSortKey], 'vi', { numeric: true, sensitivity: 'base' }) * nvlSortDir);
-  document.getElementById('nvl-count').textContent = `${rows.length} / ${nvlRows.length} mục`;
-  document.getElementById('nvl-tbody').innerHTML = rows.map(({ row, index }) => '<tr>' +
-    [row.supplier, row.name, row.code, row.toyotakiCode, row.customer, row.product].map(value => `<td>${escapeHtml(value)}</td>`).join('') +
-    `<td class="row-actions"><button type="button" class="edit" data-nvl-action="edit" data-index="${index}">Sửa</button><button type="button" class="del" data-nvl-action="delete" data-index="${index}">Xóa</button></td>` +
-    '</tr>').join('');
-  document.getElementById('nvl-table').style.display = rows.length ? 'table' : 'none';
-  document.getElementById('nvl-empty').style.display = rows.length ? 'none' : 'block';
-  if (!rows.length) document.getElementById('nvl-empty').textContent = nvlRows.length ? 'Không có nguyên vật liệu khớp bộ lọc.' : 'Chưa có nguyên vật liệu nào.';
-  document.querySelectorAll('#nvl-table th[data-nvl-key]').forEach(th => {
-    th.dataset.dir = th.dataset.nvlKey === nvlSortKey ? (nvlSortDir === 1 ? 'asc' : 'desc') : '';
-  });
-}
-document.getElementById('nvl-search').addEventListener('input', renderNvlTable);
-document.querySelector('#nvl-table thead').addEventListener('click', e => {
-  const th = e.target.closest('th[data-nvl-key]');
-  if (!th) return;
-  if (nvlSortKey === th.dataset.nvlKey) nvlSortDir *= -1;
-  else { nvlSortKey = th.dataset.nvlKey; nvlSortDir = 1; }
-  renderNvlTable();
-});
-
 // ── Modal helpers ────────────────────────────────────────────────────────
 function openModal(id){ document.getElementById(id).classList.add('open'); document.body.style.overflow = 'hidden'; }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); document.body.style.overflow = ''; }
-let nvlEditingIndex = null;
-function resetNvlForm(){
-  nvlEditingIndex = null;
-  clearMsg('nvl-msg');
-  document.getElementById('nvl-form').reset();
-  document.getElementById('nvl-form-title').textContent = 'Thêm nguyên vật liệu';
-  document.getElementById('nvl-submit').textContent = 'Thêm nguyên vật liệu';
-}
-function openNvlEdit(index){
-  const row = nvlRows[index];
-  if (!row) return;
-  nvlEditingIndex = index;
-  clearMsg('nvl-msg');
-  document.getElementById('nvl-form-title').textContent = 'Sửa nguyên vật liệu';
-  document.getElementById('nvl-submit').textContent = 'Lưu thay đổi';
-  document.getElementById('nvl-supplier').value = row.supplier;
-  document.getElementById('nvl-name').value = row.name;
-  document.getElementById('nvl-code').value = row.code;
-  document.getElementById('nvl-toyotaki-code').value = row.toyotakiCode;
-  document.getElementById('nvl-toyotaki-code').readOnly = true;
-  document.getElementById('nvl-customer').value = row.customer;
-  document.getElementById('nvl-product').value = row.product;
-  openModal('nvl-modal');
-}
-const nvlModal = document.getElementById('nvl-modal');
-nvlModal._close = () => { closeModal('nvl-modal'); resetNvlForm(); };
-nvlModal.addEventListener('click', e => { if (e.target === nvlModal) nvlModal._close(); });
-nvlModal.querySelector('[data-close-modal]').addEventListener('click', nvlModal._close);
-document.getElementById('nvl-add').addEventListener('click', () => {
-  resetNvlForm();
-  document.getElementById('nvl-toyotaki-code').readOnly = false;
-  openModal('nvl-modal');
-});
-document.getElementById('nvl-tbody').addEventListener('click', e => {
-  const button = e.target.closest('button[data-nvl-action]');
-  if (!button) return;
-  const index = Number(button.dataset.index);
-  if (!Number.isInteger(index) || !nvlRows[index]) return;
-  if (button.dataset.nvlAction === 'edit') return openNvlEdit(index);
-  const row = nvlRows[index];
-  if (!confirm('Xóa nguyên vật liệu "' + row.toyotakiCode + '"?')) return;
-  deleteNvlRow(row).then(ok => { if (ok) toast('Đã xóa ' + row.toyotakiCode); });
-});
-document.getElementById('nvl-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (nvlEditingIndex !== null && !nvlRows[nvlEditingIndex]) return;
-  const row = {
-    supplier: document.getElementById('nvl-supplier').value.trim(),
-    name: document.getElementById('nvl-name').value.trim(),
-    code: document.getElementById('nvl-code').value.trim(),
-    toyotakiCode: document.getElementById('nvl-toyotaki-code').value.trim(),
-    customer: document.getElementById('nvl-customer').value.trim(),
-    product: document.getElementById('nvl-product').value.trim(),
-  };
-  if (nvlRows.some((item, index) => index !== nvlEditingIndex && item.toyotakiCode.toLowerCase() === row.toyotakiCode.toLowerCase())){
-    return showMsg('nvl-msg', 'error', 'Mã NVL hệ thống Toyotaki đã tồn tại.');
-  }
-  const isNew = nvlEditingIndex === null;
-  const button = document.getElementById('nvl-submit');
-  button.disabled = true;
-  if (!await saveNvlRow(row)){ button.disabled = false; return; }
-  button.disabled = false;
-  nvlModal._close();
-  toast((isNew ? 'Đã thêm ' : 'Đã lưu ') + row.toyotakiCode);
-});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(ov => ov._close && ov._close());
 });
@@ -1130,7 +906,6 @@ async function main(){
   catalogs.sp.reload();
   catalogs.ns.reload();
   KhuonDs.mount(document.getElementById('khuon-ds'), { admin: true, userName: (await MesAuth.getCurrentUserIdentity()) || '' });
-  await loadNvlRows();
   loadDocPermissions();
 }
 
