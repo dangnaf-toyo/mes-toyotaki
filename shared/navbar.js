@@ -17,6 +17,9 @@
  * ============================================================================
  */
 (function () {
+  // Trang được nhúng trong một tab quản trị không cần thanh điều hướng thứ hai.
+  if (new URLSearchParams(location.search).has('embed')) return;
+
   const MENU = [
     { label: 'Điều hành & Báo cáo', items: [
       { label: 'Dashboard Sản lượng', href: 'sanluong-supabase.html' },
@@ -25,7 +28,6 @@
       { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
       { label: 'Forecast sản lượng năm', href: 'forecast-san-luong.html' },
-      { label: 'Bom', href: 'bom.html' },
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
