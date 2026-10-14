@@ -148,6 +148,9 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 .info-box{font-size:12px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px;padding:8px 10px;line-height:1.5}
 .info-box .warn{color:var(--alarm-fg);font-weight:700}
 .info-box .iss{border-top:1px dashed var(--border);padding-top:3px;margin-top:3px}
+.xl-loi{font-size:12.5px;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-fg);border-radius:8px;padding:8px 10px;line-height:1.5}
+.xl-loi ul{margin:4px 0 0;padding-left:18px}
+.xl-thieu{outline:2px solid var(--alarm-fg);outline-offset:1px;border-radius:6px}
 /* Phê duyệt */
 .duyet{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
 .duyet-st{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:170px}
@@ -362,6 +365,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
       </div>
       <div class="full" id="xl-anh-truoc"></div>
       <div class="full" id="xl-anh-sau"></div>
+      <div class="xl-loi full" id="xl-loi" hidden></div>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn btn-outline" id="xlMoLai">↺ Mở lại</button>
@@ -1073,6 +1077,7 @@ async function openXl(id){
   document.getElementById('xlLuu').style.display = sua ? '' : 'none';
   document.getElementById('xlXong').style.display = sua ? '' : 'none';
   document.getElementById('xlMoLai').style.display = canEdit && xong ? '' : 'none';
+  xlBaoLoi([]);
 
   const anhTruoc = document.getElementById('xl-anh-truoc'), anhSau = document.getElementById('xl-anh-sau');
   anhTruoc.innerHTML = anhSau.innerHTML = '<div class="info-box">Đang tải ảnh…</div>';
@@ -1087,7 +1092,9 @@ async function openXl(id){
         '<a href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(a.url) + '" alt="" loading="lazy" style="width:70px;height:70px;object-fit:cover;border-radius:6px;margin:4px 4px 0 0"></a>').join('') : 'chưa có') + '</div>';
       return null;
     }
-    return SuCoAnh.picker(el, { kind, title, idSuCo: r.id_su_co, existing: anh[kind], immediate: true, canRemoveExisting: true, onError: m => showMsg(m, 'err', 4000) });
+    const p = SuCoAnh.picker(el, { kind, title, idSuCo: r.id_su_co, existing: anh[kind], immediate: true, canRemoveExisting: true, onError: m => showMsg(m, 'err', 4000),
+      onChange: () => { if (p.existing.length) el.classList.remove('xl-thieu'); } });
+    return p;
   };
   xlPickers = [mk(anhTruoc, 'truoc', 'Ảnh trước xử lý (hiện trạng)'), mk(anhSau, 'sau', 'Ảnh sau xử lý')].filter(Boolean);
 }
@@ -1098,12 +1105,44 @@ function closeXl(){
   loadXl();
 }
 
+// Khung báo lỗi cố định trong form + tô đỏ ô thiếu (thông báo nổi tự tắt sau vài giây, dễ bị bỏ lỡ).
+// loi: [{ text, id? }] — id = phần tử cần tô đỏ.
+function xlBaoLoi(loi, tieuDe){
+  document.querySelectorAll('#modalXl .xl-thieu').forEach(el => el.classList.remove('xl-thieu'));
+  const box = document.getElementById('xl-loi');
+  box.hidden = !loi.length;
+  if (!loi.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<b>⚠ ' + escapeHtml(tieuDe || 'Chưa hoàn thành được — còn thiếu:') + '</b><ul>' +
+    loi.map(l => '<li>' + escapeHtml(l.text) + '</li>').join('') + '</ul>';
+  loi.forEach(l => { if (l.id) document.getElementById(l.id).classList.add('xl-thieu'); });
+  box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function xlThieuDeHoanThanh(){
+  const v = id => document.getElementById(id).value.trim();
+  const soAnh = kind => { const p = xlPickers.find(z => z.kind === kind); return p ? p.existing.length : 0; };
+  const loi = [];
+  if (!v('xl-chinh')) loi.push({ text: 'Người đảm nhiệm chính', id: 'xl-chinh' });
+  if (!v('xl-bd')) loi.push({ text: 'Thời gian bắt đầu xử lý', id: 'xl-bd' });
+  if (!v('xl-kt')) loi.push({ text: 'Thời gian kết thúc xử lý', id: 'xl-kt' });
+  if (!v('xl-nd')) loi.push({ text: 'Nguyên nhân / nội dung xử lý', id: 'xl-nd' });
+  if (!soAnh('truoc')) loi.push({ text: 'Ít nhất 1 ảnh trước xử lý (hiện trạng)', id: 'xl-anh-truoc' });
+  if (!soAnh('sau')) loi.push({ text: 'Ít nhất 1 ảnh sau xử lý', id: 'xl-anh-sau' });
+  return loi;
+}
+['xl-chinh','xl-bd','xl-kt','xl-nd'].forEach(id => ['input','change'].forEach(ev =>
+  document.getElementById(id).addEventListener(ev, e => e.target.classList.remove('xl-thieu'))));
+
 async function luuXl(hanhDong){
   const r = xlEditing;
   if (!r) return;
-  if (xlPickers.some(p => p.busy)) return showMsg('Chờ ảnh tải lên xong', 'err', 2500);
+  if (xlPickers.some(p => p.busy)) return xlBaoLoi([{ text: 'Ảnh đang tải lên — chờ tải xong rồi bấm lại' }], 'Chưa lưu được:');
   const chinh = document.getElementById('xl-chinh').value, phu = document.getElementById('xl-phu').value;
-  if (hanhDong !== 'mo_lai' && phu && phu === chinh) return showMsg('Đảm nhiệm phụ phải khác đảm nhiệm chính', 'err', 3000);
+  if (hanhDong !== 'mo_lai' && phu && phu === chinh) return xlBaoLoi([{ text: 'Đảm nhiệm phụ phải khác đảm nhiệm chính', id: 'xl-phu' }], 'Chưa lưu được:');
+  if (hanhDong === 'hoan_thanh') {
+    const thieu = xlThieuDeHoanThanh();
+    if (thieu.length) return xlBaoLoi(thieu);
+  }
+  xlBaoLoi([]);
   if (hanhDong === 'hoan_thanh' && !confirm('Xác nhận hoàn thành xử lý ' + r.id_su_co + '?')) return;
   if (hanhDong === 'mo_lai' && !confirm('Mở lại phiếu đã hoàn thành để sửa?')) return;
   const btns = ['xlLuu','xlXong','xlMoLai'].map(k => document.getElementById(k));
@@ -1115,7 +1154,7 @@ async function luuXl(hanhDong){
     p_noi_dung: document.getElementById('xl-nd').value.trim(),
   });
   btns.forEach(b => { b.disabled = false; });
-  if (error || !data || !data.ok) return showMsg('Lỗi: ' + rpcErr(data, error), 'err', 5000);
+  if (error || !data || !data.ok) return xlBaoLoi([{ text: rpcErr(data, error) }], hanhDong === 'hoan_thanh' ? 'Chưa hoàn thành được:' : 'Chưa lưu được:');
   showMsg(hanhDong === 'hoan_thanh' ? '✓ Đã hoàn thành xử lý' : hanhDong === 'mo_lai' ? '✓ Đã mở lại phiếu' : '✓ Đã lưu', 'ok', 2500);
   if (hanhDong === 'mo_lai') { await loadXl(); return openXl(r.id_su_co); }
   closeXl();
