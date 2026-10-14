@@ -151,6 +151,20 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 .xl-loi{font-size:12.5px;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-fg);border-radius:8px;padding:8px 10px;line-height:1.5}
 .xl-loi ul{margin:4px 0 0;padding-left:18px}
 .xl-thieu{outline:2px solid var(--alarm-fg);outline-offset:1px;border-radius:6px}
+/* Linh kiện / vật tư tiêu hao dùng cho sự cố (T107) */
+.xl-lk{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--bg-sunken)}
+.xl-lk h4{margin:0 0 6px;font-size:12.5px}
+.xl-lk table{width:100%;border-collapse:collapse;font-size:12px;background:var(--bg-panel)}
+.xl-lk th,.xl-lk td{border-bottom:1px solid var(--border);padding:4px 6px;text-align:left;vertical-align:top}
+.xl-lk th{font-size:10.5px;color:var(--text-muted);text-transform:uppercase}
+.xl-lk td.num{text-align:right;white-space:nowrap}
+.xl-lk .add{display:grid;grid-template-columns:2fr 70px 1.4fr;gap:6px;margin-top:8px}
+.xl-lk .add input,.xl-lk .add select{border:1.5px solid var(--border-strong);border-radius:6px;padding:6px 8px;font:inherit;font-size:12.5px;width:100%;background:#fff;color:var(--text)}
+.xl-lk .add .w{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.xl-lk .add .w select,.xl-lk .add .w input{width:auto;flex:1;min-width:140px}
+.xl-lk .ton{font-size:11.5px;color:var(--text-muted)}
+.xl-lk .tra{border:1px solid var(--border-strong);background:var(--bg-panel);border-radius:5px;font:inherit;font-size:11px;padding:1px 6px;cursor:pointer}
+@media (max-width:560px){.xl-lk .add{grid-template-columns:1fr 70px}.xl-lk .add #xl-lk-ly{grid-column:1/-1}}
 /* Phê duyệt */
 .duyet{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
 .duyet-st{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:170px}
@@ -365,6 +379,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
       </div>
       <div class="full" id="xl-anh-truoc"></div>
       <div class="full" id="xl-anh-sau"></div>
+      <div class="xl-lk full" id="xl-lk"></div>
       <div class="xl-loi full" id="xl-loi" hidden></div>
     </div>
     <div class="modal-foot">
@@ -939,6 +954,7 @@ let xlAnh = {};            // id_su_co -> {truoc, sau}
 let xlEditing = null;
 let xlPickers = [];
 let xlLoading = false;
+let xlBatBuocAnh = false;  // duc_cau_hinh['xlbt_bat_buoc_anh'] (T107) — server kiểm lại
 
 function xlState(r){
   const x = r.xl;
@@ -960,7 +976,9 @@ async function loadXl(){
   try {
     const calls = [sb.rpc('duc_khuon_xlbt_danh_sach', { p_lich_su: false })];
     if (xlTab === 'ls') calls.push(sb.rpc('duc_khuon_xlbt_danh_sach', { p_lich_su: true, p_tu: fmtDate(weekMonday), p_den: fmtDate(addDays(weekMonday, 6)) }));
-    const res = await Promise.all(calls);
+    const [res, ch] = await Promise.all([Promise.all(calls),
+      sb.from('duc_cau_hinh').select('gia_tri').eq('khoa', 'xlbt_bat_buoc_anh').maybeSingle()]);
+    xlBatBuocAnh = !!(ch.data && ch.data.gia_tri === true);
     for (const r of res) {
       if (r.error || !r.data || !r.data.ok) {
         document.querySelector('#tblXl tbody').innerHTML = '<tr class="empty-row"><td colspan="11">Lỗi tải xử lý bất thường: ' + escapeHtml(rpcErr(r.data, r.error)) + '</td></tr>';
@@ -1064,7 +1082,8 @@ async function openXl(id){
       : 'Máy đã chạy lại lúc ' + fmtTs(r.gio_tro_lai) + ' (dừng ' + fmtNum(r.phut_dung) + ' phút)') + '</div>' +
     (xong ? '<div style="color:var(--run-fg);font-weight:700">✓ Hoàn thành bởi ' + escapeHtml(x.nguoi_hoan_thanh) + ' lúc ' + fmtTs(x.hoan_thanh_luc) + '</div>'
       : x.nguoi_cap_nhat ? '<div style="color:var(--text-muted)">Cập nhật: ' + escapeHtml(x.nguoi_cap_nhat) + ' · ' + fmtTs(x.cap_nhat_luc) + '</div>' : '') +
-    '<div style="color:var(--text-muted);font-size:11px">Hoàn thành ở đây không đóng sự cố trên dashboard Đúc (trưởng ca vẫn đóng như cũ). Hoàn thành cần ≥1 ảnh trước + ≥1 ảnh sau.</div>';
+    '<div style="color:var(--text-muted);font-size:11px">Hoàn thành ở đây không đóng sự cố trên dashboard Đúc (trưởng ca vẫn đóng như cũ).' +
+      (xlBatBuocAnh ? ' Hoàn thành cần ≥1 ảnh trước + ≥1 ảnh sau.' : '') + '</div>';
   document.getElementById('xl-chinh').innerHTML = nguoiOptions(x.nguoi_dam_nhiem, '— Chọn người —');
   document.getElementById('xl-chinh').value = x.nguoi_dam_nhiem || '';
   document.getElementById('xl-phu').innerHTML = nguoiOptions(x.nguoi_dam_nhiem_phu, '— Không có —');
@@ -1083,6 +1102,7 @@ async function openXl(id){
   anhTruoc.innerHTML = anhSau.innerHTML = '<div class="info-box">Đang tải ảnh…</div>';
   xlPickers = [];
   document.getElementById('modalXl').classList.add('open');
+  xlLkLoad(r, sua);
   let anh = { truoc: [], sau: [] };
   try { anh = await SuCoAnh.load(r.id_su_co); } catch (er) { showMsg('Lỗi tải ảnh: ' + er.message, 'err', 4000); }
   if (xlEditing !== r) return;
@@ -1105,6 +1125,151 @@ function closeXl(){
   loadXl();
 }
 
+// ── Linh kiện / vật tư tiêu hao dùng cho sự cố (T107) ──────────────────────
+// Ghi thẳng vào sổ kho linh kiện (khuon_lk_ghi_giao_dich, gắn id_su_co): xuất
+// dùng trừ tồn Chờ sử dụng ngay; cái cũ tháo ra / trả lại kho = phiếu tháo ra.
+const LK_THAY_ROLES = ['nhan_vien_bao_duong_khuon', 'nhan_vien_thong_ke', 'admin'];
+const LK_LY_DO = ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay theo vấn đề khuôn', 'Vật tư tiêu hao xử lý sự cố'];
+const LK_THAO = { cho_su_dung: 'Cái cũ → Chờ sử dụng', cho_sua: 'Cái cũ → Chờ sửa', phe: 'Cái cũ → Phế' };
+const LK_TRA_LAI = 'Trả lại kho (ghi nhầm / dùng không hết)';
+const laTraLai = g => g.loai === 'thao_ra' && g.ket_qua_thao === 'cho_su_dung' && g.muc_dich === LK_TRA_LAI;
+let xlLk = { dm: [], gan: [], gd: [] };
+
+async function xlLkLoad(r, sua){
+  const box = document.getElementById('xl-lk');
+  box.innerHTML = '<h4>🔩 Linh kiện / vật tư tiêu hao đã dùng</h4><div class="ton">Đang tải…</div>';
+  const [dm, gan, gd] = await Promise.all([
+    sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,don_vi,ton_cho_su_dung').eq('dang_dung', true).order('ma_lk'),
+    r.so_khuon ? sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').eq('ma_khuon', r.so_khuon) : Promise.resolve({ data: [] }),
+    sb.from('khuon_lk_giao_dich').select('id,thoi_diem,loai,id_lk,ma_lk,ten_lk,so_luong,ma_khuon,vi_tri,ket_qua_thao,muc_dich,nguoi')
+      .eq('id_su_co', r.id_su_co).order('thoi_diem'),
+  ]);
+  if (xlEditing !== r) return;
+  const err = dm.error || gan.error || gd.error;
+  if (err) { box.innerHTML = '<h4>🔩 Linh kiện / vật tư tiêu hao đã dùng</h4><div class="ton">Lỗi tải: ' + escapeHtml(err.message) + '</div>'; return; }
+  xlLk = { dm: dm.data || [], gan: gan.data || [], gd: gd.data || [] };
+  xlLkRender(r, sua);
+}
+
+function xlLkRender(r, sua){
+  const box = document.getElementById('xl-lk');
+  const ghi = sua && LK_THAY_ROLES.includes(myRole);
+  const lkById = id => xlLk.dm.find(x => Number(x.id) === Number(id));
+  const dv = id => { const lk = lkById(id); return lk ? ' ' + escapeHtml(lk.don_vi) : ''; };
+  let h = '<h4>🔩 Linh kiện / vật tư tiêu hao đã dùng</h4>';
+  h += xlLk.gd.length
+    ? '<table><thead><tr><th>Thời điểm</th><th>Phiếu</th><th>Linh kiện / vật tư</th><th style="text-align:right">SL</th><th>Khuôn</th><th>Người ghi</th>' + (ghi ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      xlLk.gd.map(g => '<tr><td style="white-space:nowrap">' + fmtTs(g.thoi_diem) + '</td>' +
+        '<td>' + (g.loai === 'xuat_thay' ? '<b>Xuất dùng</b>' : laTraLai(g) ? '↩ Trả lại kho' : escapeHtml(LK_THAO[g.ket_qua_thao] || 'Tháo ra')) + (g.muc_dich && !laTraLai(g) ? SUB(escapeHtml(g.muc_dich)) : '') + '</td>' +
+        '<td><b>' + escapeHtml(g.ma_lk) + '</b>' + SUB(escapeHtml(g.ten_lk)) + '</td>' +
+        '<td class="num">' + (laTraLai(g) ? '−' : '') + fmtNum(g.so_luong) + dv(g.id_lk) + '</td>' +
+        '<td>' + escapeHtml(g.ma_khuon || '—') + (g.vi_tri ? SUB(escapeHtml(g.vi_tri)) : '') + '</td>' +
+        '<td>' + escapeHtml(g.nguoi) + '</td>' +
+        (ghi ? '<td>' + (g.loai === 'xuat_thay' ? '<button type="button" class="tra" data-tra="' + g.id + '" title="Ghi nhầm / dùng không hết — trả về tồn Chờ sử dụng">↩ Trả lại</button>' : '') + '</td>' : '') +
+        '</tr>').join('') + '</tbody></table>'
+    : '<div class="ton">Chưa ghi linh kiện / vật tư nào cho sự cố này.</div>';
+  if (ghi) {
+    const ganIds = new Set(xlLk.gan.map(g => Number(g.id_lk)));
+    const opt = x => '<option value="' + escapeHtml(x.ma_lk) + '">' + escapeHtml(x.ten_lk + ' · tồn ' + fmtNum(x.ton_cho_su_dung) + ' ' + x.don_vi) + '</option>';
+    h += '<div class="add">' +
+      '<input id="xl-lk-ma" list="dlXlLk" placeholder="Mã / tên linh kiện, vật tư" autocomplete="off">' +
+      '<input id="xl-lk-sl" type="number" min="0" step="any" value="1" title="Số lượng">' +
+      '<input id="xl-lk-ly" list="dlXlLkLy" placeholder="Lý do (VD: Mòn, Gãy…)">' +
+      '<div class="w">' +
+        (r.so_khuon ? '' : '<input id="xl-lk-khuon" placeholder="Khuôn (sự cố không ghi khuôn)">') +
+        '<select id="xl-lk-cu" title="Linh kiện cũ tháo ra khỏi khuôn"><option value="">Cái cũ tháo ra: không ghi</option>' +
+          '<option value="phe">Cái cũ tháo ra → Phế</option><option value="cho_sua">Cái cũ tháo ra → Chờ sửa</option>' +
+          '<option value="cho_su_dung">Cái cũ tháo ra → Chờ sử dụng</option></select>' +
+        '<button type="button" class="btn" id="xl-lk-them">＋ Ghi xuất dùng</button>' +
+      '</div>' +
+      '<div class="w ton" id="xl-lk-ton">Xuất dùng trừ ngay tồn Chờ sử dụng. Linh kiện gắn với khuôn ' + escapeHtml(r.so_khuon || '') + ' hiện đầu danh sách.</div>' +
+      '</div>' +
+      '<datalist id="dlXlLk">' + xlLk.dm.filter(x => ganIds.has(Number(x.id))).map(opt).join('') +
+        xlLk.dm.filter(x => !ganIds.has(Number(x.id))).map(opt).join('') + '</datalist>' +
+      '<datalist id="dlXlLkLy">' + LK_LY_DO.map(v => '<option value="' + escapeHtml(v) + '">').join('') + '</datalist>';
+  } else if (sua) {
+    h += '<div class="ton" style="margin-top:6px">🔒 Chỉ NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
+  }
+  box.innerHTML = h;
+  if (!ghi) return;
+  const maEl = document.getElementById('xl-lk-ma');
+  maEl.addEventListener('input', () => {
+    const lk = xlLk.dm.find(x => x.ma_lk === maEl.value.trim());
+    const tieuHao = lk && lk.loai === 'vat_tu_tieu_hao';
+    document.getElementById('xl-lk-cu').hidden = tieuHao;
+    if (tieuHao) document.getElementById('xl-lk-cu').value = '';
+    document.getElementById('xl-lk-ton').innerHTML = lk
+      ? '<span><b>' + escapeHtml(lk.ma_lk) + '</b> — ' + escapeHtml(lk.ten_lk) + (tieuHao ? ' (vật tư tiêu hao)' : '') +
+        ' · tồn Chờ sử dụng <b>' + fmtNum(lk.ton_cho_su_dung) + '</b> ' + escapeHtml(lk.don_vi) + '</span>'
+      : 'Chọn linh kiện có trong danh mục (trang Linh kiện dự phòng khuôn).';
+  });
+  document.getElementById('xl-lk-them').addEventListener('click', e => xlLkXuat(r, sua, e.target));
+  box.querySelectorAll('[data-tra]').forEach(b => b.addEventListener('click', () => xlLkTraLai(r, sua, Number(b.dataset.tra), b)));
+}
+
+async function xlLkGhi(args){
+  const { data, error } = await sb.rpc('khuon_lk_ghi_giao_dich', args);
+  if (error || !data || !data.ok) throw new Error(rpcErr(data, error));
+  return data;
+}
+
+async function xlLkXuat(r, sua, btn){
+  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const lk = xlLk.dm.find(x => x.ma_lk === v('xl-lk-ma'));
+  const sl = Number(v('xl-lk-sl'));
+  const khuon = r.so_khuon || v('xl-lk-khuon');
+  const tieuHao = lk && lk.loai === 'vat_tu_tieu_hao';
+  const loi = [];
+  if (!lk) loi.push({ text: 'Chọn linh kiện / vật tư có trong danh mục', id: 'xl-lk-ma' });
+  if (!(sl > 0)) loi.push({ text: 'Số lượng phải > 0', id: 'xl-lk-sl' });
+  if (lk && !tieuHao && !khuon) loi.push({ text: 'Nhập khuôn được thay linh kiện', id: 'xl-lk-khuon' });
+  if (loi.length) return xlBaoLoi(loi, 'Chưa ghi được linh kiện:');
+  xlBaoLoi([]);
+  const cu = tieuHao ? '' : v('xl-lk-cu');
+  const g = xlLk.gan.find(x => Number(x.id_lk) === Number(lk.id));
+  const lyDo = v('xl-lk-ly') || (tieuHao ? 'Vật tư tiêu hao xử lý sự cố' : 'Thay theo vấn đề khuôn');
+  if (!confirm('Xuất ' + fmtNum(sl) + ' ' + lk.don_vi + ' ' + lk.ma_lk + ' — ' + lk.ten_lk + ' cho sự cố ' + r.id_su_co + '?\nTồn Chờ sử dụng sẽ bị trừ ngay.' +
+    (cu ? '\nĐồng thời ghi cái cũ tháo ra → ' + LK_THAO[cu].replace('Cái cũ → ', '') + '.' : ''))) return;
+  btn.disabled = true;
+  const chung = { p_id_lk: lk.id, p_so_luong: sl, p_ma_khuon: khuon || null, p_vi_tri: g ? g.vi_tri_lap : null, p_id_su_co: r.id_su_co };
+  try {
+    await xlLkGhi({ ...chung, p_loai: 'xuat_thay', p_muc_dich: lyDo });
+    if (cu) {
+      try { await xlLkGhi({ ...chung, p_loai: 'thao_ra', p_ket_qua_thao: cu, p_muc_dich: 'Tháo ra khi xử lý sự cố' }); }
+      catch (er) { xlBaoLoi([{ text: 'Đã xuất dùng nhưng chưa ghi được cái cũ tháo ra: ' + er.message }], 'Lưu ý:'); }
+    }
+    showMsg('✓ Đã ghi xuất ' + lk.ma_lk, 'ok', 2500);
+    await xlLkLoad(r, sua);
+  } catch (er) {
+    xlBaoLoi([{ text: er.message }], 'Chưa ghi được linh kiện:');
+  } finally { btn.disabled = false; }
+}
+
+async function xlLkTraLai(r, sua, idGd, btn){
+  const g = xlLk.gd.find(x => Number(x.id) === idGd);
+  if (!g) return;
+  const traRoi = xlLk.gd.filter(x => laTraLai(x) && Number(x.id_lk) === Number(g.id_lk))
+    .reduce((s, x) => s + Number(x.so_luong), 0);
+  const xuat = xlLk.gd.filter(x => x.loai === 'xuat_thay' && Number(x.id_lk) === Number(g.id_lk)).reduce((s, x) => s + Number(x.so_luong), 0);
+  const conLai = xuat - traRoi;
+  if (conLai <= 0) return xlBaoLoi([{ text: g.ma_lk + ' đã trả lại hết số đã xuất cho sự cố này' }], 'Không trả lại được:');
+  const nhap = prompt('Trả lại kho ' + g.ma_lk + ' — ' + g.ten_lk + ' (còn có thể trả ' + fmtNum(conLai) + '). Số lượng trả lại:', String(Math.min(Number(g.so_luong), conLai)));
+  if (nhap == null) return;
+  const sl = Number(String(nhap).replace(',', '.'));
+  if (!(sl > 0) || sl > conLai) return xlBaoLoi([{ text: 'Số lượng trả lại phải > 0 và ≤ ' + fmtNum(conLai) }], 'Không trả lại được:');
+  btn.disabled = true;
+  try {
+    await xlLkGhi({ p_loai: 'thao_ra', p_id_lk: g.id_lk, p_so_luong: sl, p_ma_khuon: g.ma_khuon, p_vi_tri: g.vi_tri,
+      p_ket_qua_thao: 'cho_su_dung', p_muc_dich: LK_TRA_LAI, p_id_su_co: r.id_su_co });
+    xlBaoLoi([]);
+    showMsg('✓ Đã trả lại ' + fmtNum(sl) + ' ' + g.ma_lk, 'ok', 2500);
+    await xlLkLoad(r, sua);
+  } catch (er) {
+    xlBaoLoi([{ text: er.message }], 'Không trả lại được:');
+    btn.disabled = false;
+  }
+}
+
 // Khung báo lỗi cố định trong form + tô đỏ ô thiếu (thông báo nổi tự tắt sau vài giây, dễ bị bỏ lỡ).
 // loi: [{ text, id? }] — id = phần tử cần tô đỏ.
 function xlBaoLoi(loi, tieuDe){
@@ -1114,7 +1279,7 @@ function xlBaoLoi(loi, tieuDe){
   if (!loi.length) { box.innerHTML = ''; return; }
   box.innerHTML = '<b>⚠ ' + escapeHtml(tieuDe || 'Chưa hoàn thành được — còn thiếu:') + '</b><ul>' +
     loi.map(l => '<li>' + escapeHtml(l.text) + '</li>').join('') + '</ul>';
-  loi.forEach(l => { if (l.id) document.getElementById(l.id).classList.add('xl-thieu'); });
+  loi.forEach(l => { const el = l.id && document.getElementById(l.id); if (el) el.classList.add('xl-thieu'); });
   box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 function xlThieuDeHoanThanh(){
@@ -1125,8 +1290,8 @@ function xlThieuDeHoanThanh(){
   if (!v('xl-bd')) loi.push({ text: 'Thời gian bắt đầu xử lý', id: 'xl-bd' });
   if (!v('xl-kt')) loi.push({ text: 'Thời gian kết thúc xử lý', id: 'xl-kt' });
   if (!v('xl-nd')) loi.push({ text: 'Nguyên nhân / nội dung xử lý', id: 'xl-nd' });
-  if (!soAnh('truoc')) loi.push({ text: 'Ít nhất 1 ảnh trước xử lý (hiện trạng)', id: 'xl-anh-truoc' });
-  if (!soAnh('sau')) loi.push({ text: 'Ít nhất 1 ảnh sau xử lý', id: 'xl-anh-sau' });
+  if (xlBatBuocAnh && !soAnh('truoc')) loi.push({ text: 'Ít nhất 1 ảnh trước xử lý (hiện trạng)', id: 'xl-anh-truoc' });
+  if (xlBatBuocAnh && !soAnh('sau')) loi.push({ text: 'Ít nhất 1 ảnh sau xử lý', id: 'xl-anh-sau' });
   return loi;
 }
 ['xl-chinh','xl-bd','xl-kt','xl-nd'].forEach(id => ['input','change'].forEach(ev =>

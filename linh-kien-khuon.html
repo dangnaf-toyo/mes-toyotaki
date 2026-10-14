@@ -241,7 +241,7 @@ tr.off td{color:var(--text-dim)}
       <span class="lbl">đến</span><input type="date" id="hDen">
       <select id="hLoai"></select>
       <input id="hKhuon" list="dlKhuon" placeholder="Khuôn" style="width:150px">
-      <input type="search" id="hLk" placeholder="Mã / tên linh kiện" style="width:180px">
+      <input type="search" id="hLk" placeholder="Mã / tên linh kiện / sự cố" style="width:200px">
       <button type="button" class="btn btn-outline" id="hTai">↻ Xem</button>
       <span class="spacer"></span>
       <span class="hint" id="hDem"></span>
@@ -322,7 +322,7 @@ tr.off td{color:var(--text-dim)}
       <div class="ton-box" id="gd-ton">—</div>
       <div class="fg"><label>Loại phiếu *</label><div class="radios" id="gd-loai"></div></div>
       <div class="row2" data-show="xuat_thay thao_ra">
-        <div class="fg"><label>Khuôn *</label><input id="gd-khuon" list="dlKhuon" placeholder="Mã khuôn"></div>
+        <div class="fg"><label>Khuôn * <span style="text-transform:none;font-weight:400">(vật tư tiêu hao: không bắt buộc)</span></label><input id="gd-khuon" list="dlKhuon" placeholder="Mã khuôn"></div>
         <div class="fg"><label>Vị trí trên khuôn</label><input id="gd-vi-tri" placeholder="VD: Insert lòng 1"></div>
       </div>
       <div class="fg" data-show="nhap xuat_thay thao_ra sua_xong bao_phe"><label>Số lượng *</label><input type="number" id="gd-sl" min="0" step="1"></div>
@@ -394,16 +394,16 @@ const TABS = ['ton', 'khuon', 'danh-muc', 'lich-su'];
 const LOAI = {
   insert: 'Insert tạo hình', pin_tao_lo: 'Pin tạo lỗ', loi_truot: 'Lõi trượt', ejector_pin: 'Ejector pin',
   return_pin: 'Return pin', co_khuon: 'Cổ khuôn', plunger_tip: 'Plunger tip', sleeve: 'Sleeve',
-  lo_xo: 'Lò xo', dau_noi_nuoc: 'Đầu nối nước', khac: 'Khác',
+  lo_xo: 'Lò xo', dau_noi_nuoc: 'Đầu nối nước', khac: 'Khác', vat_tu_tieu_hao: 'Vật tư tiêu hao',
 };
 const PHAM_VI = { rieng: 'Riêng khuôn', chung: 'Dùng chung' };
 // Quy tắc đặt mã (hộp 📏 ở tab Danh mục): mã nhóm 3 chữ theo loại.
 const LOAI_MA = {
   insert: 'INS', pin_tao_lo: 'PIN', loi_truot: 'SLC', ejector_pin: 'EJP', return_pin: 'RTP',
-  co_khuon: 'SPB', plunger_tip: 'PLG', sleeve: 'SLV', lo_xo: 'SPR', dau_noi_nuoc: 'WTC', khac: 'OTH',
+  co_khuon: 'SPB', plunger_tip: 'PLG', sleeve: 'SLV', lo_xo: 'SPR', dau_noi_nuoc: 'WTC', khac: 'OTH', vat_tu_tieu_hao: 'CSM',
 };
 const LOAI_MA_EN = { INS: 'Insert', PIN: 'Core pin', SLC: 'Slide core', EJP: 'Ejector pin', RTP: 'Return pin',
-  SPB: 'Sprue bush', PLG: 'Plunger tip', SLV: 'Sleeve', SPR: 'Spring', WTC: 'Water connector', OTH: 'Other' };
+  SPB: 'Sprue bush', PLG: 'Plunger tip', SLV: 'Sleeve', SPR: 'Spring', WTC: 'Water connector', OTH: 'Other', CSM: 'Consumable' };
 const GD = {
   nhap:      ['📥 Nhập', 'quan_ly'],
   xuat_thay: ['🔧 Xuất thay vào khuôn', 'thay'],
@@ -414,7 +414,7 @@ const GD = {
 };
 const MUC_DICH = {
   nhap: ['Mua mới', 'Chế tạo / gia công', 'Nhận lại từ nơi khác'],
-  xuat_thay: ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay định kỳ', 'Thay theo vấn đề khuôn'],
+  xuat_thay: ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay định kỳ', 'Thay theo vấn đề khuôn', 'Vật tư tiêu hao'],
   thao_ra: ['Thay linh kiện mới', 'Tháo kiểm tra'],
   sua_xong: ['Sửa nội bộ', 'Gửi sửa ngoài'],
   bao_phe: ['Hỏng không sửa được', 'Hết tuổi thọ', 'Khuôn trả khách / báo phế'],
@@ -910,7 +910,7 @@ async function loadLichSu(){
   const { data, error } = await req;
   if (error) { tb.innerHTML = '<tr><td colspan="11" class="empty">Lỗi: ' + escapeHtml(error.message) + '</td></tr>'; return; }
   const ql = q.toLowerCase();
-  gdLs = (data || []).filter(x => !ql || (x.ma_lk + ' ' + x.ten_lk).toLowerCase().includes(ql));
+  gdLs = (data || []).filter(x => !ql || (x.ma_lk + ' ' + x.ten_lk + ' ' + (x.id_su_co || '')).toLowerCase().includes(ql));
   document.getElementById('hDem').textContent = gdLs.length + ' phiếu' + (gdLs.length >= 3000 ? ' (tối đa 3000 — thu hẹp khoảng ngày)' : '');
   if (!gdLs.length) { tb.innerHTML = '<tr><td colspan="11" class="empty">Không có giao dịch trong khoảng lọc</td></tr>'; return; }
   const dl = n => Number(n) ? '<span class="' + (n > 0 ? 'delta-p' : 'delta-m') + '">' + (n > 0 ? '+' : '') + fmtNum(n) + '</span>' : '0';
@@ -921,17 +921,17 @@ async function loadLichSu(){
     '<td class="num">' + fmtNum(x.so_luong) + '</td><td class="num">' + dl(Number(x.delta_cho_su_dung)) + ' / ' + dl(Number(x.delta_cho_sua)) + '</td>' +
     '<td class="num">' + fmtNum(x.ton_sau_cho_su_dung) + ' / ' + fmtNum(x.ton_sau_cho_sua) + '</td>' +
     '<td>' + (x.ma_khuon ? '<b>' + escapeHtml(x.ma_khuon) + '</b>' + (x.vi_tri ? '<small>' + escapeHtml(x.vi_tri) + '</small>' : '') : '—') + '</td>' +
-    '<td class="num">' + fmtNum(x.shot_khuon) + '</td><td>' + escapeHtml(x.muc_dich || '—') + '</td>' +
+    '<td class="num">' + fmtNum(x.shot_khuon) + '</td><td>' + escapeHtml(x.muc_dich || '—') + (x.id_su_co ? '<small>Sự cố ' + escapeHtml(x.id_su_co) + '</small>' : '') + '</td>' +
     '<td>' + escapeHtml(x.nguoi) + '<small>' + escapeHtml(x.vai_tro) + '</small></td><td>' + escapeHtml(x.ghi_chu) + '</td></tr>').join('');
 }
 function xuatLichSu(){
   if (!gdLs.length) return showMsg('Không có dữ liệu để xuất', 'err');
   const rows = [['Thời điểm', 'Loại', 'Mã LK', 'Tên LK', 'SL', 'Thay đổi Chờ sử dụng', 'Thay đổi Chờ sửa', 'Tồn sau Chờ sử dụng', 'Tồn sau Chờ sửa',
-    'Khuôn', 'Vị trí', 'Shot khuôn', 'Tháo ra →', 'Mục đích / lý do', 'Người ghi', 'Vai trò', 'Ghi chú'],
+    'Khuôn', 'Vị trí', 'Shot khuôn', 'Tháo ra →', 'Mục đích / lý do', 'Sự cố', 'Người ghi', 'Vai trò', 'Ghi chú'],
     ...gdLs.map(x => [fmtDT(x.thoi_diem), GD[x.loai] ? GD[x.loai][0].replace(/^\S+ /, '') : x.loai, x.ma_lk, x.ten_lk, Number(x.so_luong),
       Number(x.delta_cho_su_dung), Number(x.delta_cho_sua), Number(x.ton_sau_cho_su_dung), Number(x.ton_sau_cho_sua),
       x.ma_khuon || '', x.vi_tri, x.shot_khuon == null ? '' : Number(x.shot_khuon),
-      { cho_su_dung: 'Chờ sử dụng', cho_sua: 'Chờ sửa', phe: 'Phế' }[x.ket_qua_thao] || '', x.muc_dich, x.nguoi, x.vai_tro, x.ghi_chu])];
+      { cho_su_dung: 'Chờ sử dụng', cho_sua: 'Chờ sửa', phe: 'Phế' }[x.ket_qua_thao] || '', x.muc_dich, x.id_su_co || '', x.nguoi, x.vai_tro, x.ghi_chu])];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Giao dịch');
   XLSX.writeFile(wb, 'giao-dich-linh-kien_' + isoDate(new Date()) + '.xlsx');
