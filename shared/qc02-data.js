@@ -46,7 +46,14 @@ const Qc02Data = (() => {
     // Share simultaneous reads; do not retain data after completion. Focus re-reads new staff.
     if (!directoryRequest) directoryRequest = readDirectory().finally(()=>{directoryRequest=null;});
     const rows = await directoryRequest;
-    return rows.filter(r => (!role || r.roles?.includes(role.toLowerCase())) && (!department || r.departments?.includes(department)));
+    const roles = (Array.isArray(role) ? role : role ? [role] : []).map(x => String(x).toLowerCase());
+    return rows.filter(r => (!roles.length || roles.some(x => r.roles?.includes(x))) && (!department || r.departments?.includes(department)));
+  }
+  const employeeValue = r => r.code + '_' + r.name;
+  // T110: giá trị đang nhập có đúng 1 người trong danh sách (theo vai trò) không.
+  async function isEmployee(value, roles) {
+    const v = String(value || '').trim();
+    return !!v && (await employees(roles)).some(r => employeeValue(r) === v);
   }
   function populate(list, rows, value, label) {
     list.replaceChildren();
@@ -54,12 +61,14 @@ const Qc02Data = (() => {
       const option = document.createElement('option'); option.value = value(row); option.label = label(row); list.append(option);
     });
   }
-  function attachEmployees(ids) {
-    const list = document.createElement('datalist'); list.id = 'qc02-employees'; document.body.append(list);
+  // opts.roles: chỉ gợi ý người có 1 trong các vai trò (VD IQC: ['iqc','qc_manager']).
+  function attachEmployees(ids, opts = {}) {
+    const roles = opts.roles || null;
+    const list = document.createElement('datalist'); list.id = 'qc02-employees' + (roles ? '-' + roles.join('-') : ''); document.body.append(list);
     let request = 0;
     async function refresh() {
       const current = ++request;
-      try { const rows=await employees(); if(current===request)populate(list, rows, r => r.code + '_' + r.name, r => r.name); }
+      try { const rows=await employees(roles); if(current===request)populate(list, rows, employeeValue, r => r.name); }
       catch (e) { console.error('Không tải được danh mục nhân sự QC', e); }
     }
     ids.forEach(id => {
@@ -105,5 +114,5 @@ const Qc02Data = (() => {
       inspection_minutes:'Thời gian kiểm (phút)', created_at:'Ngày tạo', updated_at:'Ngày cập nhật', created_by:'Người tạo' };
     if (target) Qc02View.table(target, ['Thông tin', 'Nội dung'], Object.entries(row || {}).map(([k,v]) => [labels[k] || k.replace(/_/g,' '), v ?? '—']));
   }
-  return { readAll, employees, employeeText, attachEmployees, products, standard, lotDetails };
+  return { readAll, employees, employeeText, attachEmployees, isEmployee, products, standard, lotDetails };
 })();
