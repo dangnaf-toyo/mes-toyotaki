@@ -1139,13 +1139,13 @@ const LK_LY_DO = ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay theo vấn 
 const LK_THAO = { cho_su_dung: 'Cái cũ → Chờ sử dụng', cho_sua: 'Cái cũ → Chờ sửa', phe: 'Cái cũ → Phế' };
 const LK_TRA_LAI = 'Trả lại kho (ghi nhầm / dùng không hết)';
 const laTraLai = g => g.loai === 'thao_ra' && g.ket_qua_thao === 'cho_su_dung' && g.muc_dich === LK_TRA_LAI;
-let xlLk = { dm: [], gan: [], gd: [] };
+let xlLk = { dm: [], gan: [], gd: [], chon: [] };   // chon = danh sách được chọn (T111)
 
 async function xlLkLoad(r, sua){
   const box = document.getElementById('xl-lk');
   box.innerHTML = '<h4>🔩 Linh kiện / vật tư tiêu hao đã dùng</h4><div class="ton">Đang tải…</div>';
   const [dm, gan, gd] = await Promise.all([
-    sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,don_vi,ton_cho_su_dung').eq('dang_dung', true).order('ma_lk'),
+    sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,pham_vi,don_vi,ton_cho_su_dung').eq('dang_dung', true).order('ma_lk'),
     r.so_khuon ? sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').eq('ma_khuon', r.so_khuon) : Promise.resolve({ data: [] }),
     sb.from('khuon_lk_giao_dich').select('id,thoi_diem,loai,id_lk,ma_lk,ten_lk,so_luong,ma_khuon,vi_tri,ket_qua_thao,muc_dich,nguoi')
       .eq('id_su_co', r.id_su_co).order('thoi_diem'),
@@ -1153,7 +1153,7 @@ async function xlLkLoad(r, sua){
   if (xlEditing !== r) return;
   const err = dm.error || gan.error || gd.error;
   if (err) { box.innerHTML = '<h4>🔩 Linh kiện / vật tư tiêu hao đã dùng</h4><div class="ton">Lỗi tải: ' + escapeHtml(err.message) + '</div>'; return; }
-  xlLk = { dm: dm.data || [], gan: gan.data || [], gd: gd.data || [] };
+  xlLk = { dm: dm.data || [], gan: gan.data || [], gd: gd.data || [], chon: [] };
   xlLkRender(r, sua);
 }
 
@@ -1175,7 +1175,9 @@ function xlLkRender(r, sua){
         '</tr>').join('') + '</tbody></table>'
     : '<div class="ton">Chưa ghi linh kiện / vật tư nào cho sự cố này.</div>';
   if (ghi) {
+    // T111: sự cố có khuôn → chỉ chọn linh kiện riêng gán cho khuôn + linh kiện dùng chung + vật tư tiêu hao.
     const ganIds = new Set(xlLk.gan.map(g => Number(g.id_lk)));
+    const chon = xlLk.chon = r.so_khuon ? xlLk.dm.filter(x => ganIds.has(Number(x.id)) || x.pham_vi === 'chung' || x.loai === 'vat_tu_tieu_hao') : xlLk.dm;
     const opt = x => '<option value="' + escapeHtml(x.ma_lk) + '">' + escapeHtml(x.ten_lk + ' · tồn ' + fmtNum(x.ton_cho_su_dung) + ' ' + x.don_vi) + '</option>';
     h += '<div class="add">' +
       '<input id="xl-lk-ma" list="dlXlLk" placeholder="Mã / tên linh kiện, vật tư" autocomplete="off">' +
@@ -1188,10 +1190,13 @@ function xlLkRender(r, sua){
           '<option value="cho_su_dung">Cái cũ tháo ra → Chờ sử dụng</option></select>' +
         '<button type="button" class="btn" id="xl-lk-them">＋ Ghi xuất dùng</button>' +
       '</div>' +
-      '<div class="w ton" id="xl-lk-ton">Xuất dùng trừ ngay tồn Chờ sử dụng. Linh kiện gắn với khuôn ' + escapeHtml(r.so_khuon || '') + ' hiện đầu danh sách.</div>' +
+      '<div class="w ton" id="xl-lk-ton">Xuất dùng trừ ngay tồn Chờ sử dụng.' + (r.so_khuon
+        ? ' Danh sách = linh kiện riêng của khuôn ' + escapeHtml(r.so_khuon) + ' + linh kiện dùng chung + vật tư tiêu hao' +
+          (xlLk.gan.length ? '.' : ' — khuôn này <b>chưa gán linh kiện riêng</b>, gán ở trang <a href="linh-kien-khuon.html" target="_blank" rel="noopener">Linh kiện dự phòng khuôn</a>.')
+        : '') + '</div>' +
       '</div>' +
-      '<datalist id="dlXlLk">' + xlLk.dm.filter(x => ganIds.has(Number(x.id))).map(opt).join('') +
-        xlLk.dm.filter(x => !ganIds.has(Number(x.id))).map(opt).join('') + '</datalist>' +
+      '<datalist id="dlXlLk">' + chon.filter(x => ganIds.has(Number(x.id))).map(opt).join('') +
+        chon.filter(x => !ganIds.has(Number(x.id))).map(opt).join('') + '</datalist>' +
       '<datalist id="dlXlLkLy">' + LK_LY_DO.map(v => '<option value="' + escapeHtml(v) + '">').join('') + '</datalist>';
   } else if (sua) {
     h += '<div class="ton" style="margin-top:6px">🔒 Chỉ NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
@@ -1200,7 +1205,7 @@ function xlLkRender(r, sua){
   if (!ghi) return;
   const maEl = document.getElementById('xl-lk-ma');
   maEl.addEventListener('input', () => {
-    const lk = xlLk.dm.find(x => x.ma_lk === maEl.value.trim());
+    const lk = xlLk.chon.find(x => x.ma_lk === maEl.value.trim());
     const tieuHao = lk && lk.loai === 'vat_tu_tieu_hao';
     document.getElementById('xl-lk-cu').hidden = tieuHao;
     if (tieuHao) document.getElementById('xl-lk-cu').value = '';
@@ -1221,12 +1226,12 @@ async function xlLkGhi(args){
 
 async function xlLkXuat(r, sua, btn){
   const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-  const lk = xlLk.dm.find(x => x.ma_lk === v('xl-lk-ma'));
+  const lk = xlLk.chon.find(x => x.ma_lk === v('xl-lk-ma'));
   const sl = Number(v('xl-lk-sl'));
   const khuon = r.so_khuon || v('xl-lk-khuon');
   const tieuHao = lk && lk.loai === 'vat_tu_tieu_hao';
   const loi = [];
-  if (!lk) loi.push({ text: 'Chọn linh kiện / vật tư có trong danh mục', id: 'xl-lk-ma' });
+  if (!lk) loi.push({ text: r.so_khuon ? 'Chọn linh kiện riêng của khuôn ' + r.so_khuon + ' / linh kiện dùng chung / vật tư tiêu hao trong danh sách' : 'Chọn linh kiện / vật tư có trong danh mục', id: 'xl-lk-ma' });
   if (!(sl > 0)) loi.push({ text: 'Số lượng phải > 0', id: 'xl-lk-sl' });
   if (lk && !tieuHao && !khuon) loi.push({ text: 'Nhập khuôn được thay linh kiện', id: 'xl-lk-khuon' });
   if (loi.length) return xlBaoLoi(loi, 'Chưa ghi được linh kiện:');
