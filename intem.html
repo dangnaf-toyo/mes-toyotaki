@@ -123,6 +123,16 @@ textarea{resize:vertical;min-height:48px}
 .chip-row:empty{display:none;margin:0}
 .chip-opt{padding:6px 11px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:700;background:var(--bg-panel);color:var(--text-muted);cursor:pointer;font-family:inherit}
 .chip-opt.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+.khoa-hint{margin-top:10px;padding:8px 10px;border-radius:6px;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FECACA;font-size:12px;font-weight:600}
+.nk-wrap{overflow-x:auto;margin-top:10px}
+.nk-table{width:100%;border-collapse:collapse;font-size:12px}
+.nk-table th,.nk-table td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+.nk-table th{background:var(--bg-sunken);font-weight:700;white-space:nowrap}
+.nk-table td.t{white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.nk-sk{display:inline-block;padding:1px 7px;border-radius:10px;font-weight:700;font-size:11px;white-space:nowrap}
+.nk-sk.in{background:#DCFCE7;color:#166534}.nk-sk.sua{background:#FEF3C7;color:#92400E}
+.nk-sk.xoa{background:#FEE2E2;color:#B91C1C}.nk-sk.cap_nhat{background:#E0E7FF;color:#3730A3}
+.nk-dim{color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -395,7 +405,12 @@ textarea{resize:vertical;min-height:48px}
             <option value="phattrien">Sản phẩm đang phát triển (in tem nền đen)</option>
           </select>
         </div>
+        <div class="fg full">
+          <label class="req" for="s_lyDo">Lý do sửa / xoá tem</label>
+          <input id="s_lyDo" type="text" placeholder="Bắt buộc khi Lưu thay đổi hoặc Xoá tem — VD: nhập nhầm số lượng, in trùng...">
+        </div>
       </div>
+      <div class="khoa-hint" id="s_khoa" style="display:none"></div>
       <div class="btns">
         <button class="btn btn-s" type="button" onclick="saveTemEdit()">💾 Lưu thay đổi</button>
         <button class="btn btn-s" type="button" onclick="reprintTem()">🖨 In lại</button>
@@ -420,6 +435,41 @@ textarea{resize:vertical;min-height:48px}
         <button class="btn btn-p" type="button" onclick="tachTem()">✂️ Tách tem & in tem con</button>
       </div>
       <div class="empty-hint" id="tachHistoryHint" style="text-align:left;padding-top:10px"></div>
+    </div>
+
+    <div class="card" id="lichSuTemCard" style="display:none">
+      <div class="card-ttl">Lịch sử tem <span id="lichSuTemTag"></span></div>
+      <div id="lichSuTemBody"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Nhật ký sửa / xoá tem</div>
+      <div class="grid">
+        <div class="fg">
+          <label for="nk_tu">Từ ngày</label>
+          <input id="nk_tu" type="date">
+        </div>
+        <div class="fg">
+          <label for="nk_den">Đến ngày</label>
+          <input id="nk_den" type="date">
+        </div>
+        <div class="fg">
+          <label for="nk_maSP">Mã sản phẩm</label>
+          <input id="nk_maSP" type="text" placeholder="Để trống = tất cả">
+        </div>
+        <div class="fg">
+          <label for="nk_loai">Thao tác</label>
+          <select id="nk_loai">
+            <option value="sua,xoa">Sửa + Xoá</option>
+            <option value="xoa">Chỉ Xoá</option>
+            <option value="sua">Chỉ Sửa</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-s" type="button" onclick="loadNhatKy()">🔎 Xem nhật ký</button>
+      </div>
+      <div id="nhatKyBody"></div>
     </div>
   </div>
 </div>
@@ -646,8 +696,17 @@ async function findTem(){
   showMsg("⏳ Đang tra cứu tem...","wait");
   const { data, error } = await sb.from('duc_tem').select('*').ilike('tag_no', tagNo);
   if (error) return err("Lỗi tra cứu: " + error.message);
-  if (!data || !data.length) return err("Không tìm thấy tem");
+  if (!data || !data.length) {
+    // T109: tem đã bị xoá vẫn còn trong nhật ký.
+    clearSearch();
+    const n = await loadLichSuTem(tagNo);
+    return n ? showMsg("⚠ Tem " + tagNo + " không còn trong hệ thống — xem Lịch sử tem bên dưới.", "err")
+             : err("Không tìm thấy tem");
+  }
   fillFormFromTem(temRowToClient(data[0]));
+  document.getElementById("s_lyDo").value = "";
+  hienKhoaTem(data[0]);
+  loadLichSuTem(data[0].tag_no);
 
   const realTagNo = data[0].tag_no;
   const { data: children } = await sb.from('duc_tem_tach').select('tag_no_con,so_luong_con,thoi_diem').eq('tag_no_cha', realTagNo).order('thoi_diem');
@@ -687,20 +746,25 @@ async function saveTemEdit(){
   var ngayGio = g("s_ngayGioGhiNhan");
   if (ngayGio && new Date(ngayGio).getTime() > Date.now() + 60000)
     return err("Ngày giờ SX thực tế không được ở tương lai");
+  var lyDo = g("s_lyDo");
+  if (lyDo.length < 3) { document.getElementById("s_lyDo").focus(); return err("Nhập lý do sửa tem"); }
+  // T109: sửa qua RPC (ghi nhật ký + chặn tem thuộc ca đã kết, trừ admin).
   var patch = {
     ten_sp: g("s_tenSP"), ma_sp: ma,
-    so_luong: Number(sl), so_luong_tt: Number(sl),
+    so_luong: Number(sl),
     lot: g("s_lotNo"),
-    so_khuon: g("s_soKhuon"), so_khuon_tt: g("s_soKhuon"),
+    so_khuon: g("s_soKhuon"),
     nguyen_lieu: g("s_nguyenLieu"),
-    may_duc_chi_thi: may, may_tt: may,
+    may_duc_chi_thi: may,
     ghi_chu: g("s_ghiChu"), nguoi_tt: nguoi,
     ngay_gio_ghi_nhan: dtLocalToISO(ngayGio),
   };
   showMsg("⏳ Đang lưu thay đổi...","wait");
-  const { error } = await sb.from('duc_tem').update(patch).ilike('tag_no', currentTagNo);
-  if (error) return err("Lỗi lưu: " + error.message);
+  const { data, error } = await sb.rpc('duc_tem_sua', { p_tag_no: currentTagNo, p_data: patch, p_ly_do: lyDo });
+  if (error || (data && data.ok === false)) return err("Lỗi lưu: " + (error ? error.message : data.error));
+  document.getElementById("s_lyDo").value = "";
   showMsg("✅ Đã lưu thay đổi cho tem " + currentTagNo, "ok", 3000);
+  loadLichSuTem(currentTagNo);
 }
 
 async function tachTem(){
@@ -769,14 +833,97 @@ async function reprintTem(){
 
 async function deleteTem(){
   if(!currentTagNo) return err("Tìm tem trước khi xóa");
-  if(!window.confirm("Xóa tem "+currentTagNo+" khỏi database?")) return;
+  var lyDo = g("s_lyDo");
+  if (lyDo.length < 3) { document.getElementById("s_lyDo").focus(); return err("Nhập lý do xoá tem"); }
+  if(!window.confirm("Xóa tem "+currentTagNo+"?\nLý do: "+lyDo)) return;
   if (!(await requireLoginOrRedirect())) return;
   showMsg("⏳ Đang xóa tem...","wait");
   const deletedTagNo = currentTagNo;
-  const { error } = await sb.from('duc_tem').delete().ilike('tag_no', currentTagNo);
-  if (error) return err("Lỗi xóa: " + error.message);
+  const { data, error } = await sb.rpc('duc_tem_xoa', { p_tag_no: currentTagNo, p_ly_do: lyDo });
+  if (error || (data && data.ok === false)) return err("Lỗi xóa: " + (error ? error.message : data.error));
   clearSearch();
   showMsg("✅ Đã xóa tem " + deletedTagNo, "ok", 3000);
+  loadLichSuTem(deletedTagNo);
+}
+
+// =============================================================================
+// T109: NHẬT KÝ TEM — in / sửa / xoá / cập nhật (duc_tem_nhat_ky, ghi bằng trigger)
+// =============================================================================
+var NK_SK = { in: 'In tem', sua: 'Sửa', xoa: 'Xoá', cap_nhat: 'Cập nhật' };
+var NK_COT = {
+  ma_sp: 'Mã SP', ten_sp: 'Tên SP', so_luong: 'SL', so_luong_tt: 'SL thực tế', lot: 'Ngày SX',
+  so_khuon: 'Khuôn', so_khuon_tt: 'Khuôn TT', nguyen_lieu: 'Nguyên liệu', may_duc_chi_thi: 'Máy',
+  may_tt: 'Máy TT', ghi_chu: 'Ghi chú', nguoi_tt: 'Người thao tác', ngay_gio_ghi_nhan: 'Giờ SX thực tế',
+  trang_thai: 'Trạng thái', tram_cong_doan: 'Công đoạn', ghi_chu_sl: 'Ghi chú SL'
+};
+function nkEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function nkTime(iso){
+  if (!iso) return '';
+  var d = new Date(iso);
+  return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+function nkVal(k, v){
+  if (v == null || v === '') return '∅';
+  if (/^ngay_gio|thoi_diem/.test(k) && /^\d{4}-\d\d-\d\dT/.test(String(v))) return nkTime(v);
+  return String(v);
+}
+// Tóm tắt 1 dòng nhật ký: in/xoá = nội dung tem; sửa/cập nhật = các cột đổi.
+function nkNoiDung(r){
+  var d = r.du_lieu || {};
+  if (r.su_kien === 'in' || r.su_kien === 'xoa') {
+    return nkEsc([d.ma_sp, 'SL ' + (d.so_luong_tt != null ? d.so_luong_tt : d.so_luong), d.may_tt || d.may_duc_chi_thi,
+      d.so_khuon, d.nguoi_tt, 'in ' + nkTime(d.ngay_gio_in)].filter(Boolean).join(' · '));
+  }
+  var td = r.thay_doi || {};
+  var keys = Object.keys(td).filter(k => !(k === 'so_luong_tt' && td.so_luong) && !(k === 'so_khuon_tt' && td.so_khuon) && !(k === 'may_tt' && td.may_duc_chi_thi));
+  return keys.map(k => '<b>' + nkEsc(NK_COT[k] || k) + '</b>: ' + nkEsc(nkVal(k, td[k].cu)) + ' → ' + nkEsc(nkVal(k, td[k].moi))).join('<br>');
+}
+function nkBang(rows, coTag){
+  if (!rows.length) return '<div class="empty-hint">Không có bản ghi.</div>';
+  return '<div class="nk-wrap"><table class="nk-table"><thead><tr><th>Thời điểm</th>' + (coTag ? '<th>Tag No</th>' : '') +
+    '<th>Thao tác</th><th>Nội dung</th><th>Người</th><th>Lý do</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td class="t">' + nkTime(r.thoi_diem) + '</td>' +
+      (coTag ? '<td class="t">' + nkEsc(r.tag_no) + '</td>' : '') +
+      '<td><span class="nk-sk ' + r.su_kien + '">' + (NK_SK[r.su_kien] || r.su_kien) + '</span>' +
+        (r.ca_da_ket ? '<div class="nk-dim">ca đã kết: ' + nkEsc(r.ca_da_ket.ca) + ' ' + nkEsc(r.ca_da_ket.ngay) + '</div>' : '') +
+        (r.su_kien === 'cap_nhat' || (r.su_kien === 'xoa' && !r.ly_do) ? '<div class="nk-dim">' + nkEsc(String(r.nguon || '').replace('/rpc/', '')) + '</div>' : '') + '</td>' +
+      '<td>' + nkNoiDung(r) + '</td><td>' + nkEsc(r.nguoi) + '</td><td>' + nkEsc(r.ly_do) + '</td></tr>').join('') +
+    '</tbody></table></div>';
+}
+// Lịch sử 1 tem (kể cả tem đã xoá). Trả về số dòng.
+async function loadLichSuTem(tagNo){
+  var card = document.getElementById('lichSuTemCard');
+  const { data, error } = await sb.from('duc_tem_nhat_ky').select('*').ilike('tag_no', tagNo).order('thoi_diem');
+  if (error) { card.style.display = 'block'; document.getElementById('lichSuTemBody').innerHTML = '<div class="empty-hint">Lỗi tải lịch sử: ' + nkEsc(error.message) + '</div>'; return 0; }
+  document.getElementById('lichSuTemTag').textContent = tagNo.toUpperCase();
+  document.getElementById('lichSuTemBody').innerHTML = (data || []).length ? nkBang(data, false)
+    : '<div class="empty-hint">Chưa có lịch sử (nhật ký tem ghi từ 15/10/2026).</div>';
+  card.style.display = 'block';
+  return (data || []).length;
+}
+async function loadNhatKy(){
+  var tu = g('nk_tu'), den = g('nk_den'), ma = g('nk_maSP'), loai = g('nk_loai').split(',');
+  if (!tu) { tu = getTodayString(); document.getElementById('nk_tu').value = tu; }
+  if (!den) { den = getTodayString(); document.getElementById('nk_den').value = den; }
+  var q = sb.from('duc_tem_nhat_ky').select('*').in('su_kien', loai)
+    .gte('thoi_diem', new Date(tu + 'T00:00:00').toISOString())
+    .lt('thoi_diem', new Date(new Date(den + 'T00:00:00').getTime() + 86400000).toISOString())
+    .order('thoi_diem', { ascending: false }).limit(500);
+  if (ma) q = q.ilike('du_lieu->>ma_sp', '%' + ma + '%');
+  document.getElementById('nhatKyBody').innerHTML = '<div class="empty-hint">Đang tải...</div>';
+  const { data, error } = await q;
+  document.getElementById('nhatKyBody').innerHTML = error ? '<div class="empty-hint">Lỗi: ' + nkEsc(error.message) + '</div>' : nkBang(data || [], true);
+}
+// Cảnh báo tem thuộc ca đã kết (server chặn, chỉ admin sửa / xoá).
+async function hienKhoaTem(r){
+  var el = document.getElementById('s_khoa');
+  el.style.display = 'none';
+  const { data } = await sb.rpc('duc_tem_ca_da_ket', { p_ma_may: r.may_tt, p_ma_sp: r.ma_sp, p_moc: r.ngay_gio_ghi_nhan || r.ngay_gio_in });
+  if (!data || currentTagNo !== r.tag_no) return;
+  var p = String(data.ngay || '').split('-');
+  el.textContent = '🔒 Tem thuộc ' + (data.ca || '') + ' ' + (p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : data.ngay) +
+    ' đã kết ca — chỉ tài khoản admin được sửa / xoá.';
+  el.style.display = 'block';
 }
 
 async function hoanTacTachTem(){
@@ -797,6 +944,8 @@ function clearSearch(){
   document.getElementById("searchResultCard").style.display = "none";
   document.getElementById("tachTemCard").style.display = "none";
   document.getElementById("btnHoanTacTach").style.display = "none";
+  document.getElementById("s_khoa").style.display = "none";
+  document.getElementById("lichSuTemCard").style.display = "none";
 }
 
 // ─── Quét QR trực tiếp qua camera — dùng thư viện html5-qrcode (mebjas), tự
