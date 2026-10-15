@@ -648,13 +648,14 @@ async function loadMoldBd(){
 function laQlbpDuc(){ return state.myRole === 'admin' || (state.myRole === 'quan_ly_bo_phan' && (state.myBoPhan || []).includes('Đúc')); }
 function fmtDM_(d){ if (!d) return ''; const x = new Date(String(d).length <= 10 ? d + 'T00:00:00' : d); return String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0'); }
 function moldBdInfo(maKhuon, maMay){
-  const d = state.moldBd.khuon[String(maKhuon || '').trim()];
+  const mk = String(maKhuon || '').trim();
+  const d = state.moldBd.khuon[mk];
   const may = String(maMay || '').replace(/\s+/g, '');
   const tiep = d && (d.may_gan_day || []).some(m => String(m || '').replace(/\s+/g, '') === may);
   let nhan, chiTiet, ok;
   if (d && d.ket_luan === 'dat') { ok = true; nhan = '✅ BD đạt ' + fmtDM_(d.ngay); chiTiet = 'Bảo dưỡng gần nhất ' + fmtDM_(d.ngay) + ' (' + (d.loai || '') + '): ĐẠT.'; }
   else if (d && d.ket_luan === 'khong_dat') { ok = false; nhan = '⛔ BD không đạt ' + fmtDM_(d.ngay); chiTiet = 'Bảo dưỡng gần nhất ' + fmtDM_(d.ngay) + ' (' + (d.loai || '') + '): KHÔNG ĐẠT.'; }
-  else { ok = false; nhan = '⛔ Chưa bảo dưỡng'; chiTiet = 'Khuôn chưa có lần bảo dưỡng ĐẠT nào.'; }
+  else { ok = false; nhan = '⛔ Chưa bảo dưỡng'; chiTiet = 'Khuôn chưa có check sheet bảo dưỡng nào Hoàn thành – ĐẠT.'; }
   if (ok || !state.moldBd.bat) return { chan: false, nhan, chiTiet };
   if (tiep) return { chan: false, nhan: nhan + ' · đang trên máy', chiTiet: chiTiet + ' Khuôn đang nằm trên máy này nên được chạy tiếp.' };
   const cp = d && d.cho_phep_tam;
@@ -662,7 +663,20 @@ function moldBdInfo(maKhuon, maMay){
     return { chan: false, nhan: '🔓 Cho phép tạm', chiTiet: chiTiet + ' ' + cp.nguoi + ' cho phép chạy tạm (' + cp.ly_do + '), 1 lần lên khuôn đến ' +
       new Date(cp.het_han).toLocaleString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) + '.' };
   }
-  return { chan: true, nhan, chiTiet: chiTiet + ' Không được đưa vào sản xuất.' };
+  const hd = moldBdHuongDan(mk, d);
+  return { chan: true, nhan, chiTiet: chiTiet + ' ' + hd.text + ' Không được đưa vào sản xuất.', link: hd };
+}
+// T108: khuôn bị chặn — nói rõ đang thiếu gì + link mở đúng chỗ cần làm (giống duc-dashboard).
+function moldBdHuongDan(mk, d){
+  const cs = d && d.cs_dang_lam, kh = d && d.kh_chua_cs;
+  const khLink = tuan => 'bao-duong-khuon-tuan.html?' + (tuan ? 'tuan=' + tuan + '&' : '') + 'khuon=' + encodeURIComponent(mk);
+  if (cs && cs.id_kh) return { text: 'Có check sheet ngày ' + fmtDM_(cs.ngay) + ' chưa bấm Hoàn thành.',
+    href: 'checksheet-bao-duong-khuon.html?id=' + cs.id_kh, linkText: '📋 Mở check sheet' };
+  if (kh) return { text: 'Có lịch bảo dưỡng ngày ' + fmtDM_(kh.ngay) + (kh.nguoi ? ' (' + kh.nguoi + ')' : '') + ' nhưng chưa ghi check sheet.',
+    href: khLink(kh.tuan), linkText: '📅 Mở KH bảo dưỡng của khuôn' };
+  if (d && d.ket_luan === 'khong_dat') return { text: 'Cần bảo dưỡng lại.', href: khLink(''), linkText: '📅 Mở KH bảo dưỡng của khuôn' };
+  return { text: 'Chưa có lịch bảo dưỡng — thêm lịch rồi ghi check sheet (phiếu xử lý sự cố không tính là bảo dưỡng).',
+    href: khLink(''), linkText: '📅 Mở KH bảo dưỡng của khuôn' };
 }
 function renderMoldBdStatusMobile(prefix, maSp){
   const hintEl = document.getElementById(prefix + '-so-khuon-hint');
@@ -674,6 +688,7 @@ function renderMoldBdStatusMobile(prefix, maSp){
   const info = moldBdInfo(mk, maMay);
   box.style.color = info.chan ? 'var(--alarm-fg)' : 'var(--run-fg)';
   box.innerHTML = 'Bảo dưỡng: ' + escapeHtml(info.chiTiet) +
+    (info.link ? ' <a href="' + escapeHtml(info.link.href) + '" target="_blank" rel="noopener" style="color:var(--alarm-fg);text-decoration:underline">' + escapeHtml(info.link.linkText) + '</a>' : '') +
     (info.chan ? (laQlbpDuc() ? '<br><button type="button" data-cho-phep-tam>🔓 Cho phép chạy tạm</button>'
                               : '<br><span style="font-weight:500">Báo Quản lý bộ phận Đúc để bảo dưỡng hoặc cho phép chạy tạm.</span>') : '');
   const btn = box.querySelector('[data-cho-phep-tam]');
