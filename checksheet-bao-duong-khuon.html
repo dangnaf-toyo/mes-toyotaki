@@ -27,6 +27,10 @@
   - Kết quả sau bảo dưỡng (T96): không còn hạng mục "7. Sau bảo dưỡng" — lấy
     lần IPQC kiểm sản phẩm đầu khi khuôn lên máy (điểm kiểm đổi khuôn / sau
     sự cố C3) đầu tiên sau giờ kết thúc bảo dưỡng, RPC duc_khuon_cs_ipqc_sau_bd.
+  - Linh kiện / vật tư tiêu hao đã thay (T111): ghi thẳng phiếu xuất thay /
+    tháo ra vào sổ kho linh kiện (khuon_lk_ghi_giao_dich, gắn id_checksheet),
+    giống form xử lý bất thường. Ô chọn chỉ gồm linh kiện riêng gán cho khuôn
+    + linh kiện dùng chung + vật tư tiêu hao. Khoá khi check sheet hoàn thành.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -131,6 +135,15 @@ tr.row-ng td{background:#FFF5F5}
 .photo-empty{font-size:12px;color:var(--text-dim);font-style:italic;padding:6px 0}
 .photo-busy{font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px}
 @media (max-width:700px){.photo-cols{grid-template-columns:1fr}}
+.lk table td.num{text-align:right;white-space:nowrap}
+.lk .sub{font-size:10.5px;color:var(--text-muted)}
+.lk .add{display:grid;grid-template-columns:2fr 80px 1.4fr;gap:6px;margin-top:10px}
+.lk .add input,.lk .add select{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font:inherit;font-size:13px;width:100%;background:#fff;color:var(--text)}
+.lk .add .w{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.lk .add .w select{width:auto;flex:1;min-width:180px}
+.lk .ton{font-size:12px;color:var(--text-muted)}
+.lk .tra{border:1px solid var(--border-strong);background:#fff;border-radius:5px;font:inherit;font-size:11.5px;padding:3px 8px;cursor:pointer}
+@media (max-width:560px){.lk .add{grid-template-columns:1fr 80px}.lk .add #lk-ly{grid-column:1/-1}}
 .print-only{display:none}
 .sign-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;text-align:center;font-size:12px}
 .sign-row div{border-top:1px dotted #999;padding-top:6px;min-height:70px}
@@ -334,8 +347,10 @@ function render(){
     '<div class="tally" id="tally"></div></div>' +
     '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Kết quả</th><th>Ghi chú / xử lý</th></tr></thead><tbody id="tbItems"></tbody></table></div></div>';
 
+  html += '<div class="card lk" id="lkCard"><div class="card-title">🔩 Linh kiện / vật tư tiêu hao đã thay</div><div class="ton">Đang tải...</div></div>';
+
   html += '<div class="card"><div class="card-title">Kết luận</div><div class="form-grid">' +
-    '<div class="fg"><label>Phụ tùng thay thế</label><input id="f-phu-tung" maxlength="300" value="' + escapeHtml(cs ? cs.phu_tung_thay : '') + '" placeholder="VD: 2 ty đẩy Ø6, 1 gioăng"' + dis + '></div>' +
+    '<div class="fg"><label>Phụ tùng thay thế</label><input id="f-phu-tung" maxlength="300" value="' + escapeHtml(cs ? cs.phu_tung_thay : '') + '" placeholder="Phụ tùng ngoài danh mục (linh kiện trong danh mục ghi ở khung 🔩 phía trên)"' + dis + '></div>' +
     '<div class="fg"><label>Chi phí (VNĐ)</label><input type="number" id="f-chi-phi" min="0" step="1000" value="' + (cs && cs.chi_phi != null ? cs.chi_phi : '') + '"' + dis + '></div>' +
     '<div class="fg wide"><label>Ghi chú chung</label><textarea id="f-ghi-chu" maxlength="1000"' + dis + '>' + escapeHtml(cs ? cs.ghi_chu : '') + '</textarea></div>' +
     '<div class="fg wide"><label>Kết luận khuôn</label><div class="kl">' +
@@ -360,6 +375,7 @@ function render(){
 
   document.getElementById('main').innerHTML = html;
   if (done) loadSauBd();
+  lkLoad();
   renderItems();
   renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
@@ -627,6 +643,162 @@ async function save(hoanThanh){
   if (error || !res || !res.ok) return showMsg('Lỗi lưu: ' + rpcErr(res, error), 'err', 6000);
   showMsg(hoanThanh ? '✓ Đã hoàn thành' + (res.reset_dong_ho ? ' — đã reset bộ đếm shot của khuôn' : '') : '✓ Đã lưu nháp', 'okmsg', 3500);
   await loadAll();
+}
+
+// ── Linh kiện / vật tư tiêu hao đã thay (T111) ──────────────────────────────
+// Giống form xử lý bất thường ở dashboard tổ khuôn (T107), gắn id_checksheet.
+const LK_THAY_ROLES = ['nhan_vien_bao_duong_khuon', 'nhan_vien_thong_ke', 'admin'];   // khớp khuon_lk_nguoi('thay')
+const LK_LY_DO = ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay khi bảo dưỡng khuôn', 'Vật tư tiêu hao bảo dưỡng'];
+const LK_THAO = { cho_su_dung: 'Cái cũ → Chờ sử dụng', cho_sua: 'Cái cũ → Chờ sửa', phe: 'Cái cũ → Phế' };
+const LK_TRA_LAI = 'Trả lại kho (ghi nhầm / dùng không hết)';
+const laTraLai = g => g.loai === 'thao_ra' && g.ket_qua_thao === 'cho_su_dung' && g.muc_dich === LK_TRA_LAI;
+const SUB = s => '<div class="sub">' + s + '</div>';
+let lk = { dm: [], gan: [], gd: [], chon: [] };   // chon = danh sách được chọn
+
+async function lkLoad(){
+  const [dm, gan, gd] = await Promise.all([
+    sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,pham_vi,don_vi,ton_cho_su_dung').eq('dang_dung', true).order('ma_lk'),
+    sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').eq('ma_khuon', kh.ma_khuon),
+    cs ? sb.from('khuon_lk_giao_dich').select('id,thoi_diem,loai,id_lk,ma_lk,ten_lk,so_luong,ma_khuon,vi_tri,ket_qua_thao,muc_dich,nguoi')
+      .eq('id_checksheet', cs.id).order('thoi_diem') : Promise.resolve({ data: [] }),
+  ]);
+  const box = document.getElementById('lkCard');
+  if (!box) return;
+  const err = dm.error || gan.error || gd.error;
+  if (err) { box.innerHTML = '<div class="card-title">🔩 Linh kiện / vật tư tiêu hao đã thay</div><div class="ton">Lỗi tải: ' + escapeHtml(err.message) + '</div>'; return; }
+  const ganIds = new Set((gan.data || []).map(g => Number(g.id_lk)));
+  const all = dm.data || [];
+  // Chỉ linh kiện riêng gán cho khuôn này + dùng chung + vật tư tiêu hao; riêng của khuôn lên đầu.
+  const chon = all.filter(x => ganIds.has(Number(x.id)) || x.pham_vi === 'chung' || x.loai === 'vat_tu_tieu_hao');
+  lk = { dm: all, gan: gan.data || [], gd: gd.data || [],
+    chon: chon.filter(x => ganIds.has(Number(x.id))).concat(chon.filter(x => !ganIds.has(Number(x.id)))) };
+  lkRender();
+}
+
+function lkRender(){
+  const box = document.getElementById('lkCard');
+  const ghi = canEdit && LK_THAY_ROLES.includes(myRole);
+  const dv = id => { const x = lk.dm.find(z => Number(z.id) === Number(id)); return x ? ' ' + escapeHtml(x.don_vi) : ''; };
+  let h = '<div class="card-title">🔩 Linh kiện / vật tư tiêu hao đã thay</div>';
+  h += lk.gd.length
+    ? '<div class="tbl-wrap"><table><thead><tr><th>Thời điểm</th><th>Phiếu</th><th>Linh kiện / vật tư</th><th style="text-align:right">SL</th><th>Vị trí</th><th>Người ghi</th>' + (ghi ? '<th class="no-print"></th>' : '') + '</tr></thead><tbody>' +
+      lk.gd.map(g => '<tr><td style="white-space:nowrap">' + fmtTs(g.thoi_diem) + '</td>' +
+        '<td>' + (g.loai === 'xuat_thay' ? '<b>Xuất dùng</b>' : laTraLai(g) ? '↩ Trả lại kho' : escapeHtml(LK_THAO[g.ket_qua_thao] || 'Tháo ra')) + (g.muc_dich && !laTraLai(g) ? SUB(escapeHtml(g.muc_dich)) : '') + '</td>' +
+        '<td><b>' + escapeHtml(g.ma_lk) + '</b>' + SUB(escapeHtml(g.ten_lk)) + '</td>' +
+        '<td class="num">' + (laTraLai(g) ? '−' : '') + fmtNum(g.so_luong) + dv(g.id_lk) + '</td>' +
+        '<td>' + escapeHtml(g.vi_tri || '—') + '</td>' +
+        '<td>' + escapeHtml(g.nguoi) + '</td>' +
+        (ghi ? '<td class="no-print">' + (g.loai === 'xuat_thay' ? '<button type="button" class="tra" data-tra="' + g.id + '" title="Ghi nhầm / dùng không hết — trả về tồn Chờ sử dụng">↩ Trả lại</button>' : '') + '</td>' : '') +
+        '</tr>').join('') + '</tbody></table></div>'
+    : '<div class="ton">Chưa ghi linh kiện / vật tư nào cho lần bảo dưỡng này.</div>';
+  if (ghi) {
+    const ganIds = new Set(lk.gan.map(g => Number(g.id_lk)));
+    const opt = x => '<option value="' + escapeHtml(x.ma_lk) + '">' + escapeHtml((ganIds.has(Number(x.id)) ? '' : x.loai === 'vat_tu_tieu_hao' ? '[Vật tư] ' : '[Dùng chung] ') +
+      x.ten_lk + ' · tồn ' + fmtNum(x.ton_cho_su_dung) + ' ' + x.don_vi) + '</option>';
+    h += '<div class="add no-print">' +
+      '<input id="lk-ma" list="dlLk" placeholder="Mã / tên linh kiện, vật tư" autocomplete="off">' +
+      '<input id="lk-sl" type="number" min="0" step="any" value="1" title="Số lượng">' +
+      '<input id="lk-ly" list="dlLkLy" placeholder="Lý do (VD: Mòn, Gãy…)">' +
+      '<div class="w">' +
+        '<select id="lk-cu" title="Linh kiện cũ tháo ra khỏi khuôn"><option value="">Cái cũ tháo ra: không ghi</option>' +
+          '<option value="phe">Cái cũ tháo ra → Phế</option><option value="cho_sua">Cái cũ tháo ra → Chờ sửa</option>' +
+          '<option value="cho_su_dung">Cái cũ tháo ra → Chờ sử dụng</option></select>' +
+        '<button type="button" class="btn" id="lk-them">＋ Ghi xuất dùng</button>' +
+      '</div>' +
+      '<div class="w ton" id="lk-ton">Xuất dùng trừ ngay tồn Chờ sử dụng. Danh sách = linh kiện riêng của khuôn ' + escapeHtml(kh.ma_khuon) +
+        ' + linh kiện dùng chung + vật tư tiêu hao' + (lk.gan.length ? '.' :
+        ' — khuôn này <b>chưa gán linh kiện riêng</b>, gán ở trang <a href="linh-kien-khuon.html" target="_blank" rel="noopener">Linh kiện dự phòng khuôn</a>.') + '</div>' +
+      '</div>' +
+      '<datalist id="dlLk">' + lk.chon.map(opt).join('') + '</datalist>' +
+      '<datalist id="dlLkLy">' + LK_LY_DO.map(v => '<option value="' + escapeHtml(v) + '">').join('') + '</datalist>';
+  } else if (canEdit) {
+    h += '<div class="ton no-print" style="margin-top:6px">🔒 Chỉ NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
+  }
+  box.innerHTML = h;
+  if (!ghi) return;
+  const maEl = document.getElementById('lk-ma');
+  maEl.addEventListener('input', () => {
+    const x = lk.chon.find(z => z.ma_lk === maEl.value.trim());
+    const tieuHao = x && x.loai === 'vat_tu_tieu_hao';
+    document.getElementById('lk-cu').hidden = tieuHao;
+    if (tieuHao) document.getElementById('lk-cu').value = '';
+    document.getElementById('lk-ton').innerHTML = x
+      ? '<span><b>' + escapeHtml(x.ma_lk) + '</b> — ' + escapeHtml(x.ten_lk) + (tieuHao ? ' (vật tư tiêu hao)' : '') +
+        ' · tồn Chờ sử dụng <b>' + fmtNum(x.ton_cho_su_dung) + '</b> ' + escapeHtml(x.don_vi) + '</span>'
+      : 'Chọn linh kiện trong danh sách (riêng của khuôn ' + escapeHtml(kh.ma_khuon) + ' / dùng chung / vật tư tiêu hao).';
+  });
+  document.getElementById('lk-them').addEventListener('click', e => lkXuat(e.target));
+  box.querySelectorAll('[data-tra]').forEach(b => b.addEventListener('click', () => lkTraLai(Number(b.dataset.tra), b)));
+}
+
+async function lkGhi(args){
+  const { data, error } = await sb.rpc('khuon_lk_ghi_giao_dich', args);
+  if (error || !data || !data.ok) throw new Error(rpcErr(data, error));
+  return data;
+}
+
+// Phiếu linh kiện cần id check sheet — check sheet chưa lưu lần nào thì lưu nháp trước.
+async function lkCsId(){
+  if (cs) return cs.id;
+  const { data: res, error } = await sb.rpc('duc_khuon_cs_luu', { p_id_ke_hoach: idKh, p_data: collect(), p_hoan_thanh: false });
+  if (error || !res || !res.ok) throw new Error('chưa lưu nháp được check sheet: ' + rpcErr(res, error));
+  const r = await sb.from('duc_khuon_checksheet').select('*').eq('id', res.id).maybeSingle();
+  if (r.error || !r.data) throw new Error('không đọc lại được check sheet vừa lưu');
+  cs = r.data;
+  return cs.id;
+}
+
+async function lkXuat(btn){
+  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const x = lk.chon.find(z => z.ma_lk === v('lk-ma'));
+  const sl = Number(v('lk-sl'));
+  if (!x) return showMsg('Chọn linh kiện riêng của khuôn ' + kh.ma_khuon + ' / linh kiện dùng chung / vật tư tiêu hao trong danh sách', 'err', 4000);
+  if (!(sl > 0)) return showMsg('Số lượng phải > 0', 'err', 3000);
+  const tieuHao = x.loai === 'vat_tu_tieu_hao';
+  const cu = tieuHao ? '' : v('lk-cu');
+  const g = lk.gan.find(z => Number(z.id_lk) === Number(x.id));
+  const lyDo = v('lk-ly') || (tieuHao ? 'Vật tư tiêu hao bảo dưỡng' : 'Thay khi bảo dưỡng khuôn');
+  if (!confirm('Xuất ' + fmtNum(sl) + ' ' + x.don_vi + ' ' + x.ma_lk + ' — ' + x.ten_lk + ' cho bảo dưỡng khuôn ' + kh.ma_khuon + '?\nTồn Chờ sử dụng sẽ bị trừ ngay.' +
+    (cu ? '\nĐồng thời ghi cái cũ tháo ra → ' + LK_THAO[cu].replace('Cái cũ → ', '') + '.' : ''))) return;
+  btn.disabled = true;
+  try {
+    const idCs = await lkCsId();
+    const chung = { p_id_lk: x.id, p_so_luong: sl, p_vi_tri: g ? g.vi_tri_lap : null, p_id_checksheet: idCs };
+    await lkGhi({ ...chung, p_loai: 'xuat_thay', p_muc_dich: lyDo });
+    let loiCu = '';
+    if (cu) {
+      try { await lkGhi({ ...chung, p_loai: 'thao_ra', p_ket_qua_thao: cu, p_muc_dich: 'Tháo ra khi bảo dưỡng khuôn' }); }
+      catch (er) { loiCu = er.message; }
+    }
+    if (loiCu) showMsg('Đã xuất dùng ' + x.ma_lk + ' nhưng chưa ghi được cái cũ tháo ra: ' + loiCu, 'err', 8000);
+    else showMsg('✓ Đã ghi xuất ' + x.ma_lk, 'okmsg', 2500);
+    await lkLoad();
+  } catch (er) {
+    showMsg('Chưa ghi được linh kiện: ' + er.message, 'err', 6000);
+  } finally { btn.disabled = false; }
+}
+
+async function lkTraLai(idGd, btn){
+  const g = lk.gd.find(z => Number(z.id) === idGd);
+  if (!g) return;
+  const traRoi = lk.gd.filter(z => laTraLai(z) && Number(z.id_lk) === Number(g.id_lk)).reduce((s, z) => s + Number(z.so_luong), 0);
+  const xuat = lk.gd.filter(z => z.loai === 'xuat_thay' && Number(z.id_lk) === Number(g.id_lk)).reduce((s, z) => s + Number(z.so_luong), 0);
+  const conLai = xuat - traRoi;
+  if (conLai <= 0) return showMsg(g.ma_lk + ' đã trả lại hết số đã xuất cho lần bảo dưỡng này', 'err', 4000);
+  const nhap = prompt('Trả lại kho ' + g.ma_lk + ' — ' + g.ten_lk + ' (còn có thể trả ' + fmtNum(conLai) + '). Số lượng trả lại:', String(Math.min(Number(g.so_luong), conLai)));
+  if (nhap == null) return;
+  const sl = Number(String(nhap).replace(',', '.'));
+  if (!(sl > 0) || sl > conLai) return showMsg('Số lượng trả lại phải > 0 và ≤ ' + fmtNum(conLai), 'err', 4000);
+  btn.disabled = true;
+  try {
+    await lkGhi({ p_loai: 'thao_ra', p_id_lk: g.id_lk, p_so_luong: sl, p_vi_tri: g.vi_tri,
+      p_ket_qua_thao: 'cho_su_dung', p_muc_dich: LK_TRA_LAI, p_id_checksheet: cs.id });
+    showMsg('✓ Đã trả lại ' + fmtNum(sl) + ' ' + g.ma_lk, 'okmsg', 2500);
+    await lkLoad();
+  } catch (er) {
+    showMsg('Không trả lại được: ' + er.message, 'err', 6000);
+    btn.disabled = false;
+  }
 }
 
 startHeaderClock();
