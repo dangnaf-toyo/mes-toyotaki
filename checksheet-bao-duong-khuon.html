@@ -20,7 +20,7 @@
   - Nút "⚠ Vấn đề chưa đóng (n)" trên thanh tiêu đề (T91) mở màn hình
     van-de-khuon.html?khuon=X (bảng vấn đề chưa đóng + lịch sử sự cố / IPQC).
   - Mẫu hạng mục (chung + riêng từng khuôn, T78) sửa ở quan-ly-khuon.html?tab=mau
-    (Quản lý bộ phận Đúc / admin).
+    (Quản lý bộ phận Đúc / tổ trưởng khuôn / admin).
   - Ảnh TRƯỚC / SAU (T77): nén JPEG ≤1280px, tải ngay lên bucket
     khuon-bao-duong rồi tự lưu nháp (không mất ảnh nếu thoát trang). Hoàn
     thành cần ≥1 ảnh mỗi loại, tối đa 10.
@@ -192,7 +192,7 @@ tr.row-ng td{background:#FFF5F5}
 <script src="shared/navbar.js"></script>
 <script>
 // Người ghi check sheet = NV bảo dưỡng khuôn / Quản lý bộ phận Đúc (D68) / admin — khớp RPC duc_khuon_cs_luu.
-const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','admin'];
+const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','to_truong_khuon','admin'];
 const TT_KH = { nhap: ['Nháp — chưa gửi duyệt','warn'], cho_kiem_tra: ['Chờ kiểm tra','warn'], cho_phe_duyet: ['Chờ phê duyệt','warn'], da_duyet: ['Đã phê duyệt','ok'] };
 const KQ = ['OK','NG','NA'];
 const KQ_LABEL = { OK: 'OK', NG: 'NG', NA: 'N/A' };
@@ -229,7 +229,7 @@ function showMsg(text, cls, ms){
   if (cls === 'err') window.scrollTo(0, 0);
 }
 function rpcErr(data, error){ return error ? error.message : (data && data.error) || 'không rõ'; }
-function laNguoiSuaMau(){ return myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
+function laNguoiSuaMau(){ return myRole === 'admin' || myRole === 'to_truong_khuon' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
 function laNguoiGhi(){ return EDIT_ROLES.includes(myRole) || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
 
 function startHeaderClock(){
@@ -303,7 +303,7 @@ function render(){
       ' — hoàn thành bởi ' + escapeHtml(cs.nguoi_hoan_thanh) + ' lúc ' + fmtTs(cs.thoi_diem_hoan_thanh) +
       (cs.id_log ? ' · đã ghi sổ đời khuôn' : '') + '</div>';
   } else if (!laNguoiGhi()) {
-    html += '<div class="card no-print" style="color:var(--warn-fg);font-weight:600">🔒 Chỉ xem — nhân viên bảo dưỡng khuôn / Quản lý bộ phận Đúc mới ghi được check sheet' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>';
+    html += '<div class="card no-print" style="color:var(--warn-fg);font-weight:600">🔒 Chỉ xem — tổ trưởng / nhân viên bảo dưỡng khuôn / Quản lý bộ phận Đúc mới ghi được check sheet' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>';
   }
 
   html += '<div class="card"><div class="card-title">Thông tin khuôn & kế hoạch</div><div class="info-grid">' +
@@ -647,7 +647,7 @@ async function save(hoanThanh){
 
 // ── Linh kiện / vật tư tiêu hao đã thay (T111) ──────────────────────────────
 // Giống form xử lý bất thường ở dashboard tổ khuôn (T107), gắn id_checksheet.
-const LK_THAY_ROLES = ['nhan_vien_bao_duong_khuon', 'nhan_vien_thong_ke', 'admin'];   // khớp khuon_lk_nguoi('thay')
+const LK_THAY_ROLES = ['nhan_vien_bao_duong_khuon', 'to_truong_khuon', 'nhan_vien_thong_ke', 'admin'];   // khớp khuon_lk_nguoi('thay')
 const LK_LY_DO = ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay khi bảo dưỡng khuôn', 'Vật tư tiêu hao bảo dưỡng'];
 const LK_THAO = { cho_su_dung: 'Cái cũ → Chờ sử dụng', cho_sua: 'Cái cũ → Chờ sửa', phe: 'Cái cũ → Phế' };
 const LK_TRA_LAI = 'Trả lại kho (ghi nhầm / dùng không hết)';
@@ -712,7 +712,7 @@ function lkRender(){
       '<datalist id="dlLk">' + lk.chon.map(opt).join('') + '</datalist>' +
       '<datalist id="dlLkLy">' + LK_LY_DO.map(v => '<option value="' + escapeHtml(v) + '">').join('') + '</datalist>';
   } else if (canEdit) {
-    h += '<div class="ton no-print" style="margin-top:6px">🔒 Chỉ NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
+    h += '<div class="ton no-print" style="margin-top:6px">🔒 Chỉ tổ trưởng / NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
   }
   box.innerHTML = h;
   if (!ghi) return;

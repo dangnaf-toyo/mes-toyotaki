@@ -17,7 +17,7 @@
     khuon_lk_giao_dich — sổ giao dịch (nhập / xuất thay / tháo ra / sửa xong /
                          báo phế / kiểm kê), chỉ thêm, người + giờ lấy ở server
   Quyền (server kiểm trong RPC khuon_lk_*):
-    - NV thống kê / admin: danh mục, gán khuôn, mọi loại phiếu, nhập Excel
+    - Tổ trưởng khuôn / NV thống kê / admin (T112): danh mục, gán khuôn, mọi loại phiếu, nhập Excel
     - NV bảo dưỡng khuôn: xuất thay vào khuôn, tháo ra (tự trừ / cộng kho)
     - Vai trò khác: chỉ xem (phải đăng nhập)
   Mức tối thiểu của 1 linh kiện = max(tồn tối thiểu khai báo, Σ dự phòng tối
@@ -446,7 +446,7 @@ function showMsg(text, cls, ms){
   clearTimeout(msgTimer);
   msgTimer = setTimeout(() => { el.className = ''; }, ms || 3500);
 }
-function canQL(){ return ['admin', 'nhan_vien_thong_ke'].includes(myRole); }
+function canQL(){ return ['admin', 'nhan_vien_thong_ke', 'to_truong_khuon'].includes(myRole); }
 function canThay(){ return canQL() || myRole === 'nhan_vien_bao_duong_khuon'; }
 function coQuyen(loai){ return GD[loai][1] === 'quan_ly' ? canQL() : canThay(); }
 async function rpcWrite(fn, params){
@@ -1018,8 +1018,8 @@ async function init(){
     return;
   }
   document.getElementById('roleNote').innerHTML = canQL() ? '' : '<div class="note ro">' + (canThay()
-    ? '🔧 Nhân viên bảo dưỡng khuôn: ghi được Xuất thay vào khuôn / Tháo ra (tự trừ / cộng kho). Danh mục, nhập, sửa xong, báo phế, kiểm kê do nhân viên thống kê làm.'
-    : '🔒 Chỉ xem — nhân viên thống kê quản lý linh kiện dự phòng, nhân viên bảo dưỡng khuôn ghi thay linh kiện.') + '</div>';
+    ? '🔧 Nhân viên bảo dưỡng khuôn: ghi được Xuất thay vào khuôn / Tháo ra (tự trừ / cộng kho). Danh mục, nhập, sửa xong, báo phế, kiểm kê do tổ trưởng khuôn / nhân viên thống kê làm.'
+    : '🔒 Chỉ xem — tổ trưởng khuôn / nhân viên thống kê quản lý linh kiện dự phòng, nhân viên bảo dưỡng khuôn ghi thay linh kiện.') + '</div>';
   ['dAdd', 'dNhap'].forEach(id => { document.getElementById(id).hidden = !canQL(); });
   document.getElementById('tGhi').hidden = !canThay();
   await loadAll();

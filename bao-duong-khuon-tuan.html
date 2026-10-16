@@ -402,7 +402,7 @@ const THU_LABEL = ['T2','T3','T4','T5','T6','T7','CN'];
 const LOAI_NGAN = { 'Bảo dưỡng định kỳ': 'BD định kỳ', 'Sửa chữa': 'Sửa chữa', 'Thay khuôn mới': 'Thay mới', 'Kiểm tra': 'Kiểm tra' };
 // Khớp RPC T75/D66/D67: người lập = nhân viên bảo dưỡng khuôn hoặc Quản lý bộ phận Đúc (admin sửa
 // hộ được). QLBP Đúc kiểm tra được cả kế hoạch mình lập (D67); admin không duyệt hộ.
-const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','admin'];
+const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','to_truong_khuon','admin'];
 const TT_LABEL = { nhap: 'Nháp — đang lập', cho_kiem_tra: 'Chờ kiểm tra', cho_phe_duyet: 'Chờ phê duyệt', da_duyet: 'Đã phê duyệt' };
 const SU_KIEN_LABEL = { them: '➕ Thêm lịch', sua: '✏️ Sửa lịch', xoa: '🗑️ Xoá lịch', gui_duyet: '📤 Gửi kiểm tra',
   kiem_tra: '✅ Kiểm tra đạt', phe_duyet: '✅ Phê duyệt', tu_choi: '❌ Từ chối' };
@@ -724,7 +724,7 @@ function render(){
   renderNguoi();
   renderDuyet();
   renderXl();
-  document.getElementById('roNote').textContent = !canEdit ? '🔒 Chỉ xem — nhân viên bảo dưỡng khuôn / Quản lý bộ phận Đúc (người lập) mới sửa được'
+  document.getElementById('roNote').textContent = !canEdit ? '🔒 Chỉ xem — tổ trưởng khuôn / nhân viên bảo dưỡng khuôn / Quản lý bộ phận Đúc (người lập) mới sửa được'
     : trangThai() === 'nhap' ? 'Bấm vào ô để lên lịch / sửa'
     : '⚠ Kế hoạch đã gửi — sửa phải nhập lý do và kiểm tra/duyệt lại';
   document.getElementById('btnAdd').style.display = canEdit ? '' : 'none';
@@ -911,7 +911,7 @@ function renderDuyet(){
   document.getElementById('duyetBar').innerHTML =
     '<div class="duyet-st"><span class="duyet-badge ' + tt + '">' + TT_LABEL[tt] + '</span>' +
       '<button type="button" class="log-toggle" id="btnLog">📜 Lịch sử thay đổi (' + duyetLog.length + ')</button></div>' +
-    sign('Người lập', 'NV bảo dưỡng khuôn / QLBP Đúc', tt !== 'nhap' ? d.nguoi_lap : '', tt !== 'nhap' ? d.thoi_diem_lap : null, false) +
+    sign('Người lập', 'Tổ trưởng / NV bảo dưỡng khuôn / QLBP Đúc', tt !== 'nhap' ? d.nguoi_lap : '', tt !== 'nhap' ? d.thoi_diem_lap : null, false) +
     sign('Người kiểm tra', 'Quản lý bộ phận Đúc', d.nguoi_kiem_tra, d.thoi_diem_kiem_tra, tt === 'cho_kiem_tra') +
     sign('Người phê duyệt', 'Giám đốc sản xuất', d.nguoi_phe_duyet, d.thoi_diem_phe_duyet, tt === 'cho_phe_duyet') +
     '<div class="duyet-actions">' + actions + '</div>' +
@@ -995,7 +995,7 @@ async function loadXl(){
     if (res[1]) xlLs = res[1].data.rows || [];
     xlAnh = await SuCoAnh.count([...xlCan, ...xlLs].map(r => r.id_su_co));
     document.getElementById('xlNote').textContent = 'Sự cố phát sinh từ ' + fmtTs(res[0].data.tu_thoi_diem) +
-      (canEdit ? ' · bấm vào dòng để xử lý' : ' · 🔒 chỉ xem — NV bảo dưỡng khuôn / QLBP Đúc mới ghi được');
+      (canEdit ? ' · bấm vào dòng để xử lý' : ' · 🔒 chỉ xem — tổ trưởng / NV bảo dưỡng khuôn / QLBP Đúc mới ghi được');
     renderXl();
     renderSummary();
   } finally { xlLoading = false; }
@@ -1134,7 +1134,7 @@ function closeXl(){
 // ── Linh kiện / vật tư tiêu hao dùng cho sự cố (T107) ──────────────────────
 // Ghi thẳng vào sổ kho linh kiện (khuon_lk_ghi_giao_dich, gắn id_su_co): xuất
 // dùng trừ tồn Chờ sử dụng ngay; cái cũ tháo ra / trả lại kho = phiếu tháo ra.
-const LK_THAY_ROLES = ['nhan_vien_bao_duong_khuon', 'nhan_vien_thong_ke', 'admin'];
+const LK_THAY_ROLES = ['nhan_vien_bao_duong_khuon', 'to_truong_khuon', 'nhan_vien_thong_ke', 'admin'];
 const LK_LY_DO = ['Mòn', 'Gãy', 'Nứt', 'Dính kim loại', 'Thay theo vấn đề khuôn', 'Vật tư tiêu hao xử lý sự cố'];
 const LK_THAO = { cho_su_dung: 'Cái cũ → Chờ sử dụng', cho_sua: 'Cái cũ → Chờ sửa', phe: 'Cái cũ → Phế' };
 const LK_TRA_LAI = 'Trả lại kho (ghi nhầm / dùng không hết)';
@@ -1199,7 +1199,7 @@ function xlLkRender(r, sua){
         chon.filter(x => !ganIds.has(Number(x.id))).map(opt).join('') + '</datalist>' +
       '<datalist id="dlXlLkLy">' + LK_LY_DO.map(v => '<option value="' + escapeHtml(v) + '">').join('') + '</datalist>';
   } else if (sua) {
-    h += '<div class="ton" style="margin-top:6px">🔒 Chỉ NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
+    h += '<div class="ton" style="margin-top:6px">🔒 Chỉ tổ trưởng / NV bảo dưỡng khuôn / thống kê / admin ghi được linh kiện.</div>';
   }
   box.innerHTML = h;
   if (!ghi) return;
