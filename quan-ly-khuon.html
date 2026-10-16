@@ -20,7 +20,7 @@
     sheet (T81 bỏ "Ghi BD" tay / duc_ghi_lich_su_bao_duong).
   - ?tab=mau&khuon=X: hạng mục check sheet bảo dưỡng (duc_khuon_cs_mau +
     duc_khuon_cs_mau_bo, T76/T78) — mục chung, bỏ mục chung cho 1 khuôn, mục
-    riêng của khuôn. Chỉ Quản lý bộ phận Đúc / admin sửa (RLS).
+    riêng của khuôn. Chỉ Quản lý bộ phận Đúc / tổ trưởng khuôn / admin sửa (RLS).
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -147,7 +147,7 @@ function showMsg(text, cls, ms){
   clearTimeout(msgTimer);
   msgTimer = setTimeout(() => { el.className = ''; }, ms || 3500);
 }
-function laNguoiSuaMau(){ return myRole === 'admin' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
+function laNguoiSuaMau(){ return myRole === 'admin' || myRole === 'to_truong_khuon' || (myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc')); }
 
 function startHeaderClock(){
   function tick(){
@@ -218,7 +218,7 @@ function renderMau(){
   if (mauKhuon && !ds.includes(mauKhuon)) ds.unshift(mauKhuon);
   if (!mauKhuon) mauKhuon = ds[0] || '';
   document.getElementById('mauKhuon').innerHTML = ds.map(k => '<option' + (k === mauKhuon ? ' selected' : '') + '>' + escapeHtml(k) + '</option>').join('');
-  document.getElementById('mauRo').innerHTML = ro ? '<div class="ro-note">🔒 Chỉ xem — Quản lý bộ phận Đúc hoặc admin mới sửa được hạng mục' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>' : '';
+  document.getElementById('mauRo').innerHTML = ro ? '<div class="ro-note">🔒 Chỉ xem — Quản lý bộ phận Đúc, tổ trưởng khuôn hoặc admin mới sửa được hạng mục' + (myRole ? '' : ' (chưa đăng nhập)') + '.</div>' : '';
   document.querySelectorAll('#sec-mau .mau-edit').forEach(e => { e.hidden = ro; });
   const mk = mauKhuon;
   document.querySelectorAll('.mau-mk').forEach(e => { e.textContent = mk; });
