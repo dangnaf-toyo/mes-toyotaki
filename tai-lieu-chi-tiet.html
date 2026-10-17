@@ -74,7 +74,14 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 
 .col-viewer{flex:1;min-width:0}
 .viewer-wrap{position:relative;flex:1;background:#111;border-radius:0 0 8px 8px;overflow:hidden}
-.viewer-wrap iframe{width:100%;height:100%;border:none;display:block}
+.col-viewer:fullscreen{border-radius:0}
+.col-viewer:fullscreen .viewer-wrap{border-radius:0}
+/* Màn hình rộng: khung trang cao đúng 1 màn hình để vùng xem tài liệu đủ cao. */
+@media (min-width:900px){
+  .app{height:calc(100vh - var(--navbar-h, 0px));min-height:0}
+  .main{overflow:hidden}
+}
+@media (max-width:899px){ .viewer-wrap{min-height:70vh} }
 .watermark-layer{position:absolute;inset:0;pointer-events:none;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(6,1fr);z-index:5}
 .watermark-layer span{display:flex;align-items:center;justify-content:center;transform:rotate(-30deg);color:rgba(255,255,255,.18);font-size:12px;font-weight:700;white-space:nowrap;text-align:center;line-height:1.3}
 .viewer-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px;flex-direction:column;gap:8px}
@@ -147,7 +154,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
     </div>
 
     <div class="panel col-viewer">
-      <div class="panel-head"><h2 id="viewerTitle">Xem tài liệu</h2></div>
+      <div class="panel-head"><h2 id="viewerTitle">Xem tài liệu</h2><div id="viewerTools"></div></div>
       <div class="viewer-wrap" id="viewerWrap">
         <div class="viewer-empty">Chọn 1 phiên bản bên trái để xem.</div>
       </div>
@@ -160,6 +167,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/doc-viewer.js"></script>
 <script>
 function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 let toastTimer;
@@ -326,11 +334,21 @@ function buildWatermark(text){
   return '<div class="watermark-layer">' + Array.from({ length: cells }).map(() => `<span>${escapeHtml(text)}</span>`).join('') + '</div>';
 }
 
+let viewer = null;
+function getViewer(){
+  if (!viewer){
+    const wrap = document.getElementById('viewerWrap');
+    viewer = DocViewer.mount(wrap, document.getElementById('viewerTools'));
+    wireViewerGuards(wrap);
+  }
+  return viewer;
+}
+
 async function selectVersion(versionId){
   state.selectedVersion = versionId;
   document.querySelectorAll('.ver-row').forEach(r => r.classList.toggle('active', r.dataset.vid === versionId));
-  const wrap = document.getElementById('viewerWrap');
-  wrap.innerHTML = '<div class="viewer-empty">Đang tải…</div>';
+  const v = getViewer();
+  v.clear('<div class="viewer-empty">Đang tải…</div>');
   try {
     const resp = await fetch(SUPABASE_URL + '/functions/v1/get-document-view-url', {
       method: 'POST',
@@ -344,10 +362,16 @@ async function selectVersion(versionId){
     const result = await resp.json();
     if (!resp.ok) throw new Error(result.error || ('Lỗi HTTP ' + resp.status));
     const watermarkText = (result.ten_nguoi_xem || '') + ' · ' + fmtDT(result.thoi_gian);
-    wrap.innerHTML = `<iframe src="${escapeHtml(result.url)}#toolbar=0" title="Xem tài liệu"></iframe>` + buildWatermark(watermarkText);
-    wireViewerGuards(wrap);
+    // Tải file về bộ nhớ rồi vẽ bằng PDF.js (shared/doc-viewer.js) — signed URL
+    // không nằm trong DOM, không có thanh tải/in của trình xem PDF trình duyệt.
+    const fileResp = await fetch(result.url);
+    if (!fileResp.ok) throw new Error('Lỗi tải file xem (HTTP ' + fileResp.status + ')');
+    const blob = await fileResp.blob();
+    if (state.selectedVersion !== versionId) return;
+    await v.open(blob, buildWatermark(watermarkText));
   } catch (e) {
-    wrap.innerHTML = '<div class="viewer-empty">Không xem được: ' + escapeHtml(e.message) + '</div>';
+    if (state.selectedVersion !== versionId) return;
+    v.clear('<div class="viewer-empty">Không xem được: ' + escapeHtml(e.message) + '</div>');
   }
 }
 
