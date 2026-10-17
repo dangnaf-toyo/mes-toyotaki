@@ -69,7 +69,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .prod-row .lc-btn:hover{color:var(--text);border-color:var(--border-strong)}
 .empty-hint{padding:20px;text-align:center;color:var(--text-muted);font-size:12.5px}
 
-.col-detail{flex:1;min-width:0}
+.col-detail{flex:1;min-width:0;scroll-margin-top:calc(var(--navbar-h, 0px) + 6px)}
 .detail-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px}
 .cat-card{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden}
 .cat-card .cat-head{background:var(--bg-sunken);padding:8px 12px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:12.5px;border-bottom:1px solid var(--border)}
@@ -80,6 +80,12 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .doc-row .name{flex:1;font-size:12.5px}
 .doc-row .arrow{color:var(--text-dim);font-size:11px}
 .cat-empty{padding:8px;color:var(--text-dim);font-size:11.5px;font-style:italic}
+/* Màn hình rộng: khung trang cao đúng 1 màn hình, 2 cột cuộn riêng — chọn mã ở
+   cuối danh sách vẫn thấy ngay tài liệu bên phải (trước đây cả trang cuộn). */
+@media (min-width:900px){
+  .app{height:calc(100vh - var(--navbar-h, 0px));min-height:0}
+  .main{overflow:hidden}
+}
 
 .modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
 .modal-mask.open{display:flex}
@@ -289,6 +295,10 @@ function selectProduct(maSp){
   renderProductList();
   const p = state.products.find(x => x.ma_sp === maSp);
   document.getElementById('detailTitle').textContent = maSp + (p && p.ten_sp ? ' — ' + p.ten_sp : '');
+  document.getElementById('detailBody').scrollTop = 0;
+  // Màn hình hẹp (cả trang cuộn): đưa khung tài liệu vào tầm nhìn nếu đang khuất.
+  const detail = document.querySelector('.col-detail');
+  if (detail.getBoundingClientRect().top < 56) detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
   loadDetail(maSp);
 }
 
