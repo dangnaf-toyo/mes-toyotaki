@@ -548,7 +548,9 @@ async function loadTonKho(maSp){
   });
 
   const p = productMap[maSp];
-  const rawSteps = (p && p.quy_trinh_cong_doan) ? p.quy_trinh_cong_doan.split(',').map(s => s.trim()).filter(Boolean) : null;
+  // Bước không có tồn riêng (VD "Dập gate & cắt gate") không hiện ô tồn kho.
+  const rawSteps = (p && p.quy_trinh_cong_doan) ? p.quy_trinh_cong_doan.split(',').map(s => s.trim())
+    .filter(cd => cd && (CONG_DOAN_ALL_ORDER.includes(cd) || combined[cd] !== undefined)) : null;
   const steps = rawSteps && rawSteps.length ? rawSteps : CONG_DOAN_ALL_ORDER.filter(cd => combined[cd] !== undefined);
   // Công đoạn có tồn kho nhưng không nằm trong lưu trình khai báo (VD đã đổi
   // quy trình sau khi tem đã chạy) — vẫn hiện thêm cuối, không giấu số liệu.
