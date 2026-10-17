@@ -169,6 +169,7 @@ textarea{resize:vertical;min-height:48px}
           <label class="req" for="maSP">Mã sản phẩm</label>
           <select id="maSP" onchange="onMaChange('')"></select>
         </div>
+        <div class="fg full" id="kanbanOnlyWarn" style="display:none;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;border-radius:6px;padding:8px 12px;font-size:13px"></div>
         <div class="fg">
           <label for="tenSP">Tên sản phẩm</label>
           <input id="tenSP" type="text" placeholder="Tự điền theo mã" disabled>
@@ -564,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 async function loadMaster(){
   const [prod, may, nv] = await Promise.all([
-    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan,sl_thung_cong_doan,ma_khach_hang,ten_khach_hang,ma_sp_khach_hang').order('ma_sp'),
+    sb.from('master_products').select('ma_sp,ten_sp,nguyen_lieu,so_khuon,sl_dong_goi_chuan,chi_thi_kanban,sl_thung_cong_doan,ma_khach_hang,ten_khach_hang,ma_sp_khach_hang').order('ma_sp'),
     sb.from('master_machines').select('ma_may,kanban').or('bo_phan.eq.Đúc,bo_phan.is.null').order('ma_may'),
     sb.from('master_employees').select('ten_nhan_vien').order('ten_nhan_vien'),
   ]);
@@ -576,6 +577,7 @@ async function loadMaster(){
     ma: r.ma_sp, ten: r.ten_sp || '', nguyenLieu: r.nguyen_lieu || '', soKhuon: r.so_khuon || '', slDongGoiChuan: r.sl_dong_goi_chuan || '',
     maKhachHang: r.ma_khach_hang || '', tenKhachHang: r.ten_khach_hang || '', maSpKhachHang: r.ma_sp_khach_hang || '',
     slThungCongDoan: r.sl_thung_cong_doan || {},
+    chiThiKanban: !!r.chi_thi_kanban,
   }));
   masterMap = {};
   masterData.forEach(m => { masterMap[m.ma] = m; });
@@ -608,6 +610,19 @@ function onMaChange(prefix){
   document.getElementById(prefix + "tenSP").value = item ? item.ten : "";
   document.getElementById(prefix + "nguyenLieu").value = item ? item.nguyenLieu : "";
   populateSoKhuonChips(prefix, item ? item.soKhuon : "");
+  if (prefix === "") updateKanbanOnly(item);
+}
+
+/** D70: mã SP chỉ thị bằng Kanban (master_products.chi_thi_kanban) không được
+    in tem thủ công — sản lượng chỉ ghi nhận khi quét QR tem chỉ thị. Server
+    (duc_ghi_tem) cũng chặn; ở đây khoá nút + chỉ đường sang tab Chỉ thị SX. */
+function updateKanbanOnly(item){
+  var on = !!(item && item.chiThiKanban);
+  var el = document.getElementById("kanbanOnlyWarn");
+  el.style.display = on ? "block" : "none";
+  el.innerHTML = on ? "⛔ Mã <b>" + String(item.ma).replace(/[&<>"]/g, function(c){ return "&#" + c.charCodeAt(0) + ";"; }) + "</b> chỉ thị sản xuất bằng <b>Kanban</b> — không in tem thủ công. "
+    + "Tạo lô ở tab <a href=\"#\" onclick=\"switchTab('kanban');return false\">📋 Chỉ thị SX</a>, sản lượng ghi nhận khi quét QR tem chỉ thị." : "";
+  document.getElementById("btnIn").disabled = on;
 }
 
 /** Danh sách khuôn của 1 mã SP lưu dạng "KPH #13-14, KPH #15-16" (text, xem
@@ -1076,7 +1091,9 @@ function buildKanbanForm(items, mayRows){
   });
   var selSp = document.getElementById('k_maSP');
   selSp.innerHTML = '<option value="">-- Chọn mã SP --</option>';
-  items.forEach(function(m){ selSp.innerHTML += '<option value="' + m.ma + '">' + m.ma + '</option>'; });
+  items.slice().sort(function(a, b){
+    return (b.chiThiKanban ? 1 : 0) - (a.chiThiKanban ? 1 : 0) || String(a.ma).localeCompare(String(b.ma), 'vi');
+  }).forEach(function(m){ selSp.innerHTML += '<option value="' + m.ma + '">' + (m.chiThiKanban ? '★ ' : '') + m.ma + '</option>'; });
 }
 
 function onKanbanMaChange(){
@@ -1589,6 +1606,7 @@ async function inTem(){
   if (!(await requireLoginOrRedirect())) return;
   var ma=g("maSP"),sl=g("soLuong"),may=g("mayDuc"),nguoi=g("nguoiTT"),loai=g("loaiSP");
   if(!ma)   return err("Chọn Mã sản phẩm");
+  if(masterMap[ma] && masterMap[ma].chiThiKanban) return err("Mã " + ma + " chỉ thị bằng Kanban — không in tem thủ công");
   if(!sl||isNaN(sl)||+sl<=0) return err("Số lượng phải > 0");
   if(!may)  return err("Chọn Máy đúc");
   if(!nguoi)return err("Chọn Người thao tác");
@@ -1743,6 +1761,7 @@ function clearAll(){
   document.getElementById("lotNo").value = getTodayString();
   document.getElementById("maSP").value="";
   document.getElementById("tenSP").value="";
+  updateKanbanOnly(null);
   document.getElementById("mayDuc").value="";
   document.getElementById("nguoiTT").value="";
   document.getElementById("loaiSP").value="hangloat";
@@ -1751,7 +1770,8 @@ function clearAll(){
 }
 function setBtn(v){
   var b=document.getElementById("btnIn");
-  b.disabled=v;
+  var m=masterMap[g("maSP")];
+  b.disabled=v||!!(m&&m.chiThiKanban);
   b.textContent=v?"⏳ Đang xử lý...":"🖨 In Tem";
 }
 var msgToken = 0;

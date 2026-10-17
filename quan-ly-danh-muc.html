@@ -226,6 +226,12 @@
               <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
               <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
               <div style="grid-column:1/-1">
+                <label for="sp-kanban">Chỉ thị sản xuất bằng Kanban</label>
+                <label style="font-weight:400;display:flex;align-items:center;gap:6px">
+                  <input type="checkbox" id="sp-kanban" style="width:auto"> Chỉ ghi nhận sản lượng bằng quét QR tem chỉ thị Kanban — KHÔNG cho in tem thủ công
+                </label>
+              </div>
+              <div style="grid-column:1/-1">
                 <label>SL đóng gói theo công đoạn (pcs/thùng — Đúc: tem chỉ thị Kanban; còn lại: tem thành phẩm, để trống = chưa in được tem công đoạn đó)</label>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
                   <label style="font-weight:400;display:flex;align-items:center;gap:4px">Đúc <input type="number" step="any" id="sp-sldonggoi" style="width:90px" placeholder="pcs"></label>
@@ -642,6 +648,7 @@ function spFillForm(r){
   document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
   document.getElementById('sp-sokhuon').value = r.so_khuon || '';
   document.getElementById('sp-sldonggoi').value = r.sl_dong_goi_chuan ?? '';
+  document.getElementById('sp-kanban').checked = !!r.chi_thi_kanban;
   setQuyTrinhValue(r.quy_trinh_cong_doan);
   setSlThungCdValue(r.sl_thung_cong_doan);
   document.getElementById('sp-form-title').textContent = 'Sửa sản phẩm: ' + r.ma_sp;
@@ -663,14 +670,15 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   const slRaw = document.getElementById('sp-sldonggoi').value;
   const sl_dong_goi_chuan = slRaw === '' ? null : Number(slRaw);
   const quy_trinh_cong_doan = getQuyTrinhValue() || null;
+  const chi_thi_kanban = document.getElementById('sp-kanban').checked;
   let sl_thung_cong_doan;
   try { sl_thung_cong_doan = getSlThungCdValue(); } catch (e) { return showMsg('sp-msg', 'error', e.message); }
   if (!ma_sp) return;
   let error;
   if (spEditing){
-    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan }).eq('ma_sp', spEditing));
+    ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan, chi_thi_kanban }).eq('ma_sp', spEditing));
   } else {
-    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan }));
+    ({ error } = await sb.from('master_products').insert({ ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan, chi_thi_kanban }));
   }
   if (error) return showMsg('sp-msg', 'error', 'Lỗi: ' + error.message);
   toast(spEditing ? 'Đã lưu ' + ma_sp : 'Đã thêm ' + ma_sp);
@@ -680,7 +688,7 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
 initCatalog({
   id: 'sp',
   emptyText: 'Chưa có sản phẩm nào.',
-  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, sl_thung_cong_doan, quy_trinh_cong_doan'),
+  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, sl_thung_cong_doan, quy_trinh_cong_doan, chi_thi_kanban'),
   pk: r => r.ma_sp,
   resetForm: spResetForm,
   fillForm: spFillForm,
@@ -695,6 +703,7 @@ initCatalog({
     { k: 'nguyen_lieu', label: 'Nguyên liệu', sortable: true, sortVal: r => r.nguyen_lieu || '', text: r => r.nguyen_lieu || '', render: r => escapeHtml(r.nguyen_lieu) || DASH },
     { k: 'so_khuon', label: 'Số khuôn', sortable: true, sortVal: r => r.so_khuon || '', text: r => r.so_khuon || '', render: r => escapeHtml(r.so_khuon) || DASH },
     { k: 'sl_thung_cong_doan', label: 'SL đóng gói/thùng', sortable: true, sortVal: r => fmtSlThungCd(r), text: r => fmtSlThungCd(r), render: r => escapeHtml(fmtSlThungCd(r)) || DASH },
+    { k: 'chi_thi_kanban', label: 'Kanban', sortable: true, sortVal: r => !!r.chi_thi_kanban, text: r => r.chi_thi_kanban ? 'kanban' : '', render: r => r.chi_thi_kanban ? '<span style="color:var(--run-fg);font-weight:600">✔ Kanban</span>' : DASH },
     { k: 'quy_trinh_cong_doan', label: 'Quy trình công đoạn', sortable: true, sortVal: r => r.quy_trinh_cong_doan || '', text: r => r.quy_trinh_cong_doan || '', render: r => escapeHtml(r.quy_trinh_cong_doan) || DASH },
   ],
 });
