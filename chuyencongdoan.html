@@ -411,7 +411,9 @@ async function loadDanhMuc(){
   lockNguoiNhanToCurrentUser();
   productRoutingMap = {};
   (prodRes.data || []).forEach(p => {
-    const route = String(p.quy_trinh_cong_doan || "").split(",").map(s => s.trim()).filter(Boolean);
+    // Bỏ các bước không chuyển công đoạn (VD "Dập gate & cắt gate") → Đúc gợi ý thẳng bước sau.
+    const route = String(p.quy_trinh_cong_doan || "").split(",").map(s => s.trim())
+      .filter(cd => cd && CONG_DOAN_LIST.includes(cd));
     if (route.length) productRoutingMap[p.ma_sp] = route;
   });
 }
