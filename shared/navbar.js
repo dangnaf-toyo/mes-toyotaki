@@ -102,7 +102,7 @@
     'ghi-nhan-tem-thanh-pham.html': { icon: '📦', title: 'Ghi nhận thùng thành phẩm', desc: 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
     'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin', noTitleBar: true },
-    'tai-lieu-danh-muc.html': { icon: '📁', title: 'Quản lý tài liệu kỹ thuật', desc: 'Bản vẽ, khuôn/jig, đồ gá, dưỡng kiểm, QCP, tiêu chuẩn — theo mã SP', noTitleBar: true },
+    'tai-lieu-danh-muc.html': { icon: '📁', title: 'Quản lý tài liệu kỹ thuật', desc: 'Bản vẽ SP/khuôn, Jig - đồ gá, linh kiện dự phòng khuôn, dưỡng kiểm, QCP, tiêu chuẩn — theo mã SP', noTitleBar: true },
     'tai-lieu-chi-tiet.html': { icon: '📄', title: 'Chi tiết tài liệu kỹ thuật', desc: 'Xem view-only, tải bản gốc CAD (nếu có quyền), quản lý phiên bản', noTitleBar: true },
     'tai-lieu-he-thong.html': { icon: '📘', title: 'Tài liệu hệ thống', desc: 'Sổ tay chất lượng, thủ tục, phương pháp/tiêu chuẩn, biểu mẫu — theo cấp 1-4', noTitleBar: true },
     'phieu-thay-doi-tai-lieu.html': { icon: '📝', title: 'Lập phiếu thay đổi tài liệu', desc: 'Tạo mới / sửa đổi / huỷ tài liệu — tự tính tầng rủi ro A/B/C', noTitleBar: true },
