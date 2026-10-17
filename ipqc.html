@@ -77,6 +77,7 @@ button{cursor:pointer;font-family:inherit}
 .qcard-may{font-size:1.25rem;font-weight:700}
 .qcard-sp{font-family:'JetBrains Mono',monospace;font-size:.9rem;color:var(--text-muted);margin-top:.1rem}
 .qcard-meta{font-size:.8rem;color:var(--text-dim);margin-top:.25rem}
+.btn-sp{font:inherit;font-size:.85rem;padding:.3rem .6rem;margin:.2rem .2rem 0 0;border:1px solid var(--border-strong);border-radius:.4rem;background:var(--bg-panel);color:var(--text);cursor:pointer}
 .qcard-time{font-size:1.1rem;font-weight:700;font-family:'JetBrains Mono',monospace}
 .qcard-time.warn{color:var(--warn-fg)}
 .qcard-time.alarm{color:var(--alarm-fg)}
@@ -404,13 +405,15 @@ async function loadQueue(){
   state.tamDung = tamDung;
   if (tamDung.paused) return [];
 
-  const [activeSet, cpRes, dinhKyRes] = await Promise.all([
+  const [activeSet, cpRes, dinhKyRes, khRes] = await Promise.all([
     getActiveIdDongSet(),
     sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'cho_kiem'),
     sb.rpc('duc_get_ipqc_periodic_due'),
+    sb.rpc('duc_get_ipqc_kh_due'),
   ]);
   if (cpRes.error) throw new Error('Không tải được hàng đợi IPQC: ' + cpRes.error.message);
   if (dinhKyRes.error) throw new Error('Không tính được điểm định kỳ IPQC: ' + dinhKyRes.error.message);
+  if (khRes.error) throw new Error('Không tính được điểm kiểm theo KHSX: ' + khRes.error.message);
 
   const now = Date.now();
   const PRIORITY = { sau_su_co: 0, doi_khuon: 0, dinh_ky: 1 };
@@ -436,6 +439,15 @@ async function loadQueue(){
       phut_da_troi: r.phut_da_troi, virtual: true,
     }, ipqcDueInfo('dinh_ky', r.phut_da_troi)));
 
+  // D71: máy có KHSX hôm nay nhưng trưởng ca chưa nhập dòng ca — định kỳ
+  // theo KHSX (id_dong NULL). Đã bấm vào trước đó thì dùng checkpoint thật.
+  const fromKh = (khRes.data || []).map(r => Object.assign({
+    id_checkpoint: r.id_checkpoint || ('khsx:' + r.ma_may), id_dong: null, ma_may: r.ma_may,
+    ma_sp: r.ma_sp_dang_cho || (r.ds_ma_sp || [])[0] || '', ds_ma_sp: r.ds_ma_sp || [],
+    ngay: r.ngay, ca: null, loai_kiem: 'dinh_ky', thoi_diem_tao: null,
+    phut_da_troi: r.phut_da_troi, virtual: !r.id_checkpoint, kh: true,
+  }, ipqcDueInfo('dinh_ky', r.phut_da_troi)));
+
   const priorityOf = cp => PRIORITY[cp.loai_kiem] != null ? PRIORITY[cp.loai_kiem] : 2;
 
   // 1 máy (id_dong) có thể đến hạn nhiều loại kiểm cùng lúc. "Định kỳ" chỉ
@@ -447,9 +459,10 @@ async function loadQueue(){
   // chỉ ẩn bớt ở danh sách hiển thị — khi kiểm xong, thẻ còn lại (nếu vẫn
   // đến hạn) sẽ tự hiện ra ở lần tải sau.
   const byIdDong = new Map();
-  fromCheckpoints.concat(fromDinhKy).forEach(cp => {
-    if (!byIdDong.has(cp.id_dong)) byIdDong.set(cp.id_dong, []);
-    byIdDong.get(cp.id_dong).push(cp);
+  fromCheckpoints.concat(fromDinhKy, fromKh).forEach(cp => {
+    const key = cp.id_dong || ('kh:' + cp.ma_may);
+    if (!byIdDong.has(key)) byIdDong.set(key, []);
+    byIdDong.get(key).push(cp);
   });
   const deduped = [];
   byIdDong.forEach(items => {
@@ -519,12 +532,19 @@ function renderQueue(){
     // khi có yêu cầu kiểm" — kể cả loại định kỳ chưa tới hạn (không hiện đếm
     // ngược "còn bao lâu" nữa, chỉ khác ở nhãn "sắp tới" + màu sắc).
     const timeLabel = (cp.loai_kiem === 'dinh_ky' && Qc02View.overdue(cp.phut_da_troi) ? 'QUÁ 2 GIỜ · ' : '') + cp.phut_da_troi + 'p';
+    // Thẻ KHSX: máy có ≥2 mã trong KH hôm nay → chọn mã ngay trên thẻ.
+    const chonSp = cp.kh && cp.virtual && cp.ds_ma_sp.length > 1;
+    const idJs = escapeHtml(JSON.stringify(cp.id_checkpoint));
+    const spHtml = chonSp
+      ? '<div class="qcard-sp">Chọn mã đang chạy: ' + cp.ds_ma_sp.map(sp =>
+          `<button type="button" class="btn-sp" onclick="event.stopPropagation();openCheck(${idJs}, ${escapeHtml(JSON.stringify(sp))})">${escapeHtml(sp)}</button>`).join(' ') + '</div>'
+      : `<div class="qcard-sp">${escapeHtml(cp.ma_sp)}</div>`;
     return `
-      <div class="qcard" data-lvl="${lvl}" onclick="openCheck('${cp.id_checkpoint}')">
+      <div class="qcard" data-lvl="${lvl}"${chonSp ? '' : ` onclick="openCheck(${idJs})"`}>
         <div class="qcard-main">
           <div class="qcard-may">${escapeHtml(cp.ma_may)}</div>
-          <div class="qcard-sp">${escapeHtml(cp.ma_sp)}</div>
-          <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.da_den_han ? '' : ' · sắp tới'}${cp.id_su_co_goc ? ' · ' + escapeHtml(cp.id_su_co_goc) : ''}</div>
+          ${spHtml}
+          <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.kh ? ' · theo KHSX (chưa có KH ca)' : ''}${cp.da_den_han ? '' : ' · sắp tới'}${cp.id_su_co_goc ? ' · ' + escapeHtml(cp.id_su_co_goc) : ''}</div>
         </div>
         <div style="text-align:right">
           <div class="qcard-time ${lvl === 'ok' ? '' : lvl}">${timeLabel}</div>
@@ -583,11 +603,38 @@ async function onBatDauNgay(){
   } catch (e) { onError(e); }
 }
 
-async function openCheck(idCheckpoint){
+async function openCheck(idCheckpoint, maSpChon){
   const cp = state.queue.find(x => x.id_checkpoint === idCheckpoint);
   if (!cp) return;
 
-  if (cp.virtual){
+  if (cp.kh && cp.virtual){
+    // D71: máy có KHSX hôm nay, trưởng ca chưa nhập dòng ca — tạo checkpoint
+    // thật (id_dong NULL), tự gắn vào dòng ca khi trưởng ca nhập sau.
+    const session = await MesAuth.getSession();
+    if (!session){
+      showToast('Cần đăng nhập trước khi bắt đầu kiểm. Đang chuyển sang trang đăng nhập…', true);
+      setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
+      return;
+    }
+    const maSp = maSpChon || cp.ma_sp;
+    showOverlay('Đang chuẩn bị điểm kiểm...');
+    try {
+      const mocBatDau = new Date(Date.now() - cp.phut_da_troi * 60000).toISOString();
+      const { data, error } = await sb.rpc('duc_ipqc_tao_checkpoint_kh', {
+        p_ma_may: cp.ma_may, p_ma_sp: maSp, p_moc_cho: mocBatDau,
+      });
+      if (error) throw new Error(error.message);
+      if (!data || data.ok !== true){
+        hideOverlay();
+        onError(new Error(data && data.reason || 'Không tạo được điểm kiểm theo KHSX'));
+        state.queue = await loadQueue(); renderQueue();
+        return;
+      }
+      cp.id_checkpoint = data.id_checkpoint;
+      cp.ma_sp = maSp;
+      cp.virtual = false;
+    } catch (e) { hideOverlay(); onError(e); return; }
+  } else if (cp.virtual){
     // Mục "định kỳ" ảo (tính trực tiếp, chưa có dòng thật trong bảng) — tạo
     // dòng checkpoint thật ngay bây giờ, giữ nguyên mốc đếm giờ đã tính sẵn
     // (lần kiểm hoàn thành gần nhất của máy), rồi mới mở form kiểm. Tạo dòng
@@ -625,7 +672,7 @@ async function openCheck(idCheckpoint){
   document.getElementById('ck-may').textContent = cp.ma_may;
   document.getElementById('ck-loai').textContent = LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem;
   document.getElementById('ck-ma-sp').textContent = cp.ma_sp;
-  document.getElementById('ck-meta').textContent = 'Chờ đã ' + cp.phut_da_troi + ' phút — ' + cp.ca + ', ' + (cp.ngay ? new Date(cp.ngay).toLocaleDateString('vi-VN') : '');
+  document.getElementById('ck-meta').textContent = 'Chờ đã ' + cp.phut_da_troi + ' phút — ' + (cp.ca || 'Theo KHSX, trưởng ca chưa nhập KH ca') + ', ' + (cp.ngay ? new Date(cp.ngay).toLocaleDateString('vi-VN') : '');
 
   document.getElementById('ck-incident-info').classList.add('hidden');
   if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
@@ -859,6 +906,7 @@ async function submitCheck(ketQua){
     if (data && data.ok === false) return onError(new Error(data.error));
 
     const msg = ketQua === 'OK' ? '✓ Đã lưu — OK, cho phép sản xuất'
+      : ketQua === 'NG' && !submittedCheckpoint.id_dong ? '✓ Đã lưu — NG. Máy chưa có KH ca nên CHƯA tự mở sự cố F1 — báo trưởng ca xử lý'
       : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
       : '✓ Đã ghi nhận cảnh báo — hiển thị tại Duyệt tiếp tục SX IPQC; chưa có đề nghị chạy tiếp';
     showToast(msg + (data && data.note ? ' (' + data.note + ')' : ''));

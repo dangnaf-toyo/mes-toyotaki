@@ -16,8 +16,11 @@ const MesIpqcWarning = (() => {
         state.queue=state.queue.filter(r=>r.id_checkpoint!==cp.id_checkpoint);state.current=null;renderQueue();showScreen('scr-queue');
         showToast('Cảnh báo đã được ghi nhận tại Duyệt tiếp tục SX IPQC.');publish();return;
       }
-      const job=(await MesIpqcFlow.jobs()).find(r=>r.id_dong===cp.id_dong);
-      if(!job||job.ma_may!==cp.ma_may||job.ma_sp!==cp.ma_sp)throw new Error('Phiên sản xuất đã thay đổi; không ghi cảnh báo cho máy/model khác.');
+      // D71: điểm kiểm theo KHSX (id_dong NULL — trưởng ca chưa nhập KH ca) không có dòng ca để đối chiếu.
+      if(cp.id_dong){
+        const job=(await MesIpqcFlow.jobs()).find(r=>r.id_dong===cp.id_dong);
+        if(!job||job.ma_may!==cp.ma_may||job.ma_sp!==cp.ma_sp)throw new Error('Phiên sản xuất đã thay đổi; không ghi cảnh báo cho máy/model khác.');
+      }
       if(state.current?.id_checkpoint!==cp.id_checkpoint)throw new Error('Phiên kiểm tra đã thay đổi.');
       const result=await submitCheck('CANH_BAO');
       if(result?.ok)publish();
