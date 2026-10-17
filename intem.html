@@ -595,7 +595,9 @@ function buildSelects(items, mays, nguois){
   ['maSP', 's_maSP'].forEach(id => {
     const sel = document.getElementById(id);
     sel.innerHTML = '<option value="">-- Chọn mã SP --</option>';
-    items.forEach(item => { sel.innerHTML += '<option value="'+item.ma+'">'+item.ma+'</option>'; });
+    // D70: tab In Tem (maSP) không liệt kê mã chỉ thị Kanban; tab Tra cứu vẫn đủ mã.
+    items.filter(item => id !== 'maSP' || !item.chiThiKanban)
+      .forEach(item => { sel.innerHTML += '<option value="'+item.ma+'">'+item.ma+'</option>'; });
   });
   ['mayDuc', 's_mayDuc'].forEach(id => fillOptions(document.getElementById(id), mays, '-- Chọn máy --'));
   ['nguoiTT', 's_nguoiTT'].forEach(id => fillOptions(document.getElementById(id), nguois, '-- Chọn người --'));
@@ -656,6 +658,9 @@ function applyPrefill(){
   if (!PREFILL || !PREFILL.maSP) return;
   document.getElementById("maSP").value = PREFILL.maSP;
   onMaChange('');
+  // Mã chỉ thị Kanban không có trong danh sách → báo lý do thay vì để trống im lặng.
+  var pf = masterMap[PREFILL.maSP];
+  if (pf && pf.chiThiKanban) { updateKanbanOnly(pf); return; }
   if (!document.getElementById("tenSP").value && PREFILL.tenSP) {
     document.getElementById("tenSP").value = PREFILL.tenSP;
   }
