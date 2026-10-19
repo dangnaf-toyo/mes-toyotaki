@@ -1253,18 +1253,39 @@ async function adjustSuggestedForOpenShift(suggested, phuongAn){
   if (!suggested) return suggested;
   const plans = state.shiftPlans[phuongAn] || [];
   const idx = plans.findIndex(c => c.ca === suggested.ca);
-  if (idx <= 0) return suggested; // ca đầu ngày (hoặc không xác định) — không có ca trước để lùi về
-  const prevCa = plans[idx - 1].ca;
-  const ngayStr = toDateInputValue(suggested.ngay);
-  try {
-    const { data, error } = await sb.from('duc_bao_cao_ca').select('ca').eq('ngay', ngayStr).eq('ca', prevCa).limit(1);
-    if (error) return suggested; // lỗi mạng — cứ dùng gợi ý theo giờ như cũ, không chặn bootstrap
-    if (!data || !data.length) {
-      // Ca trước trong ngày CHƯA kết ca → vẫn hiển thị ca đó thay vì nhảy sang ca sau
-      return { phuongAnCa: suggested.phuongAnCa, ca: prevCa, ngay: suggested.ngay };
-    }
-  } catch (e) {}
+  if (idx > 0) { // ca đầu ngày (hoặc không xác định) — không có ca trước để lùi về
+    const prevCa = plans[idx - 1].ca;
+    const ngayStr = toDateInputValue(suggested.ngay);
+    try {
+      const { data, error } = await sb.from('duc_bao_cao_ca').select('ca').eq('ngay', ngayStr).eq('ca', prevCa).limit(1);
+      if (error) return suggested; // lỗi mạng — cứ dùng gợi ý theo giờ như cũ, không chặn bootstrap
+      if (!data || !data.length) {
+        // Ca trước trong ngày CHƯA kết ca → vẫn hiển thị ca đó thay vì nhảy sang ca sau
+        return { phuongAnCa: suggested.phuongAnCa, ca: prevCa, ngay: suggested.ngay };
+      }
+    } catch (e) {}
+  }
+  // Ngược lại: ca theo đồng hồ ĐÃ kết ca sớm (vd kết Ca ngày 19/10 lúc 14:17) →
+  // tiến sang ca kế tiếp, nếu không header đứng ở ca đã kết, không còn dòng nào
+  // và "Kết ca" báo "Không có bản ghi đầy đủ thông tin để lưu".
+  for (let i = 0; i < 2; i++) {
+    if (!(await caDaKetLuc(toDateInputValue(suggested.ngay), suggested.ca))) break;
+    const next = computeNextShift(toDateInputValue(suggested.ngay), suggested.ca, phuongAn);
+    if (!next) break;
+    suggested = { phuongAnCa: suggested.phuongAnCa, ca: next.ca, ngay: next.ngay };
+  }
   return suggested;
+}
+
+/** Thời điểm đã kết ca (Date) của ngày/ca, null nếu chưa kết hoặc lỗi mạng. */
+async function caDaKetLuc(ngayStr, ca){
+  if (!ngayStr || !ca) return null;
+  try {
+    const { data, error } = await sb.from('duc_bao_cao_ca').select('thoi_diem_ket_ca')
+      .eq('ngay', ngayStr).eq('ca', ca).order('thoi_diem_ket_ca', { ascending: false }).limit(1);
+    if (error || !data || !data.length) return null;
+    return new Date(data[0].thoi_diem_ket_ca || Date.now());
+  } catch (e) { return null; }
 }
 
 /** Chuẩn hoá SHIFT_PLANS thành shape client giống api_bootstrap trả về. */
@@ -1301,6 +1322,14 @@ async function bootstrap(){
   const phuongAnBootstrap = savedPhuongAn || '2 ca 12h';
   let suggested = detectCurrentShift(phuongAnBootstrap);
   suggested = await adjustSuggestedForOpenShift(suggested, phuongAnBootstrap);
+  // Ca nhớ trong trình duyệt (chọn trưởng ca lúc sáng → lưu "Ca ngày") được ưu
+  // tiên hơn ca gợi ý nếu lưu trong ngày — bỏ nó đi nếu ca đó đã kết ca.
+  try {
+    const savedCa = localStorage.getItem(LS_KEYS.CA);
+    if (suggested && savedCa && savedCa !== suggested.ca && (await caDaKetLuc(toDateInputValue(suggested.ngay), savedCa))) {
+      localStorage.removeItem(LS_KEYS.CA);
+    }
+  } catch (e) {}
 
   populateHeader(suggested);
   populateDatalists();
@@ -4171,7 +4200,22 @@ async function endShift(){
   const withPlan = getActiveMachineRows(shiftRows);
   const allWithPlan = shiftRows.filter(r => r.ma_sp);
   if (allWithPlan.length === 0 && shiftIncidents.length === 0) {
-    return showToast('Không có bản ghi đầy đủ thông tin để lưu', true);
+    const ketLuc = await caDaKetLuc(state.ngay, state.ca);
+    const next = computeNextShift(state.ngay, state.ca, state.phuongAnCa);
+    if (ketLuc && next) {
+      const chon = state.ca + ' ' + formatDateShort(new Date(state.ngay + 'T00:00:00'));
+      const sau = next.ca + ' ' + formatDateShort(next.ngay);
+      if (confirm(chon + ' đã kết ca lúc ' + pad(ketLuc.getHours()) + ':' + pad(ketLuc.getMinutes()) + ' ' + formatDateShort(ketLuc) +
+                  ' — không còn gì để kết.\n\nBấm OK để chuyển sang ' + sau + '.')) {
+        document.getElementById('sel-ngay').value = toDateInputValue(next.ngay);
+        document.getElementById('sel-ca').value = next.ca;
+        onShiftContextChange(); saveSelection();
+        showToast('→ Đã chuyển sang ' + sau);
+      }
+      return;
+    }
+    return showToast('Không có bản ghi đầy đủ thông tin để lưu — ' + state.ca + ' ' +
+      formatDateShort(new Date(state.ngay + 'T00:00:00')) + ' chưa có máy nào có kế hoạch. Kiểm tra lại ngày/ca ở đầu trang.', true);
   }
 
   const nextShift = computeNextShift(state.ngay, state.ca, state.phuongAnCa);
@@ -4460,6 +4504,7 @@ async function submitEndShift(){
       document.getElementById('sel-ca').value = carry.next_ca;
       state.ngay = document.getElementById('sel-ngay').value;
       state.ca = carry.next_ca;
+      saveSelection();
       showToast('→ Đã chuyển sang ' + carry.next_ca);
     } else {
       const next = computeNextShift(snapshot.ngay, snapshot.ca, snapshot.phuongAnCa);
@@ -4468,6 +4513,7 @@ async function submitEndShift(){
         document.getElementById('sel-ca').value = next.ca;
         state.ngay = document.getElementById('sel-ngay').value;
         state.ca = next.ca;
+        saveSelection();
       }
     }
     loadShiftState(true);
