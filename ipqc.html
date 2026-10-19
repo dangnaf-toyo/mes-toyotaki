@@ -224,7 +224,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/mes-qc-fields.js"></script>
-<script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
+<script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 10;
@@ -663,7 +663,7 @@ async function openCheck(idCheckpoint, maSpChon){
   }
 
   state.current = cp;
-  state.checkStartedAt = Date.now();
+  state.checkStartedAt = null;
   state.photos = [];
   renderPhotoGrid();
   document.getElementById('ck-ghi-chu').value = '';
@@ -888,11 +888,12 @@ async function submitCheck(ketQua){
 
   showOverlay('Đang tải ảnh bằng chứng...');
   try {
+    await MesIpqcSession.prepare();
     const anhUrls = await uploadEvidencePhotos(state.current.ma_may, state.current.ma_sp, ketQua);
 
     showOverlay('Đang lưu kết quả...');
     const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
-    const { data, error } = await sb.rpc('duc_submit_ipqc_check', {
+    const { data, error } = await sb.rpc('duc_submit_ipqc_session', {
       p_id_checkpoint: submittedCheckpoint.id_checkpoint,
       p_checklist: state.checklistAnswers,
       p_ket_qua: ketQua,
@@ -905,6 +906,7 @@ async function submitCheck(ketQua){
     if (error) return onError(new Error(error.message));
     if (data && data.ok === false) return onError(new Error(data.error));
 
+    await MesIpqcSession.completed(submittedCheckpoint,ketQua);
     const msg = ketQua === 'OK' ? '✓ Đã lưu — OK, cho phép sản xuất'
       : ketQua === 'NG' && !submittedCheckpoint.id_dong ? '✓ Đã lưu — NG. Máy chưa có KH ca nên CHƯA tự mở sự cố F1 — báo trưởng ca xử lý'
       : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
@@ -921,5 +923,6 @@ async function submitCheck(ketQua){
 }
 </script>
 <script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
+<script src="shared/mes-ng-status.js"></script><script src="shared/mes-ipqc-session.js"></script>
 </body>
 </html>

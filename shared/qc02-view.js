@@ -54,32 +54,24 @@ const Qc02View = (() => {
     backdrop.onclick=e=>{if(e.target===backdrop)dialog.close();};
     backdrop.append(dialog);document.body.append(backdrop);dialog.setAttribute('open','');
   }
-  function photo(url, urls = [url]) {
-    const gallery = [...new Set(urls.map(u => safeUrl(u, true)).filter(Boolean))];
-    if (!gallery.length) return;
-    let index = Math.max(0, gallery.indexOf(safeUrl(url, true)));
-    const dialog = document.createElement('dialog');
-    dialog.className = 'qc02-viewer';
-    dialog.style.cssText = 'max-width:95vw;max-height:95vh;border:0;border-radius:8px;padding:12px';
-    const close = document.createElement('button'); close.textContent = '×'; close.setAttribute('aria-label','Đóng ảnh');
-    const prev = document.createElement('button'); prev.textContent = '← Trước';
-    const next = document.createElement('button'); next.textContent = 'Sau →';
-    const count = document.createElement('span');
-    const img = document.createElement('img'); img.alt = 'Ảnh QC';
-    img.style.cssText = 'display:block;margin:0 auto;max-width:85vw;max-height:80vh;object-fit:contain';
-    const update = () => { img.src = gallery[index]; count.textContent = ` ${index + 1}/${gallery.length} `; };
-    prev.onclick = () => { index = (index + gallery.length - 1) % gallery.length; update(); };
-    next.onclick = () => { index = (index + 1) % gallery.length; update(); };
-    prev.hidden = next.hidden = gallery.length < 2;
-    close.onclick = () => dialog.close();
-    dialog.onclick = event => { if (event.target === dialog) dialog.close(); };
-    dialog.onkeydown = event => {
-      if (event.key === 'ArrowLeft') { event.preventDefault(); prev.click(); }
-      if (event.key === 'ArrowRight') { event.preventDefault(); next.click(); }
-      if (event.key === 'Escape') { event.preventDefault(); dialog.close(); }
-    };
-    dialog.onclose = () => dialog.remove();
-    dialog.append(close, prev, count, next, img); update(); openDialog(dialog); close.focus();
+  function photo(url,urls=[url]){
+    const gallery=[...new Set(urls.map(u=>safeUrl(u,true)).filter(Boolean))];if(!gallery.length)return;hidePreview();let index=Math.max(0,gallery.indexOf(safeUrl(url,true))),scale=1,x=0,y=0,fitScale=1,pinch=null;const points=new Map();
+    const dialog=document.createElement('dialog');dialog.className='qc02-viewer qc-zoom-viewer';dialog.style.cssText='position:fixed;inset:0;margin:auto;width:98vw;height:94vh;height:94dvh;max-width:98vw;max-height:96vh;border:0;border-radius:10px;padding:8px;box-sizing:border-box;background:#111827;color:white';
+    const shell=document.createElement('div');shell.style.cssText='height:100%;display:flex;flex-direction:column;gap:8px';const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:4px;flex-shrink:0';const viewport=document.createElement('div');viewport.className='qc-zoom-viewport';viewport.style.cssText='position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none;user-select:none;background:#0b1020';
+    const img=document.createElement('img');img.alt='Ảnh QC';img.draggable=false;img.style.cssText='position:absolute;left:50%;top:50%;max-width:none;max-height:none;object-fit:contain;transform-origin:center;pointer-events:none';const count=document.createElement('span'),ratio=document.createElement('output');ratio.setAttribute('aria-live','polite');
+    function bounds(){return {w:viewport.clientWidth||innerWidth*.95,h:viewport.clientHeight||innerHeight*.75,nw:img.naturalWidth||800,nh:img.naturalHeight||600};}
+    function paint(){const b=bounds();const mx=Math.max(0,(b.nw*scale-b.w)/2),my=Math.max(0,(b.nh*scale-b.h)/2);x=Math.max(-mx,Math.min(mx,x));y=Math.max(-my,Math.min(my,y));img.style.width=b.nw+'px';img.style.height=b.nh+'px';img.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+scale+')';ratio.textContent=Math.round(scale*100)+'%';viewport.style.cursor=scale>fitScale?'grab':'default';viewport.dataset.scale=String(scale);viewport.dataset.panX=String(x);viewport.dataset.panY=String(y);}
+    function fit(){const b=bounds();fitScale=Math.min(32,b.w/b.nw,b.h/b.nh);scale=fitScale;x=y=0;paint();}
+    function zoom(value,px=0,py=0){const next=Math.max(.05,Math.min(32,value)),factor=next/scale;x=px-(px-x)*factor;y=py-(py-y)*factor;scale=next;paint();}
+    function button(label,run){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=run;toolbar.append(b);return b;}
+    const prev=button('← Trước',()=>{index=(index+gallery.length-1)%gallery.length;update();}),next=button('Sau →',()=>{index=(index+1)%gallery.length;update();});prev.hidden=next.hidden=gallery.length<2;toolbar.append(count);button('Phóng to +',()=>zoom(scale*1.25));button('Thu nhỏ −',()=>zoom(scale/1.25));button('Kích thước gốc',()=>{scale=1;x=y=0;paint();});button('Vừa màn hình',fit);toolbar.append(ratio);const close=button('Đóng ×',()=>dialog.close());
+    function update(){points.clear();pinch=null;img.src=gallery[index];count.textContent=(index+1)+'/'+gallery.length;img.onload=fit;fit();}viewport.append(img);shell.append(toolbar,viewport);dialog.append(shell);
+    viewport.addEventListener('wheel',e=>{e.preventDefault();const r=viewport.getBoundingClientRect();zoom(scale*Math.exp(-Math.sign(e.deltaY)*.15),e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2);},{passive:false});
+    const pair=()=>{const [a,b]=[...points.values()];return {distance:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};};
+    viewport.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();points.set(e.pointerId,{x:e.clientX,y:e.clientY});viewport.setPointerCapture?.(e.pointerId);if(points.size===2)pinch=pair();});
+    viewport.addEventListener('pointermove',e=>{const old=points.get(e.pointerId);if(!old)return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2){const current=pair(),r=viewport.getBoundingClientRect();if(pinch?.distance>0){zoom(scale*current.distance/pinch.distance,pinch.x-r.left-r.width/2,pinch.y-r.top-r.height/2);x+=current.x-pinch.x;y+=current.y-pinch.y;paint();}pinch=current;}else if(points.size===1&&scale>fitScale){x+=e.clientX-old.x;y+=e.clientY-old.y;paint();}});
+    for(const name of ['pointerup','pointercancel','lostpointercapture'])viewport.addEventListener(name,e=>{points.delete(e.pointerId);pinch=points.size===2?pair():null;});
+    dialog.onkeydown=e=>{if(e.key==='ArrowLeft')prev.click();else if(e.key==='ArrowRight')next.click();else if(['+','='].includes(e.key))zoom(scale*1.25);else if(e.key==='-')zoom(scale/1.25);else if(e.key==='Escape')dialog.close();else return;e.preventDefault();};const resize=()=>fit();window.addEventListener('resize',resize);dialog.onclose=()=>{window.removeEventListener('resize',resize);points.clear();dialog.remove();};openDialog(dialog);update();close.focus();
   }
   function pdf(url) {
     const src = safeUrl(url);
