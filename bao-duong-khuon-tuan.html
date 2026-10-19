@@ -197,7 +197,12 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 .tabs{display:inline-flex;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;text-transform:none;letter-spacing:0}
 .tabs button{border:none;background:#fff;padding:4px 10px;font:inherit;font-size:11.5px;font-weight:700;color:var(--text-muted);cursor:pointer}
 .tabs button.on{background:var(--accent);color:#fff}
-.xl-sel{border:1.5px solid var(--border-strong);border-radius:6px;padding:3px 6px;font:inherit;font-size:11.5px;text-transform:none;letter-spacing:0}
+.xl-sel{border:1.5px solid var(--border-strong);border-radius:6px;padding:3px 6px;font:inherit;font-size:11.5px;text-transform:none;letter-spacing:0;max-width:100%}
+.xl-filter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:11.5px}
+.xl-filter input[type=search]{min-width:170px}
+.xl-filter .dem{color:var(--text-muted);font-weight:600}
+.xl-cu{margin-bottom:8px;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);color:var(--warn-fg);font-size:12px;font-weight:600}
+.xl-cu button{margin-left:6px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:5px;padding:2px 8px;font:inherit;cursor:pointer}
 #tblXl td{font-size:12px}
 #tblXl tr.xl-row{cursor:pointer}
 #tblXl tr.xl-row:hover td{background:#EFF6FF}
@@ -287,10 +292,23 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
   <div class="card" id="cardXl">
     <div class="card-title">
       Công việc không theo kế hoạch — xử lý bất thường (A2 · B1 · F1)
-      <div class="tabs" id="xlTabs"><button type="button" data-tab="can" class="on">Cần xử lý</button><button type="button" data-tab="ls">Đã xong trong tuần đang xem</button></div>
-      <select class="xl-sel" id="xlLoai"><option value="">Tất cả loại</option><option value="A2">A2 · Sự cố khuôn</option><option value="B1">B1 · Chất lượng SP</option><option value="F1">F1 · IPQC NG</option></select>
       <span class="ro-note" id="xlNote"></span>
     </div>
+    <div class="xl-filter">
+      <select class="xl-sel" id="xlKhoang" title="Thời gian phát sinh sự cố">
+        <option value="24h">24 giờ gần nhất</option><option value="hom_nay">Hôm nay</option><option value="7n">7 ngày gần nhất</option>
+        <option value="tuan">Tuần đang xem</option><option value="tu_chon">Chọn ngày…</option><option value="tat_ca">Tất cả (từ khi bật)</option>
+      </select>
+      <span id="xlTuChon" style="display:none"><input type="date" class="xl-sel" id="xlTu"> → <input type="date" class="xl-sel" id="xlDen"></span>
+      <select class="xl-sel" id="xlTrangThai"><option value="">Mọi trạng thái</option><option value="cho">Chờ nhận</option><option value="dang">Đang xử lý</option><option value="chua_xong">Chưa xong (chờ + đang)</option><option value="xong">Hoàn thành</option></select>
+      <select class="xl-sel" id="xlLoai"><option value="">Mọi loại vấn đề</option><option value="A2">A2 · Sự cố khuôn</option><option value="B1">B1 · Chất lượng SP</option><option value="F1">F1 · IPQC NG</option></select>
+      <select class="xl-sel" id="xlMay"></select>
+      <select class="xl-sel" id="xlSp"></select>
+      <select class="xl-sel" id="xlNguoi"></select>
+      <input type="search" class="xl-sel" id="xlQ" placeholder="Tìm vấn đề / mã sự cố / khuôn…">
+      <span class="dem" id="xlDem"></span>
+    </div>
+    <div class="xl-cu" id="xlCu" style="display:none"></div>
     <div class="tbl-wrap" style="max-height:none;min-height:0">
       <table id="tblXl"><thead><tr><th>Mã sự cố</th><th>Loại</th><th>Máy</th><th>Khuôn / SP</th><th>Phát sinh</th><th>Vấn đề</th><th>Máy SX</th><th>Tổ khuôn xử lý</th><th>Đảm nhiệm</th><th>Bắt đầu → Kết thúc</th><th>Ảnh</th></tr></thead><tbody></tbody></table>
     </div>
@@ -954,8 +972,8 @@ async function onXuLyDuyet(dongY){
 // ── Công việc không theo kế hoạch: xử lý bất thường A2/B1/F1 (T103) ─────────
 const LOAI_XL = { A2: 'Sự cố khuôn', B1: 'Chất lượng SP', F1: 'IPQC NG' };
 let xlCan = [];            // chưa xong + xong trong 7 ngày (RPC p_lich_su=false)
-let xlLs = [];             // xong trong tuần đang xem
-let xlTab = 'can';
+let xlLs = [];             // đã hoàn thành (RPC p_lich_su=true) — chỉ tải khi khoảng xem lùi quá 6 ngày
+let xlAll = [];            // xlCan ∪ xlLs
 let xlAnh = {};            // id_su_co -> {truoc, sau}
 let xlEditing = null;
 let xlPickers = [];
@@ -980,8 +998,12 @@ async function loadXl(){
   if (xlLoading) return;
   xlLoading = true;
   try {
+    // RPC p_lich_su=false đã gồm mọi vụ chưa xong + vụ xong trong 7 ngày → đủ cho
+    // khoảng xem ≤ 6 ngày; lùi xa hơn thì tải thêm vụ hoàn thành từ đầu khoảng.
+    const k = xlKhoang();
     const calls = [sb.rpc('duc_khuon_xlbt_danh_sach', { p_lich_su: false })];
-    if (xlTab === 'ls') calls.push(sb.rpc('duc_khuon_xlbt_danh_sach', { p_lich_su: true, p_tu: fmtDate(weekMonday), p_den: fmtDate(addDays(weekMonday, 6)) }));
+    if (!k.tu || k.tu < addDays(new Date(), -6)) calls.push(sb.rpc('duc_khuon_xlbt_danh_sach',
+      { p_lich_su: true, p_tu: k.tu ? fmtDate(k.tu) : '2000-01-01', p_den: fmtDate(new Date()) }));
     const [res, ch] = await Promise.all([Promise.all(calls),
       sb.from('duc_cau_hinh').select('gia_tri').eq('khoa', 'xlbt_bat_buoc_anh').maybeSingle()]);
     xlBatBuocAnh = !!(ch.data && ch.data.gia_tri === true);
@@ -992,8 +1014,12 @@ async function loadXl(){
       }
     }
     xlCan = res[0].data.rows || [];
-    if (res[1]) xlLs = res[1].data.rows || [];
-    xlAnh = await SuCoAnh.count([...xlCan, ...xlLs].map(r => r.id_su_co));
+    xlLs = res[1] ? (res[1].data.rows || []) : [];
+    const seen = new Set();
+    xlAll = [...xlCan, ...xlLs].filter(r => !seen.has(r.id_su_co) && seen.add(r.id_su_co));
+    xlAll.sort((a, b) => (xlState(a).cls === 'xong') - (xlState(b).cls === 'xong')
+      || (new Date(b.gio_phat_sinh) - new Date(a.gio_phat_sinh)));
+    xlAnh = await SuCoAnh.count(xlAll.map(r => r.id_su_co));
     document.getElementById('xlNote').textContent = 'Sự cố phát sinh từ ' + fmtTs(res[0].data.tu_thoi_diem) +
       (canEdit ? ' · bấm vào dòng để xử lý' : ' · 🔒 chỉ xem — tổ trưởng / NV bảo dưỡng khuôn / QLBP Đúc mới ghi được');
     renderXl();
@@ -1001,23 +1027,71 @@ async function loadXl(){
   } finally { xlLoading = false; }
 }
 
+// Vụ cũ hơn đầu khoảng xem nhưng vẫn cần chú ý: máy còn dừng hoặc tổ khuôn đang xử lý dở.
+function xlCanChuY(r){ return r.dang_dung_may || (r.xl && r.xl.trang_thai !== 'hoan_thanh'); }
 function xlSummaryHtml(){
-  const cho = xlCan.filter(r => !r.xl).length;
-  const dang = xlCan.filter(r => r.xl && r.xl.trang_thai !== 'hoan_thanh').length;
+  const moc = addDays(new Date(), -1);
+  const ds = xlCan.filter(r => new Date(r.gio_phat_sinh) >= moc || xlCanChuY(r));
+  const cho = ds.filter(r => !r.xl).length;
+  const dang = ds.filter(r => r.xl && r.xl.trang_thai !== 'hoan_thanh').length;
   if (!cho && !dang) return '<span style="color:var(--run-fg)">Bất thường tồn: <b>0</b></span>';
   return '<a href="#cardXl" style="color:var(--alarm-fg);text-decoration:none">Bất thường chờ nhận: <b>' + cho + '</b></a>' +
     (dang ? '<span style="color:var(--warn-fg)">Bất thường đang xử lý: <b>' + dang + '</b></span>' : '');
 }
 
+// Khoảng thời gian phát sinh đang xem: {tu, den} (Date, den không tính; null = không giới hạn).
+function xlKhoang(){
+  const v = document.getElementById('xlKhoang').value;
+  const now = new Date(), homNay = new Date(fmtDate(now) + 'T00:00:00');
+  if (v === 'hom_nay') return { tu: homNay, den: null, nhan: 'hôm nay' };
+  if (v === '7n') return { tu: addDays(homNay, -6), den: null, nhan: '7 ngày gần nhất' };
+  if (v === 'tuan') return { tu: new Date(fmtDate(weekMonday) + 'T00:00:00'), den: new Date(fmtDate(addDays(weekMonday, 7)) + 'T00:00:00'), nhan: 'tuần đang xem' };
+  if (v === 'tat_ca') return { tu: null, den: null, nhan: 'từ khi bật' };
+  if (v === 'tu_chon') {
+    const a = document.getElementById('xlTu').value, b = document.getElementById('xlDen').value;
+    return { tu: a ? new Date(a + 'T00:00:00') : null, den: b ? addDays(new Date(b + 'T00:00:00'), 1) : null, nhan: 'khoảng ngày đã chọn' };
+  }
+  return { tu: new Date(now.getTime() - 24 * 3600 * 1000), den: null, nhan: '24 giờ gần nhất' };
+}
+function xlTrongKhoang(r, k){
+  const t = new Date(r.gio_phat_sinh);
+  return (!k.tu || t >= k.tu) && (!k.den || t < k.den);
+}
+function xlNguoiCua(r){ return r.xl ? [r.xl.nguoi_dam_nhiem, r.xl.nguoi_dam_nhiem_phu].filter(Boolean) : []; }
+// Đổ lại options của 1 ô lọc theo dữ liệu trong khoảng, giữ lựa chọn đang có.
+function xlFillSel(id, tatCa, vals){
+  const el = document.getElementById(id), cur = el.value;
+  const ds = [...new Set(vals.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
+  if (cur && !ds.includes(cur)) ds.unshift(cur);
+  el.innerHTML = '<option value="">' + tatCa + '</option>' + ds.map(v => '<option>' + escapeHtml(v) + '</option>').join('');
+  el.value = cur;
+}
+
 function renderXl(){
   const tbody = document.querySelector('#tblXl tbody');
-  const q = document.getElementById('txtSearch').value.trim().toLowerCase();
+  const k = xlKhoang();
+  const trongKhoang = xlAll.filter(r => xlTrongKhoang(r, k));
+  xlFillSel('xlMay', 'Mọi máy', trongKhoang.map(r => r.ma_may));
+  xlFillSel('xlSp', 'Mọi mã SP', trongKhoang.map(r => r.ma_sp));
+  xlFillSel('xlNguoi', 'Mọi người xử lý', trongKhoang.flatMap(xlNguoiCua));
+
+  const cu = k.tu ? xlCan.filter(r => new Date(r.gio_phat_sinh) < k.tu && xlCanChuY(r)) : [];
+  const boxCu = document.getElementById('xlCu');
+  boxCu.style.display = cu.length ? '' : 'none';
+  if (cu.length) boxCu.innerHTML = '⚠ Còn ' + cu.length + ' vụ phát sinh trước ' + k.nhan + ' vẫn đang dừng máy / đang xử lý dở' +
+    '<button type="button" id="xlXemCu">Xem</button>';
+
+  const tt = document.getElementById('xlTrangThai').value;
   const loai = document.getElementById('xlLoai').value;
-  let rows = (xlTab === 'ls' ? xlLs : xlCan).filter(r => !loai || xlLoaiMa(r) === loai);
-  if (q) rows = rows.filter(r => [r.id_su_co, r.ma_may, r.so_khuon, r.ma_sp, r.van_de, r.xl && r.xl.nguoi_dam_nhiem, r.xl && r.xl.nguoi_dam_nhiem_phu]
+  const may = document.getElementById('xlMay').value, sp = document.getElementById('xlSp').value, nguoi = document.getElementById('xlNguoi').value;
+  const q = (document.getElementById('xlQ').value.trim() || document.getElementById('txtSearch').value.trim()).toLowerCase();
+  let rows = trongKhoang.filter(r => (!loai || xlLoaiMa(r) === loai) && (!may || r.ma_may === may) && (!sp || r.ma_sp === sp)
+    && (!nguoi || xlNguoiCua(r).includes(nguoi)) && (!tt || xlState(r).cls === tt || (tt === 'chua_xong' && xlState(r).cls !== 'xong')));
+  if (q) rows = rows.filter(r => [r.id_su_co, r.ma_may, r.so_khuon, r.ma_sp, r.van_de, r.noi_dung_sx, r.xl && r.xl.noi_dung_xu_ly, ...xlNguoiCua(r)]
     .some(v => String(v || '').toLowerCase().includes(q)));
+  document.getElementById('xlDem').textContent = rows.length + ' vụ';
   if (!rows.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">' + (xlTab === 'ls' ? 'Không có vụ nào hoàn thành trong tuần này.' : '✓ Không có bất thường nào cần xử lý.') + '</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="11">' + (trongKhoang.length ? 'Không có vụ nào khớp bộ lọc.' : '✓ Không có sự cố A2/B1/F1 nào phát sinh trong ' + k.nhan + '.') + '</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => {
@@ -1043,15 +1117,27 @@ function renderXl(){
   }).join('');
 }
 
-document.getElementById('xlTabs').addEventListener('click', e => {
-  const b = e.target.closest('button[data-tab]');
-  if (!b || b.dataset.tab === xlTab) return;
-  xlTab = b.dataset.tab;
-  document.querySelectorAll('#xlTabs button').forEach(x => x.classList.toggle('on', x === b));
-  if (xlTab === 'ls') { xlLs = []; document.querySelector('#tblXl tbody').innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải...</td></tr>'; loadXl(); }
-  else renderXl();
+function xlDoiKhoang(){
+  const tuChon = document.getElementById('xlKhoang').value === 'tu_chon';
+  document.getElementById('xlTuChon').style.display = tuChon ? '' : 'none';
+  if (tuChon && !document.getElementById('xlTu').value) {
+    document.getElementById('xlTu').value = fmtDate(addDays(new Date(), -1));
+    document.getElementById('xlDen').value = fmtDate(new Date());
+  }
+  document.querySelector('#tblXl tbody').innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải...</td></tr>';
+  loadXl();
+}
+document.getElementById('xlKhoang').addEventListener('change', xlDoiKhoang);
+document.getElementById('xlTu').addEventListener('change', xlDoiKhoang);
+document.getElementById('xlDen').addEventListener('change', xlDoiKhoang);
+['xlTrangThai', 'xlLoai', 'xlMay', 'xlSp', 'xlNguoi'].forEach(id => document.getElementById(id).addEventListener('change', renderXl));
+document.getElementById('xlQ').addEventListener('input', renderXl);
+document.getElementById('xlCu').addEventListener('click', e => {
+  if (!e.target.closest('#xlXemCu')) return;
+  document.getElementById('xlKhoang').value = 'tat_ca';
+  document.getElementById('xlTrangThai').value = 'chua_xong';
+  xlDoiKhoang();
 });
-document.getElementById('xlLoai').addEventListener('change', renderXl);
 document.querySelector('#tblXl tbody').addEventListener('click', e => {
   const tr = e.target.closest('tr.xl-row');
   if (tr) openXl(tr.dataset.id);
@@ -1071,7 +1157,7 @@ function nguoiOptions(selected, emptyLabel){
 }
 
 async function openXl(id){
-  const r = [...xlCan, ...xlLs].find(z => z.id_su_co === id);
+  const r = xlAll.find(z => z.id_su_co === id);
   if (!r) return;
   xlEditing = r;
   const x = r.xl || {};
