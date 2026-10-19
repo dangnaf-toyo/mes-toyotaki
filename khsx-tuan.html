@@ -770,9 +770,6 @@ function openRowModal(id){
   ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
     document.getElementById('f-' + d).value = r ? (r[d] || 0) : 0;
   });
-  // Mã máy/SP không sửa được sau khi tạo (là khoá cùng tuần) — chỉ cho sửa khi thêm mới
-  document.getElementById('f-ma-may').disabled = !!r;
-  document.getElementById('f-ma-sp').disabled = !!r;
   updateTongTuan('f-', 'f-tong-tuan');
   document.getElementById('modalRowDuc').classList.add('open');
 }
@@ -825,18 +822,25 @@ document.getElementById('btnSaveRowDuc').addEventListener('click', async () => {
   };
 
   const oldRow = editingId ? ducRows.find(x => x.id === editingId) : null;
-  const viTri = 'Máy ' + maMay + ' — Mã SP ' + maSp;
+  // Sửa được cả Máy/Mã SP — (tuần, máy, mã SP) là khoá nên không được trùng dòng khác.
+  const trung = ducRows.find(x => x.id !== editingId && x.ma_may === maMay && x.ma_sp === maSp);
+  if (trung) return showMsg('Tuần này đã có dòng Máy ' + maMay + ' — Mã SP ' + maSp + '. Sửa dòng đó hoặc chọn máy/mã khác.', 'err', 5000);
+  const doiKhoa = oldRow && (oldRow.ma_may !== maMay || oldRow.ma_sp !== maSp);
+  const viTri = doiKhoa
+    ? ('Máy ' + oldRow.ma_may + ' — Mã SP ' + oldRow.ma_sp + ' → Máy ' + maMay + ' — Mã SP ' + maSp)
+    : ('Máy ' + maMay + ' — Mã SP ' + maSp);
   const ok = await ghiLogVaXinLyDoNeuCan(
     oldRow ? 'sua' : 'them_moi', viTri,
-    oldRow ? formatDayValues(oldRow) : '',
-    formatDayValues(payload)
+    oldRow ? (doiKhoa ? oldRow.ma_may + ' | ' + oldRow.ma_sp + ' | ' : '') + formatDayValues(oldRow) : '',
+    (doiKhoa ? maMay + ' | ' + maSp + ' | ' : '') + formatDayValues(payload)
   );
   if (!ok) return;
 
   const btn = document.getElementById('btnSaveRowDuc');
   btn.disabled = true;
-  const { error } = await sb.from('duc_khsx_tuan_plan')
-    .upsert(payload, { onConflict: 'tuan_bat_dau,ma_may,ma_sp' });
+  const { error } = oldRow
+    ? await sb.from('duc_khsx_tuan_plan').update(payload).eq('id', oldRow.id)
+    : await sb.from('duc_khsx_tuan_plan').upsert(payload, { onConflict: 'tuan_bat_dau,ma_may,ma_sp' });
   btn.disabled = false;
   if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
   showMsg('✓ Đã lưu', 'ok', 2000);
@@ -913,8 +917,6 @@ function openRowModalCd(id){
   ['t2','t3','t4','t5','t6','t7','cn'].forEach(d => {
     document.getElementById('cf-' + d).value = r ? (r[d] || 0) : 0;
   });
-  // Mã SP không sửa được sau khi tạo (là khoá cùng tuần+công đoạn) — chỉ cho sửa khi thêm mới
-  selSp.disabled = !!r;
   updateTongTuan('cf-', 'cf-tong-tuan');
   document.getElementById('modalRowCd').classList.add('open');
 }
@@ -944,18 +946,23 @@ document.getElementById('btnSaveRowCd').addEventListener('click', async () => {
   };
 
   const oldRowCd = editingId ? cdRows.find(x => x.id === editingId) : null;
-  const viTriCd = 'Mã SP ' + maSp;
+  // Sửa được cả Mã SP — (tuần, công đoạn, mã SP) là khoá nên không được trùng dòng khác.
+  const trungCd = cdRows.find(x => x.id !== editingId && x.ma_sp === maSp);
+  if (trungCd) return showMsg('Tuần này ' + activeTab + ' đã có dòng Mã SP ' + maSp + '. Sửa dòng đó hoặc chọn mã khác.', 'err', 5000);
+  const doiMaCd = oldRowCd && oldRowCd.ma_sp !== maSp;
+  const viTriCd = doiMaCd ? ('Mã SP ' + oldRowCd.ma_sp + ' → ' + maSp) : ('Mã SP ' + maSp);
   const okCd = await ghiLogVaXinLyDoNeuCan(
     oldRowCd ? 'sua' : 'them_moi', viTriCd,
-    oldRowCd ? formatDayValues(oldRowCd) : '',
-    formatDayValues(payload)
+    oldRowCd ? (doiMaCd ? oldRowCd.ma_sp + ' | ' : '') + formatDayValues(oldRowCd) : '',
+    (doiMaCd ? maSp + ' | ' : '') + formatDayValues(payload)
   );
   if (!okCd) return;
 
   const btn = document.getElementById('btnSaveRowCd');
   btn.disabled = true;
-  const { error } = await sb.from('cd_khsx_tuan_plan')
-    .upsert(payload, { onConflict: 'tuan_bat_dau,cong_doan,ma_sp' });
+  const { error } = oldRowCd
+    ? await sb.from('cd_khsx_tuan_plan').update(payload).eq('id', oldRowCd.id)
+    : await sb.from('cd_khsx_tuan_plan').upsert(payload, { onConflict: 'tuan_bat_dau,cong_doan,ma_sp' });
   btn.disabled = false;
   if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
   showMsg('✓ Đã lưu', 'ok', 2000);
