@@ -246,6 +246,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -306,7 +307,8 @@ function groupBy(arr, keyFn){
   return m;
 }
 function top3VanDe(rows){
-  const g = groupBy(rows, r => (r.van_de && r.van_de.trim()) || '(không ghi nội dung xử lý)');
+  // T125: mô tả IPQC tự sinh rút gọn → các lần NG cùng hạng mục gom chung 1 dòng.
+  const g = groupBy(rows, r => (r.van_de && IpqcText.gon(r.van_de.trim())) || '(không ghi nội dung xử lý)');
   const items = [...g.entries()].map(([label, rs]) => ({ label, phut: sumBy(rs, r=>r.thoi_gian_dung_phut), count: rs.length }));
   items.sort((a,b) => b.phut - a.phut);
   return items.slice(0,3);

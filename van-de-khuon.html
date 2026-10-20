@@ -118,6 +118,7 @@ table.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/khuon-van-de.js"></script>
 <script>
@@ -223,8 +224,8 @@ function renderIssues(){
     const p = cpByVd[a.id_van_de] || {};
     const ng = (Array.isArray(p.checklist_json) ? p.checklist_json : []).filter(x => x && x.dat === false).map(x => x.muc);
     const anh = Array.isArray(p.anh_bang_chung_url) ? p.anh_bang_chung_url : [];
-    // Mô tả tự sinh từ IPQC đã liệt kê hạng mục -> bỏ phần đó khi đã hiện nhãn đỏ.
-    const moTa = ng.length ? String(a.mo_ta || '').replace(/\s*—\s*Hạng mục không đạt:[\s\S]*$/, '') : String(a.mo_ta || '');
+    // Mô tả tự sinh từ IPQC: rút gọn (T125); đã hiện nhãn đỏ hạng mục NG thì bỏ phần hạng mục.
+    const moTa = IpqcText.gon(a.mo_ta, { boHangMuc: ng.length > 0 });
     const id = escapeHtml(a.id_van_de);
     const cls = a.trang_thai === 'Chờ xác nhận' ? 'cho' : a.trang_thai === 'Đã đóng' ? 'dong' : 'mo';
     let act;
