@@ -86,7 +86,7 @@ const MesOqcRecord = (() => {
     ]);
     const defects=document.createElement('div');target.append(defects);Qc02View.table(defects,['Nhóm lỗi','Tên lỗi','Số lượng','Ghi chú'],(row.defects||[]).map(d=>[d.group,MesQcFields.defectName(d),d.qty,d.detail||d.note]));
     const urls=photos(row),gallery=document.createElement('div');gallery.className='oqc-record-gallery';gallery.dataset.qcGallery='';
-    urls.forEach(url=>{const link=document.createElement('a');link.href=url;link.dataset.qcPhoto='';link.className='oqc-record-photo';const img=document.createElement('img');img.src=url;img.alt='Ảnh lỗi OQC';img.style.cssText='width:120px;height:90px;object-fit:contain';link.append(img);link.onclick=e=>{e.preventDefault();e.stopPropagation();Qc02View.photo(url,urls);};gallery.append(link);});target.append(gallery);
+    urls.forEach(url=>{const link=document.createElement('a');link.href=url;link.dataset.qcPhoto='';link.className='oqc-record-photo';const img=document.createElement('img');img.src=url;img.alt='Ảnh lỗi OQC';img.style.cssText='width:120px;height:90px;object-fit:contain';link.append(img);link.onclick=e=>{e.preventDefault();e.stopPropagation();Qc02View.photo(url,urls);};gallery.append(link);});target.append(gallery);if(typeof MesOqcScope!=='undefined')MesOqcScope.describe(id,target);
     if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
   }
   byId('rows').addEventListener('click',event=>{
