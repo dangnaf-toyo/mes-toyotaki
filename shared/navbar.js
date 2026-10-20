@@ -31,7 +31,6 @@
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
-      { label: 'Tra cứu sự cố Đúc', href: 'su-co-duc.html' },
       { label: 'Bảng điều khiển Bavia', href: 'cong-doan-dashboard.html?cd=Bavia' },
       { label: 'Bảng điều khiển Gia Công', href: 'cong-doan-dashboard.html?cd=Gia+C%C3%B4ng' },
       { label: 'Bảng điều khiển Sơn', href: 'cong-doan-dashboard.html?cd=S%C6%A1n' },
