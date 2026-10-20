@@ -14,6 +14,7 @@
  *
  *   IpqcText.gon(text)                       // chuỗi gọn (text thuần, tự escape khi chèn HTML)
  *   IpqcText.gon(text, { boHangMuc: true })  // bỏ phần hạng mục (màn hình đã hiện riêng)
+ *   IpqcText.gon(text, { boGhiChu: true })   // bỏ ghi chú (gom các vấn đề cùng hạng mục — T127)
  *   IpqcText.tach(text)                      // { kq, loai, hangMuc[], ghiChu } hoặc null
  * ============================================================================
  */
@@ -62,7 +63,8 @@
     const t = tach(text);
     if (!t) return text == null ? '' : String(text);
     const hm = opt && opt.boHangMuc ? [] : t.hangMuc;
-    return 'IPQC ' + t.kq + (t.loai ? ' (' + t.loai + ')' : '') + (hm.length ? ': ' + hm.join(' · ') : '') + (t.ghiChu ? ' — ' + t.ghiChu : '');
+    return 'IPQC ' + t.kq + (t.loai ? ' (' + t.loai + ')' : '') + (hm.length ? ': ' + hm.join(' · ') : '') +
+      (t.ghiChu && !(opt && opt.boGhiChu) ? ' — ' + t.ghiChu : '');
   }
 
   window.IpqcText = { gon, tach };

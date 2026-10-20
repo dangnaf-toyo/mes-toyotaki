@@ -100,6 +100,24 @@ button{cursor:pointer;font-family:inherit}
 .incident-info .ii-title{font-size:.75rem;font-weight:700;color:#9A3412;text-transform:uppercase;letter-spacing:.03em;margin-bottom:.35rem}
 .incident-info .ii-row{font-size:.85rem;color:#7C2D12;margin-top:.25rem;white-space:pre-wrap}
 .incident-info .ii-row b{font-weight:700}
+.vdt .g{border:1px solid #FDBA74;border-radius:.6rem;background:#fff;padding:.55rem .65rem;margin-top:.5rem}
+.vdt .g.need{border-color:#DC2626;box-shadow:0 0 0 2px #FECACA}
+.vdt .g.xong{border-color:#86EFAC}
+.vdt .g .t{font-weight:700;font-size:.9rem;color:#0F172A}
+.vdt .g .t a{color:#0F5FA5;font-weight:600;font-size:.78rem;margin-left:.3rem}
+.vdt .g .m{font-size:.75rem;color:#7C2D12;margin-top:.15rem}
+.vdt .g .xl{font-size:.78rem;color:#065F46;margin-top:.2rem;white-space:pre-wrap}
+.vdt .g .lt{font-size:.78rem;color:#B45309;margin-top:.2rem}
+.vdt .g .ph{display:flex;gap:.3rem;margin-top:.35rem;flex-wrap:wrap}
+.vdt .g .ph img{width:52px;height:52px;object-fit:cover;border-radius:.4rem;border:1px solid #CBD5E1;cursor:zoom-in}
+.vdt .opts{display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-top:.45rem}
+.vdt .opts button{border:1.5px solid #CBD5E1;background:#fff;border-radius:.5rem;padding:.55rem .35rem;font-weight:700;font-size:.8rem;color:#334155}
+.vdt .opts button.on[data-kq=khong_tai_phat]{background:#059669;border-color:#059669;color:#fff}
+.vdt .opts button.on[data-kq=tai_phat_cb]{background:#D97706;border-color:#D97706;color:#fff}
+.vdt .opts button.on[data-kq=tai_phat_ng]{background:#DC2626;border-color:#DC2626;color:#fff}
+.vdt .opts button.on[data-kq=chua_kiem]{background:#475569;border-color:#475569;color:#fff}
+.vdt input.lydo{width:100%;margin-top:.4rem;border:1.5px solid #CBD5E1;border-radius:.45rem;padding:.45rem .55rem;font:inherit;font-size:.85rem}
+.vdt .warn{margin-top:.45rem;padding:.45rem .6rem;border-radius:.45rem;background:#FEF2F2;color:#B91C1C;font-size:.8rem;font-weight:600;border:1px solid #FCA5A5}
 .incident-info .ii-code{font-family:'JetBrains Mono',monospace;font-weight:700;background:#FDBA74;color:#7C2D12;padding:.05rem .4rem;border-radius:.3rem}
 
 .checklist{margin:0 .75rem .75rem;background:var(--bg-panel);border-radius:.7rem;box-shadow:var(--shadow-sm);overflow:hidden}
@@ -190,6 +208,7 @@ button{cursor:pointer;font-family:inherit}
     <summary class="ii-title" style="cursor:pointer">🕘 Lịch sử sự cố — từ khi phát sinh đến hiện tại</summary>
     <div id="ck-su-co-lich-su-body" style="margin-top:.5rem"></div>
   </details>
+  <div class="incident-info vdt hidden" id="ck-vd-truoc"></div>
   <button class="pdf-btn hidden" id="ck-pdf-btn">📄 Xem tiêu chuẩn (PDF)</button>
 
   <div class="checklist" id="ck-checklist"></div>
@@ -686,6 +705,7 @@ async function openCheck(idCheckpoint, maSpChon){
   lichSu.classList.toggle('hidden', !cp.id_su_co_goc);
   if (cp.id_su_co_goc) { lichSu.open = true; SuCoLichSu.mount(document.getElementById('ck-su-co-lich-su-body'), cp.id_su_co_goc); }
   else if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
+  loadVdTruoc(cp);   // T127
 
   showScreen('scr-check');
   // The original checklist remains independent of the reference document.
@@ -753,6 +773,103 @@ function fillIncidentInfo(idSuCo, loai, gioPhatSinh, vanDe, xuLy, damNhiem){
   document.getElementById('ck-incident-xu-ly').innerHTML = '<b>Đang xử lý:</b> ' + escapeHtml(xuLy || '—');
   document.getElementById('ck-incident-dam-nhiem').innerHTML = '<b>Đảm nhiệm:</b> ' + escapeHtml(damNhiem || '—');
   box.classList.remove('hidden');
+}
+
+// ── T127: vấn đề lần sản xuất trước — IPQC xác nhận có tái phát hay không ─────
+// Lần kiểm sản phẩm đầu sau lên khuôn (đổi khuôn / C3) → mọi vấn đề chưa đóng của
+// khuôn; lần kiểm khác → vấn đề lần trước "chưa kiểm được". Gom theo nội dung
+// (IpqcText.gon bỏ ghi chú), trả lời 1 lần cho cả nhóm. Server kiểm lại (trigger
+// trg_duc_ipqc_vd_kiem_tra) và áp dụng khi lưu kết quả.
+const VD_KQ = { khong_tai_phat: '✅ Không tái phát', tai_phat_cb: '⚠ Tái phát — cho SX tiếp', tai_phat_ng: '⛔ Tái phát — NG dừng SX', chua_kiem: '⏸ Chưa kiểm được' };
+async function loadVdTruoc(cp){
+  const box = document.getElementById('ck-vd-truoc');
+  box.classList.add('hidden'); box.innerHTML = '';
+  state.vdTruoc = null;
+  if (!cp || !cp.id_checkpoint) return;
+  try {
+    const { data, error } = await sb.rpc('duc_ipqc_vd_danh_sach', { p_id_checkpoint: cp.id_checkpoint });
+    if (state.current?.id_checkpoint !== cp.id_checkpoint) return;
+    if (error || !data || !data.ok || !data.bat || !(data.van_de || []).length) return;
+    const groups = [], byKey = {};
+    data.van_de.forEach(v => {
+      // Gom theo hạng mục lỗi (bỏ loại kiểm / ghi chú): các lần NG cùng lỗi = 1 dòng.
+      const t = window.IpqcText ? IpqcText.tach(v.mo_ta) : null;
+      const core = t ? (t.hangMuc.join(' · ') || 'IPQC ' + t.kq) : (String(v.mo_ta || '').trim() || '(không mô tả)');
+      const key = t ? 'Lỗi IPQC: ' + core : core;
+      let g = byKey[key];
+      if (!g) { g = byKey[key] = { key, core, items: [], kq: v.da_tra_loi ? v.da_tra_loi.ket_qua : '', ly_do: v.da_tra_loi ? v.da_tra_loi.ly_do : '', need: false }; groups.push(g); }
+      g.items.push(v);
+    });
+    state.vdTruoc = { maKhuon: data.ma_khuon, lenKhuon: data.len_khuon, groups };
+    renderVdTruoc();
+  } catch (e) { /* lỗi mạng: server vẫn chặn khi lưu kết quả */ }
+}
+function renderVdTruoc(){
+  const box = document.getElementById('ck-vd-truoc'), vd = state.vdTruoc;
+  if (!vd) { box.classList.add('hidden'); return; }
+  const n = vd.groups.reduce((s, g) => s + g.items.length, 0);
+  const dm = d => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
+  box.innerHTML = '<div class="ii-title">🔁 ' + (vd.lenKhuon ? 'Vấn đề lần sản xuất trước' : 'Vấn đề lần trước chưa kiểm được') +
+      ' — khuôn ' + escapeHtml(vd.maKhuon || '') + ' (' + n + ') — bắt buộc xác nhận có tái phát không</div>' +
+    vd.groups.map((g, i) => {
+      const may = [...new Set(g.items.map(v => v.ma_may).filter(Boolean))].join(', ');
+      const ngay = [...new Set(g.items.map(v => dm(v.ngay_phat_hien)))].join(', ');
+      const xl = [...new Set(g.items.map(v => v.noi_dung_xu_ly).filter(Boolean))];
+      const lt = g.items.map(v => v.lan_truoc).find(x => x && x.ket_qua === 'chua_kiem');
+      const tp = Math.max(0, ...g.items.map(v => Number(v.lan_tai_phat) || 0));
+      const anh = (g.items.find(v => Array.isArray(v.anh) && v.anh.length) || {}).anh || [];
+      return '<div class="g' + (g.kq && (g.kq !== 'chua_kiem' || g.ly_do.trim()) ? ' xong' : g.need ? ' need' : '') + '">' +
+        '<div class="t">' + escapeHtml(g.key) + (g.items.length > 1 ? ' ×' + g.items.length : '') +
+          '<a href="van-de-khuon.html?khuon=' + encodeURIComponent(vd.maKhuon || '') + '&tab=chua-dong&vd=' + encodeURIComponent(g.items[0].id_van_de) + '" target="_blank" rel="noopener">Chi tiết ↗</a></div>' +
+        '<div class="m">' + [ngay, may].filter(Boolean).map(escapeHtml).join(' · ') + (tp ? ' · tái phát ' + tp + ' lần' : '') + '</div>' +
+        (xl.length ? '<div class="xl">✔ Đã xử lý: ' + xl.map(escapeHtml).join(' / ') + '</div>' : '') +
+        (lt ? '<div class="lt">Lần trước chưa kiểm được: ' + escapeHtml(lt.ly_do || '') + ' (' + escapeHtml(lt.nguoi || '') + ')</div>' : '') +
+        (anh.length ? '<div class="ph">' + anh.slice(0, 4).map(u => '<img src="' + escapeHtml(u) + '" alt="" loading="lazy" data-vd-anh="' + escapeHtml(u) + '">').join('') + '</div>' : '') +
+        '<div class="opts">' + Object.keys(VD_KQ).map(k => '<button type="button" data-g="' + i + '" data-kq="' + k + '" class="' + (g.kq === k ? 'on' : '') + '">' + VD_KQ[k] + '</button>').join('') + '</div>' +
+        (g.kq === 'chua_kiem' ? '<input class="lydo" data-lydo="' + i + '" maxlength="300" placeholder="Lý do chưa kiểm được (bắt buộc)…" value="' + escapeHtml(g.ly_do) + '">' : '') +
+      '</div>';
+    }).join('') +
+    (vd.groups.some(g => g.need) ? '<div class="warn">Chọn kết quả cho tất cả vấn đề trước khi lưu lần kiểm.</div>' : '');
+  box.classList.remove('hidden');
+}
+document.getElementById('ck-vd-truoc').addEventListener('click', e => {
+  const b = e.target.closest('button[data-kq]');
+  if (b) { const g = state.vdTruoc.groups[Number(b.dataset.g)]; g.kq = g.kq === b.dataset.kq ? '' : b.dataset.kq; g.need = false; renderVdTruoc(); return; }
+  const im = e.target.closest('img[data-vd-anh]');
+  if (im && typeof Qc02View !== 'undefined') Qc02View.photo(im.dataset.vdAnh);
+});
+document.getElementById('ck-vd-truoc').addEventListener('input', e => {
+  const t = e.target.closest('input[data-lydo]');
+  if (t) state.vdTruoc.groups[Number(t.dataset.lydo)].ly_do = t.value;
+});
+// Kiểm tra trước khi lưu: '' = được lưu, ngược lại là thông báo lỗi.
+function kiemTraVdTruoc(ketQua){
+  const vd = state.vdTruoc;
+  if (!vd) return '';
+  const thieu = vd.groups.filter(g => !g.kq || (g.kq === 'chua_kiem' && !g.ly_do.trim()));
+  if (thieu.length) {
+    vd.groups.forEach(g => { g.need = thieu.includes(g); });
+    renderVdTruoc();
+    document.getElementById('ck-vd-truoc').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return 'Còn ' + thieu.length + ' vấn đề lần sản xuất trước chưa xác nhận tái phát hay không' +
+      (thieu.some(g => g.kq === 'chua_kiem') ? ' (hoặc thiếu lý do "Chưa kiểm được")' : '') + '.';
+  }
+  if (vd.groups.some(g => g.kq === 'tai_phat_ng') && ketQua !== 'NG') return 'Có vấn đề tái phát đánh giá NG (dừng SX) — phải bấm ❌ NG.';
+  if (vd.groups.some(g => g.kq === 'tai_phat_cb') && ketQua === 'OK') return 'Có vấn đề tái phát — chọn ⚠ Cảnh báo (cho SX tiếp) hoặc ❌ NG, không được OK.';
+  return '';
+}
+// Vấn đề tái phát → thêm mục "Không đạt" vào checklist của lần kiểm (để NG / Cảnh báo hợp lệ + ghi vào vấn đề mới).
+function vdTaiPhatChecklist(){
+  return state.vdTruoc ? state.vdTruoc.groups.filter(g => g.kq === 'tai_phat_cb' || g.kq === 'tai_phat_ng')
+    .map(g => ({ code: 'tai_phat', muc: 'Tái phát: ' + g.core, dat: false })) : [];
+}
+async function luuVdTruoc(idCheckpoint){
+  if (!state.vdTruoc) return;
+  const traLoi = [];
+  state.vdTruoc.groups.forEach(g => g.items.forEach(v => traLoi.push({ id_van_de: v.id_van_de, ket_qua: g.kq, ly_do: g.ly_do || '' })));
+  const { data, error } = await sb.rpc('duc_ipqc_vd_luu', { p_id_checkpoint: idCheckpoint, p_tra_loi: traLoi });
+  if (error) throw new Error(error.message);
+  if (!data || !data.ok) throw new Error((data && data.error) || 'Không lưu được xác nhận tái phát');
 }
 
 // Mục kiểm dạng "Nhóm — Chi tiết" (vd "Ngoại quan — Cào xước; dính nhôm") được
@@ -872,6 +989,9 @@ async function submitCheck(ketQua){
   if (!state.current) return;
   const submittedCheckpoint = { ...state.current };
   if(!state.checklistAnswers.some(a=>a.code==='machine_condition'&&typeof a.dat==='boolean'))return showToast('Chọn Đạt hoặc Không đạt cho Điều kiện máy.',true);
+  const vdLoi = kiemTraVdTruoc(ketQua);   // T127
+  if (vdLoi) return showToast(vdLoi, true);
+  const ckList = state.checklistAnswers.concat(vdTaiPhatChecklist());
 
   const session = await MesAuth.getSession();
   if (!session){
@@ -883,8 +1003,8 @@ async function submitCheck(ketQua){
 
   if (!state.photos.length) return showToast('Vui lòng chụp ít nhất 1 ảnh bằng chứng trước khi lưu', true);
 
-  const allPass = state.checklistAnswers.every(a => a.dat === true);
-  const anyFail = state.checklistAnswers.some(a => a.dat === false);
+  const allPass = ckList.every(a => a.dat === true);
+  const anyFail = ckList.some(a => a.dat === false);
   if (ketQua === 'OK' && !allPass) {
     return showToast('Chỉ được chọn OK khi TẤT CẢ các mục kiểm đều Đạt', true);
   }
@@ -898,13 +1018,14 @@ async function submitCheck(ketQua){
 
   showOverlay('Đang tải ảnh bằng chứng...');
   try {
+    await luuVdTruoc(submittedCheckpoint.id_checkpoint);   // T127
     const anhUrls = await uploadEvidencePhotos(state.current.ma_may, state.current.ma_sp, ketQua);
 
     showOverlay('Đang lưu kết quả...');
     const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
     const { data, error } = await sb.rpc('duc_submit_ipqc_check', {
       p_id_checkpoint: submittedCheckpoint.id_checkpoint,
-      p_checklist: state.checklistAnswers,
+      p_checklist: ckList,
       p_ket_qua: ketQua,
       p_anh_urls: anhUrls,
       p_ghi_chu: ghiChu,

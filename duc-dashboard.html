@@ -909,6 +909,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/ipqc-text.js"></script>
+<script src="shared/khuon-nam-van-de.js"></script>
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
@@ -2928,11 +2929,17 @@ async function submitKhsxBatch(){
     return { maMay, sug: chosen, soKhuon: chosen.so_khuon || row.dataset.khuon || '', khCa: Number(khCaInput.value) || Math.round((chosen.kh_ngay || 0) / 2) };
   });
 
+  // T127: khuôn còn vấn đề lần SX trước → xác nhận đã nắm thông tin trước khi nạp (bỏ qua máy bị Huỷ).
+  const boQua = [];
+  for (const it of items) {
+    if (it.soKhuon && !(await KhuonNamVanDe.damBao(it.soKhuon, it.maMay))) { it.boQua = true; boQua.push(it.maMay + ': chưa xác nhận đã nắm vấn đề khuôn ' + it.soKhuon); }
+  }
   const btn = document.getElementById('kb-btn-save');
   btn.disabled = true;
   showOverlay('Đang nạp kế hoạch cho ' + items.length + ' máy...');
-  let ok = 0, fail = [];
+  let ok = 0, fail = boQua.slice();
   for (const it of items) {
+    if (it.boQua) continue;
     try {
       await rpcWrite('duc_upsert_plan', {
         p_ngay: state.ngay, p_ca: state.ca, p_phuong_an_ca: state.phuongAnCa,
@@ -3015,6 +3022,8 @@ async function submitPlan(){
   if (!khCa || khCa <= 0) return showToast('Nhập KH ca hợp lệ', true);
   if (!soKhuon) return showToast('Chưa chọn số khuôn', true);
   if (!kiemTraKhuonBd(soKhuon)) return;
+  // T127: lên khuôn còn vấn đề lần SX trước → trưởng ca phải xác nhận đã nắm thông tin.
+  if (!(await KhuonNamVanDe.damBao(soKhuon, state.currentTarget.ma_may))) return;
 
   if (document.getElementById('mp-pair-toggle').checked) return submitPairedPlan(maSp, khCa, soKhuon);
 
@@ -3415,6 +3424,7 @@ async function submitChangeProduct(){
   if (!gioBatDau) return showToast('Nhập giờ bắt đầu đổi khuôn', true);
   if (!soKhuon) return showToast('Chưa chọn số khuôn', true);
   if (!kiemTraKhuonBd(soKhuon)) return;
+  if (!(await KhuonNamVanDe.damBao(soKhuon, state.currentTarget.ma_may))) return;   // T127
 
   if (state.currentTarget.isPairOut) {
     return submitChangeProductPairOut(newMaSp, khCa, gioBatDau, soKhuon);
