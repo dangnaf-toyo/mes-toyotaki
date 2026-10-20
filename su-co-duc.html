@@ -268,41 +268,70 @@ async function load(){
     all = [];
     showMsg('Lỗi tải sự cố: ' + e.message, 'err', 6000);
   }
-  fillOptions();
   render();
 }
 
 // ── Bộ lọc ────────────────────────────────────────────────────────────────────
-function fillSel(id, tatCa, vals, labelFn){
-  const el = $(id), cur = el.value || el.dataset.want || '';
-  const ds = [...new Set(vals.filter(Boolean))].sort(cmp);
-  if (cur && !ds.includes(cur)) ds.unshift(cur);
+// Các ô lọc phụ thuộc nhau: mỗi ô chỉ liệt kê giá trị còn khớp với các ô lọc
+// khác (kèm số vụ). Máy → Mã SP → Khuôn theo thứ bậc: chọn máy DC7 thì ô Mã SP
+// chỉ còn mã đã chạy DC7, chọn mã thì ô Khuôn chỉ còn khuôn của mã đó; ô cấp
+// trên KHÔNG bị ô cấp dưới thu hẹp (để đổi máy/mã thẳng, không phải bỏ chọn trước).
+const DIM = { fCa: ['ca'], fLoai: ['loai'], fMay: ['may', 'sp', 'khuon'], fSp: ['sp', 'khuon'], fKhuon: ['khuon'] };
+const CHUOI = ['fMay', 'fSp', 'fKhuon'];   // đổi ô trước → bỏ chọn ô sau nếu không còn hợp lệ
+function demTheo(rows, keyFn){
+  const m = new Map();
+  rows.forEach(r => [].concat(keyFn(r)).forEach(v => { if (v) m.set(v, (m.get(v) || 0) + 1); }));
+  return m;
+}
+function fillSel(id, tatCa, keyFn){
+  const el = $(id), cur = el.value;
+  const dem = demTheo(filtered(DIM[id]), keyFn);
+  const ds = [...dem.keys()].sort(cmp);
+  if (cur && !dem.has(cur)) ds.unshift(cur);
   el.innerHTML = '<option value="">' + tatCa + '</option>' +
-    ds.map(v => '<option value="' + escapeHtml(v) + '">' + escapeHtml(labelFn ? labelFn(v) : v) + '</option>').join('');
-  el.value = cur; delete el.dataset.want;
+    ds.map(v => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + ' (' + (dem.get(v) || 0) + ')</option>').join('');
+  el.value = cur;
 }
 function fillOptions(){
-  fillSel('fCa', 'Mọi ca', all.flatMap(r => r.cas));
-  fillSel('fMay', 'Mọi máy', all.map(r => r.ma_may));
-  fillSel('fSp', 'Mọi mã SP', all.map(r => r.ma_sp));
-  fillSel('fKhuon', 'Mọi khuôn', all.map(r => r.so_khuon));
-  const el = $('fLoai'), cur = el.value || el.dataset.want || '';
-  const co = new Set(all.map(r => r.ma));
+  fillSel('fCa', 'Mọi ca', r => r.cas);
+  fillSel('fMay', 'Mọi máy', r => r.ma_may);
+  fillSel('fSp', 'Mọi mã SP', r => r.ma_sp);
+  fillSel('fKhuon', 'Mọi khuôn', r => r.so_khuon);
+  const el = $('fLoai'), cur = el.value;
+  const dem = demTheo(filtered('loai'), r => [r.ma, 'g:' + r.ma[0]]);
+  const n = k => ' (' + (dem.get(k) || 0) + ')';
   let h = '<option value="">Mọi loại vấn đề</option>';
   for (const [g, ten] of Object.entries(NHOM)) {
-    h += '<optgroup label="' + escapeHtml(ten) + '"><option value="g:' + g + '">Cả nhóm ' + escapeHtml(ten) + '</option>' +
-      LOAI.filter(([m]) => m[0] === g).map(([m, t]) => '<option value="' + m + '">' + m + ' — ' + escapeHtml(t) + (co.has(m) ? '' : ' (0)') + '</option>').join('') + '</optgroup>';
+    h += '<optgroup label="' + escapeHtml(ten) + '"><option value="g:' + g + '">Cả nhóm ' + escapeHtml(ten) + n('g:' + g) + '</option>' +
+      LOAI.filter(([m]) => m[0] === g).map(([m, t]) => '<option value="' + m + '">' + m + ' — ' + escapeHtml(t) + n(m) + '</option>').join('') + '</optgroup>';
   }
-  if (co.has('??')) h += '<option value="??">?? — Không rõ loại</option>';
-  el.innerHTML = h; el.value = cur; delete el.dataset.want;
+  if (dem.has('??') || cur === '??') h += '<option value="??">?? — Không rõ loại' + n('??') + '</option>';
+  el.innerHTML = h; el.value = cur;
+}
+// Đổi máy → bỏ mã SP / khuôn không còn khớp; đổi mã → bỏ khuôn không còn khớp.
+function lamSachSau(id){
+  const i = CHUOI.indexOf(id);
+  if (i < 0) return;
+  const key = { fSp: r => r.ma_sp, fKhuon: r => r.so_khuon };
+  CHUOI.slice(i + 1).forEach(k => {
+    if ($(k).value && !filtered(DIM[k]).some(r => key[k](r) === $(k).value)) $(k).value = '';
+  });
+}
+// Giá trị lọc lấy từ URL: tạo sẵn option để filtered() đọc được trước lần fillOptions đầu.
+function datGiaTri(id, v){
+  const el = $(id);
+  if (![...el.options].some(o => o.value === v)) el.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>');
+  el.value = v;
 }
 function hopLoai(r, v){ return !v || (v.startsWith('g:') ? r.ma[0] === v.slice(2) : r.ma === v); }
-// Áp mọi bộ lọc trừ `bo` (để thống kê theo 1 chiều vẫn thấy các giá trị khác của chiều đó).
+// Áp mọi bộ lọc trừ các chiều trong `bo` (chuỗi hoặc mảng) — để thống kê / ô lọc
+// theo 1 chiều vẫn thấy các giá trị khác của chiều đó.
 function filtered(bo){
+  const bo_ = [].concat(bo || []), b = d => bo_.includes(d);
   const ca = $('fCa').value, loai = $('fLoai').value, may = $('fMay').value, sp = $('fSp').value, kh = $('fKhuon').value, tt = $('fTt').value;
   const q = $('fQ').value.trim().toLowerCase();
-  return all.filter(r => (bo === 'ca' || !ca || r.cas.includes(ca)) && (bo === 'loai' || hopLoai(r, loai))
-    && (bo === 'may' || !may || r.ma_may === may) && (bo === 'sp' || !sp || r.ma_sp === sp) && (bo === 'khuon' || !kh || r.so_khuon === kh)
+  return all.filter(r => (b('ca') || !ca || r.cas.includes(ca)) && (b('loai') || hopLoai(r, loai))
+    && (b('may') || !may || r.ma_may === may) && (b('sp') || !sp || r.ma_sp === sp) && (b('khuon') || !kh || r.so_khuon === kh)
     && (!tt || (tt === 'mo') === r.dang_mo)
     && (!q || [r.id_su_co, r.van_de, r.noi_dung_xu_ly, r.dam_nhiem, r.ghi_chu, r.truong_ca, r.ma_may, r.ma_sp, r.so_khuon, r.loai_su_co]
       .some(v => String(v || '').toLowerCase().includes(q))));
@@ -331,6 +360,7 @@ function statBlock(title, dim, rows, keyFn, labelFn, cur){
 }
 
 function render(){
+  fillOptions();
   setUrl();
   const rows = filtered();
   const tong = rows.reduce((s, r) => s + r.phut, 0), dangMo = rows.filter(r => r.dang_mo).length;
@@ -447,14 +477,14 @@ function init(){
   const qs = new URLSearchParams(location.search);
   if (qs.get('tu') && qs.get('den')) { $('fTu').value = qs.get('tu'); $('fDen').value = qs.get('den'); danhDauNhanh(); }
   else datKhoang('7');
-  [['ca', 'fCa'], ['loai', 'fLoai'], ['may', 'fMay'], ['sp', 'fSp'], ['khuon', 'fKhuon']].forEach(([k, id]) => { if (qs.get(k)) $(id).dataset.want = qs.get(k); });
+  [['ca', 'fCa'], ['loai', 'fLoai'], ['may', 'fMay'], ['sp', 'fSp'], ['khuon', 'fKhuon']].forEach(([k, id]) => { if (qs.get(k)) datGiaTri(id, qs.get(k)); });
   if (qs.get('tt')) $('fTt').value = qs.get('tt');
   if (qs.get('q')) $('fQ').value = qs.get('q');
 
   document.querySelectorAll('[data-nhanh]').forEach(b => b.addEventListener('click', () => { datKhoang(b.dataset.nhanh); doiNgay(); }));
   $('fTu').addEventListener('change', doiNgay);
   $('fDen').addEventListener('change', doiNgay);
-  ['fCa', 'fLoai', 'fMay', 'fSp', 'fKhuon', 'fTt'].forEach(id => $(id).addEventListener('change', () => { showN = PAGE; render(); }));
+  ['fCa', 'fLoai', 'fMay', 'fSp', 'fKhuon', 'fTt'].forEach(id => $(id).addEventListener('change', () => { lamSachSau(id); showN = PAGE; render(); }));
   $('fQ').addEventListener('input', () => { showN = PAGE; render(); });
   $('btnXoaLoc').addEventListener('click', () => {
     ['fCa', 'fLoai', 'fMay', 'fSp', 'fKhuon', 'fTt', 'fQ'].forEach(id => { $(id).value = ''; });
@@ -464,7 +494,8 @@ function init(){
     const tr = e.target.closest('tr[data-dim]');
     if (!tr) return;
     const id = { loai: 'fLoai', may: 'fMay', sp: 'fSp', khuon: 'fKhuon' }[tr.dataset.dim];
-    $(id).value = $(id).value === tr.dataset.val ? '' : tr.dataset.val;
+    if ($(id).value === tr.dataset.val) $(id).value = ''; else datGiaTri(id, tr.dataset.val);
+    lamSachSau(id);
     showN = PAGE; render();
   });
   document.querySelector('table.ds thead').addEventListener('click', e => {
