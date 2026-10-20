@@ -186,6 +186,10 @@ button{cursor:pointer;font-family:inherit}
     <div class="ii-row" id="ck-incident-xu-ly"></div>
     <div class="ii-row" id="ck-incident-dam-nhiem"></div>
   </div>
+  <details class="incident-info hidden" id="ck-su-co-lich-su" open>
+    <summary class="ii-title" style="cursor:pointer">🕘 Lịch sử sự cố — từ khi phát sinh đến hiện tại</summary>
+    <div id="ck-su-co-lich-su-body" style="margin-top:.5rem"></div>
+  </details>
   <button class="pdf-btn hidden" id="ck-pdf-btn">📄 Xem tiêu chuẩn (PDF)</button>
 
   <div class="checklist" id="ck-checklist"></div>
@@ -225,6 +229,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/navbar.js"></script>
 <script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
+<script src="shared/su-co-lich-su.js"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 10;
@@ -675,7 +680,11 @@ async function openCheck(idCheckpoint, maSpChon){
   document.getElementById('ck-meta').textContent = 'Chờ đã ' + cp.phut_da_troi + ' phút — ' + (cp.ca || 'Theo KHSX, trưởng ca chưa nhập KH ca') + ', ' + (cp.ngay ? new Date(cp.ngay).toLocaleDateString('vi-VN') : '');
 
   document.getElementById('ck-incident-info').classList.add('hidden');
-  if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
+  // T122: có mã sự cố gốc → hiện toàn bộ lịch sử sự cố (thay khung tóm tắt cũ).
+  const lichSu = document.getElementById('ck-su-co-lich-su');
+  lichSu.classList.toggle('hidden', !cp.id_su_co_goc);
+  if (cp.id_su_co_goc) { lichSu.open = true; SuCoLichSu.mount(document.getElementById('ck-su-co-lich-su-body'), cp.id_su_co_goc); }
+  else if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
 
   showScreen('scr-check');
   // The original checklist remains independent of the reference document.
