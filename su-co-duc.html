@@ -154,6 +154,8 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/su-co-anh.js"></script>
+<script src="shared/qc02-view.js"></script>
+<script src="shared/su-co-lich-su.js"></script>
 <script>
 // Cùng danh mục với CONFIG.LOAI_SU_CO ở duc-dashboard.html.
 const LOAI = [
@@ -414,9 +416,21 @@ function render(){
   if (openId) loadDetail(all.find(r => r.key === openId));
 }
 
+// Bấm 1 sự cố: dòng thời gian đầy đủ từ lúc phát sinh đến khi đóng (T122 — shared/su-co-lich-su.js,
+// RPC duc_su_co_lich_su cần đăng nhập). Chưa đăng nhập / sự cố không có mã → chi tiết rút gọn bên dưới.
 async function loadDetail(r){
   const el = $('ct');
   if (!r || !el) return;
+  let coPhien = false;
+  try { coPhien = !!(await MesAuth.getSession()); } catch (e) {}
+  if ($('ct') !== el) return;
+  if (r.id_su_co && coPhien) {
+    el.innerHTML = '<div style="max-width:960px"></div>';
+    return SuCoLichSu.mount(el.firstChild, r.id_su_co);
+  }
+  return loadDetailRutGon(r, el, r.id_su_co && !coPhien);
+}
+async function loadDetailRutGon(r, el, canDangNhap){
   let anh = { truoc: [], sau: [] }, xl = null;
   if (r.id_su_co) {
     try {
@@ -436,7 +450,9 @@ async function loadDetail(r){
       '<div class="hint">' + escapeHtml([xl.nguoi_dam_nhiem, xl.nguoi_dam_nhiem_phu].filter(Boolean).join(' + ')) +
       (xl.bat_dau ? ' · ' + fmtTs(xl.bat_dau) + ' → ' + (xl.ket_thuc ? fmtTs(xl.ket_thuc) : '…') : '') + '</div></div>' : '') +
     '<div><h4>Ảnh hiện trạng</h4>' + imgs(anh.truoc || []) + '<h4 style="margin-top:8px">Ảnh sau xử lý</h4>' + imgs(anh.sau || []) + '</div>' +
-    '</div>';
+    '</div>' +
+    (canDangNhap ? '<div class="hint" style="margin-top:8px"><a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) +
+      '">Đăng nhập</a> để xem toàn bộ lịch sử sự cố (ai báo, các lần cập nhật, tổ khuôn, linh kiện, IPQC kiểm…).</div>' : '');
 }
 
 // ── Excel ─────────────────────────────────────────────────────────────────────
