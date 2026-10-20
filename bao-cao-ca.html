@@ -272,16 +272,37 @@ function renderReport(s, lichSuRows, incidents){
 }
 
 let lastReportName = 'BaoCaoKetCa.pdf';
+// Xuất PDF bằng html2pdf (html2canvas chụp ảnh rồi cắt trang). Không chụp thẳng
+// phần tử đang hiển thị: nó nằm trong khung cuộn (modal) / trang đã cuộn xuống →
+// ảnh bị lệch theo khoảng cuộn, phần cuối báo cáo bị cắt, các trang sau trắng.
+// Chép ra 1 khung riêng ở đầu trang, rộng cố định, không cuộn; không cắt ngang dòng bảng.
+async function xuatPdfTuPhanTu(el, filename){
+  const box = document.createElement('div');
+  box.style.cssText = 'position:absolute;left:0;top:0;width:780px;background:#fff;z-index:-1;padding:0;margin:0';
+  const clone = el.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.style.cssText += ';display:block;max-height:none;overflow:visible;height:auto';
+  box.appendChild(clone);
+  document.body.appendChild(box);
+  const sx = window.scrollX, sy = window.scrollY;
+  window.scrollTo(0, 0);
+  try {
+    await html2pdf().set({
+      filename: filename,
+      margin: 10,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.kpi', 'h1', 'h2'] },
+    }).from(clone).save();
+  } finally {
+    box.remove();
+    window.scrollTo(sx, sy);
+  }
+}
 function exportReportPdf(){
-  const el = document.getElementById('reportBody');
-  html2pdf().set({
-    filename: lastReportName,
-    margin: 10,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['css', 'legacy'] },
-  }).from(el).save();
+  xuatPdfTuPhanTu(document.getElementById('reportBody'), lastReportName)
+    .catch(e => showSearchMsg('error', 'Lỗi xuất PDF: ' + e.message));
 }
 
 function tickClock(){
