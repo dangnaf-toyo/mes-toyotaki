@@ -224,7 +224,7 @@
         const img = e.target.closest('img[data-sclh-urls]');
         if (!img) return;
         const urls = JSON.parse(img.dataset.sclhUrls), u = urls[Number(img.dataset.sclhI) || 0];
-        if (window.Qc02View && typeof Qc02View.photo === 'function') Qc02View.photo(u, urls);
+        if (typeof Qc02View !== 'undefined' && typeof Qc02View.photo === 'function') Qc02View.photo(u, urls);
         else window.open(u, '_blank', 'noopener');
       });
     }
