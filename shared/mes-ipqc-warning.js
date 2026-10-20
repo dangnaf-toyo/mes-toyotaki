@@ -32,7 +32,7 @@ const MesIpqcWarning = (() => {
         }
       }
     }catch(error){showToast(error.message,true);}
-    finally{busy=false;for(const {el,disabled}of controls)el.disabled=disabled;button.disabled=false;}
+    finally{busy=false;for(const {el,disabled}of controls)el.disabled=disabled;button.disabled=false;if(typeof MesIpqcSession!=='undefined')MesIpqcSession.syncControls();}
   }
   return {open};
 })();

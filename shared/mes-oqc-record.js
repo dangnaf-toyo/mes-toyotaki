@@ -50,7 +50,7 @@ const MesOqcRecord = (() => {
       if(known){seen.add(item.code);const input=[...document.querySelectorAll('#defects .defect')].find(i=>i.dataset.code===item.code);const detail=[...document.querySelectorAll('#defects .detail')].find(i=>i.dataset.code===item.code);if(input)input.value=item.qty;if(detail)detail.value=item.detail||'';}
       else otherRows.push({...item,key:++serial,label:item.label||item.name||item.code||'Lỗi cũ',detail:item.detail||item.note||'',qty:item.qty??0});
     }
-    byId('date').readOnly=true; renderOther();calc();
+    byId('date').readOnly=false; renderOther();calc();
   };
   resetForm = function() { original=null;otherRows=[];byId('date').readOnly=false;oldReset();renderOther(); };
   byId('addOtherDefect').onclick=()=>add();
@@ -68,10 +68,14 @@ const MesOqcRecord = (() => {
     try{
       for(const input of document.querySelectorAll('#defects .defect'))if(!Number.isInteger(Number(input.value))||Number(input.value)<0)throw new Error('Số lượng lỗi phải là số nguyên, không âm.');
       for(const row of otherRows)if(!Number.isInteger(Number(row.qty))||Number(row.qty)<0||(!row.label.trim()&&Number(row.qty)>0))throw new Error('Kiểm tra tên và số lượng từng lỗi khác.');
-      if(original)byId('date').value=original.inspection_date||'';
+
       await oldSubmit(event);
     }catch(error){event.preventDefault();message(error.message,true);byId('save').disabled=false;}
   };
+  async function showAudit(id,target){
+    const section=document.createElement('section');section.dataset.auditRecord=String(id);target.append(section);const title=document.createElement('h4');title.textContent='Lịch sử chỉnh sửa';section.append(title);
+    try{for(let offset=0;;offset+=100){const r=await sb.from('oqc_daily_inspection_audit').select('*').eq('inspection_id',id).order('id',{ascending:false}).range(offset,offset+99);if(r.error)throw r.error;if(!section.isConnected)return;for(const row of r.data||[]){const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=(row.actor_name||'MES')+' · '+MesQcFields.display(row.changed_at||row.created_at);pre.textContent=JSON.stringify({before:row.old_data,after:row.new_data},null,2);pre.style.whiteSpace='pre-wrap';details.append(summary,pre);section.append(details);}if(!r.data||r.data.length<100)break;}if(section.children.length===1)section.append(document.createTextNode('Chưa có chỉnh sửa.'));}catch(e){section.append(document.createTextNode('Chưa đọc được lịch sử: '+e.message));}
+  }
   function photos(row) {
     const result=[];
     function append(value){if(Array.isArray(value))value.forEach(append);else if(typeof value==='string'){try{const parsed=JSON.parse(value);if(Array.isArray(parsed)){append(parsed);return;}}catch{}const url=Qc02View.safeUrl(value,true);if(url)result.push(url);}}
@@ -87,6 +91,7 @@ const MesOqcRecord = (() => {
     const defects=document.createElement('div');target.append(defects);Qc02View.table(defects,['Nhóm lỗi','Tên lỗi','Số lượng','Ghi chú'],(row.defects||[]).map(d=>[d.group,MesQcFields.defectName(d),d.qty,d.detail||d.note]));
     const urls=photos(row),gallery=document.createElement('div');gallery.className='oqc-record-gallery';gallery.dataset.qcGallery='';
     urls.forEach(url=>{const link=document.createElement('a');link.href=url;link.dataset.qcPhoto='';link.className='oqc-record-photo';const img=document.createElement('img');img.src=url;img.alt='Ảnh lỗi OQC';img.style.cssText='width:120px;height:90px;object-fit:contain';link.append(img);link.onclick=e=>{e.preventDefault();e.stopPropagation();Qc02View.photo(url,urls);};gallery.append(link);});target.append(gallery);if(typeof MesOqcScope!=='undefined')MesOqcScope.describe(id,target);
+    showAudit(id,target);
     if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
   }
   byId('rows').addEventListener('click',event=>{
