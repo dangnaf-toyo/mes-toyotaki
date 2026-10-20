@@ -22,6 +22,7 @@
   const LK_LOAI = { xuat_thay: 'Xuất thay', thao_ra: 'Tháo ra', nhap: 'Nhập kho', dieu_chinh: 'Điều chỉnh' };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  const gonIpqc = t => (window.IpqcText ? IpqcText.gon(t) : (t || ''));
   function pad(n){ return String(n).padStart(2, '0'); }
   function tg(ts){ if (!ts) return '—'; const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1); }
   function giaTri(k, v){ if (v == null || v === '') return '(trống)'; return (k === 'gio_phat_sinh' || k === 'gio_tro_lai') ? tg(v) : String(v); }
@@ -110,7 +111,7 @@
     const moDl = (nkMo && nkMo.du_lieu) || {};
     add(goc.gio_phat_sinh || moDl.gio_phat_sinh, 'do', '🚨 Phát sinh sự cố — ' + esc(goc.loai_su_co || goc.loai || moDl.loai || ''),
       nkMo ? 'Báo bởi ' + nkMo.nguoi + ' lúc ' + tg(nkMo.thoi_diem) : '',
-      dong('Vấn đề / hiện trạng', moDl.van_de || goc.van_de) +
+      dong('Vấn đề / hiện trạng', gonIpqc(moDl.van_de || goc.van_de)) +
       dong('Xử lý ban đầu', moDl.noi_dung_xu_ly) + dong('Đảm nhiệm', moDl.dam_nhiem));
 
     // Ảnh: gom theo loại + người + phút
@@ -190,7 +191,7 @@
       '<div><b>Máy</b> ' + esc(goc.ma_may || '') + ' · <b>SP</b> ' + esc(sps.join(', ') || goc.ma_sp || '') + (goc.so_khuon ? ' · <b>Khuôn</b> ' + esc(goc.so_khuon) : '') +
         ' · <b>Phát sinh</b> ' + tg(phatSinh) + '</div>' +
       '<div>' + st + '</div>' +
-      '<div><b>Vấn đề / nguyên nhân:</b> ' + esc(cuoi.van_de || goc.van_de || '—') + '</div>' +
+      '<div><b>Vấn đề / nguyên nhân:</b> ' + esc(gonIpqc(cuoi.van_de || goc.van_de) || '—') + '</div>' +
       '<div><b>Nội dung xử lý:</b> ' + esc(cuoi.noi_dung_xu_ly || '—') + '</div>' +
       '<div><b>Đảm nhiệm:</b> ' + esc(cuoi.dam_nhiem || '—') + '</div>' +
     '</div>';

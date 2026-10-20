@@ -100,7 +100,7 @@
         else kq = '<span class="vd-kq cho">Đã SX lại</span>';
         return { src: 'su_co', t: x.gio_phat_sinh, ca: x.ca, may: x.ma_may,
           nguon: '<span class="vd-src su_co">⚠ Sự cố</span>' + (x.id_su_co ? '<small>' + escapeHtml(x.id_su_co) + '</small>' : ''),
-          loi: '<b>' + escapeHtml(x.loai || '—') + '</b>' + escapeHtml(x.van_de || ''),
+          loi: '<b>' + escapeHtml(x.loai || '—') + '</b>' + escapeHtml(typeof IpqcText !== 'undefined' ? IpqcText.gon(x.van_de) : (x.van_de || '')),
           dung: x.dang_mo ? '<span class="vd-kq ng">đang dừng</span>' : (x.phut != null ? '<b>' + x.phut + "'</b>" : '—') + (x.gio_tro_lai ? '<small>SX lại ' + vdGio(x.gio_tro_lai) + '</small>' : ''),
           xl: String(x.xu_ly || '').trim(), kq,
           anh: vdAnh(x.anh_truoc, 'Hiện trạng') + vdAnh(x.anh_sau, 'Sau xử lý'),

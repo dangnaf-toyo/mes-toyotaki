@@ -204,6 +204,7 @@ tr.row-ng td{background:#FFF5F5}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
 // Người ghi check sheet = NV bảo dưỡng khuôn / Quản lý bộ phận Đúc (D68) / admin — khớp RPC duc_khuon_cs_luu.
@@ -465,7 +466,7 @@ function renderVd(){
   if (done) {
     const ds = Array.isArray(cs.van_de_xu_ly) ? cs.van_de_xu_ly.filter(x => x.xac_nhan) : [];
     box.innerHTML = '<div class="card-title">⚠ Vấn đề khuôn đã xử lý trong lần bảo dưỡng này (' + ds.length + ')</div>' +
-      (ds.length ? '<div class="vd-list">' + ds.map(x => '<div class="vd-it ok"><div class="h"><b>' + escapeHtml(x.mo_ta || x.id_van_de) + '</b>' +
+      (ds.length ? '<div class="vd-list">' + ds.map(x => '<div class="vd-it ok"><div class="h"><b>' + escapeHtml(IpqcText.gon(x.mo_ta) || x.id_van_de) + '</b>' +
         '<span class="m">' + (x.ngay_phat_hien ? fmtDateVN(x.ngay_phat_hien) : '') + (x.ma_may ? ' · ' + escapeHtml(x.ma_may) : '') + '</span></div>' +
         '<div class="nd"><b>Đã xử lý:</b> ' + escapeHtml(x.noi_dung) + '</div></div>').join('') + '</div>'
         : '<div style="font-size:12px;color:var(--text-muted)">Không có vấn đề khuôn nào chưa đóng lúc hoàn thành.</div>');
@@ -486,7 +487,7 @@ function renderVd(){
         const id = escapeHtml(v.id_van_de);
         return '<div class="vd-it' + (xong ? ' ok' : vdThieu ? ' need' : '') + '">' +
           '<div class="h"><span class="tt' + (v.trang_thai === 'Chờ xác nhận' ? ' cho' : '') + '">' + escapeHtml(v.trang_thai) + '</span>' +
-          '<b>' + escapeHtml(v.mo_ta || '—') + '</b>' +
+          '<b>' + escapeHtml(IpqcText.gon(v.mo_ta) || '—') + '</b>' +
           '<span class="m">' + (v.ngay_phat_hien ? fmtDateVN(v.ngay_phat_hien) : '') + (v.ca_phat_hien ? ' · ' + escapeHtml(v.ca_phat_hien) : '') +
             (v.ma_may ? ' · ' + escapeHtml(v.ma_may) : '') + (v.nguoi_phat_hien ? ' · phát hiện: ' + escapeHtml(v.nguoi_phat_hien) : '') +
             (Number(v.lan_tai_phat) ? ' · tái phát ' + v.lan_tai_phat + ' lần' : '') + '</span></div>' +
@@ -751,7 +752,7 @@ async function save(hoanThanh){
       vdThieu = true; renderVd();
       document.getElementById('vdCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
       return showMsg('Chưa hoàn thành được: còn ' + thieuVd.length + ' vấn đề khuôn chưa đóng chưa xác nhận xử lý (' +
-        thieuVd.slice(0, 3).map(v => v.mo_ta || v.id_van_de).join('; ') + (thieuVd.length > 3 ? '…' : '') +
+        thieuVd.slice(0, 3).map(v => IpqcText.gon(v.mo_ta) || v.id_van_de).join('; ') + (thieuVd.length > 3 ? '…' : '') +
         '). Ghi nội dung và tích "Đã xử lý vấn đề này" cho tất cả vấn đề ở khung ⚠ Vấn đề khuôn chưa đóng.', 'err', 9000);
     }
     const ng = items.filter(it => it.ket_qua === 'NG').length;

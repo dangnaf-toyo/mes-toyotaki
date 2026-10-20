@@ -412,6 +412,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/su-co-anh.js"></script>
 <script>
@@ -869,7 +870,7 @@ function renderInfo(){
   if (iss.length) {
     h += '<div class="iss"><b>Vấn đề khuôn cần chú ý:</b>' + iss.map(a =>
       '<div>• [' + escapeHtml(a.trang_thai || '') + '] ' + (a.ngay_phat_hien ? fmtDateVN(new Date(a.ngay_phat_hien)) + ' — ' : '') +
-      escapeHtml(a.mo_ta || '(không có mô tả)') + '</div>').join('') + '</div>';
+      escapeHtml(IpqcText.gon(a.mo_ta) || '(không có mô tả)') + '</div>').join('') + '</div>';
   }
   box.innerHTML = h;
 }
@@ -1107,7 +1108,7 @@ function renderXl(){
       '<td style="font-weight:700">' + escapeHtml(r.ma_may || '') + '</td>' +
       '<td style="white-space:nowrap"><b>' + escapeHtml(r.so_khuon || '—') + '</b>' + SUB(escapeHtml(r.ma_sp || '')) + '</td>' +
       '<td style="white-space:nowrap">' + fmtTs(r.gio_phat_sinh) + SUB('Ca ' + escapeHtml(r.ca || '')) + '</td>' +
-      '<td class="vd">' + escapeHtml(r.van_de || '') + (r.noi_dung_sx ? '<small>SX: ' + escapeHtml(r.noi_dung_sx) + '</small>' : '') + '</td>' +
+      '<td class="vd">' + escapeHtml(IpqcText.gon(r.van_de)) + (r.noi_dung_sx ? '<small>SX: ' + escapeHtml(r.noi_dung_sx) + '</small>' : '') + '</td>' +
       '<td>' + may + '</td>' +
       '<td><span class="xst ' + st.cls + '">' + st.label + '</span></td>' +
       '<td>' + (x.nguoi_dam_nhiem ? '<b>' + escapeHtml(x.nguoi_dam_nhiem) + '</b>' + (x.nguoi_dam_nhiem_phu ? SUB('+ ' + escapeHtml(x.nguoi_dam_nhiem_phu)) : '') : '—') + '</td>' +
@@ -1168,7 +1169,7 @@ async function openXl(id){
   document.getElementById('xl-info').innerHTML =
     '<div><b>Máy:</b> ' + escapeHtml(r.ma_may || '') + ' · <b>Khuôn:</b> ' + escapeHtml(r.so_khuon || '—') + ' · <b>SP:</b> ' + escapeHtml(r.ma_sp || '') +
       ' · <b>Phát sinh:</b> ' + fmtTs(r.gio_phat_sinh) + ' (ca ' + escapeHtml(r.ca || '') + ')</div>' +
-    '<div><b>Vấn đề:</b> ' + escapeHtml(r.van_de || '—') + '</div>' +
+    '<div><b>Vấn đề:</b> ' + escapeHtml(IpqcText.gon(r.van_de) || '—') + '</div>' +
     (r.noi_dung_sx ? '<div><b>Sản xuất đã xử lý:</b> ' + escapeHtml(r.noi_dung_sx) + (r.dam_nhiem_sx ? ' (' + escapeHtml(r.dam_nhiem_sx) + ')' : '') + '</div>' : '') +
     '<div>' + (r.dang_dung_may ? '<span class="warn">⛔ Máy đang dừng ' + fmtNum(r.phut_dung) + ' phút</span>'
       : 'Máy đã chạy lại lúc ' + fmtTs(r.gio_tro_lai) + ' (dừng ' + fmtNum(r.phut_dung) + ' phút)') + '</div>' +

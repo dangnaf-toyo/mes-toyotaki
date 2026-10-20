@@ -152,6 +152,7 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/qc02-view.js"></script>
@@ -406,7 +407,7 @@ function render(){
       '<td class="nw"><span class="loai ' + r.ma[0] + '" title="' + escapeHtml(r.loai_su_co) + '">' + r.ma + '</span><small>' + escapeHtml(TEN_LOAI[r.ma] || r.loai_su_co || '') + '</small></td>' +
       '<td class="nw">' + fmtTs(r.gio_phat_sinh) + ' → ' + (r.dang_mo ? '<span class="mo">đang mở</span>' : fmtTs(r.gio_tro_lai) || '—') + '<small>' + escapeHtml(r.id_su_co) + '</small></td>' +
       '<td class="n' + (r.dang_mo ? ' mo' : '') + '">' + fmtNum(Math.round(r.phut)) + '</td>' +
-      '<td class="vd">' + escapeHtml(r.van_de) + '</td>' +
+      '<td class="vd">' + escapeHtml(IpqcText.gon(r.van_de)) + '</td>' +
       '<td class="vd">' + escapeHtml(r.noi_dung_xu_ly) + '</td>' +
       '<td>' + escapeHtml(r.dam_nhiem) + '</td></tr>' +
       (open ? '<tr class="ct"><td colspan="10" id="ct">Đang tải chi tiết…</td></tr>' : '');
@@ -442,7 +443,7 @@ async function loadDetailRutGon(r, el, canDangNhap){
   if ($('ct') !== el) return;
   const imgs = list => list.length ? '<div class="ph">' + list.map(a => '<a href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(a.url) + '" alt="" loading="lazy"></a>').join('') + '</div>' : '<span class="hint">Chưa có ảnh</span>';
   el.innerHTML = '<div class="ct-grid">' +
-    '<div><h4>Vấn đề</h4><p>' + escapeHtml(r.van_de || '—') + '</p>' +
+    '<div><h4>Vấn đề</h4><p>' + escapeHtml(IpqcText.gon(r.van_de) || '—') + '</p>' +
       (r.ghi_chu ? '<h4 style="margin-top:8px">Ghi chú</h4><p>' + escapeHtml(r.ghi_chu) + '</p>' : '') +
       '<div class="hint" style="margin-top:6px">' + escapeHtml(r.loai_su_co || '') + (r.ten_sp ? ' · ' + escapeHtml(r.ten_sp) : '') + (r.truong_ca ? ' · Trưởng ca: ' + escapeHtml(r.truong_ca) : '') + '</div></div>' +
     '<div><h4>Sản xuất xử lý</h4><p>' + escapeHtml(r.noi_dung_xu_ly || '—') + '</p>' + (r.dam_nhiem ? '<div class="hint">' + escapeHtml(r.dam_nhiem) + '</div>' : '') + '</div>' +
