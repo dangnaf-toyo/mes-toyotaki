@@ -57,6 +57,74 @@
 - [ ] **Sẵn sàng cho sản phẩm mới** — tạo quy trình NPI trước khi báo giá/sản xuất: routing, BOM, dụng cụ/jig, tiêu chuẩn đo, Control Plan, năng lực, rủi ro và phê duyệt thử nghiệm. Cần hỗ trợ sớm các công đoạn rửa, leak test và lắp ráp để không phải sửa cấu trúc dữ liệu khi sản phẩm mới vào sản xuất.
 - [ ] **Họp cải tiến hằng ngày dựa trên dữ liệu** — chuẩn hoá bảng họp 10–15 phút theo ca/ngày: an toàn, kế hoạch–thực tế, chất lượng, downtime, WIP bất thường, hành động khắc phục và người/hạn hoàn thành. MES cung cấp dữ liệu; trưởng bộ phận chịu trách nhiệm chốt hành động và theo dõi đến khi đóng.
 
+## Nhóm 7 — Quản lý điểm thay đổi (Henkaten / 4M) — chống phát sinh và lọt NG
+
+> Đề xuất ngày 2026-10-20 theo yêu cầu người dùng ("nhà máy quản lý điểm thay đổi rất kém, cả có kế hoạch lẫn bất thường"). Làm dần theo giai đoạn; mỗi giai đoạn cần người dùng chốt các điểm ở cuối mục trước khi code.
+
+**Số liệu thực tế 60 ngày đến 20/10/2026 (prod)** — lý do ưu tiên:
+
+| Chỉ số | Lên khuôn / đổi SP (`doi_khuon`) | Sau sự cố (`sau_su_co`) |
+|---|---|---|
+| Số lần sinh yêu cầu IPQC kiểm SP đầu | 298 | 847 |
+| Không có lần kiểm nào được ghi nhận | 96 (32%) | 295 (35%) |
+| IPQC kiểm trễ — trung vị / P90 | 110 / 270 phút | 103 / 293 phút |
+| NG / Cảnh báo trong số đã kiểm | 36% | 37% |
+
+- 28% lần IPQC NG/Cảnh báo (224/802) xảy ra trong vòng 4h sau 1 thay đổi trên cùng máy (đổi khuôn, sửa máy, sửa khuôn, mất điện, đổi NVL…).
+- Số vụ 60 ngày: F1 350, B1 303, A2 232, C3 127, A1 98, A3 35, C1 22, D1 20, E2 20, C2 18, B2 7, E3 7, D2 2.
+- Lưu ý: một phần "không kiểm" có thể do checkpoint bị thay thế (`het_hieu_luc`) — tách rõ khi bắt đầu làm.
+
+**Đã có sẵn, tận dụng được:** điểm kiểm IPQC sản phẩm đầu khi đổi khuôn / sau sự cố; chặn khuôn chưa BD ĐẠT (T100); xác nhận vấn đề lần SX trước + tái phát khi lên khuôn (T127); phân loại sự cố A1/A2/A3/B2/D1/D2/E*; luật "IPQC OK mới đóng sự cố" (hiện chỉ cảnh báo — `v_hard_block_ipqc = false` trong `duc_resolve_incident`); tem theo máy/khuôn/giờ + tem cách ly + NCP + truy xuất nguồn gốc; KHSX tuần, KH BD khuôn + check sheet, linh kiện khuôn, phiếu thay đổi tài liệu, IQC lot NVL; nhật ký sự cố (T122).
+
+**Thiết kế đề xuất:**
+
+1. **Sổ điểm thay đổi duy nhất** — mỗi điểm: loại (Man / Machine / Material / Method / Measurement / Mold), có kế hoạch hay bất thường, máy, mã SP, khuôn, thời điểm bắt đầu, mức rủi ro, biện pháp kiểm soát, nguồn phát sinh (liên kết sự cố / check sheet / lot…), trạng thái *Đang hiệu lực → Đã xác nhận ổn định → Đóng*.
+2. **Tự phát hiện điểm thay đổi bất thường** từ dữ liệu sẵn có (không phụ thuộc người nhớ khai):
+
+| Nguồn sẵn có | Điểm thay đổi |
+|---|---|
+| Đổi khuôn / đổi SP (C3, `doi_khuon`) | Khuôn / Phương pháp |
+| Đóng sự cố A1 / A2 / A3 | Máy / Khuôn / Hạ tầng — "chạy lại sau sửa" |
+| Thay linh kiện khuôn (`khuon_lk_giao_dich`), hoàn thành check sheet BD | Khuôn |
+| Lot NVL mới (IQC), sự cố B2 | Vật liệu |
+| D1 thiếu người, D2 người mới; người vận hành khác thường lệ | Con người |
+| Máy dừng > X giờ rồi chạy lại (nghỉ dài, đầu tuần) | Máy |
+| Ban hành phiếu thay đổi tài liệu / tiêu chuẩn | Phương pháp (có KH) |
+
+3. **Khai báo thay đổi có kế hoạch** — đổi điều kiện đúc, đổi NVL / nhà cung cấp, sửa khuôn lớn, người mới, thiết bị mới: đăng ký trước → QA/QLSX duyệt → kích hoạt khi bắt đầu, kèm biện pháp đã duyệt.
+4. **Kiểm soát trong thời gian điểm thay đổi hiệu lực:**
+   - **Kiểm SP đầu bắt buộc** — mỗi điểm thay đổi tự sinh lần kiểm IPQC "sau thay đổi", ưu tiên đầu hàng đợi, có đồng hồ + cảnh báo trễ.
+   - **Giữ hàng đầu tiên** — tem in sau thời điểm thay đổi ở trạng thái "chờ xác nhận", KHÔNG chuyển công đoạn được cho tới khi IPQC OK (chốt chính chống lọt NG).
+   - **Tăng tần suất IPQC** trong N giờ đầu sau thay đổi (VD 30–60 phút thay vì 2 giờ).
+   - **Đánh dấu tem** sản xuất trong thời gian hiệu lực → OQC kiểm tăng cường; phát hiện NG → tự liệt kê tem từ thời điểm thay đổi để cách ly (dùng tem cách ly / NCP sẵn có).
+   - **Bảng điểm thay đổi** trên Dashboard Đúc (biểu tượng trên ô máy); báo cáo ca/tuần: số điểm thay đổi, NG phát sinh trong thời gian hiệu lực, tỷ lệ kiểm SP đầu đúng hạn.
+
+**Lộ trình:**
+
+- [ ] **GĐ1 — Tự phát hiện + kiểm SP đầu (tận dụng cái sẵn có)**
+  - [ ] Bảng sổ điểm thay đổi + tự sinh từ: đổi khuôn/C3, đóng sự cố A1/A2/A3/B2, máy dừng > X giờ, hoàn thành check sheet BD khuôn, thay linh kiện khuôn.
+  - [ ] Lần kiểm IPQC "sau thay đổi" ưu tiên + đồng hồ / cảnh báo trễ; tách rõ số liệu "không kiểm" vs checkpoint bị thay thế.
+  - [ ] Bật dần luật "chưa IPQC OK thì không đóng được sự cố" (`v_hard_block_ipqc`).
+  - [ ] Bảng điểm thay đổi trên Dashboard Đúc + màn hình tra cứu sổ điểm thay đổi.
+- [ ] **GĐ2 — Giữ hàng + tăng tần suất + khoanh vùng**
+  - [ ] Tem "chờ xác nhận" sau thay đổi, chặn chuyển công đoạn tới khi IPQC OK.
+  - [ ] Tăng tần suất IPQC định kỳ trong N giờ sau thay đổi.
+  - [ ] Đánh dấu tem trong thời gian hiệu lực; NG → tự liệt kê tem cần cách ly.
+  - [ ] Báo cáo ca/tuần: điểm thay đổi, NG trong cửa sổ, tỷ lệ kiểm SP đầu đúng hạn.
+- [ ] **GĐ3 — Thay đổi có kế hoạch + con người + điều kiện đúc + mở rộng**
+  - [ ] Đăng ký điểm thay đổi có kế hoạch + phê duyệt + kích hoạt.
+  - [ ] Ma trận tay nghề / người mới (Man).
+  - [ ] Điều kiện đúc tiêu chuẩn theo mã SP × máy + ghi lại mỗi lần chỉnh (Method).
+  - [ ] Liên kết IQC lot NVL mới, phiếu thay đổi tài liệu.
+  - [ ] Mở rộng sang Bavia / Gia công / Sơn / OQC.
+
+**Cần người dùng chốt trước khi code:**
+1. Làm trước cho Đúc rồi mở rộng sang công đoạn khác?
+2. Giữ hàng đầu tiên (tem chờ xác nhận, chặn chuyển công đoạn) có chấp nhận được về vận hành?
+3. Ai duyệt điểm thay đổi có kế hoạch (QA / QLSX / Giám đốc SX)?
+4. Ngưỡng: máy dừng bao lâu thì tính là điểm thay đổi; tăng tần suất IPQC trong bao nhiêu giờ sau thay đổi?
+5. Bật luôn luật "chưa IPQC OK không đóng được sự cố" (hiện chỉ cảnh báo)?
+
 ## Thứ tự ưu tiên nghiệp vụ đề xuất
 
 1. Chuẩn QR/lot/pallet, quy trình tách-gộp và vị trí WIP.
@@ -64,6 +132,7 @@
 3. Routing/BOM, sổ đời khuôn (bao gồm khuôn dập gate) và cân bằng vật liệu đúc.
 4. FPY/OEE, năng lực–nút thắt, bảo trì thiết bị và dashboard cải tiến hằng ngày.
 5. Phòng đo, gia công ngoài và luồng NPI cho rửa/leak test/lắp ráp.
+6. **Quản lý điểm thay đổi (Henkaten)** — xem Nhóm 7; số liệu 60 ngày cho thấy ~1/3 lần đổi khuôn / sau sự cố không được kiểm SP đầu, nên cân nhắc đưa lên sớm.
 
 ## Roadmap tóm tắt tính năng cần thiết để hoàn thiện MES
 
@@ -80,6 +149,7 @@
 - [ ] **Khoanh vùng NG** — xác định phạm vi khả nghi theo máy, ca, khuôn, lot và công đoạn gần nhất.
 - [ ] **FPY & chi phí chất lượng** — đo First Pass Yield, rework, scrap, thời gian sửa và nguyên nhân gây lỗi.
 - [ ] **IPQC/OQC tích hợp** — kiểm tra theo mốc thời gian và sau sự cố, gắn với nơi sản xuất đang chạy.
+- [ ] **Quản lý điểm thay đổi (Henkaten / 4M)** — sổ điểm thay đổi tự phát hiện + có kế hoạch, kiểm SP đầu bắt buộc, giữ hàng đầu tiên, tăng tần suất IPQC, khoanh vùng tem. Chi tiết + lộ trình 3 giai đoạn ở Nhóm 7.
 
 ### Giai đoạn 3 — Routing, BOM và sản phẩm mới
 - [ ] **BOM theo mã SP** — định nghĩa vật liệu, định mức, thành phần và phiên bản quy trình cho từng sản phẩm.
