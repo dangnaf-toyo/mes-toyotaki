@@ -139,7 +139,7 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
     <div class="card-title" id="dsTitle">Danh sách sự cố</div>
     <div class="tw"><table class="ds">
       <thead><tr>
-        <th data-sort="ngay">Ngày / Ca</th><th data-sort="ma_may">Máy</th><th data-sort="ma_sp">Mã SP</th><th data-sort="so_khuon">Khuôn</th>
+        <th data-sort="ngay">Ngày / Ca</th><th data-sort="ma_may">Máy</th><th data-sort="ma_sps">Mã SP</th><th data-sort="so_khuons">Khuôn</th>
         <th data-sort="ma">Loại</th><th data-sort="gio_phat_sinh">Phát sinh → Trở lại</th><th class="n" data-sort="phut">Phút dừng</th>
         <th>Vấn đề</th><th>Xử lý (sản xuất)</th><th data-sort="dam_nhiem">Đảm nhiệm</th>
       </tr></thead>
@@ -152,8 +152,11 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/su-co-anh.js"></script>
+<script src="shared/qc02-view.js"></script>
+<script src="shared/su-co-lich-su.js"></script>
 <script>
 // Cùng danh mục với CONFIG.LOAI_SU_CO ở duc-dashboard.html.
 const LOAI = [
@@ -230,12 +233,17 @@ async function load(){
       const k = r.id_su_co || ('#' + r.id_ban_ghi);
       const g = map.get(k);
       if (!g) {
-        map.set(k, { key: k, id_su_co: r.id_su_co || '', ngay: r.ngay, ca: r.ca, cas: [r.ca], ma_may: r.ma_may, ma_sp: r.ma_sp, ten_sp: r.ten_sp,
-          so_khuon: r.so_khuon, loai_su_co: r.loai_su_co, ma: maLoai(r.loai_su_co), gio_phat_sinh: r.gio_phat_sinh, gio_tro_lai: r.gio_tro_lai,
-          phut: Number(r.thoi_gian_dung_phut) || 0, van_de: r.van_de, noi_dung_xu_ly: r.noi_dung_xu_ly, dam_nhiem: r.dam_nhiem,
+        map.set(k, { key: k, id_su_co: r.id_su_co || '', ngay: r.ngay, ca: r.ca, cas: [r.ca], ma_may: r.ma_may, ma_sps: [r.ma_sp].filter(Boolean), ten_sp: r.ten_sp,
+          so_khuons: [r.so_khuon].filter(Boolean), loai_su_co: r.loai_su_co, ma: maLoai(r.loai_su_co), gio_phat_sinh: r.gio_phat_sinh, gio_tro_lai: r.gio_tro_lai,
+          phut: Number(r.thoi_gian_dung_phut) || 0, phutCa: { [r.ngay + '|' + r.ca]: Number(r.thoi_gian_dung_phut) || 0 }, van_de: r.van_de, noi_dung_xu_ly: r.noi_dung_xu_ly, dam_nhiem: r.dam_nhiem,
           ghi_chu: r.ghi_chu, truong_ca: r.truong_ca, dang_mo: false });
       } else {
-        g.phut += Number(r.thoi_gian_dung_phut) || 0;
+        // Vắt ca: cộng phút từng ca. Khuôn kép: nhiều dòng CÙNG ca (mỗi mã 1 dòng) → lấy max, không cộng.
+        const kCa = r.ngay + '|' + r.ca, p = Number(r.thoi_gian_dung_phut) || 0;
+        if (g.phutCa[kCa] == null) { g.phutCa[kCa] = p; g.phut += p; }
+        else if (p > g.phutCa[kCa]) { g.phut += p - g.phutCa[kCa]; g.phutCa[kCa] = p; }
+        if (r.ma_sp && !g.ma_sps.includes(r.ma_sp)) g.ma_sps.push(r.ma_sp);
+        if (r.so_khuon && !g.so_khuons.includes(r.so_khuon)) g.so_khuons.push(r.so_khuon);
         if (!g.cas.includes(r.ca)) g.cas.push(r.ca);
         if (r.gio_tro_lai && (!g.gio_tro_lai || r.gio_tro_lai > g.gio_tro_lai)) g.gio_tro_lai = r.gio_tro_lai;
         if (r.noi_dung_xu_ly) g.noi_dung_xu_ly = r.noi_dung_xu_ly;
@@ -250,6 +258,8 @@ async function load(){
       const phutMo = r.open_gio_phat_sinh ? Math.max(0, Math.round((now - new Date(r.open_gio_phat_sinh)) / 60000)) : 0;
       const g = map.get(r.open_id_su_co);
       if (g) {
+        if (r.ma_sp && !g.ma_sps.includes(r.ma_sp)) g.ma_sps.push(r.ma_sp);
+        if (r.so_khuon && !g.so_khuons.includes(r.so_khuon)) g.so_khuons.push(r.so_khuon);
         if (g.dang_mo) continue;
         g.dang_mo = true; g.phut += phutMo; g.gio_tro_lai = null;
         if (!g.cas.includes(r.ca)) g.cas.push(r.ca);
@@ -257,7 +267,7 @@ async function load(){
         if (r.open_dam_nhiem) g.dam_nhiem = r.open_dam_nhiem;
       } else {
         map.set(r.open_id_su_co, { key: r.open_id_su_co, id_su_co: r.open_id_su_co, ngay: r.ngay, ca: r.ca, cas: [r.ca], ma_may: r.ma_may,
-          ma_sp: r.ma_sp, ten_sp: r.ten_sp, so_khuon: r.so_khuon, loai_su_co: r.open_loai_su_co, ma: maLoai(r.open_loai_su_co),
+          ma_sps: [r.ma_sp].filter(Boolean), ten_sp: r.ten_sp, so_khuons: [r.so_khuon].filter(Boolean), loai_su_co: r.open_loai_su_co, ma: maLoai(r.open_loai_su_co),
           gio_phat_sinh: r.open_gio_phat_sinh, gio_tro_lai: null, phut: phutMo, van_de: r.open_van_de,
           noi_dung_xu_ly: r.open_noi_dung_xu_ly, dam_nhiem: r.open_dam_nhiem, dang_mo: true });
       }
@@ -295,8 +305,8 @@ function fillSel(id, tatCa, keyFn){
 function fillOptions(){
   fillSel('fCa', 'Mọi ca', r => r.cas);
   fillSel('fMay', 'Mọi máy', r => r.ma_may);
-  fillSel('fSp', 'Mọi mã SP', r => r.ma_sp);
-  fillSel('fKhuon', 'Mọi khuôn', r => r.so_khuon);
+  fillSel('fSp', 'Mọi mã SP', r => r.ma_sps);
+  fillSel('fKhuon', 'Mọi khuôn', r => r.so_khuons);
   const el = $('fLoai'), cur = el.value;
   const dem = demTheo(filtered('loai'), r => [r.ma, 'g:' + r.ma[0]]);
   const n = k => ' (' + (dem.get(k) || 0) + ')';
@@ -312,9 +322,9 @@ function fillOptions(){
 function lamSachSau(id){
   const i = CHUOI.indexOf(id);
   if (i < 0) return;
-  const key = { fSp: r => r.ma_sp, fKhuon: r => r.so_khuon };
+  const key = { fSp: r => r.ma_sps, fKhuon: r => r.so_khuons };
   CHUOI.slice(i + 1).forEach(k => {
-    if ($(k).value && !filtered(DIM[k]).some(r => key[k](r) === $(k).value)) $(k).value = '';
+    if ($(k).value && !filtered(DIM[k]).some(r => key[k](r).includes($(k).value))) $(k).value = '';
   });
 }
 // Giá trị lọc lấy từ URL: tạo sẵn option để filtered() đọc được trước lần fillOptions đầu.
@@ -331,9 +341,9 @@ function filtered(bo){
   const ca = $('fCa').value, loai = $('fLoai').value, may = $('fMay').value, sp = $('fSp').value, kh = $('fKhuon').value, tt = $('fTt').value;
   const q = $('fQ').value.trim().toLowerCase();
   return all.filter(r => (b('ca') || !ca || r.cas.includes(ca)) && (b('loai') || hopLoai(r, loai))
-    && (b('may') || !may || r.ma_may === may) && (b('sp') || !sp || r.ma_sp === sp) && (b('khuon') || !kh || r.so_khuon === kh)
+    && (b('may') || !may || r.ma_may === may) && (b('sp') || !sp || r.ma_sps.includes(sp)) && (b('khuon') || !kh || r.so_khuons.includes(kh))
     && (!tt || (tt === 'mo') === r.dang_mo)
-    && (!q || [r.id_su_co, r.van_de, r.noi_dung_xu_ly, r.dam_nhiem, r.ghi_chu, r.truong_ca, r.ma_may, r.ma_sp, r.so_khuon, r.loai_su_co]
+    && (!q || [r.id_su_co, r.van_de, r.noi_dung_xu_ly, r.dam_nhiem, r.ghi_chu, r.truong_ca, r.ma_may, ...r.ma_sps, ...r.so_khuons, r.loai_su_co]
       .some(v => String(v || '').toLowerCase().includes(q))));
 }
 
@@ -348,7 +358,7 @@ function setUrl(){
 // ── Hiển thị ──────────────────────────────────────────────────────────────────
 function statBlock(title, dim, rows, keyFn, labelFn, cur){
   const g = new Map();
-  rows.forEach(r => { const k = keyFn(r); if (!k) return; const x = g.get(k) || { n: 0, p: 0 }; x.n++; x.p += r.phut; g.set(k, x); });
+  rows.forEach(r => [].concat(keyFn(r)).forEach(k => { if (!k) return; const x = g.get(k) || { n: 0, p: 0 }; x.n++; x.p += r.phut; g.set(k, x); }));
   const list = [...g.entries()].sort((a, b) => b[1].p - a[1].p || b[1].n - a[1].n).slice(0, 10);
   const maxP = Math.max(1, ...list.map(x => x[1].p));
   return '<div class="card stat"><div class="card-title">' + title + ' <span style="text-transform:none;font-weight:500">(theo phút dừng)</span></div>' +
@@ -373,8 +383,8 @@ function render(){
   $('stats').innerHTML =
     statBlock('Theo loại vấn đề', 'loai', filtered('loai'), r => r.ma, m => m + ' — ' + (TEN_LOAI[m] || 'Không rõ'), $('fLoai').value) +
     statBlock('Theo máy', 'may', filtered('may'), r => r.ma_may, null, $('fMay').value) +
-    statBlock('Theo mã SP', 'sp', filtered('sp'), r => r.ma_sp, null, $('fSp').value) +
-    statBlock('Theo khuôn', 'khuon', filtered('khuon'), r => r.so_khuon, null, $('fKhuon').value);
+    statBlock('Theo mã SP', 'sp', filtered('sp'), r => r.ma_sps, null, $('fSp').value) +
+    statBlock('Theo khuôn', 'khuon', filtered('khuon'), r => r.so_khuons, null, $('fKhuon').value);
 
   const k = sortKey;
   rows.sort((a, b) => {
@@ -392,12 +402,12 @@ function render(){
     return '<tr class="row' + (open ? ' open' : '') + '" data-key="' + escapeHtml(r.key) + '">' +
       '<td class="nw">' + fmtDM(r.ngay) + '<small>' + escapeHtml(r.cas.join(' + ')) + '</small></td>' +
       '<td class="nw b">' + escapeHtml(r.ma_may) + '</td>' +
-      '<td class="nw">' + escapeHtml(r.ma_sp) + '</td>' +
-      '<td class="nw b">' + escapeHtml(r.so_khuon || '—') + '</td>' +
+      '<td class="nw">' + r.ma_sps.map(escapeHtml).join('<br>') + '</td>' +
+      '<td class="nw b">' + (r.so_khuons.map(escapeHtml).join('<br>') || '—') + '</td>' +
       '<td class="nw"><span class="loai ' + r.ma[0] + '" title="' + escapeHtml(r.loai_su_co) + '">' + r.ma + '</span><small>' + escapeHtml(TEN_LOAI[r.ma] || r.loai_su_co || '') + '</small></td>' +
       '<td class="nw">' + fmtTs(r.gio_phat_sinh) + ' → ' + (r.dang_mo ? '<span class="mo">đang mở</span>' : fmtTs(r.gio_tro_lai) || '—') + '<small>' + escapeHtml(r.id_su_co) + '</small></td>' +
       '<td class="n' + (r.dang_mo ? ' mo' : '') + '">' + fmtNum(Math.round(r.phut)) + '</td>' +
-      '<td class="vd">' + escapeHtml(r.van_de) + '</td>' +
+      '<td class="vd">' + escapeHtml(IpqcText.gon(r.van_de)) + '</td>' +
       '<td class="vd">' + escapeHtml(r.noi_dung_xu_ly) + '</td>' +
       '<td>' + escapeHtml(r.dam_nhiem) + '</td></tr>' +
       (open ? '<tr class="ct"><td colspan="10" id="ct">Đang tải chi tiết…</td></tr>' : '');
@@ -407,9 +417,21 @@ function render(){
   if (openId) loadDetail(all.find(r => r.key === openId));
 }
 
+// Bấm 1 sự cố: dòng thời gian đầy đủ từ lúc phát sinh đến khi đóng (T122 — shared/su-co-lich-su.js,
+// RPC duc_su_co_lich_su cần đăng nhập). Chưa đăng nhập / sự cố không có mã → chi tiết rút gọn bên dưới.
 async function loadDetail(r){
   const el = $('ct');
   if (!r || !el) return;
+  let coPhien = false;
+  try { coPhien = !!(await MesAuth.getSession()); } catch (e) {}
+  if ($('ct') !== el) return;
+  if (r.id_su_co && coPhien) {
+    el.innerHTML = '<div style="max-width:960px"></div>';
+    return SuCoLichSu.mount(el.firstChild, r.id_su_co);
+  }
+  return loadDetailRutGon(r, el, r.id_su_co && !coPhien);
+}
+async function loadDetailRutGon(r, el, canDangNhap){
   let anh = { truoc: [], sau: [] }, xl = null;
   if (r.id_su_co) {
     try {
@@ -421,7 +443,7 @@ async function loadDetail(r){
   if ($('ct') !== el) return;
   const imgs = list => list.length ? '<div class="ph">' + list.map(a => '<a href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(a.url) + '" alt="" loading="lazy"></a>').join('') + '</div>' : '<span class="hint">Chưa có ảnh</span>';
   el.innerHTML = '<div class="ct-grid">' +
-    '<div><h4>Vấn đề</h4><p>' + escapeHtml(r.van_de || '—') + '</p>' +
+    '<div><h4>Vấn đề</h4><p>' + escapeHtml(IpqcText.gon(r.van_de) || '—') + '</p>' +
       (r.ghi_chu ? '<h4 style="margin-top:8px">Ghi chú</h4><p>' + escapeHtml(r.ghi_chu) + '</p>' : '') +
       '<div class="hint" style="margin-top:6px">' + escapeHtml(r.loai_su_co || '') + (r.ten_sp ? ' · ' + escapeHtml(r.ten_sp) : '') + (r.truong_ca ? ' · Trưởng ca: ' + escapeHtml(r.truong_ca) : '') + '</div></div>' +
     '<div><h4>Sản xuất xử lý</h4><p>' + escapeHtml(r.noi_dung_xu_ly || '—') + '</p>' + (r.dam_nhiem ? '<div class="hint">' + escapeHtml(r.dam_nhiem) + '</div>' : '') + '</div>' +
@@ -429,7 +451,9 @@ async function loadDetail(r){
       '<div class="hint">' + escapeHtml([xl.nguoi_dam_nhiem, xl.nguoi_dam_nhiem_phu].filter(Boolean).join(' + ')) +
       (xl.bat_dau ? ' · ' + fmtTs(xl.bat_dau) + ' → ' + (xl.ket_thuc ? fmtTs(xl.ket_thuc) : '…') : '') + '</div></div>' : '') +
     '<div><h4>Ảnh hiện trạng</h4>' + imgs(anh.truoc || []) + '<h4 style="margin-top:8px">Ảnh sau xử lý</h4>' + imgs(anh.sau || []) + '</div>' +
-    '</div>';
+    '</div>' +
+    (canDangNhap ? '<div class="hint" style="margin-top:8px"><a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) +
+      '">Đăng nhập</a> để xem toàn bộ lịch sử sự cố (ai báo, các lần cập nhật, tổ khuôn, linh kiện, IPQC kiểm…).</div>' : '');
 }
 
 // ── Excel ─────────────────────────────────────────────────────────────────────
@@ -438,8 +462,8 @@ function xuatExcel(){
   if (!rows.length) return showMsg('Không có dữ liệu để xuất', 'err');
   const ts = t => t ? new Date(t).toLocaleString('vi-VN', { hour12: false }) : '';
   const data = rows.map(r => ({
-    'Mã sự cố': r.id_su_co, 'Ngày SX': fmtDM(r.ngay), 'Ca': r.cas.join(' + '), 'Máy': r.ma_may, 'Mã SP': r.ma_sp, 'Tên SP': r.ten_sp || '',
-    'Khuôn': r.so_khuon || '', 'Mã loại': r.ma, 'Loại sự cố': TEN_LOAI[r.ma] || r.loai_su_co || '', 'Phát sinh': ts(r.gio_phat_sinh),
+    'Mã sự cố': r.id_su_co, 'Ngày SX': fmtDM(r.ngay), 'Ca': r.cas.join(' + '), 'Máy': r.ma_may, 'Mã SP': r.ma_sps.join(', '), 'Tên SP': r.ten_sp || '',
+    'Khuôn': r.so_khuons.join(', '), 'Mã loại': r.ma, 'Loại sự cố': TEN_LOAI[r.ma] || r.loai_su_co || '', 'Phát sinh': ts(r.gio_phat_sinh),
     'Trở lại': r.dang_mo ? 'Đang mở' : ts(r.gio_tro_lai), 'Phút dừng': Math.round(r.phut), 'Vấn đề': r.van_de || '',
     'Nội dung xử lý': r.noi_dung_xu_ly || '', 'Đảm nhiệm': r.dam_nhiem || '', 'Ghi chú': r.ghi_chu || '', 'Trưởng ca': r.truong_ca || '',
   }));

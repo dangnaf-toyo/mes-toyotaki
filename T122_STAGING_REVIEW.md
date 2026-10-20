@@ -2,7 +2,7 @@
 
 Chỉ staging: https://mes-toyotaki.dangnaf.workers.dev/
 
-Database staging: `jcjbleugnclzsghfpmvk` (`mes-toyotaki-staging`). Không thay đổi production, main hoặc master. Nhánh làm việc đã fast-forward tới `c5fad8f`, giữ các cập nhật T121 và D74 của staging.
+Database staging: `jcjbleugnclzsghfpmvk` (`mes-toyotaki-staging`). Không thay đổi production, main hoặc master. Bản phát hành giữ đầy đủ staging tới `47a1b21`, gồm T121–T126 và D74; tích hợp bằng merge thông thường, không reset/force push. Giữ lịch sử sự cố IPQC, mô tả lỗi rút gọn và checksheet bảo dưỡng khuôn từ các commit mới.
 
 ## Thay đổi
 
@@ -20,6 +20,8 @@ Database staging: `jcjbleugnclzsghfpmvk` (`mes-toyotaki-staging`). Không thay �
 ## Migration
 
 `supabase/migration_phase_T122_qc_followup_staging.sql` yêu cầu T118/T120 đã có.
+
+Đây là file QC follow-up, độc lập với `migration_phase_T122_lich_su_su_co.sql` của nhóm cập nhật lịch sử sự cố. Không tự chạy thêm migration của các task khác. RPC lịch sử sự cố đã được xác minh có trên staging.
 
 - Đổi hai hàm mới của T118: `duc_ipqc_session_complete_trigger`, `duc_submit_ipqc_session`; không thay thân RPC kiểm tra cũ.
 - `oqc_capacity_plan`: thêm `source_kind`, `source_plan_id`, `oqc_plan_id` và index/FK liên kết kế hoạch tuần. Cho phép NULL phiên bản/giây khi một kế hoạch sản xuất mới chưa đủ định mức.

@@ -100,6 +100,23 @@ tr.row-ng td{background:#FFF5F5}
 .kq-btn:disabled{cursor:default}
 .kq-text{font-weight:800}
 .kq-text.OK{color:var(--run-fg)}.kq-text.NG{color:var(--alarm-fg)}.kq-text.NA{color:var(--text-muted)}
+.vd-list{display:flex;flex-direction:column;gap:8px}
+.vd-it{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff}
+.vd-it.ok{border-color:#6EE7B7;background:var(--run-bg)}
+.vd-it.need{border-color:var(--alarm-fg);background:var(--alarm-bg)}
+.vd-it .h{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;font-size:12px}
+.vd-it .h b{font-size:12.5px}
+.vd-it .h a.vd-link{font-size:12.5px;font-weight:700;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.vd-it .h a.vd-link:hover{color:var(--accent-hover)}
+.vd-it .m{color:var(--text-muted);font-size:11.5px}
+.vd-it .tt{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--alarm-bg);color:var(--alarm-fg)}
+.vd-it .tt.cho{background:var(--warn-bg);color:var(--warn-fg)}
+.vd-it .cu{font-size:11.5px;color:var(--text-muted);margin-top:3px;white-space:pre-wrap}
+.vd-it textarea{width:100%;min-height:40px;margin-top:6px;border:1.5px solid var(--border-strong);border-radius:6px;padding:6px 8px;font:inherit;font-size:12.5px}
+.vd-it label.xn{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;font-weight:700;cursor:pointer}
+.vd-it label.xn input{width:18px;height:18px}
+.vd-it .nd{margin-top:4px;font-size:12.5px;white-space:pre-wrap}
+.vd-warn{margin-bottom:8px;padding:8px 10px;border-radius:6px;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;font-size:12.5px;font-weight:600}
 .tally{display:flex;gap:14px;font-size:12px;color:var(--text-muted);font-weight:600;margin-left:auto;text-transform:none;letter-spacing:0}
 .tally b{font-family:'JetBrains Mono',monospace;font-size:14px}
 .kl{display:flex;gap:8px}
@@ -189,6 +206,7 @@ tr.row-ng td{background:#FFF5F5}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
 // Người ghi check sheet = NV bảo dưỡng khuôn / Quản lý bộ phận Đúc (D68) / admin — khớp RPC duc_khuon_cs_luu.
@@ -200,6 +218,8 @@ const KQ_LABEL = { OK: 'OK', NG: 'NG', NA: 'N/A' };
 const idKh = Number(new URLSearchParams(location.search).get('id')) || null;
 let myRole = null, myBoPhan = [];
 let kh = null, mold = null, duyet = null, cs = null, mau = [], mauBo = [], employees = [], issues = [];
+// T123: xác nhận xử lý vấn đề khuôn chưa đóng — id_van_de -> { noi_dung, xac_nhan }.
+let vdXl = {}, vdThieu = false;
 let items = [];          // [{nhom,noi_dung,tieu_chuan,ket_qua,ghi_chu}]
 let ketLuan = '';
 let canEdit = false;
@@ -271,6 +291,10 @@ async function loadAll(){
   mold = moldRes.data; duyet = duyetRes.data; cs = csRes.data; mau = mauRes.data || []; mauBo = boRes.data || [];
   employees = empRes.data || [];
   issues = (issRes.data || []).filter(x => x.trang_thai !== 'Đã đóng');
+  vdXl = {}; vdThieu = false;
+  (cs && Array.isArray(cs.van_de_xu_ly) ? cs.van_de_xu_ly : []).forEach(x => { vdXl[x.id_van_de] = { noi_dung: x.noi_dung || '', xac_nhan: !!x.xac_nhan }; });
+  // Vấn đề đã có nội dung xử lý (Chờ xác nhận) → điền sẵn, người BD vẫn phải tự tích xác nhận.
+  issues.forEach(v => { if (!vdXl[v.id_van_de]) vdXl[v.id_van_de] = { noi_dung: v.noi_dung_xu_ly || '', xac_nhan: false }; });
   const lnkVd = document.getElementById('lnkVanDe');
   lnkVd.href = 'van-de-khuon.html?khuon=' + encodeURIComponent(kh.ma_khuon);
   lnkVd.textContent = '⚠ Vấn đề chưa đóng (' + issues.length + ')';
@@ -347,6 +371,8 @@ function render(){
     '<div class="tally" id="tally"></div></div>' +
     '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Hạng mục</th><th>Tiêu chuẩn</th><th>Kết quả</th><th>Ghi chú / xử lý</th></tr></thead><tbody id="tbItems"></tbody></table></div></div>';
 
+  html += '<div class="card" id="vdCard"></div>';
+
   html += '<div class="card lk" id="lkCard"><div class="card-title">🔩 Linh kiện / vật tư tiêu hao đã thay</div><div class="ton">Đang tải...</div></div>';
 
   html += '<div class="card"><div class="card-title">Kết luận</div><div class="form-grid">' +
@@ -377,6 +403,7 @@ function render(){
   if (done) loadSauBd();
   lkLoad();
   renderItems();
+  renderVd();
   renderPhotos('truoc'); renderPhotos('sau');
   updateDuration();
   bindEvents();
@@ -430,6 +457,78 @@ async function loadSauBd(){
   el.innerHTML = h;
 }
 
+// ── Vấn đề khuôn chưa đóng — bắt buộc xác nhận xử lý trước khi hoàn thành (T123) ──
+// Tên vấn đề = link mở màn hình Vấn đề khuôn (tab mới), tô sáng + cuộn tới đúng vấn đề đó.
+function vdLink(id, text, kemDaDong){
+  const url = 'van-de-khuon.html?khuon=' + encodeURIComponent(kh.ma_khuon) + '&tab=chua-dong' + (kemDaDong ? '&all=1' : '') + '&vd=' + encodeURIComponent(id);
+  return '<a class="vd-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener" title="Xem chi tiết vấn đề (ảnh IPQC, hạng mục NG, lịch sử xử lý)">' + escapeHtml(text) + ' ↗</a>';
+}
+function vdChuaXacNhan(){
+  return issues.filter(v => { const x = vdXl[v.id_van_de]; return !x || !x.xac_nhan || !String(x.noi_dung || '').trim(); });
+}
+function renderVd(){
+  const box = document.getElementById('vdCard');
+  if (!box) return;
+  const done = cs && cs.trang_thai === 'hoan_thanh';
+  if (done) {
+    const ds = Array.isArray(cs.van_de_xu_ly) ? cs.van_de_xu_ly.filter(x => x.xac_nhan) : [];
+    box.innerHTML = '<div class="card-title">⚠ Vấn đề khuôn đã xử lý trong lần bảo dưỡng này (' + ds.length + ')</div>' +
+      (ds.length ? '<div class="vd-list">' + ds.map(x => '<div class="vd-it ok"><div class="h">' + vdLink(x.id_van_de, IpqcText.gon(x.mo_ta) || x.id_van_de, true) +
+        '<span class="m">' + (x.ngay_phat_hien ? fmtDateVN(x.ngay_phat_hien) : '') + (x.ma_may ? ' · ' + escapeHtml(x.ma_may) : '') + '</span></div>' +
+        '<div class="nd"><b>Đã xử lý:</b> ' + escapeHtml(x.noi_dung) + '</div></div>').join('') + '</div>'
+        : '<div style="font-size:12px;color:var(--text-muted)">Không có vấn đề khuôn nào chưa đóng lúc hoàn thành.</div>');
+    return;
+  }
+  const thieu = vdChuaXacNhan();
+  const n = issues.length, ok = n - thieu.length;
+  const dis = canEdit ? '' : ' disabled';
+  box.innerHTML = '<div class="card-title">⚠ Vấn đề khuôn chưa đóng — xác nhận xử lý' +
+    (canEdit && n ? '<button type="button" class="btn btn-outline btn-sm no-print" id="btnVdAll">☑ Xác nhận tất cả</button>' : '') +
+    '<div class="tally"><span style="color:' + (thieu.length ? 'var(--alarm-fg)' : 'var(--run-fg)') + '">Đã xác nhận ' + ok + '/' + n + '</span></div></div>' +
+    (!n ? '<div style="font-size:12px;color:var(--run-fg);font-weight:600">✓ Khuôn không có vấn đề nào chưa đóng.</div>' :
+      (vdThieu && thieu.length ? '<div class="vd-warn">Còn ' + thieu.length + ' vấn đề chưa xác nhận xử lý — phải ghi nội dung đã xử lý và tích "Đã xử lý vấn đề này" cho TẤT CẢ vấn đề mới hoàn thành được check sheet.</div>' : '') +
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Bắt buộc: ghi đã xử lý gì và tích xác nhận cho từng vấn đề. Khi hoàn thành, vấn đề chuyển sang "Chờ xác nhận" — IPQC kiểm sản phẩm đầu sau bảo dưỡng xác nhận OK thì đóng.</div>' +
+      '<div class="vd-list">' + issues.map(v => {
+        const x = vdXl[v.id_van_de] || { noi_dung: '', xac_nhan: false };
+        const xong = x.xac_nhan && String(x.noi_dung || '').trim();
+        const id = escapeHtml(v.id_van_de);
+        return '<div class="vd-it' + (xong ? ' ok' : vdThieu ? ' need' : '') + '">' +
+          '<div class="h"><span class="tt' + (v.trang_thai === 'Chờ xác nhận' ? ' cho' : '') + '">' + escapeHtml(v.trang_thai) + '</span>' +
+          vdLink(v.id_van_de, IpqcText.gon(v.mo_ta) || '—') +
+          '<span class="m">' + (v.ngay_phat_hien ? fmtDateVN(v.ngay_phat_hien) : '') + (v.ca_phat_hien ? ' · ' + escapeHtml(v.ca_phat_hien) : '') +
+            (v.ma_may ? ' · ' + escapeHtml(v.ma_may) : '') + (v.nguoi_phat_hien ? ' · phát hiện: ' + escapeHtml(v.nguoi_phat_hien) : '') +
+            (Number(v.lan_tai_phat) ? ' · tái phát ' + v.lan_tai_phat + ' lần' : '') + '</span></div>' +
+          (v.trang_thai === 'Chờ xác nhận' && v.nguoi_xu_ly ? '<div class="cu">Đã ghi xử lý trước đó: ' + escapeHtml(v.nguoi_xu_ly) + (v.ngay_xu_ly ? ' · ' + fmtDateVN(v.ngay_xu_ly) : '') + '</div>' : '') +
+          '<textarea data-vd-nd="' + id + '" maxlength="500" placeholder="Đã xử lý gì cho vấn đề này trong lần bảo dưỡng…"' + dis + '>' + escapeHtml(x.noi_dung) + '</textarea>' +
+          '<label class="xn"><input type="checkbox" data-vd-ok="' + id + '"' + (x.xac_nhan ? ' checked' : '') + dis + '> Đã xử lý vấn đề này</label>' +
+        '</div>';
+      }).join('') + '</div>');
+  const all = document.getElementById('btnVdAll');
+  if (all) all.onclick = () => {
+    const trong = issues.filter(v => !String((vdXl[v.id_van_de] || {}).noi_dung || '').trim());
+    let chung = '';
+    if (trong.length) {
+      chung = prompt(trong.length + ' vấn đề chưa ghi nội dung xử lý — nhập nội dung chung cho các vấn đề này:', '');
+      if (chung === null) return;
+      chung = chung.trim();
+      if (!chung) return showMsg('Cần nhập nội dung đã xử lý', 'err', 3000);
+    } else if (!confirm('Xác nhận đã xử lý tất cả ' + issues.length + ' vấn đề?')) return;
+    issues.forEach(v => {
+      const x = vdXl[v.id_van_de] || (vdXl[v.id_van_de] = { noi_dung: '', xac_nhan: false });
+      if (!String(x.noi_dung || '').trim()) x.noi_dung = chung;
+      x.xac_nhan = true;
+    });
+    renderVd();
+  };
+}
+function vdData(){
+  return issues.map(v => {
+    const x = vdXl[v.id_van_de] || {};
+    return { id_van_de: v.id_van_de, mo_ta: v.mo_ta || '', ngay_phat_hien: v.ngay_phat_hien, ma_may: v.ma_may || '',
+      trang_thai_truoc: v.trang_thai, noi_dung: String(x.noi_dung || '').trim(), xac_nhan: !!x.xac_nhan };
+  });
+}
+
 function info(k, v){ return '<div><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; }
 
 function renderItems(){
@@ -470,6 +569,27 @@ function updateDuration(){
 }
 
 function bindEvents(){
+  const vd = document.getElementById('vdCard');
+  vd.addEventListener('input', e => {
+    const t = e.target.closest('textarea[data-vd-nd]');
+    if (!t) return;
+    const x = vdXl[t.dataset.vdNd] || (vdXl[t.dataset.vdNd] = { noi_dung: '', xac_nhan: false });
+    x.noi_dung = t.value;
+  });
+  vd.addEventListener('change', e => {
+    const c = e.target.closest('input[data-vd-ok]');
+    if (!c) return;
+    const x = vdXl[c.dataset.vdOk] || (vdXl[c.dataset.vdOk] = { noi_dung: '', xac_nhan: false });
+    if (c.checked && !String(x.noi_dung || '').trim()) {
+      c.checked = false;
+      showMsg('Ghi nội dung đã xử lý trước khi tích xác nhận', 'err', 3000);
+      const t = vd.querySelector('textarea[data-vd-nd="' + CSS.escape(c.dataset.vdOk) + '"]');
+      if (t) t.focus();
+      return;
+    }
+    x.xac_nhan = c.checked;
+    renderVd();
+  });
   const tb = document.getElementById('tbItems');
   tb.addEventListener('click', e => {
     const b = e.target.closest('.kq-btn');
@@ -542,6 +662,7 @@ function collect(){
     ket_luan: ketLuan,
     anh_truoc: photos.truoc,
     anh_sau: photos.sau,
+    van_de_xu_ly: vdData(),  // T123
   };
 }
 
@@ -633,6 +754,14 @@ async function save(hoanThanh){
     if (!data.nguoi_thuc_hien) return showMsg('Chọn người đảm nhiệm chính', 'err', 3000);
     if (!data.nguoi_thuc_hien_phu && !confirm('Chưa chọn người đảm nhiệm phụ — hoàn thành với 1 người thực hiện?')) return;
     if (!ketLuan) return showMsg('Chọn kết luận ĐẠT / KHÔNG ĐẠT', 'err', 3000);
+    const thieuVd = vdChuaXacNhan();
+    if (thieuVd.length) {
+      vdThieu = true; renderVd();
+      document.getElementById('vdCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return showMsg('Chưa hoàn thành được: còn ' + thieuVd.length + ' vấn đề khuôn chưa đóng chưa xác nhận xử lý (' +
+        thieuVd.slice(0, 3).map(v => IpqcText.gon(v.mo_ta) || v.id_van_de).join('; ') + (thieuVd.length > 3 ? '…' : '') +
+        '). Ghi nội dung và tích "Đã xử lý vấn đề này" cho tất cả vấn đề ở khung ⚠ Vấn đề khuôn chưa đóng.', 'err', 9000);
+    }
     const ng = items.filter(it => it.ket_qua === 'NG').length;
     if (!confirm('Hoàn thành check sheet khuôn ' + kh.ma_khuon + ' — kết luận ' + (ketLuan === 'dat' ? 'ĐẠT' : 'KHÔNG ĐẠT') +
       (ng ? ' (' + ng + ' hạng mục NG)' : '') + '?\nSau khi hoàn thành sẽ không sửa được nữa.')) return;

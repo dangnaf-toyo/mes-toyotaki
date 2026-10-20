@@ -908,6 +908,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/ipqc-text.js"></script>
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
@@ -2331,7 +2332,7 @@ function makeRowHTML(row, stateClass, isActive){
           SuCoAnh.badge((state.anhSuCoCount || {})[row.open_id_su_co], ' onclick=\'openEditOpenIncidentModal(' + idDongJson + ')\'') +
           '<span class="timer" data-start="' + startTime.toISOString() + '">--:--</span>' +
         '</div>' +
-        '<div class="issue-detail">' + escapeHtml(row.open_van_de || '(chưa nhập mô tả)') + '</div>' +
+        '<div class="issue-detail">' + escapeHtml(IpqcText.gon(row.open_van_de) || '(chưa nhập mô tả)') + '</div>' +
         '<div class="issue-meta">' +
           '<span>🕐 ' + pad(startTime.getHours()) + ':' + pad(startTime.getMinutes()) + ' · 👤 ' + escapeHtml(row.open_dam_nhiem || '—') + '</span>' +
           '<span class="meta-actions">' +
@@ -2354,9 +2355,9 @@ function makeRowHTML(row, stateClass, isActive){
         const end = new Date(i.gio_tro_lai);
         const title = i.loai_su_co + '\n' + pad(start.getHours()) + ':' + pad(start.getMinutes()) + ' → ' +
           pad(end.getHours()) + ':' + pad(end.getMinutes()) + ' — ' + i.thoi_gian_dung_phut + "'\n" +
-          (i.van_de || '') + '\nXử lý: ' + (i.noi_dung_xu_ly || '') + '\n\n(Click để chỉnh sửa)';
+          IpqcText.gon(i.van_de) + '\nXử lý: ' + (i.noi_dung_xu_ly || '') + '\n\n(Click để chỉnh sửa)';
         const shortCode = (i.loai_su_co || '').split(' ')[0];
-        const shortName = (i.van_de || '').substring(0, 8) || 'Sự cố';
+        const shortName = IpqcText.gon(i.van_de).substring(0, 8) || 'Sự cố';
         const editedClass = i.van_de_edited === 'Yes' ? ' edited' : '';
         return '<span class="chip editable' + editedClass + '" title="' + escapeHtml(title) + '" onclick=\'openEditIncidentModal(' +
           JSON.stringify(i.id_ban_ghi) + ')\'><span class="chip-code">' + escapeHtml(shortCode) + '</span>' +
@@ -3274,7 +3275,7 @@ async function openResolveModal(idDong){
   document.getElementById('mr-summary').innerHTML =
     (row.open_id_su_co ? '<div class="issue-ma-su-co" style="display:inline-block;margin-bottom:4px">' + escapeHtml(row.open_id_su_co) + '</div>' : '') +
     '<div style="font-weight:600;color:var(--alarm-fg);margin-bottom:4px">' + escapeHtml(row.open_loai_su_co) + '</div>' +
-    '<div style="color:var(--text)">' + escapeHtml(row.open_van_de || '(chưa nhập mô tả)') + '</div>' +
+    '<div style="color:var(--text)">' + escapeHtml(IpqcText.gon(row.open_van_de) || '(chưa nhập mô tả)') + '</div>' +
     '<div style="color:var(--text-muted);margin-top:6px;font-size:11px">🕐 Phát sinh: ' +
       pad(startTime.getHours()) + ':' + pad(startTime.getMinutes()) +
       ' · ⏱ Đã dừng: ' + fmtElapsedFromMs(nowServer() - startTime) + '</div>';
@@ -3892,7 +3893,7 @@ function _renderMoldIssueBadge(row){
   const icon = row.mold_issue_status === 'Chờ xác nhận' ? '❓' : '⚠';
   const label = row.mold_issue_status === 'Chờ xác nhận' ? 'CHỜ XÁC NHẬN' : 'VẤN ĐỀ';
   const countNote = row.mold_issue_count > 1 ? ' (' + row.mold_issue_count + ')' : '';
-  const tooltip = row.mold_issue_status + countNote + '\n' + (row.mold_issue_mo_ta || '') + '\n\n(Click để xem/xử lý)';
+  const tooltip = row.mold_issue_status + countNote + '\n' + IpqcText.gon(row.mold_issue_mo_ta) + '\n\n(Click để xem/xử lý)';
   return '<span class="mold-issue-badge" title="' + escapeHtml(tooltip) + '" onclick=\'openMoldIssueManageModal(' +
     JSON.stringify(row.so_khuon) + ')\'>' + icon + ' ' + label + countNote + '</span>';
 }
@@ -4009,7 +4010,7 @@ function _renderMoldIssueList(wrap, issues, showMaKhuon){
           '<span>' + khuonNote + dtStr + ' · ' + escapeHtml(x.ma_may || '—') + ' · ' + escapeHtml(x.ma_sp || '—') + ' · ' + escapeHtml(x.nguoi_phat_hien || '—') + '</span>' +
           '<span style="font-weight:600;color:' + statusColor + '">' + escapeHtml(x.trang_thai) + taiPhatNote + '</span>' +
         '</div>' +
-        '<div style="font-size:12px;margin-top:4px">' + escapeHtml(x.mo_ta) + '</div>' +
+        '<div style="font-size:12px;margin-top:4px">' + escapeHtml(IpqcText.gon(x.mo_ta)) + '</div>' +
         actionHTML +
       '</div>';
   }).join('');
@@ -4598,7 +4599,7 @@ function renderShiftReport(d, snap){
           '<td>' + escapeHtml(i.loai_su_co || '—') + '</td>' +
           '<td>' + pad(st.getHours()) + ':' + pad(st.getMinutes()) + ' → ' + pad(en.getHours()) + ':' + pad(en.getMinutes()) + '</td>' +
           '<td class="num">' + i.thoi_gian_dung_phut + "'</td>" +
-          '<td>' + escapeHtml(i.van_de || '—') + '</td>' +
+          '<td>' + escapeHtml(IpqcText.gon(i.van_de) || '—') + '</td>' +
           '<td>' + escapeHtml(i.noi_dung_xu_ly || '—') + '</td>' +
         '</tr>';
       }).join('');
