@@ -211,6 +211,7 @@ button{cursor:pointer;font-family:inherit}
   <div class="incident-info vdt hidden" id="ck-vd-truoc"></div>
   <button class="pdf-btn hidden" id="ck-pdf-btn">📄 Xem tiêu chuẩn (PDF)</button>
 
+  <div class="hidden" id="ck-btk"></div>   <!-- T133: kết quả đo theo bảng tuần kiểm -->
   <div class="checklist" id="ck-checklist"></div>
 
   <div class="photo-wrap">
@@ -250,6 +251,8 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script src="shared/su-co-lich-su.js"></script>
+<script src="shared/ipqc-spc.js"></script>
+<script src="shared/ipqc-btk-do.js"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 10;
@@ -711,6 +714,15 @@ async function openCheck(idCheckpoint, maSpChon){
   // The original checklist remains independent of the reference document.
   state.checklistAnswers = [...IPQC_DEFAULT_CHECKLIST.map(muc => ({ muc, dat: null })),{code:'machine_condition',group:'Điều kiện máy',muc:'Điều kiện máy',dat:null}];
   renderChecklist();
+  // T133: mã có bảng tuần kiểm → nhập kết quả đo, mục "Kích thước" tự đánh giá.
+  state.btk = null;
+  IpqcBtkDo.mount(document.getElementById('ck-btk'), cp, {
+    onChange: s => { if (state.current?.id_checkpoint === cp.id_checkpoint) apDungBtk(s); },
+  }).then(ctl => {
+    if (state.current?.id_checkpoint !== cp.id_checkpoint) return;
+    state.btk = ctl;
+    if (ctl) khoaMucKichThuoc();
+  }).catch(e => showToast('Không tải được bảng tuần kiểm: ' + e.message, true));
   const request = state.referenceRequest = (state.referenceRequest || 0) + 1;
   const pdfBtn = document.getElementById('ck-pdf-btn');
   pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.onclick = null;
@@ -882,6 +894,20 @@ function renderChecklist(){
   wrap.innerHTML=groups.map(([name,items])=>'<section data-check-group="'+escapeHtml(name)+'">'+'<div class="cl-group-title">'+escapeHtml(name)+'</div>'+items.map(item).join('')+'</section>').join('');
 }
 
+// T133: mục "Kích thước (theo bảng tuần kiểm)" lấy kết quả từ khung đo, không bấm tay.
+function viTriMucKichThuoc(){ return state.checklistAnswers.findIndex(a => a.muc === IPQC_DEFAULT_CHECKLIST[0]); }
+function apDungBtk(s){
+  const i = viTriMucKichThuoc();
+  if (i >= 0) setChecklistAnswer(i, s.du ? s.dat : (s.dat === false ? false : null));
+}
+function khoaMucKichThuoc(){
+  const i = viTriMucKichThuoc(); if (i < 0) return;
+  ['cl-ok-', 'cl-bad-'].forEach(k => { const b = document.getElementById(k + i); if (b) { b.disabled = true; b.title = 'Tự đánh giá theo kết quả đo bảng tuần kiểm'; } });
+  const t = document.getElementById('cl-ok-' + i)?.closest('.cl-item')?.querySelector('.cl-text');
+  if (t) t.textContent = 'Theo bảng tuần kiểm — tự đánh giá từ kết quả đo ở trên';
+  apDungBtk(state.btk.trangThai());
+}
+
 function setChecklistAnswer(i, dat){
   state.checklistAnswers[i].dat = dat;
   document.getElementById('cl-ok-' + i).classList.toggle('sel-ok', dat === true);
@@ -988,6 +1014,7 @@ async function uploadEvidencePhotos(maMay, maSp, ketQua){
 async function submitCheck(ketQua){
   if (!state.current) return;
   const submittedCheckpoint = { ...state.current };
+  if (state.btk && !state.btk.trangThai().du) return showToast('Nhập đủ kết quả đo các hạng mục bảng tuần kiểm (kích thước).', true);   // T133
   if(!state.checklistAnswers.length||state.checklistAnswers.some(a=>typeof a.dat!=='boolean'))return showToast('Xác nhận đầy đủ tất cả hạng mục bắt buộc trước khi lưu.',true);
   if(!state.checklistAnswers.some(a=>a.code==='machine_condition'&&typeof a.dat==='boolean'))return showToast('Chọn Đạt hoặc Không đạt cho Điều kiện máy.',true);
   const vdLoi = kiemTraVdTruoc(ketQua);   // T127
@@ -1021,6 +1048,7 @@ async function submitCheck(ketQua){
   try {
     await MesIpqcSession.prepare();
     await luuVdTruoc(submittedCheckpoint.id_checkpoint);   // T127
+    if (state.btk) await state.btk.luu(submittedCheckpoint.id_checkpoint, nguoiKiem);   // T133
     const anhUrls = await uploadEvidencePhotos(state.current.ma_may, state.current.ma_sp, ketQua);
 
     showOverlay('Đang lưu kết quả...');
