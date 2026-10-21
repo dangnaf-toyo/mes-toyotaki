@@ -15,7 +15,9 @@
   theo công đoạn → Bavia) thì server tự tạo tem thành phẩm (Tag No TP…) và
   trang in ngay TEM XUẤT HÀNG theo mẫu khách:
     - FCC: Phiếu quản lý lô sản phẩm (A4 dọc, 2 phiếu/tờ).
-    - Astemo / Soji / Mikasa / Cosmos: TEM HÀNG (A4 ngang, 4 tem/tờ).
+    - Astemo: Phiếu quản lý lô dạng thẻ dọc ĐÚC/GIA CÔNG/SƠN/LẮP RÁP (T132, theo
+      ảnh Picture/PHIẾU QUẢN LÝ LÔ ASTEMO.png; A4 dọc, 2 thẻ/tờ).
+    - Soji / Mikasa / Cosmos: TEM HÀNG (A4 ngang, 4 tem/tờ).
   Mẫu theo các file "Excel file/Tem xuất hàng *.xlsx", thêm QR + Tag No để
   OQC / Nhập kho / Xuất hàng quét tiếp và truy xuất ngược về tem Đúc.
   Chỉ mã có Bavia là công đoạn SX cuối (sau Bavia là OQC / Nhập kho).
@@ -242,7 +244,7 @@ async function moTem(raw){
     ['Khách hàng', (info && info.ten_khach_hang) || '—'], ['SL/thùng', info && info.ok ? num(info.sl_thung) + ' pcs' : '—'],
     ['Còn trên tem', num(t.so_luong) + ' pcs'], ['Ngày đúc', dmy(t.ngay)],
     ['Máy', t.may_tt || t.may_duc_chi_thi || '—'], ['Khuôn', t.so_khuon || '—'],
-    ['Vị trí', (loc && loc.vi_tri_hien_tai) || 'Đúc'], ['Mẫu tem', info && info.ok ? (info.mau === 'fcc' ? 'Phiếu QL lô FCC' : 'TEM HÀNG') : '—'],
+    ['Vị trí', (loc && loc.vi_tri_hien_tai) || 'Đúc'], ['Mẫu tem', info && info.ok ? ({ fcc: 'Phiếu QL lô FCC', astemo: 'Phiếu QL lô Astemo' }[info.mau] || 'TEM HÀNG') : '—'],
   ];
   document.getElementById('temKv').innerHTML = kv.map(([k, v]) => '<div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div>').join('');
 
@@ -473,6 +475,41 @@ function phieuFcc(t){
     '</table></div>';
 }
 
+// Phiếu quản lý lô Astemo — thẻ dọc theo ảnh mẫu: khối ĐÚC (đúc / mài = Bavia /
+// kiểm tra) điền sẵn, khối GIA CÔNG / SƠN / LẮP RÁP để trống cho khách ghi tay.
+function caNgan(c){ return String(c || '').replace(/^Ca\s+/i, ''); }
+function dmyNgan(d){ const s = dmy(d); return s ? s.slice(0, 6) + s.slice(8) : ''; }
+function phieuAstemo(t){
+  const ng = t.nguon || [];
+  const uniq = a => [...new Set(a.filter(Boolean))].join(', ');
+  const ngayBv = t.luc ? dmyNgan(new Date(new Date(t.luc).getTime() + 7 * 3600e3).toISOString()) : '';
+  const cap = (l1, v1, l2, v2) => '<td class="l">' + l1 + '</td><td class="v">' + (v1 || '') + '</td><td class="l">' + l2 + '</td><td class="v">' + (v2 || '') + '</td>';
+  const khoi = (ten, maSo, buoc) => {
+    const rows = [];
+    if (maSo) rows.push(cap('Mã số', '', 'Tên chi tiết', ''));
+    buoc.forEach(b => { rows.push(cap(b[0], b[1], 'Số lượng', b[2])); rows.push(cap('Người làm', b[3], 'Ca', b[4])); });
+    return rows.map((r, i) => '<tr>' + (i === 0 ? '<td class="bp" rowspan="' + rows.length + '"><span>' + ten + '</span></td>' : '') + r + '</tr>').join('');
+  };
+  return '<div class="as">' +
+    '<div class="as-top"><div class="nl">Nguyên liệu<b>' + esc(t.nguyen_lieu || '') + '</b></div>' +
+      '<div class="qr">' + qrSvg(t.tag_no) + '<div>' + esc(t.tag_no) + (t.thung_le ? ' · lẻ' : '') + '</div></div></div>' +
+    '<table><colgroup><col style="width:6.5%"><col style="width:25%"><col style="width:26%"><col style="width:17%"><col style="width:25.5%"></colgroup>' +
+    '<tr><td colspan="5" class="ti"><span class="hr">HR</span>PHIẾU QUẢN LÝ LÔ <small>- (Màu đen)</small></td></tr>' +
+    '<tr><td class="bp0" rowspan="2">Bộ phận</td>' + cap('Mã số', esc(t.ma_sp_khach_hang || t.ma_sp), 'Tên chi tiết', esc(t.ten_sp || '')) + '</tr>' +
+    '<tr>' + cap('Số lô', esc(lotNo(t)), 'Số khuôn', esc(t.so_khuon || '')) + '</tr>' +
+    khoi('ĐÚC', false, [
+      ['Ngày đúc', esc(uniq(ng.map(n => dmyNgan(n.ngay)))), num(ng.reduce((s, n) => s + Number(n.so_luong_lay), 0)), esc(uniq(ng.map(n => tenNguoi(n.nguoi)))), esc(uniq(ng.map(n => caNgan(n.ca))))],
+      ['Ngày mài', ngayBv, num(t.so_luong) + (Number(t.ng_bavia) ? ' <small>(NG ' + num(t.ng_bavia) + ')</small>' : ''), esc(uniq(String(t.nguoi_bavia || '').split(', ').map(tenNguoi))), ''],
+      ['Ngày kiểm tra', '', '', '', ''],
+      ['Ngày kiểm tra', '', '', '', ''],
+    ]) +
+    khoi('GIA CÔNG', true, ['Ngày gia công', 'Ngày KT áp lực', 'Ngày ép Pin', 'Ngày cạo via', 'Ngày kiểm tra'].map(x => [x, '', '', '', ''])) +
+    khoi('SƠN', true, ['Ngày xử lý', 'Ngày treo giàn', 'Ngày sơn', 'Ngày bóc making', 'Ngày kiểm tra'].map(x => [x, '', '', '', ''])) +
+    khoi('LẮP RÁP', true, [['Ngày lắp ráp', '', '', '', '']]) +
+    '<tr><td colspan="5" class="ft">ĐÚC → GIA CÔNG → SƠN → LẮP RÁP → LƯU GIỮ TẠI LẮP RÁP<br>THỜI GIAN BẢO LƯU 20 NĂM</td></tr>' +
+    '</table></div>';
+}
+
 const PRINT_CSS = {
   chung: '@page{size:A4 landscape;margin:5mm}' +
     '.pg{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:97mm;gap:3mm;page-break-after:always}.pg:last-child{page-break-after:auto}' +
@@ -483,6 +520,20 @@ const PRINT_CSS = {
     '.th .qr{text-align:center;font-family:monospace;font-size:2.4mm;font-weight:bold}.th .qr svg{width:15mm;height:15mm;display:block;margin:0 auto 0.4mm}' +
     '.th .lb{font-weight:bold;font-size:3mm}.th .lb i{font-weight:normal;font-size:2.5mm}' +
     '.th .v{font-weight:bold;text-align:center}.th .v.big{font-size:4.4mm}.th .v.sm{font-size:3mm;font-weight:normal}.th .le{font-size:2.6mm;font-weight:normal}',
+  astemo: '@page{size:A4 portrait;margin:5mm}' +
+    '.pg{display:grid;grid-template-columns:1fr 1fr;gap:4mm;page-break-after:always}.pg:last-child{page-break-after:auto}' +
+    '.as{height:285mm;border:0.4mm solid #000;padding:2mm;display:flex;flex-direction:column;overflow:hidden}' +
+    '.as-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5mm}' +
+    '.as .nl{border:0.4mm solid #000;padding:0.8mm 2mm;font-size:3mm;text-align:center;line-height:1.2}.as .nl b{display:block;font-size:4.2mm}' +
+    '.as .qr{text-align:center;font-family:monospace;font-size:2.2mm;font-weight:bold}.as .qr svg{width:16mm;height:16mm;display:block;margin:0 auto 0.3mm}' +
+    '.as table{width:100%;flex:1;border-collapse:collapse;table-layout:fixed}' +
+    '.as td{border:0.3mm solid #000;padding:0 1.2mm;font-size:2.9mm;height:6.4mm;vertical-align:middle;overflow:hidden;line-height:1.05}' +
+    '.as td.l{font-weight:bold;font-size:2.7mm}.as td.v{font-weight:bold;font-size:3.1mm;color:#000}.as td.v small{font-weight:normal;font-size:2.4mm}' +
+    '.as td.ti{text-align:center;font-weight:bold;font-size:4.6mm;height:9mm}.as td.ti small{font-size:3mm;font-weight:normal}' +
+    '.as .hr{display:inline-block;border:0.35mm solid #000;border-radius:50%;font-size:2.6mm;padding:0.6mm 1mm;margin-right:3mm;vertical-align:middle}' +
+    '.as td.bp,.as td.bp0{text-align:center;font-weight:bold;font-size:2.6mm;padding:0;white-space:normal}' +
+    '.as td.bp span{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);font-size:3.2mm;letter-spacing:0.3mm}' +
+    '.as td.ft{text-align:center;font-weight:bold;font-size:2.7mm;height:9mm;white-space:normal;line-height:1.3}',
   fcc: '@page{size:A4 portrait;margin:6mm}' +
     '.pg{display:flex;flex-direction:column;gap:8mm;page-break-after:always}.pg:last-child{page-break-after:auto}' +
     '.pf{height:136mm;overflow:hidden}.pf table{width:100%;border-collapse:collapse;table-layout:fixed}' +
@@ -499,14 +550,14 @@ async function inTem(tags){
   const { data, error } = await sb.rpc('bavia_xh_du_lieu_in', { p_tags: tags });
   if (error) return showMsg('Không lấy được dữ liệu in: ' + error.message, 'err');
   const ban = Math.max(1, Math.min(6, Number(document.getElementById('optBan').value) || 1));
-  const groups = { chung: [], fcc: [] };
-  (data || []).forEach(t => { for (let i = 0; i < ban; i++) groups[t.mau === 'fcc' ? 'fcc' : 'chung'].push(t); });
-  // In từng nhóm mẫu riêng (khổ giấy khác nhau: TEM HÀNG A4 ngang, phiếu FCC A4 dọc).
-  for (const m of ['chung', 'fcc']) {
+  const groups = { chung: [], fcc: [], astemo: [] };
+  (data || []).forEach(t => { for (let i = 0; i < ban; i++) groups[groups[t.mau] ? t.mau : 'chung'].push(t); });
+  // In từng nhóm mẫu riêng (khổ giấy khác nhau: TEM HÀNG A4 ngang, phiếu FCC / Astemo A4 dọc).
+  for (const m of ['chung', 'fcc', 'astemo']) {
     const ds = groups[m]; if (!ds.length) continue;
-    const per = m === 'fcc' ? 2 : 4;
+    const per = m === 'chung' ? 4 : 2;
     let pages = '';
-    for (let i = 0; i < ds.length; i += per) pages += '<div class="pg">' + ds.slice(i, i + per).map(m === 'fcc' ? phieuFcc : temHang).join('') + '</div>';
+    for (let i = 0; i < ds.length; i += per) pages += '<div class="pg">' + ds.slice(i, i + per).map({ chung: temHang, fcc: phieuFcc, astemo: phieuAstemo }[m]).join('') + '</div>';
     await inHtml('<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Tem xuất hàng</title><style>' +
       '*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff}' + PRINT_CSS[m] +
       '</style></head><body>' + pages + '</body></html>');
