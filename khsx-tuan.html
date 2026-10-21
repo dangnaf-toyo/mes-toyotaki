@@ -288,7 +288,8 @@ const CONG_DOAN_LIST = ['Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽ
 const TABS = ['Đúc'].concat(CONG_DOAN_LIST);
 
 let weekMonday = mondayOf(new Date());
-let activeTab = TABS[0];
+const requestedTab = new URLSearchParams(location.search).get('cd');
+let activeTab = TABS.includes(requestedTab) ? requestedTab : TABS[0];
 let ducRows = [];
 let cdRows = [];
 let editingId = null;
@@ -1352,15 +1353,16 @@ function startHeaderClock(){
 }
 
 renderTabs();
-document.getElementById('panelDuc').classList.add('active');
+document.getElementById('panelDuc').classList.toggle('active',activeTab==='Đúc');
+document.getElementById('panelCd').classList.toggle('active',activeTab!=='Đúc');
 updateWeekLabel();
 startHeaderClock();
-loadDucRows();
+loadActivePanel();
 loadMasterLists();
 loadMyRoleInfo();
 loadDuyetInfo();
 loadChangeLog();
 </script>
-<script src="shared/oqc-capacity-math.js?v=T122"></script><script src="shared/qc-production-staff.js?v=T122"></script>
+<script src="shared/oqc-capacity-math.js?v=T122"></script><script src="shared/oqc-dashboard-math.js?v=20261021"></script><script src="shared/qc-production-staff.js?v=20261021"></script>
 </body>
 </html>

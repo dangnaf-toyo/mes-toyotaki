@@ -49,8 +49,7 @@
       { label: 'IPQC', href: 'ipqc.html' },
       { label: 'Duyệt tiếp tục SX IPQC', href: 'ipqc-approval.html' },
       { label: 'IQC đầu vào', href: 'iqc.html' },
-      { label: 'OQC nhập kiểm tra', href: 'oqc-daily.html' },
-      { label: 'Định mức kiểm tra QC', href: 'oqc-capacity.html' },
+      { label: 'OQC kiểm tra', href: 'oqc-daily.html' },
       { label: 'QC Manager / NCP', href: 'qc-manager.html' },
     ] },
     { label: 'Kho & Truy xuất', items: [
@@ -85,7 +84,7 @@
     'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh' },
     'ipqc-approval.html': { icon: '⚠️', title: 'Duyệt tiếp tục sản xuất IPQC', desc: 'Tạo, duyệt và theo dõi yêu cầu tiếp tục chạy có điều kiện', noTitleBar: true },
     'iqc.html': { icon: '📋', title: 'IQC — Dashboard đầu vào', desc: 'Theo dõi LOT, nhà cung cấp, lỗi và tỷ lệ NG theo thời gian', noTitleBar: true },
-    'oqc-daily.html': { icon: '✅', title: 'OQC — Kiểm tra xuất hàng', desc: 'Kiểm tra đầu ra trước khi xuất hàng', noTitleBar: true },
+    'oqc-daily.html': { icon: '✅', title: 'OQC kiểm tra', desc: 'Dashboard · CAPA · kế hoạch và hiệu suất kiểm tra', noTitleBar: true },
     'oqc-capacity.html': { icon: '⏱', title: 'Định mức kiểm tra QC', desc: 'Kế hoạch kiểm tra · Hiệu suất kế hoạch 80%', noTitleBar: true },
     'chuyencongdoan.html': { icon: '🔀', title: 'Chuyển công đoạn & Đóng gói', desc: 'Quét QR chuyển hàng, đóng gói lại, đổi mã SP', noTitleBar: true },
     'oqc.html': { icon: '📦', title: 'Đóng gói Pallet', desc: 'Quét tem, gom pallet, đóng gói — dùng cho mọi công đoạn cuối trước nhập kho', noTitleBar: true },
