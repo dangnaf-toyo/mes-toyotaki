@@ -80,6 +80,19 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 #qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
 .hist-item{font-size:12px;padding:5px 0;border-bottom:1px dashed var(--border)}
 .hist-note{color:var(--text-muted);margin-top:2px;font-style:italic}
+.hist-item .hh{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.hist-item .phieu{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)}
+.hist-item .st{font-size:11px;font-weight:700;padding:1px 6px;border-radius:9px;background:var(--bg-sunken);color:var(--text-muted)}
+.hist-item .st.ok{background:var(--run-bg);color:var(--run-fg)}
+.hist-item .st.cho{background:var(--warn-bg);color:var(--warn-fg)}
+.hist-item .st.tc{background:var(--alarm-bg);color:var(--alarm-fg)}
+.hist-item .gn{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:2px 14px;margin-top:3px}
+.hist-item .gn .k{color:var(--text-muted)}
+.hist-item .gn b{font-weight:600}
+.hist-item .tc-ly{color:var(--alarm-fg);margin-top:2px}
+.node-hist{margin:0 0 6px;padding:2px 10px;border-left:3px solid var(--border)}
+.node-hist .ttl{font-size:11px;font-weight:700;color:var(--text-muted);margin-top:2px}
+.node-hist .hist-item{font-size:11.5px;padding:3px 0}
 </style>
 </head>
 <body>
@@ -201,10 +214,15 @@ async function search(raw){
   const allTags = new Set([tagNo]);
   edges.forEach(e => { allTags.add(e.tu); allTags.add(e.den); });
 
-  const [{ data: temList }, { data: locList }] = await Promise.all([
+  const otherTags = [...allTags].filter(t => t !== tagNo);
+  const [{ data: temList }, { data: locList }, { data: nodeHist }] = await Promise.all([
     sb.from('duc_tem').select('*').in('tag_no', [...allTags]),
     sb.from('cd_v_vi_tri_hien_tai').select('tag_no,vi_tri_hien_tai').in('tag_no', [...allTags]),
+    otherTags.length ? sb.from('cd_chuyen_cong_doan_log').select('*').in('tag_no', otherTags).order('thoi_gian_chuyen') : Promise.resolve({ data: [] }),
   ]);
+  // Lịch sử chuyển công đoạn của từng tem cha/con trong cây (giao/nhận ở tem nguồn).
+  const tagHist = {};
+  (nodeHist || []).forEach(r => { (tagHist[r.tag_no] = tagHist[r.tag_no] || []).push(r); });
   const tagInfo = {};
   (temList || []).forEach(t => { tagInfo[t.tag_no] = t; });
   tagInfo[tagNo] = temRes.data;
@@ -214,8 +232,8 @@ async function search(raw){
 
   document.getElementById('resultArea').style.display = 'block';
   renderCurrent(temRes.data, locRes.data);
-  renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo, tagLoc);
-  renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo, tagLoc);
+  renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo, tagLoc, tagHist);
+  renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo, tagLoc, tagHist);
   renderHistory(histRes.data || []);
   showMsg('✅ Đã tra cứu ' + tagNo, 'ok');
 }
@@ -262,7 +280,7 @@ function renderNodeDetail(info, loc){
     '<div class="sr"><div class="k">' + escapeHtml(k) + '</div><div class="v">' + escapeHtml(v) + '</div></div>').join('') + '</div>';
 }
 
-function renderTree(elId, edges, rootTag, direction, tagInfo, tagLoc){
+function renderTree(elId, edges, rootTag, direction, tagInfo, tagLoc, tagHist){
   const el = document.getElementById(elId);
   if (!edges.length){ el.innerHTML = '<div class="empty">' + (direction === 'nguoc' ? 'Không có — đây là tem gốc, chưa được tách/gộp từ tem nào khác.' : 'Chưa được dùng để tách/đóng gói thành tem nào khác.') + '</div>'; return; }
 
@@ -282,21 +300,37 @@ function renderTree(elId, edges, rootTag, direction, tagInfo, tagLoc){
         '<div class="node-head"><span class="rel-' + e.loai + '">' + REL_LABEL[direction][e.loai] + '</span> ' +
         '<span class="tag-chip">' + escapeHtml(other) + '</span> — ' + fmtNum(e.so_luong) + ' sp' + '</div>' +
         renderNodeDetail(info, tagLoc[other]) +
+        ((tagHist[other] || []).length ? '<div class="node-hist"><div class="ttl">🚚 Chuyển công đoạn</div>' + tagHist[other].map(histItemHtml).join('') + '</div>' : '') +
         (grandChildren ? '<ul class="tree">' + grandChildren + '</ul>' : '') + '</li>';
     }).join('');
   }
   el.innerHTML = '<ul class="tree root">' + renderChildrenList(rootTag, new Set([rootTag])) + '</ul>';
 }
 
+// Một lần chuyển công đoạn: công đoạn nhận quét tem (người nhận + thoi_gian_chuyen)
+// → công đoạn giao xác nhận (người giao + ngay_gio_xac_nhan, chuỗi "HH:mm:ss dd/MM/yyyy").
+function fmtTs(v){ return v ? new Date(v).toLocaleString('vi-VN', { hour12: false }) : ''; }
+function histItemHtml(r){
+  const st = r.trang_thai_xac_nhan || '';
+  const cls = /từ chối/i.test(st) ? 'tc' : /^Đã xác nhận/i.test(st) ? 'ok' : /^Chờ/i.test(st) ? 'cho' : '';
+  const daXn = cls === 'ok' || cls === 'tc';
+  const sl = fmtNum(r.sl_thuc_chuyen) + ' sp' +
+    (Number(r.chenh_lech) ? ' (tem ' + fmtNum(r.sl_tren_tem) + ', lệch ' + fmtNum(r.chenh_lech) + ')' : '');
+  return '<div class="hist-item"><div class="hh"><b>' + escapeHtml(r.cong_doan_giao) + '</b> → <b>' + escapeHtml(r.cong_doan_nhan) + '</b>' +
+      '<span>' + sl + '</span>' + (st ? '<span class="st ' + cls + '">' + escapeHtml(st) + '</span>' : '') +
+      (r.id_phieu ? '<span class="phieu">' + escapeHtml(r.id_phieu) + '</span>' : '') + '</div>' +
+    '<div class="gn">' +
+      '<div><span class="k">📥 Nhận:</span> <b>' + escapeHtml(r.nguoi_nhan || '—') + '</b> · ' + escapeHtml(fmtTs(r.thoi_gian_chuyen) || '—') + '</div>' +
+      '<div><span class="k">📤 Giao:</span> <b>' + escapeHtml(r.nguoi_giao || (daXn ? '—' : 'chưa xác nhận')) + '</b>' +
+        (r.ngay_gio_xac_nhan ? ' · ' + escapeHtml(r.ngay_gio_xac_nhan) : '') + '</div>' +
+    '</div>' +
+    (r.ly_do_tu_choi ? '<div class="tc-ly">✖ Lý do từ chối: ' + escapeHtml(r.ly_do_tu_choi) + '</div>' : '') +
+    (r.ghi_chu ? '<div class="hist-note">📝 ' + escapeHtml(r.ghi_chu) + '</div>' : '') + '</div>';
+}
 function renderHistory(rows){
   const el = document.getElementById('histList');
   if (!rows.length){ el.innerHTML = '<div class="empty">Chưa từng chuyển công đoạn.</div>'; return; }
-  el.innerHTML = rows.map(r => {
-    const t = new Date(r.thoi_gian_chuyen).toLocaleString('vi-VN', { hour12: false });
-    return '<div class="hist-item">' + t + ' — <b>' + escapeHtml(r.cong_doan_giao) + '</b> → <b>' + escapeHtml(r.cong_doan_nhan) + '</b> · ' +
-      fmtNum(r.sl_thuc_chuyen) + ' sp · ' + escapeHtml(r.trang_thai_xac_nhan || '') +
-      (r.ghi_chu ? '<div class="hist-note">📝 ' + escapeHtml(r.ghi_chu) + '</div>' : '') + '</div>';
-  }).join('');
+  el.innerHTML = rows.map(histItemHtml).join('');
 }
 
 /* ---------- Quét QR camera (giống chuyencongdoan.html) ---------- */
