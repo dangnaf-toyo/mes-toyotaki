@@ -39,9 +39,8 @@
       { label: 'In tem', href: 'intem.html' },
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
       { label: 'Tem xuất hàng Bavia', href: 'bavia-tem-xuat-hang.html' },
-      { label: 'Quản lý khuôn', href: 'quan-ly-khuon.html' },
-      { label: 'Dashboard tổ khuôn', href: 'bao-duong-khuon-tuan.html' },
-      { label: 'Linh kiện dự phòng khuôn', href: 'linh-kien-khuon.html' },
+      // T137: 1 mục "Tổ khuôn" — các trang con hiện dải tab (SUB_TABS bên dưới).
+      { label: 'Tổ khuôn', href: 'bao-duong-khuon-tuan.html', subTabs: 'to_khuon' },
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html' },
       { label: 'Đóng gói Pallet', href: 'oqc.html' },
       { label: 'Báo cáo cuối ca công đoạn', href: 'cong-doan-bao-cao-ca.html' },
@@ -129,6 +128,24 @@
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
   };
 
+  // T137: nhóm trang hiện chung 1 dải tab con dưới thanh menu. Tab đầu = trang
+  // mặc định của mục menu; "also" = trang phụ (mở từ trong tab) vẫn hiện dải
+  // tab và tô sáng tab cha.
+  const SUB_TABS = {
+    to_khuon: { label: 'Tổ khuôn', tabs: [
+      { label: 'Dashboard tổ khuôn', href: 'bao-duong-khuon-tuan.html', also: ['checksheet-bao-duong-khuon.html'] },
+      { label: 'Quản lý khuôn', href: 'quan-ly-khuon.html', also: ['van-de-khuon.html'] },
+      { label: 'Linh kiện dự phòng khuôn', href: 'linh-kien-khuon.html' },
+    ] },
+  };
+  function subTabPages(key) {
+    const g = SUB_TABS[key]; if (!g) return [];
+    return g.tabs.reduce((a, t) => a.concat([t.href], t.also || []), []);
+  }
+  function subGroupOf(cur) {
+    return Object.keys(SUB_TABS).find(k => subTabPages(k).includes(cur)) || null;
+  }
+
   const CSS = `
 :root{--navbar-h:50px}
 body{padding-top:var(--navbar-h)}
@@ -166,6 +183,11 @@ body{padding-top:var(--navbar-h)}
   .mnb-auth{display:none}
   .mnb-auth-mobile{display:flex;margin-top:8px;padding:12px 8px;border-top:2px solid #f0e6d8;font-size:12.5px;color:#666}
 }
+.mnb-subtabs{background:#fff;border-bottom:1px solid #E4DACB;padding:6px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:Arial,Helvetica,sans-serif}
+.mnb-subtabs-label{font-size:11px;font-weight:800;color:#8A7C68;text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+.mnb-subtab{padding:7px 14px;border-radius:6px;border:1px solid #E4DACB;color:#5a4a3a;text-decoration:none;font-size:12.5px;font-weight:700;min-height:32px;box-sizing:border-box;display:inline-flex;align-items:center}
+.mnb-subtab:hover{background:#faf5f0;color:#C87941}
+.mnb-subtab.route-active{background:#C87941;border-color:#C87941;color:#fff}
 .mnb-title-bar{background:#fff;border-bottom:1px solid #E4DACB;padding:12px 20px;
   display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-family:Arial,Helvetica,sans-serif}
 .mnb-title-icon{font-size:18px;line-height:1}
@@ -198,13 +220,18 @@ body{padding-top:var(--navbar-h)}
     return (parts[parts.length - 1] || 'index.html').toLowerCase();
   }
 
+  function itemActive(it, cur) {
+    if (!it.href) return false;
+    return it.href.toLowerCase() === cur || (!!it.subTabs && subTabPages(it.subTabs).includes(cur));
+  }
+
   function groupsHtml(groups, cur) {
     return groups.map(g => {
       const itemsHtml = g.items.map(it => it.folder
         ? `<div class="mnb-folder" title="Thư mục Bom">${it.label}</div>`
-        : `<a href="${it.href}" class="mnb-item${it.href.toLowerCase() === cur ? ' route-active' : ''}">${it.label}</a>`
+        : `<a href="${it.href}" class="mnb-item${itemActive(it, cur) ? ' route-active' : ''}">${it.label}</a>`
       ).join('');
-      const groupActive = g.items.some(it => it.href && it.href.toLowerCase() === cur);
+      const groupActive = g.items.some(it => itemActive(it, cur));
       return `<div class="mnb-group${groupActive ? ' route-active' : ''}">
         <button type="button" class="mnb-group-btn">${g.label} <span class="mnb-caret">▾</span></button>
         <div class="mnb-dropdown">${itemsHtml}</div>
@@ -342,6 +369,21 @@ body{padding-top:var(--navbar-h)}
     renderAuthInto('mnbAuthMobile', null);
     wireGroupButtons();
     wireStaticInteractions();
+
+    // T137: dải tab con (VD Tổ khuôn) ngay dưới thanh menu / banner staging.
+    const subKey = subGroupOf(cur);
+    if (subKey) {
+      const g = SUB_TABS[subKey];
+      const strip = document.createElement('nav');
+      strip.className = 'mnb-subtabs';
+      strip.setAttribute('aria-label', g.label);
+      strip.innerHTML = '<span class="mnb-subtabs-label">' + g.label + '</span>' + g.tabs.map(t => {
+        const on = t.href === cur || (t.also || []).includes(cur);
+        return '<a class="mnb-subtab' + (on ? ' route-active' : '') + '" href="' + t.href + '"' + (on ? ' aria-current="page"' : '') + '>' + t.label + '</a>';
+      }).join('');
+      const banner = bar.nextSibling && bar.nextSibling.textContent && bar.nextSibling.textContent.indexOf('STAGING') >= 0 ? bar.nextSibling : null;
+      (banner || bar).after(strip);
+    }
 
     // Thanh tiêu đề chuẩn hoá — thay header tự viết riêng (không đồng nhất)
     // ở từng trang. Trang không có trong PAGE_META (hiếm) thì không vẽ gì,
