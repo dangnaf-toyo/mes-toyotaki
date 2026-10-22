@@ -161,8 +161,7 @@ tr:last-child td{border-bottom:none}
       <button class="tab-btn" id="tab-btn-tracuu" onclick="switchTab('tracuu')">Tra cứu lịch sử</button>
       <button class="tab-btn" id="tab-btn-ncp" onclick="switchTab('ncp')">Xử lý sản phẩm không phù hợp</button>
       <button class="tab-btn" id="tab-btn-tieuchuan" onclick="switchTab('tieuchuan')">Quản lý tiêu chuẩn</button>
-      <button class="tab-btn" id="tab-btn-bieudo" onclick="switchTab('bieudo')">Biểu đồ kiểm soát</button>
-      <button class="tab-btn" id="tab-btn-ngoqc" onclick="switchTab('ngoqc')">NG OQC</button>
+      <a class="tab-btn" href="bieu-do-chat-luong.html" style="text-decoration:none" title="Biểu đồ kiểm soát + P-Chart NG OQC đã chuyển sang menu Chất lượng › Biểu đồ chất lượng">📈 Biểu đồ chất lượng ↗</a>
     </div>
     <div class="live-badge"><span class="live-dot"></span><span id="live-status">Đang tải...</span></div>
     <div class="header-clock">
@@ -397,9 +396,7 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <!-- ===================== TAB: QUẢN LÝ TIÊU CHUẨN ===================== -->
-  <div class="tabpanel" id="tab-bieudo"><div id="bd-root"></div></div>
-  <!-- T135: dashboard NG OQC (shared/oqc-ng-dash.js) -->
-  <div class="tabpanel" id="tab-ngoqc"><div id="ngoqc-root"></div></div>
+  <!-- T136: Biểu đồ kiểm soát + NG OQC chuyển sang bieu-do-chat-luong.html -->
 
   <div class="tabpanel" id="tab-tieuchuan">
     <!-- T133: bảng tuần kiểm kích thước theo mã (shared/ipqc-btk-qc.js) -->
@@ -446,7 +443,6 @@ tr:last-child td{border-bottom:none}
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/ipqc-spc.js"></script>
 <script src="shared/ipqc-btk-qc.js"></script>
-<script src="shared/oqc-ng-dash.js?v=T135b"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
 
@@ -459,13 +455,7 @@ function switchTab(tab){
   document.getElementById('tab-btn-tracuu').classList.toggle('active', tab === 'tracuu');
   document.getElementById('tab-btn-ncp').classList.toggle('active', tab === 'ncp');
   document.getElementById('tab-btn-tieuchuan').classList.toggle('active', tab === 'tieuchuan');
-  document.getElementById('tab-bieudo').classList.toggle('active', tab === 'bieudo');
-  document.getElementById('tab-btn-bieudo').classList.toggle('active', tab === 'bieudo');
-  document.getElementById('tab-ngoqc').classList.toggle('active', tab === 'ngoqc');
-  document.getElementById('tab-btn-ngoqc').classList.toggle('active', tab === 'ngoqc');
   if (tab === 'tieuchuan') { loadTieuChuanList(); if (!state.btkMounted) { state.btkMounted = true; IpqcBtkQc.mountEditor(document.getElementById('btk-root')); } }
-  if (tab === 'bieudo') { if (!state.bdCtl) state.bdCtl = IpqcBtkQc.mountChart(document.getElementById('bd-root')); else state.bdCtl.then(c => c && c.taiLai()); }
-  if (tab === 'ngoqc') { if (!state.ngOqcCtl) state.ngOqcCtl = OqcNgDash.mount(document.getElementById('ngoqc-root')); else state.ngOqcCtl.then(c => c && c.taiLai()); }
   if (tab === 'ncp' && !state.ncpLoaded) { state.ncpLoaded = true; loadNcpList(); }
 }
 
@@ -1334,6 +1324,6 @@ setInterval(loadBoard, 15000);
 </script>
 <script>Qc02Data.attachEmployees(["ncp-nguoi-dam-nhiem","ncp-nguoi-dam-nhiem-doi-sach"]);</script>
 <script src="shared/mes-ng-status.js?v=20261022-detail"></script><script src="shared/mes-ncp-source.js"></script>
-<script>/* T135: qc-manager.html?tab=ngoqc mở thẳng tab */(function(){var t=new URLSearchParams(location.search).get('tab');if(t&&document.getElementById('tab-'+t))setTimeout(function(){switchTab(t);},0);})();</script>
+<script>/* ?tab=… mở thẳng tab; T136: bieudo / ngoqc đã chuyển sang bieu-do-chat-luong.html */(function(){var t=new URLSearchParams(location.search).get('tab');var moi={bieudo:'kiemsoat',ngoqc:'pchart'};if(moi[t]){location.replace('bieu-do-chat-luong.html?tab='+moi[t]);return;}if(t&&document.getElementById('tab-'+t))setTimeout(function(){switchTab(t);},0);})();</script>
 </body>
 </html>

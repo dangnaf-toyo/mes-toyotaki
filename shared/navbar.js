@@ -49,6 +49,7 @@
       { label: 'IQC đầu vào', href: 'iqc.html' },
       { label: 'OQC kiểm tra', href: 'oqc-daily.html' },
       { label: 'QC Manager / NCP', href: 'qc-manager.html' },
+      { label: 'Biểu đồ chất lượng', href: 'bieu-do-chat-luong.html' },
     ] },
     { label: 'Kho & Truy xuất', items: [
       { label: 'Kho NVL', href: 'nvl.html' },
@@ -104,6 +105,7 @@
     'bavia-tem-xuat-hang.html': { icon: '🏷️', title: 'Tem xuất hàng Bavia', desc: 'Quét QR tem Đúc ghi nhận sản lượng Bavia — đủ thùng in tem xuất hàng theo mẫu khách (FCC / Astemo / Soji / Mikasa / Cosmos)' },
     'ghi-nhan-tem-thanh-pham.html': { icon: '📦', title: 'Ghi nhận thùng thành phẩm', desc: 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
+    'bieu-do-chat-luong.html': { icon: '📈', title: 'Biểu đồ chất lượng', desc: 'Biểu đồ kiểm soát kích thước IPQC · P-Chart NG OQC', noTitleBar: true },
     'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin', noTitleBar: true },
     'tai-lieu-danh-muc.html': { icon: '📁', title: 'Quản lý tài liệu kỹ thuật', desc: 'Bản vẽ SP/khuôn, dữ liệu báo giá, KQ sản xuất thử, Jig - đồ gá, LK dự phòng khuôn, dưỡng kiểm, QCP, tiêu chuẩn — theo mã SP', noTitleBar: true },
     'tai-lieu-chi-tiet.html': { icon: '📄', title: 'Chi tiết tài liệu kỹ thuật', desc: 'Xem view-only, tải bản gốc CAD (nếu có quyền), quản lý phiên bản', noTitleBar: true },
