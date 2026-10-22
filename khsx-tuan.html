@@ -117,6 +117,17 @@ tr:hover td{background:var(--bg-sunken)}
 .log-item .lm{color:var(--text-dim);font-size:10.5px;margin-top:2px}
 .log-item .lr{color:var(--accent-hover);margin-top:3px;font-style:italic}
 .log-empty{color:var(--text-dim);font-size:12px;font-style:italic;padding:8px 0}
+/* Số ca làm việc của máy (T134) */
+.soca-box{margin-bottom:12px}
+.soca-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px}
+.soca-note{flex:1;min-width:240px;font-size:11px;color:var(--text-muted)}
+#tblSoCa td{padding:4px 6px}
+#tblSoCa select{border:1.5px solid var(--border-strong);border-radius:5px;padding:3px 4px;font-family:inherit;font-size:12px;background:#fff;width:100%;min-width:64px}
+#tblSoCa select.sc-1{background:var(--warn-bg);color:var(--warn-fg);font-weight:600}
+#tblSoCa select.sc-0{background:var(--bg-sunken);color:var(--text-dim)}
+#tblSoCa select.dirty{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#tblSoCa .sc-cap{min-height:12px;font-size:10px;color:var(--text-dim);text-align:center;font-family:'JetBrains Mono',monospace}
+#tblSoCa .sc-src{font-size:11px;color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -156,6 +167,26 @@ tr:hover td{background:var(--bg-sunken)}
 
     <!-- PANEL: Đúc (khoá theo máy) -->
     <div class="panel" id="panelDuc">
+      <div class="soca-box">
+        <div class="soca-head">
+          <b>🕐 Số ca làm việc của máy</b>
+          <span class="soca-note">2 ca = chạy cả ngày &amp; đêm · 1 ca = chỉ ca đầu (Ca ngày/Ca 1) · Nghỉ = máy không chạy. Dashboard Đúc chia KH ngày của máy theo số ca này. Máy chưa khai báo tuần này lấy theo tuần gần nhất trước đó (không có thì 2 ca).</span>
+          <button type="button" class="btn" id="btnLuuSoCa" disabled>💾 Lưu số ca</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="tblSoCa">
+            <thead>
+              <tr>
+                <th>Mã máy</th>
+                <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
+                <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
+                <th>Nguồn</th>
+              </tr>
+            </thead>
+            <tbody id="tbodySoCa"><tr class="empty-row"><td colspan="9">Đang tải…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
       <div class="tbl-wrap">
         <table id="tblDuc">
           <thead>
@@ -726,7 +757,112 @@ async function loadDucRows(){
   ducRows = data || [];
   renderDucRows();
   renderTongTuanBar();
+  loadSoCa();
 }
+
+// =============================================================================
+// Số ca làm việc của máy (T134) — bảng duc_khsx_tuan_so_ca, khoá (tuần, máy),
+// mỗi ngày 0/1/2. Máy chưa khai báo tuần này → tuần gần nhất trước đó, không
+// có thì 2 ca. duc-dashboard.html đọc cùng quy tắc (loadSoCaMay_).
+// =============================================================================
+const SO_CA_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
+let soCaMap = {};     // ma_may -> { days:[7], nguon:'tuan'|'tuan_truoc'|'mac_dinh', tuan }
+let soCaDirty = {};   // ma_may -> [7] giá trị đang sửa chưa lưu
+
+async function loadSoCa(){
+  const tuan = fmtDate(weekMonday);
+  const { data, error } = await sb.from('duc_khsx_tuan_so_ca').select('*')
+    .lte('tuan_bat_dau', tuan).order('tuan_bat_dau', { ascending: false }).limit(500);
+  if (error) {
+    document.getElementById('tbodySoCa').innerHTML = '<tr class="empty-row"><td colspan="9">Lỗi tải số ca: ' + escapeHtml(error.message) + '</td></tr>';
+    return;
+  }
+  soCaMap = {}; soCaDirty = {};
+  (data || []).forEach(r => {
+    if (soCaMap[r.ma_may]) return;   // đã lấy tuần mới hơn
+    soCaMap[r.ma_may] = { days: SO_CA_COLS.map(d => Number(r[d])), nguon: r.tuan_bat_dau === tuan ? 'tuan' : 'tuan_truoc', tuan: r.tuan_bat_dau };
+  });
+  renderSoCa();
+}
+
+function soCaCua(maMay){
+  return soCaDirty[maMay] || (soCaMap[maMay] ? soCaMap[maMay].days : [2,2,2,2,2,2,2]);
+}
+
+function renderSoCa(){
+  const tbody = document.getElementById('tbodySoCa');
+  // Máy có dòng KH tuần này + máy đã khai báo riêng cho tuần này.
+  const mays = [...new Set(ducRows.map(r => r.ma_may).concat(
+    Object.keys(soCaMap).filter(m => soCaMap[m].nguon === 'tuan')))]
+    .sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+  if (!mays.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Thêm dòng kế hoạch trước — máy có kế hoạch sẽ hiện ở đây để khai báo số ca.</td></tr>';
+    updateSoCaBtn();
+    return;
+  }
+  const khNgayMay = {};
+  ducRows.forEach(r => {
+    if (!khNgayMay[r.ma_may]) khNgayMay[r.ma_may] = [0,0,0,0,0,0,0];
+    SO_CA_COLS.forEach((d, i) => { khNgayMay[r.ma_may][i] += Number(r[d]) || 0; });
+  });
+  tbody.innerHTML = mays.map(m => {
+    const days = soCaCua(m);
+    const goc = soCaMap[m] ? soCaMap[m].days : [2,2,2,2,2,2,2];
+    const cells = days.map((v, i) => {
+      const kh = (khNgayMay[m] || [])[i] || 0;
+      const cap = kh > 0 ? (v > 0 ? '≈' + fmtNum(Math.round(kh / v)) + '/ca' : '⚠ có KH') : '';
+      return '<td><select class="sc-' + v + (v !== goc[i] ? ' dirty' : '') + '" data-may="' + escapeHtml(m) + '" data-i="' + i + '">'
+        + [[2,'2 ca'],[1,'1 ca'],[0,'Nghỉ']].map(([val, lbl]) => '<option value="' + val + '"' + (val === v ? ' selected' : '') + '>' + lbl + '</option>').join('')
+        + '</select><div class="sc-cap">' + cap + '</div></td>';
+    }).join('');
+    const sc = soCaMap[m];
+    const nguon = soCaDirty[m] ? '✏️ chưa lưu'
+      : !sc ? 'Mặc định 2 ca'
+      : sc.nguon === 'tuan' ? '✓ Đã khai báo'
+      : 'Theo tuần ' + fmtDateVN(new Date(sc.tuan + 'T00:00:00'));
+    return '<tr><td><b>' + escapeHtml(m) + '</b></td>' + cells + '<td class="sc-src">' + nguon + '</td></tr>';
+  }).join('');
+  tbody.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => {
+    const m = sel.dataset.may;
+    const days = soCaCua(m).slice();
+    days[Number(sel.dataset.i)] = Number(sel.value);
+    const goc = soCaMap[m] ? soCaMap[m].days : [2,2,2,2,2,2,2];
+    if (days.join() === goc.join() && soCaMap[m] && soCaMap[m].nguon === 'tuan') delete soCaDirty[m];
+    else soCaDirty[m] = days;
+    renderSoCa();
+  }));
+  updateSoCaBtn();
+}
+
+function updateSoCaBtn(){
+  const n = Object.keys(soCaDirty).length;
+  const btn = document.getElementById('btnLuuSoCa');
+  btn.disabled = n === 0;
+  btn.textContent = n ? '💾 Lưu số ca (' + n + ' máy)' : '💾 Lưu số ca';
+}
+
+document.getElementById('btnLuuSoCa').addEventListener('click', async () => {
+  if (!(await requireLoginOrRedirect())) return;
+  const mays = Object.keys(soCaDirty);
+  if (!mays.length) return;
+  const fmt = days => days.join('/');
+  const ok = await ghiLogVaXinLyDoNeuCan('sua', 'Số ca làm việc — ' + mays.join(', '),
+    mays.map(m => m + ': ' + fmt(soCaMap[m] ? soCaMap[m].days : [2,2,2,2,2,2,2])).join('; '),
+    mays.map(m => m + ': ' + fmt(soCaDirty[m])).join('; '));
+  if (!ok) return;
+  const user = await MesAuth.getCurrentUserIdentity();
+  const payloads = mays.map(m => {
+    const p = { tuan_bat_dau: fmtDate(weekMonday), ma_may: m, updated_by: user, updated_at: new Date().toISOString() };
+    SO_CA_COLS.forEach((d, i) => { p[d] = soCaDirty[m][i]; });
+    return p;
+  });
+  const btn = document.getElementById('btnLuuSoCa');
+  btn.disabled = true;
+  const { error } = await sb.from('duc_khsx_tuan_so_ca').upsert(payloads, { onConflict: 'tuan_bat_dau,ma_may' });
+  if (error) { btn.disabled = false; return showMsg('Lỗi lưu số ca: ' + error.message, 'err'); }
+  showMsg('✓ Đã lưu số ca làm việc ' + mays.length + ' máy', 'ok', 2500);
+  loadSoCa(); loadDuyetInfo(); loadChangeLog();
+});
 
 function renderDucRows(){
   const tbody = document.getElementById('tbodyDuc');
