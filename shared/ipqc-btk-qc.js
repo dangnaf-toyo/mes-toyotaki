@@ -22,7 +22,10 @@
     const st = document.createElement('style'); st.id = 'bq-css';
     st.textContent =
       '.bq{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;font-size:13px}' +
-      '.bq .side{flex:1 1 240px;max-width:290px;min-width:0;background:#fff;border:1px solid #D9DFE5;border-radius:12px;padding:10px}' +
+      '.bq .side{flex:1 1 240px;max-width:290px;min-width:0;background:#fff;border:1px solid #D9DFE5;border-radius:12px;padding:10px;position:sticky;top:calc(var(--navbar-h,50px) + 8px);align-self:flex-start}' +
+      '.bq .side [data-list]{max-height:calc(100vh - var(--navbar-h,50px) - 130px);min-height:200px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}' +
+      '.bq .main{scroll-margin-top:calc(var(--navbar-h,50px) + 8px)}' +
+      '@media (max-width:700px){.bq .side{position:static;max-width:none}.bq .side [data-list]{max-height:50vh}}' +
       '.bq .main{flex:999 1 620px;min-width:0;display:flex;flex-direction:column;gap:12px}' +
       '.bq .card{background:#fff;border:1px solid #D9DFE5;border-radius:12px;padding:12px 14px}' +
       '.bq .ttl{font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;gap:8px}' +
@@ -93,6 +96,9 @@
 
     async function chonMa(ma) {
       st.ma = ma; veDanhSach();
+      // Danh sách có thanh trượt riêng: bấm mã ở cuối danh sách thì đưa nội dung bên phải lên đầu màn hình.
+      const top = main.getBoundingClientRect().top;
+      if (top < 0 || top > window.innerHeight * 0.5) main.scrollIntoView({ block: 'start' });
       const v = await sb.from('ipqc_btk').select('*').eq('ma_sp', ma).order('tao_luc', { ascending: false });
       st.versions = v.data || [];
       const ids = st.versions.map(x => x.id);
