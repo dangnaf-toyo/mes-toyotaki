@@ -7,6 +7,7 @@ Tiếp nối staging 197568e (T134), không thay bằng master/main.
 - Thanh chức năng giữ nguyên, thêm Dashboard OQC. Nhập báo cáo ngày/CAPA đổi vùng nội dung trong cùng trang, không mở popup/tab/trang mới. Chi tiết báo cáo và trình xem ảnh vẫn giữ nguyên.
 - Form báo cáo: hàng thông tin đầu; nhân viên/giờ/OK/NG bên trái, nhóm lỗi bên phải; danh sách dài cuộn riêng; ảnh thumbnail và Lưu ở cuối. Hướng dẫn dài chuyển tooltip; thông tin phụ vẫn truy cập được. Model, nhân viên, lỗi và đường lưu dùng nguồn hiện có; không tạo danh mục trùng.
 - CAPA hai cột, lịch sử thu gọn. Giờ/người/ngày và hiệu suất mục tiêu do người có quyền nhập. Chưa lưu thì để trống, không tự lấy 7 giờ/90%. Cấu hình dùng chung OQC theo ngày áp dụng; thay đổi tạo phiên bản, không ghi đè phiên bản cũ. CAPA kế hoạch làm tròn xuống PCS.
+- Kế hoạch liên kết cũ chưa chụp cấu hình dùng cấu hình hiệu lực; plan basis đã chụp nhưng thiếu cấu hình giữ nguyên NULL, không gán ngược dữ liệu mới.
 - Dashboard tính nhân lực theo cấu hình từng ngày/snapshot, hiệu suất thực tế = giờ chuẩn/giờ công; mục tiêu lấy từ snapshot đã lưu. Khi gộp nhiều mục tiêu, so sánh theo trọng số giờ công. Thiếu dữ liệu thì báo rõ.
 - Kế hoạch tuần OQC chỉ còn số lượng; bỏ nhãn nhân lực, khối tổng và các phần nhập giờ/preview bổ sung. Giữ nguyên RPC lưu, nhập Excel, tổng tuần, thêm/sửa/gửi duyệt. Không sửa logic ca máy T134 hay tab khác.
 
@@ -20,7 +21,7 @@ File: supabase/migration_phase_oqc_workspace_config_20261022_staging.sql.
 - Sau migration và smoke ROLLBACK, hash báo cáo/giờ công/context/định mức/plan basis/kế hoạch tuần được đối chiếu với trước. 5 báo cáo giữ hash 87f2efca44d86a3ebf0dbeae45cb50f4.
 
 ## Kiểm tra
-- 11 nhóm JSDOM OQC: mở form trong trang, lưu/nạp cấu hình, thiếu backend/quyền, dữ liệu lịch sử, ảnh, NG/OK/giờ công.
+- 12 nhóm JSDOM OQC: mở form trong trang, lưu/nạp cấu hình, thiếu backend/quyền, dữ liệu lịch sử, ảnh, NG/OK/giờ công.
 - 15 nhóm PostgreSQL cục bộ: migration lặp lại, không đổi dữ liệu cũ, snapshot, thiếu cấu hình, save/retry, phân quyền, bất biến lịch sử.
 - 6 nhóm công thức: giờ thập phân, mục tiêu tùy chỉnh, làm tròn PCS, cộng model trước làm tròn người, hiệu suất 80% khác hoàn thành KH 100%, thiếu dữ liệu.
 - 9 nhóm Chromium: 1366×768, 390×844, 102 dòng lỗi cuộn riêng và không cuộn trang desktop, ảnh/zoom, form/CAPA trong trang, không lỗi JS, kế hoạch tuần chỉ hiện số lượng.
