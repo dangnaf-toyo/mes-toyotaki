@@ -69,6 +69,9 @@
       '.ond table{border-collapse:collapse;width:100%}.ond th,.ond td{padding:5px 8px;text-align:left;border-top:1px solid #EEF1F5;white-space:nowrap}' +
       '.ond th{background:#F6F8FA;color:#3A4250;font-weight:600;border-top:0}.ond td.r,.ond th.r{text-align:right}' +
       '.ond .msg{font-weight:600;padding:6px 10px;border-radius:6px}.ond .msg.err{background:#FEF2F2;color:#B42318}.ond .msg.ok{background:#EFF6FF;color:#1F5FBF}' +
+      '.ond .card[data-card]{cursor:pointer}.ond .card[data-card]:hover{box-shadow:0 0 0 2px #C3D6F1}.ond .card.sel{box-shadow:0 0 0 2px #1F5FBF}' +
+      '.ond .dt{flex:1 1 100%;box-sizing:border-box}.ond .dt td{font-size:12px}.ond .dt tr.sub td{background:#F6F8FA;font-weight:700}' +
+      '.ond .dt tr.out td.ngp{color:#B42318;font-weight:700}.ond .tagd{font-size:10.5px;font-weight:700;border:1px solid #14181F;border-radius:4px;padding:0 5px;margin-left:4px}' +
       '@media (max-width:640px){.ond .card{min-width:100%}}';
     document.head.appendChild(st);
   }
@@ -76,7 +79,7 @@
   async function mount(el) {
     css();
     const today = ymd(new Date());
-    const st = { end: today, range: 16, kh: '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null };
+    const st = { end: today, range: 16, kh: '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
     el.innerHTML =
       '<div class="ond">' +
       '<div class="bar">' +
@@ -121,7 +124,7 @@
       const out = [];
       for (let off = 0; ; off += 1000) {
         const { data, error } = await sb.from('oqc_daily_inspection')
-          .select('id,inspection_date,product_code,product_name,customer_name,total_qty,ng_qty,defects')
+          .select('id,inspection_date,shift,inspection_time,product_code,product_name,customer_name,inspector_code,inspector_name,total_qty,ok_qty,ng_qty,defects,note,lot_no,task_no')
           .gte('inspection_date', from).lte('inspection_date', st.end).order('id').range(off, off + 999);
         if (error) throw error;
         out.push(...(data || []));
@@ -134,7 +137,10 @@
           const l = String((x.label || x.code || 'Khác')).trim();
           defs[l] = (defs[l] || 0) + q;
         });
-        return { d: r.inspection_date, p: r.product_code, n: Number(r.total_qty) || 0, ng: Number(r.ng_qty) || 0, defs, kh: r.customer_name || '' };
+        return { id: r.id, d: r.inspection_date, p: r.product_code, n: Number(r.total_qty) || 0, ng: Number(r.ng_qty) || 0,
+          ok: r.ok_qty != null ? Number(r.ok_qty) : (Number(r.total_qty) || 0) - (Number(r.ng_qty) || 0), defs, kh: r.customer_name || '',
+          ca: r.shift || '', gio: r.inspection_time ? String(r.inspection_time).slice(0, 5) : '',
+          nguoi: r.inspector_name || r.inspector_code || '', maNguoi: r.inspector_code || '', ghiChu: r.note || '', lot: r.lot_no || '', task: r.task_no || '' };
       }).filter(r => r.n > 0);
     }
     async function loadProds() {
@@ -315,7 +321,7 @@
 
       // Thẻ từng mã
       const PC = 120;
-      $('cards').innerHTML = info.length ? info.map(x => {
+      const cardHtml = info.map(x => {
         const m = META[x.st];
         const ymax = Math.max(x.tg, x.cl || 0, ...x.pts.map(p => Math.max(p.p, p.ucl || 0))) * 1.15 || 0.01;
         const ln = x.pts.map(p => (((p.i + 0.5) / N) * 1000).toFixed(1) + ',' + (PC - Math.min(1, p.p / ymax) * PC).toFixed(1)).join(' ');
@@ -333,7 +339,7 @@
         const dMax = dEnt.length ? dEnt[0][1] : 1;
         const defs = dEnt.slice(0, 6).map(([l, q], i) => '<div style="display:grid;grid-template-columns:96px minmax(0,1fr) 36px;align-items:center;gap:6px"><span title="' + esc(l) + '" style="overflow:hidden;text-overflow:ellipsis;color:#3A4250">' + esc(l) + '</span><span style="height:10px;background:#EEF1F5;border-radius:2px;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:' + pct(q / dMax) + ';background:' + (i === 0 ? BLUE : LBLUE) + ';border-radius:2px"></span></span><span class="mono" style="text-align:right;font-weight:700">' + fn(q) + '</span></div>').join('') || '<div class="mut">Không có NG</div>';
         const w2c = x.r2 != null && x.r2 > x.tg ? RED : INK;
-        return '<div class="card" style="border-left:4px solid ' + (m.bd === '#E4E8EE' ? '#DDE2EA' : m.bd) + '">' +
+        return '<div class="card' + (st.sel === x.code ? ' sel' : '') + '" data-card="' + esc(x.code) + '" role="button" tabindex="0" title="Bấm để xem số liệu kiểm tra chi tiết" style="border-left:4px solid ' + (m.bd === '#E4E8EE' ? '#DDE2EA' : m.bd) + '">' +
           '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px">' +
           '<span class="mono" style="font-weight:700;font-size:13px">' + esc(x.code) + '</span><span class="mut" style="font-size:11.5px">' + esc(x.name) + '</span>' +
           '<span style="font-size:11px;font-weight:700;color:' + ((x.st === 'bat_thuong' || x.st === 'tang') ? RED : '#5B6472') + '">' + m.l + '</span><span style="flex:1"></span>' +
@@ -351,9 +357,97 @@
           '</div><div style="flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:5px;padding-top:8px">' +
           '<div class="mut" style="font-size:11px;font-weight:600;display:flex;justify-content:space-between"><span>Loại lỗi</span><span class="mono">' + fn(x.total.ng) + ' / ' + fn(x.total.n) + '</span></div>' + defs +
           '</div></div></div>';
-      }).join('') : '<div class="bx mut" style="flex:1;text-align:center;padding:30px">Không có báo cáo OQC trong khoảng đã chọn.</div>';
+      });
+      const selIdx = info.findIndex(x => x.code === st.sel);
+      if (selIdx >= 0) {
+        // 2 thẻ/hàng: bảng chi tiết chèn ngay sau hàng chứa thẻ được chọn
+        const twoCols = $('cards').clientWidth >= 1130;
+        const after = twoCols ? Math.min(cardHtml.length - 1, selIdx | 1) : selIdx;
+        cardHtml.splice(after + 1, 0, detailHtml(info[selIdx], C));
+      } else if (st.sel) st.sel = null;
+      $('cards').innerHTML = info.length ? cardHtml.join('') : '<div class="bx mut" style="flex:1;text-align:center;padding:30px">Không có báo cáo OQC trong khoảng đã chọn.</div>';
 
       renderCfg(C);
+    }
+
+    // ---------- bảng chi tiết kết quả kiểm tra của 1 mã ----------
+    function detailRows(x, C) {
+      const rs = C.inD.filter(r => r.p === x.code).sort((a, b) => b.d.localeCompare(a.d) || String(b.gio).localeCompare(String(a.gio)) || b.id - a.id);
+      const seen = {}; rs.slice().reverse().forEach(r => { const k = r.d + '|' + r.n; r.dup = !!seen[k]; seen[k] = true; });
+      return rs;
+    }
+    function nguoiKiem(r) {
+      const w = st.work[r.id];
+      const extra = w && Array.isArray(w.labor) ? w.labor.filter(l => l && l.employee_code && l.employee_code !== r.maNguoi).map(l => l.employee_name || l.employee_code) : [];
+      return [r.nguoi].concat(extra).filter(Boolean).join(', ');
+    }
+    function gioKiem(r) {
+      const w = st.work[r.id];
+      if (!w || !Array.isArray(w.labor) || !w.labor.length) return '';
+      return String(Math.round(w.labor.reduce((s, l) => s + (Number(l.hours) || 0), 0) * 100) / 100).replace('.', ',');
+    }
+    function loiText(r) { return Object.entries(r.defs).sort((a, b) => b[1] - a[1]).map(([l, q]) => l + ' ' + q).join(', '); }
+    function detailHtml(x, C) {
+      const rs = detailRows(x, C);
+      const outDays = {}; x.pts.forEach(p => { if (p.out) outDays[p.d] = p.ucl; });
+      const T = C.agg(rs);
+      const byD = {}; rs.forEach(r => (byD[r.d] = byD[r.d] || []).push(r));
+      let body = '';
+      Object.keys(byD).sort().reverse().forEach(d => {
+        const list = byD[d];
+        list.forEach(r => {
+          body += '<tr class="' + (outDays[d] != null ? 'out' : '') + '"><td class="mono">' + dl(d) + '</td><td>' + esc(r.ca) + '</td><td class="mono">' + esc(r.gio) + '</td>' +
+            '<td>' + esc(nguoiKiem(r)) + '</td><td class="r mono">' + esc(gioKiem(r)) + '</td>' +
+            '<td class="r mono">' + fn(r.n) + '</td><td class="r mono">' + fn(r.ok) + '</td><td class="r mono" style="font-weight:700">' + fn(r.ng) + '</td>' +
+            '<td class="r mono ngp">' + fp(r.n ? r.ng / r.n : null, 2) + '</td>' +
+            '<td style="white-space:normal;min-width:220px">' + esc(loiText(r)) + '</td>' +
+            '<td class="mono">' + esc([r.lot, r.task].filter(Boolean).join(' / ')) + '</td>' +
+            '<td style="white-space:normal;min-width:140px">' + esc(r.ghiChu) + (r.dup ? '<span class="tagd" title="Cùng ngày, cùng SL kiểm với phiếu khác">nghi trùng</span>' : '') + '</td></tr>';
+        });
+        if (list.length > 1) {
+          const a = C.agg(list);
+          body += '<tr class="sub' + (outDays[d] != null ? ' out' : '') + '"><td class="mono">' + dl(d) + '</td><td colspan="4">Cộng ngày (' + list.length + ' phiếu)</td><td class="r mono">' + fn(a.n) + '</td><td class="r mono">' + fn(list.reduce((s, r) => s + r.ok, 0)) + '</td><td class="r mono">' + fn(a.ng) + '</td><td class="r mono ngp">' + fp(a.ng / a.n, 2) + '</td><td colspan="3"></td></tr>';
+        }
+      });
+      return '<div class="bx dt" data-o="detail" style="border:2px solid #1F5FBF;display:flex;flex-direction:column;gap:8px">' +
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px">' +
+        '<h3><span class="mono">' + esc(x.code) + '</span> <span class="mut" style="font-weight:500">' + esc(x.name) + '</span> — kết quả kiểm tra ' + dl(C.days[0]) + ' → ' + dl(C.end) + '</h3>' +
+        '<span class="mono mut">' + rs.length + ' phiếu · kiểm ' + fn(T.n) + ' · OK ' + fn(rs.reduce((s, r) => s + r.ok, 0)) + ' · NG ' + fn(T.ng) + ' · ' + fp(T.n ? T.ng / T.n : null, 2) + '</span>' +
+        '<span style="flex:1"></span>' +
+        '<button type="button" class="btn sm" data-act="xls">Xuất Excel</button>' +
+        '<button type="button" class="btn sm" data-act="close" aria-label="Đóng bảng chi tiết">Đóng ✕</button></div>' +
+        '<div style="overflow-x:auto;max-height:520px;overflow-y:auto"><table><thead><tr>' +
+        '<th>Ngày</th><th>Ca</th><th>Giờ</th><th>Người kiểm</th><th class="r">Giờ kiểm</th><th class="r">SL kiểm</th><th class="r">OK</th><th class="r">NG</th><th class="r">NG%</th><th>Loại lỗi (pcs)</th><th>Lot / Task</th><th>Ghi chú</th>' +
+        '</tr></thead><tbody>' + (body || '<tr><td colspan="12" class="mut" style="text-align:center;padding:20px">Không có phiếu</td></tr>') + '</tbody></table></div>' +
+        '<div class="mut" style="font-size:11px">NG% đỏ = ngày vượt UCL. Giờ kiểm và người kiểm phụ chỉ có ở phiếu nhập bằng màn hình OQC mới.</div></div>';
+    }
+    async function loadWork(code) {
+      const C = compute();
+      const ids = C.inD.filter(r => r.p === code).map(r => r.id).filter(id => !(id in st.work));
+      for (let i = 0; i < ids.length; i += 200) {
+        const part = ids.slice(i, i + 200);
+        const { data } = await sb.from('oqc_inspection_work').select('inspection_id,labor').in('inspection_id', part);
+        part.forEach(id => { st.work[id] = null; });
+        (data || []).forEach(w => { st.work[w.inspection_id] = w; });
+      }
+    }
+    async function moChiTiet(code) {
+      st.sel = st.sel === code ? null : code;
+      render();
+      if (!st.sel) return;
+      const d = $('cards').querySelector('[data-o="detail"]');
+      if (d && d.scrollIntoView) d.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      try { await loadWork(code); if (st.sel === code) render(); } catch (e) { /* giờ kiểm / người kiểm phụ không bắt buộc */ }
+    }
+    function xuatExcel() {
+      if (!window.XLSX) return alert('Chưa tải thư viện Excel');
+      const C = compute(); const x = C.info.find(i => i.code === st.sel); if (!x) return;
+      const rs = detailRows(x, C);
+      const aoa = [['Ngày', 'Ca', 'Giờ', 'Người kiểm', 'Giờ kiểm', 'SL kiểm', 'OK', 'NG', 'NG%', 'Loại lỗi (pcs)', 'Lot', 'Task', 'Ghi chú']]
+        .concat(rs.map(r => [dl(r.d) + '/' + r.d.slice(0, 4), r.ca, r.gio, nguoiKiem(r), gioKiem(r), r.n, r.ok, r.ng, r.n ? Math.round(r.ng / r.n * 10000) / 100 : '', loiText(r), r.lot, r.task, r.ghiChu]));
+      const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [10, 8, 7, 28, 9, 9, 9, 8, 7, 50, 14, 14, 30].map(w => ({ wch: w }));
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, x.code.slice(0, 31));
+      XLSX.writeFile(wb, 'OQC_' + x.code + '_' + C.days[0] + '_' + C.end + '.xlsx');
     }
 
     // ---------- bảng CL & mục tiêu ----------
@@ -407,6 +501,9 @@
       setTimeout(() => setMsg(null), 2500);
     }
 
+    el.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.card) { e.preventDefault(); moChiTiet(e.target.dataset.card); }
+    });
     el.addEventListener('change', e => {
       const k = e.target.dataset && e.target.dataset.k; if (!k) return;
       if (k === 'end') { if (!e.target.value) return; st.end = e.target.value; taiLai(); }
@@ -414,9 +511,13 @@
       else if (k === 'kh') { st.kh = e.target.value; render(); }
     });
     el.addEventListener('click', e => {
-      const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+      const b = e.target.closest('[data-act]');
+      if (!b) { const cd = e.target.closest('[data-card]'); if (cd) moChiTiet(cd.dataset.card); return; }
+      if (b.disabled) return;
       const a = b.dataset.act;
       if (a === 'cfg') { st.cfgOpen = !st.cfgOpen; b.classList.toggle('on', st.cfgOpen); render(); }
+      else if (a === 'close') { st.sel = null; render(); }
+      else if (a === 'xls') xuatExcel();
       else if (a === 'p7') { st.pareto = '7'; render(); }
       else if (a === 'pall') { st.pareto = 'all'; render(); }
       else if (a === 'cl' || a === 'mt') luu(a === 'cl' ? 'cl' : 'muc_tieu', b.dataset.ma);
