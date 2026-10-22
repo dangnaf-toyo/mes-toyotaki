@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Biểu đồ chất lượng — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<!--
+  bieu-do-chat-luong.html — T136: menu Chất lượng › Biểu đồ chất lượng.
+  Gom các biểu đồ QC vào 1 trang, mỗi loại 1 tab (trước nằm trong qc-manager.html):
+  - ?tab=kiemsoat : Biểu đồ kiểm soát kích thước IPQC (I-MR / X̄-R) — IpqcBtkQc.mountChart (T133)
+  - ?tab=pchart   : P-Chart NG OQC — OqcNgDash.mount (T135)
+  qc-manager.html?tab=bieudo|ngoqc tự chuyển sang đây.
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-header:#1E293B;--accent:#0F5FA5;--text:#0F172A}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:6px 8px 8px;gap:8px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;color:#FFF}
+.tabs{display:flex;gap:6px;margin-left:8px;flex-wrap:wrap}
+.tab-btn{background:transparent;border:1px solid #475569;color:#CBD5E1;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tabpanel{display:none}
+.tabpanel.active{display:block}
+.login{background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;border-radius:8px;padding:12px 14px;font-weight:600}
+.login a{color:#0F5FA5}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="co">Toyotaki · Chất lượng</div><div class="title">Biểu đồ chất lượng</div></div>
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab-btn" role="tab" data-tab="kiemsoat">Biểu đồ kiểm soát</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="pchart">P-Chart NG OQC</button>
+    </div>
+  </header>
+  <div id="login-msg" class="login" style="display:none">Cần đăng nhập để xem biểu đồ. <a id="login-link" href="shared/login.html">Đăng nhập</a></div>
+  <div class="tabpanel" id="tab-kiemsoat"><div id="kiemsoat-root"></div></div>
+  <div class="tabpanel" id="tab-pchart"><div id="pchart-root"></div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="shared/ipqc-spc.js"></script>
+<script src="shared/ipqc-btk-qc.js"></script>
+<script src="shared/oqc-ng-dash.js?v=T135b"></script>
+<script>
+const TABS = ['kiemsoat', 'pchart'];
+const ctl = {};
+function chonTab(tab) {
+  if (!TABS.includes(tab)) tab = TABS[0];
+  TABS.forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    const b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
+    b.classList.toggle('active', t === tab);
+    b.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+  });
+  const u = new URL(location.href); u.searchParams.set('tab', tab); history.replaceState(null, '', u);
+  if (tab === 'kiemsoat') {
+    if (!ctl.kiemsoat) ctl.kiemsoat = IpqcBtkQc.mountChart(document.getElementById('kiemsoat-root'));
+    else ctl.kiemsoat.then(c => c && c.taiLai && c.taiLai());
+  } else if (tab === 'pchart') {
+    if (!ctl.pchart) ctl.pchart = OqcNgDash.mount(document.getElementById('pchart-root'));
+    else ctl.pchart.then(c => c && c.taiLai && c.taiLai());
+  }
+}
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => chonTab(b.dataset.tab)));
+(async () => {
+  const s = await MesAuth.getSession();
+  if (!s) {
+    document.getElementById('login-link').href = 'shared/login.html?returnTo=' + encodeURIComponent(location.href);
+    document.getElementById('login-msg').style.display = '';
+    return;
+  }
+  chonTab(new URLSearchParams(location.search).get('tab'));
+})();
+</script>
+</body>
+</html>
