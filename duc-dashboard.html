@@ -1671,32 +1671,58 @@ function nangLucCa_(maSp, phuongAnCa, ca){
 }
 
 // Năng lực 1 ca của MÁY theo KHSX tuần = tổng KH ngày của máy đó (mọi mã)
-// / số ca trong ngày. KH ngày do bộ phận kế hoạch lập đã tính theo năng lực
+// / số ca làm việc của máy ngày đó (T134: khai báo ở KHSX tuần, mặc định = số
+// ca của phương án ca). KH ngày do bộ phận kế hoạch lập đã tính theo năng lực
 // thật của máy, còn nangLucCa_() (CT × cavity, hiệu suất 100%) cao gấp ~2 lần
 // thực tế (đối chiếu lịch sử: sản lượng thực ≈ 40-50% lý thuyết) — bug DC 6
 // 24/09: KH ngày EXE-PLT-01 = 4200 bị dồn hết vào 1 ca vì "năng lực" 4500.
-function nangLucCaTheoKhNgay_(khNgayMay, phuongAnCa){
+function nangLucCaTheoKhNgay_(khNgayMay, phuongAnCa, soCaMay){
   if (!(khNgayMay > 0)) return null;
-  const soCa = Object.keys(CONFIG.SHIFT_PLANS[phuongAnCa] || {}).length || 2;
+  const soCa = soCaMay > 0 ? soCaMay : (Object.keys(CONFIG.SHIFT_PLANS[phuongAnCa] || {}).length || 2);
   return Math.round(khNgayMay / soCa);
 }
 
-// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan, kh_ngay_may, da_chiem_ca },
+// T134: số ca làm việc theo máy cho 1 ngày, từ duc_khsx_tuan_so_ca — tuần
+// chứa ngày đó, máy chưa khai báo thì lấy tuần gần nhất trước đó, không có
+// thì null (= mặc định theo phương án ca). Trả về { ma_may: 0|1|2 }.
+async function loadSoCaMay_(mondayStr, dayIdx, maMays){
+  const out = {};
+  if (!maMays || !maMays.length) return out;
+  const { data, error } = await sb.from('duc_khsx_tuan_so_ca').select('*')
+    .lte('tuan_bat_dau', mondayStr).in('ma_may', maMays).order('tuan_bat_dau', { ascending: false });
+  if (error) { console.error('loadSoCaMay_ lỗi:', error); return out; }
+  const col = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'][dayIdx];
+  (data || []).forEach(r => { if (!(r.ma_may in out)) out[r.ma_may] = Number(r[col]); });
+  return out;
+}
+
+// Ca thứ mấy trong ngày (0 = ca đầu) theo phương án ca — máy khai báo N ca thì
+// chỉ N ca đầu có KH, ca sau là ca nghỉ của máy.
+function caNghiTheoSoCa_(soCaMay, phuongAnCa, ca){
+  if (soCaMay == null || isNaN(soCaMay)) return false;
+  const idx = Object.keys(CONFIG.SHIFT_PLANS[phuongAnCa] || {}).indexOf(ca);
+  return idx >= 0 && idx >= soCaMay;
+}
+
+// opt: { ma_sp, ten_sp, so_khuon, kh_ngay, kh_tuan, kh_ngay_may, so_ca_may, da_chiem_ca },
 // remaining: phần KH ngày còn lại chưa chạy của mã.
 //   kh_ngay_may: tổng KH ngày của máy (mọi mã) — xác định năng lực ca.
+//   so_ca_may: số ca làm việc của máy ngày đó (T134, KHSX tuần) — null = mặc định.
 //   da_chiem_ca: phần năng lực ca đã bị mã KHÁC của máy chiếm trong chính ca
 //                này (đổi mã giữa ca) — trừ ra khỏi năng lực.
 // phuongAnCa/ca: mặc định ca hiện tại (state) — truyền rõ khi tính cho MỘT CA
 // KHÁC (VD ca kế tiếp lúc Kết ca, xem computeCarryOverKhCaSuggestions_()).
 function buildKhsxSuggestion_(opt, remaining, phuongAnCa, ca){
   const pac = phuongAnCa || state.phuongAnCa;
-  let cap = nangLucCaTheoKhNgay_(opt.kh_ngay_may, pac);
+  const caNghi = caNghiTheoSoCa_(opt.so_ca_may, pac, ca || state.ca);
+  let cap = nangLucCaTheoKhNgay_(opt.kh_ngay_may, pac, opt.so_ca_may);
   if (cap != null) cap = Math.max(0, cap - (opt.da_chiem_ca || 0));
   else cap = nangLucCa_(opt.ma_sp, pac, ca || state.ca);
-  const khCa = cap != null ? Math.min(remaining, cap) : Math.round(remaining / 2);
+  const khCa = caNghi ? 0 : cap != null ? Math.min(remaining, cap) : Math.round(remaining / (opt.so_ca_may || 2));
   return {
     conflict: false, ma_sp: opt.ma_sp, ten_sp: opt.ten_sp, so_khuon: opt.so_khuon,
     kh_ngay: opt.kh_ngay, kh_tuan: opt.kh_tuan, kh_ca: Math.max(0, Math.round(khCa)),
+    so_ca_may: opt.so_ca_may, ca_nghi: caNghi,
   };
 }
 
@@ -1722,9 +1748,10 @@ async function computeCarryOverKhCaSuggestions_(rows, nextNgayStr, nextCaStr, ph
     const dayCols = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'];
     const maMays = [...new Set(rows.map(r => r.ma_may))];
 
-    const [khsxRes, nextDayRes] = await Promise.all([
+    const [khsxRes, nextDayRes, soCaMay] = await Promise.all([
       sb.from('duc_khsx_tuan_plan').select('ma_may,ma_sp,' + dayCols.join(',')).eq('tuan_bat_dau', mondayStr).in('ma_may', maMays),
       sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,tt_ca,kh_ca').eq('ngay', nextNgayStr).in('ma_may', maMays),
+      loadSoCaMay_(mondayStr, dayIdx, maMays),
     ]);
     if (khsxRes.error) throw khsxRes.error;
     if (nextDayRes.error) throw nextDayRes.error;
@@ -1744,10 +1771,15 @@ async function computeCarryOverKhCaSuggestions_(rows, nextNgayStr, nextCaStr, ph
     });
 
     rows.forEach(r => {
+      // T134: ca kế tiếp là ca nghỉ của máy theo số ca khai báo → không tự tiếp tục.
+      if (caNghiTheoSoCa_(soCaMay[r.ma_may], phuongAnCa, nextCaStr)) {
+        result[r.ma_may] = { kh_ca: 0, ca_nghi: true, so_ca_may: soCaMay[r.ma_may] };
+        return;
+      }
       const khNgay = khNgayByKey[r.ma_may + '|' + r.ma_sp];
       if (khNgay === undefined) return;   // không có KHSX tuần khớp máy+mã cho ngày đó — để caller fallback
       const remaining = Math.max(0, khNgay - daChiemChoTrongNgay_(nextDayByMachine[r.ma_may] || [], r.ma_sp));
-      result[r.ma_may] = buildKhsxSuggestion_({ ma_sp: r.ma_sp, kh_ngay_may: khNgayMay[r.ma_may] }, remaining, phuongAnCa, nextCaStr).kh_ca;
+      result[r.ma_may] = buildKhsxSuggestion_({ ma_sp: r.ma_sp, kh_ngay_may: khNgayMay[r.ma_may], so_ca_may: soCaMay[r.ma_may] }, remaining, phuongAnCa, nextCaStr);
     });
   } catch (e) {
     console.error('computeCarryOverKhCaSuggestions_ lỗi:', e);
@@ -1798,6 +1830,7 @@ async function loadWeeklyPlanSuggestions(){
     ]);
     if (khsxRes.error) throw khsxRes.error;
     if (todayRes.error) throw todayRes.error;
+    const soCaMay = await loadSoCaMay_(mondayStr, dayIdx, [...new Set((khsxRes.data || []).map(r => r.ma_may))]);
 
     const byMachine = {};
     (khsxRes.data || []).forEach(r => {
@@ -1824,7 +1857,7 @@ async function loadWeeklyPlanSuggestions(){
       const list = byMachine[m];
       const todayRows = todayByMachine[m] || [];
       const khNgayMay = list.reduce((s, o) => s + o.kh_ngay, 0);
-      list.forEach(o => { o.kh_ngay_may = khNgayMay; });
+      list.forEach(o => { o.kh_ngay_may = khNgayMay; o.so_ca_may = soCaMay[m]; });
 
       if (list.length === 1) {
         const opt = list[0];
@@ -2809,9 +2842,16 @@ function fillPlanFieldsFromKhsxSuggestion_(sug){
 
   const box = document.getElementById('mp-khsx-suggest');
   box.style.display = '';
+  if (sug.ca_nghi) {
+    box.style.background = 'var(--warn-bg)'; box.style.color = 'var(--warn-fg)';
+    box.innerHTML = '⏸ Theo KHSX tuần máy này ' + (sug.so_ca_may ? 'chỉ chạy <b>' + sug.so_ca_may + ' ca</b>' : '<b>nghỉ</b>')
+      + ' ngày này — ' + escapeHtml(state.ca) + ' là ca nghỉ nên KH ca = 0. Nếu máy chạy thêm ca, tự nhập KH ca.';
+    return;
+  }
   box.style.background = 'var(--run-bg)'; box.style.color = 'var(--run-fg)';
   box.innerHTML = '📋 Đã tự điền theo KHSX tuần: <b>' + escapeHtml(sug.ma_sp) + '</b> — KH ngày ' + fmtNum(sug.kh_ngay)
-    + ' → gợi ý ca này ≈ <b>' + fmtNum(sug.kh_ca) + '</b> (theo năng lực máy/phần KH ngày còn lại). Kiểm tra lại trước khi Lưu.';
+    + ' → gợi ý ca này ≈ <b>' + fmtNum(sug.kh_ca) + '</b> (theo năng lực máy' + (sug.so_ca_may ? ' chạy ' + sug.so_ca_may + ' ca' : '')
+    + '/phần KH ngày còn lại). Kiểm tra lại trước khi Lưu.';
 }
 
 // Người dùng bấm chọn mã chạy trước ở khung hỏi conflict (đầu ngày, chưa có
@@ -2872,11 +2912,14 @@ async function openKhsxBatchModal(){
       const khuonOf = o => o.so_khuon || pickDefaultMold(moldsDungDuocCuaSp(o.ma_sp), m, daChon);
       row.dataset.khuon = khuonOf(opts[0]);
       if (row.dataset.khuon && !opts[0].so_khuon) daChon.add(row.dataset.khuon);
-      const subText = o => (o.ten_sp || '') + (o.so_khuon ? ' · Khuôn ' + o.so_khuon
+      // T134: ca này là ca nghỉ của máy theo số ca khai báo → mặc định không nạp.
+      const caNghi = caNghiTheoSoCa_(opts[0].so_ca_may, state.phuongAnCa, state.ca);
+      const subText = o => (caNghi ? '⏸ Máy ' + (o.so_ca_may ? 'chạy ' + o.so_ca_may + ' ca' : 'nghỉ') + ' theo KHSX tuần — ca này nghỉ · ' : '') +
+        (o.ten_sp || '') + (o.so_khuon ? ' · Khuôn ' + o.so_khuon
           : khuonOf(o) ? ' · Khuôn ' + khuonOf(o) + ' (ưu tiên ' + moldUuTien(khuonOf(o)) + ')' : '') +
         (moldNgungSx(o.so_khuon) ? ' · ⛔ khuôn ' + moldNgungSx(o.so_khuon) + ' — không nạp được, đổi tình trạng ở Quản lý khuôn' : '');
       row.innerHTML =
-        '<input type="checkbox" class="kb-check" data-ma-may="' + escapeHtml(m) + '"' + (moldNgungSx(opts[0].so_khuon) ? '' : ' checked') + ' style="width:16px;height:16px;flex:none">'
+        '<input type="checkbox" class="kb-check" data-ma-may="' + escapeHtml(m) + '"' + (moldNgungSx(opts[0].so_khuon) || caNghi ? '' : ' checked') + ' style="width:16px;height:16px;flex:none">'
         + '<div style="flex:1;min-width:0">'
         + '<div style="font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         + escapeHtml(m) + ' — '
@@ -2926,7 +2969,7 @@ async function submitKhsxBatch(){
     const row = chk.closest('div');
     const chosen = sug.conflict ? sug.options[Number(row.querySelector('.kb-ma-sp-select').value)] : sug;
     const khCaInput = row.querySelector('.kb-kh-ca');
-    return { maMay, sug: chosen, soKhuon: chosen.so_khuon || row.dataset.khuon || '', khCa: Number(khCaInput.value) || Math.round((chosen.kh_ngay || 0) / 2) };
+    return { maMay, sug: chosen, soKhuon: chosen.so_khuon || row.dataset.khuon || '', khCa: Number(khCaInput.value) || Math.round((chosen.kh_ngay || 0) / (chosen.so_ca_may || 2)) };
   });
 
   // T127: khuôn còn vấn đề lần SX trước → xác nhận đã nắm thông tin trước khi nạp (bỏ qua máy bị Huỷ).
@@ -4318,21 +4361,26 @@ async function endShift(){
       // dòng KHSX khớp (ma_may+ma_sp+ngày) mới fallback về KH ca của ca vừa
       // xong (giữ hành vi cũ cho trường hợp không tra được KHSX).
       const suggested = khCaSuggestions[r.ma_may];
-      const khCaMoi = suggested !== undefined ? suggested : (r.kh_ca || 0);
-      const suggestedBadge = suggested !== undefined
+      const khCaMoi = suggested !== undefined ? suggested.kh_ca : (r.kh_ca || 0);
+      // T134: máy chỉ chạy N ca theo KHSX tuần, ca kế tiếp là ca nghỉ → mặc định
+      // KHÔNG tiếp tục (vẫn tick lại được nếu máy chạy thêm ca).
+      const caNghi = !!(suggested && suggested.ca_nghi) && !hasOpen;
+      const suggestedBadge = caNghi
+        ? '<span style="display:block;font-size:9px;color:var(--warn-fg)" title="Số ca làm việc khai báo ở KHSX tuần">⏸ máy ' + (suggested.so_ca_may ? 'chạy ' + suggested.so_ca_may + ' ca' : 'nghỉ') + ' — ca sau nghỉ</span>'
+        : suggested !== undefined
         ? '<span style="display:block;font-size:9px;color:var(--text-muted)">theo KHSX tuần</span>'
         : '<span style="display:block;font-size:9px;color:var(--text-muted)" title="Không có KHSX tuần khớp máy/mã cho ca kế tiếp — giữ tạm KH ca cũ, tự sửa nếu cần">⚠ giữ KH ca cũ</span>';
       const item = document.createElement('div');
       item.style.cssText = 'display:grid;grid-template-columns:24px 1fr 90px 120px;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px' +
         (hasOpen ? ';background:#FEF2F2' : '');
       item.innerHTML =
-        '<input type="checkbox" data-idx="' + idx + '" checked ' + (hasOpen ? 'disabled title="Máy có sự cố mở — không thể untick"' : '') + ' onchange="onCarryOverToggle(' + idx + ')">' +
+        '<input type="checkbox" data-idx="' + idx + '"' + (caNghi ? '' : ' checked') + ' ' + (hasOpen ? 'disabled title="Máy có sự cố mở — không thể untick"' : '') + ' onchange="onCarryOverToggle(' + idx + ')">' +
         '<div>' +
           '<div style="font-weight:600">' + escapeHtml(r.ma_may) + ' — <span style="font-family:\'JetBrains Mono\',monospace;font-size:11px">' + escapeHtml(r.ma_sp) + '</span>' + badgeOpen + extendBadge + '</div>' +
           '<div style="color:var(--text-muted);font-size:10px">KH ' + fmtNum(r.kh_ca) + ' · TT ' + fmtNum(r.tt_ca) + ' · ' + (r.kh_ca > 0 ? Math.round(r.tt_ca/r.kh_ca*100) : 0) + '%</div>' +
         '</div>' +
         '<div style="text-align:right;font-size:11px;color:var(--text-muted)">KH ca mới:' + suggestedBadge + '</div>' +
-        '<input type="number" data-idx="' + idx + '" min="0" value="' + khCaMoi + '" style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:4px;font-size:12px" class="es-kh-input">';
+        '<input type="number" data-idx="' + idx + '" min="0" value="' + khCaMoi + '"' + (caNghi ? ' disabled' : '') + ' style="padding:4px 8px;border:1px solid var(--border-strong);border-radius:4px;font-size:12px" class="es-kh-input">';
       list.appendChild(item);
     });
     state.endShiftMachines = sorted;
