@@ -1,16 +1,50 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Định mức kiểm tra QC</title>
-<style>
-*{box-sizing:border-box}body{font:15px Arial,sans-serif;background:#f4f6f9;color:#172338;margin:0}main{max-width:1250px;margin:auto;padding:24px 16px}h1{font-size:25px}h2{font-size:20px;margin-top:0}section{background:white;border:1px solid #dce2ea;border-radius:12px;padding:20px;margin:18px 0}.fields{display:flex;gap:16px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;gap:6px;margin:8px 0}input,select,button{font:inherit;padding:10px;border:1px solid #b9c4d2;border-radius:6px}input[type=number]{max-width:160px}button{cursor:pointer;background:#edf2f8;color:#172338}button.primary{background:#174a86;color:white}button:disabled{cursor:not-allowed;opacity:.5}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:10px;text-align:left;border-bottom:1px solid #e0e5ed}th{background:#f2f5f9;white-space:nowrap}td input{width:100%}.muted{color:#58677b;font-size:14px;line-height:1.5}.notice{padding:12px;background:#fff5d9;border:1px solid #ead18b;border-radius:8px;white-space:pre-wrap}.error{color:#a11b20}output{display:block;margin:12px 0;font-weight:bold;line-height:1.7}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:14px 0}.card{padding:14px;background:#eff4fa;border-radius:8px}.card b{display:block;font-size:21px;margin-top:8px}a{color:#174a86}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}details{margin:12px 0}summary{cursor:pointer}.busy{opacity:.7}
-.fields label{flex:1 1 200px;min-width:0}.fields select{max-width:100%;min-width:0}pre{white-space:pre-wrap;overflow-wrap:anywhere}
-</style></head><body><main>
-<h1>Định mức kiểm tra QC</h1><p class="muted">Định mức, kế hoạch và nhân lực QC · Thao tác kiểm QC, độc lập với routing sản xuất · Hiệu suất kế hoạch cố định <b>80%</b>.</p>
-<div id="backend" class="notice" role="status" aria-live="polite">Đang xác minh backend…</div><div class="actions"><button id="reload" type="button">Kiểm tra lại / tải dữ liệu</button><a href="oqc-daily.html">Nhập kết quả OQC hàng ngày →</a></div><p id="message" role="status" aria-live="polite"></p>
-<section><h2>Định mức theo model</h2><div class="fields"><label>Model trong danh mục<select id="standardModel"><option value="">— Chọn model —</option></select></label><label>Ngày hiệu lực<input id="effective" type="date"></label><label>Giờ làm việc/người (trước 80%)<input id="previewHours" type="number" min="0.01" max="24" step="any" placeholder="Nhập giờ"></label></div>
-<div class="table-wrap"><table><thead><tr><th>Bước kiểm tra QC</th><th>Giây/PCS</th><th></th></tr></thead><tbody id="steps"></tbody></table></div><div class="actions"><button id="addStep" type="button" data-write="standard">+ Thêm bước</button><button id="saveStandard" type="button" class="primary" data-write="standard">Lưu phiên bản định mức mới</button></div><output id="capacityPreview"></output><p class="muted">Tổng giây tự cộng. Capa/người = giờ × 3.600 × 80% ÷ giây/PCS, làm tròn xuống. Phiên bản đã lưu không sửa/xóa; thêm/xóa bước chỉ áp dụng cho bản đang chỉnh sửa.</p>
-<details><summary>Lịch sử phiên bản định mức</summary><div class="table-wrap"><table><thead><tr><th>Phiên bản</th><th>Hiệu lực</th><th>Bước kiểm</th><th>Giây/PCS</th><th>Người lưu</th><th>Thời điểm</th></tr></thead><tbody id="standardHistory"></tbody></table></div></details></section>
-<section><h2>Kế hoạch kiểm tra</h2><div class="fields"><label>Nguồn kế hoạch<select id="planSource"><option value="manual">Tự thêm kế hoạch</option><option value="machining">Nạp từ kế hoạch gia công</option><option value="oqc">Nạp từ kế hoạch OQC</option></select></label><button id="loadSource" type="button">Nạp danh sách nguồn của ngày</button><label>Dòng nguồn<select id="sourceRecord"><option value="">— Chọn dòng nguồn —</option></select></label></div><div class="fields"><label>Ngày kế hoạch / đối chiếu<input id="workDate" type="date"></label><label>Model<select id="planModel"><option value="">— Chọn model —</option></select></label><label>Số lượng dự kiến (PCS)<input id="planQty" type="number" min="1" step="1"></label><label>Giờ/người của ngày đó (trước 80%)<input id="planHours" type="number" min="0.01" max="24" step="any"></label></div>
-<label>Phiên bản định mức áp dụng cho bản đang chỉnh sửa<select id="planVersion"><option value="">Giữ bản đã lưu / bản hiệu lực nếu là kế hoạch mới</option></select></label><output id="planPreview"></output><div class="actions"><button id="suggestWeekly" type="button" hidden>Nạp nguồn OQC</button><button id="savePlan" type="button" class="primary" data-write="plan">Lưu kế hoạch model</button></div><p class="muted">Giờ/người áp dụng chung cho tất cả model trong ngày. Nạp đúng ngày/model/SL; kiểm tra và điều chỉnh trước khi lưu. Nạp lại cập nhật cùng dòng, không cộng SL. Số lượng liên kết với đúng dòng kế hoạch sản xuất OQC. Sửa kế hoạch đã lưu giữ nguyên phiên bản định mức ban đầu.</p><div class="table-wrap"><table><thead><tr><th>Model</th><th>SL kế hoạch</th><th>Phiên bản</th><th>Giây/PCS</th><th>Capa/người</th><th>Nhân lực quy đổi</th><th>Nguồn</th><th></th></tr></thead><tbody id="plans"></tbody></table></div><output id="totalStaff"></output></section>
-<section><h2>Nhân lực thực tế</h2><p class="muted">Nhập từng nhóm có cùng số giờ thực tế. Chỉ tính giờ dành cho kiểm 100% sau gia công; mỗi người/giờ chỉ ghi một lần. Giá trị gợi ý chưa phải thực tế được xác nhận.</p><div class="table-wrap"><table><thead><tr><th>Số người thực tế</th><th>Giờ thực tế/người</th><th>Nhóm / ghi chú</th><th></th></tr></thead><tbody id="laborGroups"></tbody></table></div><div class="actions"><button id="addLabor" data-write="actual" type="button">+ Thêm nhóm</button><button id="suggestLabor" type="button">Gợi ý từ kế hoạch (chưa xác nhận)</button><button id="saveLabor" data-write="actual" type="button" class="primary">Xác nhận nhân lực thực tế</button></div><p id="laborState" class="muted"></p></section>
-<section><h2>Đối chiếu kết quả thực tế</h2><div id="metrics" class="cards"></div><p id="scopeSummary" class="muted"></p><div class="table-wrap"><table><thead><tr><th>Model</th><th>Đã kiểm (OK + NG)</th><th>SL kế hoạch</th><th>Hoàn thành KH</th><th>Thời gian định mức thực hiện</th><th>Phiên bản dùng</th></tr></thead><tbody id="results"></tbody></table></div><p class="muted">Hoàn thành kế hoạch tính các model có kế hoạch. Hiệu suất thực tế tính toàn bộ kết quả đúng phạm vi trong ngày, kể cả model ngoài kế hoạch. Hiệu suất = thời gian định mức thực hiện ÷ thời gian nhân lực thực tế; mẫu số không nhân 80%. Mục tiêu: 80%. Dữ liệu cũ/chưa rõ phạm vi không tự gộp; thiếu phiên bản định mức hoặc nhân lực thực tế sẽ báo “Chưa đủ dữ liệu”.</p>
-<details><summary>Lịch sử điều chỉnh kế hoạch / nhân lực / phạm vi</summary><div id="audit"></div></details></section>
-</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script src="shared/supabase-client.js"></script><script src="shared/navbar.js"></script><script src="shared/oqc-capacity-math.js?v=T120"></script><script src="shared/oqc-capacity.js?v=T122"></script></body></html>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Định mức kiểm tra QC</title>
+    <!-- T140: trang cũ đã bỏ khỏi menu — CAPA/định mức chuyển vào OQC kiểm tra (nút CAPA). Giữ trang để link cũ không lỗi. -->
+    <meta http-equiv="refresh" content="0; url=oqc-daily.html?view=capa" />
+    <script>
+      location.replace("oqc-daily.html?view=capa");
+    </script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #eef1f5;
+        color: #0f172a;
+        font: 13px Inter, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      }
+      .box {
+        margin: 16px;
+        padding: 16px 20px;
+        background: #fff;
+        border: 1px solid #d9dfe5;
+        border-radius: 8px;
+        text-align: center;
+      }
+      a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        margin-top: 10px;
+        padding: 6px 14px;
+        border-radius: 6px;
+        background: #0f5fa5;
+        color: #fff;
+        font-weight: 600;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      Định mức kiểm tra QC đã chuyển vào <b>OQC kiểm tra › CAPA</b>.<br />
+      <a href="oqc-daily.html?view=capa">Mở CAPA</a>
+    </div>
+  </body>
+</html>

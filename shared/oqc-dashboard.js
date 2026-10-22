@@ -1,92 +1,1148 @@
 /* OQC dashboard: existing weekly OQC plan/catalog; per-inspection work and frozen CAPA. */
-const OqcDashboard=(()=>{
- 'use strict';const M=OqcDashboardMath,$=id=>document.getElementById(id),fmt=(n,d=2)=>n==null?'Chưa đủ dữ liệu':Number(n).toLocaleString('vi-VN',{maximumFractionDigits:d}),pct=n=>n==null?'Chưa đủ dữ liệu':fmt(n)+'%',staff=n=>n==null?'Chưa có CAPA':Number(n).toLocaleString('vi-VN',{minimumFractionDigits:1,maximumFractionDigits:1});
- const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Bangkok'}).format(new Date());
- const node=(tag,text)=>{const e=document.createElement(tag);if(text!=null)e.textContent=text;return e;};
- const style=node('style');style.textContent='.oqc-dialog{width:min(1200px,96vw);max-height:92vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:0;background:var(--bg-panel);color:var(--text)}.oqc-dialog::backdrop{background:#0f172a88}.oqc-dialog .panel{margin:0;border:0}.oqc-dashboard-note{padding:9px 12px;background:var(--warn-bg);border:1px solid var(--border);margin:8px 0;border-radius:6px;white-space:pre-wrap}.oqc-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.oqc-labor input{width:110px}.oqc-labor select{max-width:300px;width:100%}.oqc-photo-list{display:flex;gap:8px;flex-wrap:wrap}.oqc-photo-list img{width:110px;height:85px;object-fit:contain}.oqc-model-button{border:0;color:var(--accent);background:none;cursor:pointer;text-align:left;font-weight:600}.oqc-data-scroll,#modelSummary{overflow:auto}#modelSummary table{min-width:1000px}.oqc-dialog .head{position:sticky;top:0;background:var(--bg-panel);z-index:3}.oqc-capa-row input{width:100%}.oqc-dashboard-note.error{color:var(--alarm-fg)}@media(max-width:600px){.oqc-dashboard-panel .grid,.oqc-dialog .grid{grid-template-columns:minmax(0,1fr)}.oqc-dashboard-panel .grid>*{min-width:0}.oqc-dashboard-panel input,.oqc-dashboard-panel select{max-width:100%;box-sizing:border-box}.oqc-labor th,.oqc-labor td{padding:5px}.oqc-labor input{width:75px}}';document.head.append(style);
- let info=null,employees=[],versions=[],configs=[],snapshot=null,loadToken=0,saveBusy=false,capaBusy=false,editToken=0,editingWork=null,labor=[],images=[],files=[],request=null,capaSteps=[],modelCode='',planToken=0,historicalNg=null;
- const formPanel=$('form').closest('section'),formDialog=node('section');formDialog.id='oqcReportDialog';formDialog.className='oqc-workspace hidden';formDialog.append(formPanel);document.querySelector('main').append(formDialog);
- formPanel.querySelector('.head').textContent='Nhập báo cáo ngày';const closeForm=node('button','Dashboard OQC');closeForm.type='button';closeForm.className='btn secondary';closeForm.onclick=()=>showView('dashboard');formPanel.querySelector('.head').append(closeForm);
- const actions=$('oqcHeaderActions');actions.insertAdjacentHTML('beforeend','<button type="button" id="oqcNewReport" class="btn-ghost">Nhập báo cáo ngày</button><button type="button" id="oqcOpenCapa" class="btn-ghost">CAPA</button><a class="btn-ghost" href="khsx-tuan.html?cd=OQC">Kế hoạch tuần OQC</a>');
- const status=node('div');status.id='oqcDashboardStatus';status.className='oqc-dashboard-note';status.setAttribute('role','status');$('msg').after(status);
- $('period').closest('section').classList.add('oqc-dashboard-panel');
- const scopeField=node('div');scopeField.className='field';const scopeLabel=node('label','Phạm vi');scopeLabel.htmlFor='oqcDashboardScope';const scopeSelect=node('select');scopeSelect.id='oqcDashboardScope';for(const [value,label]of [...MesOqcScope.current.map(value=>[value,MesOqcScope.labels[value]]),['ALL','Tất cả kết quả'],['UNKNOWN','Chưa xác định (dữ liệu cũ)'],['LEGACY','Phạm vi cũ khác']])scopeSelect.add(new Option(label,value));scopeField.append(scopeLabel,scopeSelect);$('period').closest('.grid').append(scopeField);
- const demand=node('div');demand.id='oqcDailyStaff';$('modelSummary').after(demand);
- $('ng').readOnly=true;$('ng').type='number';$('ng').min='0';$('ng').step='1';$('ng').classList.add('ro');$('ng').closest('.field').querySelector('label').textContent='NG (tự tính)';$('total').closest('.field').querySelector('label').textContent='Số PCS đã kiểm (OK + NG)';$('defectTotal').closest('tr').firstElementChild.textContent='Tổng số lượng lỗi';formPanel.querySelector('.defect-table thead th:last-child').textContent='Số lượng (PCS)';
- const hourField=node('div');hourField.className='field';hourField.innerHTML='<label for="oqcInspectionHours">Số giờ kiểm tra</label><input id="oqcInspectionHours" type="text" inputmode="decimal" placeholder="Ví dụ: 1,5" autocomplete="off"><small>Giờ của người kiểm đang chọn dành riêng cho báo cáo/model này.</small>';$('inspectorCode').closest('.field').after(hourField);
- const guidance=node('p');guidance.id='oqcDefectGuide';guidance.textContent='Mỗi sản phẩm NG chỉ ghi một loại lỗi chính, tránh đếm trùng.';formPanel.querySelector('.defect-table').parentElement.before(guidance);
- const workSection=node('section');workSection.innerHTML='<p id="oqcFormMessage" role="alert"></p><details id="oqcAdditionalLabor"><summary>Giờ của người kiểm khác (nếu có)</summary><p>Chỉ thêm người khác và giờ dành riêng cho báo cáo này.</p><div class="oqc-data-scroll"><table class="oqc-labor"><thead><tr><th>Nhân viên trung tâm</th><th>Giờ thực tế</th><th></th></tr></thead><tbody id="oqcLaborRows"></tbody></table></div><button id="oqcAddLabor" type="button" class="btn secondary">+ Thêm người kiểm khác</button></details><p id="oqcLaborTotal"></p><h3>Ảnh lỗi</h3><input id="oqcReportPhotos" type="file" accept="image/*" multiple><p>Tối đa 10 ảnh; ảnh/lỗi và thông tin cũ vẫn được giữ khi sửa.</p><div id="oqcReportPhotoList" class="oqc-photo-list"></div><p id="oqcReportPolicy" class="oqc-dashboard-note"></p>';$('note').closest('.field').before(workSection);
- const capaDialog=node('section');capaDialog.id='oqcCapaDialog';capaDialog.className='panel oqc-workspace hidden';capaDialog.innerHTML='<div class="head">CAPA · kiểm 100% sau gia công<button type="button" id="oqcCapaClose" class="btn secondary">Dashboard OQC</button></div><div class="body"><div class="grid"><div class="field"><label>Model trung tâm</label><select id="oqcCapaModel"><option value="">— Chọn model —</option></select></div><div class="field"><label>Ngày áp dụng</label><input id="oqcCapaEffective" type="date"></div></div><div class="oqc-data-scroll"><table><thead><tr><th>Công đoạn kiểm (thao tác kiểm OQC)</th><th>Giây/PCS</th><th>Sắp xếp / xóa</th></tr></thead><tbody id="oqcCapaSteps"></tbody></table></div><div class="oqc-toolbar"><button type="button" id="oqcCapaAdd" class="btn secondary">+ Thêm công đoạn</button><button type="button" id="oqcCapaSave" class="btn primary">Lưu áp dụng phiên bản mới</button></div><p id="oqcCapaPreview" class="oqc-dashboard-note"></p><p id="oqcCapaMessage" role="status"></p><h3>Lịch sử phiên bản</h3><div id="oqcCapaHistory" class="oqc-data-scroll"></div></div>';document.querySelector('main').append(capaDialog);
- const dashboardPanel=$('period').closest('section');
- function showView(view){if(saveBusy)return;for(const [name,panel]of [['dashboard',dashboardPanel],['report',formDialog],['capa',capaDialog]])panel.classList.toggle('hidden',name!==view);$('oqcDashboardStatus').classList.toggle('hidden',view!=='dashboard');$('msg').classList.toggle('hidden',view!=='dashboard');for(const [id,name]of [['oqcDashboardHome','dashboard'],['oqcNewReport','report'],['oqcOpenCapa','capa']])$(id)?.classList.toggle('active',name===view);document.documentElement.dataset.oqcView=view;window.scrollTo({top:0,behavior:'instant'});}
- const home=node('button','Dashboard OQC');home.id='oqcDashboardHome';home.type='button';home.className='btn-ghost active';home.onclick=()=>showView('dashboard');actions.prepend(home);
- const modelDialog=node('dialog');modelDialog.id='oqcModelDialog';modelDialog.className='oqc-dialog';modelDialog.innerHTML='<div class="head"><span id="oqcModelTitle"></span><button id="oqcModelClose" type="button" class="btn secondary">Đóng</button></div><div class="body"><div id="oqcModelMetrics" class="cards"></div><div id="oqcModelDefects"></div><h3>Từng lần kiểm trong đúng khoảng ngày đang xem</h3><div id="oqcModelRecords" class="oqc-data-scroll"></div></div>';document.body.append(modelDialog);
- function table(target,headers,rows){target.replaceChildren();const t=node('table'),head=node('tr');for(const h of headers)head.append(node('th',h));t.append(head);for(const values of rows){const tr=node('tr');for(const v of values){const td=node('td');if(v instanceof Node)td.append(v);else td.textContent=v??'';tr.append(td);}t.append(tr);}target.append(t);}
- async function rpc(name,args={}){const r=await sb.rpc(name,args);if(r.error)throw r.error;return r.data;}
- async function read(table,filter,order='id'){const rows=[];for(let offset=0;;offset+=500){let q=sb.from(table).select('*').order(order,{ascending:true});if(order==='work_date')q=q.order('product_code',{ascending:true});if(filter)q=filter(q);const r=await q.range(offset,offset+499);if(r.error)throw r.error;rows.push(...r.data||[]);if(!r.data||r.data.length<500)return rows;}}
- async function byIds(table,ids){const all=[];for(let i=0;i<ids.length;i+=100)all.push(...await read(table,q=>q.in('inspection_id',ids.slice(i,i+100)),'inspection_id'));return all;}
- function monday(day){const d=new Date(day+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);}
- function effective(code,date){return versions.filter(v=>v.product_code===code&&v.effective_from<=date).sort((a,b)=>b.effective_from.localeCompare(a.effective_from)||Number(b.id)-Number(a.id))[0];}
- function configAt(date){return configs.filter(c=>c.effective_from<=date).sort((a,b)=>b.effective_from.localeCompare(a.effective_from)||Number(b.id)-Number(a.id))[0]||null;}
- function updateStatus(){const c=configAt(today());status.textContent='';status.hidden=true;status.title=c?fmt(c.planning_hours)+' giờ/người · Mục tiêu '+pct(Number(c.target_efficiency)*100):'Chưa lưu cấu hình giờ/hiệu suất';}
- function match(row,record){return row&&row.source_date===record.inspection_date&&row.source_product_code===record.product_code;}
- function policy(){const v=editingWork?.seconds_per_piece!=null?editingWork:editing?dataRows.find(r=>r.id===editing)?.context:effective($('code').value,$('date').value);$('oqcReportPolicy').title=editing?'Sửa trên báo cáo gốc. Giữ CAPA đã lưu nếu ngày/model/phạm vi không đổi; giờ công và ảnh chỉ thay đổi theo nội dung bạn nhập.':'Báo cáo mới: '+(v?.seconds_per_piece?'CAPA v'+(v.standard_version_id||v.id)+' · '+fmt(v.seconds_per_piece)+' giây/PCS.':'Chưa có CAPA; vẫn lưu kết quả và ghi rõ chưa đủ dữ liệu tính hiệu suất.');}
- function lock(){const enabled=!!info?.can_actual&&!saveBusy;$('save').disabled=!enabled;$('oqcNewReport').disabled=!info?.can_actual||saveBusy;$('oqcOpenCapa').disabled=saveBusy;$('oqcDashboardHome').disabled=saveBusy;$('oqcCapaSave').disabled=!info?.can_standard||capaBusy;$('oqcCapaAdd').disabled=!info?.can_standard||capaBusy;for(const id of ['oqcPlanningHours','oqcTargetEfficiency'])if($(id))$(id).disabled=!info?.can_standard||capaBusy;$('oqcAddLabor').disabled=!enabled;$('oqcReportPhotos').disabled=!enabled;closeForm.disabled=saveBusy;for(const e of $('form').querySelectorAll('input,textarea,select,button'))if(saveBusy)e.disabled=true;}
- const boot=(async()=>{try{await MesAuth.requireAuth();info=await rpc('oqc_dashboard_info');if(info?.version!=='oqc-dashboard-20261021')throw Error('Backend dashboard không đúng phiên bản');if(info.inspection_scope_version!==2)throw Error('Thiếu migration phạm vi và thứ tự lỗi OQC trên staging.');if(info.planning_config_version!==1)throw Error('Thiếu migration OQC cấu hình linh hoạt trên staging; chưa thể lưu.');if(info.report_input_version!==1)throw Error('Thiếu migration OQC report input trên staging; chưa thể lưu giờ và NG tự tính.');[employees,versions,configs]=await Promise.all([Qc02Data.employees(),read('oqc_work_standard_version'),read('oqc_planning_config_version')]);fillEmployees(employees);await MesOqcHistory.ready;for(const p of MesOqcHistory.products())$('oqcCapaModel').add(new Option(p.ma_sp+' — '+(p.ten_sp||''),p.ma_sp));updateStatus();await OqcWorkspace.loadOrder(info.can_standard);lock();return true;}catch(e){status.textContent='Chưa thể lưu dashboard OQC: cần backend OQC dashboard trên đúng staging và quyền tài khoản. '+(e.code||'')+' '+e.message;status.hidden=false;status.classList.add('error');info=null;lock();return false;}})();
- const baseRender=renderStats,baseLoad=loadStats;
- setPeriod=function(value){if(value==='custom')return;const end=today(),d=new Date(end+'T00:00:00Z');if(value==='week')d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));else if(value==='month')d.setUTCDate(1);$('from').value=d.toISOString().slice(0,10);$('to').value=end;loadStats();};
- for(const id of ['from','to'])$(id).addEventListener('change',()=>{$('period').value='custom';});
- renderStats=function(){baseRender();if(snapshot&&snapshot.records===dataRows)renderDashboard();};
- loadStats=async function(){const ticket=++loadToken;try{if(!await boot)return;if($('period').value==='day'){$('from').value=today();$('to').value=today();}if(!await baseLoad()||ticket!==loadToken)return;const raw=[...dataRows],ids=raw.map(r=>r.id),from=$('from').value,to=$('to').value;
-  const [contexts,works,weekly,bases,legacyPlans]=await Promise.all([byIds('oqc_inspection_context',ids),byIds('oqc_inspection_work',ids),read('cd_khsx_tuan_plan',q=>q.eq('cong_doan','OQC').gte('tuan_bat_dau',monday(from)).lte('tuan_bat_dau',monday(to))),read('oqc_dashboard_plan_basis',q=>q.gte('work_date',from).lte('work_date',to),'work_date'),read('oqc_capacity_plan',q=>q.gte('work_date',from).lte('work_date',to),'work_date')]);if(ticket!==loadToken)return;
-  const scope=$('oqcDashboardScope').value,annotated=raw.map(r=>{const c=contexts.find(c=>c.inspection_id===r.id),w=works.find(w=>w.inspection_id===r.id),context=match(c,r)?c:null,work=match(w,r)?w:null;return {...r,context,work,images:[...new Set([...(r.images||[]),...(work?.images||[])])]};});
-  const records=annotated.filter(r=>scope==='ALL'?true:scope==='UNKNOWN'?!r.context?.inspection_scope:scope==='LEGACY'?!!r.context?.inspection_scope&&!MesOqcScope.current.includes(r.context.inspection_scope):r.context?.inspection_scope===scope);
-  const filters=MesOqcHistory.filters(),products=MesOqcHistory.products(),plans=[];
-  for(const p of scope==='FULL_POST_MACHINING'?weekly:[]){if(filters.models.length&&!filters.models.includes(p.ma_sp))continue;const product=products.find(x=>x.ma_sp===p.ma_sp),customer=product?.ma_khach_hang?'code:'+product.ma_khach_hang:product?.ten_khach_hang?'name:'+product.ten_khach_hang:'';if(filters.customer&&filters.customer!==customer)continue;
-   for(let i=0;i<7;i++){const d=new Date(p.tuan_bat_dau+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+i);const date=d.toISOString().slice(0,10),qty=Number(p[['t2','t3','t4','t5','t6','t7','cn'][i]]||0);if(date<from||date>to||qty<=0)continue;const basis=bases.find(b=>b.work_date===date&&b.product_code===p.ma_sp)||legacyPlans.find(b=>b.work_date===date&&b.product_code===p.ma_sp&&(b.oqc_plan_id===p.id||(b.source_kind==='oqc'&&b.source_plan_id===p.id))),norm=basis||effective(p.ma_sp,date);plans.push({date,product_code:p.ma_sp,quantity:qty,source_id:p.id,seconds_per_piece:norm?.seconds_per_piece??null,standard_version_id:norm?.standard_version_id||norm?.id||null,preview:!basis,planning_hours:basis&&Object.hasOwn(basis,'planning_config_version_id')?basis.planning_hours:configAt(date)?.planning_hours??null,target_efficiency:basis&&Object.hasOwn(basis,'planning_config_version_id')?basis.target_efficiency:configAt(date)?.target_efficiency??null});}}
-  dataRows=records;snapshot={records,plans,from,to,outside:raw.length-records.length,scope};renderStats();if(modelDialog.open&&modelCode)renderModel(modelCode);
- }catch(e){if(ticket===loadToken){message('Không tải được dashboard đầy đủ: '+(e.code||'')+' '+e.message,true);snapshot=null;}}};
- function missing(reason){const e=node('span','—');e.title=reason;return e;}
- function value(n,reason,suffix=''){return n==null?missing(reason):fmt(n)+suffix;}
- function efficiency(s){const v=value(s.efficiency,s.missingHours?'Thiếu giờ công thực tế':s.missingCapa?'Chưa có CAPA đúng phạm vi đã lưu':'Chưa đủ dữ liệu tính hiệu suất','%');if(v instanceof Node)return v;const e=node('span',v);e.title=s.target==null?'Chưa có mục tiêu lưu':('Mục tiêu đã lưu: '+pct(s.target*100)+(s.efficiency>=s.target*100?' · Đạt':' · Chưa đạt'));return e;}
- function cards(target,s){target.replaceChildren();const values=[['Kế hoạch',s.planned?fmt(s.planned):missing('Chưa có kế hoạch đúng phạm vi/ngày/model')],['Đã kiểm',fmt(s.checked)],['% hoàn thành',value(s.completion,'Chưa có kế hoạch tương ứng hoặc kết quả khác phạm vi','%')],['OK',fmt(s.ok)],['NG',fmt(s.ng)],['Tỷ lệ NG',value(s.ngRate,'Chưa có sản lượng đã kiểm','%')],['Giờ công',value(s.hours,'Thiếu giờ công thực tế; đã ghi '+fmt(s.knownHours)+' giờ')],['Số người kiểm',s.people],['Hiệu suất',efficiency(s)]];for(const [label,val]of values){const c=node('div',label);c.className='card';const b=node('b');if(val instanceof Node)b.append(val);else b.textContent=val;c.append(b);target.append(c);}}
- function renderDashboard(){const s=M.summary(snapshot.records,snapshot.plans);cards($('cards'),s);const products=MesOqcHistory.products();const rows=M.group(snapshot.records,snapshot.plans).map(g=>{const b=node('button',g.code+' — '+(products.find(p=>p.ma_sp===g.code)?.ten_sp||''));b.type='button';b.className='oqc-model-button';b.onclick=()=>{modelCode=g.code;renderModel(g.code);modelDialog.showModal();};return [b,g.planned?fmt(g.planned):missing('Chưa có kế hoạch đúng phạm vi/ngày/model'),fmt(g.checked),value(g.completion,'Chưa có kế hoạch tương ứng','%'),fmt(g.ok),fmt(g.ng),value(g.hours,'Thiếu giờ công thực tế'),g.people,efficiency(g)];});table($('modelSummary'),['Mã/tên sản phẩm','Kế hoạch','Đã kiểm','% hoàn thành','OK','NG','Giờ công','Số người kiểm','Hiệu suất'],rows);$('modelSummary').title='Kế hoạch từ KH tuần OQC đã liên kết sau gia công; không gán sang Sơn/Gia Công ngoài. Giờ công cộng theo từng người/báo cáo; hiệu suất = giờ công chuẩn / giờ công thực tế × 100%.';
-  demand.replaceChildren();demand.hidden=true;OqcDefectCharts.render($('oqcDefectSummary'),snapshot.records,$('oqcTrendUnit').value,MesQcFields.defectName,{pcs:true});
- }
- function renderModel(code){if(!snapshot)return;const records=snapshot.records.filter(r=>r.product_code===code),plans=snapshot.plans.filter(p=>p.product_code===code);$('oqcModelTitle').textContent=code+' · '+MesQcFields.date(snapshot.from)+' – '+MesQcFields.date(snapshot.to);cards($('oqcModelMetrics'),M.summary(records,plans));OqcDefectCharts.render($('oqcModelDefects'),records,$('oqcTrendUnit').value,MesQcFields.defectName,{pcs:true});table($('oqcModelRecords'),['Ngày kiểm','Người kiểm','Đã kiểm','OK','NG','Giờ công','Thông tin / ảnh'],records.map(r=>{const b=node('button','Xem thông tin / ảnh');b.className='btn secondary';b.onclick=()=>showRecord(r.id);return [MesOqcRecord.date(r),r.inspector_name,Number(r.ok_qty)+Number(r.ng_qty),r.ok_qty,r.ng_qty,r.work?.labor?.length?fmt(r.work.labor.reduce((n,l)=>n+Number(l.hours),0)):'Chưa ghi nhận',b];}));}
- function showRecord(id){MesOqcRecord.detail(id);const row=dataRows.find(r=>r.id===id),section=node('section');if(!row)return;const h=node('h3','Giờ công và CAPA đã lưu');section.append(h);const box=node('div');section.append(box);table(box,['Thông tin','Giá trị'],[['CAPA',row.work?.standard_version_id?'v'+row.work.standard_version_id+' · '+fmt(row.work.seconds_per_piece)+' giây/PCS':row.context?.standard_version_id?'v'+row.context.standard_version_id:'Chưa có CAPA lịch sử'],['Giờ thực tế theo người',(row.work?.labor||[]).map(l=>l.employee_code+' — '+l.employee_name+': '+fmt(l.hours)+' giờ').join('; ')||'Chưa có dữ liệu'],['Hiệu suất thực tế',pct(M.summary([row],[]).efficiency)],['Chính sách lưu cùng báo cáo',M.planning(row.work)?fmt(row.work.planning_hours)+' giờ · mục tiêu '+pct(Number(row.work.target_efficiency)*100):'Chưa có cấu hình lịch sử']]);$('oqcRecordBody').append(section);}
- $('rows').addEventListener('click',e=>{if(e.target.closest('button,a,input,select'))return;const tr=e.target.closest('[data-record-id]');if(tr){e.stopImmediatePropagation();showRecord(Number(tr.dataset.recordId));}},true);
- $('rows').addEventListener('keydown',e=>{if(e.target.matches('[data-record-id]')&&['Enter',' '].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();showRecord(Number(e.target.dataset.recordId));}},true);
- loadPlan=async function(){const ticket=++planToken,code=$('code').value,date=$('date').value;if(!code||!date)return $('plan').value='';if($('inspectionScope').value!=='FULL_POST_MACHINING'){$('plan').title='Kế hoạch hiện có chưa phân loại cho phạm vi này; không dùng kế hoạch sau gia công thay thế.';return $('plan').value='—';}try{const col=['t2','t3','t4','t5','t6','t7','cn'][(new Date(date+'T00:00:00Z').getUTCDay()+6)%7],q=await sb.from('cd_khsx_tuan_plan').select(col).eq('tuan_bat_dau',monday(date)).eq('cong_doan','OQC').eq('ma_sp',code).maybeSingle();if(q.error)throw q.error;const rows=await read('oqc_daily_inspection',q=>q.eq('inspection_date',date).eq('product_code',code)),contexts=await byIds('oqc_inspection_context',rows.map(r=>r.id));if(ticket!==planToken)return;const checked=rows.filter(r=>contexts.some(c=>c.inspection_id===r.id&&match(c,r)&&c.inspection_scope==='FULL_POST_MACHINING')).reduce((n,r)=>n+Number(r.ok_qty)+Number(r.ng_qty),0),planned=Number(q.data?.[col]||0);$('plan').value=planned?fmt(planned)+' / '+fmt(checked)+' / '+fmt(Math.max(0,planned-checked)):'Ngoài kế hoạch / Đã kiểm '+fmt(checked);}catch(e){if(ticket===planToken)$('plan').value='Chưa đọc được KH: '+e.message;}};
- $('date').addEventListener('change',()=>loadPlan());$('inspectionScope').addEventListener('change',()=>loadPlan());
- function quantities(){return [...document.querySelectorAll('#defects .defect,#otherDefects [data-other="qty"]')].map(i=>({value:Number(i.value||0),valid:!i.validity.badInput&&Number.isInteger(Number(i.value||0))&&Number(i.value||0)>=0}));}
- function calcWork(){const values=quantities(),valid=values.every(q=>q.valid),sum=values.reduce((n,q)=>n+q.value,0),total=Number($('total').value)||0,ng=editing?(historicalNg??Number(dataRows.find(r=>r.id===editing)?.ng_qty||0)):valid?sum:null,ok=ng==null?null:total-ng;$('ng').value=ng??'';$('ok').value=ok!=null&&ok>=0?ok:'';$('okPct').value=total>0&&ok!=null&&ok>=0?pct(ok/total*100):'—';$('ngPct').value=total>0&&ng!=null?pct(ng/total*100):'—';$('defectTotal').textContent=valid?fmt(sum):'Số lượng không hợp lệ';$('oqcDefectGuide').textContent=editing?'ⓘ Giữ nguyên NG lịch sử':'ⓘ Mỗi PCS NG ghi một lỗi chính';$('oqcDefectGuide').title=editing?'Báo cáo đã lưu giữ nguyên NG; không tính lại theo số lượng lỗi.':'Mỗi sản phẩm NG chỉ ghi một loại lỗi chính, tránh đếm trùng.';}
- calc=calcWork;$('total').oninput=calcWork;
- function parseHours(value){const raw=String(value??'').trim();if(!raw)return null;if(!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(raw))throw Error('Số giờ kiểm tra phải là số dương, có thể nhập thập phân như 1,5.');const n=Number(raw.replace(',','.'));if(!Number.isFinite(n)||n<=0||n>24)throw Error('Số giờ kiểm tra phải lớn hơn 0 và không vượt 24 giờ.');return n;}
- function reportLabor(){const h=parseHours($('oqcInspectionHours').value),all=labor.map(l=>({...l,hours:parseHours(l.hours)}));if(h!=null)all.unshift({employee_code:$('inspectorCode').value,hours:h});return all;}
- function renderLabor(){$('oqcAdditionalLabor').open=labor.length>0;const body=$('oqcLaborRows');body.replaceChildren();labor.forEach((r,i)=>{const tr=node('tr'),td=node('td'),select=node('select');select.setAttribute('aria-label','Người kiểm '+(i+1));select.add(new Option('— Chọn nhân viên —',''));for(const p of employees)select.add(new Option(p.code+' — '+p.name,p.code));if(r.employee_code&&![...select.options].some(o=>o.value===r.employee_code))select.add(new Option(r.employee_code+' — '+(r.employee_name||'nhân viên đã lưu'),r.employee_code));select.value=r.employee_code||'';select.onchange=()=>{r.employee_code=select.value;};td.append(select);tr.append(td);const hours=node('input');hours.type='number';hours.min='.001';hours.max='24';hours.step='any';hours.value=r.hours??'';hours.setAttribute('aria-label','Giờ thực tế '+(i+1));hours.oninput=()=>{r.hours=hours.value;laborTotal();};const ht=node('td');ht.append(hours);tr.append(ht);const b=node('button','Xóa');b.type='button';b.className='btn secondary';b.onclick=()=>{labor.splice(i,1);renderLabor();};const bt=node('td');bt.append(b);tr.append(bt);body.append(tr);});laborTotal();}
- function laborTotal(){try{const all=reportLabor();$('oqcLaborTotal').textContent=all.length?'Giờ công đã nhập: '+fmt(all.reduce((n,l)=>n+(l.hours||0),0))+' giờ-người.':'Chưa có giờ kiểm tra — chưa đủ dữ liệu tính hiệu suất.';}catch(e){$('oqcLaborTotal').textContent=e.message;}}
- $('oqcInspectionHours').oninput=laborTotal;$('inspectorCode').addEventListener('change',laborTotal);
- function renderPhotos(){const box=$('oqcReportPhotoList');box.replaceChildren();for(const url of images){const item=node('div'),img=node('img');img.src=url;img.alt='Ảnh lỗi OQC';img.onclick=()=>Qc02View.photo(url,images);const b=node('button','Bỏ ảnh khỏi báo cáo');b.type='button';b.className='btn secondary';b.disabled=saveBusy;b.onclick=()=>{images=images.filter(x=>x!==url);renderPhotos();};item.append(img,b);box.append(item);}for(const f of files){const item=node('div'),img=node('img'),reader=new FileReader();img.alt=f.name;img.title=f.name;reader.onload=()=>{if(item.isConnected&&files.includes(f)){img.src=reader.result;img.onclick=()=>Qc02View.photo(reader.result,[reader.result]);}};reader.readAsDataURL(f);const remove=node('button','Bỏ ảnh');remove.type='button';remove.className='btn secondary';remove.disabled=saveBusy;remove.onclick=()=>{files=files.filter(x=>x!==f);renderPhotos();};item.append(img,remove);box.append(item);}}
- const oldReset=resetForm;resetForm=function(){++editToken;oldReset();editingWork=null;historicalNg=null;labor=[];images=[];files=[];request=null;$('oqcInspectionHours').value='';$('oqcFormMessage').textContent='';$('ng').value='0';$('date').value=today();$('inspectionScope').value='FULL_POST_MACHINING';$('oqcReportPhotos').value='';renderLabor();renderPhotos();calcWork();policy();};
- const oldEdit=editRow;editRow=function(id){if(saveBusy)return;oldEdit(id);const r=dataRows.find(r=>r.id===id);if(!r)return;const ticket=++editToken;editingWork=r.work;historicalNg=Number(r.ng_qty);const primary=(r.work?.labor||[]).find(l=>String(l.employee_code).toLowerCase()===String(r.inspector_code).toLowerCase());$('oqcInspectionHours').value=primary?.hours??'';labor=(r.work?.labor||[]).filter(l=>String(l.employee_code).toLowerCase()!==String(r.inspector_code).toLowerCase()).map(l=>({...l}));images=[...new Set(r.work?.images||r.images||[])];files=[];request=null;$('oqcReportPhotos').value='';MesOqcScope.selectValue(r.context?.inspection_scope);$('inspectionScope').disabled=!info?.can_actual||!r.context||!MesOqcScope.current.includes(r.context.inspection_scope); $('ng').value=r.ng_qty;renderLabor();renderPhotos();calcWork();policy();showView('report');Promise.resolve().then(()=>{if(ticket===editToken){$('ng').value=r.ng_qty;calcWork();}});};
- $('oqcNewReport').onclick=()=>{if(!info?.can_actual)return;resetForm();showView('report');};$('oqcAddLabor').onclick=()=>{labor.push({employee_code:'',hours:''});renderLabor();};$('oqcReportPhotos').onchange=()=>{const chosen=[...$('oqcReportPhotos').files];if(chosen.some(f=>!f.type.startsWith('image/'))||images.length+chosen.length>10){message('Chỉ chọn ảnh, tối đa 10 ảnh cho một báo cáo.',true);$('oqcReportPhotos').value='';return;}files=chosen;renderPhotos();};$('code').addEventListener('change',policy);$('date').addEventListener('change',policy);
- $('form').onsubmit=async e=>{e.preventDefault();if(saveBusy||!info?.can_actual)return;saveBusy=true;const states=[...$('form').querySelectorAll('input,select,textarea,button')].map(el=>[el,el.disabled]);lock();try{
-  calcWork();const total=Number($('total').value),ng=Number($('ng').value);if(!quantities().every(q=>q.valid))throw Error('Số lượng từng lỗi phải là số nguyên, không âm.');if(!Number.isInteger(total)||total<=0||!Number.isInteger(ng)||ng<0||ng>total)throw Error('Số đã kiểm phải là số nguyên dương; tổng NG không được lớn hơn số đã kiểm.');const defects=defectsPayload();if(defects.some(d=>!Number.isInteger(Number(d.qty))||Number(d.qty)<0||Number(d.qty)>ng))throw Error('Số lượng từng lỗi phải nguyên, không âm và không vượt NG.');const allLabor=reportLabor();
-  const codes=new Set();for(const l of allLabor){if((!employees.some(p=>p.code===l.employee_code)&&!editingWork?.labor?.some(p=>p.employee_code===l.employee_code))||!M.positive(l.hours)||Number(l.hours)>24||codes.has(l.employee_code.toLowerCase()))throw Error('Chọn nhân viên trung tâm, nhập giờ riêng cho model; mỗi người chỉ một dòng.');codes.add(l.employee_code.toLowerCase());}if(allLabor.length&&!codes.has($('inspectorCode').value.toLowerCase()))throw Error('Bổ sung số giờ kiểm tra cho người kiểm đang chọn.');
-  for(const file of [...files]){const key='oqc-inspections/'+(request?.id||crypto.randomUUID())+'/'+crypto.randomUUID();const r=await sb.storage.from('ipqc-evidence').upload(key,file,{contentType:file.type,upsert:false});if(r.error)throw r.error;images.push(sb.storage.from('ipqc-evidence').getPublicUrl(key).data.publicUrl);files=files.filter(f=>f!==file);}files=[];$('oqcReportPhotos').value='';renderPhotos();
-  const original=editing&&dataRows.find(r=>r.id===editing),payload={inspection_date:$('date').value,shift:$('shift').value,product_code:$('code').value,inspector_code:$('inspectorCode').value,total_qty:total,ng_qty:ng,defects,note:$('note').value,lot_no:$('inspectionLot').value.trim()||null,task_no:$('inspectionTask').value.trim()||null,...MesOqcHistory.customerPayload($('code').value,original),scope:$('inspectionScope').value||null,inspection_hours:parseHours($('oqcInspectionHours').value),labor:allLabor.map(l=>({employee_code:l.employee_code,hours:Number(l.hours)})),images,expected_updated_at:original?.updated_at||null};
-  const signature=JSON.stringify(payload);if(request&&request.signature!==signature){const old=await sb.from('oqc_dashboard_write_request').select('inspection_id').eq('request_id',request.id).maybeSingle();if(old.error)throw Error('Chưa xác minh được lần gửi trước; giữ nguyên bản nháp và thử lại. '+old.error.message);if(old.data){const saved=await sb.from('oqc_daily_inspection').select('*').eq('id',old.data.inspection_id).maybeSingle();if(saved.error||!saved.data)throw Error('Chưa đọc được báo cáo đã lưu');editing=saved.data.id;payload.expected_updated_at=saved.data.updated_at;}request=null;}
-  if(!request)request={id:crypto.randomUUID(),signature:JSON.stringify(payload)};const id=await rpc('oqc_save_daily_report',{p_id:editing,p_data:{...payload,request_id:request.id}});if(!id)throw Error('Máy chủ chưa xác nhận đã lưu báo cáo');resetForm();saveBusy=false;showView('dashboard');saveBusy=true;await loadStats();message('Đã lưu báo cáo OQC #'+id+' và phân bổ giờ công; dashboard đã cập nhật.');
- }catch(error){$('oqcFormMessage').textContent=(error.code?error.code+' — ':'')+error.message;message($('oqcFormMessage').textContent,true);}finally{saveBusy=false;for(const [el,disabled]of states)el.disabled=disabled;if(!editing)$('inspectionScope').disabled=!info?.can_actual;lock();}};
- function capaConfig(){return {planning_hours:$('oqcPlanningHours').value.replace(',','.'),target_efficiency:Number($('oqcTargetEfficiency').value.replace(',','.'))/100};}
- function capaPreview(){const c=M.capa(capaSteps,capaConfig());$('oqcCapaPreview').textContent=c.error||c.configError||'';for(const [id,value]of [['oqcSeconds',c.seconds],['oqcHourly',c.hourly],['oqcDaily',c.daily]])$(id).textContent=value==null?'Chưa đủ dữ liệu':fmt(value,id==='oqcSeconds'?6:2);}
- function renderCapaSteps(){const body=$('oqcCapaSteps');body.replaceChildren();capaSteps.forEach((s,i)=>{const tr=node('tr');tr.className='oqc-capa-row';for(const key of ['name','seconds']){const input=node('input');input.type=key==='seconds'?'number':'text';if(key==='seconds'){input.min='0';input.step='any';}input.value=s[key]??'';input.disabled=!info?.can_standard||capaBusy;input.setAttribute('aria-label',(key==='name'?'Công đoạn ':'Giây/PCS ')+(i+1));input.oninput=()=>{s[key]=input.value;capaPreview();};const td=node('td');td.append(input);tr.append(td);}const td=node('td');for(const [title,delta]of [['↑',-1],['↓',1],['Xóa',0]]){const b=node('button',title);b.type='button';b.className='btn secondary';b.disabled=!info?.can_standard||capaBusy||(delta!==0&&(i+delta<0||i+delta>=capaSteps.length));b.onclick=()=>{if(delta===0)capaSteps.splice(i,1);else [capaSteps[i],capaSteps[i+delta]]=[capaSteps[i+delta],capaSteps[i]];renderCapaSteps();};td.append(b);}tr.append(td);body.append(tr);});capaPreview();lock();}
- function loadCapa(){const code=$('oqcCapaModel').value,v=effective(code,$('oqcCapaEffective').value),c=configAt($('oqcCapaEffective').value);$('oqcPlanningHours').value=c?.planning_hours??'';$('oqcTargetEfficiency').value=c?Number((Number(c.target_efficiency)*100).toFixed(8)):'';capaSteps=v?v.steps.map(s=>({...s})):[{name:'',seconds:''}];renderCapaSteps();table($('oqcConfigHistory'),['Cấu hình chung','Ngày áp dụng','Giờ/người','Mục tiêu','Người cập nhật','Thời gian'],[...configs].sort((a,b)=>Number(b.id)-Number(a.id)).map(c=>['v'+c.id,c.effective_from,c.planning_hours,pct(Number(c.target_efficiency)*100),c.created_by_name,MesQcFields.display(c.created_at)]));table($('oqcCapaHistory'),['Phiên bản','Áp dụng','Công đoạn theo thứ tự','Giây/PCS','Người cập nhật','Thời gian'],versions.filter(v=>v.product_code===code).sort((a,b)=>Number(b.id)-Number(a.id)).map(v=>['v'+v.id,v.effective_from,v.steps.map(s=>s.name+': '+s.seconds).join(' → '),fmt(v.seconds_per_piece,6),v.created_by_name,MesQcFields.display(v.created_at)]));}
- $('oqcOpenCapa').onclick=async()=>{await boot;try{[versions,configs]=await Promise.all([read('oqc_work_standard_version'),read('oqc_planning_config_version')]);loadCapa();showView('capa');}catch(e){message(e.message,true);}};$('oqcCapaEffective').value=today();$('oqcCapaModel').onchange=loadCapa;$('oqcCapaEffective').onchange=loadCapa;$('oqcCapaAdd').onclick=()=>{capaSteps.push({name:'',seconds:''});renderCapaSteps();};$('oqcCapaSave').onclick=async()=>{if(capaBusy||!info?.can_standard)return;const c=M.capa(capaSteps,capaConfig());if(c.error||c.configError){$('oqcCapaMessage').textContent=c.error||'Chưa đủ dữ liệu: giờ > 0, ≤ 24; hiệu suất > 0, ≤ 100%.';return;}capaBusy=true;renderCapaSteps();try{await rpc('oqc_save_capa_config',{p_product:$('oqcCapaModel').value,p_effective:$('oqcCapaEffective').value,p_steps:capaSteps,p_hours:capaConfig().planning_hours,p_target:capaConfig().target_efficiency});[versions,configs]=await Promise.all([read('oqc_work_standard_version'),read('oqc_planning_config_version')]);updateStatus();loadCapa();await loadStats();$('oqcCapaMessage').textContent='Đã lưu phiên bản CAPA mới. Báo cáo đã lưu giữ nguyên giây chuẩn và giờ công lịch sử.';}catch(e){$('oqcCapaMessage').textContent=(e.code||'')+' '+e.message;}finally{capaBusy=false;renderCapaSteps();}};
- $('oqcCapaClose').onclick=()=>showView('dashboard');$('oqcModelClose').onclick=()=>modelDialog.close();$('oqcDashboardScope').onchange=()=>loadStats();
- OqcWorkspace.mount({formPanel,formDialog,capaDialog,showView});$('oqcPlanningHours').oninput=capaPreview;$('oqcTargetEfficiency').oninput=capaPreview;
- $('inspectorCode').addEventListener('focus',async()=>{try{employees=await Qc02Data.employees();fillEmployees(employees);}catch(e){$('oqcFormMessage').textContent=e.message;}});$('code').addEventListener('focus',async()=>{if(!employees.length&&await boot){fillEmployees(employees);renderLabor();}});lock();
- boot.then(ok=>{if(ok)loadStats();});
- return {ready:boot,refresh:()=>loadStats(),showRecord,getSnapshot:()=>snapshot};
+const OqcDashboard = (() => {
+  "use strict";
+  const M = OqcDashboardMath,
+    $ = (id) => document.getElementById(id),
+    fmt = (n, d = 2) =>
+      n == null ? "Chưa đủ dữ liệu" : Number(n).toLocaleString("vi-VN", { maximumFractionDigits: d }),
+    pct = (n) => (n == null ? "Chưa đủ dữ liệu" : fmt(n) + "%"),
+    staff = (n) =>
+      n == null
+        ? "Chưa có CAPA"
+        : Number(n).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Bangkok" }).format(new Date());
+  const node = (tag, text) => {
+    const e = document.createElement(tag);
+    if (text != null) e.textContent = text;
+    return e;
+  };
+  const style = node("style");
+  style.textContent =
+    ".oqc-dialog{width:min(1200px,96vw);max-height:92vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:0;background:var(--bg-panel);color:var(--text)}.oqc-dialog::backdrop{background:#0f172a88}.oqc-dialog .panel{margin:0;border:0}.oqc-dashboard-note{padding:9px 12px;background:var(--warn-bg);border:1px solid var(--border);margin:8px 0;border-radius:6px;white-space:pre-wrap}.oqc-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.oqc-labor input{width:110px}.oqc-labor select{max-width:300px;width:100%}.oqc-photo-list{display:flex;gap:8px;flex-wrap:wrap}.oqc-photo-list img{width:110px;height:85px;object-fit:contain}.oqc-model-button{border:0;color:var(--accent);background:none;cursor:pointer;text-align:left;font-weight:600}.oqc-data-scroll,#modelSummary{overflow:auto}#modelSummary table{min-width:1000px}.oqc-dialog .head{position:sticky;top:0;background:var(--bg-panel);z-index:3}.oqc-capa-row input{width:100%}.oqc-dashboard-note.error{color:var(--alarm-fg)}@media(max-width:600px){.oqc-dashboard-panel .grid,.oqc-dialog .grid{grid-template-columns:minmax(0,1fr)}.oqc-dashboard-panel .grid>*{min-width:0}.oqc-dashboard-panel input,.oqc-dashboard-panel select{max-width:100%;box-sizing:border-box}.oqc-labor th,.oqc-labor td{padding:5px}.oqc-labor input{width:75px}}";
+  document.head.append(style);
+  let info = null,
+    employees = [],
+    versions = [],
+    configs = [],
+    snapshot = null,
+    loadToken = 0,
+    saveBusy = false,
+    capaBusy = false,
+    editToken = 0,
+    editingWork = null,
+    labor = [],
+    images = [],
+    files = [],
+    request = null,
+    capaSteps = [],
+    modelCode = "",
+    planToken = 0,
+    historicalNg = null;
+  const formPanel = $("form").closest("section"),
+    formDialog = node("section");
+  formDialog.id = "oqcReportDialog";
+  formDialog.className = "oqc-workspace hidden";
+  formDialog.append(formPanel);
+  document.querySelector("main").append(formDialog);
+  formPanel.querySelector(".head").textContent = "Nhập báo cáo ngày";
+  const closeForm = node("button", "Dashboard OQC");
+  closeForm.type = "button";
+  closeForm.className = "btn secondary";
+  closeForm.onclick = () => showView("dashboard");
+  formPanel.querySelector(".head").append(closeForm);
+  const actions = $("oqcHeaderActions");
+  actions.insertAdjacentHTML(
+    "beforeend",
+    '<button type="button" id="oqcNewReport" class="btn-ghost">Nhập báo cáo ngày</button><button type="button" id="oqcOpenCapa" class="btn-ghost">CAPA</button><a class="btn-ghost" href="khsx-tuan.html?cd=OQC">Kế hoạch tuần OQC</a>',
+  );
+  const status = node("div");
+  status.id = "oqcDashboardStatus";
+  status.className = "oqc-dashboard-note";
+  status.setAttribute("role", "status");
+  $("msg").after(status);
+  $("period").closest("section").classList.add("oqc-dashboard-panel");
+  const scopeField = node("div");
+  scopeField.className = "field";
+  const scopeLabel = node("label", "Phạm vi");
+  scopeLabel.htmlFor = "oqcDashboardScope";
+  const scopeSelect = node("select");
+  scopeSelect.id = "oqcDashboardScope";
+  for (const [value, label] of [
+    ...MesOqcScope.current.map((value) => [value, MesOqcScope.labels[value]]),
+    ["ALL", "Tất cả kết quả"],
+    ["UNKNOWN", "Chưa xác định (dữ liệu cũ)"],
+    ["LEGACY", "Phạm vi cũ khác"],
+  ])
+    scopeSelect.add(new Option(label, value));
+  scopeField.append(scopeLabel, scopeSelect);
+  // T140: bộ lọc Thống kê OQC dồn 1 hàng (tự xuống dòng khi hẹp); Phạm vi đứng trước nút Xem/Xuất Excel.
+  const filterBar = $("period").closest(".grid"),
+    filterButtons = filterBar.querySelector("button.primary")?.parentElement;
+  filterBar.classList.add("oqc-filterbar");
+  for (const [id, cls] of [
+    ["period", "f-period"],
+    ["from", "f-date"],
+    ["to", "f-date"],
+    ["filterCustomer", "f-customer"],
+    ["modelSearch", "f-model"],
+    ["inspectorSearch", "f-inspector"],
+    ["filterShift", "f-shift"],
+  ])
+    $(id).closest(".field").classList.add(cls);
+  scopeField.classList.add("f-scope");
+  if (filterButtons) {
+    filterButtons.className = "oqc-filter-actions";
+    filterBar.insertBefore(scopeField, filterButtons);
+  } else filterBar.append(scopeField);
+  const clearModels = $("clearModels");
+  clearModels.className = "oqc-clear-models";
+  clearModels.textContent = "×";
+  clearModels.title = "Bỏ chọn tất cả model";
+  clearModels.setAttribute("aria-label", "Bỏ chọn tất cả model");
+  $("modelSearch").after(clearModels);
+  clearModels.hidden = !MesOqcHistory.selectedModels().length;
+  const demand = node("div");
+  demand.id = "oqcDailyStaff";
+  $("modelSummary").after(demand);
+  $("ng").readOnly = true;
+  $("ng").type = "number";
+  $("ng").min = "0";
+  $("ng").step = "1";
+  $("ng").classList.add("ro");
+  $("ng").closest(".field").querySelector("label").textContent = "NG (tự tính)";
+  $("total").closest(".field").querySelector("label").textContent = "Số PCS đã kiểm (OK + NG)";
+  $("defectTotal").closest("tr").firstElementChild.textContent = "Tổng số lượng lỗi";
+  formPanel.querySelector(".defect-table thead th:last-child").textContent = "Số lượng (PCS)";
+  const hourField = node("div");
+  hourField.className = "field";
+  hourField.innerHTML =
+    '<label for="oqcInspectionHours">Số giờ kiểm tra</label><input id="oqcInspectionHours" type="text" inputmode="decimal" placeholder="Ví dụ: 1,5" autocomplete="off"><small>Giờ của người kiểm đang chọn dành riêng cho báo cáo/model này.</small>';
+  $("inspectorCode").closest(".field").after(hourField);
+  const guidance = node("p");
+  guidance.id = "oqcDefectGuide";
+  guidance.textContent = "Mỗi sản phẩm NG chỉ ghi một loại lỗi chính, tránh đếm trùng.";
+  formPanel.querySelector(".defect-table").parentElement.before(guidance);
+  const workSection = node("section");
+  workSection.innerHTML =
+    '<p id="oqcFormMessage" role="alert"></p><details id="oqcAdditionalLabor"><summary>Giờ của người kiểm khác (nếu có)</summary><p>Chỉ thêm người khác và giờ dành riêng cho báo cáo này.</p><div class="oqc-data-scroll"><table class="oqc-labor"><thead><tr><th>Nhân viên trung tâm</th><th>Giờ thực tế</th><th></th></tr></thead><tbody id="oqcLaborRows"></tbody></table></div><button id="oqcAddLabor" type="button" class="btn secondary">+ Thêm người kiểm khác</button></details><p id="oqcLaborTotal"></p><h3>Ảnh lỗi</h3><input id="oqcReportPhotos" type="file" accept="image/*" multiple><p>Tối đa 10 ảnh; ảnh/lỗi và thông tin cũ vẫn được giữ khi sửa.</p><div id="oqcReportPhotoList" class="oqc-photo-list"></div><p id="oqcReportPolicy" class="oqc-dashboard-note"></p>';
+  $("note").closest(".field").before(workSection);
+  const capaDialog = node("section");
+  capaDialog.id = "oqcCapaDialog";
+  capaDialog.className = "panel oqc-workspace hidden";
+  capaDialog.innerHTML =
+    '<div class="head">CAPA · kiểm 100% sau gia công<button type="button" id="oqcCapaClose" class="btn secondary">Dashboard OQC</button></div><div class="body"><div class="grid"><div class="field"><label>Model trung tâm</label><select id="oqcCapaModel"><option value="">— Chọn model —</option></select></div><div class="field"><label>Ngày áp dụng</label><input id="oqcCapaEffective" type="date"></div></div><div class="oqc-data-scroll"><table><thead><tr><th>Công đoạn kiểm (thao tác kiểm OQC)</th><th>Giây/PCS</th><th>Sắp xếp / xóa</th></tr></thead><tbody id="oqcCapaSteps"></tbody></table></div><div class="oqc-toolbar"><button type="button" id="oqcCapaAdd" class="btn secondary">+ Thêm công đoạn</button><button type="button" id="oqcCapaSave" class="btn primary">Lưu áp dụng phiên bản mới</button></div><p id="oqcCapaPreview" class="oqc-dashboard-note"></p><p id="oqcCapaMessage" role="status"></p><h3>Lịch sử phiên bản</h3><div id="oqcCapaHistory" class="oqc-data-scroll"></div></div>';
+  document.querySelector("main").append(capaDialog);
+  const dashboardPanel = $("period").closest("section");
+  function showView(view) {
+    if (saveBusy) return;
+    for (const [name, panel] of [
+      ["dashboard", dashboardPanel],
+      ["report", formDialog],
+      ["capa", capaDialog],
+    ])
+      panel.classList.toggle("hidden", name !== view);
+    $("oqcDashboardStatus").classList.toggle("hidden", view !== "dashboard");
+    $("msg").classList.toggle("hidden", view !== "dashboard");
+    for (const [id, name] of [
+      ["oqcDashboardHome", "dashboard"],
+      ["oqcNewReport", "report"],
+      ["oqcOpenCapa", "capa"],
+    ])
+      $(id)?.classList.toggle("active", name === view);
+    document.documentElement.dataset.oqcView = view;
+    try {
+      const u = new URL(location.href);
+      if (view === "dashboard") u.searchParams.delete("view");
+      else u.searchParams.set("view", view);
+      history.replaceState(history.state, "", u);
+    } catch (_) {}
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  const home = node("button", "Dashboard OQC");
+  home.id = "oqcDashboardHome";
+  home.type = "button";
+  home.className = "btn-ghost active";
+  home.onclick = () => showView("dashboard");
+  actions.prepend(home);
+  const modelDialog = node("dialog");
+  modelDialog.id = "oqcModelDialog";
+  modelDialog.className = "oqc-dialog";
+  modelDialog.innerHTML =
+    '<div class="head"><span id="oqcModelTitle"></span><button id="oqcModelClose" type="button" class="btn secondary">Đóng</button></div><div class="body"><div id="oqcModelMetrics" class="cards"></div><div id="oqcModelDefects"></div><h3>Từng lần kiểm trong đúng khoảng ngày đang xem</h3><div id="oqcModelRecords" class="oqc-data-scroll"></div></div>';
+  document.body.append(modelDialog);
+  function table(target, headers, rows) {
+    target.replaceChildren();
+    const t = node("table"),
+      head = node("tr");
+    for (const h of headers) head.append(node("th", h));
+    t.append(head);
+    for (const values of rows) {
+      const tr = node("tr");
+      for (const v of values) {
+        const td = node("td");
+        if (v instanceof Node) td.append(v);
+        else td.textContent = v ?? "";
+        tr.append(td);
+      }
+      t.append(tr);
+    }
+    target.append(t);
+  }
+  const backendError = (text) => Object.assign(Error(text), { code: "OQC_BACKEND" });
+  async function rpc(name, args = {}) {
+    const r = await sb.rpc(name, args);
+    if (r.error) throw r.error;
+    return r.data;
+  }
+  async function read(table, filter, order = "id") {
+    const rows = [];
+    for (let offset = 0; ; offset += 500) {
+      let q = sb.from(table).select("*").order(order, { ascending: true });
+      if (order === "work_date") q = q.order("product_code", { ascending: true });
+      if (filter) q = filter(q);
+      const r = await q.range(offset, offset + 499);
+      if (r.error) throw r.error;
+      rows.push(...(r.data || []));
+      if (!r.data || r.data.length < 500) return rows;
+    }
+  }
+  async function byIds(table, ids) {
+    const all = [];
+    for (let i = 0; i < ids.length; i += 100)
+      all.push(...(await read(table, (q) => q.in("inspection_id", ids.slice(i, i + 100)), "inspection_id")));
+    return all;
+  }
+  function monday(day) {
+    const d = new Date(day + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  }
+  function effective(code, date) {
+    return versions
+      .filter((v) => v.product_code === code && v.effective_from <= date)
+      .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || Number(b.id) - Number(a.id))[0];
+  }
+  function configAt(date) {
+    return (
+      configs
+        .filter((c) => c.effective_from <= date)
+        .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || Number(b.id) - Number(a.id))[0] || null
+    );
+  }
+  function updateStatus() {
+    const c = configAt(today());
+    status.textContent = "";
+    status.hidden = true;
+    status.title = c
+      ? fmt(c.planning_hours) + " giờ/người · Mục tiêu " + pct(Number(c.target_efficiency) * 100)
+      : "Chưa lưu cấu hình giờ/hiệu suất";
+  }
+  function match(row, record) {
+    return row && row.source_date === record.inspection_date && row.source_product_code === record.product_code;
+  }
+  function policy() {
+    const v =
+      editingWork?.seconds_per_piece != null
+        ? editingWork
+        : editing
+          ? dataRows.find((r) => r.id === editing)?.context
+          : effective($("code").value, $("date").value);
+    $("oqcReportPolicy").title = editing
+      ? "Sửa trên báo cáo gốc. Giữ CAPA đã lưu nếu ngày/model/phạm vi không đổi; giờ công và ảnh chỉ thay đổi theo nội dung bạn nhập."
+      : "Báo cáo mới: " +
+        (v?.seconds_per_piece
+          ? "CAPA v" + (v.standard_version_id || v.id) + " · " + fmt(v.seconds_per_piece) + " giây/PCS."
+          : "Chưa có CAPA; vẫn lưu kết quả và ghi rõ chưa đủ dữ liệu tính hiệu suất.");
+  }
+  function lock() {
+    const enabled = !!info?.can_actual && !saveBusy;
+    $("save").disabled = !enabled;
+    $("oqcNewReport").disabled = !info?.can_actual || saveBusy;
+    $("oqcNewReport").title = info?.can_actual ? "" : "Tài khoản chưa có quyền nhập báo cáo OQC";
+    $("oqcOpenCapa").disabled = saveBusy;
+    $("oqcDashboardHome").disabled = saveBusy;
+    $("oqcCapaSave").disabled = !info?.can_standard || capaBusy;
+    $("oqcCapaAdd").disabled = !info?.can_standard || capaBusy;
+    for (const id of ["oqcPlanningHours", "oqcTargetEfficiency"])
+      if ($(id)) $(id).disabled = !info?.can_standard || capaBusy;
+    $("oqcAddLabor").disabled = !enabled;
+    $("oqcReportPhotos").disabled = !enabled;
+    closeForm.disabled = saveBusy;
+    for (const e of $("form").querySelectorAll("input,textarea,select,button")) if (saveBusy) e.disabled = true;
+  }
+  const boot = (async () => {
+    try {
+      await MesAuth.requireAuth();
+      info = await rpc("oqc_dashboard_info");
+      if (info?.version !== "oqc-dashboard-20261021") throw backendError("oqc_dashboard_info: sai phiên bản " + info?.version);
+      if (info.inspection_scope_version !== 2) throw backendError("Máy chủ thiếu phần phạm vi kiểm / thứ tự lỗi OQC.");
+      if (info.planning_config_version !== 1)
+        throw backendError("Máy chủ thiếu phần cấu hình giờ/hiệu suất OQC.");
+      if (info.report_input_version !== 1)
+        throw backendError("Máy chủ thiếu phần nhập giờ kiểm và NG tự tính.");
+      [employees, versions, configs] = await Promise.all([
+        Qc02Data.employees(),
+        read("oqc_work_standard_version"),
+        read("oqc_planning_config_version"),
+      ]);
+      fillEmployees(employees);
+      await MesOqcHistory.ready;
+      for (const p of MesOqcHistory.products())
+        $("oqcCapaModel").add(new Option(p.ma_sp + " — " + (p.ten_sp || ""), p.ma_sp));
+      updateStatus();
+      await OqcWorkspace.loadOrder(info.can_standard);
+      lock();
+      return true;
+    } catch (e) {
+      oqcShowError(status, e, "Chưa nhập được báo cáo OQC");
+      status.hidden = false;
+      status.classList.add("error");
+      info = null;
+      lock();
+      return false;
+    }
+  })();
+  const baseRender = renderStats,
+    baseLoad = loadStats;
+  setPeriod = function (value) {
+    if (value === "custom") return;
+    const end = today(),
+      d = new Date(end + "T00:00:00Z");
+    if (value === "week") d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    else if (value === "month") d.setUTCDate(1);
+    $("from").value = d.toISOString().slice(0, 10);
+    $("to").value = end;
+    loadStats();
+  };
+  for (const id of ["from", "to"])
+    $(id).addEventListener("change", () => {
+      $("period").value = "custom";
+    });
+  renderStats = function () {
+    baseRender();
+    if (snapshot && snapshot.records === dataRows) renderDashboard();
+  };
+  loadStats = async function () {
+    const ticket = ++loadToken;
+    try {
+      if (!(await boot)) return;
+      if ($("period").value === "day") {
+        $("from").value = today();
+        $("to").value = today();
+      }
+      if (!(await baseLoad()) || ticket !== loadToken) return;
+      const raw = [...dataRows],
+        ids = raw.map((r) => r.id),
+        from = $("from").value,
+        to = $("to").value;
+      const [contexts, works, weekly, bases, legacyPlans] = await Promise.all([
+        byIds("oqc_inspection_context", ids),
+        byIds("oqc_inspection_work", ids),
+        read("cd_khsx_tuan_plan", (q) =>
+          q.eq("cong_doan", "OQC").gte("tuan_bat_dau", monday(from)).lte("tuan_bat_dau", monday(to)),
+        ),
+        read("oqc_dashboard_plan_basis", (q) => q.gte("work_date", from).lte("work_date", to), "work_date"),
+        read("oqc_capacity_plan", (q) => q.gte("work_date", from).lte("work_date", to), "work_date"),
+      ]);
+      if (ticket !== loadToken) return;
+      const scope = $("oqcDashboardScope").value,
+        annotated = raw.map((r) => {
+          const c = contexts.find((c) => c.inspection_id === r.id),
+            w = works.find((w) => w.inspection_id === r.id),
+            context = match(c, r) ? c : null,
+            work = match(w, r) ? w : null;
+          return { ...r, context, work, images: [...new Set([...(r.images || []), ...(work?.images || [])])] };
+        });
+      const records = annotated.filter((r) =>
+        scope === "ALL"
+          ? true
+          : scope === "UNKNOWN"
+            ? !r.context?.inspection_scope
+            : scope === "LEGACY"
+              ? !!r.context?.inspection_scope && !MesOqcScope.current.includes(r.context.inspection_scope)
+              : r.context?.inspection_scope === scope,
+      );
+      const filters = MesOqcHistory.filters(),
+        products = MesOqcHistory.products(),
+        plans = [];
+      for (const p of scope === "FULL_POST_MACHINING" ? weekly : []) {
+        if (filters.models.length && !filters.models.includes(p.ma_sp)) continue;
+        const product = products.find((x) => x.ma_sp === p.ma_sp),
+          customer = product?.ma_khach_hang
+            ? "code:" + product.ma_khach_hang
+            : product?.ten_khach_hang
+              ? "name:" + product.ten_khach_hang
+              : "";
+        if (filters.customer && filters.customer !== customer) continue;
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(p.tuan_bat_dau + "T00:00:00Z");
+          d.setUTCDate(d.getUTCDate() + i);
+          const date = d.toISOString().slice(0, 10),
+            qty = Number(p[["t2", "t3", "t4", "t5", "t6", "t7", "cn"][i]] || 0);
+          if (date < from || date > to || qty <= 0) continue;
+          const basis =
+              bases.find((b) => b.work_date === date && b.product_code === p.ma_sp) ||
+              legacyPlans.find(
+                (b) =>
+                  b.work_date === date &&
+                  b.product_code === p.ma_sp &&
+                  (b.oqc_plan_id === p.id || (b.source_kind === "oqc" && b.source_plan_id === p.id)),
+              ),
+            norm = basis || effective(p.ma_sp, date);
+          plans.push({
+            date,
+            product_code: p.ma_sp,
+            quantity: qty,
+            source_id: p.id,
+            seconds_per_piece: norm?.seconds_per_piece ?? null,
+            standard_version_id: norm?.standard_version_id || norm?.id || null,
+            preview: !basis,
+            planning_hours:
+              basis && Object.hasOwn(basis, "planning_config_version_id")
+                ? basis.planning_hours
+                : (configAt(date)?.planning_hours ?? null),
+            target_efficiency:
+              basis && Object.hasOwn(basis, "planning_config_version_id")
+                ? basis.target_efficiency
+                : (configAt(date)?.target_efficiency ?? null),
+          });
+        }
+      }
+      dataRows = records;
+      snapshot = { records, plans, from, to, outside: raw.length - records.length, scope };
+      renderStats();
+      if (modelDialog.open && modelCode) renderModel(modelCode);
+    } catch (e) {
+      if (ticket === loadToken) {
+        message(e, true, "Không tải được dashboard đầy đủ");
+        snapshot = null;
+      }
+    }
+  };
+  function missing(reason) {
+    const e = node("span", "—");
+    e.title = reason;
+    return e;
+  }
+  function value(n, reason, suffix = "") {
+    return n == null ? missing(reason) : fmt(n) + suffix;
+  }
+  function efficiency(s) {
+    const v = value(
+      s.efficiency,
+      s.missingHours
+        ? "Thiếu giờ công thực tế"
+        : s.missingCapa
+          ? "Chưa có CAPA đúng phạm vi đã lưu"
+          : "Chưa đủ dữ liệu tính hiệu suất",
+      "%",
+    );
+    if (v instanceof Node) return v;
+    const e = node("span", v);
+    e.title =
+      s.target == null
+        ? "Chưa có mục tiêu lưu"
+        : "Mục tiêu đã lưu: " + pct(s.target * 100) + (s.efficiency >= s.target * 100 ? " · Đạt" : " · Chưa đạt");
+    return e;
+  }
+  function cards(target, s) {
+    target.replaceChildren();
+    const values = [
+      ["Kế hoạch", s.planned ? fmt(s.planned) : missing("Chưa có kế hoạch đúng phạm vi/ngày/model")],
+      ["Đã kiểm", fmt(s.checked)],
+      ["% hoàn thành", value(s.completion, "Chưa có kế hoạch tương ứng hoặc kết quả khác phạm vi", "%")],
+      ["OK", fmt(s.ok)],
+      ["NG", fmt(s.ng)],
+      ["Tỷ lệ NG", value(s.ngRate, "Chưa có sản lượng đã kiểm", "%")],
+      ["Giờ công", value(s.hours, "Thiếu giờ công thực tế; đã ghi " + fmt(s.knownHours) + " giờ")],
+      ["Số người kiểm", s.people],
+      ["Hiệu suất", efficiency(s)],
+    ];
+    for (const [label, val] of values) {
+      const c = node("div", label);
+      c.className = "card";
+      const b = node("b");
+      if (val instanceof Node) b.append(val);
+      else b.textContent = val;
+      c.append(b);
+      target.append(c);
+    }
+  }
+  function renderDashboard() {
+    const s = M.summary(snapshot.records, snapshot.plans);
+    cards($("cards"), s);
+    const products = MesOqcHistory.products();
+    const rows = M.group(snapshot.records, snapshot.plans).map((g) => {
+      const b = node("button", g.code + " — " + (products.find((p) => p.ma_sp === g.code)?.ten_sp || ""));
+      b.type = "button";
+      b.className = "oqc-model-button";
+      b.onclick = () => {
+        modelCode = g.code;
+        renderModel(g.code);
+        modelDialog.showModal();
+      };
+      return [
+        b,
+        g.planned ? fmt(g.planned) : missing("Chưa có kế hoạch đúng phạm vi/ngày/model"),
+        fmt(g.checked),
+        value(g.completion, "Chưa có kế hoạch tương ứng", "%"),
+        fmt(g.ok),
+        fmt(g.ng),
+        value(g.hours, "Thiếu giờ công thực tế"),
+        g.people,
+        efficiency(g),
+      ];
+    });
+    table(
+      $("modelSummary"),
+      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Số người kiểm", "Hiệu suất"],
+      rows,
+    );
+    $("modelSummary").title =
+      "Kế hoạch từ KH tuần OQC đã liên kết sau gia công; không gán sang Sơn/Gia Công ngoài. Giờ công cộng theo từng người/báo cáo; hiệu suất = giờ công chuẩn / giờ công thực tế × 100%.";
+    demand.replaceChildren();
+    demand.hidden = true;
+    OqcDefectCharts.render($("oqcDefectSummary"), snapshot.records, $("oqcTrendUnit").value, MesQcFields.defectName, {
+      pcs: true,
+    });
+  }
+  function renderModel(code) {
+    if (!snapshot) return;
+    const records = snapshot.records.filter((r) => r.product_code === code),
+      plans = snapshot.plans.filter((p) => p.product_code === code);
+    $("oqcModelTitle").textContent =
+      code + " · " + MesQcFields.date(snapshot.from) + " – " + MesQcFields.date(snapshot.to);
+    cards($("oqcModelMetrics"), M.summary(records, plans));
+    OqcDefectCharts.render($("oqcModelDefects"), records, $("oqcTrendUnit").value, MesQcFields.defectName, {
+      pcs: true,
+    });
+    table(
+      $("oqcModelRecords"),
+      ["Ngày kiểm", "Người kiểm", "Đã kiểm", "OK", "NG", "Giờ công", "Thông tin / ảnh"],
+      records.map((r) => {
+        const b = node("button", "Xem thông tin / ảnh");
+        b.className = "btn secondary";
+        b.onclick = () => showRecord(r.id);
+        return [
+          MesOqcRecord.date(r),
+          r.inspector_name,
+          Number(r.ok_qty) + Number(r.ng_qty),
+          r.ok_qty,
+          r.ng_qty,
+          r.work?.labor?.length ? fmt(r.work.labor.reduce((n, l) => n + Number(l.hours), 0)) : "Chưa ghi nhận",
+          b,
+        ];
+      }),
+    );
+  }
+  function showRecord(id) {
+    MesOqcRecord.detail(id);
+    const row = dataRows.find((r) => r.id === id),
+      section = node("section");
+    if (!row) return;
+    const h = node("h3", "Giờ công và CAPA đã lưu");
+    section.append(h);
+    const box = node("div");
+    section.append(box);
+    table(
+      box,
+      ["Thông tin", "Giá trị"],
+      [
+        [
+          "CAPA",
+          row.work?.standard_version_id
+            ? "v" + row.work.standard_version_id + " · " + fmt(row.work.seconds_per_piece) + " giây/PCS"
+            : row.context?.standard_version_id
+              ? "v" + row.context.standard_version_id
+              : "Chưa có CAPA lịch sử",
+        ],
+        [
+          "Giờ thực tế theo người",
+          (row.work?.labor || [])
+            .map((l) => l.employee_code + " — " + l.employee_name + ": " + fmt(l.hours) + " giờ")
+            .join("; ") || "Chưa có dữ liệu",
+        ],
+        ["Hiệu suất thực tế", pct(M.summary([row], []).efficiency)],
+        [
+          "Chính sách lưu cùng báo cáo",
+          M.planning(row.work)
+            ? fmt(row.work.planning_hours) + " giờ · mục tiêu " + pct(Number(row.work.target_efficiency) * 100)
+            : "Chưa có cấu hình lịch sử",
+        ],
+      ],
+    );
+    $("oqcRecordBody").append(section);
+  }
+  $("rows").addEventListener(
+    "click",
+    (e) => {
+      if (e.target.closest("button,a,input,select")) return;
+      const tr = e.target.closest("[data-record-id]");
+      if (tr) {
+        e.stopImmediatePropagation();
+        showRecord(Number(tr.dataset.recordId));
+      }
+    },
+    true,
+  );
+  $("rows").addEventListener(
+    "keydown",
+    (e) => {
+      if (e.target.matches("[data-record-id]") && ["Enter", " "].includes(e.key)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showRecord(Number(e.target.dataset.recordId));
+      }
+    },
+    true,
+  );
+  loadPlan = async function () {
+    const ticket = ++planToken,
+      code = $("code").value,
+      date = $("date").value;
+    if (!code || !date) return ($("plan").value = "");
+    if ($("inspectionScope").value !== "FULL_POST_MACHINING") {
+      $("plan").title = "Kế hoạch hiện có chưa phân loại cho phạm vi này; không dùng kế hoạch sau gia công thay thế.";
+      return ($("plan").value = "—");
+    }
+    try {
+      const col = ["t2", "t3", "t4", "t5", "t6", "t7", "cn"][(new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7],
+        q = await sb
+          .from("cd_khsx_tuan_plan")
+          .select(col)
+          .eq("tuan_bat_dau", monday(date))
+          .eq("cong_doan", "OQC")
+          .eq("ma_sp", code)
+          .maybeSingle();
+      if (q.error) throw q.error;
+      const rows = await read("oqc_daily_inspection", (q) => q.eq("inspection_date", date).eq("product_code", code)),
+        contexts = await byIds(
+          "oqc_inspection_context",
+          rows.map((r) => r.id),
+        );
+      if (ticket !== planToken) return;
+      const checked = rows
+          .filter((r) =>
+            contexts.some(
+              (c) => c.inspection_id === r.id && match(c, r) && c.inspection_scope === "FULL_POST_MACHINING",
+            ),
+          )
+          .reduce((n, r) => n + Number(r.ok_qty) + Number(r.ng_qty), 0),
+        planned = Number(q.data?.[col] || 0);
+      $("plan").value = planned
+        ? fmt(planned) + " / " + fmt(checked) + " / " + fmt(Math.max(0, planned - checked))
+        : "Ngoài kế hoạch / Đã kiểm " + fmt(checked);
+    } catch (e) {
+      if (ticket === planToken) {
+        $("plan").value = "Chưa đọc được KH";
+        $("plan").title = oqcFriendlyError(e).text + " (" + (e.code || "") + " " + e.message + ")";
+      }
+    }
+  };
+  $("date").addEventListener("change", () => loadPlan());
+  $("inspectionScope").addEventListener("change", () => loadPlan());
+  function quantities() {
+    return [...document.querySelectorAll('#defects .defect,#otherDefects [data-other="qty"]')].map((i) => ({
+      value: Number(i.value || 0),
+      valid: !i.validity.badInput && Number.isInteger(Number(i.value || 0)) && Number(i.value || 0) >= 0,
+    }));
+  }
+  function calcWork() {
+    const values = quantities(),
+      valid = values.every((q) => q.valid),
+      sum = values.reduce((n, q) => n + q.value, 0),
+      total = Number($("total").value) || 0,
+      ng = editing ? (historicalNg ?? Number(dataRows.find((r) => r.id === editing)?.ng_qty || 0)) : valid ? sum : null,
+      ok = ng == null ? null : total - ng;
+    $("ng").value = ng ?? "";
+    $("ok").value = ok != null && ok >= 0 ? ok : "";
+    $("okPct").value = total > 0 && ok != null && ok >= 0 ? pct((ok / total) * 100) : "—";
+    $("ngPct").value = total > 0 && ng != null ? pct((ng / total) * 100) : "—";
+    $("defectTotal").textContent = valid ? fmt(sum) : "Số lượng không hợp lệ";
+    $("oqcDefectGuide").textContent = editing ? "ⓘ Giữ nguyên NG lịch sử" : "ⓘ Mỗi PCS NG ghi một lỗi chính";
+    $("oqcDefectGuide").title = editing
+      ? "Báo cáo đã lưu giữ nguyên NG; không tính lại theo số lượng lỗi."
+      : "Mỗi sản phẩm NG chỉ ghi một loại lỗi chính, tránh đếm trùng.";
+  }
+  calc = calcWork;
+  $("total").oninput = calcWork;
+  function parseHours(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return null;
+    if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(raw))
+      throw Error("Số giờ kiểm tra phải là số dương, có thể nhập thập phân như 1,5.");
+    const n = Number(raw.replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0 || n > 24) throw Error("Số giờ kiểm tra phải lớn hơn 0 và không vượt 24 giờ.");
+    return n;
+  }
+  function reportLabor() {
+    const h = parseHours($("oqcInspectionHours").value),
+      all = labor.map((l) => ({ ...l, hours: parseHours(l.hours) }));
+    if (h != null) all.unshift({ employee_code: $("inspectorCode").value, hours: h });
+    return all;
+  }
+  function renderLabor() {
+    $("oqcAdditionalLabor").open = labor.length > 0;
+    const body = $("oqcLaborRows");
+    body.replaceChildren();
+    labor.forEach((r, i) => {
+      const tr = node("tr"),
+        td = node("td"),
+        select = node("select");
+      select.setAttribute("aria-label", "Người kiểm " + (i + 1));
+      select.add(new Option("— Chọn nhân viên —", ""));
+      for (const p of employees) select.add(new Option(p.code + " — " + p.name, p.code));
+      if (r.employee_code && ![...select.options].some((o) => o.value === r.employee_code))
+        select.add(new Option(r.employee_code + " — " + (r.employee_name || "nhân viên đã lưu"), r.employee_code));
+      select.value = r.employee_code || "";
+      select.onchange = () => {
+        r.employee_code = select.value;
+      };
+      td.append(select);
+      tr.append(td);
+      const hours = node("input");
+      hours.type = "number";
+      hours.min = ".001";
+      hours.max = "24";
+      hours.step = "any";
+      hours.value = r.hours ?? "";
+      hours.setAttribute("aria-label", "Giờ thực tế " + (i + 1));
+      hours.oninput = () => {
+        r.hours = hours.value;
+        laborTotal();
+      };
+      const ht = node("td");
+      ht.append(hours);
+      tr.append(ht);
+      const b = node("button", "Xóa");
+      b.type = "button";
+      b.className = "btn secondary";
+      b.onclick = () => {
+        labor.splice(i, 1);
+        renderLabor();
+      };
+      const bt = node("td");
+      bt.append(b);
+      tr.append(bt);
+      body.append(tr);
+    });
+    laborTotal();
+  }
+  function laborTotal() {
+    try {
+      const all = reportLabor();
+      $("oqcLaborTotal").textContent = all.length
+        ? "Giờ công đã nhập: " + fmt(all.reduce((n, l) => n + (l.hours || 0), 0)) + " giờ-người."
+        : "Chưa có giờ kiểm tra — chưa đủ dữ liệu tính hiệu suất.";
+    } catch (e) {
+      $("oqcLaborTotal").textContent = e.message;
+    }
+  }
+  $("oqcInspectionHours").oninput = laborTotal;
+  $("inspectorCode").addEventListener("change", laborTotal);
+  function renderPhotos() {
+    const box = $("oqcReportPhotoList");
+    box.replaceChildren();
+    for (const url of images) {
+      const item = node("div"),
+        img = node("img");
+      img.src = url;
+      img.alt = "Ảnh lỗi OQC";
+      img.onclick = () => Qc02View.photo(url, images);
+      const b = node("button", "Bỏ ảnh khỏi báo cáo");
+      b.type = "button";
+      b.className = "btn secondary";
+      b.disabled = saveBusy;
+      b.onclick = () => {
+        images = images.filter((x) => x !== url);
+        renderPhotos();
+      };
+      item.append(img, b);
+      box.append(item);
+    }
+    for (const f of files) {
+      const item = node("div"),
+        img = node("img"),
+        reader = new FileReader();
+      img.alt = f.name;
+      img.title = f.name;
+      reader.onload = () => {
+        if (item.isConnected && files.includes(f)) {
+          img.src = reader.result;
+          img.onclick = () => Qc02View.photo(reader.result, [reader.result]);
+        }
+      };
+      reader.readAsDataURL(f);
+      const remove = node("button", "Bỏ ảnh");
+      remove.type = "button";
+      remove.className = "btn secondary";
+      remove.disabled = saveBusy;
+      remove.onclick = () => {
+        files = files.filter((x) => x !== f);
+        renderPhotos();
+      };
+      item.append(img, remove);
+      box.append(item);
+    }
+  }
+  const oldReset = resetForm;
+  resetForm = function () {
+    ++editToken;
+    oldReset();
+    editingWork = null;
+    historicalNg = null;
+    labor = [];
+    images = [];
+    files = [];
+    request = null;
+    $("oqcInspectionHours").value = "";
+    $("oqcFormMessage").textContent = "";
+    $("ng").value = "0";
+    $("date").value = today();
+    $("inspectionScope").value = "FULL_POST_MACHINING";
+    $("oqcReportPhotos").value = "";
+    renderLabor();
+    renderPhotos();
+    calcWork();
+    policy();
+  };
+  const oldEdit = editRow;
+  editRow = function (id) {
+    if (saveBusy) return;
+    oldEdit(id);
+    const r = dataRows.find((r) => r.id === id);
+    if (!r) return;
+    const ticket = ++editToken;
+    editingWork = r.work;
+    historicalNg = Number(r.ng_qty);
+    const primary = (r.work?.labor || []).find(
+      (l) => String(l.employee_code).toLowerCase() === String(r.inspector_code).toLowerCase(),
+    );
+    $("oqcInspectionHours").value = primary?.hours ?? "";
+    labor = (r.work?.labor || [])
+      .filter((l) => String(l.employee_code).toLowerCase() !== String(r.inspector_code).toLowerCase())
+      .map((l) => ({ ...l }));
+    images = [...new Set(r.work?.images || r.images || [])];
+    files = [];
+    request = null;
+    $("oqcReportPhotos").value = "";
+    MesOqcScope.selectValue(r.context?.inspection_scope);
+    $("inspectionScope").disabled =
+      !info?.can_actual || !r.context || !MesOqcScope.current.includes(r.context.inspection_scope);
+    $("ng").value = r.ng_qty;
+    renderLabor();
+    renderPhotos();
+    calcWork();
+    policy();
+    showView("report");
+    Promise.resolve().then(() => {
+      if (ticket === editToken) {
+        $("ng").value = r.ng_qty;
+        calcWork();
+      }
+    });
+  };
+  $("oqcNewReport").onclick = () => {
+    if (!info?.can_actual) return;
+    resetForm();
+    showView("report");
+  };
+  $("oqcAddLabor").onclick = () => {
+    labor.push({ employee_code: "", hours: "" });
+    renderLabor();
+  };
+  $("oqcReportPhotos").onchange = () => {
+    const chosen = [...$("oqcReportPhotos").files];
+    if (chosen.some((f) => !f.type.startsWith("image/")) || images.length + chosen.length > 10) {
+      message("Chỉ chọn ảnh, tối đa 10 ảnh cho một báo cáo.", true);
+      $("oqcReportPhotos").value = "";
+      return;
+    }
+    files = chosen;
+    renderPhotos();
+  };
+  $("code").addEventListener("change", policy);
+  $("date").addEventListener("change", policy);
+  $("form").onsubmit = async (e) => {
+    e.preventDefault();
+    if (saveBusy || !info?.can_actual) return;
+    saveBusy = true;
+    const states = [...$("form").querySelectorAll("input,select,textarea,button")].map((el) => [el, el.disabled]);
+    lock();
+    try {
+      calcWork();
+      const total = Number($("total").value),
+        ng = Number($("ng").value);
+      if (!quantities().every((q) => q.valid)) throw Error("Số lượng từng lỗi phải là số nguyên, không âm.");
+      if (!Number.isInteger(total) || total <= 0 || !Number.isInteger(ng) || ng < 0 || ng > total)
+        throw Error("Số đã kiểm phải là số nguyên dương; tổng NG không được lớn hơn số đã kiểm.");
+      const defects = defectsPayload();
+      if (defects.some((d) => !Number.isInteger(Number(d.qty)) || Number(d.qty) < 0 || Number(d.qty) > ng))
+        throw Error("Số lượng từng lỗi phải nguyên, không âm và không vượt NG.");
+      const allLabor = reportLabor();
+      const codes = new Set();
+      for (const l of allLabor) {
+        if (
+          (!employees.some((p) => p.code === l.employee_code) &&
+            !editingWork?.labor?.some((p) => p.employee_code === l.employee_code)) ||
+          !M.positive(l.hours) ||
+          Number(l.hours) > 24 ||
+          codes.has(l.employee_code.toLowerCase())
+        )
+          throw Error("Chọn nhân viên trung tâm, nhập giờ riêng cho model; mỗi người chỉ một dòng.");
+        codes.add(l.employee_code.toLowerCase());
+      }
+      if (allLabor.length && !codes.has($("inspectorCode").value.toLowerCase()))
+        throw Error("Bổ sung số giờ kiểm tra cho người kiểm đang chọn.");
+      for (const file of [...files]) {
+        const key = "oqc-inspections/" + (request?.id || crypto.randomUUID()) + "/" + crypto.randomUUID();
+        const r = await sb.storage.from("ipqc-evidence").upload(key, file, { contentType: file.type, upsert: false });
+        if (r.error) throw r.error;
+        images.push(sb.storage.from("ipqc-evidence").getPublicUrl(key).data.publicUrl);
+        files = files.filter((f) => f !== file);
+      }
+      files = [];
+      $("oqcReportPhotos").value = "";
+      renderPhotos();
+      const original = editing && dataRows.find((r) => r.id === editing),
+        payload = {
+          inspection_date: $("date").value,
+          shift: $("shift").value,
+          product_code: $("code").value,
+          inspector_code: $("inspectorCode").value,
+          total_qty: total,
+          ng_qty: ng,
+          defects,
+          note: $("note").value,
+          lot_no: $("inspectionLot").value.trim() || null,
+          task_no: $("inspectionTask").value.trim() || null,
+          ...MesOqcHistory.customerPayload($("code").value, original),
+          scope: $("inspectionScope").value || null,
+          inspection_hours: parseHours($("oqcInspectionHours").value),
+          labor: allLabor.map((l) => ({ employee_code: l.employee_code, hours: Number(l.hours) })),
+          images,
+          expected_updated_at: original?.updated_at || null,
+        };
+      const signature = JSON.stringify(payload);
+      if (request && request.signature !== signature) {
+        const old = await sb
+          .from("oqc_dashboard_write_request")
+          .select("inspection_id")
+          .eq("request_id", request.id)
+          .maybeSingle();
+        if (old.error)
+          throw Error("Chưa xác minh được lần gửi trước; giữ nguyên bản nháp và thử lại. " + old.error.message);
+        if (old.data) {
+          const saved = await sb
+            .from("oqc_daily_inspection")
+            .select("*")
+            .eq("id", old.data.inspection_id)
+            .maybeSingle();
+          if (saved.error || !saved.data) throw Error("Chưa đọc được báo cáo đã lưu");
+          editing = saved.data.id;
+          payload.expected_updated_at = saved.data.updated_at;
+        }
+        request = null;
+      }
+      if (!request) request = { id: crypto.randomUUID(), signature: JSON.stringify(payload) };
+      const id = await rpc("oqc_save_daily_report", { p_id: editing, p_data: { ...payload, request_id: request.id } });
+      if (!id) throw Error("Máy chủ chưa xác nhận đã lưu báo cáo");
+      resetForm();
+      saveBusy = false;
+      showView("dashboard");
+      saveBusy = true;
+      await loadStats();
+      message("Đã lưu báo cáo OQC #" + id + " và phân bổ giờ công; dashboard đã cập nhật.");
+    } catch (error) {
+      oqcShowError($("oqcFormMessage"), error, "Chưa lưu được báo cáo");
+      message(error, true, "Chưa lưu được báo cáo");
+    } finally {
+      saveBusy = false;
+      for (const [el, disabled] of states) el.disabled = disabled;
+      if (!editing) $("inspectionScope").disabled = !info?.can_actual;
+      lock();
+    }
+  };
+  function capaConfig() {
+    return {
+      planning_hours: $("oqcPlanningHours").value.replace(",", "."),
+      target_efficiency: Number($("oqcTargetEfficiency").value.replace(",", ".")) / 100,
+    };
+  }
+  function capaPreview() {
+    const c = M.capa(capaSteps, capaConfig());
+    $("oqcCapaPreview").textContent = c.error || c.configError || "";
+    for (const [id, value] of [
+      ["oqcSeconds", c.seconds],
+      ["oqcHourly", c.hourly],
+      ["oqcDaily", c.daily],
+    ])
+      $(id).textContent = value == null ? "Chưa đủ dữ liệu" : fmt(value, id === "oqcSeconds" ? 6 : 2);
+  }
+  function renderCapaSteps() {
+    const body = $("oqcCapaSteps");
+    body.replaceChildren();
+    capaSteps.forEach((s, i) => {
+      const tr = node("tr");
+      tr.className = "oqc-capa-row";
+      for (const key of ["name", "seconds"]) {
+        const input = node("input");
+        input.type = key === "seconds" ? "number" : "text";
+        if (key === "seconds") {
+          input.min = "0";
+          input.step = "any";
+        }
+        input.value = s[key] ?? "";
+        input.disabled = !info?.can_standard || capaBusy;
+        input.setAttribute("aria-label", (key === "name" ? "Công đoạn " : "Giây/PCS ") + (i + 1));
+        input.oninput = () => {
+          s[key] = input.value;
+          capaPreview();
+        };
+        const td = node("td");
+        td.append(input);
+        tr.append(td);
+      }
+      const td = node("td");
+      for (const [title, delta] of [
+        ["↑", -1],
+        ["↓", 1],
+        ["Xóa", 0],
+      ]) {
+        const b = node("button", title);
+        b.type = "button";
+        b.className = "btn secondary";
+        b.disabled =
+          !info?.can_standard || capaBusy || (delta !== 0 && (i + delta < 0 || i + delta >= capaSteps.length));
+        b.onclick = () => {
+          if (delta === 0) capaSteps.splice(i, 1);
+          else [capaSteps[i], capaSteps[i + delta]] = [capaSteps[i + delta], capaSteps[i]];
+          renderCapaSteps();
+        };
+        td.append(b);
+      }
+      tr.append(td);
+      body.append(tr);
+    });
+    capaPreview();
+    lock();
+  }
+  function loadCapa() {
+    const code = $("oqcCapaModel").value,
+      v = effective(code, $("oqcCapaEffective").value),
+      c = configAt($("oqcCapaEffective").value);
+    $("oqcPlanningHours").value = c?.planning_hours ?? "";
+    $("oqcTargetEfficiency").value = c ? Number((Number(c.target_efficiency) * 100).toFixed(8)) : "";
+    capaSteps = v ? v.steps.map((s) => ({ ...s })) : [{ name: "", seconds: "" }];
+    renderCapaSteps();
+    table(
+      $("oqcConfigHistory"),
+      ["Cấu hình chung", "Ngày áp dụng", "Giờ/người", "Mục tiêu", "Người cập nhật", "Thời gian"],
+      [...configs]
+        .sort((a, b) => Number(b.id) - Number(a.id))
+        .map((c) => [
+          "v" + c.id,
+          c.effective_from,
+          c.planning_hours,
+          pct(Number(c.target_efficiency) * 100),
+          c.created_by_name,
+          MesQcFields.display(c.created_at),
+        ]),
+    );
+    table(
+      $("oqcCapaHistory"),
+      ["Phiên bản", "Áp dụng", "Công đoạn theo thứ tự", "Giây/PCS", "Người cập nhật", "Thời gian"],
+      versions
+        .filter((v) => v.product_code === code)
+        .sort((a, b) => Number(b.id) - Number(a.id))
+        .map((v) => [
+          "v" + v.id,
+          v.effective_from,
+          v.steps.map((s) => s.name + ": " + s.seconds).join(" → "),
+          fmt(v.seconds_per_piece, 6),
+          v.created_by_name,
+          MesQcFields.display(v.created_at),
+        ]),
+    );
+  }
+  $("oqcOpenCapa").onclick = async () => {
+    await boot;
+    try {
+      [versions, configs] = await Promise.all([read("oqc_work_standard_version"), read("oqc_planning_config_version")]);
+      loadCapa();
+      showView("capa");
+    } catch (e) {
+      message(e, true, "Không mở được CAPA");
+    }
+  };
+  $("oqcCapaEffective").value = today();
+  $("oqcCapaModel").onchange = loadCapa;
+  $("oqcCapaEffective").onchange = loadCapa;
+  $("oqcCapaAdd").onclick = () => {
+    capaSteps.push({ name: "", seconds: "" });
+    renderCapaSteps();
+  };
+  $("oqcCapaSave").onclick = async () => {
+    if (capaBusy || !info?.can_standard) return;
+    const c = M.capa(capaSteps, capaConfig());
+    if (c.error || c.configError) {
+      $("oqcCapaMessage").textContent = c.error || "Chưa đủ dữ liệu: giờ > 0, ≤ 24; hiệu suất > 0, ≤ 100%.";
+      return;
+    }
+    capaBusy = true;
+    renderCapaSteps();
+    try {
+      await rpc("oqc_save_capa_config", {
+        p_product: $("oqcCapaModel").value,
+        p_effective: $("oqcCapaEffective").value,
+        p_steps: capaSteps,
+        p_hours: capaConfig().planning_hours,
+        p_target: capaConfig().target_efficiency,
+      });
+      [versions, configs] = await Promise.all([read("oqc_work_standard_version"), read("oqc_planning_config_version")]);
+      updateStatus();
+      loadCapa();
+      await loadStats();
+      $("oqcCapaMessage").textContent =
+        "Đã lưu phiên bản CAPA mới. Báo cáo đã lưu giữ nguyên giây chuẩn và giờ công lịch sử.";
+    } catch (e) {
+      oqcShowError($("oqcCapaMessage"), e, "Chưa lưu được CAPA");
+    } finally {
+      capaBusy = false;
+      renderCapaSteps();
+    }
+  };
+  $("oqcCapaClose").onclick = () => showView("dashboard");
+  $("oqcModelClose").onclick = () => modelDialog.close();
+  $("oqcDashboardScope").onchange = () => loadStats();
+  OqcWorkspace.mount({ formPanel, formDialog, capaDialog, showView });
+  $("oqcPlanningHours").oninput = capaPreview;
+  $("oqcTargetEfficiency").oninput = capaPreview;
+  $("inspectorCode").addEventListener("focus", async () => {
+    try {
+      employees = await Qc02Data.employees();
+      fillEmployees(employees);
+    } catch (e) {
+      oqcShowError($("oqcFormMessage"), e, "Không tải được nhân sự");
+    }
+  });
+  $("code").addEventListener("focus", async () => {
+    if (!employees.length && (await boot)) {
+      fillEmployees(employees);
+      renderLabor();
+    }
+  });
+  lock();
+  boot.then((ok) => {
+    if (ok) loadStats();
+  });
+  // T140: mở thẳng 1 màn hình bằng ?view=capa|report|dashboard (oqc-capacity.html cũ chuyển về ?view=capa).
+  const initialView = new URLSearchParams(location.search).get("view");
+  if (initialView === "capa") $("oqcOpenCapa").click();
+  else if (initialView === "report")
+    boot.then((ok) => {
+      if (ok && info?.can_actual) $("oqcNewReport").click();
+      else showView("dashboard");
+    });
+  return { ready: boot, refresh: () => loadStats(), showRecord, getSnapshot: () => snapshot };
 })();

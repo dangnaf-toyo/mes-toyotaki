@@ -79,7 +79,7 @@
     'index.html': { icon: '🏠', title: 'Trang chủ MES', desc: 'Chọn chức năng bạn muốn sử dụng', noTitleBar: true },
     'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca', noTitleBar: true },
     'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
-    'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh' },
+    'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh', noTitleBar: true },
     'ipqc-approval.html': { icon: '⚠️', title: 'Duyệt tiếp tục sản xuất IPQC', desc: 'Tạo, duyệt và theo dõi yêu cầu tiếp tục chạy có điều kiện', noTitleBar: true },
     'iqc.html': { icon: '📋', title: 'IQC — Dashboard đầu vào', desc: 'Theo dõi LOT, nhà cung cấp, lỗi và tỷ lệ NG theo thời gian', noTitleBar: true },
     'oqc-daily.html': { icon: '✅', title: 'OQC kiểm tra', desc: 'Dashboard · CAPA · kế hoạch và hiệu suất kiểm tra', noTitleBar: true },
@@ -155,7 +155,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-group-btn{background:none;border:none;color:#e8e0d5;font-size:12.5px;font-weight:700;
   padding:0 10px;height:var(--navbar-h);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;font-family:inherit}
 .mnb-group-btn:hover,.mnb-group.route-active .mnb-group-btn{color:#fff;background:rgba(255,255,255,.09)}
-.mnb-caret{font-size:9px;opacity:.7}
+.mnb-caret{font-size:11px;opacity:.7}
 .mnb-dropdown{display:none;position:absolute;top:100%;left:0;background:#fff;border-radius:0 0 8px 8px;
   box-shadow:0 8px 20px rgba(0,0,0,.22);min-width:230px;padding:6px;flex-direction:column;z-index:5001}
 .mnb-group:hover .mnb-dropdown,.mnb-group.open .mnb-dropdown{display:flex}
@@ -164,7 +164,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-item.route-active{background:#f5e6d7;color:#a85e2a}
 .mnb-auth{flex-shrink:0;font-size:11.5px;color:#c9c2b6;display:flex;align-items:center;gap:8px;white-space:nowrap;padding-right:6px}
 .mnb-auth a{color:#C87941;text-decoration:none;font-weight:700}
-.mnb-burger{display:none;background:none;border:none;color:#fff;font-size:19px;cursor:pointer;padding:0 6px;flex-shrink:0}
+.mnb-burger{display:none;background:none;border:none;color:#fff;font-size:19px;cursor:pointer;padding:0 6px;flex-shrink:0;min-width:40px;min-height:40px}
 .mnb-auth-mobile{display:none}
 @media (max-width:820px){
   .mnb-groups{display:none;position:fixed;top:var(--navbar-h);left:0;right:0;bottom:0;

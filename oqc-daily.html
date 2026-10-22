@@ -1,109 +1,1044 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OQC kiểm tra</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
-<style>
-/* Chuẩn giao diện chung MES (theo duc-dashboard.html) */
-:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
-*{box-sizing:border-box}
-html,body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
-input,select,textarea,button{font-family:inherit;font-size:13px}
-input,select,textarea{padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;background:#fff;color:var(--text);outline:none}
-input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(15,95,165,.15)}
-textarea{min-height:56px;resize:vertical}
-h3{font-size:13px;font-weight:700;margin:14px 0 8px}
-.hidden{display:none!important}
-header.mes-hdr{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;margin:6px 12px 0}
-header.mes-hdr .brand{display:flex;flex-direction:column;line-height:1.2}
-header.mes-hdr .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
-header.mes-hdr .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
-header.mes-hdr .header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:100%}
-header.mes-hdr .btn-ghost{min-height:34px;justify-content:center;white-space:nowrap;line-height:1.35;background:transparent;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-header.mes-hdr .btn-ghost:disabled{opacity:.5;cursor:not-allowed}
-header.mes-hdr .btn-ghost:hover:not(:disabled){background:#334155}
-header.mes-hdr .btn-ghost.active{background:var(--accent);border-color:var(--accent)}
-header.mes-hdr .header-user{font-size:11px;color:#94A3B8;margin-left:auto}
-header.mes-hdr .header-clock{display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
-header.mes-hdr .header-clock .date{font-size:10px;color:#94A3B8}
-header.mes-hdr .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:700;padding:6px 8px;border-bottom:2px solid var(--border);background:var(--bg-panel)}
-td{padding:7px 8px;border-bottom:1px solid var(--border)}
-.field{display:flex;flex-direction:column;gap:4px}
-.field label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em}
-.bar{height:14px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin:2px 0 6px}
-.bar i{display:block;height:100%;background:var(--alarm-fg)}
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OQC kiểm tra</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript
+      ><link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet"
+    /></noscript>
+    <style>
+      /* Chuẩn giao diện chung MES (theo duc-dashboard.html) */
+      :root {
+        --bg-page: #eef1f5;
+        --bg-panel: #ffffff;
+        --bg-sunken: #f5f7fa;
+        --bg-header: #1e293b;
+        --border: #d9dfe5;
+        --border-strong: #b8c1cc;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --text-dim: #94a3b8;
+        --accent: #0f5fa5;
+        --accent-hover: #0a4681;
+        --run-fg: #047857;
+        --run-bg: #ecfdf5;
+        --warn-fg: #b45309;
+        --warn-bg: #fffbeb;
+        --alarm-fg: #b91c1c;
+        --alarm-bg: #fef2f2;
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+        --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+        --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.16);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Arial,
+          sans-serif;
+        background: var(--bg-page);
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.35;
+        -webkit-font-smoothing: antialiased;
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font-family: inherit;
+        font-size: 13px;
+      }
+      input,
+      select,
+      textarea {
+        padding: 7px 9px;
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        outline: none;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(15, 95, 165, 0.15);
+      }
+      textarea {
+        min-height: 56px;
+        resize: vertical;
+      }
+      h3 {
+        font-size: 13px;
+        font-weight: 700;
+        margin: 14px 0 8px;
+      }
+      .hidden {
+        display: none !important;
+      }
+      header.mes-hdr {
+        background: var(--bg-header);
+        color: #f1f5f9;
+        border-radius: 8px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: var(--shadow-sm);
+        flex-wrap: wrap;
+        margin: 6px 12px 0;
+      }
+      header.mes-hdr .brand {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+      }
+      header.mes-hdr .brand .co {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: #94a3b8;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+      header.mes-hdr .brand .title {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #fff;
+      }
+      header.mes-hdr .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        max-width: 100%;
+      }
+      header.mes-hdr .btn-ghost {
+        min-height: 34px;
+        justify-content: center;
+        white-space: nowrap;
+        line-height: 1.35;
+        background: transparent;
+        color: #f1f5f9;
+        border: 1px solid #475569;
+        border-radius: 5px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      header.mes-hdr .btn-ghost:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      header.mes-hdr .btn-ghost:hover:not(:disabled) {
+        background: #334155;
+      }
+      header.mes-hdr .btn-ghost.active {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      header.mes-hdr .header-user {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-left: auto;
+      }
+      header.mes-hdr .header-clock {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        padding: 0 10px;
+        line-height: 1.15;
+      }
+      header.mes-hdr .header-clock .date {
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      header.mes-hdr .header-clock .time {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.02em;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+        font-weight: 700;
+        padding: 6px 8px;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg-panel);
+      }
+      td {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .bar {
+        height: 14px;
+        background: var(--bg-sunken);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 2px 0 6px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--alarm-fg);
+      }
 
-.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);margin-bottom:8px;overflow:hidden}
-.head{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.body{padding:12px 14px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.btn{padding:7px 14px;border:1px solid transparent;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.primary{background:var(--accent);color:#fff}
-.primary:hover:not(:disabled){background:var(--accent-hover)}
-.secondary{background:#fff;border-color:var(--border-strong);color:var(--text)}
-.secondary:hover:not(:disabled){background:var(--bg-sunken)}
+      .panel {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+      .head {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .body {
+        padding: 12px 14px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .btn {
+        padding: 7px 14px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      .secondary {
+        background: #fff;
+        border-color: var(--border-strong);
+        color: var(--text);
+      }
+      .secondary:hover:not(:disabled) {
+        background: var(--bg-sunken);
+      }
 
-.wrap{padding:6px 12px 60px}
-.ro{background:var(--bg-sunken)}
-.msg{padding:8px 12px;margin-bottom:8px;border-radius:6px;display:none;font-weight:600}
-.err{display:block;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FECACA}
-.okmsg{display:block;background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
-.defect-table input.defect{width:120px;text-align:right;font-family:'JetBrains Mono',monospace}
-.defect-table input.detail{width:100%;max-width:320px}
-.group td{background:var(--bg-sunken);font-weight:700;color:var(--accent)}
-.total-row td{font-weight:700;background:var(--warn-bg);color:var(--warn-fg)}
-.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
-.card{background:var(--bg-sunken);border:1px solid var(--border);padding:8px 12px;border-radius:8px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
-.card b{display:block;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.02em;text-transform:none;margin-top:2px}
-.trend-chip{display:inline-block;padding:4px 8px;margin:3px;border-radius:5px;background:var(--alarm-bg);color:var(--alarm-fg);font-size:12px}
-@media(max-width:900px){.grid,.cards{grid-template-columns:1fr 1fr}}
-.qc-picker{position:relative}.qc-suggestions{position:absolute;top:65px;left:0;right:0;z-index:30;max-height:250px;overflow:auto;background:var(--bg-panel);border:1px solid var(--border);box-shadow:0 4px 12px #0005}.qc-suggestions button{display:block;text-align:left;width:100%;border:0;padding:10px;background:transparent;color:var(--text);cursor:pointer}.qc-suggestions button:hover,.qc-suggestions button:focus{background:var(--bg)}.qc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.qc-chips button{border:1px solid var(--border);border-radius:14px;padding:5px 10px;background:var(--bg-panel);color:var(--text);cursor:pointer}
-</style><link rel="stylesheet" href="shared/oqc-workspace.css?v=T139"></head><body><header class="mes-hdr">
-  <div class="brand"><span class="co">Toyotaki</span><span class="title">OQC kiểm tra</span></div>
-  <nav class="header-actions" id="oqcHeaderActions" aria-label="Chức năng OQC"><a class="btn-ghost" href="oqc.html">Đóng gói Pallet</a><a class="btn-ghost" href="khsx-tuan.html">KHSX tuần</a></nav>
-  <span class="header-user" id="who"></span>
-  <div class="header-clock"><span class="date" id="hdrDate">—</span><span class="time" id="hdrTime">--:--:--</span></div>
-</header>
-<main class="wrap"><div id="msg" class="msg"></div>
-<section class="panel"><div class="head">Nhập kiểm tra xuất hàng</div><div class="body"><form id="form"><div class="grid">
-<div class="field"><label>Ngày kiểm tra</label><input type="date" id="date" required></div><div class="field"><label>LOT (nếu có)</label><input id="inspectionLot"></div><div class="field"><label>Task No./tem (nếu có)</label><input id="inspectionTask"></div><div class="field"><label>Ca</label><select id="shift"><option>Ca 1</option><option>Ca 2</option></select></div>
-<div class="field"><label>Mã sản phẩm / Model</label><select id="code" required><option value="">-- Chọn Model --</option></select></div><div class="field"><label>Tên sản phẩm</label><input id="name" class="ro" readonly></div><div class="field" id="oqc-standard">Chọn model để xem tiêu chuẩn</div>
-<div class="field"><label>Mã nhân viên kiểm tra</label><select id="inspectorCode" required><option value="">-- Chọn nhân viên OQC --</option></select></div><div class="field"><label>Tên người kiểm</label><input id="inspectorName" class="ro" readonly></div>
-<div class="field"><label>Tổng kiểm</label><input type="number" min="0" step="1" id="total" required></div><div class="field"><label>Tổng NG (từ bảng lỗi)</label><input id="ng" class="ro" readonly></div>
-<div class="field"><label>OK</label><input id="ok" class="ro" readonly></div><div class="field"><label>% OK</label><input id="okPct" class="ro" readonly></div><div class="field"><label>% NG</label><input id="ngPct" class="ro" readonly></div><div class="field"><label>KHSX / Đã kiểm / Còn lại</label><input id="plan" class="ro" readonly></div></div>
-<h3>Chi tiết lỗi</h3><button type="button" id="addOtherDefect" class="btn secondary">+ Thêm lỗi khác</button><div style="overflow:auto"><table class="defect-table"><thead><tr><th>Nhóm lỗi</th><th>Tên lỗi</th><th>Chi tiết / kích thước</th><th>SL NG</th></tr></thead><tbody id="defects"></tbody><tbody id="otherDefects"></tbody><tfoot><tr class="total-row"><td colspan="3">Tổng NG</td><td id="defectTotal">0</td></tr></tfoot></table></div><br>
-<div class="field"><label>Ghi chú</label><textarea id="note"></textarea></div><br><button class="btn primary" id="save">Lưu</button> <button type="button" class="btn secondary" onclick="resetForm()">Làm mới</button></form></div></section>
-<section class="panel"><div class="head">Thống kê OQC</div><div class="body"><div class="grid"><div class="field"><label>Xem nhanh</label><select id="period" onchange="setPeriod(this.value)"><option value="day" selected>Hôm nay</option><option value="week">Tuần này</option><option value="month">Tháng này</option><option value="custom">Khoảng ngày</option></select></div><div class="field"><label>Từ ngày</label><input type="date" id="from"></div><div class="field"><label>Đến ngày</label><input type="date" id="to"></div><div class="field"><label>Khách hàng</label><select id="filterCustomer"><option value="">Tất cả</option></select></div><div class="field qc-picker"><label for="modelSearch">Model</label><input id="modelSearch" placeholder="Tìm mã / tên model..." autocomplete="off" role="combobox" aria-controls="modelSuggestions" aria-expanded="false"><div id="modelSuggestions" class="qc-suggestions" role="listbox" aria-multiselectable="true" hidden></div><div id="modelChips" class="qc-chips" aria-live="polite"></div><button type="button" id="clearModels" class="btn secondary">Bỏ chọn model</button></div><div class="field qc-picker"><label for="inspectorSearch">Người kiểm</label><input id="inspectorSearch" placeholder="Tìm nhân viên..." autocomplete="off" role="combobox" aria-controls="inspectorSuggestions" aria-expanded="false"><div id="inspectorSuggestions" class="qc-suggestions" role="listbox" hidden></div><div id="inspectorChoice" class="qc-chips" aria-live="polite"></div></div><div class="field"><label>Ca</label><select id="filterShift"><option value="">Tất cả</option><option>Ca 1</option><option>Ca 2</option></select></div><div><button class="btn primary" type="button" onclick="loadStats()">Xem</button> <button class="btn secondary" type="button" onclick="exportExcel()">Xuất Excel</button></div></div><br><div class="cards" id="cards"></div><h3>Tổng hợp theo model</h3><div id="modelSummary"></div><h3>Biểu đồ lỗi OQC</h3><label>Xu hướng theo <select id="oqcTrendUnit"><option value="day">Ngày</option><option value="week">Tuần</option></select></label><div id="oqcDefectSummary"></div><h3>Lịch sử kiểm tra</h3><div id="oqcHistoryPager" aria-live="polite"></div><div style="overflow:auto"><table><thead><tr><th>Ngày kiểm tra</th><th>Giờ kiểm tra</th><th>Ca</th><th>Model</th><th>Khách hàng</th><th>LOT / Task</th><th>Người kiểm</th><th>Tổng</th><th>OK</th><th>NG</th><th>%OK</th><th>%NG</th><th>Kết quả</th><th>Lỗi / SL</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div></section><dialog id="oqcRecordDialog" style="width:min(1000px,95vw);max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg-panel);color:var(--text)"><div class="head">Chi tiết kiểm tra OQC <button type="button" id="oqcRecordClose" class="btn secondary">Đóng</button></div><div id="oqcRecordBody" class="body"></div></dialog></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="shared/supabase-client.js"></script><script src="shared/navbar.js"></script>
-<script src="shared/mes-qc-fields.js"></script>
-<script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
-<script src="shared/qc02-data.js"></script><script>
-const $=id=>document.getElementById(id),E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let identity='',catalog=[],dataRows=[],productMap={},employeeMap={},editing=null;
-const localDate=(d=new Date())=>{d=new Date(d-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};function message(s,bad=false){$('msg').textContent=s;$('msg').className='msg '+(bad?'err':'okmsg')}
-async function init(){await MesAuth.requireAuth();identity=await MesAuth.getCurrentUserIdentity()||'';$('who').textContent=identity;$('date').value=localDate();$('from').value=localDate();$('to').value=localDate();const [p,e,c]=await Promise.all([sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp'),Qc02Data.employees('oqc').then(data=>({data,error:null})),sb.from('quality_defect_catalog').select('*').contains('processes',['OQC']).eq('is_active',true).order('sort_order')]);if(p.error)return message(p.error.message,true);if(c.error)return message('Chưa chạy migration T38 danh mục lỗi dùng chung: '+c.error.message,true);(p.data||[]).forEach(x=>productMap[x.ma_sp]=x.ten_sp||'');$('code').innerHTML+=Object.keys(productMap).map(x=>'<option value="'+E(x)+'">'+E(x)+' — '+E(productMap[x])+'</option>').join('');fillEmployees(e.data||[]);catalog=c.data||[];renderDefects();calc();loadStats()}
-function renderDefects(){const groups=['NG ngoại quan','NG kích thước','NG khác'];$('defects').innerHTML=groups.map(g=>{const rows=catalog.filter(x=>x.defect_group===g);if(!rows.length)return'';return '<tr class="group"><td colspan="4">'+E(g)+'</td></tr>'+rows.map(x=>'<tr><td>'+E(g)+'</td><td>'+E(x.label)+'</td><td><input class="detail" data-code="'+E(x.code)+'" placeholder="VD: Ø10, mặt C..."></td><td><input class="defect" data-code="'+E(x.code)+'" data-label="'+E(x.label)+'" data-group="'+E(g)+'" type="number" min="0" step="1" value="0"></td></tr>').join('')}).join('');document.querySelectorAll('.defect').forEach(x=>x.oninput=calc)}
-function calc(){const t=Number($('total').value)||0,n=[...document.querySelectorAll('.defect')].reduce((s,x)=>s+(Number(x.value)||0),0),o=t-n;$('ng').value=n;$('defectTotal').textContent=n;$('ok').value=o>=0?o:'';$('okPct').value=t&&o>=0?(o/t*100).toLocaleString('vi-VN',{maximumFractionDigits:2})+'%':'0%';$('ngPct').value=t?(n/t*100).toLocaleString('vi-VN',{maximumFractionDigits:2})+'%':'0%'}$('total').oninput=calc;
-$('code').onchange=()=>{$('name').value=productMap[$('code').value]||'';loadPlan()};$('inspectorCode').onchange=()=>{$('inspectorName').value=employeeMap[$('inspectorCode').value]||''};
-function defectsPayload(){return [...document.querySelectorAll('.defect')].filter(x=>Number(x.value)>0).map(x=>({code:x.dataset.code,label:x.dataset.label,group:x.dataset.group,detail:document.querySelector('.detail[data-code="'+CSS.escape(x.dataset.code)+'"]').value.trim(),qty:Number(x.value)}))}
-$('form').onsubmit=async ev=>{ev.preventDefault();const total=Number($('total').value),ng=Number($('ng').value);if(!Number.isInteger(total)||total<=0||ng>total)return message('Tổng kiểm phải lớn hơn 0 và Tổng NG từ bảng lỗi không được vượt Tổng kiểm.',true);const ic=$('inspectorCode').value.trim(),orig=editing&&dataRows.find(x=>x.id===editing);if(!(ic in employeeMap)&&!(orig&&orig.inspector_code===ic))return message('Mã nhân viên kiểm tra phải chọn trong danh sách nhân viên OQC (vai trò OQC ở Quản lý danh mục › Nhân sự).',true);const d={inspection_date:$('date').value,lot_no:$('inspectionLot').value.trim()||null,task_no:$('inspectionTask').value.trim()||null,...MesOqcHistory.customerPayload($('code').value,orig),shift:$('shift').value,product_code:$('code').value,product_name:$('name').value,inspector_code:$('inspectorCode').value.trim(),inspector_name:$('inspectorName').value.trim(),total_qty:total,defects:defectsPayload(),note:$('note').value};$('save').disabled=true;let error;try{({error}=await (typeof MesOqcScope!=='undefined'?MesOqcScope.save(editing,d,identity):sb.rpc('oqc_save_daily_inspection_qc_v2',{p_id:editing,p_data:d,p_actor:identity})));}catch(e){error=e;}finally{$('save').disabled=false;}$('save').disabled=false;if(error)return message(error.message,true);message(editing?'Đã cập nhật và lưu lịch sử.':'Đã lưu kiểm tra OQC.');resetForm();loadStats()};
-function resetForm(){Qc02Data.standard('',document.getElementById('oqc-standard'));editing=null;$('form').reset();$('date').value=localDate();renderDefects();calc()}async function loadPlan(){const code=$('code').value,d=$('date').value;if(!code||!d)return $('plan').value='';const x=new Date(d+'T00:00:00'),day=['cn','t2','t3','t4','t5','t6','t7'][x.getDay()],mon=new Date(x);mon.setDate(x.getDate()-((x.getDay()+6)%7));const [p,o]=await Promise.all([sb.from('cd_khsx_tuan_plan').select(day).eq('tuan_bat_dau',localDate(mon)).eq('cong_doan','OQC').eq('ma_sp',code).maybeSingle(),sb.from('oqc_daily_inspection').select('total_qty').eq('inspection_date',d).eq('product_code',code)]);const plan=Number(p.data?.[day])||0,checked=(o.data||[]).reduce((s,r)=>s+Number(r.total_qty),0);$('plan').value=plan.toLocaleString('vi-VN')+' / '+checked.toLocaleString('vi-VN')+' / '+Math.max(0,plan-checked).toLocaleString('vi-VN')}
-function setPeriod(v){const now=new Date(),f=new Date(now);if(v==='week')f.setDate(now.getDate()-((now.getDay()+6)%7));else if(v==='month')f.setDate(1);else if(v==='custom')return;$('from').value=localDate(f);$('to').value=localDate(now);loadStats()}
-async function loadStats(){const {data,error}=await sb.from('oqc_daily_inspection').select('*').gte('inspection_date',$('from').value).lte('inspection_date',$('to').value).order('inspection_date',{ascending:false});if(error)return message(error.message,true);dataRows=data||[];renderStats()}
-function renderStats(){const t=dataRows.reduce((s,r)=>s+Number(r.total_qty),0),o=dataRows.reduce((s,r)=>s+Number(r.ok_qty),0),n=dataRows.reduce((s,r)=>s+Number(r.ng_qty),0);$('cards').innerHTML=[['Tổng kiểm',t],['OK',o],['NG',n],['%OK',t?(o/t*100).toFixed(2)+'%':'0%'],['%NG',t?(n/t*100).toFixed(2)+'%':'0%']].map(x=>'<div class="card">'+x[0]+'<b>'+x[1]+'</b></div>').join('');$('rows').innerHTML=dataRows.map(r=>'<tr data-record-id="'+r.id+'" tabindex="0" aria-label="Xem chi tiết record OQC"><td>'+MesOqcRecord.date(r)+'</td><td>'+E(r.shift)+'</td><td>'+E(r.product_code)+'</td><td>'+E(r.product_name)+'</td><td>'+E(r.inspector_code)+'</td><td>'+E(r.inspector_name)+'</td><td>'+r.total_qty+'</td><td>'+r.ok_qty+'</td><td>'+r.ng_qty+'</td><td>'+(r.total_qty?(r.ng_qty/r.total_qty*100).toFixed(2):0)+'%</td><td><button class="btn secondary" onclick="editRow('+r.id+')">Sửa</button></td></tr>').join('')}
-function editRow(id){const r=dataRows.find(x=>x.id===id);if(!r)return;editing=id;$('date').value=r.inspection_date;$('shift').value=r.shift;$('code').value=r.product_code;Qc02Data.standard(r.product_code,document.getElementById('oqc-standard'));$('name').value=r.product_name;if(!Array.from($('inspectorCode').options).some(x=>x.value===r.inspector_code)){const option=document.createElement('option');option.value=r.inspector_code;option.textContent=r.inspector_code+' — '+r.inspector_name; $('inspectorCode').append(option);}$('inspectorCode').value=r.inspector_code;$('inspectorName').value=r.inspector_name;$('total').value=r.total_qty;$('note').value=r.note||'';renderDefects();(r.defects||[]).forEach(d=>{const q=document.querySelector('.defect[data-code="'+CSS.escape(d.code)+'"]'),z=document.querySelector('.detail[data-code="'+CSS.escape(d.code)+'"]');if(q)q.value=d.qty;if(z)z.value=d.detail||''});calc();scrollTo({top:0,behavior:'smooth'})}
-function exportExcel(){const out=dataRows.map(r=>({Ngày:r.inspection_date,Ca:r.shift,Model:r.product_code,'Tên SP':r.product_name,'Mã NV':r.inspector_code,'Người kiểm':r.inspector_name,'Tổng kiểm':r.total_qty,OK:r.ok_qty,NG:r.ng_qty,'%OK':r.total_qty?r.ok_qty/r.total_qty:0,'%NG':r.total_qty?r.ng_qty/r.total_qty:0,...Object.fromEntries((r.defects||[]).map(x=>[(x.label+(x.detail?' — '+x.detail:'')),x.qty]))}));const ws=XLSX.utils.json_to_sheet(out),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'OQC');XLSX.writeFile(wb,'thong-ke-oqc.xlsx')}
-</script><script>
-(function(){function t(){var d=new Date(),p=n=>String(n).padStart(2,"0");document.getElementById("hdrTime").textContent=p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());document.getElementById("hdrDate").textContent=["CN","T2","T3","T4","T5","T6","T7"][d.getDay()]+", "+p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear();}t();setInterval(t,1000);})();
-</script>
-<script src="shared/mes-oqc-record.js"></script><script src="shared/oqc-defect-charts.js?v=20261022-scopes"></script><script src="shared/mes-oqc-history.js?v=T122"></script><script src="shared/mes-oqc-scope.js?v=20261022-scopes"></script>
-<script>
-function fillEmployees(rows){const selected=$('inspectorCode').value;employeeMap={};const select=$('inspectorCode');select.replaceChildren();const empty=document.createElement('option');empty.value='';empty.textContent='-- Chọn nhân viên OQC --';select.append(empty);for(const r of rows){employeeMap[r.code]=r.name;const option=document.createElement('option');option.value=r.code;option.textContent=r.code+' — '+r.name;select.append(option);}if(selected in employeeMap)select.value=selected;else if(editing){const original=dataRows.find(r=>r.id===editing);if(original&&original.inspector_code===selected){const option=document.createElement('option');option.value=selected;option.textContent=selected+' — '+original.inspector_name+' (bản ghi cũ)';select.append(option);select.value=selected;}}}
-document.getElementById('code').addEventListener('change',()=>Qc02Data.standard($('code').value,$('oqc-standard')));
-document.getElementById('inspectorCode').addEventListener('focus',async()=>{try{fillEmployees(await Qc02Data.employees('oqc'));}catch(e){message('Không tải được nhân sự OQC: '+e.message,true);}});
-init().catch(e=>message(e.message,true));
-</script>
-<script src="shared/oqc-workspace.js?v=T139"></script><script src="shared/oqc-dashboard-math.js?v=20261022-config"></script><script src="shared/oqc-dashboard.js?v=20261022-scopes"></script>
-</body></html>
+      .wrap {
+        padding: 6px 12px 60px;
+      }
+      .ro {
+        background: var(--bg-sunken);
+      }
+      .msg {
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        display: none;
+        font-weight: 600;
+      }
+      .err {
+        display: block;
+        background: var(--alarm-bg);
+        color: var(--alarm-fg);
+        border: 1px solid #fecaca;
+      }
+      .okmsg {
+        display: block;
+        background: var(--run-bg);
+        color: var(--run-fg);
+        border: 1px solid #a7f3d0;
+      }
+      .defect-table input.defect {
+        width: 120px;
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .defect-table input.detail {
+        width: 100%;
+        max-width: 320px;
+      }
+      .group td {
+        background: var(--bg-sunken);
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .total-row td {
+        font-weight: 700;
+        background: var(--warn-bg);
+        color: var(--warn-fg);
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .card {
+        background: var(--bg-sunken);
+        border: 1px solid var(--border);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .card b {
+        display: block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+        text-transform: none;
+        margin-top: 2px;
+      }
+      .trend-chip {
+        display: inline-block;
+        padding: 4px 8px;
+        margin: 3px;
+        border-radius: 5px;
+        background: var(--alarm-bg);
+        color: var(--alarm-fg);
+        font-size: 12px;
+      }
+      @media (max-width: 900px) {
+        .grid,
+        .cards {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .qc-picker {
+        position: relative;
+      }
+      .qc-suggestions {
+        position: absolute;
+        top: 65px;
+        left: 0;
+        right: 0;
+        z-index: 30;
+        max-height: 250px;
+        overflow: auto;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 12px #0005;
+      }
+      .qc-suggestions button {
+        display: block;
+        text-align: left;
+        width: 100%;
+        border: 0;
+        padding: 10px;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .qc-suggestions button:hover,
+      .qc-suggestions button:focus {
+        background: var(--bg);
+      }
+      .qc-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .qc-chips button {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 5px 10px;
+        background: var(--bg-panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+    </style>
+    <link rel="stylesheet" href="shared/oqc-workspace.css?v=T140" />
+  </head>
+  <body>
+    <header class="mes-hdr">
+      <div class="brand"><span class="co">Toyotaki</span><span class="title">OQC kiểm tra</span></div>
+      <nav class="header-actions" id="oqcHeaderActions" aria-label="Chức năng OQC">
+        <a class="btn-ghost" href="oqc.html">Đóng gói Pallet</a><a class="btn-ghost" href="khsx-tuan.html">KHSX tuần</a>
+      </nav>
+      <span class="header-user" id="who"></span>
+      <div class="header-clock">
+        <span class="date" id="hdrDate">—</span><span class="time" id="hdrTime">--:--:--</span>
+      </div>
+    </header>
+    <main class="wrap">
+      <div id="msg" class="msg"></div>
+      <section class="panel">
+        <div class="head">Nhập kiểm tra xuất hàng</div>
+        <div class="body">
+          <form id="form">
+            <div class="grid">
+              <div class="field"><label>Ngày kiểm tra</label><input type="date" id="date" required /></div>
+              <div class="field"><label>LOT (nếu có)</label><input id="inspectionLot" /></div>
+              <div class="field"><label>Task No./tem (nếu có)</label><input id="inspectionTask" /></div>
+              <div class="field">
+                <label>Ca</label
+                ><select id="shift">
+                  <option>Ca 1</option>
+                  <option>Ca 2</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Mã sản phẩm / Model</label
+                ><select id="code" required>
+                  <option value="">-- Chọn Model --</option>
+                </select>
+              </div>
+              <div class="field"><label>Tên sản phẩm</label><input id="name" class="ro" readonly /></div>
+              <div class="field" id="oqc-standard">Chọn model để xem tiêu chuẩn</div>
+              <div class="field">
+                <label>Mã nhân viên kiểm tra</label
+                ><select id="inspectorCode" required>
+                  <option value="">-- Chọn nhân viên OQC --</option>
+                </select>
+              </div>
+              <div class="field"><label>Tên người kiểm</label><input id="inspectorName" class="ro" readonly /></div>
+              <div class="field">
+                <label>Tổng kiểm</label><input type="number" min="0" step="1" id="total" required />
+              </div>
+              <div class="field"><label>Tổng NG (từ bảng lỗi)</label><input id="ng" class="ro" readonly /></div>
+              <div class="field"><label>OK</label><input id="ok" class="ro" readonly /></div>
+              <div class="field"><label>% OK</label><input id="okPct" class="ro" readonly /></div>
+              <div class="field"><label>% NG</label><input id="ngPct" class="ro" readonly /></div>
+              <div class="field"><label>KHSX / Đã kiểm / Còn lại</label><input id="plan" class="ro" readonly /></div>
+            </div>
+            <h3>Chi tiết lỗi</h3>
+            <button type="button" id="addOtherDefect" class="btn secondary">+ Thêm lỗi khác</button>
+            <div style="overflow: auto">
+              <table class="defect-table">
+                <thead>
+                  <tr>
+                    <th>Nhóm lỗi</th>
+                    <th>Tên lỗi</th>
+                    <th>Chi tiết / kích thước</th>
+                    <th>SL NG</th>
+                  </tr>
+                </thead>
+                <tbody id="defects"></tbody>
+                <tbody id="otherDefects"></tbody>
+                <tfoot>
+                  <tr class="total-row">
+                    <td colspan="3">Tổng NG</td>
+                    <td id="defectTotal">0</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <br />
+            <div class="field"><label>Ghi chú</label><textarea id="note"></textarea></div>
+            <br /><button class="btn primary" id="save">Lưu</button>
+            <button type="button" class="btn secondary" onclick="resetForm()">Làm mới</button>
+          </form>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="head">Thống kê OQC</div>
+        <div class="body">
+          <div class="grid">
+            <div class="field">
+              <label>Xem nhanh</label
+              ><select id="period" onchange="setPeriod(this.value)">
+                <option value="day" selected>Hôm nay</option>
+                <option value="week">Tuần này</option>
+                <option value="month">Tháng này</option>
+                <option value="custom">Khoảng ngày</option>
+              </select>
+            </div>
+            <div class="field"><label>Từ ngày</label><input type="date" id="from" /></div>
+            <div class="field"><label>Đến ngày</label><input type="date" id="to" /></div>
+            <div class="field">
+              <label>Khách hàng</label
+              ><select id="filterCustomer">
+                <option value="">Tất cả</option>
+              </select>
+            </div>
+            <div class="field qc-picker">
+              <label for="modelSearch">Model</label
+              ><input
+                id="modelSearch"
+                placeholder="Tìm mã / tên model..."
+                autocomplete="off"
+                role="combobox"
+                aria-controls="modelSuggestions"
+                aria-expanded="false"
+              />
+              <div id="modelSuggestions" class="qc-suggestions" role="listbox" aria-multiselectable="true" hidden></div>
+              <div id="modelChips" class="qc-chips" aria-live="polite"></div>
+              <button type="button" id="clearModels" class="btn secondary">Bỏ chọn model</button>
+            </div>
+            <div class="field qc-picker">
+              <label for="inspectorSearch">Người kiểm</label
+              ><input
+                id="inspectorSearch"
+                placeholder="Tìm nhân viên..."
+                autocomplete="off"
+                role="combobox"
+                aria-controls="inspectorSuggestions"
+                aria-expanded="false"
+              />
+              <div id="inspectorSuggestions" class="qc-suggestions" role="listbox" hidden></div>
+              <div id="inspectorChoice" class="qc-chips" aria-live="polite"></div>
+            </div>
+            <div class="field">
+              <label>Ca</label
+              ><select id="filterShift">
+                <option value="">Tất cả</option>
+                <option>Ca 1</option>
+                <option>Ca 2</option>
+              </select>
+            </div>
+            <div>
+              <button class="btn primary" type="button" onclick="loadStats()">Xem</button>
+              <button class="btn secondary" type="button" onclick="exportExcel()">Xuất Excel</button>
+            </div>
+          </div>
+          <br />
+          <div class="cards" id="cards"></div>
+          <h3>Tổng hợp theo model</h3>
+          <div id="modelSummary"></div>
+          <h3>Biểu đồ lỗi OQC</h3>
+          <label
+            >Xu hướng theo
+            <select id="oqcTrendUnit">
+              <option value="day">Ngày</option>
+              <option value="week">Tuần</option>
+            </select></label
+          >
+          <div id="oqcDefectSummary"></div>
+          <h3>Lịch sử kiểm tra</h3>
+          <div id="oqcHistoryPager" aria-live="polite"></div>
+          <div style="overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày kiểm tra</th>
+                  <th>Giờ kiểm tra</th>
+                  <th>Ca</th>
+                  <th>Model</th>
+                  <th>Khách hàng</th>
+                  <th>LOT / Task</th>
+                  <th>Người kiểm</th>
+                  <th>Tổng</th>
+                  <th>OK</th>
+                  <th>NG</th>
+                  <th>%OK</th>
+                  <th>%NG</th>
+                  <th>Kết quả</th>
+                  <th>Lỗi / SL</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <dialog
+        id="oqcRecordDialog"
+        style="
+          width: min(1000px, 95vw);
+          max-height: 90vh;
+          overflow: auto;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          background: var(--bg-panel);
+          color: var(--text);
+        "
+      >
+        <div class="head">
+          Chi tiết kiểm tra OQC <button type="button" id="oqcRecordClose" class="btn secondary">Đóng</button>
+        </div>
+        <div id="oqcRecordBody" class="body"></div>
+      </dialog>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="shared/supabase-client.js"></script>
+    <script src="shared/navbar.js"></script>
+    <script src="shared/mes-qc-fields.js"></script>
+    <script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
+    <script src="shared/qc02-data.js"></script>
+    <script>
+      const $ = (id) => document.getElementById(id),
+        E = (s) =>
+          String(s ?? "").replace(
+            /[&<>"']/g,
+            (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+          );
+      let identity = "",
+        catalog = [],
+        dataRows = [],
+        productMap = {},
+        employeeMap = {},
+        editing = null;
+      const localDate = (d = new Date()) => {
+        d = new Date(d - d.getTimezoneOffset() * 60000);
+        return d.toISOString().slice(0, 10);
+      };
+      /* T140: lỗi kỹ thuật (mã Postgres, mạng, máy chủ thiếu chức năng) → câu dễ hiểu; chi tiết thu vào <details>. */
+      function oqcFriendlyError(e, context) {
+        const code = String(e?.code || ""),
+          raw = String(e?.message || e || ""),
+          detail = [code, raw, e?.details, e?.hint].filter(Boolean).join(" · ");
+        let text;
+        if (code === "42501" || /permission denied|not authorized|không có quyền|row-level security|JWT/i.test(raw))
+          text = "Tài khoản chưa có quyền OQC — liên hệ QC Manager.";
+        else if (/failed to fetch|networkerror|network request|load failed|timeout|ERR_NETWORK/i.test(raw))
+          text = "Mất kết nối, thử lại.";
+        else if (
+          ["PGRST202", "PGRST205", "42883", "42P01", "OQC_BACKEND"].includes(code) ||
+          /could not find the function|does not exist|schema cache/i.test(raw)
+        )
+          text = "Chức năng OQC trên máy chủ chưa sẵn sàng — báo quản trị hệ thống.";
+        else if ((!code || code === "P0001") && raw)
+          /* lỗi kiểm tra dữ liệu do chính hệ thống viết (tiếng Việt) — hiện nguyên văn */
+          return { text: (context ? context + ": " : "") + raw, detail: "" };
+        else text = "Lỗi máy chủ — thử lại hoặc báo quản trị hệ thống.";
+        return { text: (context ? context + ": " : "") + text, detail };
+      }
+      function oqcShowError(target, e, context) {
+        const f = oqcFriendlyError(e, context);
+        target.replaceChildren(document.createTextNode(f.text));
+        if (f.detail) {
+          const d = document.createElement("details"),
+            s = document.createElement("summary"),
+            p = document.createElement("code");
+          d.className = "oqc-tech";
+          s.textContent = "Chi tiết kỹ thuật";
+          p.textContent = f.detail;
+          d.append(s, p);
+          target.append(d);
+        }
+        return f;
+      }
+      function message(s, bad = false, context) {
+        if (bad && typeof s === "object" && s) oqcShowError($("msg"), s, context);
+        else $("msg").textContent = s;
+        $("msg").className = "msg " + (bad ? "err" : "okmsg");
+      }
+      async function init() {
+        await MesAuth.requireAuth();
+        identity = (await MesAuth.getCurrentUserIdentity()) || "";
+        $("who").textContent = identity;
+        $("date").value = localDate();
+        $("from").value = localDate();
+        $("to").value = localDate();
+        const [p, e, c] = await Promise.all([
+          sb.from("master_products").select("ma_sp,ten_sp").order("ma_sp"),
+          Qc02Data.employees("oqc").then((data) => ({ data, error: null })),
+          sb
+            .from("quality_defect_catalog")
+            .select("*")
+            .contains("processes", ["OQC"])
+            .eq("is_active", true)
+            .order("sort_order"),
+        ]);
+        if (p.error) return message(p.error, true, "Không tải được danh mục sản phẩm");
+        if (c.error) return message(c.error, true, "Không tải được danh mục lỗi OQC");
+        (p.data || []).forEach((x) => (productMap[x.ma_sp] = x.ten_sp || ""));
+        $("code").innerHTML += Object.keys(productMap)
+          .map((x) => '<option value="' + E(x) + '">' + E(x) + " — " + E(productMap[x]) + "</option>")
+          .join("");
+        fillEmployees(e.data || []);
+        catalog = c.data || [];
+        renderDefects();
+        calc();
+        loadStats();
+      }
+      function renderDefects() {
+        const groups = ["NG ngoại quan", "NG kích thước", "NG khác"];
+        $("defects").innerHTML = groups
+          .map((g) => {
+            const rows = catalog.filter((x) => x.defect_group === g);
+            if (!rows.length) return "";
+            return (
+              '<tr class="group"><td colspan="4">' +
+              E(g) +
+              "</td></tr>" +
+              rows
+                .map(
+                  (x) =>
+                    "<tr><td>" +
+                    E(g) +
+                    "</td><td>" +
+                    E(x.label) +
+                    '</td><td><input class="detail" data-code="' +
+                    E(x.code) +
+                    '" placeholder="VD: Ø10, mặt C..."></td><td><input class="defect" data-code="' +
+                    E(x.code) +
+                    '" data-label="' +
+                    E(x.label) +
+                    '" data-group="' +
+                    E(g) +
+                    '" type="number" min="0" step="1" value="0"></td></tr>',
+                )
+                .join("")
+            );
+          })
+          .join("");
+        document.querySelectorAll(".defect").forEach((x) => (x.oninput = calc));
+      }
+      function calc() {
+        const t = Number($("total").value) || 0,
+          n = [...document.querySelectorAll(".defect")].reduce((s, x) => s + (Number(x.value) || 0), 0),
+          o = t - n;
+        $("ng").value = n;
+        $("defectTotal").textContent = n;
+        $("ok").value = o >= 0 ? o : "";
+        $("okPct").value =
+          t && o >= 0 ? ((o / t) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 }) + "%" : "0%";
+        $("ngPct").value = t ? ((n / t) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 }) + "%" : "0%";
+      }
+      $("total").oninput = calc;
+      $("code").onchange = () => {
+        $("name").value = productMap[$("code").value] || "";
+        loadPlan();
+      };
+      $("inspectorCode").onchange = () => {
+        $("inspectorName").value = employeeMap[$("inspectorCode").value] || "";
+      };
+      function defectsPayload() {
+        return [...document.querySelectorAll(".defect")]
+          .filter((x) => Number(x.value) > 0)
+          .map((x) => ({
+            code: x.dataset.code,
+            label: x.dataset.label,
+            group: x.dataset.group,
+            detail: document.querySelector('.detail[data-code="' + CSS.escape(x.dataset.code) + '"]').value.trim(),
+            qty: Number(x.value),
+          }));
+      }
+      $("form").onsubmit = async (ev) => {
+        ev.preventDefault();
+        const total = Number($("total").value),
+          ng = Number($("ng").value);
+        if (!Number.isInteger(total) || total <= 0 || ng > total)
+          return message("Tổng kiểm phải lớn hơn 0 và Tổng NG từ bảng lỗi không được vượt Tổng kiểm.", true);
+        const ic = $("inspectorCode").value.trim(),
+          orig = editing && dataRows.find((x) => x.id === editing);
+        if (!(ic in employeeMap) && !(orig && orig.inspector_code === ic))
+          return message(
+            "Mã nhân viên kiểm tra phải chọn trong danh sách nhân viên OQC (vai trò OQC ở Quản lý danh mục › Nhân sự).",
+            true,
+          );
+        const d = {
+          inspection_date: $("date").value,
+          lot_no: $("inspectionLot").value.trim() || null,
+          task_no: $("inspectionTask").value.trim() || null,
+          ...MesOqcHistory.customerPayload($("code").value, orig),
+          shift: $("shift").value,
+          product_code: $("code").value,
+          product_name: $("name").value,
+          inspector_code: $("inspectorCode").value.trim(),
+          inspector_name: $("inspectorName").value.trim(),
+          total_qty: total,
+          defects: defectsPayload(),
+          note: $("note").value,
+        };
+        $("save").disabled = true;
+        let error;
+        try {
+          ({ error } = await (typeof MesOqcScope !== "undefined"
+            ? MesOqcScope.save(editing, d, identity)
+            : sb.rpc("oqc_save_daily_inspection_qc_v2", { p_id: editing, p_data: d, p_actor: identity })));
+        } catch (e) {
+          error = e;
+        } finally {
+          $("save").disabled = false;
+        }
+        $("save").disabled = false;
+        if (error) return message(error, true, "Chưa lưu được");
+        message(editing ? "Đã cập nhật và lưu lịch sử." : "Đã lưu kiểm tra OQC.");
+        resetForm();
+        loadStats();
+      };
+      function resetForm() {
+        Qc02Data.standard("", document.getElementById("oqc-standard"));
+        editing = null;
+        $("form").reset();
+        $("date").value = localDate();
+        renderDefects();
+        calc();
+      }
+      async function loadPlan() {
+        const code = $("code").value,
+          d = $("date").value;
+        if (!code || !d) return ($("plan").value = "");
+        const x = new Date(d + "T00:00:00"),
+          day = ["cn", "t2", "t3", "t4", "t5", "t6", "t7"][x.getDay()],
+          mon = new Date(x);
+        mon.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+        const [p, o] = await Promise.all([
+          sb
+            .from("cd_khsx_tuan_plan")
+            .select(day)
+            .eq("tuan_bat_dau", localDate(mon))
+            .eq("cong_doan", "OQC")
+            .eq("ma_sp", code)
+            .maybeSingle(),
+          sb.from("oqc_daily_inspection").select("total_qty").eq("inspection_date", d).eq("product_code", code),
+        ]);
+        const plan = Number(p.data?.[day]) || 0,
+          checked = (o.data || []).reduce((s, r) => s + Number(r.total_qty), 0);
+        $("plan").value =
+          plan.toLocaleString("vi-VN") +
+          " / " +
+          checked.toLocaleString("vi-VN") +
+          " / " +
+          Math.max(0, plan - checked).toLocaleString("vi-VN");
+      }
+      function setPeriod(v) {
+        const now = new Date(),
+          f = new Date(now);
+        if (v === "week") f.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+        else if (v === "month") f.setDate(1);
+        else if (v === "custom") return;
+        $("from").value = localDate(f);
+        $("to").value = localDate(now);
+        loadStats();
+      }
+      async function loadStats() {
+        const { data, error } = await sb
+          .from("oqc_daily_inspection")
+          .select("*")
+          .gte("inspection_date", $("from").value)
+          .lte("inspection_date", $("to").value)
+          .order("inspection_date", { ascending: false });
+        if (error) return message(error, true, "Không tải được thống kê");
+        dataRows = data || [];
+        renderStats();
+      }
+      function renderStats() {
+        const t = dataRows.reduce((s, r) => s + Number(r.total_qty), 0),
+          o = dataRows.reduce((s, r) => s + Number(r.ok_qty), 0),
+          n = dataRows.reduce((s, r) => s + Number(r.ng_qty), 0);
+        $("cards").innerHTML = [
+          ["Tổng kiểm", t],
+          ["OK", o],
+          ["NG", n],
+          ["%OK", t ? ((o / t) * 100).toFixed(2) + "%" : "0%"],
+          ["%NG", t ? ((n / t) * 100).toFixed(2) + "%" : "0%"],
+        ]
+          .map((x) => '<div class="card">' + x[0] + "<b>" + x[1] + "</b></div>")
+          .join("");
+        $("rows").innerHTML = dataRows
+          .map(
+            (r) =>
+              '<tr data-record-id="' +
+              r.id +
+              '" tabindex="0" aria-label="Xem chi tiết record OQC"><td>' +
+              MesOqcRecord.date(r) +
+              "</td><td>" +
+              E(r.shift) +
+              "</td><td>" +
+              E(r.product_code) +
+              "</td><td>" +
+              E(r.product_name) +
+              "</td><td>" +
+              E(r.inspector_code) +
+              "</td><td>" +
+              E(r.inspector_name) +
+              "</td><td>" +
+              r.total_qty +
+              "</td><td>" +
+              r.ok_qty +
+              "</td><td>" +
+              r.ng_qty +
+              "</td><td>" +
+              (r.total_qty ? ((r.ng_qty / r.total_qty) * 100).toFixed(2) : 0) +
+              '%</td><td><button class="btn secondary" onclick="editRow(' +
+              r.id +
+              ')">Sửa</button></td></tr>',
+          )
+          .join("");
+      }
+      function editRow(id) {
+        const r = dataRows.find((x) => x.id === id);
+        if (!r) return;
+        editing = id;
+        $("date").value = r.inspection_date;
+        $("shift").value = r.shift;
+        $("code").value = r.product_code;
+        Qc02Data.standard(r.product_code, document.getElementById("oqc-standard"));
+        $("name").value = r.product_name;
+        if (!Array.from($("inspectorCode").options).some((x) => x.value === r.inspector_code)) {
+          const option = document.createElement("option");
+          option.value = r.inspector_code;
+          option.textContent = r.inspector_code + " — " + r.inspector_name;
+          $("inspectorCode").append(option);
+        }
+        $("inspectorCode").value = r.inspector_code;
+        $("inspectorName").value = r.inspector_name;
+        $("total").value = r.total_qty;
+        $("note").value = r.note || "";
+        renderDefects();
+        (r.defects || []).forEach((d) => {
+          const q = document.querySelector('.defect[data-code="' + CSS.escape(d.code) + '"]'),
+            z = document.querySelector('.detail[data-code="' + CSS.escape(d.code) + '"]');
+          if (q) q.value = d.qty;
+          if (z) z.value = d.detail || "";
+        });
+        calc();
+        scrollTo({ top: 0, behavior: "smooth" });
+      }
+      function exportExcel() {
+        const out = dataRows.map((r) => ({
+          Ngày: r.inspection_date,
+          Ca: r.shift,
+          Model: r.product_code,
+          "Tên SP": r.product_name,
+          "Mã NV": r.inspector_code,
+          "Người kiểm": r.inspector_name,
+          "Tổng kiểm": r.total_qty,
+          OK: r.ok_qty,
+          NG: r.ng_qty,
+          "%OK": r.total_qty ? r.ok_qty / r.total_qty : 0,
+          "%NG": r.total_qty ? r.ng_qty / r.total_qty : 0,
+          ...Object.fromEntries((r.defects || []).map((x) => [x.label + (x.detail ? " — " + x.detail : ""), x.qty])),
+        }));
+        const ws = XLSX.utils.json_to_sheet(out),
+          wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "OQC");
+        XLSX.writeFile(wb, "thong-ke-oqc.xlsx");
+      }
+    </script>
+    <script>
+      (function () {
+        function t() {
+          var d = new Date(),
+            p = (n) => String(n).padStart(2, "0");
+          document.getElementById("hdrTime").textContent =
+            p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+          document.getElementById("hdrDate").textContent =
+            ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d.getDay()] +
+            ", " +
+            p(d.getDate()) +
+            "/" +
+            p(d.getMonth() + 1) +
+            "/" +
+            d.getFullYear();
+        }
+        t();
+        setInterval(t, 1000);
+      })();
+    </script>
+    <script src="shared/mes-oqc-record.js?v=T140"></script>
+    <script src="shared/oqc-defect-charts.js?v=20261022-scopes"></script>
+    <script src="shared/mes-oqc-history.js?v=T140"></script>
+    <script src="shared/mes-oqc-scope.js?v=20261022-scopes"></script>
+    <script>
+      function fillEmployees(rows) {
+        const selected = $("inspectorCode").value;
+        employeeMap = {};
+        const select = $("inspectorCode");
+        select.replaceChildren();
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "-- Chọn nhân viên OQC --";
+        select.append(empty);
+        for (const r of rows) {
+          employeeMap[r.code] = r.name;
+          const option = document.createElement("option");
+          option.value = r.code;
+          option.textContent = r.code + " — " + r.name;
+          select.append(option);
+        }
+        if (selected in employeeMap) select.value = selected;
+        else if (editing) {
+          const original = dataRows.find((r) => r.id === editing);
+          if (original && original.inspector_code === selected) {
+            const option = document.createElement("option");
+            option.value = selected;
+            option.textContent = selected + " — " + original.inspector_name + " (bản ghi cũ)";
+            select.append(option);
+            select.value = selected;
+          }
+        }
+      }
+      document
+        .getElementById("code")
+        .addEventListener("change", () => Qc02Data.standard($("code").value, $("oqc-standard")));
+      document.getElementById("inspectorCode").addEventListener("focus", async () => {
+        try {
+          fillEmployees(await Qc02Data.employees("oqc"));
+        } catch (e) {
+          message(e, true, "Không tải được nhân sự OQC");
+        }
+      });
+      init().catch((e) => message(e, true));
+    </script>
+    <script src="shared/oqc-workspace.js?v=T140"></script>
+    <script src="shared/oqc-dashboard-math.js?v=20261022-config"></script>
+    <script src="shared/oqc-dashboard.js?v=T140"></script>
+  </body>
+</html>
