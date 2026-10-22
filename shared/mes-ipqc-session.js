@@ -2,7 +2,8 @@
 const MesIpqcSession=(()=>{
  let current=null,offset=0,busy=false,ending=null,key='',userId='',storePromise=null,persistTimer,loadToken=0,ready=false;
  const panel=document.createElement('section');panel.className='session-panel';panel.style.cssText='padding:12px;border:1px solid #94a3b8;border-radius:8px;margin:12px 0';
- const start=document.createElement('button');start.type='button';start.textContent='Bắt đầu kiểm tra';start.className='btn btn-primary';start.disabled=true;
+ const css=document.createElement('style');css.textContent='.session-panel{background:#eff6ff;border:2px solid #2563eb!important}.ipqc-start-button{display:block;width:100%;min-height:60px;padding:14px 18px!important;font-size:19px!important;font-weight:800!important;line-height:1.35;background:#1d4ed8!important;color:#fff!important;border:2px solid #1e40af!important;border-radius:10px;box-shadow:0 3px 8px #1d4ed833;touch-action:manipulation}.ipqc-start-button:disabled{opacity:.5;box-shadow:none}.ipqc-start-button:focus-visible{outline:3px solid #f59e0b;outline-offset:3px}.ipqc-start-button[hidden]{display:none}';document.head.append(css);
+ const start=document.createElement('button');start.type='button';start.textContent='Bắt đầu kiểm tra';start.id='ipqc-session-start';start.className='btn btn-primary ipqc-start-button';start.disabled=true;
  const status=document.createElement('p');status.id='ipqc-session-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.style.cssText='white-space:pre-wrap;margin:8px 0';
  const retry=document.createElement('button');retry.id='ipqc-session-retry';retry.type='button';retry.textContent='Kiểm tra lại phiên';retry.className='btn';retry.hidden=true;
  const timer=document.createElement('output');timer.style.cssText='display:block;margin-top:8px;font-weight:bold';timer.setAttribute('aria-live','off');panel.append(start,status,retry,timer);document.getElementById('ck-checklist').before(panel);

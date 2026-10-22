@@ -16,17 +16,18 @@ const {backend}=require('./oqc-dashboard-fixture.cjs');
  await page.screenshot({path:'.review/oqc-dashboard-capa.png',fullPage:true});await page.locator('#oqcCapaClose').click();
  for(const [code,qty,hours]of [['A',630,3.5],['A',630,3.5],['B',360,2]]){
   const before=await page.evaluate(()=>sb.tables.oqc_daily_inspection.length);await page.locator('#oqcNewReport').click();
-  await page.locator('#code').selectOption(code);await page.locator('#inspectorCode').selectOption('QC01');await page.locator('#total').fill(String(qty));await page.locator('#ng').fill('2');
+  await page.locator('#code').selectOption(code);await page.locator('#inspectorCode').selectOption('QC01');await page.locator('#total').fill(String(qty));
   for(const input of await page.locator('#defects .defect').all())await input.fill('2');
-  await page.locator('#oqcAddLabor').click();await page.locator('#oqcLaborRows input').fill(String(hours));
+  await page.locator('#oqcInspectionHours').fill(String(hours).replace('.',','));
+  if(before===0){await page.locator('#oqcReportPhotos').setInputFiles({name:'fault.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvhoAAAAASUVORK5CYII=','base64')});}
   await page.locator('#save').click();await page.waitForFunction(n=>sb.tables.oqc_daily_inspection.length===n,before+1);
   await page.waitForFunction(()=>!document.getElementById('oqcReportDialog').open);
  }
  await page.waitForFunction(()=>OqcDashboard.getSnapshot()?.records.length===3);
- assert.deepEqual(await page.evaluate(()=>{const s=OqcDashboardMath.summary(OqcDashboard.getSnapshot().records,OqcDashboard.getSnapshot().plans);return [s.checked,s.ng,s.hours,s.people,Math.round(s.efficiency)];}),[1620,6,9,1,90]);
- await page.screenshot({path:'.review/oqc-dashboard-results.png',fullPage:true});console.log('PASS Chromium report workflow: three submissions, correct unique NG/person and allocated hours, 90% efficiency');
- await page.locator('#modelSummary button').first().click();await page.locator('#oqcModelRecords button').first().click();
- assert.match(await page.locator('#oqcRecordBody').textContent(),/Worker One/);await page.locator('#oqcRecordClose').click();await page.locator('#oqcModelClose').click();
+ assert.deepEqual(await page.evaluate(()=>{const s=OqcDashboardMath.summary(OqcDashboard.getSnapshot().records,OqcDashboard.getSnapshot().plans);return [s.checked,s.ng,s.hours,s.people,Math.round(s.efficiency)];}),[1620,12,9,1,90]);
+ await page.screenshot({path:'.review/oqc-dashboard-results.png',fullPage:true});console.log('PASS Chromium report workflow: three submissions, correct calculated NG/unique person and allocated hours, 90% efficiency');
+ await page.locator('#modelSummary button').first().click();await page.locator('#oqcModelRecords button').last().click();
+ assert.match(await page.locator('#oqcRecordBody').textContent(),/Worker One/);assert.equal(await page.locator('#oqcRecordBody img').count(),1);await page.locator('#oqcRecordBody img').click();await page.locator('.qc-zoom-viewer').getByRole('button',{name:'Phóng to +',exact:true}).click();await page.locator('.qc-zoom-viewer').getByRole('button',{name:'Đóng ×',exact:true}).click();await page.locator('#oqcRecordClose').click();await page.locator('#oqcModelClose').click();
  await page.locator('#period').selectOption('week');await page.waitForFunction(()=>OqcDashboard.getSnapshot()?.from===document.getElementById('from').value&&document.getElementById('period').value==='week');
  console.log('PASS Chromium model detail and weekly filters use the current range');
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'.review/oqc-dashboard-mobile.png',fullPage:true});
