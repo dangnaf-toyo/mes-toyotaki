@@ -1,7 +1,7 @@
 /* Read-only NCP detail/printing. Existing save and approval RPCs are unchanged. */
 const Qc02Ncp = (() => {
   const labels = {
-    id_ncp: 'Số phiếu', ma_sp: 'Mã sản phẩm', ten_sp: 'Tên sản phẩm / model', cong_doan: 'Công đoạn',
+    source_type:'Nguồn phát sinh',source_department:'Bộ phận/công đoạn',source_customer_code:'Mã khách hàng',source_customer_name:'Khách hàng',source_images:'Ảnh vấn đề',id_ncp: 'Số phiếu', ma_sp: 'Mã sản phẩm', ten_sp: 'Tên sản phẩm / model', cong_doan: 'Công đoạn',
     ma_may: 'Máy', so_khuon: 'Số khuôn', mo_ta_loi: 'Nội dung lỗi', ngay_tao: 'Thời gian mở phiếu',
     nguoi_mo_case: 'Người mở phiếu', nguoi_dam_nhiem: 'Người xử lý', nguoi_dam_nhiem_doi_sach: 'Người trả lời',
     so_luong_nghi_van: 'Số lượng nghi vấn', so_luong_ng_du_kien: 'Số lượng NG tham khảo',
@@ -40,10 +40,11 @@ const Qc02Ncp = (() => {
     target.append(gallery);
   }
   function record(target, data) {
-    const rows = Object.entries(data || {}).filter(([key]) => !key.startsWith('doi_sach_') && !key.startsWith('hinh_anh_'));
+    const rows = Object.entries(data || {}).filter(([key]) => key!=='source_request_id' && !key.startsWith('doi_sach_') && !key.startsWith('hinh_anh_'));
     Qc02View.table(target, ['Thông tin', 'Nội dung'], rows.map(([key, value]) => {
       let display = value && typeof value === 'object' ? JSON.stringify(value) : value ?? '—';
 
+      if(key==='source_type')display=({machine:'Máy đúc/IPQC',department:'Công đoạn/bộ phận',customer:'Khách hàng'})[value]||'Chưa ghi nhận';
       if(key==='defects'&&Array.isArray(value))display=value.map(d=>MesQcFields.defectName(d)+': '+d.qty).join('\n');
       if(key === 'anh_bang_chung_url') display = (Array.isArray(value) ? value.length : value ? 1 : 0) + ' ảnh (xem phần ảnh bằng chứng)';
       if(key === 'checklist_json' && Array.isArray(value)) display = value.map(item =>
@@ -75,7 +76,7 @@ const Qc02Ncp = (() => {
   function render(target, c, checkpoint, compactOnly = false) {
     target.replaceChildren();
     const grid=document.createElement('div');grid.className='qc02-record-grid';target.append(grid);
-    const groups=[['Thông tin phiếu',['id_ncp','ma_sp','cong_doan','so_luong_ng_du_kien','mo_ta_loi','nguoi_mo_case','ngay_tao']],['Nguyên nhân & Đối sách',['nguyen_nhan_phat_sinh','nguyen_nhan_luu_xuat','nguoi_dam_nhiem_doi_sach','rc_thoi_diem_gui_duyet']],['Xác nhận',['rc_nguoi_duyet','rc_thoi_diem_duyet','rc_trang_thai_duyet','trang_thai']]];
+    const groups=[['Thông tin phiếu',['id_ncp','ma_sp','source_type','source_department','source_customer_code','source_customer_name','cong_doan','so_luong_ng_du_kien','mo_ta_loi','nguoi_mo_case','ngay_tao']],['Nguyên nhân & Đối sách',['nguyen_nhan_phat_sinh','nguyen_nhan_luu_xuat','nguoi_dam_nhiem_doi_sach','rc_thoi_diem_gui_duyet']],['Xác nhận',['rc_nguoi_duyet','rc_thoi_diem_duyet','rc_trang_thai_duyet','trang_thai']]];
     c={...c,cong_doan:c.cong_doan || checkpoint?.cong_doan || 'Chưa ghi nhận'};
     const used=new Set();for(const [title,keys] of groups){const section=document.createElement('section');section.className='qc02-record-group';section.append(text('h3',title));const data={};for(const key of keys){used.add(key);data[key]=c[key]??'—';}const info=document.createElement('div');record(info,data);section.append(info);
       if(title==='Nguyên nhân & Đối sách')for(const [key,label] of Object.entries(dsLabels)){const entries=c['doi_sach_'+key+'_json'];if(Array.isArray(entries)&&entries.length)section.append(text('p',label+': '+entries.map(item=>item.noi_dung).filter(Boolean).join('; ')));}
@@ -92,7 +93,7 @@ const Qc02Ncp = (() => {
     const root = document.createElement('section'); root.id = 'qc02-print';
     root.append(text('h1', 'TOYOTAKI — PHIẾU XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP'));
     root.append(text('h2', c.id_ncp));
-    const info = document.createElement('div'); record(info, {id_ncp:c.id_ncp,ma_sp:c.ma_sp,ten_sp:c.ten_sp,cong_doan:c.cong_doan || checkpoint?.cong_doan || 'Chưa ghi nhận',so_luong_ng_du_kien:c.so_luong_ng_du_kien,mo_ta_loi:c.mo_ta_loi,nguoi_mo_case:c.nguoi_mo_case,ngay_tao:c.ngay_tao}); root.append(info);
+    const info = document.createElement('div'); record(info, {id_ncp:c.id_ncp,ma_sp:c.ma_sp,ten_sp:c.ten_sp,source_type:c.source_type,source_department:c.source_department,source_customer_code:c.source_customer_code,source_customer_name:c.source_customer_name,cong_doan:c.cong_doan || checkpoint?.cong_doan || 'Chưa ghi nhận',so_luong_ng_du_kien:c.so_luong_ng_du_kien,mo_ta_loi:c.mo_ta_loi,nguoi_mo_case:c.nguoi_mo_case,ngay_tao:c.ngay_tao}); root.append(info);
     root.append(text('h3', 'Ảnh lỗi / bằng chứng kiểm tra')); photos(root, evidence);
     if(c.nguyen_nhan_phat_sinh)root.append(text('p','Nguyên nhân phát sinh: '+c.nguyen_nhan_phat_sinh));
     if(c.nguyen_nhan_luu_xuat)root.append(text('p','Nguyên nhân lưu xuất: '+c.nguyen_nhan_luu_xuat));

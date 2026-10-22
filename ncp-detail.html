@@ -280,7 +280,7 @@ header .sub{font-size:12px;color:#94A3B8;font-family:'JetBrains Mono',monospace}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/mes-qc-fields.js"></script>
-<script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
+<script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script src="shared/qc02-data.js"></script>
 <script src="shared/qc02-ncp.js"></script>
 <script>
@@ -326,8 +326,8 @@ async function load(){
   if (!data) return alert('Không tìm thấy phiếu: ' + state.id);
 
   state.case = data;
-  state.ipqcEvidence = [];state.checkpoint = null;
-  if(data.id_checkpoint_goc){const {data:cp}=await sb.from('duc_ipqc_checkpoint').select('*').eq('id_checkpoint',data.id_checkpoint_goc).maybeSingle();state.checkpoint = cp;state.ipqcEvidence=jsonArr(cp&&cp.anh_bang_chung_url)}
+  state.ipqcEvidence = jsonArr(data.source_images);state.checkpoint = null;
+  if(data.id_checkpoint_goc){const {data:cp}=await sb.from('duc_ipqc_checkpoint').select('*').eq('id_checkpoint',data.id_checkpoint_goc).maybeSingle();state.checkpoint = cp;state.ipqcEvidence=[...state.ipqcEvidence,...jsonArr(cp&&cp.anh_bang_chung_url)]}
   state.currentUserEmail = (await MesAuth.getCurrentUserIdentity()) || '';
   state.images.phat_sinh = jsonArr(data.hinh_anh_phat_sinh_json).slice();
   state.images.luu_xuat = jsonArr(data.hinh_anh_luu_xuat_json).slice();

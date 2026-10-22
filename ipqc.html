@@ -249,7 +249,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/mes-qc-fields.js"></script>
-<script src="shared/qc02-view.js?v=qc02-hover-preview-20261008"></script>
+<script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script src="shared/su-co-lich-su.js"></script>
 <script src="shared/ipqc-spc.js"></script>
 <script src="shared/ipqc-btk-do.js"></script>
@@ -691,7 +691,7 @@ async function openCheck(idCheckpoint, maSpChon){
   }
 
   state.current = cp;
-  state.checkStartedAt = Date.now();
+  state.checkStartedAt = null;
   state.photos = [];
   renderPhotoGrid();
   document.getElementById('ck-ghi-chu').value = '';
@@ -722,6 +722,7 @@ async function openCheck(idCheckpoint, maSpChon){
     if (state.current?.id_checkpoint !== cp.id_checkpoint) return;
     state.btk = ctl;
     if (ctl) khoaMucKichThuoc();
+    if (typeof MesIpqcSession !== 'undefined') MesIpqcSession.syncControls();
   }).catch(e => showToast('Không tải được bảng tuần kiểm: ' + e.message, true));
   const request = state.referenceRequest = (state.referenceRequest || 0) + 1;
   const pdfBtn = document.getElementById('ck-pdf-btn');
@@ -1015,6 +1016,7 @@ async function submitCheck(ketQua){
   if (!state.current) return;
   const submittedCheckpoint = { ...state.current };
   if (state.btk && !state.btk.trangThai().du) return showToast('Nhập đủ kết quả đo các hạng mục bảng tuần kiểm (kích thước).', true);   // T133
+  if(!state.checklistAnswers.length||state.checklistAnswers.some(a=>typeof a.dat!=='boolean'))return showToast('Xác nhận đầy đủ tất cả hạng mục bắt buộc trước khi lưu.',true);
   if(!state.checklistAnswers.some(a=>a.code==='machine_condition'&&typeof a.dat==='boolean'))return showToast('Chọn Đạt hoặc Không đạt cho Điều kiện máy.',true);
   const vdLoi = kiemTraVdTruoc(ketQua);   // T127
   if (vdLoi) return showToast(vdLoi, true);
@@ -1045,13 +1047,14 @@ async function submitCheck(ketQua){
 
   showOverlay('Đang tải ảnh bằng chứng...');
   try {
+    await MesIpqcSession.prepare();
     await luuVdTruoc(submittedCheckpoint.id_checkpoint);   // T127
     if (state.btk) await state.btk.luu(submittedCheckpoint.id_checkpoint, nguoiKiem);   // T133
     const anhUrls = await uploadEvidencePhotos(state.current.ma_may, state.current.ma_sp, ketQua);
 
     showOverlay('Đang lưu kết quả...');
     const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
-    const { data, error } = await sb.rpc('duc_submit_ipqc_check', {
+    const { data, error } = await sb.rpc('duc_submit_ipqc_session', {
       p_id_checkpoint: submittedCheckpoint.id_checkpoint,
       p_checklist: ckList,
       p_ket_qua: ketQua,
@@ -1064,6 +1067,7 @@ async function submitCheck(ketQua){
     if (error) return onError(new Error(error.message));
     if (data && data.ok === false) return onError(new Error(data.error));
 
+    await MesIpqcSession.completed(submittedCheckpoint,ketQua);
     const msg = ketQua === 'OK' ? '✓ Đã lưu — OK, cho phép sản xuất'
       : ketQua === 'NG' && !submittedCheckpoint.id_dong ? '✓ Đã lưu — NG. Máy chưa có KH ca nên CHƯA tự mở sự cố F1 — báo trưởng ca xử lý'
       : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
@@ -1080,5 +1084,6 @@ async function submitCheck(ketQua){
 }
 </script>
 <script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
+<script src="shared/mes-ng-status.js"></script><script src="shared/mes-ipqc-session.js?v=20261022"></script>
 </body>
 </html>

@@ -319,7 +319,8 @@ const CONG_DOAN_LIST = ['Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽ
 const TABS = ['Đúc'].concat(CONG_DOAN_LIST);
 
 let weekMonday = mondayOf(new Date());
-let activeTab = TABS[0];
+const requestedTab = new URLSearchParams(location.search).get('cd');
+let activeTab = TABS.includes(requestedTab) ? requestedTab : TABS[0];
 let ducRows = [];
 let cdRows = [];
 let editingId = null;
@@ -541,6 +542,7 @@ async function ghiLogVaXinLyDoNeuCan(loai, viTri, giaTriCu, giaTriMoi){
   });
   if (error) { showMsg('Lỗi ghi log: ' + error.message, 'err'); return false; }
   if (data && data.ok === false) { showMsg(data.error, 'err'); return false; }
+  window.qcLastChangeReason=lyDo;
   return true;
 }
 
@@ -1096,9 +1098,12 @@ document.getElementById('btnSaveRowCd').addEventListener('click', async () => {
 
   const btn = document.getElementById('btnSaveRowCd');
   btn.disabled = true;
-  const { error } = oldRowCd
-    ? await sb.from('cd_khsx_tuan_plan').update(payload).eq('id', oldRowCd.id)
-    : await sb.from('cd_khsx_tuan_plan').upsert(payload, { onConflict: 'tuan_bat_dau,cong_doan,ma_sp' });
+  let error;
+  try { ({error} = activeTab === 'OQC'
+    ? await sb.rpc('qc_save_oqc_week',{p_id:oldRowCd?.id||null,p_data:{...payload,qc_reason:window.qcLastChangeReason||''},p_hours:MesQcProduction.hours()})
+    : oldRowCd ? await sb.from('cd_khsx_tuan_plan').update(payload).eq('id',oldRowCd.id)
+    : await sb.from('cd_khsx_tuan_plan').upsert(payload,{onConflict:'tuan_bat_dau,cong_doan,ma_sp'}));
+  } catch(e) { error=e; }
   btn.disabled = false;
   if (error) { showMsg('Lỗi lưu: ' + error.message, 'err'); return; }
   showMsg('✓ Đã lưu', 'ok', 2000);
@@ -1484,14 +1489,16 @@ function startHeaderClock(){
 }
 
 renderTabs();
-document.getElementById('panelDuc').classList.add('active');
+document.getElementById('panelDuc').classList.toggle('active',activeTab==='Đúc');
+document.getElementById('panelCd').classList.toggle('active',activeTab!=='Đúc');
 updateWeekLabel();
 startHeaderClock();
-loadDucRows();
+loadActivePanel();
 loadMasterLists();
 loadMyRoleInfo();
 loadDuyetInfo();
 loadChangeLog();
 </script>
+<script src="shared/oqc-capacity-math.js?v=T122"></script><script src="shared/oqc-dashboard-math.js?v=20261022-config"></script><script src="shared/qc-production-staff.js?v=20261022-quantity"></script>
 </body>
 </html>
