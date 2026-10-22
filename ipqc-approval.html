@@ -1,117 +1,1344 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Duyệt cảnh báo IPQC</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Duyệt cảnh báo IPQC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript
+      ><link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet"
+    /></noscript>
 
-<style>
-/* Chuẩn giao diện chung MES (theo duc-dashboard.html) */
-:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-md:0 4px 12px rgba(15,23,42,0.08);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
-*{box-sizing:border-box}
-html,body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
-input,select,textarea,button{font-family:inherit;font-size:13px}
-input,select,textarea{padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;background:#fff;color:var(--text);outline:none}
-input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(15,95,165,.15)}
-textarea{min-height:56px;resize:vertical}
-h3{font-size:13px;font-weight:700;margin:14px 0 8px}
-.hidden{display:none!important}
-header.mes-hdr{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;margin:6px 12px 0}
-header.mes-hdr .brand{display:flex;flex-direction:column;line-height:1.2}
-header.mes-hdr .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
-header.mes-hdr .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
-header.mes-hdr .btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-header.mes-hdr .btn-ghost:hover{background:#334155}
-header.mes-hdr .btn-ghost.active{background:var(--accent);border-color:var(--accent)}
-header.mes-hdr .header-user{font-size:11px;color:#94A3B8;margin-left:auto}
-header.mes-hdr .header-clock{display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
-header.mes-hdr .header-clock .date{font-size:10px;color:#94A3B8}
-header.mes-hdr .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:700;padding:6px 8px;border-bottom:2px solid var(--border);background:var(--bg-panel)}
-td{padding:7px 8px;border-bottom:1px solid var(--border)}
-.field{display:flex;flex-direction:column;gap:4px}
-.field label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em}
-.bar{height:14px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin:2px 0 6px}
-.bar i{display:block;height:100%;background:var(--alarm-fg)}
+    <style>
+      /* Chuẩn giao diện chung MES (theo duc-dashboard.html) */
+      :root {
+        --bg-page: #eef1f5;
+        --bg-panel: #ffffff;
+        --bg-sunken: #f5f7fa;
+        --bg-header: #1e293b;
+        --border: #d9dfe5;
+        --border-strong: #b8c1cc;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --text-dim: #94a3b8;
+        --accent: #0f5fa5;
+        --accent-hover: #0a4681;
+        --run-fg: #047857;
+        --run-bg: #ecfdf5;
+        --warn-fg: #b45309;
+        --warn-bg: #fffbeb;
+        --alarm-fg: #b91c1c;
+        --alarm-bg: #fef2f2;
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+        --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+        --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.16);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Arial,
+          sans-serif;
+        background: var(--bg-page);
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.35;
+        -webkit-font-smoothing: antialiased;
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font-family: inherit;
+        font-size: 13px;
+      }
+      input,
+      select,
+      textarea {
+        padding: 7px 9px;
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        outline: none;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(15, 95, 165, 0.15);
+      }
+      textarea {
+        min-height: 56px;
+        resize: vertical;
+      }
+      h3 {
+        font-size: 13px;
+        font-weight: 700;
+        margin: 14px 0 8px;
+      }
+      .hidden {
+        display: none !important;
+      }
+      header.mes-hdr {
+        background: var(--bg-header);
+        color: #f1f5f9;
+        border-radius: 8px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: var(--shadow-sm);
+        flex-wrap: wrap;
+        margin: 6px 12px 0;
+      }
+      header.mes-hdr .brand {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+      }
+      header.mes-hdr .brand .co {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: #94a3b8;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+      header.mes-hdr .brand .title {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #fff;
+      }
+      header.mes-hdr .btn-ghost,
+      header.mes-hdr .tab-btn {
+        background: transparent;
+        color: #cbd5e1;
+        border: 1px solid #475569;
+        border-radius: 6px;
+        padding: 6px 14px;
+        min-height: 32px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      header.mes-hdr .btn-ghost:hover,
+      header.mes-hdr .tab-btn:hover {
+        background: #334155;
+        color: #fff;
+      }
+      header.mes-hdr .tab-btn.active,
+      header.mes-hdr .btn-ghost.active {
+        color: #fff;
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      header.mes-hdr .header-user {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-left: auto;
+      }
+      header.mes-hdr .header-clock {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        padding: 0 10px;
+        line-height: 1.15;
+      }
+      header.mes-hdr .header-clock .date {
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      header.mes-hdr .header-clock .time {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.02em;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th {
+        white-space: nowrap;
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+        font-weight: 700;
+        padding: 6px 8px;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg-panel);
+      }
+      td {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .bar {
+        height: 14px;
+        background: var(--bg-sunken);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 2px 0 6px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--alarm-fg);
+      }
 
-.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm);margin-bottom:8px;overflow:hidden}
-.head{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.body{padding:12px 14px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.btn{padding:7px 14px;border:1px solid transparent;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.primary{background:var(--accent);color:#fff}
-.primary:hover:not(:disabled){background:var(--accent-hover)}
-.secondary{background:#fff;border-color:var(--border-strong);color:var(--text)}
-.secondary:hover:not(:disabled){background:var(--bg-sunken)}
+      .panel {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+      .head {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .body {
+        padding: 12px 14px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .btn {
+        min-height: 32px;
+        padding: 7px 14px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      .secondary {
+        background: #fff;
+        border-color: var(--border-strong);
+        color: var(--text);
+      }
+      .secondary:hover:not(:disabled) {
+        background: var(--bg-sunken);
+      }
 
-main{padding:6px 12px 60px}
-.full{grid-column:1/-1}
-.two{grid-column:span 2}
-.reason-box{padding:10px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px}
-.approve{background:var(--run-fg);color:#fff}
-.reject{background:var(--alarm-fg);color:#fff}
-.override{background:#6D28D9;color:#fff}
-.notice{padding:10px;border-radius:6px;font-weight:700;text-align:center;letter-spacing:.02em}
-.blocked{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FECACA}
-.allowed{background:var(--run-bg);color:var(--run-fg);border:1px solid #A7F3D0}
-td{vertical-align:top}
-.table-wrap{overflow-x:auto}
-.chip{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--bg-sunken);border:1px solid var(--border);font-size:11px;font-weight:600;white-space:nowrap}
-.actions{display:flex;gap:6px;flex-wrap:wrap}
-.audit{border-left:3px solid var(--border-strong);padding:4px 10px;margin:6px 0}
-.help{color:var(--text-muted);font-size:11px}
-@media(max-width:900px){.grid{grid-template-columns:1fr}.two,.full{grid-column:auto}}
-.warning-faults{min-width:220px;max-width:400px;white-space:pre-wrap;overflow-wrap:anywhere}.warning-photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;max-width:320px;min-width:100px}.warning-photos button{padding:4px;width:100px;height:80px}.warning-photos img{width:90px;height:70px;object-fit:contain}.warning-block{padding:12px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}.warning-block h3{margin:0 0 8px}.warning-actions{display:flex;flex-wrap:wrap;gap:8px}.warning-photos button:focus{outline:2px solid var(--primary)}
-</style></head><body>
-<header class="mes-hdr">
-  <div class="brand"><span class="co">Toyotaki</span><span class="title">Duyệt Tiếp Tục Sản Xuất IPQC</span></div>
-  <a class="btn-ghost" href="qc-manager.html">← QC Giám sát</a>
-  <span class="header-user" id="who"></span>
-  <div class="header-clock"><span class="date" id="hdrDate">—</span><span class="time" id="hdrTime">--:--:--</span></div>
-</header>
+      main {
+        padding: 6px 12px 60px;
+      }
+      .full {
+        grid-column: 1/-1;
+      }
+      .two {
+        grid-column: span 2;
+      }
+      .reason-box {
+        padding: 10px;
+        background: var(--bg-sunken);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .approve {
+        background: var(--run-fg);
+        color: #fff;
+      }
+      .reject {
+        background: var(--alarm-fg);
+        color: #fff;
+      }
+      .override {
+        background: #6d28d9;
+        color: #fff;
+      }
+      .notice {
+        padding: 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        text-align: center;
+        letter-spacing: 0.02em;
+      }
+      .blocked {
+        background: var(--alarm-bg);
+        color: var(--alarm-fg);
+        border: 1px solid #fecaca;
+      }
+      .allowed {
+        background: var(--run-bg);
+        color: var(--run-fg);
+        border: 1px solid #a7f3d0;
+      }
+      td {
+        vertical-align: top;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: var(--bg-sunken);
+        border: 1px solid var(--border);
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .audit {
+        border-left: 3px solid var(--border-strong);
+        padding: 4px 10px;
+        margin: 6px 0;
+      }
+      .help {
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .two,
+        .full {
+          grid-column: auto;
+        }
+      }
+      .warning-faults {
+        min-width: 220px;
+        max-width: 400px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .warning-photos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+        gap: 8px;
+        max-width: 320px;
+        min-width: 100px;
+      }
+      .warning-photos button {
+        padding: 4px;
+        width: 100px;
+        height: 80px;
+      }
+      .warning-photos img {
+        width: 90px;
+        height: 70px;
+        object-fit: contain;
+      }
+      .warning-block {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+        overflow-wrap: anywhere;
+      }
+      .warning-block h3 {
+        margin: 0 0 8px;
+      }
+      .warning-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .warning-photos button:focus {
+        outline: 2px solid var(--accent);
+      }
+      /* ===== T140: hộp thư cảnh báo gọn — lọc, chia trang, thẻ trên điện thoại, đóng cảnh báo cũ ===== */
+      .head-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .count-badge {
+        display: inline-block;
+        min-width: 22px;
+        padding: 1px 8px;
+        margin-left: 6px;
+        border-radius: 10px;
+        background: var(--warn-bg);
+        color: var(--warn-fg);
+        border: 1px solid #fcd34d;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        text-align: center;
+      }
+      .wf-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        align-items: center;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-sunken);
+      }
+      .wf-bar select,
+      .wf-bar input {
+        padding: 5px 8px;
+        min-height: 32px;
+        font-size: 12px;
+      }
+      .wf-bar input[type="date"] {
+        width: 136px;
+      }
+      .wf-bar input[type="search"] {
+        flex: 1 1 160px;
+        min-width: 140px;
+      }
+      .wf-bar .sep {
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      .wf-bulk {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        align-items: center;
+        padding: 6px 14px;
+        border-bottom: 1px solid var(--border);
+        background: #fff7ed;
+        font-size: 12px;
+      }
+      .wf-bulk input[type="number"] {
+        width: 64px;
+        padding: 5px 6px;
+        min-height: 32px;
+      }
+      .wf-bulk label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+      }
+      .wf-bulk b {
+        font-family: "JetBrains Mono", monospace;
+      }
+      .warn-table td {
+        vertical-align: middle;
+        padding: 6px 8px;
+      }
+      .warn-table tr.is-closed td {
+        background: #f8fafc;
+        color: var(--text-muted);
+      }
+      .warn-table tbody tr:hover td {
+        background: #f8fafc;
+      }
+      .w-sel {
+        width: 30px;
+      }
+      .w-sel input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+      .w-time {
+        white-space: nowrap;
+        width: 110px;
+      }
+      .w-time .t {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .w-time .age {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .w-mc {
+        width: 180px;
+      }
+      .w-mc .m {
+        font-weight: 700;
+      }
+      .w-mc .sub {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .w-fault .txt {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 12px;
+      }
+      .w-img {
+        width: 64px;
+      }
+      .thumb {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 48px;
+        min-height: 0;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+        cursor: zoom-in;
+        overflow: hidden;
+        vertical-align: middle;
+      }
+      .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .thumb .more {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.75);
+        color: #fff;
+        font-size: 11px;
+        padding: 0 4px;
+        border-top-left-radius: 4px;
+      }
+      .no-img {
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+      .w-who {
+        font-size: 12px;
+        width: 140px;
+      }
+      .w-act {
+        width: 1%;
+        white-space: nowrap;
+      }
+      .w-act .warning-actions {
+        flex-wrap: nowrap;
+        gap: 6px;
+      }
+      .w-act .btn {
+        padding: 6px 10px;
+      }
+      .st {
+        display: inline-block;
+        margin-top: 2px;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        border: 1px solid transparent;
+      }
+      .st-open {
+        background: var(--warn-bg);
+        color: var(--warn-fg);
+        border-color: #fcd34d;
+      }
+      .st-old {
+        background: var(--alarm-bg);
+        color: var(--alarm-fg);
+        border-color: #fecaca;
+      }
+      .st-closed {
+        background: #f1f5f9;
+        color: #475569;
+        border-color: #cbd5e1;
+      }
+      .pager {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 10px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .pager:empty {
+        display: none;
+      }
+      .pager .pg {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .pager .btn {
+        padding: 5px 10px;
+        min-width: 34px;
+        justify-content: center;
+      }
+      .pager .btn.cur {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .err-box {
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: var(--alarm-bg);
+        color: var(--alarm-fg);
+        border: 1px solid #fecaca;
+        font-weight: 600;
+        margin: 4px 0 8px;
+      }
+      .err-box details {
+        margin-top: 6px;
+        font-weight: 400;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      .err-box summary {
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .err-box code {
+        display: block;
+        margin-top: 4px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+      }
+      .inbox-status {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin: 0 0 6px;
+      }
+      dialog {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow-lg);
+        padding: 14px 16px;
+      }
+      dialog::backdrop {
+        background: rgba(15, 23, 42, 0.45);
+      }
+      .dlg-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+      .dlg-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      #closeWarnReason {
+        width: 100%;
+      }
+      .raw-code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-muted);
+        overflow-wrap: anywhere;
+      }
+      @media (max-width: 700px) {
+        main {
+          padding: 6px 8px 60px;
+        }
+        header.mes-hdr {
+          margin: 6px 8px 0;
+          gap: 8px;
+          padding: 6px 10px;
+        }
+        header.mes-hdr .header-user {
+          display: none;
+        }
+        header.mes-hdr .header-clock {
+          margin-left: auto;
+          padding: 0;
+        }
+        .head {
+          flex-wrap: wrap;
+          padding: 8px 10px;
+        }
+        .body {
+          padding: 10px;
+        }
+        .wf-bar,
+        .wf-bulk {
+          padding: 8px 10px;
+        }
+        .wf-bar select,
+        .wf-bar input[type="date"] {
+          flex: 1 1 calc(50% - 8px);
+          width: auto;
+          min-width: 0;
+        }
+        .wf-bar .sep {
+          display: none;
+        }
+        .warn-table thead {
+          display: none;
+        }
+        .warn-table,
+        .warn-table tbody {
+          display: block;
+        }
+        .warn-table tr {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          grid-template-areas:
+            "sel time img"
+            "mc mc img"
+            "fault fault fault"
+            "who who who"
+            "act act act";
+          gap: 4px 8px;
+          padding: 10px;
+          margin-bottom: 8px;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          background: #fff;
+        }
+        .warn-table tr.is-closed {
+          background: #f8fafc;
+        }
+        .warn-table td {
+          display: block;
+          padding: 0;
+          border: 0;
+          width: auto !important;
+          white-space: normal;
+          background: transparent !important;
+        }
+        .warn-table td.empty {
+          grid-column: 1/-1;
+        }
+        .w-sel {
+          grid-area: sel;
+        }
+        .w-sel:empty {
+          display: none !important;
+        }
+        .w-time {
+          grid-area: time;
+        }
+        .w-time .t,
+        .w-time .age {
+          display: inline;
+          margin-right: 6px;
+        }
+        .w-mc {
+          grid-area: mc;
+        }
+        .w-img {
+          grid-area: img;
+        }
+        .w-fault {
+          grid-area: fault;
+        }
+        .w-who {
+          grid-area: who;
+          color: var(--text-muted);
+        }
+        .w-act {
+          grid-area: act;
+        }
+        .w-act .warning-actions {
+          flex-wrap: wrap;
+        }
+        .w-act .btn {
+          flex: 1 1 auto;
+          justify-content: center;
+        }
+        .pager {
+          justify-content: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="mes-hdr">
+      <div class="brand"><span class="co">Toyotaki</span><span class="title">Duyệt Tiếp Tục Sản Xuất IPQC</span></div>
+      <a class="tab-btn" href="qc-manager.html">← QC Giám sát</a>
+      <span class="header-user" id="who"></span>
+      <div class="header-clock">
+        <span class="date" id="hdrDate">—</span><span class="time" id="hdrTime">--:--:--</span>
+      </div>
+    </header>
 
-<main>
-<section class="panel"><div class="head"><span>Cảnh báo IPQC chưa có đề nghị tiếp tục SX</span><button type="button" class="btn secondary" id="refreshWarnings">Làm mới</button><button type="button" class="btn secondary" id="directProposal" hidden>Đề nghị trực tiếp cho phiên sản xuất</button></div><div class="body"><p id="warningInboxStatus" role="status"></p><div class="table-wrap"><table><thead><tr><th>Cảnh báo / trạng thái</th><th>Máy / model / công đoạn / Task</th><th>Thông tin lỗi</th><th>Ảnh</th><th>Người IPQC / thời gian</th><th>Thao tác</th></tr></thead><tbody id="warningInbox"></tbody></table></div></div></section>
-<dialog id="warningDetailDialog" style="width:min(850px,95vw);max-height:90vh;overflow:auto"><div id="warningDetailBody"></div><button type="button" class="btn secondary" id="warningDetailClose">Đóng</button></dialog>
-<section class="panel hidden" id="proposalPanel"><div class="head"><span>Đề nghị tiếp tục sản xuất — dành cho Sản xuất</span><button class="btn secondary" onclick="resetForm()">Làm mới</button></div><div class="body">
-<div class="notice blocked">CHƯA ĐƯỢC PHÉP TIẾP TỤC SẢN XUẤT</div><br>
-<form id="requestForm"><div class="grid">
-<input type="hidden" id="checkpointId"><div class="field two"><label>Máy / công việc đang chạy</label><input id="runningSearch" placeholder="Tìm máy, model hoặc phiên"><select id="runningJob"><option value="">Đang tải...</option></select><button type="button" id="refreshRunning" class="btn secondary">Cập nhật danh sách</button></div><div class="field two"><label>Phiên sản xuất</label><div id="jobInfo" class="help"></div></div><div class="field two"><label>Cảnh báo của phiên</label><select id="warningCheckpoint"><option value="">Chọn phiên trước</option></select></div><div class="field"><label>Task No (nếu có liên kết xác minh)</label><input id="taskNo" readonly></div><div id="warningEvidence" class="full"></div><p id="proposalWarningFaults" class="full"></p><div class="field"><label>Loại lỗi</label><select id="approvalDefectType"><option value="appearance">Ngoại quan</option><option value="dimension">Kích thước / thông số đo</option></select></div><div class="field"><label>Số lượng lỗi (nếu có)</label><input id="approvalDefectQty" type="number" min="0" step="1"></div>
-<div class="field"><label>Máy *</label><input id="machine" readonly required></div><div class="field"><label>Công đoạn *</label><input id="process" readonly required></div>
-<div class="field"><label>Mã sản phẩm *</label><input id="productCode" readonly required></div><div class="field"><label>LOT (nếu có)</label><input id="lotNo" readonly></div>
-<div class="field two"><label>Nội dung cảnh báo *</label><textarea id="warningContent" required></textarea></div>
-<div class="field"><label>Giá trị thực tế</label><input id="actualValue"></div><div class="field"><label>Mức cảnh báo</label><select id="warningLevel"><option value="NG">Đã NG</option><option value="RISK">Nguy cơ NG</option><option value="EARLY_WARNING">Xu hướng tiến gần NG</option></select></div>
-<div class="field"><label>Tiêu chuẩn Min</label><input id="standardMin"></div><div class="field"><label>Tiêu chuẩn Max</label><input id="standardMax"></div>
-<div class="field two"><label>Loại lý do *</label><select id="reasonType" onchange="reasonChanged()"><option value="TIME">1. Tiếp tục chạy theo thời gian</option><option value="PLAN_QTY">2. Chạy đủ sản lượng KHSX</option><option value="DOWNSTREAM_REWORK">3. Công đoạn sau sửa/lựa hàng</option><option value="EARLY_WARNING">4. Xu hướng tiến gần NG</option></select></div>
-<div class="field two"><label>Lý do đề nghị chạy tiếp *</label><textarea id="reasonDetail" required></textarea></div><div class="field two"><label>Đối sách tạm thời *</label><textarea id="proposalCountermeasure" required></textarea></div><div class="field"><label>Người đề nghị</label><input id="proposalRequester" readonly></div><div class="field"><label>Bộ phận đề nghị *</label><input id="proposalDepartment" required></div><div class="field two"><label>Ghi chú</label><textarea id="proposalNote"></textarea></div>
-<div id="timeFields" class="reason-box full grid"><div class="field"><label>Cách giới hạn</label><select id="timeMode" onchange="reasonChanged()"><option value="until">Chạy đến giờ</option><option value="hours">Chạy thêm số giờ</option></select></div><div class="field" id="untilField"><label>Được chạy đến *</label><input type="datetime-local" id="allowedUntil"></div><div class="field hidden" id="hoursField"><label>Số giờ được chạy thêm *</label><input type="number" min=".1" step=".1" id="allowedHours"></div></div>
-<div id="qtyFields" class="reason-box full hidden grid"><div class="field"><label>Số lượng được chạy thêm (pcs) *</label><input type="number" min="1" id="allowedQty"></div><div class="field"><label>Sản lượng thực tế hiện tại</label><input type="number" min="0" id="producedCurrent" value="0"></div></div>
-<div id="repairFields" class="reason-box full hidden grid"><div class="field"><label>Công đoạn/BP chịu trách nhiệm sửa *</label><input id="repairDepartment"></div><div class="field two"><label>Nội dung xử lý *</label><textarea id="treatmentContent"></textarea></div><div class="field"><label>Thời hạn hoàn thành *</label><input type="datetime-local" id="treatmentDeadline"></div></div>
-</div><br><button class="btn primary" id="createBtn">Gửi yêu cầu phê duyệt</button></form></div></section>
-<section class="panel"><div class="head"><span>Danh sách yêu cầu và tình trạng phê duyệt</span><label><input type="checkbox" id="onlyMyRequests"> Yêu cầu của tôi</label><span id="myRequestsCount" class="help"></span><button class="btn secondary" onclick="loadRequests()">Làm mới</button></div><div class="body"><div class="table-wrap"><table><thead><tr><th>Yêu cầu / cảnh báo</th><th>Máy / SP / LOT</th><th>Lý do & phạm vi</th><th>Duyệt</th><th>Hiệu lực</th><th>Thao tác</th></tr></thead><tbody id="requests"></tbody></table></div></div></section>
-<section class="panel hidden" id="auditPanel"><div class="head"><span>Lịch sử audit — không thể xóa</span><button class="btn secondary" onclick="document.getElementById('auditPanel').classList.add('hidden')">Đóng</button></div><div class="body" id="auditBody"></div></section>
-</main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script src="shared/supabase-client.js"></script><script src="shared/navbar.js"></script>
-<script src="shared/mes-qc-fields.js"></script><script src="shared/qc02-view.js?v=qc-sessions-20261019"></script><script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ng-status.js"></script><script src="shared/mes-ipqc-approval.js"></script>
-<script>
-let identity='',session=null,rows=[]; const $=id=>document.getElementById(id),v=id=>$(id).value.trim(),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function reasonChanged(){const t=v('reasonType'),tm=v('timeMode');$('timeFields').classList.toggle('hidden',t!=='TIME');$('qtyFields').classList.toggle('hidden',!['PLAN_QTY','DOWNSTREAM_REWORK'].includes(t));$('repairFields').classList.toggle('hidden',t!=='DOWNSTREAM_REWORK');$('untilField').classList.toggle('hidden',tm!=='until');$('hoursField').classList.toggle('hidden',tm!=='hours');}
-function iso(id){return v(id)?new Date(v(id)).toISOString():null}
-function scope(r){if(r.approved_scope)return r.approved_scope;if(r.reason_type==='TIME')return r.allowed_until?'Đề nghị chạy đến '+new Date(r.allowed_until).toLocaleString('vi-VN',{hour12:false}):'Đề nghị chạy thêm '+r.allowed_hours+' giờ';if(r.reason_type==='PLAN_QTY')return 'Đề nghị chạy thêm '+Number(r.allowed_qty).toLocaleString('vi-VN')+' pcs để đủ KHSX';if(r.reason_type==='DOWNSTREAM_REWORK')return 'Đề nghị chạy '+Number(r.allowed_qty).toLocaleString('vi-VN')+' pcs; '+r.repair_department+' sửa/lựa';return 'Cảnh báo sớm — yêu cầu điều chỉnh trước khi NG';}
-function remaining(r){if(r.status!=='Đang có hiệu lực')return '—';const parts=[];if(r.expired_at){const ms=new Date(r.expired_at)-Date.now();parts.push(ms<=0?'Đã hết giờ':Math.floor(ms/3600000)+' giờ '+Math.floor(ms%3600000/60000)+' phút')}if(r.allowed_qty!=null)parts.push(Math.max(0,Number(r.allowed_qty)-(Number(r.produced_current)-Number(r.produced_at_request)))+' pcs còn lại');return parts.join(' / ')||'Theo điều kiện duyệt'}
-async function init(){session=await MesAuth.getSession();if(!session){location.href='shared/login.html?returnTo='+encodeURIComponent(location.href);return}identity=await MesAuth.getCurrentUserIdentity()||session.user.email;$('who').textContent=identity;const q=new URLSearchParams(location.search);['checkpointId','machine','process','productCode','lotNo','warningContent','actualValue','standardMin','standardMax','warningLevel'].forEach(id=>{if(q.has(id))$(id).value=q.get(id)});reasonChanged();await MesIpqcApproval.init(session);loadRequests()}
-function resetForm(){$('requestForm').reset();reasonChanged();$('proposalPanel').classList.add('hidden')}
-async function loadRequests(){await sb.rpc('duc_ipqc_refresh_continue_request',{p_request_id:null});const {data,error}=await sb.from('duc_ipqc_continue_request').select('*,duc_ipqc_continue_approval(*)').order('created_at',{ascending:false}).limit(200);if(error){$('requests').innerHTML='<tr><td colspan="6">'+esc(error.message)+' — hãy chạy migration T36.</td></tr>';return}rows=data||[];render();MesNg.openRequested(rows)}
-function render(){$('requests').innerHTML=rows.map(r=>{const ap=(r.duc_ipqc_continue_approval||[]).sort((a,b)=>a.step_no-b.step_no);const approved=ap.filter(x=>x.decision).map(x=>x.approval_level+': '+x.decision).join('<br>')||'Chưa cấp nào duyệt';const waiting=ap.find(x=>!x.decision);const live=r.status==='Đang có hiệu lực';const pending=!['Từ chối','Đã hủy','Đang có hiệu lực','Hết hiệu lực'].includes(r.status);return '<tr><td><b>'+esc(r.request_code)+'</b><br><span class="chip">'+esc(r.status)+'</span><br>'+esc(MesQcFields.cleanText(r.warning_content))+'<br>Thực tế: '+esc(r.actual_value||'—')+' · Min/Max: '+esc(r.standard_min||'—')+'/'+esc(r.standard_max||'—')+'<br>Người đề nghị: '+esc(r.requester_name)+'</td><td><b>'+esc(r.machine)+'</b> / '+esc(r.process)+'<br>'+esc(r.product_code)+' / LOT '+esc(r.lot_no)+'</td><td>'+esc(MesQcFields.cleanText(r.reason_detail))+'<br><b>'+esc(scope(r))+'</b></td><td>'+approved+'<br><b>Đang chờ: '+esc(waiting?waiting.approval_level:'—')+'</b></td><td><div class="notice '+(live?'allowed':'blocked')+'">'+(live?'ĐƯỢC PHÉP TIẾP TỤC CÓ ĐIỀU KIỆN':'CHƯA ĐƯỢC PHÉP TIẾP TỤC SẢN XUẤT')+'</div><br>'+esc(remaining(r))+'</td><td><div class="actions">'+(pending?'<button class="btn approve" onclick="decide('+r.id+',\'Duyệt\')">ĐỒNG Ý — bước hiện tại</button><button class="btn reject" onclick="decide('+r.id+',\'Từ chối\')">Từ chối</button><button class="btn override" onclick="decide('+r.id+',\'Phê duyệt trực tiếp\')">GĐSX duyệt trực tiếp</button><button class="btn secondary" onclick="cancelRequest('+r.id+')">Hủy yêu cầu</button>':'')+(live&&r.allowed_qty!=null?'<button class="btn secondary" onclick="production('+r.id+','+r.produced_current+')">Cập nhật sản lượng</button>':'')+(r.checkpoint_id?'<button class="btn secondary" onclick="MesNg.requestDetails('+r.id+',rows)">Xem lượt kiểm gốc / xử lý</button>':'')+'<button class="btn secondary" onclick="audit('+r.id+')">Lịch sử</button></div></td></tr>'}).join('')||'<tr><td colspan="6">Chưa có yêu cầu.</td></tr>'}
-async function decide(id,d){if(await MesNg.isNg(id,rows))return MesNg.decide(id,d);const note=prompt(d==='Phê duyệt trực tiếp'?'Bắt buộc nhập lý do phê duyệt trực tiếp:':'Ghi chú quyết định:');if(note===null)return;if(d==='Phê duyệt trực tiếp'&&!note.trim())return alert('Bắt buộc nhập lý do override');const {error}=await sb.rpc('duc_ipqc_decide_continue_request',{p_request_id:id,p_decision:d,p_actor:identity,p_note:note});if(error)return alert(error.message);loadRequests()}
-async function production(id,current){const qty=prompt('Nhập tổng sản lượng thực tế hiện tại:',current);if(qty===null)return;if(!Number.isFinite(Number(qty))||Number(qty)<0)return alert('Sản lượng không hợp lệ');const {error}=await sb.rpc('duc_ipqc_update_continue_production',{p_request_id:id,p_produced_current:Number(qty),p_actor:identity});if(error)return alert(error.message);loadRequests()}
-async function cancelRequest(id){const reason=prompt('Nhập lý do hủy yêu cầu:');if(reason===null)return;if(!reason.trim())return alert('Bắt buộc nhập lý do hủy');const {error}=await sb.rpc('duc_ipqc_cancel_continue_request',{p_request_id:id,p_actor:identity,p_reason:reason});if(error)return alert(error.message);loadRequests()}
-async function audit(id){const {data,error}=await sb.from('duc_ipqc_continue_audit').select('*').eq('request_id',id).order('created_at',{ascending:false});if(error)return alert(error.message);$('auditPanel').classList.remove('hidden');$('auditBody').innerHTML=(data||[]).map(a=>'<div class="audit"><b>'+esc(a.action)+'</b> — '+new Date(a.created_at).toLocaleString('vi-VN',{hour12:false})+' — '+esc(a.actor_name)+'<br><span class="help">'+esc(MesIpqcApproval.auditText(a.detail))+'</span></div>').join('');$('auditPanel').scrollIntoView({behavior:'smooth'})}
-setInterval(()=>{loadRequests();MesIpqcApproval.loadWarnings();},15000);init();
-</script><script>
-(function(){function t(){var d=new Date(),p=n=>String(n).padStart(2,"0");document.getElementById("hdrTime").textContent=p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());document.getElementById("hdrDate").textContent=["CN","T2","T3","T4","T5","T6","T7"][d.getDay()]+", "+p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear();}t();setInterval(t,1000);})();
-</script>
-</body></html>
+    <main>
+      <section class="panel" id="warningPanel">
+        <div class="head">
+          <span>Cảnh báo IPQC chưa có đề nghị tiếp tục SX<span class="count-badge" id="warnCount">…</span></span>
+          <div class="head-actions">
+            <button type="button" class="btn secondary" id="refreshWarnings">Làm mới</button
+            ><button type="button" class="btn secondary" id="directProposal" hidden>
+              Đề nghị trực tiếp cho phiên sản xuất
+            </button>
+          </div>
+        </div>
+        <div class="wf-bar" id="warnFilters">
+          <select id="wfRange" title="Khoảng thời gian">
+            <option value="7">7 ngày gần nhất</option>
+            <option value="30">30 ngày gần nhất</option>
+            <option value="all">Tất cả</option>
+            <option value="custom">Tùy chọn ngày…</option>
+          </select>
+          <input type="date" id="wfFrom" title="Từ ngày" /><span class="sep">–</span
+          ><input type="date" id="wfTo" title="Đến ngày" />
+          <select id="wfMachine" title="Máy">
+            <option value="">Tất cả máy</option>
+          </select>
+          <select id="wfProduct" title="Model / mã SP">
+            <option value="">Tất cả model</option>
+          </select>
+          <select id="wfStatus" title="Trạng thái">
+            <option value="open">Chưa đề nghị</option>
+            <option value="closed">Đã đóng</option>
+          </select>
+          <input type="search" id="wfSearch" placeholder="Tìm máy, model, lỗi, người IPQC…" />
+        </div>
+        <div class="wf-bulk hidden" id="warnBulk">
+          <label><input type="checkbox" id="wfAll" /> Chọn cả trang</label>
+          <span
+            >Chọn cảnh báo quá <input type="number" id="wfOldDays" min="1" step="1" value="3" /> ngày
+            <button type="button" class="btn secondary" id="wfSelectOld">Chọn</button></span
+          >
+          <span>Đã chọn <b id="wfSelCount">0</b></span>
+          <button type="button" class="btn secondary" id="wfClearSel">Bỏ chọn</button>
+          <button type="button" class="btn reject" id="wfCloseBtn" disabled>Đóng cảnh báo đã chọn</button>
+          <span class="help" id="wfCloseNote"></span>
+        </div>
+        <div class="body">
+          <div id="warningInboxStatus" class="inbox-status" role="status"></div>
+          <table class="warn-table">
+            <thead>
+              <tr>
+                <th class="w-sel" id="wfSelHead"></th>
+                <th>Thời gian</th>
+                <th>Máy / model / công đoạn</th>
+                <th>Lỗi</th>
+                <th>Ảnh</th>
+                <th>Người IPQC</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="warningInbox"></tbody>
+          </table>
+          <div class="pager" id="warnPager"></div>
+        </div>
+      </section>
+      <dialog id="warningDetailDialog" style="width: min(850px, 95vw); max-height: 90vh; overflow: auto">
+        <div id="warningDetailBody"></div>
+        <div class="dlg-actions">
+          <button type="button" class="btn secondary" id="warningDetailClose">Đóng</button>
+        </div>
+      </dialog>
+      <dialog id="closeWarnDialog" style="width: min(520px, 95vw)">
+        <form method="dialog" id="closeWarnForm">
+          <p class="dlg-title">Đóng cảnh báo IPQC cũ</p>
+          <p class="help" id="closeWarnInfo"></p>
+          <div class="field">
+            <label for="closeWarnReason">Lý do đóng * (tối thiểu 3 ký tự)</label>
+            <textarea
+              id="closeWarnReason"
+              placeholder="VD: Cảnh báo tồn từ ca cũ, máy đã đổi khuôn / đã xử lý ngoài hệ thống"
+            ></textarea>
+          </div>
+          <p class="help">
+            Cảnh báo chỉ được ẩn khỏi danh sách "Chưa đề nghị"; dữ liệu kiểm gốc giữ nguyên và có lịch sử người đóng.
+          </p>
+          <div id="closeWarnMsg"></div>
+          <div class="dlg-actions">
+            <button type="button" class="btn secondary" id="closeWarnCancel">Hủy</button>
+            <button type="submit" class="btn reject" id="closeWarnConfirm">Đóng cảnh báo</button>
+          </div>
+        </form>
+      </dialog>
+      <section class="panel hidden" id="proposalPanel">
+        <div class="head">
+          <span>Đề nghị tiếp tục sản xuất — dành cho Sản xuất</span
+          ><button class="btn secondary" onclick="resetForm()">Làm mới</button>
+        </div>
+        <div class="body">
+          <div class="notice blocked">CHƯA ĐƯỢC PHÉP TIẾP TỤC SẢN XUẤT</div>
+          <br />
+          <form id="requestForm">
+            <div class="grid">
+              <input type="hidden" id="checkpointId" />
+              <div class="field two">
+                <label>Máy / công việc đang chạy</label
+                ><input id="runningSearch" placeholder="Tìm máy, model hoặc phiên" /><select id="runningJob">
+                  <option value="">Đang tải...</option></select
+                ><button type="button" id="refreshRunning" class="btn secondary">Cập nhật danh sách</button>
+              </div>
+              <div class="field two">
+                <label>Phiên sản xuất</label>
+                <div id="jobInfo" class="help"></div>
+              </div>
+              <div class="field two">
+                <label>Cảnh báo của phiên</label
+                ><select id="warningCheckpoint">
+                  <option value="">Chọn phiên trước</option>
+                </select>
+              </div>
+              <div class="field"><label>Task No (nếu có liên kết xác minh)</label><input id="taskNo" readonly /></div>
+              <div id="warningEvidence" class="full"></div>
+              <p id="proposalWarningFaults" class="full"></p>
+              <div class="field">
+                <label>Loại lỗi</label
+                ><select id="approvalDefectType">
+                  <option value="appearance">Ngoại quan</option>
+                  <option value="dimension">Kích thước / thông số đo</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Số lượng lỗi (nếu có)</label><input id="approvalDefectQty" type="number" min="0" step="1" />
+              </div>
+              <div class="field"><label>Máy *</label><input id="machine" readonly required /></div>
+              <div class="field"><label>Công đoạn *</label><input id="process" readonly required /></div>
+              <div class="field"><label>Mã sản phẩm *</label><input id="productCode" readonly required /></div>
+              <div class="field"><label>LOT (nếu có)</label><input id="lotNo" readonly /></div>
+              <div class="field two">
+                <label>Nội dung cảnh báo *</label><textarea id="warningContent" required></textarea>
+              </div>
+              <div class="field"><label>Giá trị thực tế</label><input id="actualValue" /></div>
+              <div class="field">
+                <label>Mức cảnh báo</label
+                ><select id="warningLevel">
+                  <option value="NG">Đã NG</option>
+                  <option value="RISK">Nguy cơ NG</option>
+                  <option value="EARLY_WARNING">Xu hướng tiến gần NG</option>
+                </select>
+              </div>
+              <div class="field"><label>Tiêu chuẩn Min</label><input id="standardMin" /></div>
+              <div class="field"><label>Tiêu chuẩn Max</label><input id="standardMax" /></div>
+              <div class="field two">
+                <label>Loại lý do *</label
+                ><select id="reasonType" onchange="reasonChanged()">
+                  <option value="TIME">1. Tiếp tục chạy theo thời gian</option>
+                  <option value="PLAN_QTY">2. Chạy đủ sản lượng KHSX</option>
+                  <option value="DOWNSTREAM_REWORK">3. Công đoạn sau sửa/lựa hàng</option>
+                  <option value="EARLY_WARNING">4. Xu hướng tiến gần NG</option>
+                </select>
+              </div>
+              <div class="field two">
+                <label>Lý do đề nghị chạy tiếp *</label><textarea id="reasonDetail" required></textarea>
+              </div>
+              <div class="field two">
+                <label>Đối sách tạm thời *</label><textarea id="proposalCountermeasure" required></textarea>
+              </div>
+              <div class="field"><label>Người đề nghị</label><input id="proposalRequester" readonly /></div>
+              <div class="field"><label>Bộ phận đề nghị *</label><input id="proposalDepartment" required /></div>
+              <div class="field two"><label>Ghi chú</label><textarea id="proposalNote"></textarea></div>
+              <div id="timeFields" class="reason-box full grid">
+                <div class="field">
+                  <label>Cách giới hạn</label
+                  ><select id="timeMode" onchange="reasonChanged()">
+                    <option value="until">Chạy đến giờ</option>
+                    <option value="hours">Chạy thêm số giờ</option>
+                  </select>
+                </div>
+                <div class="field" id="untilField">
+                  <label>Được chạy đến *</label><input type="datetime-local" id="allowedUntil" />
+                </div>
+                <div class="field hidden" id="hoursField">
+                  <label>Số giờ được chạy thêm *</label><input type="number" min=".1" step=".1" id="allowedHours" />
+                </div>
+              </div>
+              <div id="qtyFields" class="reason-box full hidden grid">
+                <div class="field">
+                  <label>Số lượng được chạy thêm (pcs) *</label><input type="number" min="1" id="allowedQty" />
+                </div>
+                <div class="field">
+                  <label>Sản lượng thực tế hiện tại</label
+                  ><input type="number" min="0" id="producedCurrent" value="0" />
+                </div>
+              </div>
+              <div id="repairFields" class="reason-box full hidden grid">
+                <div class="field">
+                  <label>Công đoạn/BP chịu trách nhiệm sửa *</label><input id="repairDepartment" />
+                </div>
+                <div class="field two"><label>Nội dung xử lý *</label><textarea id="treatmentContent"></textarea></div>
+                <div class="field">
+                  <label>Thời hạn hoàn thành *</label><input type="datetime-local" id="treatmentDeadline" />
+                </div>
+              </div>
+            </div>
+            <br /><button class="btn primary" id="createBtn">Gửi yêu cầu phê duyệt</button>
+          </form>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="head">
+          <span>Danh sách yêu cầu và tình trạng phê duyệt</span
+          ><label><input type="checkbox" id="onlyMyRequests" /> Yêu cầu của tôi</label
+          ><span id="myRequestsCount" class="help"></span
+          ><button class="btn secondary" onclick="loadRequests()">Làm mới</button>
+        </div>
+        <div class="body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Yêu cầu / cảnh báo</th>
+                  <th>Máy / SP / LOT</th>
+                  <th>Lý do & phạm vi</th>
+                  <th>Duyệt</th>
+                  <th>Hiệu lực</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="requests"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="panel hidden" id="auditPanel">
+        <div class="head">
+          <span>Lịch sử audit — không thể xóa</span
+          ><button class="btn secondary" onclick="document.getElementById('auditPanel').classList.add('hidden')">
+            Đóng
+          </button>
+        </div>
+        <div class="body" id="auditBody"></div>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="shared/supabase-client.js"></script>
+    <script src="shared/navbar.js"></script>
+    <script src="shared/mes-qc-fields.js"></script>
+    <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
+    <script src="shared/mes-ipqc-flow.js"></script>
+    <script src="shared/mes-ng-status.js"></script>
+    <script src="shared/mes-ipqc-approval.js"></script>
+    <script>
+      let identity = "",
+        session = null,
+        rows = [];
+      const $ = (id) => document.getElementById(id),
+        v = (id) => $(id).value.trim(),
+        esc = (s) =>
+          String(s ?? "").replace(
+            /[&<>"']/g,
+            (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+          );
+      function reasonChanged() {
+        const t = v("reasonType"),
+          tm = v("timeMode");
+        $("timeFields").classList.toggle("hidden", t !== "TIME");
+        $("qtyFields").classList.toggle("hidden", !["PLAN_QTY", "DOWNSTREAM_REWORK"].includes(t));
+        $("repairFields").classList.toggle("hidden", t !== "DOWNSTREAM_REWORK");
+        $("untilField").classList.toggle("hidden", tm !== "until");
+        $("hoursField").classList.toggle("hidden", tm !== "hours");
+      }
+      function iso(id) {
+        return v(id) ? new Date(v(id)).toISOString() : null;
+      }
+      function scope(r) {
+        if (r.approved_scope) return r.approved_scope;
+        if (r.reason_type === "TIME")
+          return r.allowed_until
+            ? "Đề nghị chạy đến " + new Date(r.allowed_until).toLocaleString("vi-VN", { hour12: false })
+            : "Đề nghị chạy thêm " + r.allowed_hours + " giờ";
+        if (r.reason_type === "PLAN_QTY")
+          return "Đề nghị chạy thêm " + Number(r.allowed_qty).toLocaleString("vi-VN") + " pcs để đủ KHSX";
+        if (r.reason_type === "DOWNSTREAM_REWORK")
+          return (
+            "Đề nghị chạy " +
+            Number(r.allowed_qty).toLocaleString("vi-VN") +
+            " pcs; " +
+            r.repair_department +
+            " sửa/lựa"
+          );
+        return "Cảnh báo sớm — yêu cầu điều chỉnh trước khi NG";
+      }
+      function remaining(r) {
+        if (r.status !== "Đang có hiệu lực") return "—";
+        const parts = [];
+        if (r.expired_at) {
+          const ms = new Date(r.expired_at) - Date.now();
+          parts.push(
+            ms <= 0 ? "Đã hết giờ" : Math.floor(ms / 3600000) + " giờ " + Math.floor((ms % 3600000) / 60000) + " phút",
+          );
+        }
+        if (r.allowed_qty != null)
+          parts.push(
+            Math.max(0, Number(r.allowed_qty) - (Number(r.produced_current) - Number(r.produced_at_request))) +
+              " pcs còn lại",
+          );
+        return parts.join(" / ") || "Theo điều kiện duyệt";
+      }
+      async function init() {
+        session = await MesAuth.getSession();
+        if (!session) {
+          location.href = "shared/login.html?returnTo=" + encodeURIComponent(location.href);
+          return;
+        }
+        identity = (await MesAuth.getCurrentUserIdentity()) || session.user.email;
+        $("who").textContent = identity;
+        const q = new URLSearchParams(location.search);
+        [
+          "checkpointId",
+          "machine",
+          "process",
+          "productCode",
+          "lotNo",
+          "warningContent",
+          "actualValue",
+          "standardMin",
+          "standardMax",
+          "warningLevel",
+        ].forEach((id) => {
+          if (q.has(id)) $(id).value = q.get(id);
+        });
+        reasonChanged();
+        await MesIpqcApproval.init(session);
+        loadRequests();
+      }
+      function resetForm() {
+        $("requestForm").reset();
+        reasonChanged();
+        $("proposalPanel").classList.add("hidden");
+      }
+      async function loadRequests() {
+        await sb.rpc("duc_ipqc_refresh_continue_request", { p_request_id: null });
+        const { data, error } = await sb
+          .from("duc_ipqc_continue_request")
+          .select("*,duc_ipqc_continue_approval(*)")
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (error) {
+          $("requests").innerHTML = '<tr><td colspan="6"></td></tr>';
+          MesIpqcApproval.errorBox($("requests").querySelector("td"), "Không tải được danh sách yêu cầu.", error);
+          return;
+        }
+        rows = data || [];
+        render();
+        MesNg.openRequested(rows);
+      }
+      function render() {
+        $("requests").innerHTML =
+          rows
+            .map((r) => {
+              const ap = (r.duc_ipqc_continue_approval || []).sort((a, b) => a.step_no - b.step_no);
+              const approved =
+                ap
+                  .filter((x) => x.decision)
+                  .map((x) => x.approval_level + ": " + x.decision)
+                  .join("<br>") || "Chưa cấp nào duyệt";
+              const waiting = ap.find((x) => !x.decision);
+              const live = r.status === "Đang có hiệu lực";
+              const pending = !["Từ chối", "Đã hủy", "Đang có hiệu lực", "Hết hiệu lực"].includes(r.status);
+              return (
+                "<tr><td><b>" +
+                esc(r.request_code) +
+                '</b><br><span class="chip">' +
+                esc(r.status) +
+                "</span><br>" +
+                esc(MesQcFields.cleanText(r.warning_content)) +
+                "<br>Thực tế: " +
+                esc(r.actual_value || "—") +
+                " · Min/Max: " +
+                esc(r.standard_min || "—") +
+                "/" +
+                esc(r.standard_max || "—") +
+                "<br>Người đề nghị: " +
+                esc(r.requester_name) +
+                "</td><td><b>" +
+                esc(r.machine) +
+                "</b> / " +
+                esc(r.process) +
+                "<br>" +
+                esc(r.product_code) +
+                " / LOT " +
+                esc(r.lot_no) +
+                "</td><td>" +
+                esc(MesQcFields.cleanText(r.reason_detail)) +
+                "<br><b>" +
+                esc(scope(r)) +
+                "</b></td><td>" +
+                approved +
+                "<br><b>Đang chờ: " +
+                esc(waiting ? waiting.approval_level : "—") +
+                '</b></td><td><div class="notice ' +
+                (live ? "allowed" : "blocked") +
+                '">' +
+                (live ? "ĐƯỢC PHÉP TIẾP TỤC CÓ ĐIỀU KIỆN" : "CHƯA ĐƯỢC PHÉP TIẾP TỤC SẢN XUẤT") +
+                "</div><br>" +
+                esc(remaining(r)) +
+                '</td><td><div class="actions">' +
+                (pending
+                  ? '<button class="btn approve" onclick="decide(' +
+                    r.id +
+                    ',\'Duyệt\')">ĐỒNG Ý — bước hiện tại</button><button class="btn reject" onclick="decide(' +
+                    r.id +
+                    ',\'Từ chối\')">Từ chối</button><button class="btn override" onclick="decide(' +
+                    r.id +
+                    ',\'Phê duyệt trực tiếp\')">GĐSX duyệt trực tiếp</button><button class="btn secondary" onclick="cancelRequest(' +
+                    r.id +
+                    ')">Hủy yêu cầu</button>'
+                  : "") +
+                (live && r.allowed_qty != null
+                  ? '<button class="btn secondary" onclick="production(' +
+                    r.id +
+                    "," +
+                    r.produced_current +
+                    ')">Cập nhật sản lượng</button>'
+                  : "") +
+                (r.checkpoint_id
+                  ? '<button class="btn secondary" onclick="MesNg.requestDetails(' +
+                    r.id +
+                    ',rows)">Xem lượt kiểm gốc / xử lý</button>'
+                  : "") +
+                '<button class="btn secondary" onclick="audit(' +
+                r.id +
+                ')">Lịch sử</button></div></td></tr>'
+              );
+            })
+            .join("") || '<tr><td colspan="6">Chưa có yêu cầu.</td></tr>';
+      }
+      async function decide(id, d) {
+        if (await MesNg.isNg(id, rows)) return MesNg.decide(id, d);
+        const note = prompt(
+          d === "Phê duyệt trực tiếp" ? "Bắt buộc nhập lý do phê duyệt trực tiếp:" : "Ghi chú quyết định:",
+        );
+        if (note === null) return;
+        if (d === "Phê duyệt trực tiếp" && !note.trim()) return alert("Bắt buộc nhập lý do override");
+        const { error } = await sb.rpc("duc_ipqc_decide_continue_request", {
+          p_request_id: id,
+          p_decision: d,
+          p_actor: identity,
+          p_note: note,
+        });
+        if (error) return alert(MesIpqcApproval.friendly(error));
+        loadRequests();
+      }
+      async function production(id, current) {
+        const qty = prompt("Nhập tổng sản lượng thực tế hiện tại:", current);
+        if (qty === null) return;
+        if (!Number.isFinite(Number(qty)) || Number(qty) < 0) return alert("Sản lượng không hợp lệ");
+        const { error } = await sb.rpc("duc_ipqc_update_continue_production", {
+          p_request_id: id,
+          p_produced_current: Number(qty),
+          p_actor: identity,
+        });
+        if (error) return alert(MesIpqcApproval.friendly(error));
+        loadRequests();
+      }
+      async function cancelRequest(id) {
+        const reason = prompt("Nhập lý do hủy yêu cầu:");
+        if (reason === null) return;
+        if (!reason.trim()) return alert("Bắt buộc nhập lý do hủy");
+        const { error } = await sb.rpc("duc_ipqc_cancel_continue_request", {
+          p_request_id: id,
+          p_actor: identity,
+          p_reason: reason,
+        });
+        if (error) return alert(MesIpqcApproval.friendly(error));
+        loadRequests();
+      }
+      async function audit(id) {
+        const { data, error } = await sb
+          .from("duc_ipqc_continue_audit")
+          .select("*")
+          .eq("request_id", id)
+          .order("created_at", { ascending: false });
+        if (error) return alert(MesIpqcApproval.friendly(error));
+        $("auditPanel").classList.remove("hidden");
+        $("auditBody").innerHTML = (data || [])
+          .map(
+            (a) =>
+              '<div class="audit"><b>' +
+              esc(a.action) +
+              "</b> — " +
+              new Date(a.created_at).toLocaleString("vi-VN", { hour12: false }) +
+              " — " +
+              esc(a.actor_name) +
+              '<br><span class="help">' +
+              esc(MesIpqcApproval.auditText(a.detail)) +
+              "</span></div>",
+          )
+          .join("");
+        $("auditPanel").scrollIntoView({ behavior: "smooth" });
+      }
+      setInterval(() => {
+        loadRequests();
+        MesIpqcApproval.loadWarnings();
+      }, 15000);
+      init();
+    </script>
+    <script>
+      (function () {
+        function t() {
+          var d = new Date(),
+            p = (n) => String(n).padStart(2, "0");
+          document.getElementById("hdrTime").textContent =
+            p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+          document.getElementById("hdrDate").textContent =
+            ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d.getDay()] +
+            ", " +
+            p(d.getDate()) +
+            "/" +
+            p(d.getMonth() + 1) +
+            "/" +
+            d.getFullYear();
+        }
+        t();
+        setInterval(t, 1000);
+      })();
+    </script>
+  </body>
+</html>

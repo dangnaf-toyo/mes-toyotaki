@@ -33,3 +33,12 @@
 - RLS: không cấp `delete` cho mọi tài khoản đăng nhập — chỉ vai trò quản lý (VD `has_role('admin','qc_manager')`).
 - Không tạo bản song song kiểu `trang-v2.html` — sửa thẳng vào trang gốc (cần giữ link cũ thì để file cũ chỉ chuyển hướng).
 - Giao diện (chi tiết của dòng "Giao diện" ở trên): font Inter + JetBrains Mono (Google Fonts), `html,body{font-size:13px}`, bảng màu dùng biến `:root` (`--bg-page`, `--bg-header`, `--accent`, `--border`, `--text-muted`, `--run-fg`, `--warn-fg`, `--alarm-fg`...), header tối gồm `.brand` (dòng "Toyotaki" + tên trang) + nút điều hướng `.btn-ghost` + đồng hồ `.header-clock` bên phải, trang **tràn hết chiều ngang** (không `max-width` cho khung chính), và thêm `noTitleBar: true` cho trang đó trong `PAGE_META`. Mẫu tham khảo: `duc-dashboard.html`, `bao-cao-ca.html`.
+
+## Bổ sung sau rà soát 22/10/2026
+
+- **Code đọc được:** không nén code thành vài dòng dài (VD `oqc-daily.html` từng có dòng 2.899 ký tự). Viết JS/CSS xuống dòng bình thường, chiều rộng ~120 ký tự (`npx prettier@3.3.3 --print-width 120`). Code nén khó review, khó so diff và rất dễ đè nhau khi 2 người cùng sửa.
+- **Thông báo lỗi cho người dùng:** không hiện mã lỗi Postgres (`42501 permission denied…`), tên bảng, tên migration hay tên project cho công nhân. Viết câu dễ hiểu theo tình huống (thiếu quyền → "liên hệ QC Manager", mất mạng → "thử lại") và để chi tiết kỹ thuật trong `<details>` "Chi tiết kỹ thuật".
+- **Kích thước:** chữ nội dung ≥ 11px, nút bấm cao ≥ 32px (≥ 28px cho nút nhỏ trong bảng), ngày hiển thị `dd/mm/yyyy`, thời lượng dài hiển thị "x ngày y giờ" thay vì số phút thô.
+- **Danh sách dài:** luôn có lọc + chia trang/"Tải thêm"; điện thoại (≤ 700px) chuyển bảng nhiều cột thành thẻ, không tràn ngang.
+- **Migration:** ghi đầu file trạng thái thật ("Đã chạy STAGING dd/mm", "Đã chạy PROD dd/mm"), không ghi "STAGING ONLY" nếu tính năng sẽ lên prod. Mỗi migration một số T/D riêng, kiểm tra trùng số trên `staging` và `master` trước khi đặt.
+- **Báo cáo review/release** của từng đợt đặt trong `docs/` (VD `docs/qc-reviews/`), không để ở gốc repo.
