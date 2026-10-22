@@ -35,3 +35,14 @@
 - **Danh sách dài:** luôn có lọc + chia trang/"Tải thêm"; điện thoại (≤ 700px) chuyển bảng nhiều cột thành thẻ, không tràn ngang.
 - **Migration:** ghi đầu file trạng thái thật ("Đã chạy STAGING dd/mm", "Đã chạy PROD dd/mm"), không ghi "STAGING ONLY" nếu tính năng sẽ lên prod. Mỗi migration một số T/D riêng, kiểm tra trùng số trên `staging` và `master` trước khi đặt.
 - **Báo cáo review/release** của từng đợt đặt trong `docs/` (VD `docs/qc-reviews/`), không để ở gốc repo.
+
+## Quy trình đưa code lên production (từ 23/10/2026)
+
+Mọi thay đổi trên `staging` (nhất là của đồng đội) **phải được rà soát trước** khi sang `master` / DB prod:
+
+1. Tự kiểm trước khi báo xong: `node scripts/code-review-check.cjs --files <file đã sửa>` — không còn mức **[CAO]**.
+2. Người đưa lên prod chạy `node scripts/code-review-check.cjs origin/master..origin/staging`, đọc diff theo danh mục trong `.claude/skills/review-truoc-prod/SKILL.md`, chụp giao diện bằng `scripts/ui-review.cjs`.
+3. Lập danh sách điểm chưa hợp lý (mức CAO / TB / THẤP + đề xuất) gửi chủ dự án quyết: sửa hết, chỉ sửa mức CAO, hay lên nguyên trạng.
+4. Chỉ sau khi được duyệt mới cherry-pick sang `master` và chạy migration trên prod (staging trước, prod sau).
+
+Lỗi mức CAO luôn phải sửa trước: sai/mất dữ liệu, hàm `security definer` thiếu kiểm tra quyền hoặc thiếu `revoke ... from public, anon`, làm hỏng luồng sẵn có, lỗi JavaScript.
