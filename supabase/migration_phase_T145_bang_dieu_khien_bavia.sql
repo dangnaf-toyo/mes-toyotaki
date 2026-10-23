@@ -28,6 +28,7 @@
 -- sản lượng Đúc (duc_tem_sync_actuals / sync_lich_su) không bị ảnh hưởng.
 --
 -- Trạng thái: Đã chạy STAGING 23/10/2026 (đợt 1; lịch sử migration staging ghi tên t144_*, t144b_*, t144c_* — trước khi đổi số sang T145). Chưa chạy PROD.
+-- Đợt 2 (T146) bổ sung: bavia_line_luu / bavia_ng / bavia_test_lay chặn ca đã kết (bavia_ket_ca).
 -- Mọi tài khoản đăng nhập thao tác được (công nhân Bavia dùng tài khoản chung) — cố ý không has_role.
 -- Tên người thao tác / người kiểm tra / người test là dữ liệu trưởng ca chọn (không phải người đăng nhập);
 -- người GHI luôn lấy từ user_roles theo auth.uid() (duc_su_co_nguoi_hien_tai).
@@ -182,6 +183,9 @@ begin
   if auth.uid() is null then return jsonb_build_object('ok', false, 'error', 'Cần đăng nhập'); end if;
   if p_ngay is null or coalesce(p_ca, '') not in ('Ca ngày', 'Ca đêm', 'Ca 1', 'Ca 2') then
     return jsonb_build_object('ok', false, 'error', 'Ngày / ca không hợp lệ');
+  end if;
+  if exists (select 1 from bavia_ket_ca where ngay = p_ngay and ca = p_ca) then
+    return jsonb_build_object('ok', false, 'error', 'Ca này đã kết ca, không sửa Line được');
   end if;
   if not exists (select 1 from master_machines where bo_phan = 'Bavia' and ma_may = p_ten_line) then
     return jsonb_build_object('ok', false, 'error', p_ten_line || ' không có trong danh mục Line Bavia');
@@ -508,6 +512,9 @@ begin
   end if;
   select * into v_line from cd_tram_hien_tai where id_tram = p_id_tram and cong_doan = 'Bavia';
   if not found then return jsonb_build_object('ok', false, 'error', 'Line chưa được mở trong ca này'); end if;
+  if exists (select 1 from bavia_ket_ca where ngay = v_line.ngay and ca = v_line.ca) then
+    return jsonb_build_object('ok', false, 'error', 'Ca này đã kết ca, không ghi thêm được');
+  end if;
   if not exists (select 1 from bavia_line_nguon where tag_no = p_tag_no and ten_line = v_line.ten_tram and bo_luc is null) then
     return jsonb_build_object('ok', false, 'error', 'Tem ' || p_tag_no || ' không phải tem Đúc đang dùng của ' || v_line.ten_tram);
   end if;
@@ -548,6 +555,9 @@ begin
   end if;
   select * into v_line from cd_tram_hien_tai where id_tram = p_id_tram and cong_doan = 'Bavia';
   if not found then return jsonb_build_object('ok', false, 'error', 'Line chưa được mở trong ca này'); end if;
+  if exists (select 1 from bavia_ket_ca where ngay = v_line.ngay and ca = v_line.ca) then
+    return jsonb_build_object('ok', false, 'error', 'Ca này đã kết ca, không ghi thêm được');
+  end if;
   if not exists (select 1 from bavia_line_nguon where tag_no = p_tag_no and ten_line = v_line.ten_tram and bo_luc is null) then
     return jsonb_build_object('ok', false, 'error', 'Tem ' || p_tag_no || ' không phải tem Đúc đang dùng của ' || v_line.ten_tram);
   end if;

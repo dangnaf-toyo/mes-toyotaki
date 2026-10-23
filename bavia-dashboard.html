@@ -24,7 +24,8 @@
   RPC: bavia_du_lieu / bavia_line_luu / bavia_quet / bavia_bo_nguon / bavia_dong_thung
        / bavia_ng / bavia_test_lay / bavia_test_ket_thuc / bavia_du_lieu_in
        — supabase/migration_phase_T145_bang_dieu_khien_bavia.sql.
-  Đợt 2 (chưa làm): nạp KH từ KHSX tuần + số ca, báo cáo kết ca + khoá số liệu.
+  Đợt 2 (T146): Nạp KH từ KHSX tuần + số ca theo mã (bavia_kh_du_lieu / bavia_nap_kh), Báo cáo kết ca
+  + khoá số liệu (bavia_ket_ca_luu, admin mở lại bavia_mo_lai_ca) — supabase/migration_phase_T146_bavia_nap_kh_ket_ca.sql.
 -->
 <style>
   :root{
@@ -236,6 +237,49 @@
   .mbtn.ghost{background:#fff;color:var(--text);border:1.5px solid var(--border-strong);}
   .modal .err{color:var(--alarm-fg);font-weight:600;font-size:12.5px;}
   .qr-box{background:#fff;border-radius:12px;padding:12px;width:min(420px,100%);}
+  .modal.wide{width:min(860px,100%);}
+  .modal.xl{width:min(1060px,100%);gap:14px;}
+  .modal .sub{font-size:12px;color:var(--text-muted);margin-top:-6px;}
+  .plan-tbl select,.plan-tbl input{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--text);min-height:30px;}
+  .plan-tbl input{width:84px;font-family:var(--mono);text-align:right;}
+  .plan-tbl .w{font-size:11px;color:var(--warn-fg);font-weight:600;margin-top:2px;}
+  .rp-head{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;}
+  .rp-head .tt2{flex:1;min-width:220px;}
+  .rp-head h4{font-size:17px;}
+  .rp-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;}
+  .rp-kpis > div{background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px;padding:7px 10px;min-width:0;}
+  .rp-kpis .l{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rp-kpis .v{font-family:var(--mono);font-size:18px;font-weight:700;}
+  .rp-kpis .v small{font-size:11px;color:var(--text-dim);font-weight:500;}
+  .rp-sec h5{margin:0 0 6px;font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;}
+  .rp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;}
+  .chk{display:flex;flex-direction:column;gap:5px;}
+  .chk div{font-size:12.5px;padding:6px 10px;border-radius:7px;border:1px solid;}
+  .chk .ok{background:var(--run-bg);border-color:var(--run-bd);color:var(--run-fg);}
+  .chk .warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-fg);}
+  .chk .bad{background:var(--alarm-bg);border-color:var(--alarm-bd);color:var(--alarm-fg);font-weight:600;}
+  .reason{width:100%;min-width:150px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12px;min-height:30px;}
+  .reason.need{border-color:var(--alarm-fg);background:var(--alarm-bg);}
+  .pct.lo{color:var(--alarm-fg);}
+  .ngbar{display:grid;grid-template-columns:150px minmax(0,1fr) 40px;gap:8px;align-items:center;font-size:12px;padding:3px 0;}
+  .ngbar .b{height:10px;background:var(--bg-sunken);border-radius:3px;overflow:hidden;}
+  .ngbar .b i{display:block;height:100%;background:var(--alarm-fg);border-radius:3px;}
+  .ngbar .n{font-family:var(--mono);font-weight:700;text-align:right;}
+  .boxes tfoot td{font-weight:800;border-top:1.5px solid var(--border-strong);background:var(--bg-sunken);}
+  .rp-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--border);padding-top:12px;}
+  .rp-acts .sp{flex:1;}
+  .rp-acts .why{font-size:12px;color:var(--alarm-fg);font-weight:600;}
+  .done-banner{background:var(--run-bg);border:1.5px solid var(--run-bd);color:var(--run-fg);border-radius:9px;padding:10px 12px;font-weight:700;font-size:13px;}
+  .done-banner span{display:block;font-weight:500;font-size:12px;color:var(--text);margin-top:2px;}
+  .btn-ghost.done{border-color:#34D399;color:#A7F3D0;}
+  @media (max-width:760px){.rp-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}.rp-grid{grid-template-columns:minmax(0,1fr);}}
+  @media print{
+    body.in-bao-cao > *:not(#rpModal){display:none!important;}
+    body.in-bao-cao #rpModal{position:static;background:none;padding:0;display:block!important;}
+    body.in-bao-cao .modal{width:100%;max-height:none;overflow:visible;padding:0;}
+    body.in-bao-cao .rp-acts,body.in-bao-cao .rp-head button,body.in-bao-cao .chk{display:none!important;}
+    body.in-bao-cao .reason{border:none;background:none;padding:0;}
+  }
 
   .boot{padding:40px;text-align:center;color:var(--text-muted);}
 
@@ -281,7 +325,7 @@
     <select id="fTruongCa" class="header-select" aria-label="Trưởng ca"></select>
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">↻ Tải lại</button>
-  <button type="button" class="btn btn-ghost" id="btnKetCa" disabled title="Báo cáo kết ca làm ở đợt 2">Báo cáo kết ca</button>
+  <button type="button" class="btn btn-ghost" id="btnKetCa">Báo cáo kết ca</button>
   <div class="header-clock">
     <div class="date" id="hdrDate">—</div>
     <div class="time" id="hdrTime">--:--:--</div>
@@ -294,7 +338,7 @@
   <main class="app" id="app" hidden>
     <aside class="col side-l">
       <div class="card">
-        <h3>Line Bavia <span class="cnt" id="lineCnt"></span><span class="sp"></span></h3>
+        <h3>Line Bavia <span class="cnt" id="lineCnt"></span><span class="sp"></span><button class="h3-btn" type="button" id="btnPlan">Nạp KH từ KHSX tuần</button></h3>
         <div class="lines-wrap" id="lines"></div>
         <button class="add-line" type="button" id="btnAddLine">+ Mở Line</button>
       </div>
@@ -332,6 +376,27 @@
   </div>
 </div>
 
+<div class="modal-bg" id="planModal" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+    <h4 id="pTitle">Nạp kế hoạch Bavia từ KHSX tuần</h4>
+    <div class="sub" id="pSub"></div>
+    <div class="tbl"><table class="boxes plan-tbl" style="min-width:680px">
+      <thead><tr><th>Mã SP</th><th>Dạng</th><th style="text-align:right">KH ngày</th><th>Số ca</th><th style="text-align:right">KH ca</th><th>Line</th></tr></thead>
+      <tbody id="pRows"></tbody>
+    </table></div>
+    <div class="err" id="pErr"></div>
+    <div id="pLog"></div>
+    <div class="acts">
+      <button class="mbtn ghost" type="button" data-close>Huỷ</button>
+      <button class="mbtn" type="button" id="pSave">Nạp kế hoạch</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="rpModal" hidden>
+  <div class="modal xl" role="dialog" aria-modal="true" aria-labelledby="rpTitle" id="rpBody"></div>
+</div>
+
 <div class="modal-bg" id="camModal" hidden>
   <div class="qr-box">
     <div id="qrReaderDiv"></div>
@@ -343,6 +408,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
@@ -510,6 +576,10 @@ function renderLines() {
   $('#lines').innerHTML = (L.length ? '' : '<div class="empty-box">Chưa mở Line nào trong ca này.</div>') +
     grp('ship', 'Đóng gói xuất hàng', g1) + grp('flow', 'Chuyển công đoạn', g2) + grp('bad', 'Cần bổ sung Danh mục SP', g0);
   $('#btnAddLine').disabled = !!(D && D.ket_ca);
+  $('#btnPlan').disabled = !D || !!D.ket_ca;
+  const kb = $('#btnKetCa');
+  kb.textContent = D && D.ket_ca ? 'Báo cáo ca (đã kết)' : 'Báo cáo kết ca';
+  kb.classList.toggle('done', !!(D && D.ket_ca));
 }
 
 function srcList(l) {
@@ -872,6 +942,270 @@ $('#lmSave').onclick = async () => {
   } finally { $('#lmSave').disabled = false; }
 };
 
+/* ── Nạp KH từ KHSX tuần (đợt 2) ──────────────────────────────────────────── */
+// 1 ca/ngày: chỉ ca đầu (Ca ngày / Ca 1) có KH; ca sau KH = 0 (giống Đúc T134).
+const caSau = ca => ca === 'Ca đêm' || ca === 'Ca 2';
+const khCaGoiY = (khNgay, soCa, ca) => (soCa === 1 && caSau(ca) ? 0 : Math.round(Number(khNgay) / soCa));
+let KH = null;
+async function moNapKh() {
+  if (!D || D.ket_ca) return;
+  const ngay = $('#fNgay').value, ca = $('#fCa').value;
+  const { data, error } = await sb.rpc('bavia_kh_du_lieu', { p_ngay: ngay, p_ca: ca });
+  if (error) { errFlash(error); renderWs(); return; }
+  KH = data;
+  const thu = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(ngay + 'T00:00:00').getDay()];
+  const duyet = KH.duyet
+    ? (KH.duyet.trang_thai === 'da_duyet' ? 'KH tuần đã duyệt.' : '<b style="color:var(--warn-fg)">KH tuần chưa duyệt xong.</b>')
+    : '<b style="color:var(--warn-fg)">Tuần này chưa có trạng thái duyệt KH.</b>';
+  $('#pSub').innerHTML = esc(thu + ' ' + dmy(ngay) + ' · ' + ca) + '. ' + duyet +
+    ' Mặc định 1 ca/ngày, KH ca = KH ngày ÷ số ca; 1 ca/ngày thì ca đêm / ca 2 không có KH. Số ca chọn ở đây được nhớ cho các ngày sau trong tuần.' +
+    ' Nạp lại giữa ca sẽ ghi đè KH ca và lưu nhật ký. Line còn hàng dở của mã khác thì không nhận mã mới.';
+  const dangChay = {};
+  (D.lines || []).forEach(l => { dangChay[l.ten_line] = l; });
+  const daGan = new Set((KH.ma || []).map(m => m.line).filter(Boolean));
+  const trong = (D.danh_muc_line || []).filter(x => !dangChay[x]);
+  $('#pRows').innerHTML = (KH.ma || []).map((m, i) => {
+    let goiY = m.line;
+    if (!goiY && m.info && m.info.ok) { goiY = trong.find(x => !daGan.has(x)) || ''; if (goiY) daGan.add(goiY); }
+    const opts = (D.danh_muc_line || []).map(x => {
+      const l = dangChay[x];
+      const ban = l && l.ma_sp !== m.ma_sp && conOf(l) > 0;
+      const nhan = !l ? 'trống' : l.ma_sp === m.ma_sp ? 'đang chạy mã này' : 'đang ' + l.ma_sp + (conOf(l) > 0 ? ', còn dở ' + fmt(conOf(l)) + ' pcs' : '');
+      return '<option value="' + esc(x) + '" ' + (x === goiY ? 'selected' : '') + ' ' + (ban ? 'disabled' : '') + '>' + esc(x) + ' · ' + esc(nhan) + '</option>';
+    }).join('');
+    const info = m.info || {};
+    const dang = !info.ok ? '<span class="chip bad" title="' + esc(info.error || '') + '">Thiếu thông tin</span>'
+      : info.dang === 1 ? '<span class="chip ship">Xuất hàng</span>' : '<span class="chip flow">→ ' + esc(info.buoc_sau) + '</span>';
+    return '<tr><td><div class="mono" style="font-weight:700">' + esc(m.ma_sp) + '</div><div class="sub">' + esc(m.ten_sp || '') + '</div></td>' +
+      '<td>' + dang + '</td><td class="n">' + fmt(m.kh_ngay) + '</td>' +
+      '<td><select data-ca="' + i + '" aria-label="Số ca ' + esc(m.ma_sp) + '">' +
+        [1, 2].map(c => '<option value="' + c + '" ' + (m.so_ca === c ? 'selected' : '') + '>' + c + ' ca</option>').join('') + '</select></td>' +
+      '<td style="text-align:right"><input id="pKh' + i + '" type="number" min="0" value="' + khCaGoiY(m.kh_ngay, m.so_ca, ca) + '" aria-label="KH ca ' + esc(m.ma_sp) + '"></td>' +
+      '<td><select id="pLine' + i + '" ' + (info.ok ? '' : 'disabled') + ' aria-label="Line cho ' + esc(m.ma_sp) + '"><option value="">Không nạp</option>' + opts + '</select>' +
+        (!info.ok ? '<div class="w">' + esc(info.error || '') + '</div>' : !m.line ? '<div class="w">Chưa có Line chạy mã này</div>' : '') + '</td></tr>';
+  }).join('') || '<tr><td colspan="6"><div class="empty-box">KHSX tuần công đoạn Bavia không có KH cho ngày này.</div></td></tr>';
+  document.querySelectorAll('#pRows select[data-ca]').forEach(s => {
+    s.onchange = () => {
+      const m = KH.ma[Number(s.dataset.ca)];
+      $('#pKh' + s.dataset.ca).value = khCaGoiY(m.kh_ngay, Number(s.value), ca);
+    };
+  });
+  $('#pLog').innerHTML = (KH.nhat_ky || []).length
+    ? '<div class="rp-sec"><h5>Nhật ký nạp KH ca này</h5>' + KH.nhat_ky.map(n =>
+        '<div class="ev"><span class="h">' + hm(n.luc) + '</span><span class="tx">' + esc(n.ten_line) + ' · <b>' + esc(n.ma_sp) + '</b>: KH ca ' +
+        (n.kh_cu == null ? 'mới' : fmt(n.kh_cu)) + ' → <b>' + fmt(n.kh_moi) + '</b> (' + n.so_ca + ' ca/ngày)' + (n.ma_cu ? ' · đổi từ mã ' + esc(n.ma_cu) : '') +
+        '<div class="s">' + esc(tenNguoi(n.nguoi)) + '</div></span></div>').join('') + '</div>'
+    : '';
+  $('#pErr').textContent = '';
+  $('#pSave').disabled = !(KH.ma || []).length;
+  $('#planModal').hidden = false;
+}
+$('#btnPlan').onclick = moNapKh;
+$('#pSave').onclick = async () => {
+  const rows = (KH.ma || []).map((m, i) => ({
+    ma_sp: m.ma_sp,
+    so_ca: Number(document.querySelector('#pRows select[data-ca="' + i + '"]').value) || 1,
+    kh_ca: Number($('#pKh' + i).value) || 0,
+    ten_line: $('#pLine' + i).value,
+  }));
+  if (!rows.some(r => r.ten_line)) { $('#pErr').textContent = 'Chọn Line cho ít nhất 1 mã.'; return; }
+  $('#pSave').disabled = true;
+  try {
+    const r = await goi('bavia_nap_kh', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_rows: rows });
+    $('#planModal').hidden = true;
+    setFlash('ok', 'Đã nạp kế hoạch ca' + (r.so_line_doi ? ': ' + r.so_line_doi + ' Line đổi KH (đã lưu nhật ký)' : ', không có thay đổi') +
+      '. Line mới cần gán người thao tác và người kiểm tra.');
+    await taiLai();
+  } catch (e) {
+    // Lỗi nghiệp vụ từ server (raise P0001, VD Line còn hàng dở mã khác) hiện nguyên câu.
+    $('#pErr').textContent = e.nghiep_vu || e.code === 'P0001' ? e.message : loiDeHieu(e).t;
+  } finally { $('#pSave').disabled = false; }
+};
+
+/* ── Báo cáo kết ca (đợt 2) ───────────────────────────────────────────────── */
+const KH_DAT = 0.9; // dưới 90% KH ca phải ghi lý do khi kết ca
+let reasons = {}, laAdmin = false;
+function rpRows() {
+  return ((D && D.lines) || []).map(l => {
+    const ok = okOf(l), kh = Number(l.kh_ca || 0);
+    return {
+      l, ok, kh, ng: ngOf(l), test: testOf(l), con: conOf(l), thung: (l.thung || []).length, pct: kh ? ok / kh : 1,
+      temDo: (l.nguon || []).filter(n => Number(n.con) > 0), dangTest: (l.test || []).filter(t => !t.ket_thuc_luc),
+    };
+  });
+}
+const canLyDo = r => r.kh > 0 && r.pct < KH_DAT;
+function rpChecks(rows) {
+  const out = [];
+  rows.filter(r => !opsOf(r.l).length).forEach(r => out.push(['bad', esc(r.l.ten_line) + ' chưa gán người thao tác.']));
+  rows.filter(r => !r.l.nguoi_kiem_tra).forEach(r => out.push(['bad', esc(r.l.ten_line) + ' chưa có người kiểm tra.']));
+  rows.filter(r => canLyDo(r) && (reasons[r.l.ten_line] || '').trim().length < 3).forEach(r =>
+    out.push(['bad', esc(r.l.ten_line) + ' đạt ' + Math.round(r.pct * 100) + '% KH ca. Ghi lý do chưa đạt trong bảng.']));
+  rows.forEach(r => r.dangTest.forEach(t => out.push(['warn', esc(r.l.ten_line) + ': ' + fmt(t.so_luong) + ' pcs đang test (' + esc(t.muc_dich) + ', ' +
+    esc(t.nguoi_test) + '). Vẫn kết ca được, lần test chuyển sang ca sau và kết thúc ở ca sau.'])));
+  rows.filter(r => r.con > 0).forEach(r => out.push(['ok', esc(r.l.ten_line) + ': còn dở <b>' + fmt(r.con) + '</b> pcs trên ' + r.temDo.length +
+    ' tem Đúc (' + r.temDo.map(n => esc(String(n.tag_no).slice(-4))).join(', ') + '). Giữ khai báo cho ca sau, sản lượng tính vào ca sau.']));
+  ((D && D.lines) || []).filter(l => l.info.ok && l.info.dang === 2 && (PRE[l.ma_sp] || 0) < 3).forEach(l =>
+    out.push(['warn', esc(l.ma_sp) + ' còn ' + (PRE[l.ma_sp] || 0) + ' tem thùng in sẵn. Báo QLSX in thêm cho ca sau.']));
+  return out;
+}
+function nhomNg() {
+  const m = {};
+  ((D && D.lines) || []).forEach(l => (l.ng || []).forEach(g => { m[g.loai] = (m[g.loai] || 0) + Number(g.so_luong); }));
+  return Object.entries(m).sort((a, b) => b[1] - a[1]);
+}
+// Thùng làm chung thì chia đều số pcs cho số người đứng Line lúc ghi nhận thùng.
+function theoNguoi() {
+  const per = {};
+  ((D && D.lines) || []).forEach(l => (l.thung || []).forEach(b => {
+    const ds = String(b.nguoi_lam || '').split(',').map(s => s.trim()).filter(Boolean), k = ds.length || 1;
+    ds.forEach(p => {
+      const r = (per[p] = per[p] || { lines: new Set(), thung: 0, pcs: 0 });
+      r.lines.add(l.ten_line); r.thung++; r.pcs += Number(b.so_luong) / k;
+    });
+  }));
+  return Object.entries(per).sort((a, b) => b[1].pcs - a[1].pcs);
+}
+function reportHtml() {
+  const rows = rpRows(), sum = k => rows.reduce((s, r) => s + r[k], 0);
+  const kh = sum('kh'), ok = sum('ok'), ng = sum('ng'), test = sum('test'), con = sum('con');
+  const b1 = rows.filter(r => r.l.info.dang === 1).reduce((s, r) => s + r.thung, 0);
+  const b2 = rows.filter(r => r.l.info.dang === 2).reduce((s, r) => s + r.thung, 0);
+  const ngArr = nhomNg(), ngMax = ngArr.length ? ngArr[0][1] : 1, per = theoNguoi();
+  const tests = ((D && D.lines) || []).flatMap(l => (l.test || []).filter(t => t.id_tram === l.id_tram).map(t => ({ l, t })));
+  const kc = D.ket_ca, lyDoDaLuu = kc ? kc.ly_do || {} : {};
+  const lineRow = r => '<tr><td><b>' + esc(r.l.ten_line) + '</b></td><td class="mono">' + esc(r.l.ma_sp) + '</td>' +
+    '<td class="sub">' + esc(opsOf(r.l).join(', ') || '—') + '</td><td class="sub">' + esc(r.l.nguoi_kiem_tra || '—') + '</td>' +
+    '<td class="n">' + (r.kh ? fmt(r.kh) : '—') + '</td><td class="n">' + fmt(r.ok) + '</td>' +
+    '<td class="n"><span class="pct ' + (canLyDo(r) ? 'lo' : '') + '">' + (r.kh ? Math.round(r.pct * 100) + '%' : '—') + '</span></td>' +
+    '<td class="n">' + fmt(r.ng) + '</td><td class="n">' + fmt(r.test) + '</td><td class="n">' + r.thung + '</td><td class="n">' + fmt(r.con) + '</td>' +
+    '<td>' + (!canLyDo(r) ? '<span class="sub">Đạt</span>' : kc ? esc(lyDoDaLuu[r.l.ten_line] || '') :
+      '<input class="reason" data-reason="' + esc(r.l.ten_line) + '" value="' + esc(reasons[r.l.ten_line] || '') +
+      '" placeholder="VD: thiếu tem Đúc từ DC5" aria-label="Lý do ' + esc(r.l.ten_line) + ' chưa đạt KH">') + '</td></tr>';
+  return '<div class="rp-head"><div class="tt2"><h4 id="rpTitle">Báo cáo kết ca Bavia · ' + esc($('#fCa').value) + ' ' + dmy($('#fNgay').value) + '</h4>' +
+      '<div class="sub">Trưởng ca ' + esc($('#fTruongCa').value) + ' · ' + rows.length + ' Line</div></div>' +
+      '<button class="mbtn ghost" type="button" data-rp="xls">Xuất Excel</button><button class="mbtn ghost" type="button" data-rp="in">In / PDF</button></div>' +
+    (kc ? '<div class="done-banner">Đã kết ca lúc ' + hm(kc.ket_luc) + ' · ' + esc(tenNguoi(kc.nguoi)) + ' xác nhận' +
+      '<span>Số liệu ca này đã khoá. Muốn sửa phải nhờ admin mở lại ca (có ghi lý do). Tem Đúc còn dở và hàng đang test đã chuyển sang ca sau.</span></div>' : '') +
+    '<div class="rp-kpis"><div><div class="l">Kế hoạch ca</div><div class="v">' + fmt(kh) + '</div></div>' +
+      '<div><div class="l">OK</div><div class="v" style="color:var(--run-fg)">' + fmt(ok) + ' <small>' + (kh ? Math.round(ok / kh * 100) : 0) + '% KH</small></div></div>' +
+      '<div><div class="l">NG</div><div class="v" style="color:var(--alarm-fg)">' + fmt(ng) + ' <small>' + (ok + ng ? (ng / (ok + ng) * 100).toFixed(1) : '0.0') + '%</small></div></div>' +
+      '<div><div class="l">Hàng test</div><div class="v" style="color:var(--warn-fg)">' + fmt(test) + '</div></div>' +
+      '<div><div class="l">Thùng xuất hàng</div><div class="v" style="color:var(--ship)">' + b1 + '</div></div>' +
+      '<div><div class="l">Thùng chuyển CĐ</div><div class="v" style="color:var(--flow)">' + b2 + '</div></div></div>' +
+    '<div class="rp-sec"><h5>Theo Line</h5><div class="tbl"><table class="boxes" style="min-width:980px"><thead><tr><th>Line</th><th>Mã SP</th>' +
+      '<th>Người thao tác</th><th>Người kiểm tra</th><th style="text-align:right">KH</th><th style="text-align:right">OK</th><th style="text-align:right">% KH</th>' +
+      '<th style="text-align:right">NG</th><th style="text-align:right">Test</th><th style="text-align:right">Thùng</th><th style="text-align:right">Còn dở</th>' +
+      '<th style="width:210px">Lý do chưa đạt KH</th></tr></thead><tbody>' + rows.map(lineRow).join('') +
+      '</tbody><tfoot><tr><td colspan="4">Tổng</td><td class="n">' + fmt(kh) + '</td><td class="n">' + fmt(ok) + '</td><td class="n">' +
+      (kh ? Math.round(ok / kh * 100) : 0) + '%</td><td class="n">' + fmt(ng) + '</td><td class="n">' + fmt(test) + '</td><td class="n">' + (b1 + b2) +
+      '</td><td class="n">' + fmt(con) + '</td><td></td></tr></tfoot></table></div></div>' +
+    '<div class="rp-grid"><div class="rp-sec"><h5>NG theo loại · ' + fmt(ng) + ' pcs</h5>' +
+      (ngArr.length ? ngArr.map(([t, n]) => '<div class="ngbar"><span>' + esc(t) + '</span><span class="b"><i style="width:' + (n / ngMax * 100) +
+        '%"></i></span><span class="n">' + fmt(n) + '</span></div>').join('') : '<div class="empty-box">Không có NG trong ca.</div>') +
+      '<h5 style="margin-top:12px">Hàng test · ' + fmt(test) + ' pcs</h5>' +
+      (tests.length ? tests.map(({ l, t }) => '<div class="q-row"><span class="m" style="font-family:inherit">' + esc(t.muc_dich) + '</span><span class="n">' +
+        fmt(t.so_luong - (t.sl_tra_lai || 0)) + '</span><span class="d">' + esc(l.ten_line) + ' · ' + esc(t.nguoi_test) + ' · ' +
+        (t.ket_thuc_luc ? 'trả lại ' + fmt(t.sl_tra_lai) + ', huỷ ' + fmt(t.so_luong - t.sl_tra_lai) : 'đang test') + '</span></div>').join('')
+        : '<div class="empty-box">Không lấy hàng test.</div>') +
+    '</div><div class="rp-sec"><h5>Theo người thao tác</h5>' +
+      (per.length ? '<div class="tbl"><table class="boxes" style="min-width:0"><thead><tr><th>Người</th><th>Line</th><th style="text-align:right">Thùng</th>' +
+        '<th style="text-align:right">pcs</th></tr></thead><tbody>' + per.map(([p, r]) => '<tr><td>' + esc(p) + '</td><td class="sub">' +
+        esc([...r.lines].join(', ')) + '</td><td class="n">' + r.thung + '</td><td class="n">' + fmt(Math.round(r.pcs)) + '</td></tr>').join('') +
+        '</tbody></table></div><div class="sub" style="margin-top:6px">Thùng làm chung thì chia đều số pcs cho số người đứng Line lúc ghi nhận thùng.</div>'
+        : '<div class="empty-box">Chưa có thùng nào.</div>') +
+    '</div></div>' +
+    (kc ? '' : '<div class="rp-sec"><h5>Kiểm tra trước khi kết ca</h5><div class="chk" id="rpChecks"></div></div>') +
+    '<div class="rp-acts"><span class="why" id="rpWhy"></span><span class="sp"></span>' +
+      (kc && laAdmin ? '<button class="mbtn ghost" type="button" data-rp="mo">Mở lại ca (admin)</button>' : '') +
+      '<button class="mbtn ghost" type="button" data-close>Đóng</button>' +
+      (kc ? '' : '<button class="mbtn" type="button" id="rpConfirm">Xác nhận kết ca</button>') + '</div>';
+}
+function refreshRp() {
+  if (!$('#rpChecks')) return;
+  const cks = rpChecks(rpRows()), bad = cks.filter(c => c[0] === 'bad').length;
+  $('#rpChecks').innerHTML = cks.length ? cks.map(([k, t]) => '<div class="' + k + '">' + t + '</div>').join('') : '<div class="ok">Không có vấn đề.</div>';
+  const b = $('#rpConfirm');
+  if (b) b.disabled = bad > 0;
+  $('#rpWhy').textContent = bad ? 'Còn ' + bad + ' mục đỏ cần xử lý trước khi kết ca.' : '';
+  document.querySelectorAll('[data-reason]').forEach(i => i.classList.toggle('need', i.value.trim().length < 3));
+}
+function moBaoCao() {
+  if (!D) return;
+  $('#rpBody').innerHTML = reportHtml();
+  $('#rpModal').hidden = false;
+  refreshRp();
+  document.querySelectorAll('[data-reason]').forEach(i => i.addEventListener('input', () => { reasons[i.dataset.reason] = i.value; refreshRp(); }));
+  const c = $('#rpConfirm');
+  if (c) c.onclick = async () => {
+    if (rpChecks(rpRows()).some(x => x[0] === 'bad')) return;
+    if (!confirm('Kết ca ' + $('#fCa').value + ' ' + dmy($('#fNgay').value) + '? Sau khi kết, số liệu ca bị khoá.')) return;
+    c.disabled = true;
+    try {
+      const ly = {};
+      rpRows().filter(canLyDo).forEach(r => { ly[r.l.ten_line] = (reasons[r.l.ten_line] || '').trim(); });
+      await goi('bavia_ket_ca_luu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ly_do: ly });
+      setFlash('ok', 'Đã kết ca. Tem Đúc còn dở giữ nguyên khai báo, ca sau làm tiếp.');
+      await taiLai();
+      moBaoCao();
+    } catch (e) {
+      $('#rpWhy').textContent = e.nghiep_vu ? e.message : loiDeHieu(e).t;
+      c.disabled = false;
+    }
+  };
+}
+$('#btnKetCa').onclick = moBaoCao;
+$('#rpModal').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rp]');
+  if (!b) return;
+  if (b.dataset.rp === 'in') {
+    document.body.classList.add('in-bao-cao');
+    window.print();
+    setTimeout(() => document.body.classList.remove('in-bao-cao'), 500);
+  } else if (b.dataset.rp === 'xls') {
+    xuatExcel();
+  } else if (b.dataset.rp === 'mo') {
+    const ly = prompt('Lý do mở lại ca (bắt buộc):');
+    if (ly === null) return;
+    try {
+      await goi('bavia_mo_lai_ca', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ly_do: ly });
+      setFlash('warn', 'Đã mở lại ca. Sửa xong nhớ kết ca lại.');
+      $('#rpModal').hidden = true;
+      await taiLai();
+    } catch (er) {
+      $('#rpWhy').textContent = er.nghiep_vu ? er.message : loiDeHieu(er).t;
+    }
+  }
+});
+function xuatExcel() {
+  if (typeof XLSX === 'undefined') { $('#rpWhy').textContent = 'Chưa tải được thư viện Excel. Kiểm tra mạng rồi thử lại.'; return; }
+  const ngay = $('#fNgay').value, ca = $('#fCa').value, lyDo = D.ket_ca ? D.ket_ca.ly_do || {} : reasons;
+  const L = D.lines || [];
+  const wb = XLSX.utils.book_new();
+  const add = (ten, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ '': 'Không có dữ liệu' }]), ten);
+  add('Line', rpRows().map(r => ({
+    'Line': r.l.ten_line, 'Mã SP': r.l.ma_sp, 'Người thao tác': opsOf(r.l).join(', '), 'Người kiểm tra': r.l.nguoi_kiem_tra || '',
+    'KH ca': r.kh, 'OK': r.ok, '% KH': r.kh ? Math.round(r.pct * 100) : '', 'NG': r.ng, 'Test': r.test, 'Số thùng': r.thung,
+    'Còn dở': r.con, 'Lý do chưa đạt KH': lyDo[r.l.ten_line] || '',
+  })));
+  add('NG', L.flatMap(l => (l.ng || []).map(g => ({
+    'Giờ': hm(g.ngay_gio), 'Line': l.ten_line, 'Mã SP': l.ma_sp, 'Tem Đúc': g.tag_no, 'Lỗi': g.loai, 'Nguyên nhân': g.ghi_chu || '',
+    'SL': Number(g.so_luong), 'Người ghi': tenNguoi(g.nguoi),
+  }))));
+  add('Test', L.flatMap(l => (l.test || []).filter(t => t.id_tram === l.id_tram).map(t => ({
+    'Giờ': hm(t.thoi_diem), 'Line': l.ten_line, 'Tem Đúc': t.tag_no, 'SL': Number(t.so_luong), 'Mục đích': t.muc_dich, 'Nội dung': t.noi_dung,
+    'Người test': t.nguoi_test, 'Trả lại': t.ket_thuc_luc ? Number(t.sl_tra_lai) : '', 'Huỷ': t.ket_thuc_luc ? t.so_luong - t.sl_tra_lai : '',
+    'Trạng thái': t.ket_thuc_luc ? 'Đã kết thúc' : 'Đang test',
+  }))));
+  add('Người', theoNguoi().map(([p, r]) => ({ 'Người': p, 'Line': [...r.lines].join(', '), 'Số thùng': r.thung, 'pcs': Math.round(r.pcs) })));
+  add('Thùng', L.flatMap(l => (l.thung || []).map(b => ({
+    'Giờ': hm(b.thoi_diem), 'Line': l.ten_line, 'Mã SP': l.ma_sp, 'Tag No': b.tag_tp, 'SL': Number(b.so_luong),
+    'Dạng': b.dang === 1 ? 'Xuất hàng' : 'Chuyển CĐ', 'Tem Đúc nguồn': (b.nguon || []).map(s => s.tag_no + ' (' + s.so_luong_lay + ')').join(', '),
+    'Người làm': b.nguoi_lam || '', 'Người KT': b.nguoi_kiem || '',
+  }))));
+  XLSX.writeFile(wb, 'Bao_cao_ket_ca_Bavia_' + ngay + '_' + ca.replace(/\s+/g, '') + '.xlsx');
+}
+
 /* ── Camera ───────────────────────────────────────────────────────────────── */
 let qr = null, quet = false;
 async function moCam() {
@@ -903,16 +1237,21 @@ function tick() {
   const g = goiYNgayCa();
   $('#fNgay').value = g.ngay; $('#fCa').value = g.ca;
   selLine = lsGet('bvdb_line', null);
-  $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; ngOpen = testOpen = retOpen = null; taiLai(); };
+  $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; reasons = {}; ngOpen = testOpen = retOpen = null; taiLai(); };
   $('#fTruongCa').onchange = () => lsSet('bvdb_truong_ca', $('#fTruongCa').value);
   $('#btnReload').onclick = () => { flash = null; taiLai(); };
   try { await taiDanhMuc(); } catch (e) { console.error(e); }
+  try {
+    const { data: ss } = await sb.auth.getSession();
+    const { data: u } = await sb.from('user_roles').select('role').eq('user_id', ss.session.user.id).maybeSingle();
+    laAdmin = !!(u && u.role === 'admin');
+  } catch (e) { laAdmin = false; }
   await taiLai();
   const s = $('#scan'); if (s) s.focus();
   // Tự tải lại mỗi 60 giây (khi không đang gõ / mở form) để thấy thao tác của máy khác.
   setInterval(() => {
     const dangGo = document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName) && document.activeElement.id !== 'scan';
-    if (!busy && ngOpen === null && testOpen === null && retOpen === null && !dangGo && $('#lineModal').hidden) taiLai();
+    if (!busy && ngOpen === null && testOpen === null && retOpen === null && !dangGo && $('#lineModal').hidden && $('#planModal').hidden && $('#rpModal').hidden) taiLai();
   }, 60000);
 })();
 </script>
