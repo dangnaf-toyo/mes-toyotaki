@@ -12,6 +12,7 @@
   Gom các biểu đồ QC vào 1 trang, mỗi loại 1 tab (trước nằm trong qc-manager.html):
   - ?tab=kiemsoat : Biểu đồ kiểm soát kích thước IPQC (I-MR / X̄-R) — IpqcBtkQc.mountChart (T133)
   - ?tab=pchart   : P-Chart NG OQC — OqcNgDash.mount (T135)
+  - ?tab=bavia    : P-Chart NG Bavia — BaviaNgDash.mount (T159, Excel quá khứ + NG MES)
   qc-manager.html?tab=bieudo|ngoqc tự chuyển sang đây.
 -->
 <style>
@@ -39,11 +40,13 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
     <div class="tabs" role="tablist">
       <button type="button" class="tab-btn" role="tab" data-tab="kiemsoat">Biểu đồ kiểm soát</button>
       <button type="button" class="tab-btn" role="tab" data-tab="pchart">P-Chart NG OQC</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="bavia">P-Chart NG Bavia</button>
     </div>
   </header>
   <div id="login-msg" class="login" style="display:none">Cần đăng nhập để xem biểu đồ. <a id="login-link" href="shared/login.html">Đăng nhập</a></div>
   <div class="tabpanel" id="tab-kiemsoat"><div id="kiemsoat-root"></div></div>
   <div class="tabpanel" id="tab-pchart"><div id="pchart-root"></div></div>
+  <div class="tabpanel" id="tab-bavia"><div id="bavia-root"></div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -53,8 +56,9 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 <script src="shared/ipqc-spc.js"></script>
 <script src="shared/ipqc-btk-qc.js?v=T138"></script>
 <script src="shared/oqc-ng-dash.js?v=T157"></script>
+<script src="shared/bavia-ng-dash.js?v=T159"></script>
 <script>
-const TABS = ['kiemsoat', 'pchart'];
+const TABS = ['kiemsoat', 'pchart', 'bavia'];
 const ctl = {};
 function chonTab(tab) {
   if (!TABS.includes(tab)) tab = TABS[0];
@@ -71,6 +75,9 @@ function chonTab(tab) {
   } else if (tab === 'pchart') {
     if (!ctl.pchart) ctl.pchart = OqcNgDash.mount(document.getElementById('pchart-root'));
     else ctl.pchart.then(c => c && c.taiLai && c.taiLai());
+  } else if (tab === 'bavia') {
+    if (!ctl.bavia) ctl.bavia = BaviaNgDash.mount(document.getElementById('bavia-root'));
+    else ctl.bavia.then(c => c && c.taiLai && c.taiLai());
   }
 }
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => chonTab(b.dataset.tab)));
