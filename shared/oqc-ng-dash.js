@@ -11,6 +11,7 @@
  * chưa phân loại), "Sau Sơn", "Sau gia công ngoài", "Tất cả phạm vi".
  * T153: phạm vi Sau Sơn thêm lọc "Lần sơn" (mặc định lần 1 — P-chart chỉ so hàng sơn mới) và bảng
  * "Hiệu quả sơn theo lần sơn": % NG lần 1, OK ngay lần đầu, % sơn lại cứu được, NG chưa sơn lại, tỷ lệ đạt cuối.
+ * T157: cột biểu đồ "NG% theo ngày — chồng theo mã" hẹp lại 35%; Pareto đặt nhóm "Khác"/"Ngoài ra" cuối cùng.
  * T155: biểu đồ "NG% theo ngày — chồng theo mã": ngày không có báo cáo để trống (bỏ nền sọc chéo).
  * Trạng thái mã (cửa sổ 7 ngày đến "Đến ngày"):
  *   Bất thường  = có lần kiểm vượt UCL = CL + 3·√(CL(1−CL)/n)
@@ -57,6 +58,7 @@
     { k: 'R', l: 'Sơn lại (lần 2+)', ok: lan => lan >= 2 },
     { k: 'ALL', l: 'Tất cả lần sơn', ok: () => true },
   ];
+  const isOther = l => /^(loại |lỗi |nhóm )?(khác|ngoài ra|other|others)$/i.test(String(l).trim());
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
   const META = {
@@ -343,7 +345,7 @@
         const segs = order.filter(c => v.byP[c] > 0).map(c => '<div title="' + esc(dl(d) + ' · ' + c + ': ' + fn(v.byP[c]) + ' NG') + '" style="height:' + (v.byP[c] / v.ng * 100) + '%;background:' + pcol(c) + ';border-top:1px solid #fff;box-sizing:border-box"></div>').join('');
         return '<div style="height:100%;display:flex;flex-direction:column;justify-content:flex-end">' +
           (N <= 31 ? '<div class="mono" style="font-size:9.5px;font-weight:700;text-align:center;color:#3A4250;margin-bottom:9px">' + f1(p) + '</div>' : '') +
-          '<div style="height:' + pct(p / YM) + ';display:flex;flex-direction:column-reverse;border-radius:2px 2px 0 0;overflow:hidden">' + segs + '</div></div>';
+          '<div style="height:' + pct(p / YM) + ';width:65%;margin:0 auto;display:flex;flex-direction:column-reverse;border-radius:2px 2px 0 0;overflow:hidden">' + segs + '</div></div>';
       }).join('');
       const dayPts = days.map((d, i) => byDay[d] ? { i, d, p: byDay[d].ng / byDay[d].n, v: byDay[d] } : null).filter(Boolean);
       const line = dayPts.map(o => ((o.i + 0.5) / N * 1000).toFixed(1) + ',' + (H - Math.min(1, o.p / YM) * H).toFixed(1)).join(' ');
@@ -369,9 +371,12 @@
       const prevWin = C.all.filter(r => r.d >= C.pStart && r.d < C.cut);
       const sumBy = (rs, key) => { const o = {}; rs.forEach(r => { if (key === 'p') { if (r.ng) o[r.p] = (o[r.p] || 0) + r.ng; } else Object.entries(r.defs).forEach(([l, q]) => o[l] = (o[l] || 0) + q); }); return o; };
       const pareto = (title, key, mono) => {
-        const cur = Object.entries(sumBy(win, key)).sort((a, b) => b[1] - a[1]);
+        // Nhóm "Khác" / "Ngoài ra" luôn đứng cuối Pareto (không xếp theo số lượng)
+        const all = Object.entries(sumBy(win, key)).sort((a, b) => b[1] - a[1]);
+        const oth = all.filter(x => isOther(x[0]));
+        const cur = all.filter(x => !isOther(x[0])).slice(0, 10 - oth.length).concat(oth);
         const prev = sumBy(prevWin, key);
-        const total = cur.reduce((s, x) => s + x[1], 0), totPrev = Object.values(prev).reduce((s, x) => s + x, 0) || 1;
+        const total = all.reduce((s, x) => s + x[1], 0), totPrev = Object.values(prev).reduce((s, x) => s + x, 0) || 1;
         const PH = 200, K = 10;
         if (!cur.length) return '<div class="bx" style="flex:1 1 340px"><h3>' + title + '</h3><div class="mut" style="padding:30px 0;text-align:center">Không có NG</div></div>';
         let cum = 0;
@@ -379,7 +384,7 @@
           cum += q;
           let delta = '', dc = '#5B6472';
           if (p7) { const s2 = q / total, s1 = (prev[l] || 0) / totPrev; if (!prev[l]) { delta = 'mới'; dc = RED; } else if (s2 > s1 * 1.2) { delta = '▲'; dc = RED; } else if (s2 < s1 * 0.8) { delta = '▼'; dc = BLUE; } }
-          return { l, q, i, h: q / cur[0][1] * 0.85, cum: cum / total, delta, dc };
+          return { l, q, i, h: q / all[0][1] * 0.85, cum: cum / total, delta, dc };
         });
         const ln = bars.map(b => (((b.i + 0.5) / K) * 1000).toFixed(1) + ',' + (PH - b.cum * PH).toFixed(1)).join(' ');
         return '<div class="bx" style="flex:1 1 340px;display:flex;flex-direction:column;gap:6px">' +
