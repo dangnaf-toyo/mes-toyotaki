@@ -131,10 +131,11 @@
         esc(nguoiDs(t.nguoi_bavia)),
         num(t.so_luong),
         '',
-        'KT: ' + esc(tenNguoi(t.nguoi_kiem)),
+        '',
       ]) +
-      r(['', 'Ktra ngoại quan', '', 'Ktra ngoại quan', '', '', '', '']) +
-      r(['', 'Sandblast No', '', 'Tạo nhám ( Phun bi)', '', '', '', '']) +
+      // T151: Ktra ngoại quan = người kiểm tra của Line, Sandblast = người phun bi của Line (user chốt 23/10/2026).
+      r(['', 'Ktra ngoại quan', '', 'Ktra ngoại quan', esc(tenNguoi(t.nguoi_kiem)), '', '', '']) +
+      r(['', 'Sandblast No', '', 'Tạo nhám ( Phun bi)', esc(nguoiDs(t.nguoi_phun_bi)), '', '', '']) +
       trong(2) +
       '</table>' +
       '<div class="xs">Xuất sang công đoạn sau</div>' +
