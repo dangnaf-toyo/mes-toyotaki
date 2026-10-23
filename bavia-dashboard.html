@@ -370,6 +370,10 @@
       <input id="lmOps" type="text" autocomplete="off" placeholder="VD: Nguyễn Thị Hoa, Lê Văn Tuấn">
       <small style="color:var(--text-muted);font-size:11.5px">Trưởng ca gõ tên, nhiều người cách nhau bằng dấu phẩy.</small>
     </label>
+    <label class="f"><span>Người phun bi</span>
+      <input id="lmPhunBi" type="text" autocomplete="off" placeholder="Để trống nếu mã không phun bi">
+      <small style="color:var(--text-muted);font-size:11.5px">In vào dòng Sandblast trên Phiếu quản lý lô.</small>
+    </label>
     <label class="f"><span>Người kiểm tra (in lên tem)</span><select id="lmKiem"></select></label>
     <div class="err" id="lmErr"></div>
     <div class="acts">
@@ -415,7 +419,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/bavia-in-tem.js?v=t145"></script>
+<script src="shared/bavia-in-tem.js?v=t151"></script>
 <script>
 /* ── Danh mục cố định ─────────────────────────────────────────────────────── */
 // Tên lỗi NG tại Bavia — theo ảnh Picture/Danh sách tên lỗi NG tại bavia.png (user xác nhận 23/10/2026).
@@ -701,6 +705,9 @@ function renderWs() {
         (route ? '<div class="route">' + route + '</div>' : '<div class="flash bad">' + esc(info.error || '') + '</div>') + '</div>' +
       '<div class="ops"><span class="lab">Người thao tác</span><div class="list">' +
         (ops.map(p => '<span class="person"><span class="av">' + esc(initials(p)) + '</span>' + esc(p) + '</span>').join('') || '<span class="chip warn">Chưa gán người</span>') + '</div></div>' +
+      '<div class="ops"><span class="lab">Người phun bi</span><div class="list">' +
+        (l.nguoi_phun_bi ? '<span class="person"><span class="av">' + esc(initials(l.nguoi_phun_bi)) + '</span>' + esc(l.nguoi_phun_bi) + '</span>'
+          : '<span class="chip mute">Chưa có</span>') + '</div></div>' +
       '<div class="ops"><label class="lab" for="wsKiem">Người kiểm tra</label>' +
         '<select id="wsKiem" class="kiem-sel ' + (l.nguoi_kiem_tra ? '' : 'need') + '" ' + (khoa ? 'disabled' : '') + '><option value="">Trưởng ca chọn…</option>' +
         kiemDs.map(k => '<option ' + (k === l.nguoi_kiem_tra ? 'selected' : '') + '>' + esc(k) + '</option>').join('') + '</select></div>' +
@@ -919,6 +926,7 @@ function moLineModal(l) {
   $('#lmKh').value = l && l.kh_ca ? l.kh_ca : '';
   // Người thao tác: trưởng ca nhập tự do (user chốt 23/10/2026), nhiều người cách nhau dấu phẩy.
   $('#lmOps').value = l ? opsOf(l).join(', ') : '';
+  $('#lmPhunBi').value = l ? l.nguoi_phun_bi || '' : '';
   const kd = dsNguoiKiem();
   $('#lmKiem').innerHTML = '<option value="">Chưa chọn</option>' + kd.map(k => '<option ' + (l && k === l.nguoi_kiem_tra ? 'selected' : '') + '>' + esc(k) + '</option>').join('');
   $('#lmErr').textContent = '';
@@ -933,7 +941,8 @@ $('#lmSave').onclick = async () => {
   $('#lmSave').disabled = true;
   try {
     await goi('bavia_line_luu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ten_line: $('#lmLine').value, p_ma_sp: ma,
-      p_kh_ca: Number($('#lmKh').value) || 0, p_nguoi_thao_tac: ops.join(', '), p_nguoi_kiem: $('#lmKiem').value });
+      p_kh_ca: Number($('#lmKh').value) || 0, p_nguoi_thao_tac: ops.join(', '), p_nguoi_kiem: $('#lmKiem').value,
+      p_nguoi_phun_bi: $('#lmPhunBi').value.replace(/\s+/g, ' ').trim() });
     selLine = $('#lmLine').value; lsSet('bvdb_line', selLine);
     $('#lineModal').hidden = true;
     setFlash('ok', 'Đã lưu ' + esc(selLine) + ' · mã ' + esc(ma) + '.');
@@ -1202,7 +1211,7 @@ function xuatExcel() {
   add('Thùng', L.flatMap(l => (l.thung || []).map(b => ({
     'Giờ': hm(b.thoi_diem), 'Line': l.ten_line, 'Mã SP': l.ma_sp, 'Tag No': b.tag_tp, 'SL': Number(b.so_luong),
     'Dạng': b.dang === 1 ? 'Xuất hàng' : 'Chuyển CĐ', 'Tem Đúc nguồn': (b.nguon || []).map(s => s.tag_no + ' (' + s.so_luong_lay + ')').join(', '),
-    'Người làm': b.nguoi_lam || '', 'Người KT': b.nguoi_kiem || '',
+    'Người làm': b.nguoi_lam || '', 'Người KT': b.nguoi_kiem || '', 'Người phun bi': b.nguoi_phun_bi || '',
   }))));
   XLSX.writeFile(wb, 'Bao_cao_ket_ca_Bavia_' + ngay + '_' + ca.replace(/\s+/g, '') + '.xlsx');
 }
