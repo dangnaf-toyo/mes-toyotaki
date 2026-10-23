@@ -337,6 +337,42 @@ textarea{resize:vertical;min-height:48px}
       </div>
       <div class="empty-hint" style="text-align:left;padding-top:8px">Tem thành phẩm ở trạng thái <b>Chờ đóng gói</b> — người kiểm chỉ quét QR ở màn hình "Ghi nhận thùng thành phẩm" khi thùng đầy, lúc đó mới chọn người kiểm tra (ghi nhận ngày giờ kiểm), hệ thống tự trừ nguồn từ tem Đúc đang có mặt tại công đoạn.</div>
     </div>
+
+    <!-- T147: in tem thùng Bavia (Dạng 2 — mã còn Gia Công / Sơn sau Bavia) nhiều mã 1 lần theo KHSX tuần.
+         Dùng lại mẫu tem thành phẩm 100×70 (A4 8 tem/tờ) + cd_tao_lo_tem_thanh_pham như form ở trên. -->
+    <div class="card" id="bvCard">
+      <div class="card-ttl">In tem thùng Bavia theo KHSX tuần (mã chuyển Gia Công / Sơn)</div>
+      <div class="grid">
+        <div class="fg">
+          <label for="bv_khoang">Kế hoạch</label>
+          <select id="bv_khoang" onchange="taiBvTp()">
+            <option value="0">Hôm nay</option>
+            <option value="1">Ngày mai</option>
+            <option value="tuan">Hôm nay đến hết tuần</option>
+          </select>
+        </div>
+      </div>
+      <div class="empty-hint" id="bv_msg" style="text-align:left"></div>
+      <div class="nk-wrap"><table class="nk-table">
+        <thead><tr><th></th><th>Mã SP</th><th style="text-align:right">KH (pcs)</th>
+          <th style="text-align:right">Cần thùng</th><th style="text-align:right">Tem còn</th><th style="text-align:right">Số tem in</th></tr></thead>
+        <tbody id="bv_rows"></tbody>
+      </table></div>
+      <div class="empty-hint" style="text-align:left">Số tem in đề xuất = số thùng theo KH trừ tem đã in chưa dùng. Tem không khoá theo ngày: dùng chưa hết thì hôm sau dùng tiếp.
+        Tem chỉ có hiệu lực khi tổ Bavia quét ở Bảng điều khiển Bavia. Mã đóng gói xuất hàng (sau Bavia là OQC / Nhập kho) in tem lúc đóng thùng, không in ở đây.</div>
+      <div class="btns">
+        <button class="btn btn-s" type="button" onclick="taiBvTp()">↻ Tải lại</button>
+        <button class="btn btn-p" id="bv_btnIn" type="button" onclick="inBvTp()">🏷️ In tem đã chọn</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-ttl">Tem thùng Bavia in sẵn chưa dùng</div>
+      <div class="nk-wrap"><table class="nk-table">
+        <thead><tr><th>Lô in</th><th>Lúc in</th><th>Mã SP</th><th>Tag No</th><th style="text-align:right">Chưa dùng</th><th></th></tr></thead>
+        <tbody id="bv_lo"></tbody>
+      </table></div>
+    </div>
   </div>
 
   <!-- ============ TAB: Tra cứu Tem ============ -->
@@ -552,6 +588,7 @@ function switchTab(tab){
   document.getElementById('panelKanban').style.display = tab === 'kanban' ? 'block' : 'none';
   document.getElementById('panelTp').style.display = tab === 'tp' ? 'block' : 'none';
   if (tab !== 'search') { stopCamera(); }
+  if (tab === 'tp') taiBvTp();
 }
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tabBtnPrint').addEventListener('click', () => switchTab('print'));
@@ -1605,6 +1642,136 @@ function openPrintMultiTp(dList){
 }
 
 // =============================================================================
+// T147 — IN TEM THÙNG BAVIA THEO KHSX TUẦN (nhiều mã 1 lần)
+// Chỉ mã Dạng 2 (sau Bavia còn Gia Công / Sơn — RPC bavia_thong_tin_ma).
+// Tem in sẵn ở trạng thái "Chờ đóng gói TP", tram_cong_doan 'Bavia'; Bavia quét
+// ở bavia-dashboard.html mới ghi nhận. Huỷ tem thừa = duc_tem_xoa (có lý do,
+// ghi nhật ký tem T109).
+// =============================================================================
+var BV_ROWS = [];
+var BV_COT = ['cn', 't2', 't3', 't4', 't5', 't6', 't7'];
+function bvNgay(cong){
+  var d = new Date(Date.now() + 7 * 3600e3 + (cong || 0) * 86400e3);
+  return d.toISOString().slice(0, 10);
+}
+function bvDsNgay(){
+  var k = document.getElementById('bv_khoang').value;
+  if (k === '0') return [bvNgay(0)];
+  if (k === '1') return [bvNgay(1)];
+  var ds = [], hn = bvNgay(0);
+  var dow = new Date(hn + 'T00:00:00').getDay();   // 0 = CN
+  var con = dow === 0 ? 0 : 7 - dow;
+  for (var i = 0; i <= con; i++) ds.push(bvNgay(i));
+  return ds;
+}
+async function taiBvTp(){
+  var msg = document.getElementById('bv_msg');
+  var ds = bvDsNgay();
+  msg.textContent = '⏳ Đang tra KHSX tuần Bavia…';
+  var tuans = Array.from(new Set(ds.map(mondayOf)));
+  var kh = await sb.from('cd_khsx_tuan_plan').select('tuan_bat_dau,ma_sp,t2,t3,t4,t5,t6,t7,cn')
+    .eq('cong_doan', 'Bavia').in('tuan_bat_dau', tuans);
+  if (kh.error){ msg.textContent = 'Không tra được KHSX tuần. Thử tải lại.'; return; }
+  var khMa = {};
+  (kh.data || []).forEach(function(r){
+    ds.forEach(function(d){
+      if (mondayOf(d) !== r.tuan_bat_dau) return;
+      khMa[r.ma_sp] = (khMa[r.ma_sp] || 0) + (Number(r[BV_COT[new Date(d + 'T00:00:00').getDay()]]) || 0);
+    });
+  });
+  var mas = Object.keys(khMa).filter(function(m){ return khMa[m] > 0; }).sort();
+  var infos = await Promise.all(mas.map(function(m){
+    return sb.rpc('bavia_thong_tin_ma', { p_ma_sp: m }).then(function(r){ return r.data || {}; });
+  }));
+  var tem = await sb.from('duc_tem').select('tag_no,ma_sp,id_lo_chi_thi,ngay_gio_in')
+    .eq('trang_thai', 'Chờ đóng gói TP').eq('tram_cong_doan', 'Bavia').order('tag_no');
+  var conMa = {};
+  (tem.data || []).forEach(function(t){ conMa[t.ma_sp] = (conMa[t.ma_sp] || 0) + 1; });
+  BV_ROWS = [];
+  mas.forEach(function(m, i){
+    var inf = infos[i];
+    if (inf.ok && inf.dang === 1) return;   // mã xuất hàng: in tem lúc đóng thùng
+    var sl = Number(inf.sl_thung) || 0;
+    var can = sl ? Math.ceil(khMa[m] / sl) : 0, con = conMa[m] || 0;
+    BV_ROWS.push({ ma: m, info: inf, kh: khMa[m], sl: sl, can: can, con: con, de: Math.max(0, can - con) });
+  });
+  document.getElementById('bv_rows').innerHTML = BV_ROWS.map(function(r, i){
+    if (!r.info.ok) {
+      // Mã thiếu thông tin Danh mục SP: 1 dòng thông báo trải hết bảng (giữ input ẩn để chỉ số i khớp).
+      return '<tr><td><input type="checkbox" id="bv_chk' + i + '" disabled hidden><input type="number" id="bv_n' + i + '" value="0" hidden></td>'
+        + '<td colspan="5" style="white-space:normal"><b style="white-space:nowrap">' + svgEsc(r.ma) + '</b> · KH ' + fmtInt(r.kh)
+        + ' · <span style="color:var(--alarm-fg)">' + svgEsc(r.info.error || '') + '</span></td></tr>';
+    }
+    return '<tr><td><input type="checkbox" id="bv_chk' + i + '" ' + (r.de > 0 ? 'checked' : '') + ' aria-label="Chọn ' + svgEsc(r.ma) + '"></td>'
+      + '<td><b style="white-space:nowrap">' + svgEsc(r.ma) + '</b><div class="nk-dim">→ ' + svgEsc(r.info.buoc_sau || '') + ' · ' + fmtInt(r.sl) + ' pcs/thùng</div></td>'
+      + '<td style="text-align:right">' + fmtInt(r.kh) + '</td>'
+      + '<td style="text-align:right">' + fmtInt(r.can) + '</td>'
+      + '<td style="text-align:right;' + (r.con < r.can ? 'color:var(--warn-fg);font-weight:700' : '') + '">' + fmtInt(r.con) + '</td>'
+      + '<td style="text-align:right"><input type="number" id="bv_n' + i + '" min="0" max="500" value="' + r.de + '" style="width:70px;text-align:right" aria-label="Số tem in ' + svgEsc(r.ma) + '"></td></tr>';
+  }).join('') || '<tr><td colspan="6" class="nk-dim">KHSX tuần công đoạn Bavia không có mã chuyển Gia Công / Sơn trong khoảng này.</td></tr>';
+  msg.textContent = 'KH ' + ds.map(function(d){ return d.split('-').reverse().join('/'); }).join(', ')
+    + ' · ' + BV_ROWS.length + ' mã chuyển công đoạn.';
+  // Lô tem in sẵn chưa dùng
+  var lo = {};
+  (tem.data || []).forEach(function(t){ var k = t.id_lo_chi_thi || '(không rõ lô)'; (lo[k] = lo[k] || []).push(t); });
+  var los = Object.keys(lo).sort().reverse();
+  document.getElementById('bv_lo').innerHTML = los.map(function(k){
+    var ts = lo[k], t0 = ts[0];
+    return '<tr><td class="t">' + svgEsc(k) + '</td><td class="t">' + (t0.ngay_gio_in ? new Date(t0.ngay_gio_in).toLocaleString('vi-VN', { hour12: false }) : '') + '</td>'
+      + '<td>' + svgEsc(t0.ma_sp) + '</td><td class="t">' + svgEsc(ts[0].tag_no) + (ts.length > 1 ? ' → ' + svgEsc(ts[ts.length - 1].tag_no.slice(-4)) : '') + '</td>'
+      + '<td style="text-align:right"><b>' + ts.length + '</b></td>'
+      + '<td><button class="btn btn-s" type="button" style="padding:5px 10px;min-width:0" onclick="huyBvLo(\'' + svgEsc(k) + '\')">Huỷ ' + ts.length + ' tem chưa dùng</button></td></tr>';
+  }).join('') || '<tr><td colspan="6" class="nk-dim">Không còn tem thùng Bavia in sẵn chưa dùng.</td></tr>';
+  window.BV_LO = lo;
+}
+async function inBvTp(){
+  if (!(await requireLoginOrRedirect())) return;
+  var chon = BV_ROWS.map(function(r, i){
+    return { r: r, n: Math.round(Number(document.getElementById('bv_n' + i).value) || 0), on: document.getElementById('bv_chk' + i).checked };
+  }).filter(function(x){ return x.on && x.n > 0 && x.r.info.ok; });
+  if (!chon.length) return err('Chưa chọn mã nào có số tem lớn hơn 0');
+  if (chon.some(function(x){ return x.n > 500; })) return err('Tối đa 500 tem / mã / lần in');
+  var nguoi = '';
+  try { nguoi = (await MesAuth.getCurrentUserIdentity()) || ''; } catch (e) {}
+  var btn = document.getElementById('bv_btnIn');
+  btn.disabled = true;
+  var tems = [], loi = [];
+  for (var i = 0; i < chon.length; i++){
+    var x = chon[i];
+    showMsg('⏳ Đang tạo tem ' + x.r.ma + ' (' + (i + 1) + '/' + chon.length + ')…', 'wait');
+    var res = await sb.rpc('cd_tao_lo_tem_thanh_pham', {
+      p_cong_doan: 'Bavia', p_ma_sp: x.r.ma, p_ngay: bvDsNgay()[0],
+      p_so_thung: x.n, p_sl_thung: x.r.sl, p_sl_thung_cuoi: null, p_nguoi: nguoi,
+    });
+    if (res.error || !res.data || !res.data.ok) loi.push(x.r.ma + ': ' + ((res.data && res.data.error) || 'không tạo được'));
+    else tems = tems.concat(res.data.tems || []);
+  }
+  btn.disabled = false;
+  if (tems.length){
+    lastTpBatch = tems;
+    showMsg('✅ Đã tạo ' + tems.length + ' tem thùng Bavia' + (loi.length ? ' · lỗi: ' + loi.join('; ') : '') + ' — đang mở cửa sổ in…', loi.length ? 'err' : 'ok', 8000);
+    openPrintMultiTp(tems.map(tpTemToPrintData));
+  } else {
+    err('Không tạo được tem. ' + loi.join('; '));
+  }
+  taiBvTp();
+}
+async function huyBvLo(k){
+  var ts = (window.BV_LO || {})[k] || [];
+  if (!ts.length) return;
+  var ly = prompt('Huỷ ' + ts.length + ' tem chưa dùng của lô ' + k + '. Bavia quét các tem này sẽ bị từ chối.\nLý do huỷ:', 'Huỷ tem thùng Bavia in thừa');
+  if (ly === null) return;
+  if (ly.trim().length < 3) return err('Nhập lý do huỷ (ít nhất 3 ký tự)');
+  var hong = 0;
+  for (var i = 0; i < ts.length; i++){
+    var r = await sb.rpc('duc_tem_xoa', { p_tag_no: ts[i].tag_no, p_ly_do: ly.trim() });
+    if (r.error || !r.data || !r.data.ok) hong++;
+  }
+  showMsg(hong ? '⚠️ Đã huỷ ' + (ts.length - hong) + ' tem, ' + hong + ' tem không huỷ được (đã được quét hoặc thiếu quyền).' : '✅ Đã huỷ ' + ts.length + ' tem chưa dùng của lô ' + k + '. Đã ghi nhật ký tem.', hong ? 'err' : 'ok', 8000);
+  taiBvTp();
+}
+
+// =============================================================================
 // IN TEM (tạo tem mới)
 // =============================================================================
 async function inTem(){
@@ -1812,6 +1979,8 @@ window.addEventListener("unhandledrejection", (e) => {
     document.getElementById("mainWrap").style.display="block";
     // ?tagNo=... (từ tra-cuu-tem.html "Xem chi tiết") → mở luôn tab Tra cứu,
     // điền sẵn Tag No và tìm ngay.
+    // ?tab=tp (link từ Bảng điều khiển Bavia) → mở tab Tem Thành Phẩm.
+    if (new URLSearchParams(location.search).get('tab') === 'tp') switchTab('tp');
     if (PREFILL && PREFILL.tagNo) {
       switchTab('search');
       document.getElementById("searchTag").value = PREFILL.tagNo;
