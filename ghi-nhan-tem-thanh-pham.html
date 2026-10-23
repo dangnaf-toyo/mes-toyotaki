@@ -420,7 +420,8 @@ function beep(okTone){
 // "Đúc Kẽm" (T52) không phải công đoạn đóng gói TP — chọn công đoạn này
 // chuyển hẳn màn hình sang chế độ Kanban (xem isKanban()/applyMode()).
 const CONG_DOAN_KANBAN = "Đúc Kẽm";
-const CONG_DOAN_LIST = ["Đánh bóng Kẽm", "OQC", "Bavia", CONG_DOAN_KANBAN];
+// T147: Bavia đã chuyển sang bavia-dashboard.html (quét tem thùng ngay ở Line) — bỏ khỏi danh sách.
+const CONG_DOAN_LIST = ["Đánh bóng Kẽm", "OQC", CONG_DOAN_KANBAN];
 function slThungTp(maSp, congDoan){
   const p = productMap[maSp];
   return (p && p.sl_thung_cong_doan && Number(p.sl_thung_cong_doan[congDoan])) || 0;
@@ -468,6 +469,7 @@ async function boot(){
   // Cho phép mở thẳng vào chế độ Kanban qua link (?cd=Đúc+Kẽm) — dùng khi
   // redirect từ ghi-nhan-kanban.html cũ (T52).
   const cdParam = new URLSearchParams(location.search).get('cd');
+  if (cdParam === 'Bavia') { location.replace('bavia-dashboard.html'); return; }
   if (cdParam && CONG_DOAN_LIST.includes(cdParam)) document.getElementById('congDoan').value = cdParam;
   applyMode(); // đã tự nạp Trạm/tổ hoặc Máy đúc theo đúng chế độ
   const tasks = [loadNguoiKiem(), loadSpDangSx(), loadKpi()];

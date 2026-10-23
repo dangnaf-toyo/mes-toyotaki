@@ -38,7 +38,6 @@
       { label: 'Nhập liệu di động', href: 'mobile.html' },
       { label: 'In tem', href: 'intem.html' },
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
-      { label: 'Tem xuất hàng Bavia', href: 'bavia-tem-xuat-hang.html' },
       // T137: 1 mục "Tổ khuôn" — các trang con hiện dải tab (SUB_TABS bên dưới).
       { label: 'Tổ khuôn', href: 'bao-duong-khuon-tuan.html', subTabs: 'to_khuon' },
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html' },
