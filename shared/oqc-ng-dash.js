@@ -11,6 +11,7 @@
  * chưa phân loại), "Sau Sơn", "Sau gia công ngoài", "Tất cả phạm vi".
  * T153: phạm vi Sau Sơn thêm lọc "Lần sơn" (mặc định lần 1 — P-chart chỉ so hàng sơn mới) và bảng
  * "Hiệu quả sơn theo lần sơn": % NG lần 1, OK ngay lần đầu, % sơn lại cứu được, NG chưa sơn lại, tỷ lệ đạt cuối.
+ * T155: biểu đồ "NG% theo ngày — chồng theo mã": ngày không có báo cáo để trống (bỏ nền sọc chéo).
  * Trạng thái mã (cửa sổ 7 ngày đến "Đến ngày"):
  *   Bất thường  = có lần kiểm vượt UCL = CL + 3·√(CL(1−CL)/n)
  *   Tăng        = NG% 7 ngày ≥ 7 ngày trước × 1,3 (và +0,5 điểm %)
@@ -88,7 +89,6 @@
       '.ond .lg{display:inline-flex;align-items:center;gap:5px;color:#3A4250}' +
       '.ond .sw{width:10px;height:10px;border-radius:2px;display:inline-block}' +
       '.ond .dot{width:10px;height:10px;border-radius:99px;display:inline-block;box-sizing:border-box}' +
-      '.ond .hatch{background:repeating-linear-gradient(45deg,#E9EDF2 0 3px,#F7F8FA 3px 6px)}' +
       '.ond .plot{position:relative;border-left:1px solid #C9D0DA;border-bottom:1px solid #C9D0DA}' +
       '.ond .plot svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}' +
       '.ond .ax{display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:#5B6472;text-align:right;transform:translateY(-6px)}' +
@@ -337,7 +337,7 @@
       const YM = niceMax(maxDay), H = 230;
       const cols = days.map(d => {
         const v = byDay[d];
-        if (!v) return '<div class="hatch" style="height:100%;border-radius:2px" title="' + dl(d) + ': không có báo cáo"></div>';
+        if (!v) return '<div style="height:100%" title="' + dl(d) + ': không có báo cáo"></div>';
         const p = v.ng / v.n;
         const order = topP.filter(c => v.byP[c]).concat(Object.keys(v.byP).filter(c => !topP.includes(c)));
         const segs = order.filter(c => v.byP[c] > 0).map(c => '<div title="' + esc(dl(d) + ' · ' + c + ': ' + fn(v.byP[c]) + ' NG') + '" style="height:' + (v.byP[c] / v.ng * 100) + '%;background:' + pcol(c) + ';border-top:1px solid #fff;box-sizing:border-box"></div>').join('');
