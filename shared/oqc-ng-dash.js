@@ -5,6 +5,8 @@
  * Đọc oqc_daily_inspection (NG theo ngày/mã/loại lỗi) + oqc_ng_cau_hinh (CL
  * mỗi mã do QC Manager đặt/khoá, mục tiêu chung '*' + riêng). Ghi cấu hình
  * qua RPC oqc_ng_dat (supabase/migration_phase_T135_oqc_ng_dashboard.sql).
+ * Khoảng xem: "Từ ngày" → "Đến ngày" (tối đa 366 ngày) + nút chọn nhanh; biểu đồ,
+ * Pareto "cả khoảng", thẻ từng mã và bảng chi tiết theo khoảng này.
  * Trạng thái mã (cửa sổ 7 ngày đến "Đến ngày"):
  *   Bất thường  = có lần kiểm vượt UCL = CL + 3·√(CL(1−CL)/n)
  *   Tăng        = NG% 7 ngày ≥ 7 ngày trước × 1,3 (và +0,5 điểm %)
@@ -26,6 +28,17 @@
   const addDays = (s, k) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + k); return ymd(d); };
   const dl = s => s.slice(8, 10) + '/' + s.slice(5, 7);
   const pct = x => (Math.max(0, Math.min(1, x)) * 100).toFixed(3) + '%';
+  const soNgay = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000) + 1;
+  const MAX_NGAY = 366;
+  // Chọn nhanh khoảng ngày: trả về [từ, đến]; loại theo số ngày giữ nguyên "Đến ngày" đang chọn
+  const PRESETS = [
+    { k: 'd7', l: '7 ngày', f: e => [addDays(e, -6), e] },
+    { k: 'd16', l: '16 ngày', f: e => [addDays(e, -15), e] },
+    { k: 'd28', l: '4 tuần', f: e => [addDays(e, -27), e] },
+    { k: 'd91', l: '3 tháng', f: e => [addDays(e, -90), e] },
+    { k: 'thang', l: 'Tháng này', f: (e, t) => [t.slice(0, 8) + '01', t] },
+    { k: 'thang_truoc', l: 'Tháng trước', f: (e, t) => { const dau = t.slice(0, 8) + '01'; const cuoi = addDays(dau, -1); return [cuoi.slice(0, 8) + '01', cuoi]; } },
+  ];
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
   const META = {
@@ -79,12 +92,15 @@
   async function mount(el) {
     css();
     const today = ymd(new Date());
-    const st = { end: today, range: 16, kh: '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
+    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
     el.innerHTML =
       '<div class="ond">' +
       '<div class="bar">' +
-      '<label>Đến ngày <input type="date" data-k="end" value="' + today + '"></label>' +
-      '<label>Khoảng <select data-k="range"><option value="16">16 ngày</option><option value="28">4 tuần</option><option value="56">8 tuần</option><option value="91">3 tháng</option></select></label>' +
+      '<label>Từ ngày <input type="date" data-k="start" value="' + st.start + '" max="' + today + '"></label>' +
+      '<label>Đến ngày <input type="date" data-k="end" value="' + today + '" max="' + today + '"></label>' +
+      '<span style="display:inline-flex;flex-wrap:wrap;gap:4px">' +
+      PRESETS.map(p => '<button type="button" class="btn sm' + (p.k === 'd16' ? ' on' : '') + '" data-act="preset" data-p="' + p.k + '">' + p.l + '</button>').join('') +
+      '</span>' +
       '<label>Khách hàng <select data-k="kh"><option value="">Tất cả</option></select></label>' +
       '<span style="flex:1"></span><span data-o="msg"></span>' +
       '<button type="button" class="btn" data-act="cfg">🔒 CL &amp; mục tiêu</button>' +
@@ -120,7 +136,9 @@
       st.cfg = {}; (data || []).forEach(r => { st.cfg[r.ma_sp] = r; });
     }
     async function loadRows() {
-      const from = addDays(st.end, -(Math.max(st.range, 14) + 27));
+      // Lấy thêm 4 tuần trước "Đến ngày" để luôn tính được trạng thái 7 ngày / TB 4 tuần dù khoảng chọn ngắn
+      const lui = addDays(st.end, -27);
+      const from = st.start < lui ? st.start : lui;
       const out = [];
       for (let off = 0; ; off += 1000) {
         const { data, error } = await sb.from('oqc_daily_inspection')
@@ -156,6 +174,24 @@
         render();
       } catch (e) { setMsg('Lỗi tải dữ liệu: ' + (e.message || e), 'err'); }
     }
+    function datKhoang(tu, den) {
+      const n = soNgay(tu, den);
+      const inTu = el.querySelector('[data-k="start"]'), inDen = el.querySelector('[data-k="end"]');
+      if (n > MAX_NGAY) {
+        inTu.value = st.start; inDen.value = st.end;
+        setMsg('Khoảng ngày tối đa ' + MAX_NGAY + ' ngày (đang chọn ' + n + ' ngày). Thu hẹp lại giúp nhé.', 'err');
+        return;
+      }
+      st.start = tu; st.end = den; st.range = n;
+      st.pareto = 'all'; // chọn khoảng để phân tích → Pareto theo cả khoảng (vẫn bấm lại được "Pareto 7 ngày")
+      inTu.value = tu; inDen.value = den;
+      el.querySelectorAll('[data-act="preset"]').forEach(btn => {
+        const p = PRESETS.find(x => x.k === btn.dataset.p);
+        const [a, b] = p.f(den, ymd(new Date()));
+        btn.classList.toggle('on', a === tu && b === den);
+      });
+      taiLai();
+    }
     function setMsg(t, cls) { const m = $('msg'); m.className = t ? 'msg ' + cls : ''; m.textContent = t || ''; }
     function khOf(r) { const p = st.prods[r.p]; return (p && p.ten_khach_hang) || r.kh || ''; }
     function fillKh() {
@@ -166,7 +202,7 @@
 
     // ---------- tính toán ----------
     function compute() {
-      const end = st.end, N = st.range, start = addDays(end, -(N - 1));
+      const end = st.end, N = st.range, start = st.start;
       const cut = addDays(end, -6), pStart = addDays(end, -13), avgFrom = addDays(end, -27);
       const all = st.rows.filter(r => !st.kh || khOf(r) === st.kh);
       const inD = all.filter(r => r.d >= start && r.d <= end);
@@ -239,7 +275,10 @@
       const pt = T ? T.ng / T.n : null;
       const arr = (a, b) => (a == null || b == null || !b) ? '' : (a >= b ? '▲' : '▼') + Math.abs(Math.round((a / b - 1) * 100)) + '%';
       const nAbn = info.filter(x => x.st === 'bat_thuong' || x.st === 'tang').length;
+      const soNgayCoBc = days.filter(d => byDay[d]).length;
       const kpi = [
+        { t: 'NG ' + dl(days[0]) + ' → ' + dl(C.end) + ' (' + N + ' ngày)', v: fp(pAll, 2), vc: pAll != null && pAll > gTarget ? RED : INK, d: '', dc: '',
+          s: kAll.n ? fn(kAll.ng) + ' / ' + fn(kAll.n) + ' · ' + soNgayCoBc + ' ngày có báo cáo' : 'không có báo cáo' },
         { t: 'NG ngày ' + dl(C.end), v: pt == null ? '—' : fp(pt, 2), vc: pt != null && pt > gTarget ? RED : INK, d: arr(pt, pAll), dc: pt != null && pAll != null && pt > pAll ? RED : BLUE, s: T ? fn(T.ng) + ' / ' + fn(T.n) + ' · MT ' + fp(gTarget) : 'chưa có báo cáo' },
         { t: 'NG 7 ngày', v: fp(pw2, 2), vc: pw2 != null && pw2 > gTarget ? RED : INK, d: arr(pw2, pw1), dc: pw2 != null && pw1 != null && pw2 > pw1 ? RED : BLUE, s: '7 ngày trước ' + fp(pw1, 2) },
         { t: 'Mã bất thường / tăng', v: String(nAbn), vc: nAbn ? RED : INK, d: '', dc: '', s: '/ ' + info.filter(x => x.st !== 'khong_kiem').length + ' mã có kiểm 7 ngày' },
@@ -317,7 +356,7 @@
           '</div></div><div class="ax mono" style="height:' + PH + 'px;text-align:left"><span>100%</span><span>80%</span><span>60%</span><span>40%</span><span>20%</span><span>0</span></div></div></div>';
       };
       $('charts').innerHTML = daily + pareto('Pareto theo mã sản phẩm', 'p', true) + pareto('Pareto theo loại lỗi', 'def', false);
-      $('ptog').innerHTML = '<button type="button" class="btn sm' + (p7 ? ' on' : '') + '" data-act="p7" style="border-radius:6px 0 0 6px">Pareto 7 ngày</button><button type="button" class="btn sm' + (p7 ? '' : ' on') + '" data-act="pall" style="border-radius:0 6px 6px 0;margin-left:-1px">Cả khoảng</button>';
+      $('ptog').innerHTML = '<button type="button" class="btn sm' + (p7 ? ' on' : '') + '" data-act="p7" style="border-radius:6px 0 0 6px">Pareto 7 ngày</button><button type="button" class="btn sm' + (p7 ? '' : ' on') + '" data-act="pall" style="border-radius:0 6px 6px 0;margin-left:-1px">Cả khoảng ' + dl(days[0]) + ' → ' + dl(C.end) + '</button>';
 
       // Thẻ từng mã
       const PC = 120;
@@ -506,8 +545,12 @@
     });
     el.addEventListener('change', e => {
       const k = e.target.dataset && e.target.dataset.k; if (!k) return;
-      if (k === 'end') { if (!e.target.value) return; st.end = e.target.value; taiLai(); }
-      else if (k === 'range') { st.range = Number(e.target.value) || 16; taiLai(); }
+      if (k === 'start' || k === 'end') {
+        if (!e.target.value) return;
+        const tu = k === 'start' ? e.target.value : st.start, den = k === 'end' ? e.target.value : st.end;
+        // Chọn ngược (Từ sau Đến) thì tự đảo lại cho đúng thứ tự
+        datKhoang(tu <= den ? tu : den, tu <= den ? den : tu);
+      }
       else if (k === 'kh') { st.kh = e.target.value; render(); }
     });
     el.addEventListener('click', e => {
@@ -518,6 +561,10 @@
       if (a === 'cfg') { st.cfgOpen = !st.cfgOpen; b.classList.toggle('on', st.cfgOpen); render(); }
       else if (a === 'close') { st.sel = null; render(); }
       else if (a === 'xls') xuatExcel();
+      else if (a === 'preset') {
+        const p = PRESETS.find(x => x.k === b.dataset.p);
+        if (p) { const [tu, den] = p.f(st.end, ymd(new Date())); datKhoang(tu, den); }
+      }
       else if (a === 'p7') { st.pareto = '7'; render(); }
       else if (a === 'pall') { st.pareto = 'all'; render(); }
       else if (a === 'cl' || a === 'mt') luu(a === 'cl' ? 'cl' : 'muc_tieu', b.dataset.ma);
