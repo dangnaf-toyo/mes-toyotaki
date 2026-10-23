@@ -7,6 +7,8 @@
  * qua RPC oqc_ng_dat (supabase/migration_phase_T135_oqc_ng_dashboard.sql).
  * Khoảng xem: "Từ ngày" → "Đến ngày" (tối đa 366 ngày) + nút chọn nhanh; biểu đồ,
  * Pareto "cả khoảng", thẻ từng mã và bảng chi tiết theo khoảng này.
+ * T150: lọc theo phạm vi kiểm (oqc_inspection_context) — mặc định "Sau gia công" (gồm phiếu cũ
+ * chưa phân loại), "Sau Sơn", "Sau gia công ngoài", "Tất cả phạm vi".
  * Trạng thái mã (cửa sổ 7 ngày đến "Đến ngày"):
  *   Bất thường  = có lần kiểm vượt UCL = CL + 3·√(CL(1−CL)/n)
  *   Tăng        = NG% 7 ngày ≥ 7 ngày trước × 1,3 (và +0,5 điểm %)
@@ -38,6 +40,13 @@
     { k: 'd91', l: '3 tháng', f: e => [addDays(e, -90), e] },
     { k: 'thang', l: 'Tháng này', f: (e, t) => [t.slice(0, 8) + '01', t] },
     { k: 'thang_truoc', l: 'Tháng trước', f: (e, t) => { const dau = t.slice(0, 8) + '01'; const cuoi = addDays(dau, -1); return [cuoi.slice(0, 8) + '01', cuoi]; } },
+  ];
+  // Phạm vi kiểm (oqc_inspection_context.inspection_scope). Phiếu chưa phân loại ('') là dữ liệu sau gia công cũ.
+  const SCOPES = [
+    { k: 'MACHINING', l: 'Sau gia công', ok: sc => sc === 'FULL_POST_MACHINING' || sc === '' },
+    { k: 'POST_PAINTING', l: 'Sau Sơn', ok: sc => sc === 'POST_PAINTING' },
+    { k: 'POST_OUTSOURCED_MACHINING', l: 'Sau gia công ngoài', ok: sc => sc === 'POST_OUTSOURCED_MACHINING' },
+    { k: 'ALL', l: 'Tất cả phạm vi', ok: () => true },
   ];
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
@@ -92,7 +101,7 @@
   async function mount(el) {
     css();
     const today = ymd(new Date());
-    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
+    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', scope: 'MACHINING', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
     el.innerHTML =
       '<div class="ond">' +
       '<div class="bar">' +
@@ -101,6 +110,8 @@
       '<span style="display:inline-flex;flex-wrap:wrap;gap:4px">' +
       PRESETS.map(p => '<button type="button" class="btn sm' + (p.k === 'd16' ? ' on' : '') + '" data-act="preset" data-p="' + p.k + '">' + p.l + '</button>').join('') +
       '</span>' +
+      '<label title="Sau gia công gồm cả phiếu cũ chưa phân loại phạm vi">Phạm vi <select data-k="scope">' +
+      SCOPES.map(s => '<option value="' + s.k + '">' + s.l + '</option>').join('') + '</select></label>' +
       '<label>Khách hàng <select data-k="kh"><option value="">Tất cả</option></select></label>' +
       '<span style="flex:1"></span><span data-o="msg"></span>' +
       '<button type="button" class="btn" data-act="cfg">🔒 CL &amp; mục tiêu</button>' +
@@ -148,7 +159,19 @@
         out.push(...(data || []));
         if (!data || data.length < 1000) break;
       }
+      // Phạm vi từng phiếu; chỉ tin khi ngày/mã khớp phiếu (phiếu sửa ngày/mã sau khi lưu phạm vi → coi như chưa phân loại)
+      const ctx = {};
+      for (let off = 0; ; off += 1000) {
+        const { data, error } = await sb.from('oqc_inspection_context')
+          .select('inspection_id,inspection_scope,source_date,source_product_code')
+          .gte('source_date', from).lte('source_date', st.end).order('inspection_id').range(off, off + 999);
+        if (error) throw error;
+        (data || []).forEach(c => { ctx[c.inspection_id] = c; });
+        if (!data || data.length < 1000) break;
+      }
       st.rows = out.map(r => {
+        const c = ctx[r.id];
+        const sc = c && c.source_date === r.inspection_date && c.source_product_code === r.product_code ? c.inspection_scope || '' : '';
         const defs = {};
         (Array.isArray(r.defects) ? r.defects : []).forEach(x => {
           const q = Number(x && x.qty) || 0; if (q <= 0) return;
@@ -158,7 +181,7 @@
         return { id: r.id, d: r.inspection_date, p: r.product_code, n: Number(r.total_qty) || 0, ng: Number(r.ng_qty) || 0,
           ok: r.ok_qty != null ? Number(r.ok_qty) : (Number(r.total_qty) || 0) - (Number(r.ng_qty) || 0), defs, kh: r.customer_name || '',
           ca: r.shift || '', gio: r.inspection_time ? String(r.inspection_time).slice(0, 5) : '',
-          nguoi: r.inspector_name || r.inspector_code || '', maNguoi: r.inspector_code || '', ghiChu: r.note || '', lot: r.lot_no || '', task: r.task_no || '' };
+          nguoi: r.inspector_name || r.inspector_code || '', maNguoi: r.inspector_code || '', ghiChu: r.note || '', lot: r.lot_no || '', task: r.task_no || '', sc };
       }).filter(r => r.n > 0);
     }
     async function loadProds() {
@@ -194,9 +217,11 @@
     }
     function setMsg(t, cls) { const m = $('msg'); m.className = t ? 'msg ' + cls : ''; m.textContent = t || ''; }
     function khOf(r) { const p = st.prods[r.p]; return (p && p.ten_khach_hang) || r.kh || ''; }
+    const scopeOk = r => SCOPES.find(s => s.k === st.scope).ok(r.sc);
     function fillKh() {
       const sel = el.querySelector('[data-k="kh"]');
-      const list = [...new Set(st.rows.map(khOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+      const list = [...new Set(st.rows.filter(scopeOk).map(khOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+      if (st.kh && !list.includes(st.kh)) st.kh = ''; // khách hàng không có trong phạm vi mới → về "Tất cả"
       sel.innerHTML = '<option value="">Tất cả</option>' + list.map(k => '<option' + (k === st.kh ? ' selected' : '') + '>' + esc(k) + '</option>').join('');
     }
 
@@ -204,7 +229,7 @@
     function compute() {
       const end = st.end, N = st.range, start = st.start;
       const cut = addDays(end, -6), pStart = addDays(end, -13), avgFrom = addDays(end, -27);
-      const all = st.rows.filter(r => !st.kh || khOf(r) === st.kh);
+      const all = st.rows.filter(r => scopeOk(r) && (!st.kh || khOf(r) === st.kh));
       const inD = all.filter(r => r.d >= start && r.d <= end);
       const days = []; for (let i = 0; i < N; i++) days.push(addDays(start, i));
       const gTarget = st.cfg['*'] && st.cfg['*'].muc_tieu != null ? Number(st.cfg['*'].muc_tieu) : 0.03;
@@ -277,7 +302,7 @@
       const nAbn = info.filter(x => x.st === 'bat_thuong' || x.st === 'tang').length;
       const soNgayCoBc = days.filter(d => byDay[d]).length;
       const kpi = [
-        { t: 'NG ' + dl(days[0]) + ' → ' + dl(C.end) + ' (' + N + ' ngày)', v: fp(pAll, 2), vc: pAll != null && pAll > gTarget ? RED : INK, d: '', dc: '',
+        { t: 'NG ' + (st.scope === 'ALL' ? '' : SCOPES.find(s => s.k === st.scope).l.toLowerCase() + ' ') + dl(days[0]) + ' → ' + dl(C.end) + ' (' + N + ' ngày)', v: fp(pAll, 2), vc: pAll != null && pAll > gTarget ? RED : INK, d: '', dc: '',
           s: kAll.n ? fn(kAll.ng) + ' / ' + fn(kAll.n) + ' · ' + soNgayCoBc + ' ngày có báo cáo' : 'không có báo cáo' },
         { t: 'NG ngày ' + dl(C.end), v: pt == null ? '—' : fp(pt, 2), vc: pt != null && pt > gTarget ? RED : INK, d: arr(pt, pAll), dc: pt != null && pAll != null && pt > pAll ? RED : BLUE, s: T ? fn(T.ng) + ' / ' + fn(T.n) + ' · MT ' + fp(gTarget) : 'chưa có báo cáo' },
         { t: 'NG 7 ngày', v: fp(pw2, 2), vc: pw2 != null && pw2 > gTarget ? RED : INK, d: arr(pw2, pw1), dc: pw2 != null && pw1 != null && pw2 > pw1 ? RED : BLUE, s: '7 ngày trước ' + fp(pw1, 2) },
@@ -552,6 +577,7 @@
         datKhoang(tu <= den ? tu : den, tu <= den ? den : tu);
       }
       else if (k === 'kh') { st.kh = e.target.value; render(); }
+      else if (k === 'scope') { st.scope = e.target.value; st.sel = null; fillKh(); render(); }
     });
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-act]');
