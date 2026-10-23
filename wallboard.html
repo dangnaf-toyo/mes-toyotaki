@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TOYOTAKI | Wallboard nhà máy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<!--
+  wallboard.html — T160: màn hình Smart TV (trình duyệt TV, không máy tính, không đăng nhập).
+  Mở bằng link có khoá: wallboard.html?k=<khoá trong bảng wallboard_khoa> (admin lấy link
+  ở cuối trang khi mở trang này lúc đã đăng nhập). Thiết kế cố định 1920×1080, tự co theo
+  màn hình TV. 2 màn tự xoay 20 giây: (1) Sản xuất Đúc, (2) Dòng chảy & chất lượng.
+  Số liệu: RPC tong_quan_hom_nay + shared/tong-quan.js (chung với index.html), tải lại
+  mỗi 60 giây, tải lại cả trang mỗi 6 giờ cho TV chạy lâu không bị đầy bộ nhớ.
+  Script viết kiểu cũ (không ?. ??) cho trình duyệt TV đời cũ.
+-->
+<style>
+  html,body{margin:0;height:100%;background:#0B1220;overflow:hidden}
+  body{font-family:'Inter','Segoe UI',Roboto,Arial,sans-serif;color:#E6EDF7;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+  #stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+  .scr{position:absolute;left:0;top:0;right:0;bottom:0;padding:28px 36px;box-sizing:border-box;display:flex;flex-direction:column;gap:22px;transition:opacity .6s}
+  .scr.off{opacity:0;pointer-events:none}
+  .hd{display:flex;align-items:center;gap:28px}
+  .hd .co{font-size:18px;letter-spacing:.14em;color:#8EA0BC;font-weight:700}
+  .hd .ti{font-size:40px;font-weight:800;line-height:1.1}
+  .pill{background:#1E3A5F;color:#BFDBFE;font-size:24px;font-weight:700;padding:8px 18px;border-radius:10px}
+  .dots{display:flex;gap:10px}.dots span{width:44px;height:8px;border-radius:4px;background:#33415C}.dots span.on{background:#E6EDF7}
+  .clk{text-align:right;line-height:1}.clk .d{font-size:20px;color:#8EA0BC;font-weight:600}.clk .t{font-size:64px;font-weight:800;letter-spacing:-.02em}
+  .panel{background:#121B2E;border:1px solid #22304A;border-radius:14px;box-sizing:border-box;min-width:0}
+  h2{margin:0;font-size:28px;font-weight:800}
+  .sub{font-size:20px;color:#8EA0BC}
+  .k4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+  .kp{padding:18px 22px;display:flex;flex-direction:column;gap:2px;border-top-width:6px;border-top-style:solid}
+  .kp .l{font-size:24px;font-weight:700;color:#8EA0BC}
+  .kp .v{font-size:76px;font-weight:800;letter-spacing:-.03em;line-height:1.05}
+  .kp .s{font-size:24px;color:#B6C3D8}
+  .g{color:#86EFAC}.a{color:#FCD34D}.r{color:#FCA5A5}.w{color:#E6EDF7}.mu{color:#8EA0BC}
+  .bg-g{border-color:#22C55E}.bg-a{border-color:#F59E0B}.bg-r{border-color:#EF4444}.bg-n{border-color:#33415C}
+  .mg{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:14px}
+  .mc{display:flex;flex-direction:column;justify-content:space-between;gap:6px;padding:14px 18px;border-radius:12px;background:#13233A;border-left:10px solid #22C55E;min-height:0;overflow:hidden}
+  .mc.warn{background:#2A2210;border-left-color:#F59E0B}.mc.alarm{background:#2B1216;border-left-color:#EF4444}.mc.cho{background:#151C2B;border-left-color:#5B6B86}
+  .mc .n{font-size:34px;font-weight:800}.mc .p{font-size:34px;font-weight:800}
+  .mc .sp{font-size:20px;color:#B6C3D8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar{height:14px;border-radius:7px;background:#22304A;overflow:hidden}.bar i{display:block;height:100%;background:#60A5FA}
+  .mc .st{font-size:22px;font-weight:800;letter-spacing:.03em;text-transform:uppercase}
+  .stop{display:flex;align-items:center;gap:16px;padding:12px 14px;background:#1A1220;border-radius:10px}
+  .ft{display:flex;justify-content:space-between;font-size:18px;color:#6B7C99}
+  .stg{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-radius:12px;background:#16213A;border-top:8px solid #22C55E}
+  .stg.off{background:#121826;border-top-color:#33415C;color:#6B7C99}
+  .trk{position:relative;height:16px;border-radius:8px;background:#22304A}.trk i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;background:#60A5FA}.trk b{position:absolute;top:-6px;bottom:-6px;width:4px;background:#E6EDF7}
+  .row3{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  .msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:700;text-align:center;max-width:1400px;line-height:1.4}
+  #adm{position:fixed;left:12px;right:12px;bottom:12px;background:#F8FAFC;color:#0F172A;border-radius:10px;padding:12px 16px;font-size:14px;display:none;z-index:9;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  #adm input{width:100%;font:inherit;padding:6px 8px;margin-top:6px;box-sizing:border-box}
+  #adm button{font:inherit;font-weight:600;padding:6px 12px;margin-top:8px;margin-right:6px;min-height:36px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="msg" id="msg">Đang tải số liệu…</div>
+  <section class="scr off" id="s1"></section>
+  <section class="scr off" id="s2"></section>
+</div>
+<div id="adm"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/tong-quan.js?v=T160"></script>
+<script>
+(function () {
+  var KHOA = new URLSearchParams(location.search).get('k');
+  var P = TongQuan.pct, N = TongQuan.fmtN;
+  var M = null, cur = 0;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function cls(p) { return p == null ? 'mu' : p >= 0.95 ? 'g' : p >= 0.85 ? 'a' : 'r'; }
+  function bd(p) { return p == null ? 'bg-n' : p >= 0.95 ? 'bg-g' : p >= 0.85 ? 'bg-a' : 'bg-r'; }
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    var st = $('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fit); fit();
+
+  function header(title, idx) {
+    var c = M.ca, wd = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(M.ngay + 'T00:00:00').getDay()];
+    return '<header class="hd"><div style="display:flex;flex-direction:column"><span class="co">TOYOTAKI · NHÀ MÁY ĐÚC</span><span class="ti">' + title + '</span></div>' +
+      (c ? '<span class="pill">' + esc(c.nhan) + '</span>' : '') +
+      '<div style="margin-left:auto;display:flex;align-items:center;gap:26px"><div class="dots"><span class="' + (idx === 0 ? 'on' : '') + '"></span><span class="' + (idx === 1 ? 'on' : '') + '"></span></div>' +
+      '<div class="clk"><div class="d">' + wd + ' ' + TongQuan.ddmm(M.ngay) + '</div><div class="t mono clock">' + TongQuan.hm(new Date()) + '</div></div></div></header>';
+  }
+  function footer(t) { return '<footer class="ft"><span>' + t + '</span><span>Cập nhật lúc ' + TongQuan.hm(M.now) + '</span></footer>'; }
+
+  function render1() {
+    var du = M.duc, g = M.oee.ganNhat;
+    var kp = [
+      du.xongNgay || (M.ca && M.ca.trangThai === 'chua')
+        ? ['Đúc cả ngày ' + TongQuan.ddmm(M.ngay), N(du.homNay.tt), 'w', du.pNgay == null ? '' : Math.round(du.pNgay * 100) + '% KH (' + N(du.khDenGio) + ')', bd(du.pNgay)]
+        : ['Sản lượng Đúc ca', N(du.caTT), 'w', du.pace == null ? 'KH ca ' + N(du.caKH) : Math.round(du.pace * 100) + '% KH đến giờ (' + N(du.caKHNow) + ')', bd(du.pace)],
+      ['OEE ca gần nhất', g ? P(g.oee) : '—', 'w', g ? g.ca + ' ' + TongQuan.ddmm(g.ngay) : 'chưa có', 'bg-n'],
+      ['Dừng máy hôm nay', N(M.dung.phut) + '′', M.dung.dangDung.length ? 'a' : 'w', M.dung.n + ' sự cố', M.dung.dangDung.length ? 'bg-a' : 'bg-n'],
+      ['NG Đúc hôm nay', P(du.ngPct, 1), du.ngPct != null && du.ngPct > du.ngMt ? 'r' : 'w', 'mục tiêu ' + P(du.ngMt, 1), du.ngPct != null && du.ngPct > du.ngMt ? 'bg-r' : 'bg-g'],
+    ];
+    var ms = M.machines.filter(function (m) { return m.st !== 'idle'; });
+    var idle = M.machines.filter(function (m) { return m.st === 'idle'; }).map(function (m) { return m.may; });
+    var cols = ms.length > 12 ? 5 : 4;
+    var c = M.ca, H = 200, html = '';
+    if (c && c.start && du.caKH) {
+      var ymax = Math.max(du.caKH, du.duBao || 0, du.caTT) * 1.1, xN = (c.frac * 1000).toFixed(1);
+      var y = function (v) { return (300 - v / ymax * 300).toFixed(1); };
+      html = '<div style="position:relative;height:' + H + 'px;border-left:2px solid #33415C;border-bottom:2px solid #33415C"><svg viewBox="0 0 1000 300" preserveAspectRatio="none" style="position:absolute;left:0;top:0;width:100%;height:100%">' +
+        '<polyline points="0,300 1000,' + y(du.caKH) + '" fill="none" stroke="#8EA0BC" stroke-width="3" stroke-dasharray="10 8" vector-effect="non-scaling-stroke"></polyline>' +
+        (du.duBao ? '<polyline points="' + xN + ',' + y(du.caTT) + ' 1000,' + y(du.duBao) + '" fill="none" stroke="#F59E0B" stroke-width="3" stroke-dasharray="3 7" vector-effect="non-scaling-stroke"></polyline>' : '') +
+        '<polyline points="0,300 ' + xN + ',' + y(du.caTT) + '" fill="none" stroke="#60A5FA" stroke-width="5" vector-effect="non-scaling-stroke"></polyline>' +
+        '<line x1="' + xN + '" y1="0" x2="' + xN + '" y2="300" stroke="#E6EDF7" stroke-width="2" vector-effect="non-scaling-stroke"></line></svg></div>' +
+        '<div class="mono mu" style="display:flex;justify-content:space-between;font-size:18px"><span>' + TongQuan.hm(c.start) + '</span><span>' + TongQuan.hm(c.end) + '</span></div>' +
+        (c.trangThai === 'chua' ? '<div style="font-size:24px;font-weight:700" class="mu">Ca bắt đầu lúc ' + TongQuan.hm(c.start) + '</div>'
+          : '<div style="font-size:24px;font-weight:700" class="' + cls(du.duBao ? du.duBao / du.caKH : null) + '">Dự báo cuối ca: <span class="mono">' + (du.duBao ? N(du.duBao) : '—') + ' / ' + N(du.caKH) + '</span></div>');
+    } else html = '<div class="sub">Chưa có kế hoạch ca.</div>';
+    var stops = M.dung.dangDung.slice(0, 4);
+    $('s1').innerHTML = header('Sản xuất hôm nay', 0) +
+      '<div class="k4">' + kp.map(function (k) { return '<div class="panel kp ' + k[4] + '"><span class="l">' + k[0] + '</span><span class="v mono ' + k[2] + '">' + esc(k[1]) + '</span><span class="s mono">' + esc(k[3]) + '</span></div>'; }).join('') + '</div>' +
+      '<div style="flex:1;min-height:0;display:flex;gap:20px">' +
+      '<div class="panel" style="flex:1 1 0;padding:20px 22px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:baseline;gap:18px"><h2>Máy Đúc ngay lúc này</h2><span class="sub">thực tế / kế hoạch đến giờ</span>' +
+      '<span style="margin-left:auto;font-size:20px;font-weight:700"><span class="g">Chạy ' + M.demSt.run + '</span> · <span class="a">Đổi khuôn/KH ' + M.demSt.warn + '</span> · <span class="r">Sự cố ' + M.demSt.alarm + '</span></span></div>' +
+      '<div class="mg" style="grid-template-columns:repeat(' + cols + ',minmax(0,1fr))">' + (ms.length ? ms.map(function (m) {
+        return '<div class="mc ' + m.st + '"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="n">' + esc(m.may) + '</span><span class="p mono ' + (m.pct == null ? 'mu' : cls(m.pct)) + '">' + (m.pct == null ? '—' : Math.round(m.pct * 100) + '%') + '</span></div>' +
+          '<span class="sp mono">' + esc(m.sp || '') + (m.kh ? ' · ' + N(m.tt) + ' / ' + N(m.khNow) : '') + '</span>' +
+          '<span class="bar"><i style="width:' + Math.min(100, (m.pct || 0) * 100).toFixed(0) + '%"></i></span>' +
+          '<span class="st ' + (m.st === 'alarm' ? 'r' : m.st === 'warn' ? 'a' : m.st === 'cho' ? 'mu' : 'g') + '">' + esc(m.nhan) + '</span></div>';
+      }).join('') : '<div class="sub">Không có máy nào đang chạy.</div>') + '</div>' +
+      (idle.length ? '<div style="font-size:18px" class="mu">Không chạy: ' + esc(idle.join(' · ')) + '</div>' : '') + '</div>' +
+      '<div style="width:600px;display:flex;flex-direction:column;gap:20px">' +
+      '<div class="panel" style="padding:20px 22px;display:flex;flex-direction:column;gap:10px"><h2>Tiến độ ca</h2>' + html + '</div>' +
+      '<div class="panel" style="flex:1;min-height:0;padding:20px 22px;display:flex;flex-direction:column;gap:12px;border-color:' + (stops.length ? '#7F1D1D' : '#22304A') + '"><h2 class="' + (stops.length ? 'r' : 'g') + '">' + (stops.length ? 'Đang dừng — cần hỗ trợ' : 'Không có máy nào đang dừng') + '</h2>' +
+      stops.map(function (s) { return '<div class="stop"><span style="font-size:30px;font-weight:800;width:150px">' + esc(s.may) + '</span><span style="flex:1;min-width:0;display:flex;flex-direction:column"><b style="font-size:22px">' + esc(String(s.loai || '').replace(/^[A-Z]\d\s*—\s*/, '')) + '</b><span style="font-size:18px;color:#B6C3D8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(s.van_de || s.sp || '') + '</span></span><span class="mono ' + (s.st === 'alarm' ? 'r' : 'a') + '" style="font-size:40px;font-weight:800">' + s.phut + '′</span></div>'; }).join('') +
+      '</div></div></div>' + footer('Tự cập nhật mỗi 60 giây · màn tiếp theo sau 20 giây');
+  }
+
+  function render2() {
+    var du = M.duc, h = du.homNay;
+    var frac = du.khNgay > 0 ? Math.min(1, du.khDenGio / du.khNgay) : 0;
+    var pD = du.pNgay;
+    var arrow = '<div style="display:flex;align-items:center;width:44px;justify-content:center"><svg width="40" height="20" viewBox="0 0 44 20" fill="none" stroke="#5B6B86" stroke-width="3"><path d="M0 10h38M30 2l8 8-8 8"></path></svg></div>';
+    var st = [];
+    st.push('<div class="stg" style="border-top-color:' + (pD == null ? '#33415C' : pD >= 0.95 ? '#22C55E' : pD >= 0.85 ? '#F59E0B' : '#EF4444') + '"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:28px;font-weight:800">Đúc</span><span class="mono ' + cls(pD) + '" style="font-size:26px;font-weight:800">' + (pD == null ? '—' : Math.round(pD * 100) + '%') + '</span></div>' +
+      '<span class="mono" style="font-size:40px;font-weight:800;line-height:1">' + N(h.tt) + '</span><span class="mono mu" style="font-size:18px">KH ngày ' + N(du.khNgay) + '</span>' +
+      '<div class="trk"><i style="width:' + (du.khNgay ? Math.min(100, h.tt / du.khNgay * 100) : 0).toFixed(1) + '%"></i><b style="left:' + (frac * 100).toFixed(1) + '%"></b></div></div>');
+    M.chuaTrienKhai.forEach(function (n) { st.push('<div class="stg off"><span style="font-size:28px;font-weight:800">' + n + '</span><span style="font-size:20px">Chưa triển khai MES</span></div>'); });
+    st.push('<div class="stg" style="border-top-color:' + (M.oqc.pct == null ? '#33415C' : M.oqc.pct > M.oqc.mt ? '#EF4444' : '#22C55E') + '"><span style="font-size:28px;font-weight:800">OQC</span><span class="mono" style="font-size:40px;font-weight:800;line-height:1">' + N(M.oqc.n) + '</span><span class="mu" style="font-size:18px">đã kiểm · NG <b class="mono ' + (M.oqc.pct != null && M.oqc.pct > M.oqc.mt ? 'r' : 'g') + '">' + P(M.oqc.pct, 1) + '</b></span></div>');
+    st.push('<div class="stg" style="border-top-color:#60A5FA"><span style="font-size:28px;font-weight:800">Nhập kho</span><span class="mono" style="font-size:40px;font-weight:800;line-height:1">' + N(M.nhapKho) + '</span><span class="mu" style="font-size:18px">pcs từ 06:00</span></div>');
+
+    var ql = [['Đúc', du.ngPct, du.ngMt], ['OQC', M.oqc.pct, M.oqc.mt]];
+    var qmx = Math.max(0.04, Math.max.apply(null, ql.map(function (r) { return Math.max(r[1] || 0, r[2]); }))) * 1.15;
+    var dl = M.dung.list.slice(0, 6), dmx = dl.length ? dl[0].phut || 1 : 1;
+    var acts = M.actions.slice(0, 5);
+    $('s2').innerHTML = header('Dòng chảy &amp; chất lượng hôm nay', 1) +
+      '<section class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:16px"><div style="display:flex;align-items:baseline;gap:18px"><h2>Dòng chảy công đoạn</h2><span class="sub">thực tế hôm nay / kế hoạch ngày · vạch trắng = phải đạt đến giờ này</span></div>' +
+      '<div style="display:flex;align-items:stretch">' + st.join(arrow) + '</div></section>' +
+      '<div class="row3">' +
+      '<div class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:18px"><h2>NG% hôm nay so mục tiêu</h2>' +
+      ql.map(function (r) { return '<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:26px;font-weight:700">' + r[0] + '</span><span class="mono ' + (r[1] == null ? 'mu' : r[1] > r[2] ? 'r' : 'g') + '" style="font-size:28px;font-weight:800">' + P(r[1], 1) + ' / ' + P(r[2], 1) + '</span></div>' +
+        '<div class="trk" style="height:20px">' + (r[1] != null ? '<i style="width:' + (r[1] / qmx * 100).toFixed(1) + '%;background:' + (r[1] > r[2] ? '#EF4444' : '#60A5FA') + '"></i>' : '') + '<b style="left:' + (r[2] / qmx * 100).toFixed(1) + '%"></b></div></div>'; }).join('') +
+      '<div class="mu" style="font-size:20px">Bavia · Gia công · Sơn: chưa triển khai MES</div>' +
+      '<div style="margin-top:auto;font-size:22px;font-weight:700" class="' + (M.oqc.ucl.length ? 'r' : 'g') + '">P-Chart OQC: ' + (M.oqc.ucl.length ? M.oqc.ucl.length + ' mã vượt UCL' : 'không mã nào vượt UCL') + '</div></div>' +
+      '<div class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:14px"><h2>Dừng máy theo nguyên nhân</h2>' +
+      (dl.length ? dl.map(function (x, i) { return '<div style="display:grid;grid-template-columns:220px minmax(0,1fr) 110px;align-items:center;gap:14px"><span style="font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.loai) + '</span><span style="height:26px;border-radius:5px;background:#1A2540"><span style="display:block;height:100%;border-radius:5px;width:' + (x.phut / dmx * 100).toFixed(0) + '%;background:' + (i === 0 ? '#EF4444' : '#3B5784') + '"></span></span><span class="mono" style="font-size:26px;font-weight:800;text-align:right">' + N(x.phut) + '′</span></div>'; }).join('') : '<div class="sub">Chưa có sự cố hôm nay.</div>') +
+      '<div class="mu" style="margin-top:auto;font-size:20px">Tổng ' + N(M.dung.phut) + ' phút · ' + M.dung.n + ' sự cố</div></div>' +
+      '<div class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;border-color:#713F12"><h2 class="a">Việc đang mở</h2>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">' +
+      [['Máy dừng', M.dung.dangDung.length], ['IPQC chưa xử lý', M.ipqc.length], ['NCP mở', M.ncp.length]].map(function (c) { return '<div style="background:#1A2540;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column"><span class="mono ' + (c[1] ? 'a' : 'g') + '" style="font-size:48px;font-weight:800;line-height:1">' + c[1] + '</span><span style="font-size:18px;color:#B6C3D8">' + c[0] + '</span></div>'; }).join('') + '</div>' +
+      acts.map(function (x) { return '<div style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:10px;background:#1A1A22"><span style="width:14px;height:14px;border-radius:99px;flex:none;background:' + (x.muc <= 1 ? '#EF4444' : '#F59E0B') + '"></span><span style="flex:1;min-width:0;font-size:21px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.t) + '</span><span class="mono ' + (x.muc <= 1 ? 'r' : 'a') + '" style="font-size:24px;font-weight:800">' + esc(x.tuoi) + '</span></div>'; }).join('') +
+      '</div></div>' + footer('Tự cập nhật mỗi 60 giây · quay lại màn 1 sau 20 giây');
+  }
+
+  function show(i) { cur = i; $('s1').className = 'scr' + (i === 0 ? '' : ' off'); $('s2').className = 'scr' + (i === 1 ? '' : ' off'); }
+  function tai() {
+    return TongQuan.load(KHOA).then(function (D) {
+      M = TongQuan.compute(D, Date.now());
+      $('msg').style.display = 'none';
+      render1(); render2(); show(cur);
+    }).catch(function (e) {
+      if (M) return; // giữ màn cũ khi rớt mạng tạm thời
+      $('msg').textContent = (KHOA ? '' : 'Mở bằng link có khoá (?k=…) hoặc đăng nhập. ') + 'Không tải được số liệu: ' + (e.message || e);
+    });
+  }
+  setInterval(function () { var t = TongQuan.hm(new Date()); var a = document.querySelectorAll('.clock'); for (var i = 0; i < a.length; i++) a[i].textContent = t; }, 5000);
+  setInterval(function () { if (M) show(cur === 0 ? 1 : 0); }, 20000);
+  setInterval(tai, 60000);
+  setTimeout(function () { location.reload(); }, 6 * 3600 * 1000);
+
+  // Đã đăng nhập + admin: hiện link có khoá để mở trên TV
+  function adminLinks() {
+    if (typeof sb === 'undefined') return;
+    sb.from('wallboard_khoa').select('khoa,ten').then(function (r) {
+      if (r.error || !r.data || !r.data.length) return;
+      var base = location.origin + location.pathname;
+      $('adm').innerHTML = '<b>Link mở trên Smart TV</b> (chỉ admin thấy khung này; ai có link đều xem được số liệu tổng hợp):' +
+        r.data.map(function (k) { return '<input readonly value="' + esc(base + '?k=' + k.khoa) + '" aria-label="Link ' + esc(k.ten) + '" onclick="this.select()">'; }).join('') +
+        '<div><button type="button" onclick="document.getElementById(\'adm\').style.display=\'none\'">Đóng</button></div>';
+      $('adm').style.display = 'block';
+    });
+  }
+
+  if (KHOA) tai();
+  else if (typeof MesAuth !== 'undefined') MesAuth.getSession().then(function (s) {
+    if (!s) { $('msg').innerHTML = 'Wallboard cần link có khoá (?k=…).<br>Admin: đăng nhập rồi mở lại trang này để lấy link.'; return; }
+    tai(); adminLinks();
+  });
+  else $('msg').textContent = 'Wallboard cần link có khoá (?k=…).';
+})();
+</script>
+</body>
+</html>
