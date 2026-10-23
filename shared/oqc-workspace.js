@@ -57,6 +57,75 @@ const OqcWorkspace = (() => {
         "Đã đổi phạm vi: bỏ số lượng của " + dropped + " lỗi không thuộc danh mục phạm vi mới — kiểm tra lại bảng lỗi.";
     calc();
   }
+  /* T153: "Lần sơn" (1 = sơn mới, 2+ = sơn lại) — chỉ cho phạm vi "Kiểm tra sau Sơn"; thay quy ước mã có đuôi -1. */
+  function lanSonField() {
+    const f = node("div", "field"),
+      label = node("label", "", "Lần sơn"),
+      sel = node("select"),
+      note = node("small");
+    label.htmlFor = sel.id = "oqcLanSon";
+    for (const [v, t] of [["1", "Lần 1 — sơn mới"], ["2", "Lần 2 — sơn lại"], ["3", "Lần 3 — sơn lại"]])
+      sel.add(new Option(t, v));
+    note.id = "oqcLanSonNote";
+    note.setAttribute("role", "status");
+    f.append(label, sel, note);
+    f.hidden = true;
+    return f;
+  }
+  let tonToken = 0;
+  /* Đối chiếu: số kiểm lần L không nên vượt NG lần L-1 còn chờ sơn lại của cùng mã (cộng dồn mọi ngày). */
+  async function kiemTonSonLai() {
+    const note = $("oqcLanSonNote"),
+      lan = Number($("oqcLanSon").value),
+      code = $("code").value,
+      ticket = ++tonToken;
+    note.textContent = "";
+    note.style.color = "";
+    if ($("oqcLanSon").closest(".field").hidden || lan < 2 || !code) return;
+    try {
+      const ctx = await sb
+        .from("oqc_inspection_context")
+        .select("inspection_id,lan_son,source_date")
+        .eq("inspection_scope", "POST_PAINTING")
+        .eq("source_product_code", code)
+        .in("lan_son", [lan - 1, lan]);
+      if (ctx.error) throw ctx.error;
+      const ids = (ctx.data || []).map((c) => c.inspection_id).filter((id) => id !== editing),
+        rows = [];
+      for (let i = 0; i < ids.length; i += 200) {
+        const r = await sb.from("oqc_daily_inspection").select("id,inspection_date,total_qty,ng_qty").in("id", ids.slice(i, i + 200));
+        if (r.error) throw r.error;
+        rows.push(...(r.data || []));
+      }
+      if (ticket !== tonToken) return;
+      const by = new Map((ctx.data || []).map((c) => [c.inspection_id, c]));
+      let ngTruoc = 0,
+        daSon = 0;
+      for (const r of rows) {
+        const c = by.get(r.id);
+        if (!c || c.source_date !== r.inspection_date) continue;
+        if (c.lan_son === lan - 1) ngTruoc += Number(r.ng_qty) || 0;
+        else daSon += Number(r.total_qty) || 0;
+      }
+      const con = Math.max(0, ngTruoc - daSon),
+        total = Number($("total").value) || 0;
+      note.textContent = "NG lần " + (lan - 1) + " còn chờ sơn lại của mã này: " + con.toLocaleString("vi-VN") + " sp";
+      if (total > con) {
+        note.textContent += " — số đã kiểm (" + total.toLocaleString("vi-VN") + ") lớn hơn, kiểm tra lại lần sơn.";
+        note.style.color = "var(--warn-fg, #B45309)";
+      }
+    } catch (e) {
+      if (ticket === tonToken) note.textContent = "Chưa đối chiếu được NG còn chờ sơn lại (thử lại sau).";
+    }
+  }
+  /* Hiện/ẩn ô Lần sơn theo phạm vi; khi sửa phiếu lấy lần sơn đã lưu. */
+  function capNhatLanSon(tuPhieu) {
+    const f = $("oqcLanSon")?.closest(".field");
+    if (!f) return;
+    f.hidden = currentScope() !== "POST_PAINTING";
+    if (tuPhieu !== undefined) $("oqcLanSon").value = String(tuPhieu || 1);
+    kiemTonSonLai();
+  }
   function mount({ formPanel, capaDialog }) {
     const form = $("form"),
       top = node("div", "oqc-report-top"),
@@ -71,6 +140,7 @@ const OqcWorkspace = (() => {
     footer.append(photo, buttons);
     const field = (id) => $(id)?.closest(".field");
     for (const id of ["date", "shift", "code", "inspectionTask", "inspectionScope"]) top.append(field(id));
+    top.append(lanSonField());
     const lot = field("inspectionLot");
     lot.hidden = true;
     form.append(lot);
@@ -247,20 +317,35 @@ const OqcWorkspace = (() => {
     if (window.ResizeObserver) new ResizeObserver(fit).observe(form);
     setTimeout(fit, 0);
     // T149: bảng lỗi theo phạm vi — đổi phạm vi, làm mới form hay mở phiếu sửa đều vẽ lại khi phạm vi khác danh mục đang hiện.
-    $("inspectionScope").addEventListener("change", syncScope);
+    $("inspectionScope").addEventListener("change", () => {
+      syncScope();
+      capNhatLanSon();
+    });
+    // T153: đối chiếu NG còn chờ sơn lại khi đổi lần sơn / model / số đã kiểm
+    $("oqcLanSon").addEventListener("change", kiemTonSonLai);
+    $("code").addEventListener("change", kiemTonSonLai);
+    let hen = null;
+    $("total").addEventListener("input", () => {
+      clearTimeout(hen);
+      hen = setTimeout(kiemTonSonLai, 400);
+    });
     const oldReset = resetForm;
     resetForm = function () {
       const r = oldReset.apply(this, arguments);
       syncScope();
+      capNhatLanSon(1);
       return r;
     };
     const oldEdit = editRow;
-    editRow = function () {
+    editRow = function (id) {
       const r = oldEdit.apply(this, arguments);
       syncScope();
+      const row = dataRows.find((x) => x.id === id);
+      capNhatLanSon((row && row.context && row.context.lan_son) || 1);
       return r;
     };
     syncScope();
+    capNhatLanSon(1);
   }
   function markDefects() {
     document.querySelectorAll("#defects .oqc-ditem").forEach((it) => {
