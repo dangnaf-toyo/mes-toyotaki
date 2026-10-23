@@ -918,6 +918,8 @@ const OqcDashboard = (() => {
           task_no: $("inspectionTask").value.trim() || null,
           ...MesOqcHistory.customerPayload($("code").value, original),
           scope: $("inspectionScope").value || null,
+          // T153: lần sơn chỉ gửi cho phạm vi "Kiểm tra sau Sơn"
+          ...($("inspectionScope").value === "POST_PAINTING" && $("oqcLanSon") ? { lan_son: $("oqcLanSon").value } : {}),
           inspection_hours: parseHours($("oqcInspectionHours").value),
           labor: allLabor.map((l) => ({ employee_code: l.employee_code, hours: Number(l.hours) })),
           images,

@@ -9,6 +9,8 @@
  * Pareto "cả khoảng", thẻ từng mã và bảng chi tiết theo khoảng này.
  * T150: lọc theo phạm vi kiểm (oqc_inspection_context) — mặc định "Sau gia công" (gồm phiếu cũ
  * chưa phân loại), "Sau Sơn", "Sau gia công ngoài", "Tất cả phạm vi".
+ * T153: phạm vi Sau Sơn thêm lọc "Lần sơn" (mặc định lần 1 — P-chart chỉ so hàng sơn mới) và bảng
+ * "Hiệu quả sơn theo lần sơn": % NG lần 1, OK ngay lần đầu, % sơn lại cứu được, NG chưa sơn lại, tỷ lệ đạt cuối.
  * Trạng thái mã (cửa sổ 7 ngày đến "Đến ngày"):
  *   Bất thường  = có lần kiểm vượt UCL = CL + 3·√(CL(1−CL)/n)
  *   Tăng        = NG% 7 ngày ≥ 7 ngày trước × 1,3 (và +0,5 điểm %)
@@ -47,6 +49,12 @@
     { k: 'POST_PAINTING', l: 'Sau Sơn', ok: sc => sc === 'POST_PAINTING' },
     { k: 'POST_OUTSOURCED_MACHINING', l: 'Sau gia công ngoài', ok: sc => sc === 'POST_OUTSOURCED_MACHINING' },
     { k: 'ALL', l: 'Tất cả phạm vi', ok: () => true },
+  ];
+  // T153: lần sơn (chỉ phạm vi Sau Sơn). Phiếu sau sơn chưa ghi lần = lần 1.
+  const LANS = [
+    { k: '1', l: 'Lần 1 (sơn mới)', ok: lan => lan === 1 },
+    { k: 'R', l: 'Sơn lại (lần 2+)', ok: lan => lan >= 2 },
+    { k: 'ALL', l: 'Tất cả lần sơn', ok: () => true },
   ];
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
@@ -101,7 +109,7 @@
   async function mount(el) {
     css();
     const today = ymd(new Date());
-    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', scope: 'MACHINING', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
+    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', scope: 'MACHINING', lan: '1', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null, work: {} };
     el.innerHTML =
       '<div class="ond">' +
       '<div class="bar">' +
@@ -112,6 +120,8 @@
       '</span>' +
       '<label title="Sau gia công gồm cả phiếu cũ chưa phân loại phạm vi">Phạm vi <select data-k="scope">' +
       SCOPES.map(s => '<option value="' + s.k + '">' + s.l + '</option>').join('') + '</select></label>' +
+      '<label data-o="lanbox" hidden title="Sơn lại = hàng NG lần trước đem sơn lại (lần 2, 3…)">Lần sơn <select data-k="lan">' +
+      LANS.map(x => '<option value="' + x.k + '">' + x.l + '</option>').join('') + '</select></label>' +
       '<label>Khách hàng <select data-k="kh"><option value="">Tất cả</option></select></label>' +
       '<span style="flex:1"></span><span data-o="msg"></span>' +
       '<button type="button" class="btn" data-act="cfg">🔒 CL &amp; mục tiêu</button>' +
@@ -120,6 +130,7 @@
       '<div class="row" data-o="kpi"></div>' +
       '<div class="row" data-o="charts"></div>' +
       '<div style="display:flex;justify-content:flex-end;gap:0;margin-top:-4px" data-o="ptog"></div>' +
+      '<div data-o="hieuqua"></div>' +
       '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:2px">' +
       '<h3 style="margin-right:auto">Kết quả kiểm tra hằng ngày từng mã</h3>' +
       '<span class="lg"><span class="dot" style="background:' + BLUE + '"></span>NG%</span>' +
@@ -163,7 +174,7 @@
       const ctx = {};
       for (let off = 0; ; off += 1000) {
         const { data, error } = await sb.from('oqc_inspection_context')
-          .select('inspection_id,inspection_scope,source_date,source_product_code')
+          .select('inspection_id,inspection_scope,source_date,source_product_code,lan_son')
           .gte('source_date', from).lte('source_date', st.end).order('inspection_id').range(off, off + 999);
         if (error) throw error;
         (data || []).forEach(c => { ctx[c.inspection_id] = c; });
@@ -172,6 +183,7 @@
       st.rows = out.map(r => {
         const c = ctx[r.id];
         const sc = c && c.source_date === r.inspection_date && c.source_product_code === r.product_code ? c.inspection_scope || '' : '';
+        const lan = sc === 'POST_PAINTING' ? Number(c.lan_son) || 1 : null;
         const defs = {};
         (Array.isArray(r.defects) ? r.defects : []).forEach(x => {
           const q = Number(x && x.qty) || 0; if (q <= 0) return;
@@ -181,7 +193,7 @@
         return { id: r.id, d: r.inspection_date, p: r.product_code, n: Number(r.total_qty) || 0, ng: Number(r.ng_qty) || 0,
           ok: r.ok_qty != null ? Number(r.ok_qty) : (Number(r.total_qty) || 0) - (Number(r.ng_qty) || 0), defs, kh: r.customer_name || '',
           ca: r.shift || '', gio: r.inspection_time ? String(r.inspection_time).slice(0, 5) : '',
-          nguoi: r.inspector_name || r.inspector_code || '', maNguoi: r.inspector_code || '', ghiChu: r.note || '', lot: r.lot_no || '', task: r.task_no || '', sc };
+          nguoi: r.inspector_name || r.inspector_code || '', maNguoi: r.inspector_code || '', ghiChu: r.note || '', lot: r.lot_no || '', task: r.task_no || '', sc, lan };
       }).filter(r => r.n > 0);
     }
     async function loadProds() {
@@ -218,6 +230,7 @@
     function setMsg(t, cls) { const m = $('msg'); m.className = t ? 'msg ' + cls : ''; m.textContent = t || ''; }
     function khOf(r) { const p = st.prods[r.p]; return (p && p.ten_khach_hang) || r.kh || ''; }
     const scopeOk = r => SCOPES.find(s => s.k === st.scope).ok(r.sc);
+    const lanOk = r => st.scope !== 'POST_PAINTING' || LANS.find(x => x.k === st.lan).ok(r.lan);
     function fillKh() {
       const sel = el.querySelector('[data-k="kh"]');
       const list = [...new Set(st.rows.filter(scopeOk).map(khOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
@@ -229,7 +242,7 @@
     function compute() {
       const end = st.end, N = st.range, start = st.start;
       const cut = addDays(end, -6), pStart = addDays(end, -13), avgFrom = addDays(end, -27);
-      const all = st.rows.filter(r => scopeOk(r) && (!st.kh || khOf(r) === st.kh));
+      const all = st.rows.filter(r => scopeOk(r) && lanOk(r) && (!st.kh || khOf(r) === st.kh));
       const inD = all.filter(r => r.d >= start && r.d <= end);
       const days = []; for (let i = 0; i < N; i++) days.push(addDays(start, i));
       const gTarget = st.cfg['*'] && st.cfg['*'].muc_tieu != null ? Number(st.cfg['*'].muc_tieu) : 0.03;
@@ -302,7 +315,9 @@
       const nAbn = info.filter(x => x.st === 'bat_thuong' || x.st === 'tang').length;
       const soNgayCoBc = days.filter(d => byDay[d]).length;
       const kpi = [
-        { t: 'NG ' + (st.scope === 'ALL' ? '' : SCOPES.find(s => s.k === st.scope).l.toLowerCase() + ' ') + dl(days[0]) + ' → ' + dl(C.end) + ' (' + N + ' ngày)', v: fp(pAll, 2), vc: pAll != null && pAll > gTarget ? RED : INK, d: '', dc: '',
+        { t: 'NG ' + (st.scope === 'POST_PAINTING' && st.lan === 'R' ? 'sơn lại ' :
+          (st.scope === 'ALL' ? '' : SCOPES.find(s => s.k === st.scope).l.toLowerCase() + ' ') +
+          (st.scope === 'POST_PAINTING' && st.lan === '1' ? 'lần 1 ' : '')) + dl(days[0]) + ' → ' + dl(C.end) + ' (' + N + ' ngày)', v: fp(pAll, 2), vc: pAll != null && pAll > gTarget ? RED : INK, d: '', dc: '',
           s: kAll.n ? fn(kAll.ng) + ' / ' + fn(kAll.n) + ' · ' + soNgayCoBc + ' ngày có báo cáo' : 'không có báo cáo' },
         { t: 'NG ngày ' + dl(C.end), v: pt == null ? '—' : fp(pt, 2), vc: pt != null && pt > gTarget ? RED : INK, d: arr(pt, pAll), dc: pt != null && pAll != null && pt > pAll ? RED : BLUE, s: T ? fn(T.ng) + ' / ' + fn(T.n) + ' · MT ' + fp(gTarget) : 'chưa có báo cáo' },
         { t: 'NG 7 ngày', v: fp(pw2, 2), vc: pw2 != null && pw2 > gTarget ? RED : INK, d: arr(pw2, pw1), dc: pw2 != null && pw1 != null && pw2 > pw1 ? RED : BLUE, s: '7 ngày trước ' + fp(pw1, 2) },
@@ -431,6 +446,7 @@
       } else if (st.sel) st.sel = null;
       $('cards').innerHTML = info.length ? cardHtml.join('') : '<div class="bx mut" style="flex:1;text-align:center;padding:30px">Không có báo cáo OQC trong khoảng đã chọn.</div>';
 
+      renderHieuQua(C);
       renderCfg(C);
     }
 
@@ -460,7 +476,7 @@
       Object.keys(byD).sort().reverse().forEach(d => {
         const list = byD[d];
         list.forEach(r => {
-          body += '<tr class="' + (outDays[d] != null ? 'out' : '') + '"><td class="mono">' + dl(d) + '</td><td>' + esc(r.ca) + '</td><td class="mono">' + esc(r.gio) + '</td>' +
+          body += '<tr class="' + (outDays[d] != null ? 'out' : '') + '"><td class="mono">' + dl(d) + '</td><td>' + esc(r.ca) + (r.lan ? ' · lần ' + r.lan : '') + '</td><td class="mono">' + esc(r.gio) + '</td>' +
             '<td>' + esc(nguoiKiem(r)) + '</td><td class="r mono">' + esc(gioKiem(r)) + '</td>' +
             '<td class="r mono">' + fn(r.n) + '</td><td class="r mono">' + fn(r.ok) + '</td><td class="r mono" style="font-weight:700">' + fn(r.ng) + '</td>' +
             '<td class="r mono ngp">' + fp(r.n ? r.ng / r.n : null, 2) + '</td>' +
@@ -512,6 +528,54 @@
       const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [10, 8, 7, 28, 9, 9, 9, 8, 7, 50, 14, 14, 30].map(w => ({ wch: w }));
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, x.code.slice(0, 31));
       XLSX.writeFile(wb, 'OQC_' + x.code + '_' + C.days[0] + '_' + C.end + '.xlsx');
+    }
+
+    // ---------- T153: hiệu quả sơn theo lần sơn (chỉ phạm vi Sau Sơn) ----------
+    function renderHieuQua(C) {
+      const box = $('hieuqua');
+      if (st.scope !== 'POST_PAINTING') { box.innerHTML = ''; return; }
+      // Mọi lần sơn trong khoảng đã chọn (không theo ô "Lần sơn"), theo khách hàng đang lọc
+      const rs = st.rows.filter(r => r.sc === 'POST_PAINTING' && r.d >= C.days[0] && r.d <= C.end && (!st.kh || khOf(r) === st.kh));
+      const by = {};
+      rs.forEach(r => {
+        const m = by[r.p] || (by[r.p] = {});
+        const v = m[r.lan] || (m[r.lan] = { n: 0, ng: 0 });
+        v.n += r.n; v.ng += r.ng;
+      });
+      const tinh = m => {
+        const l1 = m[1] || { n: 0, ng: 0 };
+        let nLai = 0, okLai = 0, ok = 0, cho = 0;
+        Object.keys(m).map(Number).forEach(L => {
+          ok += m[L].n - m[L].ng;
+          if (L >= 2) { nLai += m[L].n; okLai += m[L].n - m[L].ng; }
+          cho += Math.max(0, m[L].ng - ((m[L + 1] || {}).n || 0)); // NG lần L chưa đem sơn lần L+1
+        });
+        return { n1: l1.n, ng1: l1.ng, p1: l1.n ? l1.ng / l1.n : null, fpy: l1.n ? (l1.n - l1.ng) / l1.n : null,
+          nLai, okLai, cuu: nLai ? okLai / nLai : null, cho, dat: l1.n ? ok / l1.n : null };
+      };
+      const ma = Object.keys(by).sort();
+      const tong = {};
+      ma.forEach(p => Object.entries(by[p]).forEach(([L, v]) => { const t = tong[L] || (tong[L] = { n: 0, ng: 0 }); t.n += v.n; t.ng += v.ng; }));
+      const dong = (ten, x, dam) => '<tr' + (dam ? ' class="sub"' : '') + '><td>' + ten + '</td>' +
+        '<td class="r mono">' + fn(x.n1) + '</td><td class="r mono">' + fn(x.ng1) + '</td>' +
+        '<td class="r mono" style="color:' + (x.p1 != null && x.p1 > C.gTarget ? RED : INK) + '">' + fp(x.p1) + '</td>' +
+        '<td class="r mono">' + fp(x.fpy) + '</td><td class="r mono">' + fn(x.nLai) + '</td><td class="r mono">' + fn(x.okLai) + '</td>' +
+        '<td class="r mono">' + fp(x.cuu) + '</td><td class="r mono" style="font-weight:700;color:' + (x.cho ? RED : INK) + '">' + fn(x.cho) + '</td>' +
+        '<td class="r mono" style="font-weight:700">' + fp(x.dat) + '</td></tr>';
+      box.innerHTML = '<div class="bx" style="display:flex;flex-direction:column;gap:6px">' +
+        '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px"><h3 style="margin-right:auto">Hiệu quả sơn theo lần sơn — ' + dl(C.days[0]) + ' → ' + dl(C.end) + '</h3>' +
+        '<span class="mut" style="font-size:11.5px">Tính mọi lần sơn trong khoảng, không theo ô "Lần sơn"</span></div>' +
+        (ma.length ? '<div style="overflow-x:auto"><table><thead><tr><th>Mã</th>' +
+          '<th class="r" title="Số kiểm hàng sơn mới">Kiểm lần 1</th><th class="r">NG lần 1</th><th class="r" title="NG lần 1 / Kiểm lần 1">% NG lần 1</th>' +
+          '<th class="r" title="Tỷ lệ OK ngay lần đầu = OK lần 1 / Kiểm lần 1">OK ngay lần đầu</th>' +
+          '<th class="r" title="Tổng số kiểm các lần sơn lại (lần 2+)">Đã sơn lại</th><th class="r">OK sau sơn lại</th>' +
+          '<th class="r" title="OK sau sơn lại / Đã sơn lại">% sơn lại cứu được</th>' +
+          '<th class="r" title="NG mỗi lần chưa đem sơn lần kế tiếp (trong khoảng)">NG chưa sơn lại</th>' +
+          '<th class="r" title="(OK lần 1 + OK các lần sơn lại) / Kiểm lần 1">Tỷ lệ đạt cuối</th></tr></thead><tbody>' +
+          ma.map(p => dong('<span class="mono" style="font-weight:700">' + esc(p) + '</span> <span class="mut">' + esc((st.prods[p] && st.prods[p].ten_sp) || '') + '</span>', tinh(by[p]))).join('') +
+          (ma.length > 1 ? dong('Tổng ' + ma.length + ' mã', tinh(tong), true) : '') +
+          '</tbody></table></div>' : '<div class="mut" style="padding:12px 0;text-align:center">Không có phiếu sau sơn trong khoảng đã chọn.</div>') +
+        '<div class="mut" style="font-size:11px">Sơn lại thường làm sau vài ngày: NG cuối khoảng có thể chưa kịp sơn lại — xem khoảng dài (≥ 1 tháng) để đánh giá. Phiếu sau sơn cũ chưa ghi lần sơn được tính là lần 1.</div></div>';
     }
 
     // ---------- bảng CL & mục tiêu ----------
@@ -577,7 +641,8 @@
         datKhoang(tu <= den ? tu : den, tu <= den ? den : tu);
       }
       else if (k === 'kh') { st.kh = e.target.value; render(); }
-      else if (k === 'scope') { st.scope = e.target.value; st.sel = null; fillKh(); render(); }
+      else if (k === 'scope') { st.scope = e.target.value; st.sel = null; $('lanbox').hidden = st.scope !== 'POST_PAINTING'; fillKh(); render(); }
+      else if (k === 'lan') { st.lan = e.target.value; st.sel = null; render(); }
     });
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-act]');
