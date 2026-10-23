@@ -27,7 +27,7 @@
 -- Chỉ trừ duc_tem.so_luong (số còn lại), KHÔNG đổi so_luong_tt của tem Đúc →
 -- sản lượng Đúc (duc_tem_sync_actuals / sync_lich_su) không bị ảnh hưởng.
 --
--- Trạng thái: Đã chạy STAGING 23/10/2026 (đợt 1; lịch sử migration staging ghi tên t144_*, t144b_*, t144c_* — trước khi đổi số sang T145). Chưa chạy PROD.
+-- Trạng thái: Đã chạy STAGING 23/10/2026 (đợt 1; lịch sử migration staging ghi tên t144_*, t144b_*, t144c_* — trước khi đổi số sang T145). Đã chạy PROD 23/10/2026 (tên t145_bang_dieu_khien_bavia, bản cuối gồm mọi sửa đổi).
 -- Đợt 2 (T146) bổ sung: bavia_line_luu / bavia_ng / bavia_test_lay chặn ca đã kết (bavia_ket_ca).
 -- Mọi tài khoản đăng nhập thao tác được (công nhân Bavia dùng tài khoản chung) — cố ý không has_role.
 -- Tên người thao tác / người kiểm tra / người test là dữ liệu trưởng ca chọn (không phải người đăng nhập);

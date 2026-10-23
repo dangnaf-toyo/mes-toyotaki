@@ -19,7 +19,7 @@
 --     cd_ket_ca_cong_doan vì hàm đó xoá cd_tram_hien_tai (Bavia cần giữ Line để
 --     xem lại báo cáo / mở lại ca).
 --
--- Trạng thái: Đã chạy STAGING 23/10/2026. Chưa chạy PROD.
+-- Trạng thái: Đã chạy STAGING 23/10/2026 (+ t146b sửa theo review). Đã chạy PROD 23/10/2026 (t146_bavia_nap_kh_ket_ca, bản đã sửa).
 -- ============================================================================
 
 create table if not exists public.bavia_so_ca (
@@ -184,6 +184,7 @@ declare
   v_user text := duc_su_co_nguoi_hien_tai();
   v_ly text;
   v_note text;
+  v_ket_lai boolean;
 begin
   if auth.uid() is null then return jsonb_build_object('ok', false, 'error', 'Cần đăng nhập'); end if;
   if exists (select 1 from bavia_ket_ca where ngay = p_ngay and ca = p_ca) then
@@ -206,12 +207,20 @@ begin
     return jsonb_build_object('ok', false, 'thieu', to_jsonb(v_thieu), 'error', array_to_string(v_thieu, '; '));
   end if;
 
+  -- Kết lại sau khi admin mở ca? (xem phần ghi báo cáo bên dưới)
+  v_ket_lai := exists (select 1 from bavia_ket_ca_nhat_ky where ngay = p_ngay and ca = p_ca and hanh_dong = 'ket_ca');
+
   insert into bavia_ket_ca (ngay, ca, nguoi, nguoi_uid, ly_do)
   values (p_ngay, p_ca, v_user, auth.uid(), coalesce(p_ly_do, '{}'::jsonb));
   insert into bavia_ket_ca_nhat_ky (ngay, ca, hanh_dong, nguoi) values (p_ngay, p_ca, 'ket_ca', v_user);
 
-  -- Ghi lại báo cáo ca Bavia (xoá bản cũ nếu kết lại sau khi admin mở ca)
-  delete from cd_bao_cao_ca where ngay = p_ngay and ca = p_ca and cong_doan = 'Bavia';
+  -- Ghi báo cáo ca Bavia. Chỉ khi KẾT LẠI (admin đã mở ca) mới xoá dòng do lần kết trước ghi, và chỉ dòng
+  -- của các Line trong ca này — không đụng dòng báo cáo Bavia ghi từ trang cũ / nhập tay (sửa theo review).
+  if v_ket_lai then
+    delete from cd_bao_cao_ca b
+    where b.ngay = p_ngay and b.ca = p_ca and b.cong_doan = 'Bavia'
+      and b.to_san_xuat in (select ten_tram from cd_tram_hien_tai where cong_doan = 'Bavia' and ngay = p_ngay and ca = p_ca);
+  end if;
   for l in select * from cd_tram_hien_tai where cong_doan = 'Bavia' and ngay = p_ngay and ca = p_ca loop
     select coalesce(sum(so_luong), 0) into v_ok from bavia_thung where id_tram = l.id_tram;
     select coalesce(sum(so_luong - coalesce(sl_tra_lai, 0)), 0) into v_test from bavia_hang_test where id_tram = l.id_tram;
