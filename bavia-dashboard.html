@@ -371,7 +371,7 @@
       <small style="color:var(--text-muted);font-size:11.5px">Trưởng ca gõ tên, nhiều người cách nhau bằng dấu phẩy.</small>
     </label>
     <label class="f"><span>Người phun bi</span>
-      <input id="lmPhunBi" type="text" autocomplete="off" placeholder="Để trống nếu mã không phun bi">
+      <select id="lmPhunBi"></select>
       <small style="color:var(--text-muted);font-size:11.5px">In vào dòng Sandblast trên Phiếu quản lý lô.</small>
     </label>
     <label class="f"><span>Người kiểm tra (in lên tem)</span><select id="lmKiem"></select></label>
@@ -926,7 +926,11 @@ function moLineModal(l) {
   $('#lmKh').value = l && l.kh_ca ? l.kh_ca : '';
   // Người thao tác: trưởng ca nhập tự do (user chốt 23/10/2026), nhiều người cách nhau dấu phẩy.
   $('#lmOps').value = l ? opsOf(l).join(', ') : '';
-  $('#lmPhunBi').value = l ? l.nguoi_phun_bi || '' : '';
+  // Người phun bi: chọn trong nhân viên bộ phận Bavia (user chốt 23/10/2026); giữ tên cũ nếu đã có mà không còn trong danh sách.
+  const pb = l ? l.nguoi_phun_bi || '' : '', dsPb = dsNguoiKiem();
+  if (pb && !dsPb.includes(pb)) dsPb.unshift(pb);
+  $('#lmPhunBi').innerHTML = '<option value="">Không phun bi</option>' +
+    dsPb.map(k => '<option ' + (k === pb ? 'selected' : '') + '>' + esc(k) + '</option>').join('');
   const kd = dsNguoiKiem();
   $('#lmKiem').innerHTML = '<option value="">Chưa chọn</option>' + kd.map(k => '<option ' + (l && k === l.nguoi_kiem_tra ? 'selected' : '') + '>' + esc(k) + '</option>').join('');
   $('#lmErr').textContent = '';
@@ -942,7 +946,7 @@ $('#lmSave').onclick = async () => {
   try {
     await goi('bavia_line_luu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ten_line: $('#lmLine').value, p_ma_sp: ma,
       p_kh_ca: Number($('#lmKh').value) || 0, p_nguoi_thao_tac: ops.join(', '), p_nguoi_kiem: $('#lmKiem').value,
-      p_nguoi_phun_bi: $('#lmPhunBi').value.replace(/\s+/g, ' ').trim() });
+      p_nguoi_phun_bi: $('#lmPhunBi').value });
     selLine = $('#lmLine').value; lsSet('bvdb_line', selLine);
     $('#lineModal').hidden = true;
     setFlash('ok', 'Đã lưu ' + esc(selLine) + ' · mã ' + esc(ma) + '.');
