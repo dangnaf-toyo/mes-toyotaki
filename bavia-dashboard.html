@@ -366,7 +366,10 @@
     </div>
     <label class="f"><span>Mã SP</span><input id="lmMa" list="dsMa" autocomplete="off" placeholder="Gõ để tìm mã SP có công đoạn Bavia"></label>
     <datalist id="dsMa"></datalist>
-    <div class="f"><span>Người thao tác</span><div class="opts" id="lmOps"></div></div>
+    <label class="f"><span>Người thao tác</span>
+      <input id="lmOps" type="text" autocomplete="off" placeholder="VD: Nguyễn Thị Hoa, Lê Văn Tuấn">
+      <small style="color:var(--text-muted);font-size:11.5px">Trưởng ca gõ tên, nhiều người cách nhau bằng dấu phẩy.</small>
+    </label>
     <label class="f"><span>Người kiểm tra (in lên tem)</span><select id="lmKiem"></select></label>
     <div class="err" id="lmErr"></div>
     <div class="acts">
@@ -914,10 +917,8 @@ function moLineModal(l) {
   $('#lmLine').disabled = !!l;
   $('#lmMa').value = l ? l.ma_sp : '';
   $('#lmKh').value = l && l.kh_ca ? l.kh_ca : '';
-  const ops = l ? opsOf(l) : [];
-  const ten = [...new Set(EMP.map(x => x.ten_nhan_vien).concat(ops))];
-  $('#lmOps').innerHTML = ten.map((p, i) => '<label class="o"><input type="checkbox" value="' + esc(p) + '" ' + (ops.includes(p) ? 'checked' : '') + '>' + esc(p) + '</label>').join('') ||
-    '<div class="empty-box">Chưa có nhân viên bộ phận Bavia trong Danh mục nhân sự.</div>';
+  // Người thao tác: trưởng ca nhập tự do (user chốt 23/10/2026), nhiều người cách nhau dấu phẩy.
+  $('#lmOps').value = l ? opsOf(l).join(', ') : '';
   const kd = dsNguoiKiem();
   $('#lmKiem').innerHTML = '<option value="">Chưa chọn</option>' + kd.map(k => '<option ' + (l && k === l.nguoi_kiem_tra ? 'selected' : '') + '>' + esc(k) + '</option>').join('');
   $('#lmErr').textContent = '';
@@ -927,7 +928,7 @@ function moLineModal(l) {
 $('#btnAddLine').onclick = () => moLineModal(null);
 $('#lmSave').onclick = async () => {
   const ma = $('#lmMa').value.trim().toUpperCase();
-  const ops = [...document.querySelectorAll('#lmOps input:checked')].map(i => i.value);
+  const ops = [...new Set($('#lmOps').value.split(/[,;\n]+/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean))];
   if (!ma) { $('#lmErr').textContent = 'Nhập mã SP.'; return; }
   $('#lmSave').disabled = true;
   try {
