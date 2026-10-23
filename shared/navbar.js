@@ -31,7 +31,7 @@
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
-      { label: 'Bảng điều khiển Bavia', href: 'cong-doan-dashboard.html?cd=Bavia' },
+      { label: 'Bảng điều khiển Bavia', href: 'bavia-dashboard.html' },
       { label: 'Bảng điều khiển Gia Công', href: 'cong-doan-dashboard.html?cd=Gia+C%C3%B4ng' },
       { label: 'Bảng điều khiển Sơn', href: 'cong-doan-dashboard.html?cd=S%C6%A1n' },
       { label: 'Bảng điều khiển OQC', href: 'cong-doan-dashboard.html?cd=OQC' },
@@ -104,6 +104,7 @@
     'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
     'intem.html': { icon: '🏷️', title: 'In Tem', desc: 'Tạo/tra cứu tem Đúc, chỉ thị Kanban, tem thành phẩm', noTitleBar: true },
     'ghi-nhan-kanban.html': { icon: '📥', title: 'Ghi nhận thùng (Kanban)', desc: 'Quét QR ghi nhận thùng sản phẩm đã sản xuất — máy chạy theo tem chỉ thị in trước' },
+    'bavia-dashboard.html': { icon: '🛠️', title: 'Bảng điều khiển Bavia', desc: 'Line Bavia: khai báo tem Đúc, NG, hàng test, đóng thùng in tem xuất hàng / quét tem thùng', noTitleBar: true },
     'bavia-tem-xuat-hang.html': { icon: '🏷️', title: 'Tem xuất hàng Bavia', desc: 'Quét QR tem Đúc ghi nhận sản lượng Bavia — đủ thùng in tem xuất hàng theo mẫu khách (FCC / Astemo / Soji / Mikasa / Cosmos)' },
     'ghi-nhan-tem-thanh-pham.html': { icon: '📦', title: 'Ghi nhận thùng thành phẩm', desc: 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc' },
     'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
