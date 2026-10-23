@@ -1065,6 +1065,15 @@ function renderPhotoGrid(){
 
 function pad2(n){ return String(n).padStart(2,'0'); }
 
+function dataUrlToBlob(dataUrl, mime){
+  const bin = atob(String(dataUrl).split(',')[1] || '');
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new Blob([buf], { type: mime || 'image/jpeg' });
+}
+// "Load failed" (Safari/iOS), "Failed to fetch" (Chrome), "NetworkError" (Firefox) = lỗi mạng phía máy
+function isNetworkError(e){ return /load failed|failed to fetch|networkerror|network request failed|timed? ?out/i.test((e && (e.message || e.name)) || String(e || '')); }
+
 // Tên file trước đây chỉ có độ phân giải theo PHÚT (không có giây) và không
 // gắn với id_checkpoint — 2 lượt kiểm KHÁC NHAU cho cùng 1 máy/mã SP/kết quả
 // trong cùng 1 phút (VD kiểm định kỳ NG tự sinh ngay checkpoint sau_sự_cố,
@@ -1085,8 +1094,22 @@ async function uploadEvidencePhotos(maMay, maSp, ketQua){
     const p = state.photos[i];
     const idxPart = state.photos.length > 1 ? ('_' + (i+1)) : '';
     const path = dateFolder + '/' + stamp + '_' + safeMay + '_' + safeSp + '_' + ketQua + '_' + safeCheckpoint + '_' + uniq + idxPart + '.jpg';
-    const { error } = await sb.storage.from('ipqc-evidence').upload(path, p.blob, { contentType: p.mime, upsert: false });
-    if (error) throw new Error('Lỗi tải ảnh lên: ' + error.message);
+    // T156: iPhone (Safari / trình duyệt trong Zalo) chuyển app rồi quay lại có thể làm Blob
+    // tạo từ canvas mất dữ liệu → upload hỏng ngay "Load failed" dù ảnh xem trước vẫn hiện
+    // (ảnh xem trước dùng dataUrl). Nên mỗi lần gửi tạo Blob mới từ dataUrl; lỗi mạng thử lại 3 lần.
+    let error = null;
+    for (let lan = 1; lan <= 3; lan++) {
+      try {
+        ({ error } = await sb.storage.from('ipqc-evidence').upload(path, dataUrlToBlob(p.dataUrl, p.mime), { contentType: p.mime, upsert: false }));
+      } catch (e) { error = e; }
+      if (!error || /already exists|Duplicate/i.test(error.message || '')) { error = null; break; }
+      if (!isNetworkError(error) || lan === 3) break;
+      showToast('Mạng yếu — đang thử gửi lại ảnh ' + (i + 1) + ' (lần ' + (lan + 1) + '/3)…', true);
+      await new Promise(r => setTimeout(r, 1500 * lan));
+    }
+    if (error) throw new Error(isNetworkError(error)
+      ? 'Lỗi tải ảnh lên: mất kết nối mạng khi gửi ảnh ' + (i + 1) + '/' + state.photos.length + '. Kiểm tra Wi-Fi/4G rồi bấm gửi lại (ảnh vẫn được giữ).'
+      : 'Lỗi tải ảnh lên: ' + error.message);
     const { data } = sb.storage.from('ipqc-evidence').getPublicUrl(path);
     urls.push(data.publicUrl);
   }
