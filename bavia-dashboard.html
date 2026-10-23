@@ -19,7 +19,7 @@
     Dạng 1 — đóng gói xuất hàng: bấm "Đóng thùng · In tem" → in tem theo mẫu khách
              (shared/bavia-in-tem.js). Sản lượng tính lúc in tem.
     Dạng 2 — chuyển công đoạn (Gia Công / Sơn): quét tem thùng QLSX in sẵn.
-  1 ô quét chung: tem Đúc = khai báo nguồn (tự nhận Đúc → Bavia), tem TP = ghi
+  1 ô quét chung: tem Đúc = khai báo nguồn (T152: phải Chuyển công đoạn sang Bavia + đã xác nhận), tem TP = ghi
   nhận thùng. NG / hàng test khai báo trên dòng tem Đúc đang dùng.
   RPC: bavia_du_lieu / bavia_line_luu / bavia_quet / bavia_bo_nguon / bavia_dong_thung
        / bavia_ng / bavia_test_lay / bavia_test_ket_thuc / bavia_du_lieu_in
@@ -156,9 +156,12 @@
   .tiny:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
   .tiny.bad{color:var(--alarm-fg);border-color:var(--alarm-bd);}
   .tiny.test{color:var(--warn-fg);border-color:var(--warn-bd);}
-  .ng-form{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:var(--alarm-bg);border:1px solid var(--alarm-bd);border-radius:7px;padding:6px 8px;}
+  .ng-form{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;background:var(--alarm-bg);border:1px solid var(--alarm-bd);border-radius:7px;padding:6px 8px;}
   .ng-form select,.ng-form input,.test-form select,.test-form input,.ret-form input{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--text);min-height:30px;}
   .ng-form select{max-width:100%;}
+  .ng-row,.ng-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .ng-acts .sp{flex:1;}
+  .ng-sum{font-size:12px;font-weight:700;color:var(--alarm-fg);}
   .ng-form input[type=number]{width:72px;font-family:var(--mono);}
   .ng-form .note{flex:1 1 160px;}
   .test-form{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:7px;padding:8px;}
@@ -607,12 +610,26 @@ function srcList(l) {
     '</div>';
   }).join('') + '</div>';
 }
+// T152: NG nhiều dòng — mỗi thùng Đúc có thể có nhiều hạng mục lỗi; ghi tất cả 1 lần (bavia_ng_nhieu).
+function ngRowHtml() {
+  return '<div class="ng-row">' +
+    '<select class="ng-loai" aria-label="Tên lỗi NG">' + NG_TYPES.map(([c, t]) => '<option value="' + esc(t) + '">' + c + ' - ' + esc(t) +
+      (t === NG_KHAC ? ' (ghi rõ nguyên nhân)' : '') + '</option>').join('') + '</select>' +
+    '<input class="ng-note note" type="text" placeholder="Ghi rõ nguyên nhân" aria-label="Nguyên nhân NG khác" hidden>' +
+    '<input class="ng-qty" type="number" min="1" value="1" aria-label="Số lượng NG">' +
+    '<button class="tiny" type="button" data-ngdel title="Xoá dòng">✕</button></div>';
+}
 function ngForm(n, i) {
-  return '<div class="ng-form">' +
-    '<select id="ngType" aria-label="Tên lỗi NG">' + NG_TYPES.map(([c, t]) => '<option value="' + esc(t) + '">' + c + ' - ' + esc(t) + (t === NG_KHAC ? ' (ghi rõ nguyên nhân)' : '') + '</option>').join('') + '</select>' +
-    '<input id="ngNote" class="note" type="text" placeholder="Ghi rõ nguyên nhân" aria-label="Nguyên nhân NG khác" hidden>' +
-    '<input id="ngQty" type="number" min="1" max="' + n.con + '" value="1" aria-label="Số lượng NG">' +
-    '<button class="tiny bad" type="button" data-ngsave="' + i + '">Ghi NG</button><button class="tiny" type="button" data-cancel>Huỷ</button></div>';
+  return '<div class="ng-form" data-con="' + n.con + '"><div id="ngRows">' + ngRowHtml() + '</div>' +
+    '<div class="ng-acts"><button class="tiny" type="button" data-ngadd>+ Thêm dòng</button><span class="ng-sum" id="ngSum"></span>' +
+    '<span class="sp"></span><button class="tiny bad" type="button" data-ngsave="' + i + '">Ghi NG</button>' +
+    '<button class="tiny" type="button" data-cancel>Huỷ</button></div></div>';
+}
+function ngTong() {
+  const f = document.querySelector('.ng-form'); if (!f) return;
+  const tong = [...document.querySelectorAll('#ngRows .ng-qty')].reduce((s, x) => s + (Number(x.value) || 0), 0);
+  const con = Number(f.dataset.con) || 0;
+  $('#ngSum').textContent = 'Tổng NG ' + fmt(tong) + ' / còn ' + fmt(con) + ' pcs' + (tong > con ? ' — vượt số còn trên tem' : '');
 }
 function testForm(n, i) {
   return '<div class="test-form">' +
@@ -694,8 +711,8 @@ function renderWs() {
   const route = info.ok ? (info.quy_trinh || []).map((r, i) => (i ? '<i>›</i>' : '') + '<span class="' + (r === 'Bavia' ? 'cur' : r === info.buoc_sau ? 'next' : '') + '">' + esc(r) + '</span>').join('') : '';
   const kiemDs = dsNguoiKiem();
   if (l.nguoi_kiem_tra && !kiemDs.includes(l.nguoi_kiem_tra)) kiemDs.unshift(l.nguoi_kiem_tra);
-  const hint = !info.ok ? '' : info.dang === 1 ? 'Quét <b>tem Đúc</b> để khai báo nguồn. Tem xuất hàng in khi bấm Đóng thùng.'
-    : 'Quét <b>tem Đúc</b> để khai báo nguồn, quét <b>tem thùng in sẵn</b> để ghi nhận thùng.';
+  const hint = !info.ok ? '' : info.dang === 1 ? 'Quét <b>tem Đúc đã chuyển sang Bavia</b> để khai báo nguồn. Tem xuất hàng in khi bấm Đóng thùng.'
+    : 'Quét <b>tem Đúc đã chuyển sang Bavia</b> để khai báo nguồn, quét <b>tem thùng in sẵn</b> để ghi nhận thùng.';
   const T = l.thung || [];
   $('#ws').innerHTML =
     '<div class="card"><div class="ws-head">' +
@@ -784,7 +801,7 @@ async function goi(fn, args) {
   if (data && data.ok === false) throw Object.assign(new Error(data.error || 'Không thực hiện được'), { nghiep_vu: true });
   return data;
 }
-function loiNghiepVu(e) { if (e && e.nghiep_vu) setFlash('bad', esc(e.message)); else errFlash(e); }
+function loiNghiepVu(e) { if (e && (e.nghiep_vu || e.code === 'P0001')) setFlash('bad', esc(e.message)); else errFlash(e); }
 async function chay(fn) {
   if (busy) return;
   busy = true;
@@ -796,7 +813,7 @@ async function scanCode(raw) {
   if (!l || !tag) return;
   await chay(async () => {
     const r = await goi('bavia_quet', { p_id_tram: l.id_tram, p_tag: tag });
-    if (r.loai === 'nguon') setFlash('ok', 'Đã khai báo tem Đúc <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs' + (r.tu_nhan ? ' (tự nhận Đúc → Bavia)' : '') + '.');
+    if (r.loai === 'nguon') setFlash('ok', 'Đã khai báo tem Đúc <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs' + '.');
     else setFlash('ok', 'Đã ghi nhận thùng <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs → ' + esc(r.buoc_sau || '') + '.');
     ngOpen = testOpen = retOpen = null;
     await taiLai();
@@ -854,7 +871,16 @@ function bindWs(l) {
   const ob = $('#optBan'); if (ob) ob.onchange = () => lsSet('bvdb_ban', String(Math.max(1, Math.min(6, Number(ob.value) || 1))));
   const ed = $('#btnEditLine'); if (ed) ed.onclick = () => moLineModal(l);
   const cam = $('#btnCam'); if (cam) cam.onclick = moCam;
-  const nt = $('#ngType'); if (nt) nt.onchange = () => { const w = $('#ngNote'); w.hidden = nt.value !== NG_KHAC; if (!w.hidden) w.focus(); };
+  const nr = $('#ngRows');
+  if (nr) {
+    nr.addEventListener('change', e => {
+      if (!e.target.classList.contains('ng-loai')) return;
+      const w = e.target.parentElement.querySelector('.ng-note');
+      w.hidden = e.target.value !== NG_KHAC; if (!w.hidden) w.focus();
+    });
+    nr.addEventListener('input', ngTong);
+    ngTong();
+  }
   if (l.info.ok && l.info.dang === 1) napXemTruoc(l);
 }
 
@@ -864,7 +890,13 @@ document.addEventListener('click', async e => {
   if (t.dataset.line) { selLine = t.dataset.line; lsSet('bvdb_line', selLine); flash = null; ngOpen = testOpen = retOpen = null; renderLines(); renderWs(); const s = $('#scan'); if (s) s.focus({ preventScroll: true }); return; }
   if (t.dataset.close !== undefined) { t.closest('.modal-bg').hidden = true; return; }
   if (!l) return;
-  if (t.dataset.ng !== undefined) { ngOpen = Number(t.dataset.ng); testOpen = null; flash = null; renderWs(); const q = $('#ngQty'); if (q) q.focus(); return; }
+  if (t.dataset.ng !== undefined) { ngOpen = Number(t.dataset.ng); testOpen = null; flash = null; renderWs(); const q = $('#ngRows .ng-qty'); if (q) q.focus(); return; }
+  if (t.dataset.ngadd !== undefined) { $('#ngRows').insertAdjacentHTML('beforeend', ngRowHtml()); ngTong(); $('#ngRows .ng-row:last-child .ng-loai').focus(); return; }
+  if (t.dataset.ngdel !== undefined) {
+    const rows = document.querySelectorAll('#ngRows .ng-row');
+    if (rows.length > 1) t.closest('.ng-row').remove(); else { t.closest('.ng-row').querySelector('.ng-qty').value = 1; }
+    ngTong(); return;
+  }
   if (t.dataset.test !== undefined) { testOpen = Number(t.dataset.test); ngOpen = null; flash = null; renderWs(); return; }
   if (t.dataset.cancel !== undefined) { ngOpen = testOpen = retOpen = null; renderWs(); return; }
   if (t.dataset.tend) { retOpen = Number(t.dataset.tend); renderWs(); const q = $('#retQty'); if (q) q.focus(); return; }
@@ -876,11 +908,23 @@ document.addEventListener('click', async e => {
     return;
   }
   if (t.dataset.ngsave !== undefined) {
-    const n = l.nguon[Number(t.dataset.ngsave)], loai = $('#ngType').value, note = $('#ngNote').value.trim(), qty = Number($('#ngQty').value) || 0;
-    if (loai === NG_KHAC && note.length < 3) { $('#ngNote').style.borderColor = 'var(--alarm-fg)'; $('#ngNote').focus(); return; }
+    const n = l.nguon[Number(t.dataset.ngsave)];
+    const ds = [...document.querySelectorAll('#ngRows .ng-row')].map(r => ({
+      loai: r.querySelector('.ng-loai').value, ghi_chu: r.querySelector('.ng-note').value.trim() || null,
+      so_luong: Number(r.querySelector('.ng-qty').value) || 0, el: r,
+    }));
+    const sai = ds.find(d => d.so_luong < 1 || d.so_luong % 1 !== 0 || (d.loai === NG_KHAC && (d.ghi_chu || '').length < 3));
+    if (sai) {
+      const o = sai.loai === NG_KHAC && (sai.ghi_chu || '').length < 3 ? sai.el.querySelector('.ng-note') : sai.el.querySelector('.ng-qty');
+      o.style.borderColor = 'var(--alarm-fg)'; o.focus(); return;
+    }
+    const tong = ds.reduce((s, d) => s + d.so_luong, 0);
+    if (tong > Number(n.con)) { setFlash('bad', 'Tổng NG ' + fmt(tong) + ' pcs vượt số còn trên tem (' + fmt(n.con) + ' pcs).'); renderWs(); return; }
     await chay(async () => {
-      await goi('bavia_ng', { p_id_tram: l.id_tram, p_tag_no: n.tag_no, p_loai: loai, p_ghi_chu: note || null, p_sl: qty });
-      ngOpen = null; setFlash('warn', 'Đã ghi NG ' + fmt(qty) + ' pcs (' + esc(note ? loai + ': ' + note : loai) + ') vào tem <b>' + esc(n.tag_no) + '</b>.');
+      await goi('bavia_ng_nhieu', { p_id_tram: l.id_tram, p_tag_no: n.tag_no, p_ds: ds.map(d => ({ loai: d.loai, ghi_chu: d.ghi_chu, so_luong: d.so_luong })) });
+      ngOpen = null;
+      setFlash('warn', 'Đã ghi NG ' + fmt(tong) + ' pcs vào tem <b>' + esc(n.tag_no) + '</b>: ' +
+        ds.map(d => esc(d.ghi_chu ? d.loai + ': ' + d.ghi_chu : d.loai) + ' ' + fmt(d.so_luong)).join(', ') + '.');
       await taiLai();
     });
     return;
