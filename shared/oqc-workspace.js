@@ -7,31 +7,55 @@ const OqcWorkspace = (() => {
       if (text) e.textContent = text;
       return e;
     };
-  let orderCodes = [];
   const duplicate = "iqc_7f55011aff5e";
-  function visibleDefects(group) {
-    const rows = catalog.filter((d) => d.defect_group === group && (editing || d.code !== duplicate));
-    const rank = new Map(orderCodes.map((code, i) => [code, i]));
-    return rows
-      .map((d, i) => ({ d, i }))
-      .sort((a, b) =>
-        group === "NG ngoại quan" && !editing
-          ? (rank.get(a.d.code) ?? 1e6) - (rank.get(b.d.code) ?? 1e6) ||
-            Number(a.d.sort_order ?? 100) - Number(b.d.sort_order ?? 100) ||
-            a.i - b.i
-          : Number(a.d.sort_order ?? 100) - Number(b.d.sort_order ?? 100) || a.i - b.i,
-      )
-      .map((x) => x.d);
+  // T149: tên lỗi xếp theo bảng chữ cái tiếng Việt (A, Ă, Â, B, C, D, Đ...)
+  const collator = new Intl.Collator("vi", { sensitivity: "base", numeric: true });
+  let renderedProcess = null;
+  /* Phạm vi áp dụng cho bảng lỗi: khi sửa phiếu lấy phạm vi đã lưu của phiếu (ô chọn được gán sau khi vẽ). */
+  function currentScope() {
+    const row = editing && dataRows.find((r) => r.id === editing);
+    return (row && row.context && row.context.inspection_scope) || $("inspectionScope")?.value || "";
   }
-  async function loadOrder() {
-    const r = await sb
-      .from("oqc_defect_order_version")
-      .select("*")
-      .order("id", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (r.error) throw r.error;
-    orderCodes = [...(r.data?.defect_codes || [])];
+  /* T149: "Kiểm tra sau Sơn" dùng danh mục lỗi sơn (OQC_SON), phạm vi khác dùng danh mục OQC cũ. */
+  const processOf = (scope) => (scope === "POST_PAINTING" ? "OQC_SON" : "OQC");
+  function visibleDefects(group) {
+    const process = processOf(currentScope()),
+      row = editing && dataRows.find((r) => r.id === editing),
+      saved = new Set(((row && row.defects) || []).map((d) => d.code));
+    return catalog
+      .filter(
+        (d) =>
+          d.defect_group === group &&
+          (editing || d.code !== duplicate) &&
+          ((d.processes || []).includes(process) || saved.has(d.code)), // phiếu cũ: luôn hiện lỗi đã lưu
+      )
+      .sort((a, b) => collator.compare(a.label, b.label) || a.code.localeCompare(b.code));
+  }
+  /* T149: thứ tự lỗi theo bảng chữ cái thay cho oqc_defect_order_version; giữ hàm để dashboard gọi không lỗi. */
+  async function loadOrder() {}
+  /* Vẽ lại bảng lỗi khi đổi phạm vi; giữ SL / chi tiết đã nhập của lỗi vẫn còn hiện. */
+  function syncScope() {
+    if (processOf(currentScope()) === renderedProcess) return;
+    const keep = {};
+    document.querySelectorAll("#defects .oqc-ditem").forEach((it) => {
+      const q = it.querySelector(".defect");
+      keep[q.dataset.code] = { qty: q.value, detail: it.querySelector(".detail").value };
+    });
+    renderDefects();
+    document.querySelectorAll("#defects .oqc-ditem").forEach((it) => {
+      const q = it.querySelector(".defect"),
+        k = keep[q.dataset.code];
+      if (k) {
+        q.value = k.qty;
+        it.querySelector(".detail").value = k.detail;
+        delete keep[q.dataset.code];
+      }
+    });
+    const dropped = Object.values(keep).filter((k) => Number(k.qty) > 0).length;
+    if (dropped && $("oqcFormMessage"))
+      $("oqcFormMessage").textContent =
+        "Đã đổi phạm vi: bỏ số lượng của " + dropped + " lỗi không thuộc danh mục phạm vi mới — kiểm tra lại bảng lỗi.";
+    calc();
   }
   function mount({ formPanel, capaDialog }) {
     const form = $("form"),
@@ -96,6 +120,7 @@ const OqcWorkspace = (() => {
     const oldRender = renderDefects;
     renderDefects = function () {
       const groups = [...new Set(["NG ngoại quan", "NG kích thước", "NG khác", ...catalog.map((d) => d.defect_group)])];
+      renderedProcess = processOf(currentScope());
       $("defects").replaceChildren();
       let k = 0;
       for (const group of groups) {
@@ -221,6 +246,21 @@ const OqcWorkspace = (() => {
     window.addEventListener("resize", fit);
     if (window.ResizeObserver) new ResizeObserver(fit).observe(form);
     setTimeout(fit, 0);
+    // T149: bảng lỗi theo phạm vi — đổi phạm vi, làm mới form hay mở phiếu sửa đều vẽ lại khi phạm vi khác danh mục đang hiện.
+    $("inspectionScope").addEventListener("change", syncScope);
+    const oldReset = resetForm;
+    resetForm = function () {
+      const r = oldReset.apply(this, arguments);
+      syncScope();
+      return r;
+    };
+    const oldEdit = editRow;
+    editRow = function () {
+      const r = oldEdit.apply(this, arguments);
+      syncScope();
+      return r;
+    };
+    syncScope();
   }
   function markDefects() {
     document.querySelectorAll("#defects .oqc-ditem").forEach((it) => {
