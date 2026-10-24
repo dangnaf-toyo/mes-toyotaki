@@ -124,7 +124,8 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 .tc-note{font-size:12px;color:var(--text-muted)}.tc-note:empty{display:none}
 .tc-msg{padding:8px 10px;border-radius:6px;font-weight:600;font-size:12px}.tc-msg.ok{background:var(--run-bg);color:var(--run-fg)}.tc-msg.err{background:var(--alarm-bg);color:var(--alarm-fg)}
 .tc-cho-row{cursor:pointer}.tc-cho-row:hover td{background:var(--bg-sunken)}
-.tc-form input[type=text]:disabled{background:var(--bg-sunken)}
+.tc-form input[type=text]:disabled{background:var(--bg-sunken);color:var(--text)}
+.tc-ro .muc-row button,.tc-ro #tc-them-btn,.tc-ro #tc-pdf-input{display:none}
 .muc-row input{flex:1}
 .muc-row button{background:var(--alarm-bg);color:var(--alarm-fg);border:none;border-radius:5px;padding:0 10px;font-weight:700;cursor:pointer}
 .btn{padding:8px 14px;border-radius:6px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
@@ -443,7 +444,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 
       <div class="panel" id="tc-form-panel">
         <div class="panel-head">Soạn / sửa checklist + PDF tiêu chuẩn</div>
-        <div class="tc-form">
+        <div class="tc-form tc-ro" id="tc-form">
           <div>
             <label>Mã sản phẩm</label>
             <select id="tc-ma-sp" onchange="editTieuChuan(this.value)"><option value="">-- Chọn mã SP --</option></select>
@@ -462,9 +463,11 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
           </div>
           <div>
             <label>Nội dung sửa đổi</label>
-            <input type="text" id="tc-noi-dung" autocomplete="off" placeholder="VD: Thêm mục kiểm ngoại quan bavia">
+            <input type="text" id="tc-noi-dung" autocomplete="off" placeholder="VD: Thêm mục kiểm ngoại quan bavia" disabled>
           </div>
+          <button class="btn btn-primary hidden" onclick="tcCheDoSua(true)" id="tc-sua-btn">✏️ Chỉnh sửa</button>
           <button class="btn btn-primary hidden" onclick="guiTieuChuan()" id="tc-gui-btn">Gửi duyệt</button>
+          <button class="btn btn-outline hidden" onclick="editTieuChuan(document.getElementById('tc-ma-sp').value)" id="tc-huy-sua-btn">Huỷ chỉnh sửa</button>
           <div class="tc-note" id="tc-hint"></div>
           <div id="tc-msg"></div>
         </div>
@@ -482,7 +485,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 <script src="shared/qc02-data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/ipqc-spc.js"></script>
-<script src="shared/ipqc-btk-qc.js?v=T163"></script>
+<script src="shared/ipqc-btk-qc.js?v=T163b"></script>
 <script src="shared/mes-ng-status.js?v=T141"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBlob: null, currentUserEmail: '' };
@@ -1387,14 +1390,25 @@ function editTieuChuan(maSp){
   document.getElementById('tc-noi-dung').value = n ? (n.noi_dung_sua_doi || '') : (t ? '' : 'Lập mới');
   document.getElementById('tc-pdf-input').value = '';
   state.pdfBlob = null;
-  const sua = !!tcQuyen.soan;
-  document.querySelectorAll('#tc-muc-list input, #tc-muc-list button, #tc-them-btn, #tc-pdf-input, #tc-noi-dung').forEach(x => { x.disabled = !sua; });
-  const gui = document.getElementById('tc-gui-btn');
-  gui.classList.toggle('hidden', !sua);
-  gui.textContent = n ? 'Cập nhật bản nháp & gửi lại' : 'Gửi duyệt';
-  document.getElementById('tc-hint').textContent = sua ? 'Gửi duyệt → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. IPQC dùng bản đang dùng đến khi bản mới được phê duyệt.'
-    : tcQuyen.uid ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn tiêu chuẩn.' : 'Đăng nhập để soạn / duyệt.';
+  document.getElementById('tc-gui-btn').textContent = n ? 'Cập nhật bản nháp & gửi lại' : 'Gửi duyệt';
+  document.getElementById('tc-sua-btn').textContent = '✏️ ' + (n || t ? 'Chỉnh sửa' : 'Lập checklist');
+  tcCheDoSua(false);
   tcMsg('');
+}
+
+// Mặc định chỉ xem; bấm "Chỉnh sửa" mới mở khoá ô nhập (tránh vô tình sửa). "Huỷ chỉnh sửa" = mở lại mã.
+function tcCheDoSua(on){
+  const coMa = !!document.getElementById('tc-ma-sp').value, soan = !!tcQuyen.soan;
+  on = on && soan && coMa;
+  document.getElementById('tc-form').classList.toggle('tc-ro', !on);
+  document.querySelectorAll('#tc-muc-list input, #tc-noi-dung').forEach(x => { x.disabled = !on; });
+  document.getElementById('tc-sua-btn').classList.toggle('hidden', on || !soan || !coMa);
+  document.getElementById('tc-gui-btn').classList.toggle('hidden', !on);
+  document.getElementById('tc-huy-sua-btn').classList.toggle('hidden', !on);
+  document.getElementById('tc-hint').textContent = on ? 'Đang chỉnh sửa. Gửi duyệt → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. IPQC dùng bản đang dùng đến khi bản mới được phê duyệt.'
+    : !tcQuyen.uid ? 'Đăng nhập để soạn / duyệt.' : !soan ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn tiêu chuẩn.'
+    : coMa ? 'Đang ở chế độ xem. Bấm "Chỉnh sửa" để sửa rồi gửi duyệt.' : 'Chọn mã SP để xem / soạn.';
+  if (on) { const i = document.querySelector('#tc-muc-list input'); if (i) i.focus(); }
 }
 
 function addMucRow(value){
