@@ -121,6 +121,10 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 .tc-form label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:4px}
 .tc-form input[type=text],.tc-form select{width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
 .muc-row{display:flex;gap:6px;margin-bottom:6px}
+.tc-note{font-size:12px;color:var(--text-muted)}.tc-note:empty{display:none}
+.tc-msg{padding:8px 10px;border-radius:6px;font-weight:600;font-size:12px}.tc-msg.ok{background:var(--run-bg);color:var(--run-fg)}.tc-msg.err{background:var(--alarm-bg);color:var(--alarm-fg)}
+.tc-cho-row{cursor:pointer}.tc-cho-row:hover td{background:var(--bg-sunken)}
+.tc-form input[type=text]:disabled{background:var(--bg-sunken)}
 .muc-row input{flex:1}
 .muc-row button{background:var(--alarm-bg);color:var(--alarm-fg);border:none;border-radius:5px;padding:0 10px;font-weight:700;cursor:pointer}
 .btn{padding:8px 14px;border-radius:6px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
@@ -424,34 +428,45 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
   <!-- T136: Biểu đồ kiểm soát + NG OQC chuyển sang bieu-do-chat-luong.html -->
 
   <div class="tabpanel" id="tab-tieuchuan">
+    <!-- T163: mọi tiêu chuẩn mới / sửa đổi phải qua NV QC soạn → TP QC kiểm tra → GĐ SX phê duyệt -->
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-head">Tiêu chuẩn đang chờ duyệt <span class="count" id="tc-cho-count">0</span></div>
+      <div class="table-wrap" id="tc-cho-list"><div class="empty-note">Đang tải…</div></div>
+    </div>
     <!-- T133: bảng tuần kiểm kích thước theo mã (shared/ipqc-btk-qc.js) -->
     <div id="btk-root" style="margin-bottom:14px"></div>
     <div class="grid2">
       <div class="panel">
-        <div class="panel-head">Danh sách mã SP đã có tiêu chuẩn <span class="count" id="tc-count">0</span></div>
+        <div class="panel-head">Checklist + PDF tiêu chuẩn theo mã <span class="count" id="tc-count">0</span></div>
         <div id="tc-list"></div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head">Soạn / sửa tiêu chuẩn</div>
+      <div class="panel" id="tc-form-panel">
+        <div class="panel-head">Soạn / sửa checklist + PDF tiêu chuẩn</div>
         <div class="tc-form">
           <div>
             <label>Mã sản phẩm</label>
-            <select id="tc-ma-sp"><option value="">-- Chọn mã SP --</option></select>
+            <select id="tc-ma-sp" onchange="editTieuChuan(this.value)"><option value="">-- Chọn mã SP --</option></select>
           </div>
+          <div id="tc-duyet"></div>
+          <div id="tc-dang-dung" class="tc-note"></div>
           <div>
             <label>Checklist kiểm tra</label>
             <div id="tc-muc-list"></div>
-            <button class="btn btn-add" style="width:100%;margin-top:4px" onclick="addMucRow('')">+ Thêm mục kiểm</button>
+            <button class="btn btn-add" style="width:100%;margin-top:4px" onclick="addMucRow('')" id="tc-them-btn">+ Thêm mục kiểm</button>
           </div>
-          <button class="btn btn-primary" onclick="saveTieuChuan()">💾 Lưu checklist</button>
-
-          <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+          <div>
             <label>File PDF tiêu chuẩn gốc (tuỳ chọn)</label>
             <div id="tc-pdf-current" style="font-size:11px;color:var(--text-muted);margin-bottom:6px"></div>
             <input type="file" accept="application/pdf" id="tc-pdf-input" onchange="onPdfSelected(event)">
-            <button class="btn btn-outline" style="margin-top:6px" onclick="uploadPdf()" id="tc-pdf-btn" disabled>⬆ Upload PDF</button>
           </div>
+          <div>
+            <label>Nội dung sửa đổi</label>
+            <input type="text" id="tc-noi-dung" autocomplete="off" placeholder="VD: Thêm mục kiểm ngoại quan bavia">
+          </div>
+          <button class="btn btn-primary hidden" onclick="guiTieuChuan()" id="tc-gui-btn">Gửi duyệt</button>
+          <div class="tc-note" id="tc-hint"></div>
+          <div id="tc-msg"></div>
         </div>
       </div>
     </div>
@@ -467,10 +482,10 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 <script src="shared/qc02-data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/ipqc-spc.js"></script>
-<script src="shared/ipqc-btk-qc.js?v=T138"></script>
+<script src="shared/ipqc-btk-qc.js?v=T163"></script>
 <script src="shared/mes-ng-status.js?v=T141"></script>
 <script>
-const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBase64: null, pdfFileName: null, pdfBlob: null, currentUserEmail: '' };
+const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBlob: null, currentUserEmail: '' };
 
 function switchTab(tab){
   document.getElementById('tab-monitor').classList.toggle('active', tab === 'monitor');
@@ -481,7 +496,7 @@ function switchTab(tab){
   document.getElementById('tab-btn-tracuu').classList.toggle('active', tab === 'tracuu');
   document.getElementById('tab-btn-ncp').classList.toggle('active', tab === 'ncp');
   document.getElementById('tab-btn-tieuchuan').classList.toggle('active', tab === 'tieuchuan');
-  if (tab === 'tieuchuan') { loadTieuChuanList(); if (!state.btkMounted) { state.btkMounted = true; IpqcBtkQc.mountEditor(document.getElementById('btk-root')); } }
+  if (tab === 'tieuchuan') moTabTieuChuan();
   if (tab === 'ncp' && !state.ncpLoaded) { state.ncpLoaded = true; loadNcpList(); }
 }
 
@@ -1273,30 +1288,113 @@ function printNcpTag(idNcp){
 }
 
 // ===================== Quản lý tiêu chuẩn =====================
-let tieuChuanList = [];
-async function loadTieuChuanList(){
-  const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').order('ma_sp');
-  if (error) return;
-  tieuChuanList = (data || []).map(t => ({ ma_sp: t.ma_sp, muc_kiem: Array.isArray(t.danh_sach_muc_kiem_json) ? t.danh_sach_muc_kiem_json : [], file_pdf_url: t.file_pdf_url || '' }));
-  document.getElementById('tc-count').textContent = tieuChuanList.length;
-  const list = document.getElementById('tc-list');
-  if (!tieuChuanList.length) { list.innerHTML = '<div class="empty-note">Chưa có mã SP nào được khai báo tiêu chuẩn.</div>'; return; }
-  list.innerHTML = tieuChuanList.map(t => `
-    <div class="tc-list-item" onclick="editTieuChuan('${escapeHtml(t.ma_sp)}')">
-      <div><div class="sp">${escapeHtml(t.ma_sp)}</div><div class="n">${t.muc_kiem.length} mục kiểm${t.file_pdf_url ? ' · có PDF' : ''}</div></div>
-      <div style="color:var(--text-dim)">›</div>
-    </div>`).join('');
+// T163: checklist + PDF và bảng tuần kiểm đều phải duyệt: NV QC soạn → TP QC kiểm tra → GĐ SX
+// phê duyệt. duc_ipqc_tieuchuan = bản đang dùng (IPQC đọc); duc_ipqc_tieuchuan_de_xuat = bản
+// nháp chờ duyệt + lịch sử. Khối duyệt / quyền dùng chung với IpqcBtkQc (shared/ipqc-btk-qc.js).
+let tieuChuanList = [], tcNhap = {}, tcQuyen = {}, btkCtl = null;
+const tcPill = tt => '<span class="pill ' + (tt === 'tra_lai' ? 'ng' : 'warn') + '">' + escapeHtml(IpqcBtkQc.TT[tt] || tt) + '</span>';
+function tcMsg(text, loi){ document.getElementById('tc-msg').innerHTML = text ? '<div class="tc-msg ' + (loi ? 'err' : 'ok') + '">' + escapeHtml(text) + '</div>' : ''; }
+
+async function moTabTieuChuan(){
+  if (!state.btkMounted) {
+    state.btkMounted = true;
+    tcQuyen = await IpqcBtkQc.quyen();
+    btkCtl = await IpqcBtkQc.mountEditor(document.getElementById('btk-root'), { doiTrangThai: loadChoDuyet });
+  }
+  await loadTieuChuanList();
+  loadChoDuyet();
+  // Link từ chuông thông báo: ?tab=tieuchuan&ma=...
+  const ma = new URLSearchParams(location.search).get('ma');
+  if (ma && !state.tcMoMa) {
+    state.tcMoMa = true;
+    if (tcNhap[ma]) { editTieuChuan(ma); document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' }); }
+    else btkCtl.mo(ma);
+  }
 }
 
+async function loadChoDuyet(){
+  const el = document.getElementById('tc-cho-list');
+  const cot = 'id,ma_sp,trang_thai,noi_dung_sua_doi,nguoi_lap,nguoi_lap_uid,gui_luc,ly_do_tra_lai';
+  const [b, c] = await Promise.all([
+    sb.from('ipqc_btk').select(cot + ',phien_ban').neq('trang_thai', 'da_duyet'),
+    sb.from('duc_ipqc_tieuchuan_de_xuat').select(cot).neq('trang_thai', 'da_duyet'),
+  ]);
+  const ds = (b.data || []).map(x => ({ ...x, loai: 'btk' })).concat((c.data || []).map(x => ({ ...x, loai: 'checklist' })))
+    .sort((x, y) => String(y.gui_luc || '').localeCompare(String(x.gui_luc || '')));
+  const choToi = x => (x.trang_thai === 'cho_kiem_tra' && tcQuyen.kiemTra) || (x.trang_thai === 'cho_phe_duyet' && tcQuyen.pheDuyet)
+    || (x.trang_thai === 'tra_lai' && tcQuyen.uid && x.nguoi_lap_uid === tcQuyen.uid);
+  document.getElementById('tc-cho-count').textContent = ds.length;
+  if (!ds.length) { el.innerHTML = '<div class="empty-note">Không có tiêu chuẩn nào đang chờ duyệt.</div>'; return; }
+  el.innerHTML = '<table style="min-width:680px"><thead><tr><th>Loại</th><th>Mã SP</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>Gửi lúc</th><th>Trạng thái</th></tr></thead><tbody>' +
+    ds.map(x => `<tr class="tc-cho-row" onclick="moChoDuyet('${x.loai}','${escapeHtml(x.ma_sp)}')">
+      <td>${x.loai === 'btk' ? 'Bảng tuần kiểm ' + escapeHtml(x.phien_ban) : 'Checklist + PDF'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtml(x.ma_sp)}</td>
+      <td>${escapeHtml(x.noi_dung_sua_doi || '')}${x.trang_thai === 'tra_lai' && x.ly_do_tra_lai ? '<div style="color:var(--alarm-fg);font-size:11px">Lý do trả lại: ' + escapeHtml(x.ly_do_tra_lai) + '</div>' : ''}</td>
+      <td>${escapeHtml(x.nguoi_lap || '')}</td>
+      <td style="white-space:nowrap">${x.gui_luc ? new Date(x.gui_luc).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</td>
+      <td style="white-space:nowrap">${tcPill(x.trang_thai)}${choToi(x) ? ' <span class="pill ok">Tới lượt bạn</span>' : ''}</td></tr>`).join('') + '</tbody></table>';
+}
+
+function moChoDuyet(loai, ma){
+  if (loai === 'btk') return btkCtl.mo(ma);
+  editTieuChuan(ma);
+  document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' });
+}
+
+async function loadTieuChuanList(){
+  const [a, d] = await Promise.all([
+    sb.from('duc_ipqc_tieuchuan').select('*').order('ma_sp'),
+    sb.from('duc_ipqc_tieuchuan_de_xuat').select('*').neq('trang_thai', 'da_duyet'),
+  ]);
+  if (a.error) return;
+  tieuChuanList = (a.data || []).map(t => ({ ma_sp: t.ma_sp, muc_kiem: Array.isArray(t.danh_sach_muc_kiem_json) ? t.danh_sach_muc_kiem_json : [], file_pdf_url: t.file_pdf_url || '' }));
+  tcNhap = {}; (d.data || []).forEach(x => { tcNhap[x.ma_sp] = x; });
+  const mas = [...new Set(tieuChuanList.map(t => t.ma_sp).concat(Object.keys(tcNhap)))].sort();
+  document.getElementById('tc-count').textContent = mas.length;
+  const list = document.getElementById('tc-list');
+  if (!mas.length) { list.innerHTML = '<div class="empty-note">Chưa có mã SP nào được khai báo tiêu chuẩn.</div>'; return; }
+  list.innerHTML = mas.map(ma => {
+    const t = tieuChuanList.find(x => x.ma_sp === ma), n = tcNhap[ma];
+    return `<div class="tc-list-item" onclick="editTieuChuan('${escapeHtml(ma)}')">
+      <div><div class="sp">${escapeHtml(ma)}</div><div class="n">${t ? t.muc_kiem.length + ' mục kiểm' + (t.file_pdf_url ? ' · có PDF' : '') : 'Chưa có bản được duyệt'}</div></div>
+      <div style="display:flex;gap:6px;align-items:center">${n ? tcPill(n.trang_thai) : ''}<span style="color:var(--text-dim)">›</span></div>
+    </div>`;
+  }).join('');
+}
+
+// Mở mã maSp: có bản nháp chờ duyệt thì hiện bản nháp (kèm khối duyệt + so sánh), không thì bản đang dùng.
 function editTieuChuan(maSp){
   const t = tieuChuanList.find(x => x.ma_sp === maSp);
+  const n = tcNhap[maSp] || null;
+  state.tcXem = n;
   document.getElementById('tc-ma-sp').value = maSp;
+  const muc = n ? (Array.isArray(n.danh_sach_muc_kiem_json) ? n.danh_sach_muc_kiem_json : []) : (t ? t.muc_kiem : []);
   document.getElementById('tc-muc-list').innerHTML = '';
-  (t ? t.muc_kiem : []).forEach(m => addMucRow(m));
+  muc.forEach(m => addMucRow(m));
+  document.getElementById('tc-duyet').innerHTML = n ? IpqcBtkQc.khoiDuyet(n, tcQuyen) : '';
+  const ss = document.getElementById('tc-dang-dung');
+  if (n && t) {
+    const them = muc.filter(m => !t.muc_kiem.includes(m)), bo = t.muc_kiem.filter(m => !muc.includes(m));
+    ss.innerHTML = '<b>So với bản đang dùng (' + t.muc_kiem.length + ' mục):</b> ' +
+      ([them.length ? 'thêm ' + them.map(escapeHtml).join('; ') : '', bo.length ? 'bỏ ' + bo.map(escapeHtml).join('; ') : '',
+        (n.file_pdf_url || '') !== t.file_pdf_url ? 'PDF mới' : ''].filter(Boolean).join(' · ') || 'chỉ đổi thứ tự mục kiểm');
+  } else if (n) ss.textContent = 'Mã chưa có tiêu chuẩn được duyệt — IPQC chưa có checklist cho mã này.';
+  else ss.textContent = '';
+  const url = n ? n.file_pdf_url : t && t.file_pdf_url;
   const pdfTarget = document.getElementById('tc-pdf-current'); pdfTarget.replaceChildren();
-  if(t && t.file_pdf_url){const btn=document.createElement('button');btn.type='button';btn.textContent='Xem tiêu chuẩn';btn.onclick=()=>Qc02View.pdf(t.file_pdf_url);pdfTarget.append(btn);}else{pdfTarget.textContent='Chưa có file tiêu chuẩn';}
-  state.pdfBase64 = null; state.pdfBlob = null;
-  document.getElementById('tc-pdf-btn').disabled = true;
+  if (url) { const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Xem tiêu chuẩn' + (n && url !== (t && t.file_pdf_url) ? ' (bản nháp)' : ''); btn.onclick = () => Qc02View.pdf(url); pdfTarget.append(btn); }
+  else pdfTarget.textContent = 'Chưa có file tiêu chuẩn';
+  document.getElementById('tc-noi-dung').value = n ? (n.noi_dung_sua_doi || '') : (t ? '' : 'Lập mới');
+  document.getElementById('tc-pdf-input').value = '';
+  state.pdfBlob = null;
+  const sua = !!tcQuyen.soan;
+  document.querySelectorAll('#tc-muc-list input, #tc-muc-list button, #tc-them-btn, #tc-pdf-input, #tc-noi-dung').forEach(x => { x.disabled = !sua; });
+  const gui = document.getElementById('tc-gui-btn');
+  gui.classList.toggle('hidden', !sua);
+  gui.textContent = n ? 'Cập nhật bản nháp & gửi lại' : 'Gửi duyệt';
+  document.getElementById('tc-hint').textContent = sua ? 'Gửi duyệt → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. IPQC dùng bản đang dùng đến khi bản mới được phê duyệt.'
+    : tcQuyen.uid ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn tiêu chuẩn.' : 'Đăng nhập để soạn / duyệt.';
+  tcMsg('');
 }
 
 function addMucRow(value){
@@ -1307,52 +1405,55 @@ function addMucRow(value){
   wrap.appendChild(row);
 }
 
-async function saveTieuChuan(){
+document.getElementById('tc-duyet').addEventListener('click', async e => {
+  const dy = e.target.closest('[data-duyet]'), hy = e.target.closest('[data-huy]');
+  if (!(dy || hy) || !state.tcXem) return;
+  const maSp = state.tcXem.ma_sp;
+  (dy || hy).disabled = true;
+  try {
+    const kq = dy ? await IpqcBtkQc.duyet('checklist', state.tcXem.id, dy.dataset.duyet) : await IpqcBtkQc.huy('checklist', state.tcXem.id);
+    if (kq) { await loadTieuChuanList(); editTieuChuan(maSp); tcMsg(kq); loadChoDuyet(); return; }
+  } catch (er) { tcMsg(er.message, true); }
+  (dy || hy).disabled = false;
+});
+
+async function guiTieuChuan(){
   if (!(await ensureAuth())) return;
   const maSp = document.getElementById('tc-ma-sp').value.trim();
-  if (!maSp) return alert('Nhập mã SP');
+  if (!maSp) return tcMsg('Chọn mã SP.', true);
   const rows = Array.from(document.querySelectorAll('#tc-muc-list .muc-row input')).map(i => i.value.trim()).filter(v => v);
-  if (!rows.length) return alert('Cần ít nhất 1 mục kiểm');
+  if (!rows.length) return tcMsg('Cần ít nhất 1 mục kiểm.', true);
+  const noiDung = document.getElementById('tc-noi-dung').value.trim();
+  if (!noiDung) return tcMsg('Nhập nội dung sửa đổi.', true);
 
-  const { data, error } = await sb.rpc('duc_ipqc_save_tieu_chuan', { p_ma_sp: maSp, p_muc_kiem: rows, p_user: state.currentUserEmail });
-  if (error) return alert('Lỗi: ' + error.message);
-  if (data && data.ok === false) return alert('Lỗi: ' + data.error);
-  alert('✓ Đã lưu checklist cho ' + maSp);
-  loadTieuChuanList();
+  const btn = document.getElementById('tc-gui-btn'), nhan = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Đang gửi...';
+  try {
+    let pdfUrl = null;
+    if (state.pdfBlob) {
+      const path = maSp.replace(/[^a-zA-Z0-9_-]/g, '') + '/tieuchuan_' + Date.now() + '.pdf';
+      const { error: upErr } = await sb.storage.from('report-files').upload(path, state.pdfBlob, { contentType: 'application/pdf', upsert: false });
+      if (upErr) throw new Error('Không tải được PDF: ' + upErr.message);
+      pdfUrl = sb.storage.from('report-files').getPublicUrl(path).data.publicUrl;
+    }
+    const { data, error } = await sb.rpc('ipqc_tc_luu_checklist', { p_ma_sp: maSp, p_muc_kiem: rows, p_pdf_url: pdfUrl, p_noi_dung: noiDung,
+      p_nguoi: state.currentUserEmail || (await MesAuth.getCurrentUserIdentity()) || '' });
+    if (error) throw new Error(error.message);
+    if (data && data.ok === false) throw new Error(data.error);
+    await loadTieuChuanList();
+    editTieuChuan(maSp);
+    tcMsg('Đã gửi duyệt checklist ' + maSp + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.');
+    loadChoDuyet();
+  } catch (e) {
+    tcMsg(e.message, true);
+    btn.textContent = nhan;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function onPdfSelected(e){
-  const file = e.target.files[0];
-  if (!file) return;
-  state.pdfBlob = file;
-  state.pdfFileName = file.name;
-  document.getElementById('tc-pdf-btn').disabled = false;
-}
-
-async function uploadPdf(){
-  if (!(await ensureAuth())) return;
-  const maSp = document.getElementById('tc-ma-sp').value.trim();
-  if (!maSp) return alert('Nhập mã SP trước');
-  if (!state.pdfBlob) return alert('Chọn file PDF trước');
-
-  const btn = document.getElementById('tc-pdf-btn');
-  btn.disabled = true; btn.textContent = 'Đang upload...';
-  try {
-    const path = maSp.replace(/[^a-zA-Z0-9_-]/g, '') + '/tieuchuan_' + Date.now() + '.pdf';
-    const { error: upErr } = await sb.storage.from('report-files').upload(path, state.pdfBlob, { contentType: 'application/pdf', upsert: false });
-    if (upErr) throw new Error(upErr.message);
-    const { data: pub } = sb.storage.from('report-files').getPublicUrl(path);
-
-    const { data, error } = await sb.rpc('duc_ipqc_set_tieu_chuan_pdf', { p_ma_sp: maSp, p_url: pub.publicUrl, p_user: state.currentUserEmail });
-    if (error) throw new Error(error.message);
-    if (data && data.ok === false) throw new Error(data.error);
-    alert('✓ Đã upload PDF cho ' + maSp);
-    loadTieuChuanList();
-  } catch (e) {
-    alert('Lỗi: ' + e.message);
-  } finally {
-    btn.textContent = '⬆ Upload PDF'; btn.disabled = false;
-  }
+  state.pdfBlob = e.target.files[0] || null;
 }
 
 // ===================== Chỉ báo đăng nhập =====================
