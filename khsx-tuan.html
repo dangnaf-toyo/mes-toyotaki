@@ -318,7 +318,9 @@ tr:hover td{background:var(--bg-sunken)}
 const CONG_DOAN_LIST = ['Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC'];
 const TABS = ['Đúc'].concat(CONG_DOAN_LIST);
 
-let weekMonday = mondayOf(new Date());
+// ?tuan=YYYY-MM-DD (T162, link từ thông báo duyệt) → mở đúng tuần; ngày khác thứ Hai thì lùi về thứ Hai.
+const requestedWeek = new Date((new URLSearchParams(location.search).get('tuan') || '').slice(0, 10) + 'T00:00:00');
+let weekMonday = mondayOf(isNaN(requestedWeek) ? new Date() : requestedWeek);
 const requestedTab = new URLSearchParams(location.search).get('cd');
 let activeTab = TABS.includes(requestedTab) ? requestedTab : TABS[0];
 let ducRows = [];

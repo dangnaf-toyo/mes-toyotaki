@@ -57,7 +57,18 @@
     tra_lai: 'Trả lại', xin_gia_han: 'Xin gia hạn', tra_loi_gia_han: 'Gia hạn', nhac_viec: 'Nhắc việc',
     cap_nhat_viec: 'Cập nhật', mo_lai: 'Mở lại', huy_viec: 'Huỷ việc', binh_luan: 'Bình luận',
     gop_y: 'Góp ý', nhac_ten: 'Nhắc tên', qua_han: 'Quá hạn',
+    // T162 — thông báo từ các luồng phê duyệt sẵn có (KHSX, BD khuôn, IPQC, NCP, tài liệu).
+    can_duyet: 'Chờ bạn duyệt', da_duyet: 'Đã duyệt', tu_choi_duyet: 'Bị từ chối',
   };
+  /** Nguồn của thông báo (cột cv_thong_bao.nguon, T162); null/thiếu = 'cong_viec'. */
+  const NGUON_THONG_BAO = {
+    cong_viec: 'Công việc', khsx: 'KH sản xuất', bd_khuon: 'BD khuôn', ipqc: 'IPQC', ncp: 'NCP', tai_lieu: 'Tài liệu',
+  };
+  /** URL tương đối để mở 1 thông báo: lien_ket (nguồn phê duyệt) hoặc trang chi tiết việc; null nếu không có. */
+  function lienKetThongBao(tb) {
+    if (!tb) return null;
+    return tb.lien_ket || (tb.cong_viec_id ? 'cong-viec-chi-tiet.html?id=' + tb.cong_viec_id : null);
+  }
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -208,13 +219,25 @@
     el._t = setTimeout(() => { el.className = 'cv-toast'; }, kind === 'err' ? 6000 : 3000);
   }
 
+  /**
+   * Số yêu cầu phê duyệt (KHSX, BD khuôn, IPQC, NCP, tài liệu) đang chờ uid xử lý — T162.
+   * Trả null nếu lỗi (vd DB chưa có cột nguon) để trang ẩn ô đếm.
+   */
+  async function demChoPheDuyet(uid) {
+    try {
+      const { count, error } = await sb.from('cv_thong_bao').select('id', { count: 'exact', head: true })
+        .eq('nguoi_nhan', uid).eq('can_xu_ly', true).eq('da_xu_ly', false).neq('nguon', 'cong_viec');
+      return error || count == null ? null : count;
+    } catch (e) { return null; }
+  }
+
   /** Đọc các việc từ view (RLS tự lọc việc "hạn chế"). */
   function viecQuery() { return sb.from('cv_cong_viec_v').select('*'); }
 
   window.CV = {
-    TRANG_THAI, THU_TU_TRANG_THAI, NHOM, LOAI_BL, TRANG_THAI_GOP_Y, LIEN_KET, LOAI_THONG_BAO,
+    TRANG_THAI, THU_TU_TRANG_THAI, NHOM, LOAI_BL, TRANG_THAI_GOP_Y, LIEN_KET, LOAI_THONG_BAO, NGUON_THONG_BAO, lienKetThongBao,
     nhomCua, esc, loiDeHieu, fmtNgay, fmtNgayGio, fmtDayDu, ngayVN, hanText, rpc, nguoi, tenNguoi, viTat, boPhan, me,
-    badgeNhom, badgeTrangThai, lienKetText, theViec, veTabModule, toast, viecQuery,
+    badgeNhom, badgeTrangThai, lienKetText, theViec, veTabModule, toast, viecQuery, demChoPheDuyet,
   };
   // Trang vừa đánh dấu thông báo đã đọc → chuông trên navbar đếm lại ngay.
   window.addEventListener('cv-thong-bao-doi', () => { if (window.MesNav && MesNav.refreshBell) MesNav.refreshBell(); });

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
-<link rel="stylesheet" href="shared/cong-viec.css?v=t161">
+<link rel="stylesheet" href="shared/cong-viec.css?v=t162">
 <!--
   cong-viec-cua-toi.html?tab=lam|giao|duyet&loc=qua_han|hom_nay|cho_duyet|gia_han — Việc của tôi (T161).
   Trang vào mặc định của module Quản lý công việc. Thiết kế: docs/CONG_VIEC_THIET_KE.md.
@@ -37,7 +37,8 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .today-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .today-h b{color:#1D4ED8;font-size:13px}
 .today-h span{font-size:11px;color:var(--text-muted)}
-.today-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.today-g{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
+a.stat{text-decoration:none}
 .stat{display:flex;align-items:center;gap:10px;min-height:48px;border:1px solid var(--border);background:var(--bg-sunken);border-radius:8px;padding:6px 12px;cursor:pointer;text-align:left;color:var(--text)}
 .stat:hover{border-color:var(--accent)}
 .stat .n{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;line-height:1;min-width:28px}
@@ -91,7 +92,7 @@ details.done-grp .cards{padding-bottom:12px}
   header .header-divider{display:none}
   header .cv-modtabs{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .header-clock .time{font-size:15px}
-  .today-g{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .today-g{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr))}
   .cards{grid-template-columns:1fr}
   .fab{display:inline-flex}
   .toolbar .upd{width:100%;margin-left:0}
@@ -126,6 +127,7 @@ details.done-grp .cards{padding-bottom:12px}
       <button type="button" class="stat amber" data-loc="hom_nay"><span class="n" id="nHomNay">–</span><span class="l">Đến hạn hôm nay</span></button>
       <button type="button" class="stat blue" data-loc="cho_duyet"><span class="n" id="nChoDuyet">–</span><span class="l">Chờ tôi duyệt</span></button>
       <button type="button" class="stat blue" data-loc="gia_han"><span class="n" id="nGiaHan">–</span><span class="l">Xin gia hạn chờ tôi trả lời</span></button>
+      <a class="stat amber" id="statPheDuyet" href="thong-bao.html?tab=xu_ly&amp;nguon=phe_duyet" style="display:none" title="KH sản xuất, BD khuôn, IPQC, NCP, tài liệu đang chờ bạn duyệt"><span class="n" id="nPheDuyet">–</span><span class="l">Chờ tôi phê duyệt</span></a>
     </div>
   </section>
 
@@ -154,7 +156,7 @@ details.done-grp .cards{padding-bottom:12px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/cong-viec.js?v=t161"></script>
+<script src="shared/cong-viec.js?v=t162"></script>
 <script>
 const TABS = ['lam', 'giao', 'duyet'];
 const LOCS = {
@@ -240,6 +242,17 @@ function demHomNay(){
     btn.classList.toggle('on', loc === k);
     btn.setAttribute('aria-pressed', loc === k ? 'true' : 'false');
   });
+}
+
+// T162: yêu cầu phê duyệt từ các module khác (đếm trên cv_thong_bao) — lỗi/thiếu cột thì ẩn ô.
+async function demPheDuyet(){
+  const n = await CV.demChoPheDuyet(me.id);
+  const el = document.getElementById('nPheDuyet'), o = document.getElementById('statPheDuyet');
+  if (n == null) { o.style.display = 'none'; return; }
+  el.textContent = n;
+  o.style.display = '';
+  o.classList.toggle('has', n > 0);
+  o.classList.toggle('zero', n === 0);
 }
 
 function locTheoChip(rows){
@@ -336,6 +349,7 @@ async function taiLai(){
   if (dangTai) return;
   dangTai = true;
   try {
+    demPheDuyet().catch(() => {});
     await taiDuLieu();
     daTai = true;
     veLai();
