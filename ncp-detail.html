@@ -195,6 +195,7 @@ details.panel>summary{cursor:pointer;font-weight:700;font-size:13px;min-height:3
     </div>
     <div class="header-actions">
       <button type="button" class="btn-ghost" id="btn-print" onclick="printQc02Ncp()">🖨 In phiếu đối sách A4</button>
+      <a class="btn-ghost hidden" id="btn-giao-viec" target="_blank" rel="noopener" title="Giao việc khắc phục NCP này (mở tab mới)">+ Giao việc</a>
       <button type="button" class="btn-ghost" id="btn-close" onclick="closeNcpPage()">← Đóng</button>
     </div>
     <div class="header-clock">
@@ -450,6 +451,8 @@ function renderAll(){
   state.locked = c.rc_trang_thai_duyet === 'cho_duyet' || c.rc_trang_thai_duyet === 'da_duyet';
 
   document.getElementById('h-id-ncp').textContent = c.id_ncp;
+  const gv = document.getElementById('btn-giao-viec'); gv.classList.remove('hidden'); // T161: giao việc khắc phục, điền sẵn tiêu đề + liên kết NCP
+  gv.href = 'cong-viec-giao.html?' + new URLSearchParams({ tieu_de: ('Khắc phục NCP ' + c.id_ncp + ': ' + MesQcFields.cleanText(c.mo_ta_loi || '')).slice(0, 120).trim(), lk: 'ncp:' + c.id_ncp });
   if (window.MesNav) MesNav.setTitle(null, 'NCP: ' + c.id_ncp);
   document.getElementById('i-id-ncp').textContent = c.id_ncp;
   document.getElementById('i-ma-may').textContent = c.ma_may;

@@ -26,6 +26,13 @@
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
       { label: 'Forecast sản lượng năm', href: 'forecast-san-luong.html' },
     ] },
+    // T161: module Quản lý công việc.
+    { label: 'Công việc', items: [
+      { label: 'Việc của tôi', href: 'cong-viec-cua-toi.html' },
+      { label: 'Bảng công việc', href: 'cong-viec.html' },
+      { label: 'Giao việc mới', href: 'cong-viec-giao.html' },
+      { label: 'Thông báo', href: 'thong-bao.html' },
+    ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
       { label: 'Bảng điều khiển Bavia', href: 'bavia-dashboard.html' },
@@ -122,6 +129,12 @@
     'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
+    // T161: Quản lý công việc
+    'cong-viec-cua-toi.html': { icon: '✅', title: 'Việc của tôi', desc: 'Việc tôi làm, tôi giao, chờ tôi duyệt — quá hạn, hôm nay, tuần này', noTitleBar: true },
+    'cong-viec.html': { icon: '🗂️', title: 'Bảng công việc', desc: 'Kanban theo trạng thái · ma trận ưu tiên Quan trọng × Gấp', noTitleBar: true },
+    'cong-viec-chi-tiet.html': { icon: '📄', title: 'Chi tiết công việc', desc: 'Các bước, tệp/ảnh, trao đổi & góp ý, lịch sử', noTitleBar: true },
+    'cong-viec-giao.html': { icon: '➕', title: 'Giao việc', desc: 'Giao việc mới hoặc sửa việc — người làm, hạn, mức ưu tiên, các bước', noTitleBar: true },
+    'thong-bao.html': { icon: '🔔', title: 'Thông báo', desc: 'Thông báo công việc — chưa đọc, cần tôi xử lý', noTitleBar: true },
   };
 
   // T137: nhóm trang dùng chung 1 bộ tab. Tab đầu = trang mặc định của mục
@@ -166,12 +179,21 @@ body{padding-top:var(--navbar-h)}
 .mnb-auth a{color:#C87941;text-decoration:none;font-weight:700}
 .mnb-burger{display:none;background:none;border:none;color:#fff;font-size:19px;cursor:pointer;padding:0 6px;flex-shrink:0;min-width:40px;min-height:40px}
 .mnb-auth-mobile{display:none}
+.mnb-bell{display:none;position:relative;flex-shrink:0;width:40px;height:40px;border-radius:8px;align-items:center;justify-content:center;color:#e8e0d5;text-decoration:none}
+.mnb-bell.on{display:inline-flex}
+.mnb-bell:hover,.mnb-bell:focus-visible{color:#fff;background:rgba(255,255,255,.09)}
+.mnb-bell.route-active{color:#C87941}
+.mnb-bell svg{display:block}
+.mnb-bell-n{position:absolute;top:2px;right:1px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#DC2626;color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px #211a15;box-sizing:border-box}
+.mnb-bell-n[hidden]{display:none}
 @media (max-width:820px){
+  .mnb-bell{margin-left:auto}
   .mnb-groups{display:none;position:fixed;top:var(--navbar-h);left:0;right:0;bottom:0;
     background:#fff;flex-direction:column;overflow-y:auto;padding:8px;z-index:4999}
   .mnb-groups.open{display:flex}
   .mnb-group{width:100%}
   .mnb-group-btn{width:100%;color:#8a5a30;height:auto;padding:12px 8px;justify-content:space-between;border-bottom:1px solid #f0e6d8}
+  .mnb-group-btn:hover,.mnb-group.route-active .mnb-group-btn{color:#8a5a30;background:#faf5f0}
   .mnb-dropdown{display:none;position:static;box-shadow:none;padding:0 0 6px 12px;min-width:0}
   .mnb-group.mobile-open .mnb-dropdown{display:flex}
   .mnb-burger{display:block}
@@ -309,6 +331,7 @@ body{padding-top:var(--navbar-h)}
       '<button type="button" class="mnb-burger" id="mnbBurger">☰</button>' +
       '<a href="index.html" class="mnb-logo">TOYOTAKI <span>MES</span></a>' +
       '<div class="mnb-groups" id="mnbGroups"></div>' +
+      BELL_HTML +
       '<div class="mnb-auth" id="mnbAuth">…</div>';
     document.body.insertBefore(bar, document.body.firstChild);
 
@@ -413,7 +436,66 @@ body{padding-top:var(--navbar-h)}
     } catch (e) { /* không chặn menu nếu lỗi tra quyền — chỉ không thêm nhóm Quản trị */ }
     renderAuthInto('mnbAuth', email, identity);
     renderAuthInto('mnbAuthMobile', email, identity);
+    if (email) startBell();
   }
+
+  // T161: chuông thông báo công việc (cv_thong_bao). Chỉ hiện khi đã đăng
+  // nhập VÀ đếm được. Đếm lỗi (VD production chưa chạy migration T161 → bảng
+  // không có) → ẩn chuông im lặng; lỗi "không có bảng" thì ngừng hẳn, lỗi
+  // khác (mất mạng) thử lại ở lượt 60 giây sau — không ghi console.
+  const BELL_HTML =
+    '<a href="thong-bao.html" class="mnb-bell" id="mnbBell" aria-label="Thông báo">' +
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>' +
+      '<span class="mnb-bell-n" id="mnbBellN" hidden></span>' +
+    '</a>';
+  let bellUid = null, bellStopped = false, bellBusy = false, bellTimer = null;
+  async function refreshBell() {
+    const el = document.getElementById('mnbBell');
+    if (!el || bellStopped || bellBusy || !bellUid) return;
+    bellBusy = true;
+    try {
+      const res = await sb.from('cv_thong_bao').select('id', { count: 'exact', head: true })
+        .eq('nguoi_nhan', bellUid).eq('da_doc', false);
+      if (res.error || typeof res.count !== 'number') {
+        el.classList.remove('on');
+        const code = res.error && res.error.code;
+        if (res.status === 404 || code === 'PGRST205' || code === '42P01' || code === '42501') stopBell();
+        return;
+      }
+      const n = res.count;
+      const badge = document.getElementById('mnbBellN');
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.hidden = n === 0;
+      el.setAttribute('aria-label', n ? 'Thông báo, ' + n + ' chưa đọc' : 'Thông báo, không có thông báo mới');
+      el.title = n ? n + ' thông báo chưa đọc' : 'Thông báo';
+      el.classList.add('on');
+    } catch (e) {
+      el.classList.remove('on');
+    } finally {
+      bellBusy = false;
+    }
+  }
+  function onBellVisible() { if (document.visibilityState === 'visible') refreshBell(); }
+  function stopBell() {
+    bellStopped = true;
+    if (bellTimer) clearInterval(bellTimer);
+    document.removeEventListener('visibilitychange', onBellVisible);
+  }
+  async function startBell() {
+    if (bellUid || bellStopped) return;
+    try {
+      const session = await MesAuth.getSession();
+      if (!session) return;
+      bellUid = session.user.id;
+    } catch (e) { return; }
+    const el = document.getElementById('mnbBell');
+    if (el && currentFile() === 'thong-bao.html') el.classList.add('route-active');
+    refreshBell();
+    bellTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBell(); }, 60000);
+    document.addEventListener('visibilitychange', onBellVisible);
+  }
+  window.MesNav.refreshBell = refreshBell;
 
   function openChangePasswordModal(){
     ['mnbPwOld', 'mnbPwNew', 'mnbPwNew2'].forEach(id => { document.getElementById(id).value = ''; });
