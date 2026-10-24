@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
-<link rel="stylesheet" href="shared/cong-viec.css?v=t162">
+<link rel="stylesheet" href="shared/cong-viec.css?v=t165">
 <!--
   cong-viec.html?view=kanban|matran&bo_phan=&nguoi=<uuid>&du_an=<id>&nhom=1..4&q= — Bảng công việc (T161).
   Thiết kế + hợp đồng dữ liệu: docs/CONG_VIEC_THIET_KE.md. Đọc view cv_cong_viec_v (RLS tự lọc).
@@ -180,7 +180,7 @@ dialog.dlg::backdrop{background:rgba(15,23,42,.45)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/cong-viec.js?v=t163"></script>
+<script src="shared/cong-viec.js?v=t165"></script>
 <script>
 (function () {
   const KANBAN_COLS = ['moi', 'dang_lam', 'cho_duyet', 'hoan_thanh'];
@@ -478,6 +478,9 @@ dialog.dlg::backdrop{background:rgba(15,23,42,.45)}
     const c = kiem(r, el);
     if (c.same) return;
     if (!c.ok) { CV.toast(c.reason, 'err'); return; }
+    // T165: việc lớn còn việc con chưa xong — chỉ cảnh báo, người dùng vẫn chọn tiếp được.
+    if ((c.action === 'bao_xong' || c.action === 'duyet') && r.so_viec_con_mo > 0
+        && !confirm('Việc "' + r.tieu_de + '" còn ' + r.so_viec_con_mo + ' việc con chưa xong. Vẫn ' + (c.action === 'duyet' ? 'duyệt hoàn thành' : 'báo hoàn thành') + '?')) return;
     const card = document.querySelector(`.cv-card[data-id="${r.id}"]`);
     try {
       let msg = '';
