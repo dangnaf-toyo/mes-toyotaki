@@ -6,7 +6,9 @@
  *       lịch sử sửa đổi), nhập / xuất Excel.
  *   IpqcBtkQc.mountChart(el)   — tab "Biểu đồ kiểm soát": biểu đồ I-MR / X̄-R,
  *       cảnh báo theo 4 quy tắc, Cp/Cpk, tổng quan hạng mục, đặt lại giới hạn.
- * RPC: ipqc_btk_luu / ipqc_btk_ban_ve / ipqc_do_du_lieu / ipqc_gioi_han_dat
+ * RPC: ipqc_btk_luu / ipqc_do_du_lieu / ipqc_gioi_han_dat
+ *   T163: ipqc_btk_luu chỉ tạo BẢN NHÁP chờ duyệt (NV QC soạn → TP QC kiểm tra → GĐ SX
+ *   phê duyệt, ipqc_tc_duyet / ipqc_tc_huy); khoiDuyet/duyet/huy dùng chung cho checklist.
  * (supabase/migration_phase_T133_ipqc_bang_tuan_kiem.sql). Cần ipqc-spc.js,
  * SheetJS (XLSX) cho nhập/xuất Excel.
  * ============================================================================
@@ -15,7 +17,7 @@
   const S = () => window.IpqcSpc;
   const esc = s => S().esc(s);
   const COT = ['Mã SP', 'Phiên bản', 'Ngày hiệu lực', 'Số mẫu/lần', 'No', 'Hạng mục', 'Kiểu (Đo số / OK-NG)',
-    'Danh nghĩa', 'Dung sai +', 'Dung sai −', 'Tiêu chuẩn (OK-NG)', 'Dụng cụ KT', 'Tần suất', 'Nội dung sửa đổi', 'Người xác nhận'];
+    'Danh nghĩa', 'Dung sai +', 'Dung sai −', 'Tiêu chuẩn (OK-NG)', 'Dụng cụ KT', 'Tần suất', 'Nội dung sửa đổi', 'Người phê duyệt'];
 
   function css() {
     if (document.getElementById('bq-css')) return;
@@ -57,7 +59,15 @@
       '.bq .lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:#475569;margin-top:4px}' +
       '.bq tr.clk{cursor:pointer}.bq tr.clk:hover td{background:#F8FAFC}.bq tr.sel td{background:#EFF6FF}' +
       '.bq-mask{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:14px}' +
-      '.bq-dlg{background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:90vh;overflow:auto;padding:14px 16px;font-size:13px}';
+      '.bq-dlg{background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:90vh;overflow:auto;padding:14px 16px;font-size:13px}' +
+      '.bq .tag.no{display:inline-block;width:auto;height:auto;border-radius:10px;background:#FEF3C7;color:#92400E;font-size:10.5px}' +
+      '.bq td.doi input,.bq td.doi select{background:#FEF9C3;border-color:#EAB308}.bq tr.moi td:first-child{box-shadow:inset 3px 0 #16A34A}' +
+      '.tcd{border:1.5px solid #FCD34D;background:#FFFBEB;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px}' +
+      '.tcd .bcs{display:flex;flex-wrap:wrap;gap:6px}.tcd .bc{flex:1 1 150px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:6px 9px;display:flex;flex-direction:column;gap:2px;font-size:12px;color:#64748B}' +
+      '.tcd .bc b{color:#0F172A}.tcd .bc.x{border-color:#A7E3C6}.tcd .bc.x b::before{content:"✓ ";color:#047857}.tcd .bc.c{border-color:#F59E0B;box-shadow:0 0 0 2px #FEF3C7}' +
+      '.tcd .nut{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}' +
+      '.tcd .btn{font:inherit;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:8px;border:1.5px solid #0F5FA5;background:#fff;color:#0F5FA5;cursor:pointer}.tcd .btn.p{background:#0F5FA5;color:#fff}.tcd .btn.d{border-color:#FCA5A5;color:#B91C1C}.tcd .btn:disabled{opacity:.5}' +
+      '.tcd .loi{margin-top:8px;padding:7px 10px;border-radius:8px;background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;font-weight:600;font-size:12.5px}';
     document.head.appendChild(st);
   }
   function msg(el, text, kind) { el.innerHTML = text ? '<div class="msg ' + (kind || 'ok') + '">' + esc(text) + '</div>' : ''; }
@@ -65,36 +75,106 @@
   function ngayVN(ts) { return ts ? new Date(ts).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
   function soVN(v) { if (v === null || v === undefined) return ''; const s = String(v).trim().replace(/^[ØøФф⌀]\s*/, '').replace(',', '.'); return s; }
 
-  // ═══════════════════════════ BẢNG TUẦN KIỂM ═══════════════════════════
-  async function mountEditor(el) {
+  // ═══════════════════════════ PHÊ DUYỆT TIÊU CHUẨN (T163) ═══════════════════════════
+  // Nhân viên QC soạn → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. Dùng chung cho
+  // bảng tuần kiểm ('btk') và checklist + PDF ('checklist', qc-manager.html).
+  const TT = { cho_kiem_tra: 'Chờ TP QC kiểm tra', cho_phe_duyet: 'Chờ GĐ SX phê duyệt', tra_lai: 'Bị trả lại', da_duyet: 'Đã duyệt' };
+  const TT_NGAN = { cho_kiem_tra: 'chờ kiểm tra', cho_phe_duyet: 'chờ phê duyệt', tra_lai: 'bị trả lại' };
+  const SOAN = ['ipqc', 'nhan_vien_oqc', 'qc_manager', 'admin'];
+  let quyenP = null;
+  /** {uid, role, soan, kiemTra, pheDuyet, huyMoi} của người đang đăng nhập (uid null = chưa đăng nhập). */
+  function quyen() {
+    if (!quyenP) quyenP = (async () => {
+      try {
+        const s = await MesAuth.getSession();
+        if (!s) return { uid: null, role: null };
+        const { data } = await sb.from('user_roles').select('role').eq('user_id', s.user.id).maybeSingle();
+        const role = data ? data.role : null;
+        return { uid: s.user.id, role, soan: SOAN.includes(role), kiemTra: role === 'qc_manager', pheDuyet: role === 'giam_doc_sx', huyMoi: role === 'qc_manager' || role === 'admin' };
+      } catch (e) { return { uid: null, role: null }; }
+    })();
+    return quyenP;
+  }
+  const DA_XONG = { kiem_tra: 'Đã kiểm tra — chuyển Giám đốc SX phê duyệt.', phe_duyet: 'Đã phê duyệt — có hiệu lực ngay cho IPQC.', tra_lai: 'Đã trả lại cho người soạn.' };
+  /** Kiểm tra / phê duyệt / trả lại 1 bản nháp. Trả null nếu người dùng bấm huỷ; ném lỗi nếu không được. */
+  async function duyet(loai, id, hanhDong) {
+    let lyDo = null;
+    if (hanhDong === 'tra_lai') {
+      lyDo = prompt('Lý do trả lại (người soạn sẽ thấy):');
+      if (lyDo === null) return null;
+      if (!lyDo.trim()) throw new Error('Nhập lý do trả lại.');
+    }
+    if (hanhDong === 'phe_duyet' && !confirm('Phê duyệt? Bản này có hiệu lực ngay cho IPQC, thay bản đang dùng.')) return null;
+    const { data, error } = await sb.rpc('ipqc_tc_duyet', { p_loai: loai, p_id: id, p_hanh_dong: hanhDong, p_ly_do: lyDo, p_nguoi: await nguoi() });
+    if (error) throw new Error(error.message);
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Không thực hiện được');
+    return DA_XONG[hanhDong];
+  }
+  async function huy(loai, id) {
+    if (!confirm('Huỷ bản nháp này? Nội dung đã soạn sẽ mất.')) return null;
+    const { data, error } = await sb.rpc('ipqc_tc_huy', { p_loai: loai, p_id: id });
+    if (error) throw new Error(error.message);
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Không huỷ được');
+    return 'Đã huỷ bản nháp.';
+  }
+  /** Khối 3 bước + nút duyệt cho 1 bản nháp r (dòng ipqc_btk / duc_ipqc_tieuchuan_de_xuat). */
+  function khoiDuyet(r, q) {
     css();
-    const st = { products: [], btk: {}, ma: null, versions: [], xem: null, rows: [], viTri: [], banVe: null, noDat: 1 };
+    const tt = r.trang_thai;
+    const buoc = (ten, ai, luc, xong, cho) => '<div class="bc' + (xong ? ' x' : cho ? ' c' : '') + '"><b>' + ten + '</b><span>' +
+      (xong ? esc(ai || '') + ' · ' + esc(ngayVN(luc)) : cho ? 'Đang chờ' : '—') + '</span></div>';
+    let h = '<div class="tcd"><div class="bcs">' +
+      buoc('Soạn', r.nguoi_lap, r.gui_luc || r.tao_luc, true, false) +
+      buoc('Trưởng phòng QC kiểm tra', r.nguoi_kiem_tra, r.kiem_tra_luc, tt === 'cho_phe_duyet', tt === 'cho_kiem_tra') +
+      buoc('Giám đốc SX phê duyệt', r.nguoi_phe_duyet, r.phe_duyet_luc, false, tt === 'cho_phe_duyet') + '</div>';
+    if (tt === 'tra_lai') h += '<div class="loi">Bị trả lại bởi ' + esc(r.nguoi_tra_lai || '') + ' (' + esc(ngayVN(r.tra_lai_luc)) + '): ' + esc(r.ly_do_tra_lai || '') + ' — sửa rồi gửi lại.</div>';
+    const nut = [];
+    if (tt === 'cho_kiem_tra' && q.kiemTra) nut.push('<button class="btn p" type="button" data-duyet="kiem_tra">✓ Kiểm tra đạt — chuyển GĐ SX</button>', '<button class="btn d" type="button" data-duyet="tra_lai">Trả lại</button>');
+    if (tt === 'cho_phe_duyet' && q.pheDuyet) nut.push('<button class="btn p" type="button" data-duyet="phe_duyet">✓ Phê duyệt — áp dụng</button>', '<button class="btn d" type="button" data-duyet="tra_lai">Trả lại</button>');
+    if (q.uid && (r.nguoi_lap_uid === q.uid || q.huyMoi)) nut.push('<button class="btn d" type="button" data-huy>Huỷ bản nháp</button>');
+    if (nut.length) h += '<div class="nut">' + nut.join('') + '</div>';
+    return h + '</div>';
+  }
+
+  // ═══════════════════════════ BẢNG TUẦN KIỂM ═══════════════════════════
+  // opts.doiTrangThai(): gọi sau mỗi lần gửi duyệt / duyệt / huỷ (để trang làm mới danh sách chờ duyệt).
+  async function mountEditor(el, opts) {
+    css();
+    const q = await quyen();
+    const baoDoi = () => { if (opts && opts.doiTrangThai) opts.doiTrangThai(); };
+    const st = { products: [], btk: {}, nhap: {}, ma: null, versions: [], xem: null, rows: [], viTri: [], banVe: null, noDat: 1 };
     el.innerHTML = '<div class="bq"><div class="side"><div class="ttl"><span class="sp">Bảng tuần kiểm theo mã</span></div>' +
       '<input type="search" data-tim placeholder="Tìm mã SP…" aria-label="Tìm mã SP" style="width:100%;margin-bottom:8px"><div data-list></div></div>' +
-      '<div class="main" data-main><div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để lập / sửa bảng tuần kiểm kích thước. ' +
-      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" data-nhap>Nhập từ Excel</button><button class="btn" type="button" data-mau>Tải file mẫu</button></div></div></div></div>';
+      '<div class="main" data-main><div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để xem / soạn bảng tuần kiểm kích thước. ' +
+      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button></div></div></div></div>';
     const listEl = el.querySelector('[data-list]'), main = el.querySelector('[data-main]');
 
     async function taiDanhSach() {
       const [p, b] = await Promise.all([
         sb.from('master_products').select('ma_sp,ten_sp,ten_khach_hang').order('ma_sp'),
-        sb.from('ipqc_btk').select('ma_sp,phien_ban,id').eq('dang_dung', true),
+        sb.from('ipqc_btk').select('ma_sp,phien_ban,id,dang_dung,trang_thai').or('dang_dung.eq.true,trang_thai.neq.da_duyet'),
       ]);
       st.products = p.data || [];
-      st.btk = {}; (b.data || []).forEach(x => { st.btk[x.ma_sp] = x; });
+      st.btk = {}; st.nhap = {};
+      (b.data || []).forEach(x => { if (x.dang_dung) st.btk[x.ma_sp] = x; else st.nhap[x.ma_sp] = x; });
       veDanhSach();
     }
     function veDanhSach() {
-      const q = (el.querySelector('[data-tim]').value || '').trim().toLowerCase();
-      const ds = st.products.filter(p => !q || (p.ma_sp + ' ' + (p.ten_sp || '') + ' ' + (p.ten_khach_hang || '')).toLowerCase().includes(q))
-        .sort((a, b) => (st.btk[b.ma_sp] ? 1 : 0) - (st.btk[a.ma_sp] ? 1 : 0) || a.ma_sp.localeCompare(b.ma_sp));
-      listEl.innerHTML = ds.map(p => '<div class="li' + (p.ma_sp === st.ma ? ' on' : '') + '" data-ma="' + esc(p.ma_sp) + '" role="button" tabindex="0">' +
-        '<div style="flex:1;min-width:0"><div class="m">' + esc(p.ma_sp) + '</div><div class="t">' + esc(p.ten_sp || '') + '</div></div>' +
-        (st.btk[p.ma_sp] ? '<span class="tag ok">' + esc(st.btk[p.ma_sp].phien_ban) + '</span>' : '<span class="tag no">Chưa có</span>') + '</div>').join('') ||
-        '<div class="hint">Không có mã phù hợp.</div>';
+      const q2 = (el.querySelector('[data-tim]').value || '').trim().toLowerCase();
+      const hang = ma => st.nhap[ma] ? 2 : st.btk[ma] ? 1 : 0;
+      const ds = st.products.filter(p => !q2 || (p.ma_sp + ' ' + (p.ten_sp || '') + ' ' + (p.ten_khach_hang || '')).toLowerCase().includes(q2))
+        .sort((a, b) => hang(b.ma_sp) - hang(a.ma_sp) || a.ma_sp.localeCompare(b.ma_sp));
+      listEl.innerHTML = ds.map(p => {
+        const nh = st.nhap[p.ma_sp];
+        return '<div class="li' + (p.ma_sp === st.ma ? ' on' : '') + '" data-ma="' + esc(p.ma_sp) + '" role="button" tabindex="0">' +
+          '<div style="flex:1;min-width:0"><div class="m">' + esc(p.ma_sp) + '</div><div class="t">' + esc(p.ten_sp || '') + '</div></div>' +
+          (nh ? '<span class="tag ' + (nh.trang_thai === 'tra_lai' ? 'ng' : 'w') + '" title="' + esc(TT[nh.trang_thai]) + '">' + esc(nh.phien_ban) + ' · ' + (nh.trang_thai === 'tra_lai' ? 'trả lại' : 'chờ') + '</span>' : '') +
+          (st.btk[p.ma_sp] ? '<span class="tag ok">' + esc(st.btk[p.ma_sp].phien_ban) + '</span>' : nh ? '' : '<span class="tag no">Chưa có</span>') + '</div>';
+      }).join('') || '<div class="hint">Không có mã phù hợp.</div>';
     }
 
-    async function chonMa(ma) {
+    // idXem: phiên bản muốn mở; mặc định bản nháp đang chờ duyệt (nếu có), không thì bản đang dùng.
+    async function chonMa(ma, idXem) {
       st.ma = ma; veDanhSach();
       // Danh sách có thanh trượt riêng: bấm mã ở cuối danh sách thì đưa nội dung bên phải lên đầu màn hình.
       const top = main.getBoundingClientRect().top;
@@ -104,8 +184,8 @@
       const ids = st.versions.map(x => x.id);
       const m = ids.length ? await sb.from('ipqc_btk_muc').select('*').in('id_btk', ids).order('muc_no') : { data: [] };
       st.mucAll = m.data || [];
-      const cur = st.versions.find(x => x.dang_dung) || null;
-      napPhienBan(cur);
+      const chon = (idXem && st.versions.find(x => x.id === idXem)) || st.versions.find(x => x.trang_thai !== 'da_duyet') || st.versions.find(x => x.dang_dung) || null;
+      napPhienBan(chon);
     }
     function napPhienBan(b) {
       st.xem = b;
@@ -119,59 +199,97 @@
       if (!cur) return 'A';
       return /^[A-Y]$/.test(cur.phien_ban) ? String.fromCharCode(cur.phien_ban.charCodeAt(0) + 1) : cur.phien_ban + '.1';
     }
+    // So bản nháp với bản đang dùng: ô đã sửa / hạng mục mới / hạng mục bị bỏ.
+    const COT_SS = ['hang_muc', 'kieu', 'danh_nghia', 'dung_sai_tren', 'dung_sai_duoi', 'tieu_chuan', 'dung_cu', 'tan_suat'];
+    function giongNhau(a, b) {
+      const x = String(a ?? '').trim(), y = String(b ?? '').trim();
+      return x === y || (x !== '' && y !== '' && isFinite(+soVN(x)) && isFinite(+soVN(y)) && +soVN(x) === +soVN(y));
+    }
+    function soSanh(cur) {
+      if (!cur) return null;
+      const goc = {}; st.mucAll.filter(x => x.id_btk === cur.id).forEach(x => { goc[+x.muc_no] = x; });
+      const doi = st.rows.map(r => { const g = goc[+r.muc_no]; return g ? COT_SS.filter(c => !giongNhau(r[c], g[c])) : null; });
+      const nos = new Set(st.rows.map(r => +r.muc_no));
+      return { cur, doi, bo: Object.values(goc).filter(g => !nos.has(+g.muc_no)) };
+    }
 
     function ve() {
       const p = st.products.find(x => x.ma_sp === st.ma) || {};
-      const b = st.xem, cu = b && !b.dang_dung;
-      const cur = st.versions.find(x => x.dang_dung);
+      const b = st.xem;
+      const cur = st.versions.find(x => x.dang_dung) || null;
+      const nhap = st.versions.find(x => x.trang_thai !== 'da_duyet') || null;
+      const laNhap = !!(b && b.trang_thai !== 'da_duyet');
+      const cu = b && !laNhap && !b.dang_dung;
+      const ss = laNhap ? soSanh(cur) : null;
+      const dis = q.soan ? '' : ' disabled';
+      const tenPb = v => esc(v.phien_ban) + (v.dang_dung ? ' (đang dùng)' : v.trang_thai !== 'da_duyet' ? ' (' + TT_NGAN[v.trang_thai] + ')' : ' (cũ)');
+      let canhBao = '';
+      if (cu) canhBao = 'Đang xem phiên bản cũ ' + esc(b.phien_ban) + ' (chỉ xem). Gửi duyệt sẽ tạo bản nháp từ nội dung này' + (nhap ? ', ghi đè bản nháp ' + esc(nhap.phien_ban) : '') + '.';
+      else if (!laNhap && nhap) canhBao = 'Mã này đang có bản nháp ' + esc(nhap.phien_ban) + ' (' + esc(TT_NGAN[nhap.trang_thai]) + ') — chọn ở ô "Đang xem". Gửi duyệt từ đây sẽ ghi đè bản nháp đó.';
+      else if (!cur) canhBao = 'Mã chưa có bảng tuần kiểm được duyệt — IPQC chưa đo theo bảng tuần kiểm cho mã này.';
       main.innerHTML =
         '<div class="card"><div class="flds">' +
           '<div style="flex:1 1 220px"><div style="font-size:11px;color:#64748B;font-weight:600">Biểu kiểm tra tuần kiểm · ' + esc((b && b.ma_bieu) || 'QP-82405-B') + '</div>' +
           '<div style="font-size:19px;font-weight:800">' + esc(st.ma) + ' <span style="font-size:13px;color:#475569;font-weight:600">' + esc(p.ten_sp || '') + '</span></div></div>' +
-          '<label class="f">Đang xem<select data-pb>' + (st.versions.length ? st.versions.map(v => '<option value="' + v.id + '"' + (b && v.id === b.id ? ' selected' : '') + '>' + esc(v.phien_ban) + (v.dang_dung ? ' (đang dùng)' : '') + ' — ' + esc(v.ngay_hieu_luc || '') + '</option>').join('') : '<option>Chưa có — lập mới</option>') + '</select></label>' +
-          '<button class="btn" type="button" data-nhap>Nhập từ Excel</button><button class="btn" type="button" data-mau>Tải file mẫu</button>' +
+          '<label class="f">Đang xem<select data-pb>' + (st.versions.length ? st.versions.map(v => '<option value="' + v.id + '"' + (b && v.id === b.id ? ' selected' : '') + '>' + tenPb(v) + ' — ' + esc(v.ngay_hieu_luc || '') + '</option>').join('') : '<option>Chưa có — lập mới</option>') + '</select></label>' +
+          (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button>' +
           (b ? '<button class="btn" type="button" data-xuat>Xuất Excel</button>' : '') +
         '</div>' +
-        (cu ? '<div class="msg err">Đang xem phiên bản cũ ' + esc(b.phien_ban) + ' (chỉ xem). Lưu sẽ tạo phiên bản mới từ nội dung này.</div>' : '') +
+        (laNhap ? khoiDuyet(b, q) : '') +
+        (canhBao ? '<div class="msg ' + (cu || nhap ? 'err' : 'ok') + '">' + canhBao + '</div>' : '') +
         '<div class="flds" style="margin-top:10px">' +
-          '<label class="f">Phiên bản mới<input data-f="phien_ban" value="' + esc(phienBanMoi()) + '" style="width:70px"></label>' +
-          '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc(new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)) + '"></label>' +
-          '<label class="f">Số mẫu đo / lần<select data-f="so_mau">' + [1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (((b && b.so_mau) || 1) === n ? ' selected' : '') + '>' + n + (n === 1 ? ' (I-MR)' : ' (X̄-R)') + '</option>').join('') + '</select></label>' +
-          '<label class="f">Tần suất<input data-f="tan_suat" value="' + esc((b && b.tan_suat) || '2h/lần') + '" style="width:90px"></label>' +
-          '<label class="f">Mã biểu<input data-f="ma_bieu" value="' + esc((b && b.ma_bieu) || 'QP-82405-B') + '" style="width:110px"></label>' +
-          '<label class="f">Người xác nhận<input data-f="nguoi_xac_nhan" value="" style="width:130px"></label>' +
-          '<label class="f" style="flex:1 1 200px">Nội dung sửa đổi<input data-f="noi_dung_sua_doi" value="' + (cur ? '' : 'Lập mới') + '" placeholder="VD: Sửa dung sai hạng mục 2"></label>' +
-          '<button class="btn p" type="button" data-luu>Lưu thành phiên bản mới</button>' +
-        '</div><div data-msg></div></div>' +
+          '<label class="f">Phiên bản' + (laNhap ? '' : ' mới') + '<input data-f="phien_ban" value="' + esc(nhap ? nhap.phien_ban : phienBanMoi()) + '" style="width:70px"' + dis + '></label>' +
+          '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc(laNhap && b.ngay_hieu_luc ? b.ngay_hieu_luc : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)) + '"' + dis + '></label>' +
+          '<label class="f">Số mẫu đo / lần<select data-f="so_mau"' + dis + '>' + [1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (((b && b.so_mau) || 1) === n ? ' selected' : '') + '>' + n + (n === 1 ? ' (I-MR)' : ' (X̄-R)') + '</option>').join('') + '</select></label>' +
+          '<label class="f">Tần suất<input data-f="tan_suat" value="' + esc((b && b.tan_suat) || '2h/lần') + '" style="width:90px"' + dis + '></label>' +
+          '<label class="f">Mã biểu<input data-f="ma_bieu" value="' + esc((b && b.ma_bieu) || 'QP-82405-B') + '" style="width:110px"' + dis + '></label>' +
+          '<label class="f" style="flex:1 1 200px">Nội dung sửa đổi<input data-f="noi_dung_sua_doi" value="' + esc(laNhap ? b.noi_dung_sua_doi || '' : cur ? '' : 'Lập mới') + '" placeholder="VD: Sửa dung sai hạng mục 2"' + dis + '></label>' +
+          (q.soan ? '<button class="btn p" type="button" data-luu>' + (nhap ? 'Cập nhật bản nháp ' + esc(nhap.phien_ban) + ' & gửi lại' : 'Gửi duyệt phiên bản mới') + '</button>' : '') +
+        '</div>' +
+        '<div class="hint">' + (q.soan ? 'Gửi duyệt → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. IPQC dùng bản đang dùng đến khi bản mới được phê duyệt.'
+          : q.uid ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn bảng tuần kiểm.' : 'Đăng nhập để soạn / duyệt.') + '</div><div data-msg></div></div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">' +
           '<div class="card" style="flex:1 1 280px;min-width:0"><div class="ttl"><span class="sp">Bản vẽ vị trí đo</span></div>' +
             '<div class="bv" data-bv>' + (st.banVe ? '<img src="' + esc(st.banVe) + '" alt="Bản vẽ">' + st.viTri.map(v => '<span class="b" style="left:' + v.x + '%;top:' + v.y + '%">' + esc(v.no) + '</span>').join('')
-              : '<div>[Chưa có bản vẽ]<br><span style="font-size:11.5px">Tải ảnh PNG / JPG bản vẽ có các vị trí đo</span></div>') + '</div>' +
-            '<div class="flds" style="margin-top:8px"><label class="btn sm" style="display:inline-flex">Tải ảnh bản vẽ<input type="file" accept="image/png,image/jpeg,image/webp" data-up hidden></label>' +
-            (st.banVe ? '<label class="f">Đặt vị trí cho No<select data-nodat>' + st.rows.map(r => '<option' + (+r.muc_no === +st.noDat ? ' selected' : '') + '>' + esc(r.muc_no) + '</option>').join('') + '</select></label>' +
-              '<button class="btn sm d" type="button" data-xoavt>Xoá vị trí</button>' + (cur ? '<button class="btn sm" type="button" data-luuvt>Lưu bản vẽ + vị trí</button>' : '') : '') + '</div>' +
-            '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' + (cur ? 'Bản vẽ + vị trí lưu thẳng vào phiên bản đang dùng (không tạo phiên bản mới).' : 'Sẽ lưu cùng phiên bản đầu tiên.') : '') + '</div></div>' +
-          '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span><button class="btn sm" type="button" data-them>+ Thêm hạng mục</button></div>' +
+              : '<div>[Chưa có bản vẽ]' + (q.soan ? '<br><span style="font-size:11.5px">Tải ảnh PNG / JPG bản vẽ có các vị trí đo</span>' : '') + '</div>') + '</div>' +
+            (q.soan ? '<div class="flds" style="margin-top:8px"><label class="btn sm" style="display:inline-flex">Tải ảnh bản vẽ<input type="file" accept="image/png,image/jpeg,image/webp" data-up hidden></label>' +
+              (st.banVe ? '<label class="f">Đặt vị trí cho No<select data-nodat>' + st.rows.map(r => '<option' + (+r.muc_no === +st.noDat ? ' selected' : '') + '>' + esc(r.muc_no) + '</option>').join('') + '</select></label>' +
+                '<button class="btn sm d" type="button" data-xoavt>Xoá vị trí</button>' : '') + '</div>' +
+              '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' : '') + 'Bản vẽ + vị trí đo đi cùng khi gửi duyệt.</div>' : '') + '</div>' +
+          '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span>' + (q.soan ? '<button class="btn sm" type="button" data-them>+ Thêm hạng mục</button>' : '') + '</div>' +
             '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>Dung sai +</th><th>Dung sai −</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th><th></th></tr>' +
             st.rows.map((r, i) => {
               const so = r.kieu === 'so';
               const sp = so ? S().specMuc(r) : null;
-              return '<tr data-r="' + i + '"><td><input data-c="muc_no" value="' + esc(r.muc_no ?? '') + '" style="width:44px" inputmode="numeric"></td>' +
-                '<td><input data-c="hang_muc" value="' + esc(r.hang_muc || '') + '" style="width:150px"></td>' +
-                '<td><select data-c="kieu"><option value="so"' + (so ? ' selected' : '') + '>Đo số</option><option value="okng"' + (!so ? ' selected' : '') + '>OK / NG</option></select></td>' +
-                '<td><input data-c="danh_nghia" value="' + esc(r.danh_nghia ?? '') + '" style="width:70px" inputmode="decimal"' + (so ? '' : ' disabled') + '></td>' +
-                '<td><input data-c="dung_sai_tren" value="' + esc(r.dung_sai_tren ?? '') + '" style="width:60px" inputmode="decimal"' + (so ? '' : ' disabled') + '></td>' +
-                '<td><input data-c="dung_sai_duoi" value="' + esc(r.dung_sai_duoi ?? '') + '" style="width:60px" inputmode="decimal"' + (so ? '' : ' disabled') + '></td>' +
-                '<td><input data-c="tieu_chuan" value="' + esc(r.tieu_chuan || '') + '" style="width:170px"' + (so ? ' placeholder="(tuỳ chọn)"' : '') + '></td>' +
-                '<td><input data-c="dung_cu" value="' + esc(r.dung_cu || '') + '" style="width:110px"></td>' +
-                '<td><input data-c="tan_suat" value="' + esc(r.tan_suat || '') + '" style="width:70px"></td>' +
+              const doi = ss ? ss.doi[i] : [];
+              const td = c => '<td' + (doi && doi.includes(c) ? ' class="doi"' : '') + '>';
+              const dso = so ? dis : ' disabled';
+              return '<tr data-r="' + i + '"' + (ss && !doi ? ' class="moi"' : '') + '><td><input data-c="muc_no" value="' + esc(r.muc_no ?? '') + '" style="width:44px" inputmode="numeric"' + dis + '></td>' +
+                td('hang_muc') + '<input data-c="hang_muc" value="' + esc(r.hang_muc || '') + '" style="width:150px"' + dis + '></td>' +
+                td('kieu') + '<select data-c="kieu"' + dis + '><option value="so"' + (so ? ' selected' : '') + '>Đo số</option><option value="okng"' + (!so ? ' selected' : '') + '>OK / NG</option></select></td>' +
+                td('danh_nghia') + '<input data-c="danh_nghia" value="' + esc(r.danh_nghia ?? '') + '" style="width:70px" inputmode="decimal"' + dso + '></td>' +
+                td('dung_sai_tren') + '<input data-c="dung_sai_tren" value="' + esc(r.dung_sai_tren ?? '') + '" style="width:60px" inputmode="decimal"' + dso + '></td>' +
+                td('dung_sai_duoi') + '<input data-c="dung_sai_duoi" value="' + esc(r.dung_sai_duoi ?? '') + '" style="width:60px" inputmode="decimal"' + dso + '></td>' +
+                td('tieu_chuan') + '<input data-c="tieu_chuan" value="' + esc(r.tieu_chuan || '') + '" style="width:170px"' + (so ? ' placeholder="(tuỳ chọn)"' : '') + dis + '></td>' +
+                td('dung_cu') + '<input data-c="dung_cu" value="' + esc(r.dung_cu || '') + '" style="width:110px"' + dis + '></td>' +
+                td('tan_suat') + '<input data-c="tan_suat" value="' + esc(r.tan_suat || '') + '" style="width:70px"' + dis + '></td>' +
                 '<td class="mono" style="white-space:nowrap;color:#475569">' + (so && (sp.usl !== null || sp.lsl !== null) ? (sp.lsl !== null ? S().fmt(sp.lsl, S().soLe(r)) : '—') + ' – ' + (sp.usl !== null ? S().fmt(sp.usl, S().soLe(r)) : '—') : '—') + '</td>' +
-                '<td><button class="btn sm d" type="button" data-xoa="' + i + '" aria-label="Xoá hạng mục">✕</button></td></tr>';
+                '<td>' + (q.soan ? '<button class="btn sm d" type="button" data-xoa="' + i + '" aria-label="Xoá hạng mục">✕</button>' : '') + '</td></tr>';
             }).join('') + '</table></div>' +
+            (ss ? '<div class="hint"><b>So với bản đang dùng ' + esc(ss.cur.phien_ban) + ':</b> ô vàng = đã sửa, vạch xanh đầu dòng = hạng mục mới' +
+              (ss.bo.length ? '; bỏ: ' + ss.bo.map(g => 'No ' + esc(g.muc_no) + ' ' + esc(g.hang_muc)).join(', ') : '') +
+              (b.so_mau !== ss.cur.so_mau ? '; số mẫu/lần ' + ss.cur.so_mau + ' → ' + b.so_mau : '') +
+              (b.ban_ve_url !== ss.cur.ban_ve_url ? '; bản vẽ mới' : JSON.stringify(b.ban_ve_vi_tri || []) !== JSON.stringify(ss.cur.ban_ve_vi_tri || []) ? '; đổi vị trí đo trên bản vẽ' : '') + '.</div>' : '') +
             '<div class="hint">Dung sai −: ghi độ lớn (VD 0.2 nghĩa là −0.2). Ghi 0 nếu dung sai bằng 0; để trống = không giới hạn phía đó. Hạng mục OK/NG chỉ theo dõi tỉ lệ NG.</div></div>' +
         '</div>' +
-        '<div class="card"><div class="ttl"><span class="sp">Lịch sử sửa đổi</span></div><div class="tbl"><table style="min-width:560px"><tr><th>Phiên bản</th><th>Ngày hiệu lực</th><th>Nội dung sửa đổi</th><th>Người sửa</th><th>Xác nhận</th><th>Lưu lúc</th></tr>' +
-          (st.versions.map(v => '<tr><td><b>' + esc(v.phien_ban) + '</b>' + (v.dang_dung ? ' <span class="tag ok">đang dùng</span>' : '') + '</td><td>' + esc(v.ngay_hieu_luc || '') + '</td><td>' + esc(v.noi_dung_sua_doi || '') + '</td><td>' + esc(v.nguoi_lap || '') + '</td><td>' + esc(v.nguoi_xac_nhan || '') + '</td><td>' + esc(ngayVN(v.tao_luc)) + '</td></tr>').join('') || '<tr><td colspan="6" class="hint">Chưa có phiên bản nào.</td></tr>') +
+        '<div class="card"><div class="ttl"><span class="sp">Lịch sử sửa đổi</span></div><div class="tbl"><table style="min-width:720px"><tr><th>Phiên bản</th><th>Trạng thái</th><th>Ngày hiệu lực</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>TP QC kiểm tra</th><th>GĐ SX phê duyệt</th></tr>' +
+          (st.versions.map(v => {
+            const tag = v.dang_dung ? '<span class="tag ok">đang dùng</span>' : v.trang_thai !== 'da_duyet' ? '<span class="tag ' + (v.trang_thai === 'tra_lai' ? 'ng' : 'w') + '">' + esc(TT[v.trang_thai]) + '</span>' : '<span class="hint">đã thay thế</span>';
+            const ai = (ten, luc) => ten ? esc(ten) + '<div class="hint" style="margin:0">' + esc(ngayVN(luc)) + '</div>' : '';
+            return '<tr><td><b>' + esc(v.phien_ban) + '</b></td><td>' + tag + '</td><td>' + esc(v.ngay_hieu_luc || '') + '</td><td>' + esc(v.noi_dung_sua_doi || '') + '</td>' +
+              '<td>' + ai(v.nguoi_lap, v.gui_luc || v.tao_luc) + '</td><td>' + ai(v.nguoi_kiem_tra, v.kiem_tra_luc) + '</td>' +
+              '<td>' + (v.nguoi_phe_duyet ? ai(v.nguoi_phe_duyet, v.phe_duyet_luc) : esc(v.nguoi_xac_nhan || '')) + '</td></tr>';
+          }).join('') || '<tr><td colspan="7" class="hint">Chưa có phiên bản nào.</td></tr>') +
         '</table></div></div>';
     }
 
@@ -186,7 +304,7 @@
       const f = k => (main.querySelector('[data-f="' + k + '"]') || {}).value || '';
       return {
         phien_ban: f('phien_ban').trim(), ngay_hieu_luc: f('ngay_hieu_luc'), so_mau: +f('so_mau') || 1, tan_suat: f('tan_suat'),
-        ma_bieu: f('ma_bieu'), nguoi_xac_nhan: f('nguoi_xac_nhan'), noi_dung_sua_doi: f('noi_dung_sua_doi'),
+        ma_bieu: f('ma_bieu'), noi_dung_sua_doi: f('noi_dung_sua_doi'),
         ban_ve_url: st.banVe || '', ban_ve_vi_tri: st.viTri,
         muc: st.rows.map(r => ({ muc_no: String(r.muc_no ?? '').trim(), hang_muc: r.hang_muc, kieu: r.kieu,
           danh_nghia: soVN(r.danh_nghia), dung_sai_tren: soVN(r.dung_sai_tren), dung_sai_duoi: soVN(r.dung_sai_duoi),
@@ -203,14 +321,14 @@
         if (error) throw new Error(error.message);
         st.banVe = sb.storage.from('ipqc-ban-ve').getPublicUrl(path).data.publicUrl;
         st.viTri = [];
-        const cur = st.versions.find(x => x.dang_dung);
-        if (cur) {
-          const { data, error: e2 } = await sb.rpc('ipqc_btk_ban_ve', { p_id_btk: cur.id, p_url: st.banVe, p_vi_tri: [] });
-          if (e2 || !data || !data.ok) throw new Error((e2 && e2.message) || (data && data.error));
-          cur.ban_ve_url = st.banVe; cur.ban_ve_vi_tri = [];
-        }
-        docBang(); ve(); msg(main.querySelector('[data-msg]'), 'Đã tải bản vẽ — chọn No rồi bấm lên bản vẽ để đặt vị trí đo.');
+        docBang(); ve(); msg(main.querySelector('[data-msg]'), 'Đã tải bản vẽ — chọn No rồi bấm lên bản vẽ để đặt vị trí đo, xong bấm gửi duyệt.');
       } catch (e) { msg(m, 'Không tải được bản vẽ: ' + e.message, 'err'); }
+    }
+    // Sau khi duyệt / huỷ / gửi: nạp lại mã đang mở rồi hiện thông báo.
+    async function xong(text, idXem) {
+      await taiDanhSach(); await chonMa(st.ma, idXem);
+      msg(main.querySelector('[data-msg]'), text);
+      baoDoi();
     }
 
     el.addEventListener('input', e => { if (e.target.matches('[data-tim]')) veDanhSach(); });
@@ -227,19 +345,24 @@
       const li = t.closest('[data-ma]');
       if (li) return chonMa(li.dataset.ma);
       if (t.closest('[data-mau]')) return taiFileMau();
-      if (t.closest('[data-nhap]')) return nhapExcel(() => { taiDanhSach(); if (st.ma) chonMa(st.ma); });
+      if (t.closest('[data-nhap]')) return nhapExcel(() => { taiDanhSach(); if (st.ma) chonMa(st.ma); baoDoi(); });
       if (t.closest('[data-xuat]')) return xuatExcel(st.ma, st.xem, st.rows);
+      const dy = t.closest('[data-duyet]'), hy = t.closest('[data-huy]');
+      if (dy || hy) {
+        const id = st.xem.id;
+        (dy || hy).disabled = true;
+        try {
+          const kq = dy ? await duyet('btk', id, dy.dataset.duyet) : await huy('btk', id);
+          if (kq) return xong(kq, hy ? null : id);
+        } catch (er) { msg(main.querySelector('[data-msg]'), er.message, 'err'); }
+        (dy || hy).disabled = false;
+        return;
+      }
+      if (!q.soan) return;
       if (t.closest('[data-them]')) { docBang(); const mx = Math.max(0, ...st.rows.map(r => +r.muc_no || 0)); st.rows.push({ muc_no: mx + 1, kieu: 'so', tan_suat: '2h/lần' }); return ve(); }
       const x = t.closest('[data-xoa]');
       if (x) { docBang(); st.rows.splice(+x.dataset.xoa, 1); return ve(); }
       if (t.closest('[data-xoavt]')) { st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)); docBang(); return ve(); }
-      if (t.closest('[data-luuvt]')) {
-        const cur = st.versions.find(v => v.dang_dung);
-        const { data, error } = await sb.rpc('ipqc_btk_ban_ve', { p_id_btk: cur.id, p_url: st.banVe, p_vi_tri: st.viTri });
-        if (error || !data || !data.ok) return msg(main.querySelector('[data-msg]'), (error && error.message) || data.error, 'err');
-        cur.ban_ve_vi_tri = st.viTri;
-        return msg(main.querySelector('[data-msg]'), 'Đã lưu bản vẽ + vị trí đo vào phiên bản ' + cur.phien_ban + '.');
-      }
       const img = t.closest('[data-bv] img');
       if (img) {
         const r = img.getBoundingClientRect();
@@ -258,13 +381,13 @@
           const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: st.ma, p_data: pl, p_nguoi: await nguoi() });
           if (error) throw new Error(error.message);
           if (!data || !data.ok) throw new Error((data && data.error) || 'Không lưu được');
-          await taiDanhSach(); await chonMa(st.ma);
-          msg(main.querySelector('[data-msg]'), 'Đã lưu phiên bản ' + data.phien_ban + ' — có hiệu lực ngay cho IPQC.');
+          await xong('Đã gửi duyệt phiên bản ' + data.phien_ban + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.', data.id);
         } catch (er) { msg(m, er.message, 'err'); btn.disabled = false; }
       }
     });
     el.addEventListener('keydown', e => { const li = e.target.closest('[data-ma]'); if (li && e.key === 'Enter') chonMa(li.dataset.ma); });
     await taiDanhSach();
+    return { mo: ma => chonMa(ma) };
   }
 
   // ── Excel: file mẫu / xuất / nhập ──────────────────────────────────────
@@ -295,7 +418,7 @@
     if (typeof XLSX === 'undefined') return alert('Chưa tải được thư viện Excel — tải lại trang.');
     const aoa = [COT].concat(rows.map(r => [ma, b ? b.phien_ban : '', b ? b.ngay_hieu_luc : '', b ? b.so_mau : 1, r.muc_no, r.hang_muc,
       r.kieu === 'so' ? 'Đo số' : 'OK-NG', r.danh_nghia ?? '', r.dung_sai_tren ?? '', r.dung_sai_duoi ?? '', r.tieu_chuan || '', r.dung_cu || '', r.tan_suat || '',
-      b ? b.noi_dung_sua_doi || '' : '', b ? b.nguoi_xac_nhan || '' : '']));
+      b ? b.noi_dung_sua_doi || '' : '', b ? b.nguoi_phe_duyet || b.nguoi_xac_nhan || '' : '']));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Bang tuan kiem');
     XLSX.writeFile(wb, 'Bang_tuan_kiem_' + ma.replace(/[^\w-]/g, '_') + (b ? '_' + b.phien_ban : '') + '.xlsx');
   }
@@ -314,7 +437,7 @@
       const col = (...keys) => H.findIndex(h => keys.some(k => h.startsWith(k)));
       const C = { ma: col('mã sp'), pb: col('phiên bản'), nhl: col('ngày hiệu lực'), sm: col('số mẫu'), no: H.findIndex(h => h === 'no' || h === 'stt'),
         hm: col('hạng mục'), kieu: col('kiểu'), dn: col('danh nghĩa'), tren: col('dung sai +'), duoi: H.findIndex(h => /^dung sai\s*[−-]/.test(h)),
-        tc: col('tiêu chuẩn'), dc: col('dụng cụ'), ts: col('tần suất'), nd: col('nội dung'), xn: col('người xác nhận') };
+        tc: col('tiêu chuẩn'), dc: col('dụng cụ'), ts: col('tần suất'), nd: col('nội dung') };
       const { data: prods } = await sb.from('master_products').select('ma_sp');
       const coMa = new Set((prods || []).map(p => p.ma_sp));
       const nhom = {};
@@ -327,7 +450,6 @@
         if (!d.ngay_hieu_luc && v(C.nhl) !== '') { const x = v(C.nhl); d.ngay_hieu_luc = x instanceof Date ? new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : String(x).trim().replace(/^(\d{2})[./](\d{2})[./](\d{4})$/, '$3-$2-$1'); }
         if (!d.so_mau && v(C.sm) !== '') d.so_mau = +v(C.sm);
         if (!d.noi_dung_sua_doi && v(C.nd) !== '') d.noi_dung_sua_doi = String(v(C.nd));
-        if (!d.nguoi_xac_nhan && v(C.xn) !== '') d.nguoi_xac_nhan = String(v(C.xn));
         const kieuTxt = norm(v(C.kieu));
         const dn = soVN(v(C.dn));
         const kieu = /ok/.test(kieuTxt) ? 'okng' : /số|so|đo/.test(kieuTxt) ? 'so' : (dn !== '' && isFinite(+dn) ? 'so' : 'okng');
@@ -360,7 +482,7 @@
       ds.map(g => '<tr><td class="mono"><b>' + esc(g.ma) + '</b></td><td>' + esc(g.data.phien_ban || '(tự tăng)') + '</td><td>' + g.data.muc.length + ' (' + g.data.muc.filter(m => m.kieu === 'so').length + ' đo số)</td>' +
         '<td>' + (g.loi.length ? '<span class="tag ng">Lỗi</span> ' + g.loi.map(esc).join('<br>') : '<span class="tag ok">Hợp lệ</span>') + '</td></tr>').join('') + '</table>' +
       '<div data-kq></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" type="button" data-dong>Đóng</button>' +
-      '<button class="btn p" type="button" data-ghi' + (ok.length ? '' : ' disabled') + '>Lưu ' + ok.length + ' mã hợp lệ</button></div></div></div>';
+      '<button class="btn p" type="button" data-ghi' + (ok.length ? '' : ' disabled') + '>Gửi duyệt ' + ok.length + ' mã hợp lệ</button></div></div></div>';
     document.body.appendChild(mask);
     mask.querySelector('[data-dong]').onclick = () => mask.remove();
     mask.querySelector('[data-ghi]').onclick = async ev => {
@@ -368,7 +490,7 @@
       const ten = await nguoi(), kq = [];
       for (const g of ok) {
         const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: g.ma, p_data: g.data, p_nguoi: ten });
-        kq.push(g.ma + ': ' + (error ? error.message : data && data.ok ? 'đã lưu phiên bản ' + data.phien_ban : (data && data.error) || 'lỗi'));
+        kq.push(g.ma + ': ' + (error ? error.message : data && data.ok ? 'đã gửi duyệt phiên bản ' + data.phien_ban : (data && data.error) || 'lỗi'));
       }
       mask.querySelector('[data-kq]').innerHTML = '<div class="msg ok">' + kq.map(esc).join('<br>') + '</div>';
       if (xong) xong();
@@ -571,5 +693,5 @@
     return { taiLai: async () => { st.cache = {}; await ve(); taiCanhBao(); } };
   }
 
-  window.IpqcBtkQc = { mountEditor, mountChart };
+  window.IpqcBtkQc = { mountEditor, mountChart, quyen, khoiDuyet, duyet, huy, TT };
 })();
