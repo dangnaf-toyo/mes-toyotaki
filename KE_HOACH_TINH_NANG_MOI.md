@@ -125,6 +125,14 @@
 4. Ngưỡng: máy dừng bao lâu thì tính là điểm thay đổi; tăng tần suất IPQC trong bao nhiêu giờ sau thay đổi?
 5. Bật luôn luật "chưa IPQC OK không đóng được sự cố" (hiện chỉ cảnh báo)?
 
+## Nhóm 8 — Quản lý công việc (giao việc, tiến độ, góp ý) — ngoài sản xuất
+
+> Chốt thiết kế 2026-10-24. Thiết kế chi tiết + hợp đồng dữ liệu: `docs/CONG_VIEC_THIET_KE.md`. Bản phác thảo giao diện: https://claude.ai/artifact/W2r8mEGqkByfMHSNECh32r.
+> Người dùng: Ban giám đốc, quản lý các cấp, nhân viên gián tiếp, trưởng ca. Mọi thông báo trong MES (không Zalo). Mọi người xem + bình luận/góp ý được mọi việc (trừ việc "hạn chế"); chỉ người giao/người làm đổi trạng thái. Cấp trên (người giao) duyệt khi hoàn thành. Ưu tiên = Quan trọng × Gấp → 4 nhóm: 1 Làm ngay / 2 Lên kế hoạch / 3 Xử lý nhanh / 4 Làm sau; còn ≤ 2 ngày tự thành Gấp.
+
+- [x] **Giai đoạn 1 (T161)** (2026-10-24 — STAGING: code + DB staging; chưa lên prod) — bảng `cv_*` + RPC + RLS (`supabase/migration_phase_T161_quan_ly_cong_viec.sql`); trang `cong-viec-cua-toi.html` (việc của tôi), `cong-viec.html` (Kanban ⇄ ma trận ưu tiên), `cong-viec-chi-tiet.html` (bước, ảnh/tệp, trao đổi & góp ý, duyệt/trả lại/gia hạn, lịch sử), `cong-viec-giao.html` (giao/sửa việc, điền sẵn từ NCP/sự cố/vấn đề khuôn), `thong-bao.html` + chuông trên navbar; dùng chung `shared/cong-viec.js` / `shared/cong-viec.css`.
+- [ ] **Giai đoạn 2** — trang Dự án (giai đoạn, tiến độ thực tế/kế hoạch, thảo luận & góp ý, "tiếp thu → tạo việc"); Tổng quan Ban giám đốc (thanh trạng thái theo bộ phận, ma trận ưu tiên, tiến độ dự án theo tuần, việc xong mỗi tuần đúng/trễ hạn, việc quá hạn); việc định kỳ tự sinh (tuần/tháng/quý).
+
 ## Thứ tự ưu tiên nghiệp vụ đề xuất
 
 1. Chuẩn QR/lot/pallet, quy trình tách-gộp và vị trí WIP.

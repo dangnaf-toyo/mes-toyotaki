@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Việc của tôi — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="shared/cong-viec.css">
+<!--
+  cong-viec-cua-toi.html?tab=lam|giao|duyet&loc=qua_han|hom_nay|cho_duyet|gia_han — Việc của tôi (T161).
+  Trang vào mặc định của module Quản lý công việc. Thiết kế: docs/CONG_VIEC_THIET_KE.md.
+  - Hộp "Việc hôm nay": quá hạn, đến hạn hôm nay, chờ tôi duyệt, xin gia hạn chờ tôi trả lời (bấm để lọc).
+  - Tab Tôi làm (người làm chính + phối hợp) / Tôi giao / Chờ tôi duyệt.
+  - Nhóm Quá hạn / Hôm nay / Tuần này / Sau + "Đã xong 7 ngày qua" (thu gọn).
+  Đọc từ view cv_cong_viec_v (RLS tự lọc). Tự tải lại mỗi 60 giây + khi quay lại tab.
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#475569;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.24);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 80px}
+button,input,select{font-family:inherit}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:8px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.today{background:var(--bg-panel);border:1px solid #93C5FD;border-radius:8px;padding:10px 12px;box-shadow:var(--shadow-sm)}
+.today-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.today-h b{color:#1D4ED8;font-size:13px}
+.today-h span{font-size:11px;color:var(--text-muted)}
+.today-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.stat{display:flex;align-items:center;gap:10px;min-height:48px;border:1px solid var(--border);background:var(--bg-sunken);border-radius:8px;padding:6px 12px;cursor:pointer;text-align:left;color:var(--text)}
+.stat:hover{border-color:var(--accent)}
+.stat .n{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;line-height:1;min-width:28px}
+.stat .l{font-size:12px;font-weight:600;color:var(--text-muted);line-height:1.25}
+.stat.red .n{color:var(--alarm-fg)}
+.stat.red.has{background:var(--alarm-bg);border-color:#FCA5A5}
+.stat.amber .n{color:var(--warn-fg)}
+.stat.amber.has{background:var(--warn-bg);border-color:#FCD34D}
+.stat.blue .n{color:var(--accent)}
+.stat.zero .n{color:var(--text-dim)}
+.stat.on{outline:2px solid var(--accent);outline-offset:1px}
+
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:4px}
+.tab{min-height:40px;border:none;border-radius:6px;background:transparent;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer}
+.tab:hover{background:var(--bg-sunken);color:var(--text)}
+.tab.on{background:var(--accent);color:#fff}
+.tab .c{font-family:'JetBrains Mono',monospace;font-weight:700;margin-left:2px}
+.tab.duyet:not(.on).has{background:var(--warn-bg);color:#92400E}
+
+.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.toolbar .lbl{font-size:12px;color:var(--text-muted);font-weight:600;margin-right:2px}
+.chip{border:1px solid var(--border-strong);background:#fff;border-radius:100px;padding:0 12px;min-height:32px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;gap:6px}
+.chip .dot{width:9px;height:9px;border-radius:50%}
+.chip.on{background:var(--text);color:#fff;border-color:var(--text)}
+.chip.loc{background:#EFF6FF;border-color:#93C5FD;color:#1D4ED8}
+.toolbar .upd{margin-left:auto;font-size:11px;color:var(--text-dim)}
+
+.grp{display:flex;flex-direction:column;gap:6px}
+.grp-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 2px 0;color:var(--text-muted)}
+.grp-h.late{color:var(--alarm-fg)}
+.grp-h.now{color:var(--warn-fg)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+.cards .cv-card{height:100%}
+.ph-tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:#EDE9FE;color:#5B21B6;white-space:nowrap}
+details.done-grp{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:0 12px}
+details.done-grp summary{cursor:pointer;min-height:40px;display:flex;align-items:center;font-size:12px;font-weight:700;color:var(--run-fg);letter-spacing:.04em;text-transform:uppercase;list-style:none}
+details.done-grp summary::-webkit-details-marker{display:none}
+details.done-grp summary::before{content:'▸';margin-right:8px;color:var(--text-dim)}
+details.done-grp[open] summary::before{content:'▾'}
+details.done-grp .cards{padding-bottom:12px}
+.empty-box{background:var(--bg-panel);border:1px dashed var(--border-strong);border-radius:8px;padding:28px 16px;text-align:center;color:var(--text-muted)}
+.empty-box a{color:var(--accent);font-weight:600}
+.loading{padding:24px;text-align:center;color:var(--text-dim)}
+.errbox{background:var(--alarm-bg);border:1px solid #FCA5A5;color:var(--alarm-fg);border-radius:8px;padding:12px 14px;font-weight:600}
+
+.fab{display:none;position:fixed;right:16px;bottom:20px;z-index:300;background:var(--accent);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 20px;border-radius:28px;box-shadow:var(--shadow-lg)}
+.fab:hover{background:var(--accent-hover)}
+
+@media (max-width:820px){
+  header{padding:8px 12px;gap:8px}
+  header .header-divider{display:none}
+  header .cv-modtabs{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .header-clock .time{font-size:15px}
+  .today-g{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cards{grid-template-columns:1fr}
+  .fab{display:inline-flex}
+  .toolbar .upd{width:100%;margin-left:0}
+}
+@media (max-width:420px){
+  .tab{font-size:12px;padding:0 2px}
+  .stat{padding:6px 8px;gap:8px}
+  .stat .n{font-size:19px;min-width:22px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Việc của tôi</div>
+    </div>
+    <div class="header-divider"></div>
+    <nav class="cv-modtabs" data-cv-tabs="cua-toi" aria-label="Quản lý công việc"></nav>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <section class="today" aria-label="Việc hôm nay">
+    <div class="today-h"><b id="todayTitle">Việc hôm nay</b><span>bấm vào số để lọc</span></div>
+    <div class="today-g">
+      <button type="button" class="stat red" data-loc="qua_han"><span class="n" id="nQuaHan">–</span><span class="l">Quá hạn</span></button>
+      <button type="button" class="stat amber" data-loc="hom_nay"><span class="n" id="nHomNay">–</span><span class="l">Đến hạn hôm nay</span></button>
+      <button type="button" class="stat blue" data-loc="cho_duyet"><span class="n" id="nChoDuyet">–</span><span class="l">Chờ tôi duyệt</span></button>
+      <button type="button" class="stat blue" data-loc="gia_han"><span class="n" id="nGiaHan">–</span><span class="l">Xin gia hạn chờ tôi trả lời</span></button>
+    </div>
+  </section>
+
+  <nav class="tabs" id="tabs" aria-label="Danh sách việc">
+    <button type="button" class="tab" data-tab="lam">Tôi làm <span class="c" id="cLam"></span></button>
+    <button type="button" class="tab" data-tab="giao">Tôi giao <span class="c" id="cGiao"></span></button>
+    <button type="button" class="tab duyet" data-tab="duyet">Chờ tôi duyệt <span class="c" id="cDuyet"></span></button>
+  </nav>
+
+  <div class="toolbar" id="toolbar">
+    <span class="lbl">Ưu tiên:</span>
+    <button type="button" class="chip on" data-nhom="0">Tất cả</button>
+    <button type="button" class="chip" data-nhom="1"><span class="dot" style="background:#B91C1C"></span>1 · Làm ngay</button>
+    <button type="button" class="chip" data-nhom="2"><span class="dot" style="background:#0F5FA5"></span>2 · Lên kế hoạch</button>
+    <button type="button" class="chip" data-nhom="3"><span class="dot" style="background:#B45309"></span>3 · Xử lý nhanh</button>
+    <button type="button" class="chip" data-nhom="4"><span class="dot" style="background:#64748B"></span>4 · Làm sau</button>
+    <span id="locChip"></span>
+    <span class="upd" id="upd"></span>
+  </div>
+
+  <main id="list"><div class="loading">Đang tải…</div></main>
+</div>
+
+<a class="fab" href="cong-viec-giao.html">+ Giao việc</a>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="shared/cong-viec.js"></script>
+<script>
+const TABS = ['lam', 'giao', 'duyet'];
+const LOCS = {
+  qua_han:   { tab: 'lam',   label: 'Quá hạn' },
+  hom_nay:   { tab: 'lam',   label: 'Đến hạn hôm nay' },
+  cho_duyet: { tab: 'duyet', label: 'Chờ tôi duyệt' },
+  gia_han:   { tab: 'duyet', label: 'Xin gia hạn chờ tôi trả lời' },
+};
+const qs = new URLSearchParams(location.search);
+let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'lam';
+let loc = LOCS[qs.get('loc')] ? qs.get('loc') : '';
+if (loc) tab = LOCS[loc].tab;
+let nhomLoc = 0;
+let me = null;
+let data = { lam: [], giao: [], duyet: [] };
+let daTai = false, dangTai = false;
+
+const DANG_CHAY = ['moi', 'dang_lam', 'cho_duyet'];
+
+function startHeaderClock(){
+  function tick(){
+    const d = new Date();
+    document.getElementById('hdrClockDate').textContent = d.toLocaleDateString('vi-VN');
+    document.getElementById('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// Ngày (theo giờ VN) dạng YYYY-MM-DD cộng thêm n ngày.
+function congNgay(ymd, n){
+  const d = new Date(ymd + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function cuoiTuan(){
+  const hom = CV.ngayVN();
+  const thu = new Date(hom + 'T00:00:00Z').getUTCDay(); // 0 = CN
+  return congNgay(hom, thu === 0 ? 0 : 7 - thu);
+}
+
+function dangChay(r){ return DANG_CHAY.includes(r.trang_thai); }
+function laQuaHan(r){ return dangChay(r) && (r.qua_han === true || new Date(r.han) < new Date()); }
+function laHomNay(r){ return dangChay(r) && !laQuaHan(r) && CV.ngayVN(r.han) === CV.ngayVN(); }
+function giaHanCho(r){ return !!r.gia_han_den && (r.trang_thai === 'moi' || r.trang_thai === 'dang_lam'); }
+
+async function taiDuLieu(){
+  const tuan = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 19) + 'Z';
+  // Việc còn chạy + việc hoàn thành trong 7 ngày qua; bỏ việc đã huỷ.
+  const loc7 = 'trang_thai.in.(moi,dang_lam,cho_duyet),and(trang_thai.eq.hoan_thanh,hoan_thanh_luc.gte."' + tuan + '")';
+  const [a, b, c] = await Promise.all([
+    CV.viecQuery().eq('nguoi_lam', me.id).or(loc7).limit(1000),
+    CV.viecQuery().contains('phoi_hop', [me.id]).or(loc7).limit(1000),
+    CV.viecQuery().eq('nguoi_giao', me.id).or(loc7).limit(1000),
+  ]);
+  const loi = a.error || b.error || c.error;
+  if (loi) throw new Error(loi.message || String(loi));
+  const lam = new Map();
+  (a.data || []).forEach(r => lam.set(r.id, Object.assign({}, r, { _phoiHop: false })));
+  (b.data || []).forEach(r => { if (!lam.has(r.id)) lam.set(r.id, Object.assign({}, r, { _phoiHop: r.nguoi_lam !== me.id })); });
+  const giao = c.data || [];
+  data = {
+    lam: Array.from(lam.values()),
+    giao,
+    duyet: giao.filter(r => r.trang_thai === 'cho_duyet' || giaHanCho(r)),
+  };
+}
+
+function demHomNay(){
+  const counts = {
+    qua_han: data.lam.filter(laQuaHan).length,
+    hom_nay: data.lam.filter(laHomNay).length,
+    cho_duyet: data.giao.filter(r => r.trang_thai === 'cho_duyet').length,
+    gia_han: data.giao.filter(giaHanCho).length,
+  };
+  const ids = { qua_han: 'nQuaHan', hom_nay: 'nHomNay', cho_duyet: 'nChoDuyet', gia_han: 'nGiaHan' };
+  Object.keys(ids).forEach(k => {
+    const el = document.getElementById(ids[k]);
+    el.textContent = counts[k];
+    const btn = el.closest('.stat');
+    btn.classList.toggle('has', counts[k] > 0);
+    btn.classList.toggle('zero', counts[k] === 0);
+    btn.classList.toggle('on', loc === k);
+    btn.setAttribute('aria-pressed', loc === k ? 'true' : 'false');
+  });
+}
+
+function locTheoChip(rows){
+  if (loc === 'qua_han') rows = rows.filter(laQuaHan);
+  else if (loc === 'hom_nay') rows = rows.filter(laHomNay);
+  else if (loc === 'cho_duyet') rows = rows.filter(r => r.trang_thai === 'cho_duyet');
+  else if (loc === 'gia_han') rows = rows.filter(giaHanCho);
+  if (nhomLoc) rows = rows.filter(r => Number(r.nhom) === nhomLoc);
+  return rows;
+}
+
+function sapXep(rows){
+  return rows.slice().sort((x, y) => (x.nhom - y.nhom) || (new Date(x.han) - new Date(y.han)) || (x.id - y.id));
+}
+
+function theCua(r){
+  let html = CV.theViec(r, { trangThai: true });
+  if (r._phoiHop) html = html.replace('<div class="cv-card-top">', '<div class="cv-card-top"><span class="ph-tag" title="Bạn là người phối hợp">Phối hợp</span>');
+  return html;
+}
+
+function veDanhSach(){
+  const el = document.getElementById('list');
+  const all = data[tab];
+  const rows = locTheoChip(all);
+  const chay = rows.filter(dangChay);
+  const xong = rows.filter(r => r.trang_thai === 'hoan_thanh')
+    .sort((x, y) => new Date(y.hoan_thanh_luc || 0) - new Date(x.hoan_thanh_luc || 0));
+  const hom = CV.ngayVN(), cuoi = cuoiTuan();
+  const nhom = { qua: [], hom: [], tuan: [], sau: [] };
+  chay.forEach(r => {
+    if (laQuaHan(r)) nhom.qua.push(r);
+    else {
+      const d = CV.ngayVN(r.han);
+      if (d === hom) nhom.hom.push(r);
+      else if (d <= cuoi) nhom.tuan.push(r);
+      else nhom.sau.push(r);
+    }
+  });
+  const khoi = [
+    ['qua', 'Quá hạn', 'late'], ['hom', 'Hôm nay', 'now'], ['tuan', 'Tuần này', ''], ['sau', 'Sau', ''],
+  ];
+  let html = khoi.filter(k => nhom[k[0]].length).map(k =>
+    `<section class="grp"><div class="grp-h ${k[2]}">${k[1]} · ${nhom[k[0]].length}</div>
+      <div class="cards">${sapXep(nhom[k[0]]).map(theCua).join('')}</div></section>`).join('');
+  if (!chay.length) {
+    const tb = loc || nhomLoc ? 'Không có việc nào khớp bộ lọc.'
+      : tab === 'lam' ? 'Bạn không có việc nào đang làm.'
+      : tab === 'giao' ? 'Bạn chưa giao việc nào đang chạy. <a href="cong-viec-giao.html">+ Giao việc mới</a>'
+      : 'Không có việc nào chờ bạn duyệt.';
+    html = `<div class="empty-box">${tb}</div>`;
+  }
+  if (xong.length && tab !== 'duyet') {
+    html += `<details class="done-grp" id="doneGrp"${sessionStorageGet('cvDoneOpen') ? ' open' : ''}><summary>Đã xong 7 ngày qua · ${xong.length}</summary>
+      <div class="cards">${xong.map(theCua).join('')}</div></details>`;
+  }
+  el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px">' + html + '</div>';
+  const d = document.getElementById('doneGrp');
+  if (d) d.addEventListener('toggle', () => sessionStorageSet('cvDoneOpen', d.open ? '1' : ''));
+}
+function sessionStorageGet(k){ try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+function sessionStorageSet(k, v){ try { sessionStorage.setItem(k, v); } catch (e) {} }
+
+function veTab(){
+  document.querySelectorAll('#tabs .tab').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === tab);
+    b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
+  });
+  const dang = arr => arr.filter(dangChay).length;
+  document.getElementById('cLam').textContent = daTai ? '(' + dang(data.lam) + ')' : '';
+  document.getElementById('cGiao').textContent = daTai ? '(' + dang(data.giao) + ')' : '';
+  document.getElementById('cDuyet').textContent = daTai ? '(' + data.duyet.length + ')' : '';
+  document.querySelector('#tabs .tab.duyet').classList.toggle('has', data.duyet.length > 0);
+  document.querySelectorAll('#toolbar [data-nhom]').forEach(b => b.classList.toggle('on', Number(b.dataset.nhom) === nhomLoc));
+  document.getElementById('locChip').innerHTML = loc
+    ? `<button type="button" class="chip loc" id="boLoc" title="Bỏ lọc">Đang lọc: ${CV.esc(LOCS[loc].label)} ✕</button>` : '';
+}
+
+function capNhatUrl(){
+  const p = new URLSearchParams();
+  if (tab !== 'lam') p.set('tab', tab);
+  if (loc) p.set('loc', loc);
+  const s = p.toString();
+  history.replaceState(null, '', location.pathname + (s ? '?' + s : ''));
+}
+
+function veLai(){
+  veTab();
+  demHomNay();
+  if (daTai) veDanhSach();
+}
+
+async function taiLai(){
+  if (dangTai) return;
+  dangTai = true;
+  try {
+    await taiDuLieu();
+    daTai = true;
+    veLai();
+    document.getElementById('upd').textContent = 'Cập nhật ' + new Date().toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    if (!daTai) document.getElementById('list').innerHTML = `<div class="errbox">Không tải được danh sách việc: ${CV.esc(e.message)}</div>`;
+    else CV.toast('Không tải lại được: ' + e.message, 'err');
+  } finally {
+    dangTai = false;
+  }
+}
+
+async function init(){
+  startHeaderClock();
+  await MesAuth.requireAuth();
+  me = await CV.me();
+  if (!me) return;
+  if (me.ten) document.getElementById('todayTitle').textContent = 'Việc hôm nay của ' + me.ten;
+
+  document.getElementById('tabs').addEventListener('click', e => {
+    const b = e.target.closest('[data-tab]');
+    if (!b) return;
+    tab = b.dataset.tab;
+    if (loc && LOCS[loc].tab !== tab) loc = '';
+    capNhatUrl(); veLai();
+  });
+  document.querySelector('.today-g').addEventListener('click', e => {
+    const b = e.target.closest('[data-loc]');
+    if (!b) return;
+    const k = b.dataset.loc;
+    if (loc === k) loc = '';
+    else { loc = k; tab = LOCS[k].tab; }
+    capNhatUrl(); veLai();
+  });
+  document.getElementById('toolbar').addEventListener('click', e => {
+    if (e.target.closest('#boLoc')) { loc = ''; capNhatUrl(); return veLai(); }
+    const b = e.target.closest('[data-nhom]');
+    if (!b) return;
+    const n = Number(b.dataset.nhom);
+    nhomLoc = nhomLoc === n ? 0 : n;
+    veLai();
+  });
+
+  veTab();
+  await taiLai();
+  setInterval(() => { if (document.visibilityState === 'visible') taiLai(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') taiLai(); });
+  window.addEventListener('focus', taiLai);
+}
+init();
+</script>
+</body>
+</html>
