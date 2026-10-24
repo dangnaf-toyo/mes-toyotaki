@@ -8,11 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
-<link rel="stylesheet" href="shared/cong-viec.css?v=t161">
+<link rel="stylesheet" href="shared/cong-viec.css?v=t162">
 <!--
-  thong-bao.html?tab=tat-ca|chua-doc|xu-ly — Thông báo của module Quản lý công việc (T161).
+  thong-bao.html?tab=tat-ca|chua-doc|xu-ly&nguon=cong_viec|phe_duyet — Thông báo của module Quản lý công việc (T161),
+  thêm thông báo từ các luồng phê duyệt KHSX / BD khuôn / IPQC / NCP / tài liệu (T162, cột nguon + lien_ket).
   Đọc cv_thong_bao (RLS: chỉ dòng của mình), 100 dòng/lần, tải thêm khi cuộn tới cuối.
-  Bấm 1 thông báo → cv_doc_thong_bao([id]) rồi mở cong-viec-chi-tiet.html?id=<cong_viec_id>.
+  Bấm 1 thông báo → cv_doc_thong_bao([id]) rồi mở CV.lienKetThongBao(tb) (lien_ket, hoặc cong-viec-chi-tiet.html?id=…).
   "Đọc hết" → cv_doc_thong_bao(null). Thiết kế: docs/CONG_VIEC_THIET_KE.md §2.
 -->
 <style>
@@ -38,7 +39,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .today-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .today-h b{color:#1D4ED8;font-size:13px}
 .today-h span{font-size:11px;color:var(--text-muted)}
-.today-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.today-g{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
 .stat{display:flex;align-items:center;gap:10px;min-height:48px;border:1px solid var(--border);background:var(--bg-sunken);border-radius:8px;padding:6px 12px;text-decoration:none;color:var(--text)}
 .stat:hover{border-color:var(--accent)}
 .stat .n{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;line-height:1;min-width:28px}
@@ -55,6 +56,11 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .tab:hover{background:var(--bg-sunken);color:var(--text)}
 .tab.on{background:var(--accent);color:#fff}
 .tab .c{font-family:'JetBrains Mono',monospace;font-weight:700;margin-left:2px}
+.srcf{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.srcf .lb{font-size:11px;font-weight:600;color:var(--text-muted);margin-right:2px}
+.srcf button{min-height:32px;padding:0 12px;border-radius:16px;border:1px solid var(--border-strong);background:var(--bg-panel);font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer}
+.srcf button:hover{border-color:var(--accent);color:var(--text)}
+.srcf button.on{background:#E0ECF8;border-color:var(--accent);color:var(--accent)}
 
 .list{display:flex;flex-direction:column;gap:6px;max-width:980px;width:100%;margin:0 auto}
 .day-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);padding:8px 2px 0}
@@ -68,6 +74,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .nt .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .nt .top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .nt .type{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:#F1F5F9;color:#475569;white-space:nowrap}
+.nt .src{font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px;background:#fff;color:var(--text-muted);border:1px solid var(--border-strong);white-space:nowrap}
 .nt .act{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;background:#FFFBEB;color:#92400E;border:1px solid #FCD34D;white-space:nowrap}
 .nt .time{font-size:11px;color:var(--text-muted);margin-left:auto;font-family:'JetBrains Mono',monospace}
 .nt .txt{font-size:13px;line-height:1.45;color:var(--text);overflow-wrap:anywhere}
@@ -84,7 +91,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
   header .cv-modtabs{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .header-clock{display:none}
   #docHet{margin-left:auto}
-  .today-g{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .today-g{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:420px){
   .tab{font-size:12px;padding:0 2px}
@@ -117,6 +124,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
       <a class="stat amber" href="cong-viec-cua-toi.html?loc=hom_nay"><span class="n" id="nHomNay">–</span><span class="l">Đến hạn hôm nay</span></a>
       <a class="stat blue" href="cong-viec-cua-toi.html?tab=duyet&amp;loc=cho_duyet"><span class="n" id="nChoDuyet">–</span><span class="l">Chờ tôi duyệt</span></a>
       <a class="stat blue" href="cong-viec-cua-toi.html?tab=duyet&amp;loc=gia_han"><span class="n" id="nGiaHan">–</span><span class="l">Xin gia hạn chờ tôi trả lời</span></a>
+      <a class="stat amber" id="statPheDuyet" href="thong-bao.html?tab=xu_ly&amp;nguon=phe_duyet" style="display:none" title="KH sản xuất, BD khuôn, IPQC, NCP, tài liệu đang chờ bạn duyệt"><span class="n" id="nPheDuyet">–</span><span class="l">Chờ tôi phê duyệt</span></a>
     </div>
   </section>
 
@@ -126,15 +134,22 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
     <button type="button" class="tab" data-tab="xu-ly">Cần tôi xử lý <span class="c" id="cXuLy"></span></button>
   </nav>
 
+  <div class="srcf" id="srcf" role="group" aria-label="Lọc theo nguồn">
+    <span class="lb">Nguồn:</span>
+    <button type="button" data-nguon="tat-ca">Tất cả</button>
+    <button type="button" data-nguon="cong-viec">Công việc</button>
+    <button type="button" data-nguon="phe-duyet">Phê duyệt</button>
+  </div>
+
   <main class="list" id="list"><div class="more">Đang tải…</div></main>
   <div class="list"><div class="more" id="more"></div></div>
-  <div class="foot">Bấm vào thông báo để mở công việc. Số đỏ trên chuông = số thông báo chưa đọc.</div>
+  <div class="foot">Bấm vào thông báo để mở công việc hoặc phiếu cần duyệt. Số đỏ trên chuông = số thông báo chưa đọc.</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/cong-viec.js?v=t161"></script>
+<script src="shared/cong-viec.js?v=t162"></script>
 <script>
 const TABS = ['tat-ca', 'chua-doc', 'xu-ly'];
 const TRANG = 100;
@@ -145,9 +160,15 @@ const MAU_LOAI = {
   hoan_thanh: ['#D1FAE5', '#065F46'], mo_lai: ['#DBEAFE', '#1D4ED8'],
   tra_lai: ['#FEE2E2', '#B91C1C'], qua_han: ['#B91C1C', '#FFFFFF'], nhac_viec: ['#FEE2E2', '#B91C1C'],
   gop_y: ['#EDE9FE', '#5B21B6'], nhac_ten: ['#DCFCE7', '#166534'],
+  can_duyet: ['#FBBF24', '#451A03'], da_duyet: ['#D1FAE5', '#065F46'], tu_choi_duyet: ['#FEE2E2', '#B91C1C'],
 };
+const NGUONS = ['tat-ca', 'cong-viec', 'phe-duyet'];
 const qs = new URLSearchParams(location.search);
-let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'tat-ca';
+// Nhận cả dạng gạch dưới (xu_ly, phe_duyet) từ link ở trang khác.
+const thamSo = k => String(qs.get(k) || '').replace(/_/g, '-');
+let tab = TABS.includes(thamSo('tab')) ? thamSo('tab') : 'tat-ca';
+let nguon = NGUONS.includes(thamSo('nguon')) ? thamSo('nguon') : 'tat-ca';
+let coNguon = true; // false nếu DB chưa có cột nguon (chưa chạy migration T162) → ẩn bộ lọc nguồn.
 let me = null;
 let rows = [], hetDuLieu = false, dangTai = false, phien = 0;
 
@@ -190,15 +211,32 @@ async function veHomNay(){
     });
   } catch (e) { /* hộp phụ — lỗi thì giữ dấu "–" */ }
 }
+// T162: yêu cầu phê duyệt từ các module khác — lỗi/thiếu cột thì ẩn ô.
+async function demPheDuyet(){
+  const n = await CV.demChoPheDuyet(me.id);
+  const el = document.getElementById('nPheDuyet'), o = document.getElementById('statPheDuyet');
+  if (n == null) { o.style.display = 'none'; return; }
+  el.textContent = n;
+  o.style.display = '';
+  o.classList.toggle('has', n > 0);
+  o.classList.toggle('zero', n === 0);
+}
 
 // ---- Danh sách thông báo ----
 function locTab(q){
   if (tab === 'chua-doc') q = q.eq('da_doc', false);
   else if (tab === 'xu-ly') q = q.eq('can_xu_ly', true).eq('da_xu_ly', false);
+  return locNguon(q);
+}
+// "Phê duyệt" = mọi nguồn khác 'cong_viec'; dòng cũ (nguon null) tính là công việc.
+function locNguon(q){
+  if (!coNguon) return q;
+  if (nguon === 'cong-viec') q = q.or('nguon.is.null,nguon.eq.cong_viec');
+  else if (nguon === 'phe-duyet') q = q.neq('nguon', 'cong_viec');
   return q;
 }
 async function demTab(){
-  const dem = f => f(sb.from('cv_thong_bao').select('id', { count: 'exact', head: true }).eq('nguoi_nhan', me.id));
+  const dem = f => f(locNguon(sb.from('cv_thong_bao').select('id', { count: 'exact', head: true }).eq('nguoi_nhan', me.id)));
   const [t, u, x] = await Promise.all([
     dem(q => q),
     dem(q => q.eq('da_doc', false)),
@@ -225,10 +263,11 @@ function dongHtml(n){
   const mau = MAU_LOAI[n.loai];
   const nhan = CV.LOAI_THONG_BAO[n.loai] || n.loai;
   const canXuLy = n.can_xu_ly && !n.da_xu_ly;
+  const tenNguon = CV.NGUON_THONG_BAO[n.nguon || 'cong_viec'] || n.nguon;
   return `<button type="button" class="nt ${n.da_doc ? 'read' : 'unread'}" data-id="${n.id}">
     <span class="dot" aria-hidden="true"></span>
     <span class="body">
-      <span class="top"><span class="type"${mau ? ` style="background:${mau[0]};color:${mau[1]}"` : ''}>${CV.esc(nhan)}</span>${canXuLy ? '<span class="act">Cần xử lý</span>' : ''}<span class="time">${CV.fmtNgayGio(n.created_at).slice(6)}</span></span>
+      <span class="top"><span class="type"${mau ? ` style="background:${mau[0]};color:${mau[1]}"` : ''}>${CV.esc(nhan)}</span><span class="src">${CV.esc(tenNguon)}</span>${canXuLy ? '<span class="act">Cần xử lý</span>' : ''}<span class="time">${CV.fmtNgayGio(n.created_at).slice(6)}</span></span>
       <span class="txt">${CV.esc(n.noi_dung)}</span>
     </span>
     ${n.da_doc ? '' : '<span class="sr-only">Chưa đọc</span>'}
@@ -238,7 +277,8 @@ function dongHtml(n){
 function veDanhSach(){
   const el = document.getElementById('list');
   if (!rows.length) {
-    el.innerHTML = `<div class="empty-box">${tab === 'chua-doc' ? 'Bạn đã đọc hết thông báo.' : tab === 'xu-ly' ? 'Không có thông báo nào cần bạn xử lý.' : 'Chưa có thông báo nào.'}</div>`;
+    const loai = nguon === 'phe-duyet' ? ' về phê duyệt' : nguon === 'cong-viec' ? ' về công việc' : '';
+    el.innerHTML = `<div class="empty-box">${tab === 'chua-doc' ? (loai ? 'Không có thông báo chưa đọc' + loai + '.' : 'Bạn đã đọc hết thông báo.') : tab === 'xu-ly' ? 'Không có thông báo' + (loai || ' nào') + ' cần bạn xử lý.' : 'Chưa có thông báo nào' + loai + '.'}</div>`;
   } else {
     let html = '', ngay = '';
     rows.forEach(n => {
@@ -256,13 +296,18 @@ function veDanhSach(){
 // tu = vị trí bắt đầu; soDong = số dòng cần lấy. Lấy lại cả đoạn đã hiện khi tự tải lại.
 async function taiTrang(tu, soDong){
   const p = phien;
+  // select('*'): vẫn chạy khi DB chưa có cột nguon/lien_ket (T162).
   const { data, error } = await locTab(sb.from('cv_thong_bao')
-    .select('id,loai,cong_viec_id,du_an_id,noi_dung,can_xu_ly,da_xu_ly,da_doc,created_at')
+    .select('*')
     .eq('nguoi_nhan', me.id))
     .order('created_at', { ascending: false }).order('id', { ascending: false })
     .range(tu, tu + soDong - 1);
   if (p !== phien) return false; // đã đổi tab trong lúc chờ
-  if (error) throw new Error(error.message || String(error));
+  if (error) {
+    // DB chưa có cột nguon → bỏ bộ lọc nguồn rồi lấy lại.
+    if (coNguon && nguon !== 'tat-ca' && /nguon/.test(error.message || '')) { coNguon = false; veNguon(); capNhatUrl(); return taiTrang(tu, soDong); }
+    throw new Error(error.message || String(error));
+  }
   const d = data || [];
   rows = tu === 0 ? d : rows.concat(d.filter(n => !rows.some(r => r.id === n.id)));
   hetDuLieu = d.length < soDong;
@@ -295,17 +340,41 @@ function veTab(){
     b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
   });
 }
+function veNguon(){
+  document.getElementById('srcf').style.display = coNguon ? '' : 'none';
+  document.querySelectorAll('#srcf [data-nguon]').forEach(b => {
+    const on = b.dataset.nguon === (coNguon ? nguon : 'tat-ca');
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+function capNhatUrl(){
+  const p = new URLSearchParams();
+  if (tab !== 'tat-ca') p.set('tab', tab);
+  if (coNguon && nguon !== 'tat-ca') p.set('nguon', nguon);
+  history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+}
+function doiBoLoc(){
+  capNhatUrl();
+  veTab(); veNguon();
+  phien++; dangTai = false; rows = []; hetDuLieu = false;
+  document.getElementById('list').innerHTML = '<div class="more">Đang tải…</div>';
+  document.getElementById('more').innerHTML = '';
+  taiLai(false);
+}
 
 async function moThongBao(id){
   const n = rows.find(r => r.id === id);
   if (!n) return;
   if (!n.da_doc) {
     try { await CV.rpc('cv_doc_thong_bao', { p_ids: [id] }); n.da_doc = true; }
-    catch (e) { if (!n.cong_viec_id) { CV.toast(e.message, 'err'); return; } }
+    catch (e) { if (!CV.lienKetThongBao(n)) { CV.toast(e.message, 'err'); return; } }
     capNhatChuong();
   }
-  if (n.cong_viec_id) { location.href = 'cong-viec-chi-tiet.html?id=' + encodeURIComponent(n.cong_viec_id); return; }
-  // Thông báo dự án: trang Dự án làm ở giai đoạn 2 — tạm chỉ đánh đã đọc.
+  // lien_ket (nguồn phê duyệt) mở nguyên văn — không ghép thêm gì; việc thì mở trang chi tiết việc.
+  const url = CV.lienKetThongBao(n);
+  if (url) { location.href = url; return; }
+  // Không có liên kết (vd thông báo dự án — trang Dự án làm ở giai đoạn 2): chỉ đánh đã đọc.
   if (tab === 'chua-doc') rows = rows.filter(r => r.id !== id);
   veDanhSach();
   demTab().catch(() => {});
@@ -332,19 +401,19 @@ async function init(){
   me = await CV.me();
   if (!me) return;
   if (me.ten) document.getElementById('todayTitle').textContent = 'Việc hôm nay của ' + me.ten;
-  veTab();
+  veTab(); veNguon();
 
   document.getElementById('tabs').addEventListener('click', e => {
     const b = e.target.closest('[data-tab]');
     if (!b || b.dataset.tab === tab) return;
     tab = b.dataset.tab;
-    const p = new URLSearchParams(); if (tab !== 'tat-ca') p.set('tab', tab);
-    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
-    veTab();
-    phien++; dangTai = false; rows = []; hetDuLieu = false;
-    document.getElementById('list').innerHTML = '<div class="more">Đang tải…</div>';
-    document.getElementById('more').innerHTML = '';
-    taiLai(false);
+    doiBoLoc();
+  });
+  document.getElementById('srcf').addEventListener('click', e => {
+    const b = e.target.closest('[data-nguon]');
+    if (!b || b.dataset.nguon === nguon) return;
+    nguon = b.dataset.nguon;
+    doiBoLoc();
   });
   document.getElementById('list').addEventListener('click', e => {
     const b = e.target.closest('.nt[data-id]');
@@ -359,8 +428,8 @@ async function init(){
       .observe(document.getElementById('more'));
   }
 
-  await Promise.all([taiLai(false), veHomNay()]);
-  const tuLam = () => { if (document.visibilityState === 'visible') { taiLai(true); veHomNay(); } };
+  await Promise.all([taiLai(false), veHomNay(), demPheDuyet()]);
+  const tuLam = () => { if (document.visibilityState === 'visible') { taiLai(true); veHomNay(); demPheDuyet(); } };
   setInterval(tuLam, 60000);
   document.addEventListener('visibilitychange', tuLam);
 }
