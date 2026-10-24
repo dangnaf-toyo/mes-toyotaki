@@ -94,7 +94,7 @@
   /** Gọi RPC; lỗi thì ném Error với câu tiếng Việt từ server. */
   async function rpc(name, args) {
     const { data, error } = await sb.rpc(name, args || {});
-    if (error) throw new Error(error.message || String(error));
+    if (error) throw new Error(loiDeHieu(error.message || String(error)));
     return data;
   }
 
@@ -189,7 +189,17 @@
     });
   }
 
+  /** Đổi lỗi kỹ thuật (quyền, phiên, mạng) thành câu dễ hiểu; lỗi nghiệp vụ tiếng Việt giữ nguyên. */
+  function loiDeHieu(msg) {
+    const s = String(msg || '');
+    if (/permission denied|42501|JWT|not authenticated/i.test(s)) return 'Phiên đăng nhập đã hết hạn hoặc bạn chưa có quyền. Hãy tải lại trang hoặc đăng nhập lại.';
+    if (/Failed to fetch|NetworkError|Load failed|network/i.test(s)) return 'Mất kết nối mạng. Kiểm tra mạng rồi thử lại.';
+    if (/does not exist|PGRST\d+|schema cache/i.test(s)) return 'Hệ thống đang cập nhật, chức năng này chưa sẵn sàng. Hãy thử lại sau.';
+    return s;
+  }
+
   function toast(msg, kind) {
+    if (kind === 'err') msg = String(msg || '').replace(/(permission denied|JWT|Failed to fetch|NetworkError|Load failed|does not exist|PGRST\d+)[^\n]*/i, m => loiDeHieu(m));
     let el = document.getElementById('cvToast');
     if (!el) { el = document.createElement('div'); el.id = 'cvToast'; el.className = 'cv-toast'; document.body.appendChild(el); }
     el.textContent = msg;
@@ -203,7 +213,7 @@
 
   window.CV = {
     TRANG_THAI, THU_TU_TRANG_THAI, NHOM, LOAI_BL, TRANG_THAI_GOP_Y, LIEN_KET, LOAI_THONG_BAO,
-    nhomCua, esc, fmtNgay, fmtNgayGio, fmtDayDu, ngayVN, hanText, rpc, nguoi, tenNguoi, viTat, boPhan, me,
+    nhomCua, esc, loiDeHieu, fmtNgay, fmtNgayGio, fmtDayDu, ngayVN, hanText, rpc, nguoi, tenNguoi, viTat, boPhan, me,
     badgeNhom, badgeTrangThai, lienKetText, theViec, veTabModule, toast, viecQuery,
   };
   // Trang vừa đánh dấu thông báo đã đọc → chuông trên navbar đếm lại ngay.
