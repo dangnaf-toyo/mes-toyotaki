@@ -47,8 +47,13 @@
       '.bq td{padding:4px 5px;border-top:1px solid #EEF1F5;vertical-align:middle}' +
       '.bq .tbl{overflow-x:auto}.bq .mono{font-family:"JetBrains Mono",monospace}' +
       '.bq .no{display:inline-flex;width:22px;height:22px;border-radius:50%;background:#DC2626;color:#fff;font-weight:800;align-items:center;justify-content:center;font-size:11.5px}' +
-      '.bq .bv{position:relative;border:1.5px dashed #B8C1CC;border-radius:10px;background:#F8FAFC;min-height:180px;display:flex;align-items:center;justify-content:center;color:#64748B;text-align:center;overflow:hidden}' +
-      '.bq .bv img{display:block;max-width:100%;cursor:crosshair}.bq .bv .b{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:#DC2626;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;pointer-events:none}' +
+      '.bq .bv{position:relative;border:1.5px dashed #B8C1CC;border-radius:10px;background:#F8FAFC;min-height:180px;max-height:70vh;overflow:auto;color:#64748B;text-align:center}' +
+      '.bq .bv.trong{display:flex;align-items:center;justify-content:center}.bq .bv .bvz{position:relative;margin:0 auto}' +
+      '.bq .bv img{display:block;width:100%;height:auto;cursor:crosshair;user-select:none}.bq .bv.xem img{cursor:grab}.bq .bv.keo img{cursor:grabbing}' +
+      '.bq .bvtool{display:flex;align-items:center;gap:4px;margin-left:auto;text-transform:none;letter-spacing:0}.bq .bvtool .btn{padding:3px 9px;font-size:13px;min-width:30px}' +
+      '.bq .bvtool .z{font-family:"JetBrains Mono",monospace;font-size:12px;min-width:46px;text-align:center;color:#475569}' +
+      '.bq .bvcard:fullscreen{background:#fff;padding:14px;overflow:auto;display:flex;flex-direction:column}.bq .bvcard:fullscreen .bv{max-height:none;flex:1}' +
+      '.bq .bv .b{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:#DC2626;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff;pointer-events:none}' +
       '.bq .msg{padding:8px 10px;border-radius:8px;font-weight:600;font-size:12.5px;margin-top:8px}.bq .msg.err{background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5}.bq .msg.ok{background:#ECFDF5;color:#047857;border:1px solid #A7E3C6}' +
       '.bq .hint{font-size:11.5px;color:#64748B;margin-top:6px}' +
       '.bq .ro td input,.bq .ro td select{background:#F8FAFC}' +
@@ -143,7 +148,7 @@
     css();
     const q = await quyen();
     const baoDoi = () => { if (opts && opts.doiTrangThai) opts.doiTrangThai(); };
-    const st = { products: [], btk: {}, nhap: {}, ma: null, versions: [], xem: null, rows: [], viTri: [], banVe: null, noDat: 1, sua: false };
+    const st = { products: [], btk: {}, nhap: {}, ma: null, versions: [], xem: null, rows: [], viTri: [], banVe: null, noDat: 1, sua: false, zoom: 1 };
     el.innerHTML = '<div class="bq"><div class="side"><div class="ttl"><span class="sp">Bảng tuần kiểm theo mã</span></div>' +
       '<input type="search" data-tim placeholder="Tìm mã SP…" aria-label="Tìm mã SP" style="width:100%;margin-bottom:8px"><div data-list></div></div>' +
       '<div class="main" data-main><div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để xem / soạn bảng tuần kiểm kích thước. ' +
@@ -176,7 +181,7 @@
 
     // idXem: phiên bản muốn mở; mặc định bản nháp đang chờ duyệt (nếu có), không thì bản đang dùng.
     async function chonMa(ma, idXem) {
-      st.ma = ma; veDanhSach();
+      st.ma = ma; st.zoom = 1; veDanhSach();
       // Danh sách có thanh trượt riêng: bấm mã ở cuối danh sách thì đưa nội dung bên phải lên đầu màn hình.
       const top = main.getBoundingClientRect().top;
       if (top < 0 || top > window.innerHeight * 0.5) main.scrollIntoView({ block: 'start' });
@@ -215,7 +220,38 @@
       return { cur, doi, bo: Object.values(goc).filter(g => !nos.has(+g.muc_no)) };
     }
 
+    // Vẽ lại toàn bộ, giữ nguyên vị trí cuộn của bản vẽ đang phóng to.
     function ve() {
+      const bvCu = main.querySelector('[data-bv]');
+      const cuon = bvCu ? [bvCu.scrollLeft, bvCu.scrollTop] : null;
+      veNoiDung();
+      const bv = main.querySelector('[data-bv]'), im = bv && bv.querySelector('img');
+      if (!cuon || !im) return;
+      const traLai = () => { bv.scrollLeft = cuon[0]; bv.scrollTop = cuon[1]; };
+      if (im.complete) traLai(); else im.addEventListener('load', traLai, { once: true });
+    }
+    const diemHtml = v => '<span class="b" style="left:' + v.x + '%;top:' + v.y + '%">' + esc(v.no) + '</span>';
+    // Chỉ vẽ lại các số vị trí đo (không vẽ lại cả trang → không thoát chế độ toàn màn hình).
+    function veDiem() {
+      const w = main.querySelector('[data-bv] .bvz');
+      if (!w) return ve();
+      w.querySelectorAll('.b').forEach(x => x.remove());
+      w.insertAdjacentHTML('beforeend', st.viTri.map(diemHtml).join(''));
+      const sel = main.querySelector('[data-nodat]'); if (sel) sel.value = String(st.noDat);
+    }
+    // Phóng to / thu nhỏ, giữ nguyên điểm (cx, cy) của khung (mặc định giữa khung).
+    function datZoom(z, cx, cy) {
+      const bv = main.querySelector('[data-bv]'), w = bv && bv.querySelector('.bvz');
+      if (!w) return;
+      z = Math.min(8, Math.max(1, Math.round(z * 100) / 100));
+      if (cx == null) { cx = bv.clientWidth / 2; cy = bv.clientHeight / 2; }
+      const rx = (bv.scrollLeft + cx) / w.offsetWidth, ry = (bv.scrollTop + cy) / w.offsetHeight;
+      st.zoom = z; w.style.width = z * 100 + '%';
+      bv.scrollLeft = rx * w.offsetWidth - cx; bv.scrollTop = ry * w.offsetHeight - cy;
+      const pct = main.querySelector('[data-zpct]'); if (pct) pct.textContent = Math.round(z * 100) + '%';
+    }
+
+    function veNoiDung() {
       const p = st.products.find(x => x.ma_sp === st.ma) || {};
       const b = st.xem;
       const cur = st.versions.find(x => x.dang_dung) || null;
@@ -255,13 +291,18 @@
           : q.soan ? 'Đang ở chế độ xem. Bấm "Chỉnh sửa" để sửa rồi gửi duyệt.'
           : q.uid ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn bảng tuần kiểm.' : 'Đăng nhập để soạn / duyệt.') + '</div><div data-msg></div></div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">' +
-          '<div class="card" style="flex:1 1 280px;min-width:0"><div class="ttl"><span class="sp">Bản vẽ vị trí đo</span></div>' +
-            '<div class="bv" data-bv>' + (st.banVe ? '<img src="' + esc(st.banVe) + '" alt="Bản vẽ">' + st.viTri.map(v => '<span class="b" style="left:' + v.x + '%;top:' + v.y + '%">' + esc(v.no) + '</span>').join('')
+          '<div class="card bvcard" style="flex:1 1 280px;min-width:0"><div class="ttl"><span class="sp">Bản vẽ vị trí đo</span>' +
+            (st.banVe ? '<div class="bvtool"><button class="btn sm" type="button" data-zoom="-" title="Thu nhỏ" aria-label="Thu nhỏ">−</button>' +
+              '<span class="z" data-zpct>' + Math.round(st.zoom * 100) + '%</span><button class="btn sm" type="button" data-zoom="+" title="Phóng to" aria-label="Phóng to">+</button>' +
+              '<button class="btn sm" type="button" data-zoom="1" title="Vừa khung">Vừa khung</button>' +
+              '<button class="btn sm" type="button" data-zoom="fs" title="Toàn màn hình (Esc để thoát)" aria-label="Toàn màn hình">⛶</button></div>' : '') + '</div>' +
+            '<div class="bv' + (st.banVe ? (sua ? '' : ' xem') : ' trong') + '" data-bv>' + (st.banVe ? '<div class="bvz" style="width:' + st.zoom * 100 + '%"><img src="' + esc(st.banVe) + '" alt="Bản vẽ" draggable="false">' + st.viTri.map(diemHtml).join('') + '</div>'
               : '<div>[Chưa có bản vẽ]' + (sua ? '<br><span style="font-size:11.5px">Tải ảnh PNG / JPG bản vẽ có các vị trí đo</span>' : '') + '</div>') + '</div>' +
             (sua ? '<div class="flds" style="margin-top:8px"><label class="btn sm" style="display:inline-flex">Tải ảnh bản vẽ<input type="file" accept="image/png,image/jpeg,image/webp" data-up hidden></label>' +
               (st.banVe ? '<label class="f">Đặt vị trí cho No<select data-nodat>' + st.rows.map(r => '<option' + (+r.muc_no === +st.noDat ? ' selected' : '') + '>' + esc(r.muc_no) + '</option>').join('') + '</select></label>' +
                 '<button class="btn sm d" type="button" data-xoavt>Xoá vị trí</button>' : '') + '</div>' +
-              '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' : '') + 'Bản vẽ + vị trí đo đi cùng khi gửi duyệt.</div>' : '') + '</div>' +
+              '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' : '') + 'Bản vẽ + vị trí đo đi cùng khi gửi duyệt.</div>' : '') +
+            (st.banVe ? '<div class="hint">Phóng to bằng nút + / − hoặc giữ Ctrl + lăn chuột trên bản vẽ; kéo chuột để di chuyển bản vẽ.</div>' : '') + '</div>' +
           '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span>' + (sua ? '<button class="btn sm" type="button" data-them>+ Thêm hạng mục</button>' : '') + '</div>' +
             '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>Dung sai +</th><th>Dung sai −</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th><th></th></tr>' +
             st.rows.map((r, i) => {
@@ -353,6 +394,16 @@
       if (t.closest('[data-mau]')) return taiFileMau();
       if (t.closest('[data-nhap]')) return nhapExcel(() => { taiDanhSach(); if (st.ma) chonMa(st.ma); baoDoi(); });
       if (t.closest('[data-xuat]')) return xuatExcel(st.ma, st.xem, st.rows);
+      const zb = t.closest('[data-zoom]');
+      if (zb) {
+        const k = zb.dataset.zoom;
+        if (k === 'fs') {
+          const c = zb.closest('.bvcard');
+          if (document.fullscreenElement) return document.exitFullscreen();
+          return c.requestFullscreen && c.requestFullscreen().catch(() => {});
+        }
+        return datZoom(k === '+' ? st.zoom * 1.25 : k === '-' ? st.zoom / 1.25 : 1);
+      }
       const dy = t.closest('[data-duyet]'), hy = t.closest('[data-huy]');
       if (dy || hy) {
         const id = st.xem.id;
@@ -371,15 +422,16 @@
       if (t.closest('[data-them]')) { docBang(); const mx = Math.max(0, ...st.rows.map(r => +r.muc_no || 0)); st.rows.push({ muc_no: mx + 1, kieu: 'so', tan_suat: '2h/lần' }); return ve(); }
       const x = t.closest('[data-xoa]');
       if (x) { docBang(); st.rows.splice(+x.dataset.xoa, 1); return ve(); }
-      if (t.closest('[data-xoavt]')) { st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)); docBang(); return ve(); }
+      if (t.closest('[data-xoavt]')) { st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)); return veDiem(); }
       const img = t.closest('[data-bv] img');
+      if (img && st.vuaKeo) { st.vuaKeo = false; return; }   // vừa kéo để di chuyển, không đặt điểm
       if (img) {
         const r = img.getBoundingClientRect();
         const x2 = +((e.clientX - r.left) / r.width * 100).toFixed(1), y2 = +((e.clientY - r.top) / r.height * 100).toFixed(1);
         st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)).concat([{ no: +st.noDat, x: x2, y: y2 }]);
         const nos = st.rows.map(r2 => +r2.muc_no).filter(Boolean).sort((a, b) => a - b);
         const k = nos.indexOf(+st.noDat); if (k >= 0 && k < nos.length - 1) st.noDat = nos[k + 1];
-        docBang(); return ve();
+        return veDiem();
       }
       if (t.closest('[data-luu]')) {
         const m = main.querySelector('[data-msg]');
@@ -395,6 +447,27 @@
       }
     });
     el.addEventListener('keydown', e => { const li = e.target.closest('[data-ma]'); if (li && e.key === 'Enter') chonMa(li.dataset.ma); });
+    el.addEventListener('wheel', e => {
+      const bv = e.target.closest('[data-bv]');
+      if (!bv || !e.ctrlKey || !bv.querySelector('.bvz')) return;
+      e.preventDefault();
+      const r = bv.getBoundingClientRect();
+      datZoom(st.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    // Kéo chuột trên bản vẽ để di chuyển (di > 4px mới tính là kéo, để bấm đặt điểm vẫn chạy).
+    el.addEventListener('pointerdown', e => {
+      const bv = e.target.closest('[data-bv]');
+      if (!bv || !bv.querySelector('.bvz') || e.pointerType !== 'mouse' || e.button !== 0) return;
+      const x0 = e.clientX, y0 = e.clientY, l0 = bv.scrollLeft, t0 = bv.scrollTop;
+      st.vuaKeo = false;
+      const mv = ev => {
+        if (!st.vuaKeo && Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 5) return;
+        st.vuaKeo = true; bv.classList.add('keo');
+        bv.scrollLeft = l0 - (ev.clientX - x0); bv.scrollTop = t0 - (ev.clientY - y0);
+      };
+      const up = () => { bv.classList.remove('keo'); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    });
     await taiDanhSach();
     return { mo: ma => chonMa(ma) };
   }
