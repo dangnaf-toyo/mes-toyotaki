@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
-<link rel="stylesheet" href="shared/cong-viec.css?v=t162">
+<link rel="stylesheet" href="shared/cong-viec.css?v=t165">
 <!--
   cong-viec-chi-tiet.html?id=<id> — Chi tiết một việc (T161, module Quản lý công việc).
   Thiết kế + hợp đồng dữ liệu: docs/CONG_VIEC_THIET_KE.md.
@@ -86,6 +86,14 @@ textarea.inp{resize:vertical;line-height:1.45}
 /* Các bước */
 .pbar{flex:1 1 120px;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;min-width:80px}
 .pbar span{display:block;height:6px;background:var(--run-fg)}
+/* T165: việc con */
+.cons{display:flex;flex-direction:column;gap:6px}
+.con-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text);background:#fff}
+.con-row:hover{background:var(--bg-sunken);color:var(--text)}
+.con-row.done{opacity:.6}.con-row .t{flex:1 1 220px;font-weight:600;min-width:0;word-break:break-word}
+.con-row .who{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.con-row .due{font-size:12px;font-weight:600;white-space:nowrap;color:var(--text-muted)}.con-row .due.late{color:var(--alarm-fg)}.con-row .due.soon{color:var(--warn-fg)}
+.cha-link{font-size:13px;background:#EEF2FF;color:#3730A3;border-radius:6px;padding:6px 10px}.cha-link a{font-weight:700}
 .buoc{display:flex;align-items:center;gap:10px;min-height:40px;border-bottom:1px solid #F1F5F9}
 .buoc:last-child{border-bottom:none}
 .buoc label{display:flex;align-items:center;gap:10px;flex:1;min-height:40px;cursor:pointer;font-size:14px;min-width:0}
@@ -201,6 +209,7 @@ textarea.inp{resize:vertical;line-height:1.45}
   <div class="cols" id="main" hidden>
     <div class="col-l">
       <section class="panel" style="gap:12px" id="pDau"></section>
+      <section class="panel" id="pCon" hidden></section>
 
       <section class="panel" id="pBuoc">
         <div class="hrow"><span class="h">Các bước cần làm</span><span class="small" id="buocDem"></span><div class="pbar" id="buocBar"><span style="width:0"></span></div></div>
@@ -253,7 +262,7 @@ textarea.inp{resize:vertical;line-height:1.45}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/cong-viec.js?v=t163"></script>
+<script src="shared/cong-viec.js?v=t165"></script>
 <script>
 const esc = s => CV.esc(s);
 const QS = new URLSearchParams(location.search);
@@ -262,6 +271,7 @@ const BUCKET = 'cong-viec';
 const MAX_TEP = 25 * 1024 * 1024;
 
 let ME = null, V = null, BUOC = [], TEP = [], BL = [], DT = {}, LS = [], NGUOI = [];
+let CON = [], CHA = null;        // T165: việc con của việc này / việc lớn chứa việc này
 let loaiViet = 'binh_luan';
 const nhac = new Map();          // tên đã chèn "@Tên" → user_id
 let dangXuLy = false;
@@ -345,13 +355,16 @@ async function taiLai(){
     return false;
   }
   if (!v) { khongXem(); return false; }
-  const [rb, rt, rbl, rls] = await Promise.all([
+  const [rb, rt, rbl, rls, rcon, rcha] = await Promise.all([
     sb.from('cv_checklist').select('*').eq('cong_viec_id', ID).order('thu_tu', { ascending: true }).order('id', { ascending: true }),
     sb.from('cv_tep').select('*').eq('cong_viec_id', ID).order('created_at', { ascending: true }),
     sb.from('cv_binh_luan').select('*').eq('cong_viec_id', ID).order('created_at', { ascending: true }).order('id', { ascending: true }),
     sb.from('cv_lich_su').select('*').eq('cong_viec_id', ID).order('created_at', { ascending: false }).order('id', { ascending: false }),
+    v.viec_cha_id ? Promise.resolve({ data: [] }) : CV.viecQuery().eq('viec_cha_id', ID).order('han', { ascending: true }),
+    v.viec_cha_id ? CV.viecQuery().eq('id', v.viec_cha_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  [rb, rt, rbl, rls].forEach(r => { if (r.error) CV.toast(r.error.message, 'err'); });
+  [rb, rt, rbl, rls, rcon, rcha].forEach(r => { if (r.error) CV.toast(r.error.message, 'err'); });
+  CON = rcon.data || []; CHA = rcha.data || null;
   V = v;
   BUOC = rb.data || []; TEP = rt.data || []; BL = rbl.data || []; LS = rls.data || [];
   DT = {};
@@ -386,6 +399,9 @@ function vai(){
     lam: !!id && id === V.nguoi_lam,
     giao, bgd, quanLy: giao || bgd,
     phoiHop: !!id && (V.phoi_hop || []).includes(id),
+    // T165: người nhận việc lớn chia việc con → sửa / nhắc / huỷ được việc con, không duyệt.
+    chia: !!id && !!CHA && CHA.nguoi_lam === id && !(giao || bgd),
+    taoCon: !!id && !V.viec_cha_id && (giao || bgd || id === V.nguoi_lam) && !xongHayHuy(),
   };
 }
 function nhanVai(uid){
@@ -397,7 +413,7 @@ function nhanVai(uid){
 const xongHayHuy = () => V.trang_thai === 'hoan_thanh' || V.trang_thai === 'huy';
 
 /* ---------- Vẽ ---------- */
-function veTatCa(){ veDau(); veBuoc(); veTep(); veBinhLuan(); veHanhDong(); veUuTien(); veThongTin(); veLichSu(); }
+function veTatCa(){ veDau(); veCon(); veBuoc(); veTep(); veBinhLuan(); veHanhDong(); veUuTien(); veThongTin(); veLichSu(); }
 
 function veDau(){
   const t = CV.TRANG_THAI[V.trang_thai] || CV.TRANG_THAI.moi;
@@ -426,15 +442,40 @@ function veDau(){
   document.getElementById('pDau').innerHTML = `
     <div class="crumb">${crumb.join('<span>›</span>')}</div>
     <div class="title-row"><h1>${esc(V.tieu_de)}</h1><span class="st-big" style="background:${t.bg};color:${t.fg}">${esc(t.label)}</span></div>
+    ${V.viec_cha_id ? `<div class="cha-link">↳ Thuộc việc lớn: <a href="cong-viec-chi-tiet.html?id=${V.viec_cha_id}">${esc(V.tieu_de_cha || ('#' + V.viec_cha_id))}</a>${CHA && !xongHayHuy() && new Date(V.han) > new Date(CHA.han) ? ' · <b>hạn việc con sau hạn việc lớn</b>' : ''}</div>` : ''}
     <div class="tags">${tags.join('')}</div>
     ${buoc}
     <div class="mo-ta${V.mo_ta ? '' : ' empty'}">${V.mo_ta ? esc(V.mo_ta) : 'Không có mô tả.'}</div>`;
 }
 
+function veCon(){
+  const r = vai();
+  const box = document.getElementById('pCon');
+  box.hidden = !!V.viec_cha_id || (!CON.length && !r.taoCon);
+  if (box.hidden) return;
+  const tong = CON.filter(c => c.trang_thai !== 'huy').length, xong = CON.filter(c => c.trang_thai === 'hoan_thanh').length;
+  const hanCha = new Date(V.han).getTime();
+  box.innerHTML = `<div class="hrow"><span class="h">Việc con</span>
+      <span class="small">${tong ? `<b style="color:#047857">${xong}/${tong} xong</b>` : '<span class="muted">Chưa có việc con</span>'}</span>
+      ${tong ? `<div class="pbar"><span style="width:${Math.round(xong / tong * 100)}%"></span></div>` : ''}
+      ${r.taoCon ? `<a class="btn out" style="margin-left:auto" href="cong-viec-giao.html?cha=${V.id}">+ Thêm việc con</a>` : ''}</div>
+    <div class="cons">${CON.map(c => {
+      const h = CV.hanText(c);
+      const dong = c.trang_thai === 'hoan_thanh' || c.trang_thai === 'huy';
+      const sauCha = !dong && new Date(c.han).getTime() > hanCha;
+      return `<a class="con-row${dong ? ' done' : ''}" href="cong-viec-chi-tiet.html?id=${c.id}">${CV.badgeTrangThai(c.trang_thai)}
+        <span class="t">${esc(c.tieu_de)}</span>
+        <span class="who">${esc(c.ten_nguoi_lam || '')}</span>
+        ${sauCha ? '<span class="chip warn" title="Hạn việc con sau hạn việc lớn">Sau hạn việc lớn</span>' : ''}
+        <span class="due ${h.cls}">${esc(h.text)}</span></a>`;
+    }).join('')}</div>
+    ${!CON.length ? '<div class="small muted">Chia việc lớn thành các việc nhỏ, mỗi việc có người làm và hạn riêng. Việc con do người giao việc lớn duyệt.</div>' : ''}`;
+}
+
 function veBuoc(){
   const r = vai();
   const canTick = r.lam && V.trang_thai === 'dang_lam';
-  const canSua = (r.lam || r.giao) && !xongHayHuy();
+  const canSua = (r.lam || r.giao || r.chia) && !xongHayHuy();
   const n = BUOC.length, x = BUOC.filter(b => b.xong).length;
   document.getElementById('buocDem').innerHTML = n ? `<b style="color:#047857">${x}/${n} xong</b>` : '<span class="muted">Chưa có bước nào</span>';
   const bar = document.getElementById('buocBar');
@@ -541,6 +582,7 @@ function veHanhDong(){
       parts.push('<div class="info">Bạn được giao việc này. Bấm nhận để bắt đầu; người giao sẽ thấy bạn đã nhận.</div>');
       parts.push('<button type="button" class="btn pri full" data-act="nhan">Nhận việc</button>');
     }
+    if (tt === 'dang_lam' && V.so_viec_con_mo > 0) parts.push(`<div class="info warn">Còn <b>${V.so_viec_con_mo}</b> việc con chưa xong. Vẫn báo hoàn thành được, nhưng nên chờ các việc con xong.</div>`);
     if (tt === 'dang_lam') {
       parts.push(`<button type="button" class="btn ok full" data-act="baoxong"${con > 0 ? ' disabled' : ''}>${V.can_duyet ? 'Báo hoàn thành → gửi người giao duyệt' : 'Báo hoàn thành'}</button>`);
       if (con > 0) parts.push(`<div class="small" style="color:#B45309">Còn ${con}/${n} bước chưa tick — tick đủ các bước ở mục "Các bước cần làm" mới báo hoàn thành được.</div>`);
@@ -571,12 +613,20 @@ function veHanhDong(){
     }
   }
 
+  if (r.chia) {
+    parts.push('<div class="sub">Phần người chia việc</div>');
+    parts.push(`<div class="info">Bạn chia việc con này từ việc lớn <b>${esc(CHA.tieu_de)}</b>. Người duyệt: <b>${tenGiao}</b>.</div>`);
+    if (tt === 'cho_duyet') parts.push(`<div class="info">${tenLam} đã báo hoàn thành — đang chờ ${tenGiao} duyệt.</div>`);
+    if ((tt === 'moi' || tt === 'dang_lam') && !r.lam) parts.push(`<button type="button" class="btn out full" data-act="nhac">${tt === 'moi' ? 'Nhắc nhận việc' : 'Nhắc việc'}</button>`);
+    if (!xongHayHuy()) parts.push(`<div class="btns"><a class="btn out" href="cong-viec-giao.html?id=${V.id}">Sửa việc</a><button type="button" class="btn bad" data-act="huy">Huỷ việc</button></div>`);
+  }
+
   if (tt === 'hoan_thanh' && (r.lam || r.quanLy)) {
     parts.splice(1, 0, `<div class="info good"><b>Đã hoàn thành</b>${V.hoan_thanh_luc ? ' lúc ' + esc(CV.fmtNgayGio(V.hoan_thanh_luc)) : ''}${V.dung_han === false ? ' — <b>trễ hạn</b>.' : V.dung_han === true ? ' — đúng hạn.' : '.'}</div>`);
   }
   if (tt === 'huy' && (r.lam || r.quanLy)) parts.splice(1, 0, '<div class="info">Việc đã bị huỷ. Không còn thao tác nào.</div>');
 
-  if (!r.lam && !r.quanLy) {
+  if (!r.lam && !r.quanLy && !r.chia) {
     parts.push(`<div class="info">Bạn ${r.phoiHop ? 'là <b>người phối hợp</b>' : 'không phải người giao hay người làm'}: xem toàn bộ, bình luận và góp ý được, nhưng không đổi được trạng thái, người làm, hạn hay mức ưu tiên.</div>`);
   }
   document.getElementById('pAct').innerHTML = parts.join('');
@@ -584,7 +634,7 @@ function veHanhDong(){
 
 function veUuTien(){
   const r = vai();
-  const can = r.quanLy && !xongHayHuy();
+  const can = (r.quanLy || r.chia) && !xongHayHuy();
   const g = CV.NHOM[V.nhom] || CV.NHOM[4];
   const nut = (field, val, label) => {
     const on = !!V[field] === val;
@@ -607,7 +657,11 @@ function veThongTin(){
   const doiHan = V.han_ban_dau && V.han && new Date(V.han_ban_dau).getTime() !== new Date(V.han).getTime();
   const LAP = { tuan: 'Hằng tuần', thang: 'Hằng tháng', quy: 'Hằng quý' };
   const rows = [
-    ['Người giao', esc(V.ten_nguoi_giao || '')],
+    ...(V.viec_cha_id
+      ? [['Việc lớn', `<a href="cong-viec-chi-tiet.html?id=${V.viec_cha_id}">${esc(V.tieu_de_cha || ('#' + V.viec_cha_id))}</a>`],
+         ['Giao bởi', esc(V.ten_nguoi_tao || V.ten_nguoi_giao || '')],
+         ['Người duyệt', esc(V.ten_nguoi_giao || '') + '<small>Người giao việc lớn</small>']]
+      : [['Người giao', esc(V.ten_nguoi_giao || '')]]),
     ['Người thực hiện', esc(V.ten_nguoi_lam || '')],
     ['Phối hợp', ph.length ? ph.map(esc).join(', ') : '<span class="muted" style="font-weight:500">Không có</span>'],
     ['Hạn hoàn thành', esc(CV.fmtDayDu(V.han)) + (doiHan ? `<small>Hạn ban đầu: ${esc(CV.fmtDayDu(V.han_ban_dau))}</small>` : '')],
@@ -651,6 +705,12 @@ async function chay(fn, okMsg){
   return ok;
 }
 
+// Đoạn cảnh báo khi việc lớn còn việc con chưa xong (chỉ cảnh báo, không chặn).
+function canhBaoCon(){
+  const mo = CON.filter(c => c.trang_thai !== 'hoan_thanh' && c.trang_thai !== 'huy');
+  return mo.length ? `<div class="info warn" style="margin-bottom:8px">Còn <b>${mo.length}</b> việc con chưa xong: ${mo.map(c => esc(c.tieu_de)).join(', ')}.</div>` : '';
+}
+
 async function xuLyAct(btn){
   const act = btn.dataset.act;
   const pid = { p_id: V.id };
@@ -659,7 +719,7 @@ async function xuLyAct(btn){
     case 'baoxong': {
       const v = await hopThoai({
         tieuDe: 'Báo hoàn thành',
-        html: V.can_duyet ? `Việc sẽ chuyển sang <b>Chờ duyệt</b> và báo cho ${esc(V.ten_nguoi_giao || 'người giao')}.` : 'Việc này không cần duyệt — sẽ <b>hoàn thành ngay</b>.',
+        html: canhBaoCon() + (V.can_duyet ? `Việc sẽ chuyển sang <b>Chờ duyệt</b> và báo cho ${esc(V.ten_nguoi_giao || 'người giao')}.` : 'Việc này không cần duyệt — sẽ <b>hoàn thành ngay</b>.'),
         truong: [{ key: 'gc', label: 'Ghi chú cho người giao (không bắt buộc)', placeholder: 'VD: đã xác nhận 3 ca liên tiếp, ảnh ở mục tệp' }],
         nut: 'Báo hoàn thành', kieu: 'ok',
       });
@@ -690,7 +750,7 @@ async function xuLyAct(btn){
     case 'gh-kdy': return chay(() => CV.rpc('cv_tra_loi_gia_han', { p_id: V.id, p_dong_y: false }), 'Đã từ chối gia hạn, giữ hạn cũ.');
     case 'nhac': return chay(() => CV.rpc('cv_nhac_viec', pid), 'Đã nhắc ' + (V.ten_nguoi_lam || 'người làm') + '.');
     case 'duyet': {
-      const v = await hopThoai({ tieuDe: 'Duyệt hoàn thành', html: `Xác nhận việc <b>"${esc(V.tieu_de)}"</b> đã hoàn thành. ${new Date(V.bao_xong_luc || Date.now()) <= new Date(V.han) ? 'Báo xong trước hạn — tính <b>đúng hạn</b>.' : 'Báo xong sau hạn — tính <b>trễ hạn</b>.'}`, nut: 'Duyệt hoàn thành', kieu: 'ok' });
+      const v = await hopThoai({ tieuDe: 'Duyệt hoàn thành', html: canhBaoCon() + `Xác nhận việc <b>"${esc(V.tieu_de)}"</b> đã hoàn thành. ${new Date(V.bao_xong_luc || Date.now()) <= new Date(V.han) ? 'Báo xong trước hạn — tính <b>đúng hạn</b>.' : 'Báo xong sau hạn — tính <b>trễ hạn</b>.'}`, nut: 'Duyệt hoàn thành', kieu: 'ok' });
       if (!v) return;
       return chay(() => CV.rpc('cv_duyet', pid), 'Đã duyệt hoàn thành.');
     }
@@ -715,7 +775,12 @@ async function xuLyAct(btn){
         nut: 'Huỷ việc', kieu: 'bad',
       });
       if (!v) return;
-      return chay(() => CV.rpc('cv_huy_viec', { p_id: V.id, p_ly_do: v.ly }), 'Đã huỷ việc.');
+      const conMo = CON.filter(c => c.trang_thai !== 'hoan_thanh' && c.trang_thai !== 'huy');
+      const ok = await chay(() => CV.rpc('cv_huy_viec', { p_id: V.id, p_ly_do: v.ly }), 'Đã huỷ việc.');
+      if (!ok || !conMo.length) return ok;
+      const v2 = await hopThoai({ tieuDe: 'Huỷ luôn việc con?', html: `Việc lớn đã huỷ. Còn <b>${conMo.length}</b> việc con đang mở: ${conMo.map(c => '<b>' + esc(c.tieu_de) + '</b>').join(', ')}. Huỷ luôn các việc này (cùng lý do)?`, nut: 'Huỷ luôn việc con', kieu: 'bad' });
+      if (!v2) return ok;
+      return chay(async () => { for (const c of conMo) await CV.rpc('cv_huy_viec', { p_id: c.id, p_ly_do: v.ly }); }, 'Đã huỷ ' + conMo.length + ' việc con.');
     }
     case 'ut': {
       const f = btn.dataset.f, val = btn.dataset.v === '1';

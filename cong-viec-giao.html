@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
-<link rel="stylesheet" href="shared/cong-viec.css?v=t162">
+<link rel="stylesheet" href="shared/cong-viec.css?v=t165">
 <!--
   cong-viec-giao.html — Giao việc mới / sửa việc (T161, module Quản lý công việc).
   Thiết kế + hợp đồng dữ liệu: docs/CONG_VIEC_THIET_KE.md.
@@ -17,6 +17,9 @@
   - Điền sẵn: ?tieu_de=&mo_ta=&bo_phan=&du_an=<id>&lk=<loai>:<ma> (lk lặp được) — dùng bởi nút
     "+ Giao việc" ở ncp-detail.html, su-co-duc.html, van-de-khuon.html.
   - Hạn gửi dạng ISO +07:00 (giờ Việt Nam) bất kể múi giờ của máy.
+  - T165 việc con: giao việc mới có mục "Chia việc con" (mỗi dòng: tên, người làm, hạn →
+    cv_tao_viec_con sau khi tạo việc lớn). ?cha=<id>: thêm 1 việc con vào việc lớn có sẵn
+    (người giao / người nhận việc lớn / BGĐ) → cv_tao_viec_con, xong quay về việc lớn.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#475569;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--info-bg:#EFF6FF;--info-border:#93C5FD;--info-fg:#1D4ED8;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -80,6 +83,21 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
 .step{display:flex;gap:6px;align-items:center}
 .step .no{width:22px;text-align:right;color:var(--text-dim);font-size:12px;font-weight:600;flex-shrink:0}
 .step .inp{min-height:36px;padding:6px 9px}
+
+/* Việc con (T165) */
+.cons{display:flex;flex-direction:column;gap:8px}
+.con{display:grid;grid-template-columns:22px minmax(0,2fr) minmax(0,1.5fr) 150px 112px 32px;gap:6px;align-items:start}
+.con .no{color:var(--text-dim);font-size:12px;font-weight:600;padding-top:11px;text-align:right}
+.con .inp{min-height:40px}
+.cha-band{background:#EEF2FF;border:1px solid #C7D2FE;color:#312E81;border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.5}
+.cha-band b{color:#1E1B4B}
+.han-sau{font-size:12px;color:var(--warn-fg);font-weight:600}
+@media (max-width:760px){
+  .con{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 32px}
+  .con [data-con=tieu_de]{grid-column:2/4}.con .pk{grid-column:2/4;grid-row:2}
+  .con [data-con=ngay]{grid-column:2/3;grid-row:3}.con [data-con=gio]{grid-column:3/4;grid-row:3}
+  .con .btn-ic{grid-column:4;grid-row:1}
+}
 
 /* Bộ chọn người */
 .pk{position:relative}
@@ -162,6 +180,7 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
 <template id="tplForm">
 <form class="cols" id="frm" novalidate autocomplete="off">
   <div class="col-main">
+    <div class="cha-band" id="chaBand" hidden></div>
 
     <section class="panel">
       <span class="h">1. Việc gì</span>
@@ -215,6 +234,7 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
             <button type="button" class="btn-ic" style="padding:0 8px;font-size:12px" data-them="3">+3 ngày</button>
             <button type="button" class="btn-ic" style="padding:0 8px;font-size:12px" data-them="7">+1 tuần</button>
           </div>
+          <span class="han-sau" id="hanSau" hidden></span>
           <span class="ferr" data-err="han"></span></div>
         <label class="f"><span>Bộ phận <span class="req" aria-hidden="true">*</span></span>
           <select class="inp" id="fBoPhan"></select>
@@ -234,8 +254,16 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
       <div class="auto-gap" id="autoGap">Hạn còn ≤ 2 ngày nên hệ thống tính việc này là Gấp.</div>
     </section>
 
+    <section class="panel" id="blkCon">
+      <span class="h">3. Chia việc con (không bắt buộc)</span>
+      <div class="small">Việc lớn gồm nhiều việc nhỏ, mỗi việc có <b>người làm và hạn riêng</b> — hiện trên bảng việc của từng người. Việc con do <b>bạn (người giao việc lớn)</b> duyệt. Người nhận việc lớn cũng tự thêm việc con được sau khi nhận.</div>
+      <div class="cons" id="cons"></div>
+      <div><button type="button" class="btn btn-out btn-sm" id="btnThemCon">+ Thêm việc con</button></div>
+      <span class="ferr" data-err="con"></span>
+    </section>
+
     <section class="panel">
-      <span class="h">3. Tuỳ chọn</span>
+      <span class="h" id="hTuyChon">4. Tuỳ chọn</span>
       <div class="g2">
         <div class="f">Lặp lại
           <div class="seg" id="segLap"><button type="button" data-v="khong">Không</button><button type="button" data-v="tuan">Hằng tuần</button><button type="button" data-v="thang">Hằng tháng</button><button type="button" data-v="quy">Hằng quý</button></div>
@@ -297,13 +325,14 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/cong-viec.js?v=t163"></script>
+<script src="shared/cong-viec.js?v=t165"></script>
 <script>
 (function () {
 const $ = id => document.getElementById(id);
 const esc = s => CV.esc(s);
 const qs = new URLSearchParams(location.search);
 const editId = /^\d+$/.test(qs.get('id') || '') ? Number(qs.get('id')) : null;
+const chaId = !editId && /^\d+$/.test(qs.get('cha') || '') ? Number(qs.get('cha')) : null;   // T165: thêm việc con
 const H48 = 48 * 3600000;
 
 const st = {
@@ -313,6 +342,8 @@ const st = {
   quanTrong: false, gap: false, lapLai: 'khong', hienThi: 'cong_khai',
   canDuyetTuChon: true,         // lựa chọn của người dùng khi việc KHÔNG quan trọng
   orig: null, row: null, saving: false, duAnTruoc: '',
+  cha: null,                    // việc lớn (khi ?cha= hoặc khi sửa 1 việc con)
+  con: [],                      // các dòng việc con khi giao việc lớn mới: { tieu_de, nguoi_lam, ngay, gio }
 };
 
 // ── Tiện ích ─────────────────────────────────────────────────────────────────
@@ -423,6 +454,48 @@ function themBuoc() {
   st.checklist.push(v); $('fBuocMoi').value = ''; veChecklist(); $('fBuocMoi').focus();
 }
 
+// ── Việc con (T165) ──────────────────────────────────────────────────────────
+function veCon() {
+  $('cons').innerHTML = st.con.map((c, i) =>
+    '<div class="con" data-i="' + i + '"><span class="no">' + (i + 1) + '.</span>' +
+    '<input class="inp" data-con="tieu_de" value="' + esc(c.tieu_de) + '" maxlength="300" placeholder="Tên việc con" aria-label="Tên việc con ' + (i + 1) + '">' +
+    '<div class="pk" data-pk="' + i + '"></div>' +
+    '<input class="inp" type="date" data-con="ngay" value="' + esc(c.ngay) + '" min="' + CV.ngayVN() + '" aria-label="Ngày hạn việc con ' + (i + 1) + '">' +
+    '<input class="inp" type="time" data-con="gio" value="' + esc(c.gio) + '" aria-label="Giờ hạn việc con ' + (i + 1) + '">' +
+    '<button type="button" class="btn-ic del" data-xoacon="' + i + '" title="Bỏ việc con" aria-label="Bỏ việc con ' + (i + 1) + '">×</button></div>').join('');
+  st.con.forEach((c, i) => boChonNguoi($('cons').querySelector('[data-pk="' + i + '"]'), {
+    placeholder: 'Người làm…', multi: false,
+    get: () => c.nguoi_lam ? [c.nguoi_lam] : [], add: id => { c.nguoi_lam = id; }, remove: () => { c.nguoi_lam = null; },
+    exclude: () => [], onChange: () => { setErr('con', ''); veXemTruoc(); },
+  }));
+}
+function themCon() {
+  st.con.push({ tieu_de: '', nguoi_lam: null, ngay: $('fHanNgay').value || ngayCong(7), gio: $('fHanGio').value || '17:00' });
+  veCon();
+  const o = $('cons').querySelector('.con:last-child [data-con="tieu_de"]'); if (o) o.focus();
+}
+// Dòng việc con đã nhập (bỏ dòng trống hoàn toàn) → { tieu_de, nguoi_lam, han } ; dòng thiếu → loi.
+function conHopLe() {
+  const ds = [], loi = [];
+  st.con.forEach((c, i) => {
+    const t = String(c.tieu_de || '').trim();
+    if (!t && !c.nguoi_lam) return;
+    const han = /^\d{4}-\d{2}-\d{2}$/.test(c.ngay || '') ? c.ngay + 'T' + String(c.gio || '17:00').slice(0, 5) + ':00+07:00' : null;
+    if (!t) loi.push('Việc con ' + (i + 1) + ': nhập tên việc.');
+    else if (!c.nguoi_lam) loi.push('Việc con ' + (i + 1) + ': chọn người làm.');
+    else if (!han || Date.parse(han) <= Date.now()) loi.push('Việc con ' + (i + 1) + ': hạn phải sau thời điểm hiện tại.');
+    else ds.push({ tieu_de: t, nguoi_lam: c.nguoi_lam, han });
+  });
+  return { ds, loi };
+}
+// Nhắc khi hạn việc con sau hạn việc lớn (được phép, chỉ nhắc).
+function veHanSau() {
+  const el = $('hanSau'), iso = hanIso();
+  const sau = !!st.cha && !!iso && Date.parse(iso) > Date.parse(st.cha.han);
+  el.hidden = !sau;
+  if (sau) el.textContent = 'Hạn này sau hạn việc lớn (' + CV.fmtDayDu(st.cha.han) + ') — vẫn lưu được.';
+}
+
 // ── Liên kết dữ liệu MES ─────────────────────────────────────────────────────
 const _goiY = {};
 async function goiYMa(loai) {
@@ -484,6 +557,7 @@ function veUuTien() {
   const cb = $('fCanDuyet');
   if (st.quanTrong) { cb.checked = true; cb.disabled = true; $('lblDuyet').classList.add('locked'); $('duyetLyDo').textContent = 'Việc Quan trọng luôn phải được người giao duyệt khi hoàn thành.'; }
   else { cb.disabled = false; cb.checked = st.canDuyetTuChon; $('lblDuyet').classList.remove('locked'); $('duyetLyDo').textContent = 'Bỏ chọn: người làm báo xong là việc hoàn thành luôn.'; }
+  if (st.cha) $('lblDuyet').querySelector('span').firstChild.textContent = 'Cần ' + (st.cha.ten_nguoi_giao || 'người giao việc lớn') + ' (người giao việc lớn) duyệt khi hoàn thành ';
   veXemTruoc();
 }
 function veHienThi() {
@@ -514,6 +588,10 @@ function veXemTruoc() {
     st.phoiHop.filter(id => id !== meId).forEach(id =>
       out.push(bell(tenCua(id), 'Bạn được mời phối hợp việc: "' + esc(tieuDe) + '" — ' + nhom + '. Người làm chính: ' + esc(st.nguoiLam ? tenCua(st.nguoiLam) : '—') + han + '.')));
     const ten = [st.nguoiLam, ...st.phoiHop].filter(id => id && id !== meId).map(id => '<b>' + esc(tenCua(id)) + '</b>');
+    if (st.cha && st.cha.nguoi_giao !== meId)
+      out.push(bell(tenCua(st.cha.nguoi_giao), nguoiGiao + ' chia việc con "' + esc(tieuDe) + '" cho ' + esc(st.nguoiLam ? tenCua(st.nguoiLam) : '—') + ' (thuộc "' + esc(st.cha.tieu_de) + '"' + han + '). Bạn là người duyệt.'));
+    const soCon = conHopLe().ds.length;
+    if (soCon) out.push('<div class="small">Và <b>' + soCon + ' việc con</b>: chuông báo cho từng người làm việc con.</div>');
     box.innerHTML = !st.nguoiLam
       ? '<div class="small">Chọn người thực hiện chính để xem thông báo sẽ gửi.</div>'
       : (ten.length ? '<div class="side-txt" style="margin-bottom:8px">Chuông MES của ' + ten.join(', ') + ' sẽ hiện:</div>' + out.join('<div style="height:6px"></div>')
@@ -596,6 +674,7 @@ function kiemTra(v) {
   $('fHanNgay').classList.toggle('bad', !!hanMsg);
   loi('bo_phan', v.bo_phan ? '' : 'Chọn bộ phận.', $('fBoPhan'));
   $('fBoPhan').classList.toggle('bad', !v.bo_phan);
+  if (!editId && !chaId) { const c = conHopLe(); loi('con', c.loi.join(' '), $('cons')); }
   if (dau) { dau.scrollIntoView({ block: 'center', behavior: 'smooth' }); try { dau.focus({ preventScroll: true }); } catch (e) {} }
   return ok;
 }
@@ -610,9 +689,22 @@ async function luu(e) {
   const nhanCu = btn.textContent;
   btn.textContent = 'Đang lưu…';
   try {
+    if (chaId) {
+      const p = Object.assign({}, v, { checklist: st.checklist.map(s => String(s).trim()).filter(Boolean) });
+      await CV.rpc('cv_tao_viec_con', { p_cha: chaId, p });
+      CV.toast('Đã thêm việc con', 'ok');
+      location.href = 'cong-viec-chi-tiet.html?id=' + chaId;
+      return;
+    }
     if (!editId) {
       const p = Object.assign({}, v, { checklist: st.checklist.map(s => String(s).trim()).filter(Boolean) });
       const id = await CV.rpc('cv_tao_viec', { p });
+      const loiCon = [];
+      for (const c of conHopLe().ds) {
+        try { await CV.rpc('cv_tao_viec_con', { p_cha: id, p: c }); }
+        catch (err) { loiCon.push('"' + c.tieu_de + '": ' + (err.message || err)); }
+      }
+      if (loiCon.length) alert('Đã giao việc lớn, nhưng chưa tạo được ' + loiCon.length + ' việc con:\n' + loiCon.join('\n') + '\n\nThêm lại ở trang chi tiết việc (nút "+ Thêm việc con").');
       CV.toast('Đã giao việc', 'ok');
       location.href = 'cong-viec-chi-tiet.html?id=' + encodeURIComponent(id);
       return;  // giữ khoá nút trong lúc chuyển trang
@@ -725,24 +817,40 @@ async function init() {
       CV.boPhan().catch(() => []),
       Promise.resolve(sb.from('cv_du_an').select('id,ten,bo_phan,trang_thai').eq('trang_thai', 'dang_chay').order('ten')).then(r => r.data || []).catch(() => []),
     ];
+    if (chaId) tasks.push(CV.viecQuery().eq('id', chaId).maybeSingle().then(r => { if (r.error) throw new Error(r.error.message); return r.data; }));
     if (editId) {
       tasks.push(CV.viecQuery().eq('id', editId).maybeSingle().then(r => { if (r.error) throw new Error(r.error.message); return r.data; }));
       tasks.push(Promise.resolve(sb.from('cv_nguoi_phoi_hop').select('user_id').eq('cong_viec_id', editId)).then(r => r.error ? null : (r.data || []).map(x => x.user_id)).catch(() => null));
     }
     const kq = await Promise.all(tasks);
     st.me = kq[0]; st.nguoi = (kq[1] || []).slice(); st.boPhan = (kq[2] || []).slice(); st.duAn = (kq[3] || []).slice();
-    if (editId) { row = kq[4]; phoiHop = kq[5] || (row && row.phoi_hop) || []; }
+    if (chaId) st.cha = kq[4];
+    if (editId) {
+      row = kq[4]; phoiHop = kq[5] || (row && row.phoi_hop) || [];
+      if (row && row.viec_cha_id) st.cha = (await CV.viecQuery().eq('id', row.viec_cha_id).maybeSingle()).data || null;
+    }
   } catch (err) {
     return hienChan('⚠', 'Lỗi tải dữ liệu', err.message || String(err));
   }
 
   if (editId) {
     if (!row) return hienChan('🔍', 'Không tìm thấy việc #' + editId, 'Việc không tồn tại hoặc bạn không có quyền xem việc này.');
-    if (!st.me || (row.nguoi_giao !== st.me.id && !st.me.laBGD))
+    const laNguoiChia = !!st.cha && !!st.me && st.cha.nguoi_lam === st.me.id;   // người nhận việc lớn sửa được việc con
+    if (!st.me || (row.nguoi_giao !== st.me.id && !st.me.laBGD && !laNguoiChia))
       return hienChan('🔒', 'Bạn không có quyền sửa việc này', 'Chỉ người giao việc (' + (row.ten_nguoi_giao || '—') + ') hoặc Ban giám đốc được sửa. Bạn vẫn xem và bình luận được ở trang chi tiết.', 'cong-viec-chi-tiet.html?id=' + editId);
     if (row.trang_thai === 'hoan_thanh' || row.trang_thai === 'huy')
       return hienChan('🔒', 'Việc đã ' + (row.trang_thai === 'huy' ? 'huỷ' : 'hoàn thành') + ' — không sửa được', row.trang_thai === 'hoan_thanh' ? 'Muốn sửa, hãy "Mở lại" việc ở trang chi tiết trước.' : 'Việc đã huỷ không thể sửa.', 'cong-viec-chi-tiet.html?id=' + editId);
     st.row = row;
+  }
+  if (chaId) {
+    const c = st.cha;
+    if (!c) return hienChan('🔍', 'Không tìm thấy việc lớn #' + chaId, 'Việc không tồn tại hoặc bạn không có quyền xem việc này.');
+    if (c.viec_cha_id) return hienChan('🔒', 'Đây đã là việc con', 'Việc con không chia nhỏ tiếp được — hãy thêm việc con vào việc lớn.', 'cong-viec-chi-tiet.html?id=' + c.viec_cha_id);
+    if (c.trang_thai === 'hoan_thanh' || c.trang_thai === 'huy') return hienChan('🔒', 'Việc lớn đã đóng', 'Việc lớn đã hoàn thành hoặc đã huỷ, không thêm việc con được.', 'cong-viec-chi-tiet.html?id=' + chaId);
+    if (!st.me || (c.nguoi_giao !== st.me.id && c.nguoi_lam !== st.me.id && !st.me.laBGD))
+      return hienChan('🔒', 'Bạn không thêm việc con được', 'Chỉ người giao (' + (c.ten_nguoi_giao || '—') + ') hoặc người nhận việc lớn (' + (c.ten_nguoi_lam || '—') + ') mới chia việc con.', 'cong-viec-chi-tiet.html?id=' + chaId);
+    $('pgTitle').textContent = 'Thêm việc con'; document.title = 'Thêm việc con — TOYOTAKI';
+    if (window.MesNav) try { MesNav.setTitle('Thêm việc con', null); } catch (e) {}
   }
 
   $('root').innerHTML = '';
@@ -763,6 +871,23 @@ async function init() {
   } else {
     dienTuUrl();
   }
+  if (chaId) {
+    const c = st.cha;
+    $('fBoPhan').value = c.bo_phan || '';
+    veDuAn(c.du_an_id || '');
+    st.quanTrong = !!c.quan_trong; st.hienThi = c.hien_thi || 'cong_khai';
+    $('btnLuu').textContent = 'Thêm việc con';
+  }
+  if (st.cha) {
+    const c = st.cha;
+    $('chaBand').hidden = false;
+    $('chaBand').innerHTML = '↳ ' + (chaId ? 'Thêm việc con cho' : 'Việc con thuộc') + ' việc lớn <b><a href="cong-viec-chi-tiet.html?id=' + c.id + '">' + esc(c.tieu_de) + '</a></b>' +
+      ' · Người làm việc lớn: <b>' + esc(c.ten_nguoi_lam || '') + '</b> · Hạn việc lớn: <b>' + esc(CV.fmtDayDu(c.han)) + '</b>' +
+      '<br>Người duyệt việc con: <b>' + esc(c.ten_nguoi_giao || '') + '</b> (người giao việc lớn).';
+    $('blkCon').hidden = true;
+  }
+  if (editId) $('blkCon').hidden = true;
+  if ($('blkCon').hidden) $('hTuyChon').textContent = '3. Tuỳ chọn';
 
   const pkLam = boChonNguoi($('pkLam'), {
     placeholder: 'Tìm theo tên…', multi: false,
@@ -791,6 +916,18 @@ async function init() {
   $('fBoPhan').addEventListener('change', () => { setErr('bo_phan', ''); $('fBoPhan').classList.remove('bad'); veXemTruoc(); });
   ['fHanNgay', 'fHanGio'].forEach(id => $(id).addEventListener('input', () => { setErr('han', ''); $('fHanNgay').classList.remove('bad'); veUuTien(); }));
   $('hanNhanh').addEventListener('click', e => { const b = e.target.closest('[data-them]'); if (!b) return; $('fHanNgay').value = ngayCong(Number(b.dataset.them)); if (!$('fHanGio').value) $('fHanGio').value = '17:00'; setErr('han', ''); $('fHanNgay').classList.remove('bad'); veUuTien(); });
+
+  // Việc con
+  $('btnThemCon').addEventListener('click', themCon);
+  $('cons').addEventListener('input', e => {
+    const k = e.target.dataset.con, row = e.target.closest('[data-i]');
+    if (!k || !row) return;
+    st.con[Number(row.dataset.i)][k] = e.target.value; setErr('con', ''); veXemTruoc();
+  });
+  $('cons').addEventListener('click', e => { const b = e.target.closest('[data-xoacon]'); if (!b) return; st.con.splice(Number(b.dataset.xoacon), 1); veCon(); veXemTruoc(); });
+  ['fHanNgay', 'fHanGio'].forEach(id => $(id).addEventListener('input', veHanSau));
+  $('hanNhanh').addEventListener('click', veHanSau);
+  veHanSau();
 
   // Checklist
   $('btnThemBuoc').addEventListener('click', themBuoc);

@@ -167,11 +167,15 @@
     if (row.gia_han_den) tags.push(`<span class="cv-tag warn">Xin gia hạn</span>`);
     (row.lien_ket || []).slice(0, 3).forEach(lk => tags.push(`<span class="cv-tag link">${esc(lienKetText(lk))}</span>`));
     if (row.ten_du_an) tags.push(`<span class="cv-tag">${esc(row.ten_du_an)}</span>`);
-    const bar = row.so_buoc > 0
-      ? `<div class="cv-bar"><span style="width:${Math.round(row.so_buoc_xong / row.so_buoc * 100)}%"></span></div>` : '';
+    // T165: việc lớn hiện tiến độ việc con (thanh tiến độ theo việc con, không theo checklist).
+    if (row.so_viec_con > 0) tags.unshift(`<span class="cv-tag con">Việc con ${row.so_viec_con_xong}/${row.so_viec_con}</span>`);
+    if (row.so_viec_con_qua_han > 0) tags.unshift(`<span class="cv-tag back">${row.so_viec_con_qua_han} việc con quá hạn</span>`);
+    const tl = row.so_viec_con > 0 ? row.so_viec_con_xong / row.so_viec_con : row.so_buoc > 0 ? row.so_buoc_xong / row.so_buoc : null;
+    const bar = tl !== null ? `<div class="cv-bar"><span style="width:${Math.round(tl * 100)}%"></span></div>` : '';
     return `<a class="cv-card${row.trang_thai === 'hoan_thanh' || row.trang_thai === 'huy' ? ' done' : ''}" href="cong-viec-chi-tiet.html?id=${row.id}"
         draggable="${opts.draggable ? 'true' : 'false'}" data-id="${row.id}" style="border-left-color:${g.color}">
       <div class="cv-card-top">${badgeNhom(row.nhom)}<span class="cv-axes">${row.quan_trong ? 'Quan trọng' : 'Ít quan trọng'} · ${row.gap_hieu_luc ? 'Gấp' : 'Chưa gấp'}</span>${opts.trangThai ? badgeTrangThai(row.trang_thai) : ''}</div>
+      ${row.viec_cha_id ? `<div class="cv-cha" title="Thuộc việc lớn: ${esc(row.tieu_de_cha || '')}">↳ ${esc(row.tieu_de_cha || 'Việc lớn #' + row.viec_cha_id)}</div>` : ''}
       <div class="cv-card-title">${esc(row.tieu_de)}</div>
       ${tags.length ? `<div class="cv-tags">${tags.join('')}</div>` : ''}
       ${bar}
