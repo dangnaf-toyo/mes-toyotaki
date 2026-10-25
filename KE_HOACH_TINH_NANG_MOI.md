@@ -133,6 +133,20 @@
 - [x] **Giai đoạn 1 (T161)** (2026-10-24 — prod + staging, master 20230cd; migration T161 đã chạy cả 2 DB) — bảng `cv_*` + RPC + RLS (`supabase/migration_phase_T161_quan_ly_cong_viec.sql`); trang `cong-viec-cua-toi.html` (việc của tôi), `cong-viec.html` (Kanban ⇄ ma trận ưu tiên), `cong-viec-chi-tiet.html` (bước, ảnh/tệp, trao đổi & góp ý, duyệt/trả lại/gia hạn, lịch sử), `cong-viec-giao.html` (giao/sửa việc, điền sẵn từ NCP/sự cố/vấn đề khuôn), `thong-bao.html` + chuông trên navbar; dùng chung `shared/cong-viec.js` / `shared/cong-viec.css`.
 - [ ] **Giai đoạn 2** — trang Dự án (giai đoạn, tiến độ thực tế/kế hoạch, thảo luận & góp ý, "tiếp thu → tạo việc"); Tổng quan Ban giám đốc (thanh trạng thái theo bộ phận, ma trận ưu tiên, tiến độ dự án theo tuần, việc xong mỗi tuần đúng/trễ hạn, việc quá hạn); việc định kỳ tự sinh (tuần/tháng/quý).
 
+## Nhóm 9 — Quản lý gia công CNC (T167) — Cân bằng số lượng, FIFO và Truy xuất nguồn gốc
+
+> Đề xuất ngày 2026-10-25 theo yêu cầu quản lý xưởng CNC (30 máy: 14 phay 3 trục, 2 phay 4 trục, 14 tiện; 1 QL + 15 công nhân/ca).
+> Mục tiêu: Bảo toàn tuyệt đối 4 số lượng, kỷ luật FIFO thùng phôi, tách bạch nguồn gốc NG (gia công vs phôi đúc), kiểm soát mẫu test CMM/dưỡng và truy xuất 2 chiều.
+
+- **Nguyên tắc bảo toàn số lượng:** $\text{Vào} = \text{Ra OK} + \text{NG Gia công} + \text{NG Phôi đúc} + \text{Test tiêu hao (Hủy)} + \text{WIP dở dang tại máy}$.
+- **Kỷ luật FIFO:** Quét tem phôi nhận từ Bavia/Đúc vào kho đệm; máy CNC khi nạp phôi bắt buộc chọn thùng cũ nhất còn tồn; cảnh báo/chặn vi phạm.
+- **Tách bạch NG:** Phân định rõ NG do gia công (lẹm dao, gãy taro, sai kích thước...) vs NG do phôi đúc lộ ra sau cắt gọt (rỗ khí, lẫn xỉ, nứt ngầm) để phản hồi quy trách nhiệm.
+- **Quản lý hàng Test:** Luồng xuất mẫu First-off / định kỳ 2h / đo CMM; đo ĐẠT hoàn lại số lượng, đo NG hoặc test phá hủy chốt hủy.
+- **Truy xuất nguồn gốc:** Liên kết Mã máy CNC, bước OP, thợ đứng máy, mã Đồ gá (Jig), mã tem phôi nguồn (lô nhôm, số khuôn đúc, ca đúc).
+- [ ] **Giai đoạn 1 (T166 — Pilot 1 Cell 4–6 máy)**: Migration bảng `cnc_may_hien_tai`, `cnc_may_nguon`, `cnc_thung_ra`, `cnc_ng_chi_tiet`; giao diện trạm vận hành tablet `cnc-station.html`; luồng quét phôi nạp máy, đóng thùng in tem CNC kế thừa tem nguồn.
+- [ ] **Giai đoạn 2 (Toàn bộ 30 máy + Hàng test & Đồ gá Jig)**: Bảng `cnc_master_jig`, quy trình duyệt SP đầu First-off + đo CMM/dưỡng (`cnc_hang_test`); cảnh báo/khóa kiểm soát FIFO chặt chẽ.
+- [ ] **Giai đoạn 3 (Đối soát kết ca & Wallboard CNC)**: Bảng chốt ca đối soát `cnc_ket_ca` (tự động phát hiện lệch số lượng); dashboard tổng thể 30 máy thời gian thực + Pareto lỗi chất lượng CNC.
+
 ## Thứ tự ưu tiên nghiệp vụ đề xuất
 
 1. Chuẩn QR/lot/pallet, quy trình tách-gộp và vị trí WIP.

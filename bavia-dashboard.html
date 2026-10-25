@@ -518,7 +518,11 @@ async function taiLai() {
     const { data: pre } = await sb.from('duc_tem').select('ma_sp').eq('trang_thai', 'Chờ đóng gói TP').eq('tram_cong_doan', 'Bavia').in('ma_sp', maD2);
     (pre || []).forEach(r => { PRE[r.ma_sp] = (PRE[r.ma_sp] || 0) + 1; });
   }
-  if (!D.lines.some(l => l.ten_line === selLine)) selLine = D.lines.length ? D.lines[0].ten_line : null;
+  // Ưu tiên chọn Line đang có hàng dở (conOf(l) > 0) nếu selLine chưa có hoặc không hợp lệ
+  const lineDangDo = D.lines.find(l => conOf(l) > 0);
+  if (!selLine || !D.lines.some(l => l.ten_line === selLine)) {
+    selLine = lineDangDo ? lineDangDo.ten_line : (D.lines.length ? D.lines[0].ten_line : null);
+  }
   renderAll();
 }
 
@@ -567,12 +571,13 @@ function renderKpis() {
 
 function lineCard(l) {
   const ok = okOf(l), kh = Number(l.kh_ca || 0), pct = kh ? Math.min(100, Math.round(ok / kh * 100)) : 0;
-  const ops = opsOf(l);
+  const ops = opsOf(l), con = conOf(l);
+  const doBadge = con > 0 ? '<span class="chip warn" style="font-size:10px;padding:1px 6px" title="Còn dở ' + fmt(con) + ' pcs trên tem Đúc">Dở ' + fmt(con) + '</span> ' : '';
   const chip = !l.info.ok ? '<span class="chip bad">Thiếu thông tin</span>'
     : l.info.dang === 1 ? '<span class="chip ship">' + esc(String(l.info.ten_khach_hang || 'Xuất hàng').split(/[ (,]/)[0]) + '</span>'
     : '<span class="chip flow">→ ' + esc(nextStep(l)) + '</span>';
   return '<button type="button" class="line ' + (l.ten_line === selLine ? 'sel' : '') + '" data-line="' + esc(l.ten_line) + '">' +
-    '<div class="t"><span class="dot ' + (ops.length ? '' : 'idle') + '"></span>' + esc(l.ten_line) + '<span class="sp"></span>' + chip + '</div>' +
+    '<div class="t"><span class="dot ' + (ops.length ? '' : 'idle') + '"></span>' + esc(l.ten_line) + '<span class="sp"></span>' + doBadge + chip + '</div>' +
     '<div class="ma">' + esc(l.ma_sp) + '</div>' +
     '<div class="who">' + (ops.length ? esc(ops.join(', ')) : 'Chưa gán người') + '</div>' +
     '<div class="who">KT: ' + (l.nguoi_kiem_tra ? esc(l.nguoi_kiem_tra) : '<b style="color:var(--alarm-fg)">chưa chọn</b>') + '</div>' +
@@ -581,7 +586,10 @@ function lineCard(l) {
 function renderLines() {
   const L = (D && D.lines) || [];
   $('#lineCnt').textContent = L.length + ' / ' + ((D && D.danh_muc_line) || []).length;
-  const g1 = L.filter(l => l.info.ok && l.info.dang === 1), g2 = L.filter(l => l.info.ok && l.info.dang === 2), g0 = L.filter(l => !l.info.ok);
+  const sortDo = (a, b) => (conOf(b) > 0 ? 1 : 0) - (conOf(a) > 0 ? 1 : 0);
+  const g1 = L.filter(l => l.info.ok && l.info.dang === 1).sort(sortDo);
+  const g2 = L.filter(l => l.info.ok && l.info.dang === 2).sort(sortDo);
+  const g0 = L.filter(l => !l.info.ok);
   const grp = (cls, t, ds) => (ds.length ? '<div class="grp"><div class="grp-t ' + cls + '">' + t + '</div><div class="lines">' + ds.map(lineCard).join('') + '</div></div>' : '');
   $('#lines').innerHTML = (L.length ? '' : '<div class="empty-box">Chưa mở Line nào trong ca này.</div>') +
     grp('ship', 'Đóng gói xuất hàng', g1) + grp('flow', 'Chuyển công đoạn', g2) + grp('bad', 'Cần bổ sung Danh mục SP', g0);
