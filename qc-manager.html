@@ -942,6 +942,18 @@ function populateDynamicFilterOptions(list){
   fillSelect('fl-nguoi-kiem', inspectors);
 }
 
+// Supabase trả tối đa 1000 dòng/lần → lấy từng trang đến hết. mk() phải tạo truy vấn MỚI
+// mỗi lần gọi và có order theo khoá duy nhất để các trang không trùng/sót.
+async function taiHetTrang(mk){
+  const out = [];
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await mk().range(off, off + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
 async function searchHistory(){
   const ngay = document.getElementById('fl-ngay').value;
   const maMay = document.getElementById('fl-ma-may').value;
@@ -949,23 +961,36 @@ async function searchHistory(){
   const nguoiKiem = document.getElementById('fl-nguoi-kiem').value;
   const ketQua = document.getElementById('fl-ket-qua').value;
 
-  let q = sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'da_kiem');
-  if (maMay) q = q.eq('ma_may', maMay);
-  if (maSp) q = q.eq('ma_sp', maSp);
-  if (nguoiKiem) q = q.eq('nguoi_kiem', nguoiKiem);
-  if (ketQua) q = q.eq('ket_qua', ketQua);
-  const [{ data, error }, scRes] = await Promise.all([
-    q,
-    sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,gio_tro_lai,van_de,thoi_gian_dung_phut'),
-  ]);
-  if (error) return;
-  state.suCoLog = (scRes && scRes.data) || [];
+  const mkCp = () => {
+    let q = sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'da_kiem');
+    if (maMay) q = q.eq('ma_may', maMay);
+    if (maSp) q = q.eq('ma_sp', maSp);
+    if (nguoiKiem) q = q.eq('nguoi_kiem', nguoiKiem);
+    if (ketQua) q = q.eq('ket_qua', ketQua);
+    if (ngay) { // ngày theo giờ VN, lọc ngay trên server
+      const sau = new Date(ngay + 'T00:00:00Z'); sau.setUTCDate(sau.getUTCDate() + 1);
+      q = q.gte('thoi_diem_kiem_thuc_te', ngay + 'T00:00:00+07:00').lt('thoi_diem_kiem_thuc_te', sau.toISOString().slice(0, 10) + 'T00:00:00+07:00');
+    }
+    return q.order('thoi_diem_kiem_thuc_te', { ascending: false }).order('id_checkpoint');
+  };
+  let data, suCo;
+  try {
+    [data, suCo] = await Promise.all([
+      taiHetTrang(mkCp),
+      taiHetTrang(() => sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,gio_tro_lai,van_de,thoi_gian_dung_phut').order('id_ban_ghi')),
+    ]);
+  } catch (e) {
+    console.error('Không tải được lịch sử IPQC', e);
+    document.getElementById('history-count').textContent = '—';
+    document.getElementById('history-tbody').innerHTML = '<tr><td colspan="99" style="color:var(--alarm-fg);font-weight:600">Lỗi tải lịch sử: ' + escapeHtml(e.message || String(e)) + ' — bấm 🔍 Tra cứu để thử lại.</td></tr>';
+    document.getElementById('history-empty').classList.add('hidden');
+    return;
+  }
+  state.suCoLog = suCo;
   state.suCoPhutDungMap = buildSuCoPhutDungMap(state.suCoLog);
 
-  let list = (data || []).map(mapIpqcDoneRow);
+  const list = data.map(mapIpqcDoneRow);
   if (!state.dynamicFiltersLoaded) { populateDynamicFilterOptions(list); state.dynamicFiltersLoaded = true; }
-  if (ngay) list = list.filter(x => x.thoi_diem_kiem_thuc_te && toVnDateStr(x.thoi_diem_kiem_thuc_te) === ngay);
-  list.sort((a, b) => new Date(b.thoi_diem_kiem_thuc_te || 0) - new Date(a.thoi_diem_kiem_thuc_te || 0));
   renderHistory(list);
 }
 
