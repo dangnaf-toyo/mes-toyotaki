@@ -1930,9 +1930,9 @@ async function loadShiftState(showLoader){
 async function fetchShiftState(){
   const [liteRes, baoCaoRes, qMolds, qIssues, qIpqc] = await Promise.all([
     sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,row_seq,ngay,ca,phuong_an_ca,open_gio_phat_sinh'),
-    sb.from('duc_bao_cao_ca').select('ngay,ca'),
+    sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca').order('id_bao_cao')),
     sb.from('duc_shot_khuon').select('*'),
-    sb.from('duc_van_de_khuon').select('*').neq('trang_thai', 'Đã đóng'),
+    sbTaiHet(() => sb.from('duc_van_de_khuon').select('*').neq('trang_thai', 'Đã đóng').order('id_van_de')),
     sb.rpc('duc_get_ipqc_due_by_id_dong'),
     loadMoldBd(),
   ]);
@@ -2126,11 +2126,11 @@ async function loadKanbanProgress(){
   if (!state.kanbanMachines || state.kanbanMachines.size === 0) return;
   const yest = new Date(); yest.setDate(yest.getDate() - 1);
   const fromNgay = toDateInputValue(yest);
-  const { data, error } = await sb.from('duc_tem')
+  const { data, error } = await sbTaiHet(() => sb.from('duc_tem')
     .select('trang_thai,so_luong_tt,may_duc_chi_thi,ngay')
     .not('id_lo_chi_thi', 'is', null)
     .in('may_duc_chi_thi', [...state.kanbanMachines])
-    .gte('ngay', fromNgay);
+    .gte('ngay', fromNgay).order('tag_no'));
   if (error) return;
   const prog = {};
   (data || []).forEach(t => {
@@ -2486,7 +2486,7 @@ async function loadLiveMachineStatus(){
   try {
     const [chtRes, baoCaoRes] = await Promise.all([
       sb.from('duc_ca_hien_tai').select('ma_may,ma_sp,row_seq,ngay,ca,open_gio_phat_sinh'),
-      sb.from('duc_bao_cao_ca').select('ngay,ca'),
+      sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca').order('id_bao_cao')),
     ]);
     if (chtRes.error) throw new Error(chtRes.error.message);
     if (baoCaoRes.error) throw new Error(baoCaoRes.error.message);

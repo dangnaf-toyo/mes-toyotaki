@@ -482,12 +482,12 @@ document.getElementById("congDoanGiao").addEventListener("change", () => {
 async function checkFifoWarningFor(i){
   const s = scannedList[i];
   if (!s || !s.congDoanNhan){ if (s) s.fifoWarn = ''; renderScannedList(); return; }
-  const { data: positions } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', s.congDoanNhan);
+  const { data: positions } = await sbTaiHet(() => sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', s.congDoanNhan).order('tag_no'));
   const scannedTags = new Set(scannedList.map(x => x.tagNo));
   const tags = (positions || []).map(p => p.tag_no).filter(t => !scannedTags.has(t));
   let warn = '';
   if (tags.length){
-    const { data: tems } = await sb.from('duc_tem').select('tag_no,ngay').in('tag_no', tags).eq('ma_sp', s.maSP).gt('so_luong', 0);
+    const { data: tems } = await sbTaiTheoLo(tags, lo => sb.from('duc_tem').select('tag_no,ngay').in('tag_no', lo).eq('ma_sp', s.maSP).gt('so_luong', 0).order('tag_no'));
     const curNgay = new Date(s.ngay);
     if (tems && tems.length && !isNaN(curNgay)){
       const older = tems.filter(t => t.ngay && new Date(t.ngay) < curNgay).sort((a, b) => new Date(a.ngay) - new Date(b.ngay));
@@ -970,11 +970,11 @@ async function loadPendingList(){
   pendingIds = [];
   if (!dept){ listEl.innerHTML = 'Chọn bộ phận ở trên để xem danh sách.'; return; }
   listEl.textContent = 'Đang tải…';
-  const { data, error } = await sb.from('cd_chuyen_cong_doan_log')
+  const { data, error } = await sbTaiHet(() => sb.from('cd_chuyen_cong_doan_log')
     .select('id_phieu,tag_no,ma_sp,ten_sp,sl_thuc_chuyen,cong_doan_nhan,nguoi_nhan,thoi_gian_chuyen,ghi_chu')
     .eq('cong_doan_giao', dept)
     .eq('trang_thai_xac_nhan', 'Chờ công đoạn trước xác nhận')
-    .order('thoi_gian_chuyen', { ascending: false });
+    .order('thoi_gian_chuyen', { ascending: false }).order('id_phieu'));
   if (error){ listEl.innerHTML = '❌ Lỗi tải danh sách: ' + error.message; return; }
   if (!data || !data.length){ listEl.innerHTML = 'Không có phiếu nào đang chờ xác nhận cho bộ phận này.'; return; }
   pendingIds = data.map(r => r.id_phieu);

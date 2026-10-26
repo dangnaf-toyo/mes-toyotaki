@@ -868,12 +868,13 @@
         loadStats();
       }
       async function loadStats() {
-        const { data, error } = await sb
+        const { data, error } = await sbTaiHet(() => sb
           .from("oqc_daily_inspection")
           .select("*")
           .gte("inspection_date", $("from").value)
           .lte("inspection_date", $("to").value)
-          .order("inspection_date", { ascending: false });
+          .order("inspection_date", { ascending: false })
+          .order("id", { ascending: false }));
         if (error) return message(error, true, "Không tải được thống kê");
         dataRows = data || [];
         renderStats();

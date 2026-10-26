@@ -679,7 +679,7 @@ async function loadAllData() {
     const [mat, op, plan, tx, st, cur] = await Promise.all([
       sb.from('nvl_materials').select('ma_nvl,ten_nvl').order('ma_nvl'),
       sb.from('nvl_ton_dau_ky').select('*'),
-      sb.from('nvl_ke_hoach_ngay').select('*').order('ngay'),
+      sbTaiHet(() => sb.from('nvl_ke_hoach_ngay').select('*').order('ngay').order('ma_nvl')),
       sb.from('nvl_giao_dich').select('*').order('ngay', { ascending: false }).order('sheet_row', { ascending: false }).limit(TX_FETCH_LIMIT),
       sb.from('nvl_cai_dat').select('*'),
       sb.from('nvl_v_ton_hien_tai').select('*'),

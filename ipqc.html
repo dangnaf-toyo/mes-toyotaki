@@ -420,7 +420,7 @@ async function updateUserLabel(){
 async function getActiveIdDongSet(){
   const [chtRes, baoCaoRes] = await Promise.all([
     sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,ngay,ca,open_gio_phat_sinh'),
-    sb.from('duc_bao_cao_ca').select('ngay,ca'),
+    sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca').order('id_bao_cao')),
   ]);
   if (chtRes.error) throw new Error('Không tải được Ca_hien_tai: ' + chtRes.error.message);
   if (baoCaoRes.error) throw new Error('Không tải được Báo cáo ca: ' + baoCaoRes.error.message);
@@ -495,7 +495,7 @@ async function loadQueue(){
 
   const [activeSet, cpRes, dinhKyRes, khRes] = await Promise.all([
     getActiveIdDongSet(),
-    sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'cho_kiem'),
+    sbTaiHet(() => sb.from('duc_ipqc_checkpoint').select('*').eq('trang_thai', 'cho_kiem').order('id_checkpoint')),
     sb.rpc('duc_get_ipqc_periodic_due'),
     sb.rpc('duc_get_ipqc_kh_due'),
   ]);
