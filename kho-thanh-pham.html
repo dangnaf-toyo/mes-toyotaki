@@ -386,8 +386,8 @@ async function loadTonKho(){
   el.innerHTML = '<div class="empty">Đang tải...</div>';
 
   const [palletRes, posRes] = await Promise.all([
-    sb.from("oqc_pallet").select("id_pallet,tong_so_luong").eq("trang_thai", "da_nhap_kho"),
-    sb.from("cd_v_vi_tri_hien_tai").select("tag_no").eq("vi_tri_hien_tai", "Nhập kho"),
+    sbTaiHet(() => sb.from("oqc_pallet").select("id_pallet,tong_so_luong").eq("trang_thai", "da_nhap_kho").order("id_pallet")),
+    sbTaiHet(() => sb.from("cd_v_vi_tri_hien_tai").select("tag_no").eq("vi_tri_hien_tai", "Nhập kho").order("tag_no")),
   ]);
   if (palletRes.error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(palletRes.error.message) + '</div>'; return; }
 
@@ -396,14 +396,14 @@ async function loadTonKho(){
   const temTags = (posRes.data || []).map(p => p.tag_no);
 
   const [palletItemsRes, temRes] = await Promise.all([
-    palletIds.length ? sb.from("oqc_pallet_item").select("id_pallet,tag_no,so_luong").in("id_pallet", palletIds) : Promise.resolve({ data: [] }),
-    temTags.length ? sb.from("duc_tem").select("tag_no,ma_sp,ten_sp,so_luong").in("tag_no", temTags).gt("so_luong", 0) : Promise.resolve({ data: [] }),
+    sbTaiTheoLo(palletIds, lo => sb.from("oqc_pallet_item").select("id_pallet,tag_no,so_luong").in("id_pallet", lo).order("id_pallet").order("tag_no")),
+    sbTaiTheoLo(temTags, lo => sb.from("duc_tem").select("tag_no,ma_sp,ten_sp,so_luong").in("tag_no", lo).gt("so_luong", 0).order("tag_no")),
   ]);
 
   // Cần mã SP của tem bên trong pallet — tra thêm 1 lượt duc_tem theo tag_no của pallet items.
   const palletTemTags = [...new Set((palletItemsRes.data || []).map(it => it.tag_no))];
   const { data: palletTemInfo } = palletTemTags.length
-    ? await sb.from("duc_tem").select("tag_no,ma_sp,ten_sp").in("tag_no", palletTemTags)
+    ? await sbTaiTheoLo(palletTemTags, lo => sb.from("duc_tem").select("tag_no,ma_sp,ten_sp").in("tag_no", lo).order("tag_no"))
     : { data: [] };
   const temInfoMap = {};
   (palletTemInfo || []).forEach(t => { temInfoMap[t.tag_no] = t; });

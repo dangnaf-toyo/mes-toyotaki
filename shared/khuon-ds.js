@@ -234,7 +234,7 @@
     async function load(){
       const [m, i, p] = await Promise.all([
         sb.from('duc_shot_khuon').select('*'),
-        sb.from('duc_van_de_khuon').select('ma_khuon,trang_thai'),
+        sbTaiHet(() => sb.from('duc_van_de_khuon').select('ma_khuon,trang_thai').order('id_van_de')),
         admin ? sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp') : Promise.resolve({ data: [] }),
       ]);
       if (m.error) return showMsg('Lỗi tải khuôn: ' + m.error.message, 'err', 6000);

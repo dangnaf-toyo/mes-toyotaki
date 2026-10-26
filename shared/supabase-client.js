@@ -29,6 +29,34 @@ const IS_STAGING = !IS_PROD;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/**
+ * Supabase trả TỐI ĐA 1000 dòng mỗi lần và không báo lỗi khi cắt → bảng lớn phải lấy từng trang.
+ * sbTaiHet(mk): mk() tạo truy vấn MỚI mỗi lần gọi, có .order() theo khoá duy nhất (để các trang
+ * không trùng/sót). Trả { data, error } như truy vấn thường — thay được trực tiếp `await q`.
+ */
+async function sbTaiHet(mk) {
+  const data = [];
+  for (let off = 0; ; off += 1000) {
+    const r = await mk().range(off, off + 999);
+    if (r.error) return { data: null, error: r.error };
+    data.push(...(r.data || []));
+    if (!r.data || r.data.length < 1000) return { data, error: null };
+  }
+}
+/**
+ * Lọc .in() với danh sách dài (vd hàng trăm mã tem): chia lô để URL không quá dài, gộp kết quả.
+ * mk(lo) trả truy vấn cho 1 lô (≤ 150 phần tử); mỗi lô cũng lấy hết trang. Trả { data, error }.
+ */
+async function sbTaiTheoLo(ds, mk, lo = 150) {
+  const data = [];
+  for (let i = 0; i < ds.length; i += lo) {
+    const r = await sbTaiHet(() => mk(ds.slice(i, i + lo)));
+    if (r.error) return r;
+    data.push(...r.data);
+  }
+  return { data, error: null };
+}
+
 const MesAuth = {
   /** Trả về session hiện tại (null nếu chưa đăng nhập). */
   async getSession() {

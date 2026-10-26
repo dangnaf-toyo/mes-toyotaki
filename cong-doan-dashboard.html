@@ -984,11 +984,12 @@ function showReport(rows){
 async function loadWaiting(){
   const el = document.getElementById('waitingList');
   el.innerHTML = '<div class="empty">Đang tải...</div>';
-  const { data: positions, error } = await sb.from('cd_v_vi_tri_hien_tai').select('tag_no').in('vi_tri_hien_tai', congDoanGroup);
+  const { data: positions, error } = await sbTaiHet(() => sb.from('cd_v_vi_tri_hien_tai').select('tag_no').in('vi_tri_hien_tai', congDoanGroup).order('tag_no'));
   if (error){ el.innerHTML = '<div class="empty">Lỗi: ' + escapeHtml(error.message) + '</div>'; return; }
   if (!positions || !positions.length){ el.innerHTML = '<div class="empty">Chưa có hàng nào chuyển đến công đoạn này.</div>'; return; }
   const tags = positions.map(p => p.tag_no);
-  const { data: tems } = await sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,ngay').in('tag_no', tags).gt('so_luong', 0).order('ngay');
+  const { data: temsLo } = await sbTaiTheoLo(tags, lo => sb.from('duc_tem').select('tag_no,ma_sp,ten_sp,so_luong,ngay').in('tag_no', lo).gt('so_luong', 0).order('tag_no'));
+  const tems = (temsLo || []).sort((a, b) => String(a.ngay || '').localeCompare(String(b.ngay || '')));
   if (!tems || !tems.length){ el.innerHTML = '<div class="empty">Hàng tại đây đã được đóng gói/xử lý hết.</div>'; return; }
   el.innerHTML = tems.map(t => `
     <div class="waiting-item">

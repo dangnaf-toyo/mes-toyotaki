@@ -540,7 +540,7 @@ function startClock(){
 async function getActiveIdDongSet(){
   const [chtRes, baoCaoRes] = await Promise.all([
     sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,ngay,ca,open_gio_phat_sinh'),
-    sb.from('duc_bao_cao_ca').select('ngay,ca'),
+    sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca').order('id_bao_cao')),
   ]);
   if (chtRes.error) throw new Error(chtRes.error.message);
   if (baoCaoRes.error) throw new Error(baoCaoRes.error.message);
@@ -618,9 +618,9 @@ async function loadBoard(){
     const cutoff = new Date(Date.now() - 24 * 3600000).toISOString();
     const [activeSet, cpRes, dinhKyRes, scRes] = await Promise.all([
       getActiveIdDongSet(),
-      sb.from('duc_ipqc_checkpoint').select('*').or(`trang_thai.eq.cho_kiem,thoi_diem_kiem_thuc_te.gte.${cutoff}`),
+      sbTaiHet(() => sb.from('duc_ipqc_checkpoint').select('*').or(`trang_thai.eq.cho_kiem,thoi_diem_kiem_thuc_te.gte.${cutoff}`).order('id_checkpoint')),
       sb.rpc('duc_get_ipqc_periodic_due'),
-      sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,gio_tro_lai,van_de,thoi_gian_dung_phut').gte('gio_phat_sinh', new Date(Date.now() - 3 * 24 * 3600000).toISOString()),
+      sbTaiHet(() => sb.from('duc_su_co_log').select('id_su_co,ma_may,gio_phat_sinh,gio_tro_lai,van_de,thoi_gian_dung_phut').gte('gio_phat_sinh', new Date(Date.now() - 3 * 24 * 3600000).toISOString()).order('id_ban_ghi')),
     ]);
     if (cpRes.error) throw new Error(cpRes.error.message);
     if (dinhKyRes.error) throw new Error(dinhKyRes.error.message);
@@ -942,16 +942,11 @@ function populateDynamicFilterOptions(list){
   fillSelect('fl-nguoi-kiem', inspectors);
 }
 
-// Supabase trả tối đa 1000 dòng/lần → lấy từng trang đến hết. mk() phải tạo truy vấn MỚI
-// mỗi lần gọi và có order theo khoá duy nhất để các trang không trùng/sót.
+// Lấy hết mọi trang (sbTaiHet — shared/supabase-client.js), lỗi thì ném ra.
 async function taiHetTrang(mk){
-  const out = [];
-  for (let off = 0; ; off += 1000) {
-    const { data, error } = await mk().range(off, off + 999);
-    if (error) throw error;
-    out.push(...(data || []));
-    if (!data || data.length < 1000) return out;
-  }
+  const { data, error } = await sbTaiHet(mk);
+  if (error) throw error;
+  return data;
 }
 
 async function searchHistory(){

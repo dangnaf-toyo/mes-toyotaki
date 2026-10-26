@@ -354,12 +354,12 @@ async function loadPeriod(mode, refDate){
   const mondayList = (mode === 'week' ? [monday] : mondaysCovering(from, to)).map(fmtISO);
 
   const [bccRes, sucoRes, lssxRes, chtRes, khsxRes, actionRes] = await Promise.all([
-    sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
-      .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE),
-    sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,van_de,truong_ca')
-      .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE),
-    sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
-      .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE),
+    sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
+      .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_bao_cao')),
+    sbTaiHet(() => sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,van_de,truong_ca')
+      .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_ban_ghi')),
+    sbTaiHet(() => sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
+      .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id')),
     isCurrentPeriod
       ? sb.from('duc_ca_hien_tai').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
           .eq('ngay', todayISO).in('ca', CA_HOP_LE)

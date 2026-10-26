@@ -537,7 +537,7 @@ async function loadAndRender(){
   loadXl();
   const [moldsRes, issuesRes, planRes, khRes, logRes, duyetRes, dLogRes] = await Promise.all([
     sb.from('duc_shot_khuon').select('*'),
-    sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }),
+    sbTaiHet(() => sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }).order('id_van_de')),
     sb.from('duc_khsx_tuan_plan').select('ma_may,ma_sp,so_khuon,t2,t3,t4,t5,t6,t7,cn').eq('tuan_bat_dau', tuan),
     sb.from('duc_khuon_bd_kh_tuan').select('*').eq('tuan_bat_dau', tuan),
     sb.from('duc_khuon_bao_duong_log').select('ma_khuon,loai,ngay,nguoi_thuc_hien').gte('ngay', tuan).lte('ngay', weekEnd),
