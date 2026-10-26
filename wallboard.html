@@ -14,7 +14,8 @@
   ở cuối trang khi mở trang này lúc đã đăng nhập). Thiết kế cố định 1920×1080, tự co theo
   màn hình TV. Các màn tự xoay 20 giây: (1) Sản xuất Đúc, (2) Dòng chảy & chất lượng,
   (3) P-Chart NG OQC sau gia công, (4) P-Chart NG Bavia — từ đầu tháng (T167, RPC wallboard_pchart,
-  tải lại mỗi 5 phút; màn 3–4 chỉ xoay tới khi đã tải được số liệu).
+  tải lại mỗi 5 phút; màn 3–4 chỉ xoay tới khi đã tải được số liệu),
+  (5) Bảng công việc — việc công khai đang mở theo nhóm ưu tiên (T168, RPC wallboard_cong_viec, 60 giây).
   Số liệu: RPC tong_quan_hom_nay + shared/tong-quan.js (chung với index.html), tải lại
   mỗi 60 giây, tải lại cả trang mỗi 6 giờ cho TV chạy lâu không bị đầy bộ nhớ.
   Script viết kiểu cũ (không ?. ??) cho trình duyệt TV đời cũ.
@@ -81,6 +82,7 @@
   <section class="scr off" id="s2"></section>
   <section class="scr off" id="s3"></section>
   <section class="scr off" id="s4"></section>
+  <section class="scr off" id="s5"></section>
 </div>
 <button type="button" id="fs" style="display:none" aria-label="Phóng to toàn màn hình"></button>
 <div id="adm"></div>
@@ -92,8 +94,8 @@
 (function () {
   var KHOA = new URLSearchParams(location.search).get('k');
   var P = TongQuan.pct, N = TongQuan.fmtN;
-  var M = null, PC = null, cur = 0;
-  var SCR = ['s1', 's2', 's3', 's4'];
+  var M = null, PC = null, CVD = null, cur = 0;
+  var SCR = ['s1', 's2', 's3', 's4', 's5'];
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function cls(p) { return p == null ? 'mu' : p >= 0.95 ? 'g' : p >= 0.85 ? 'a' : 'r'; }
@@ -313,25 +315,82 @@
     if (PC.oqc) renderPC('s3', 2, 'P-Chart NG OQC sau gia công', 'kiểm', tinhPC(PC.oqc, PC.tu, PC.den, 0.03));
     if (PC.bavia) renderPC('s4', 3, 'P-Chart NG Bavia', 'SX', tinhPC(PC.bavia, PC.tu, PC.den, 0.02));
   }
-  function taiP() {
-    var xong = function (d) { if (!d || d.ok === false) throw new Error((d && d.error) || 'Không có dữ liệu'); PC = d; renderP(); show(cur); };
+  // Gọi RPC wallboard: TV dùng khoá (không đăng nhập), máy đã đăng nhập dùng phiên
+  function goi(fn) {
     var p = KHOA
-      ? fetch(SUPABASE_URL + '/rest/v1/rpc/wallboard_pchart', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }, body: JSON.stringify({ p_khoa: KHOA }) })
+      ? fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }, body: JSON.stringify({ p_khoa: KHOA }) })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      : sb.rpc('wallboard_pchart', {}).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; });
-    return p.then(xong).catch(function () { /* giữ màn cũ; chưa có thì bỏ qua 2 màn P-Chart */ });
+      : sb.rpc(fn, {}).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; });
+    return p.then(function (d) { if (!d || d.ok === false) throw new Error((d && d.error) || 'Không có dữ liệu'); return d; });
+  }
+  function taiP() {
+    return goi('wallboard_pchart').then(function (d) { PC = d; renderP(); show(cur); })
+      .catch(function () { /* giữ màn cũ; chưa có thì bỏ qua 2 màn P-Chart */ });
   }
 
-  // Các màn đang có số liệu (màn P-Chart chỉ xoay tới khi đã tải được)
-  function coMan() { var a = [0, 1]; if (M && PC && PC.oqc) a.push(2); if (M && PC && PC.bavia) a.push(3); return a; }
+  // ---------- T168: Bảng công việc (chỉ việc công khai đang mở) ----------
+  var CVN = {
+    1: ['Làm ngay', 'Quan trọng + Gấp', '#EF4444'], 2: ['Lên kế hoạch', 'Quan trọng, chưa gấp', '#3B82F6'],
+    3: ['Xử lý nhanh', 'Gấp, ít quan trọng', '#F59E0B'], 4: ['Làm sau', 'Chưa gấp, ít quan trọng', '#64748B'],
+  };
+  var CVTT = { moi: ['Mới', '#33415C', '#CBD5E1'], dang_lam: ['Đang làm', '#1E3A8A', '#BFDBFE'], cho_duyet: ['Chờ duyệt', '#713F12', '#FDE68A'] };
+  function khoang(ms) {
+    var p = Math.abs(ms) / 60000;
+    return p < 60 ? Math.max(1, Math.round(p)) + ' phút' : p < 48 * 60 ? Math.round(p / 60) + ' giờ' : Math.round(p / 1440) + ' ngày';
+  }
+  function ngayGio(d) { return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function renderCV() {
+    if (!M || !CVD) return;
+    var ds = CVD.viec || [], now = Date.now(), MAX = 3;
+    var qh = ds.filter(function (v) { return new Date(v.han).getTime() < now; }).length;
+    var cd = ds.filter(function (v) { return v.tt === 'cho_duyet'; }).length;
+    var x7 = CVD.xong7 || { n: 0, dung_han: 0 };
+    var kp = [
+      ['Việc đang mở', String(ds.length), 'w', ds.filter(function (v) { return v.nhom === 1; }).length + ' việc "Làm ngay"', 'bg-n'],
+      ['Quá hạn', String(qh), qh ? 'r' : 'g', qh ? 'cần xử lý / gia hạn' : 'không có việc quá hạn', qh ? 'bg-r' : 'bg-g'],
+      ['Chờ duyệt', String(cd), cd ? 'a' : 'w', 'đã báo xong, chờ người giao duyệt', cd ? 'bg-a' : 'bg-n'],
+      ['Hoàn thành 7 ngày', String(x7.n), 'w', x7.n ? x7.dung_han + ' / ' + x7.n + ' đúng hạn' : 'chưa có việc hoàn thành', x7.n && x7.dung_han < x7.n ? 'bg-a' : 'bg-g'],
+    ];
+    var cot = [1, 2, 3, 4].map(function (n) {
+      var g = CVN[n], list = ds.filter(function (v) { return v.nhom === n; });
+      list.sort(function (a, b) { return new Date(a.han) - new Date(b.han); });
+      return '<section class="panel" style="min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:16px 18px;border-top:8px solid ' + g[2] + '">' +
+        '<div style="display:flex;align-items:center;gap:12px"><div style="display:flex;flex-direction:column;min-width:0"><h2 style="white-space:nowrap">' + g[0] + '</h2><span class="sub" style="font-size:18px">' + g[1] + '</span></div>' +
+        '<span class="mono" style="margin-left:auto;font-size:40px;font-weight:800;color:' + (list.length ? g[2] : '#5B6B86') + '">' + list.length + '</span></div>' +
+        (list.length ? list.slice(0, MAX).map(function (v) {
+          var h = new Date(v.han), con = h.getTime() - now, tre = con < 0, tt = CVTT[v.tt] || CVTT.moi;
+          var tien = v.con ? 'việc con ' + v.con_xong + '/' + v.con : v.buoc ? 'bước ' + v.buoc_xong + '/' + v.buoc : '';
+          return '<div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:10px;background:' + (tre ? '#2B1216' : '#16213A') + ';border-left:6px solid ' + (tre ? '#EF4444' : g[2]) + '">' +
+            '<div style="font-size:23px;font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + (v.cha ? '<span class="mu">↳ </span>' : '') + esc(v.t) + '</div>' +
+            '<div style="display:flex;gap:10px;font-size:19px;color:#B6C3D8;white-space:nowrap"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">' + esc(v.lam) + ' · ' + esc(v.bp) + '</span>' +
+            (tien ? '<span class="mono mu" style="margin-left:auto;font-size:17px">' + tien + '</span>' : '') + '</div>' +
+            '<div style="display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap;overflow:hidden">' +
+            '<span style="flex:none;padding:2px 10px;border-radius:6px;font-weight:700;background:' + tt[1] + ';color:' + tt[2] + '">' + tt[0] + '</span>' +
+            '<span class="' + (tre ? 'r' : con < 864e5 ? 'a' : 'mu') + '" style="font-weight:700;overflow:hidden;text-overflow:ellipsis">' + (tre ? 'Quá hạn ' + khoang(con) : con < 1728e5 ? 'Còn ' + khoang(con) + ' · ' + ngayGio(h).slice(con < 864e5 ? 6 : 0) : 'Hạn ' + ngayGio(h)) + '</span></div></div>';
+        }).join('') + (list.length > MAX ? '<div class="sub" style="font-size:19px;text-align:center">+ ' + (list.length - MAX) + ' việc khác</div>' : '')
+          : '<div class="sub" style="font-size:20px">Không có việc</div>') + '</section>';
+    }).join('');
+    $('s5').innerHTML = header('Bảng công việc', 4) +
+      '<div class="k4">' + kp.map(function (k) { return '<div class="panel kp ' + k[4] + '"><span class="l">' + k[0] + '</span><span class="v mono ' + k[2] + '">' + esc(k[1]) + '</span><span class="s">' + esc(k[3]) + '</span></div>'; }).join('') + '</div>' +
+      '<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">' + cot + '</div>' +
+      footer('Việc công khai đang mở (Mới / Đang làm / Chờ duyệt) · nhóm ưu tiên = Quan trọng × Gấp (tự thành gấp khi còn ≤ 2 ngày) · xếp theo hạn gần nhất');
+  }
+  function taiCV() {
+    return goi('wallboard_cong_viec').then(function (d) { CVD = d; renderCV(); show(cur); })
+      .catch(function () { /* giữ màn cũ; chưa có thì bỏ qua màn công việc */ });
+  }
+
+  // Các màn đang có số liệu (màn P-Chart / công việc chỉ xoay tới khi đã tải được)
+  function coMan() { var a = [0, 1]; if (M && PC && PC.oqc) a.push(2); if (M && PC && PC.bavia) a.push(3); if (M && CVD) a.push(4); return a; }
   function show(i) { cur = i; SCR.forEach(function (s, k) { $(s).className = 'scr' + (k === i ? '' : ' off'); }); }
   function tai() {
     return TongQuan.load(KHOA).then(function (D) {
       var lan1 = !M;
       M = TongQuan.compute(D, Date.now());
       $('msg').style.display = 'none';
-      render1(); render2(); renderP(); show(cur);
+      render1(); render2(); renderP(); renderCV(); show(cur);
       if (lan1) taiP();
+      taiCV();
     }).catch(function (e) {
       if (M) return; // giữ màn cũ khi rớt mạng tạm thời
       $('msg').textContent = (KHOA ? '' : 'Mở bằng link có khoá (?k=…) hoặc đăng nhập. ') + 'Không tải được số liệu: ' + (e.message || e);
