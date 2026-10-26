@@ -1032,6 +1032,8 @@ function numOrNull(v){ return (v === '' || v === null || v === undefined) ? null
 function closeModal(){ document.querySelectorAll('.modal-mask').forEach(m => m.classList.remove('open')); }
 let toastTimer;
 function showToast(text, isError){
+  // T170: lỗi chặn (⛔ — vd chưa có IPQC OK nên chưa được chạy lại) phải bấm xác nhận, không để toast tự tắt
+  if (isError && String(text).includes('⛔')) { alert(String(text).replace(/^Lỗi:\s*/, '')); return; }
   const toast = document.getElementById('toast');
   document.getElementById('toast-text').textContent = text;
   toast.classList.toggle('error', !!isError);
@@ -3384,19 +3386,7 @@ async function submitResolve(){
     });
     hideOverlay(); closeModal();
     showToast('✓ Đã lưu sự cố — dừng ' + d.thoi_gian_dung_phut + ' phút');
-    // Giai đoạn 1 (mềm) của yêu cầu bắt buộc IPQC OK trước khi kết thúc sự cố
-    // (A1/A2/A3/B1/B2/C3/E1/F1) — RPC vẫn cho kết thúc nhưng báo cờ này khi
-    // chưa có kết quả IPQC OK, phân biệt "chưa kiểm" và "đã kiểm nhưng NG"
-    // qua canh_bao_ipqc_loai. Dùng alert() (không phải showToast) để chắc
-    // chắn trưởng ca phải bấm xác nhận mới đóng được, tránh bỏ sót cảnh báo.
-    if (d.canh_bao_ipqc) {
-      const suCoTxt = d.id_su_co ? ' ' + d.id_su_co : '';
-      if (d.canh_bao_ipqc_loai === 'ng') {
-        alert('🛑 IPQC ĐÃ kiểm tra sự cố' + suCoTxt + ' nhưng kết quả KHÔNG ĐẠT (NG/Cảnh báo) — trưởng ca cần xem lại và xử lý.');
-      } else {
-        alert('⚠️ Hệ thống chưa ghi nhận có kết quả kiểm tra IPQC cho sự cố' + suCoTxt + ', hãy nhắc nhân viên IPQC kiểm tra và hoàn thiện trên hệ thống.');
-      }
-    }
+    // T170: sự cố A1/A2/A3/B1/B2/C3/E1/F1 chưa có IPQC OK thì RPC từ chối (⛔) → onError hiện hộp thoại.
     loadShiftState(false);
   } catch (e) { onError(e); }
 }
