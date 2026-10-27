@@ -19,7 +19,7 @@ const ROLES = [
   'nhan_vien_oqc', 'nhan_vien_son', 'iatf_admin', 'nhan_vien_bao_duong_khuon',
   'nhan_vien_thong_ke', 'iqc', 'to_truong_khuon',
 ];
-const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA'];
+const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA', 'Thiết bị'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
