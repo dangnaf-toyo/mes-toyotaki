@@ -131,6 +131,11 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
 .side-txt{font-size:13px;line-height:1.6;color:#334155}
 .side-txt ul{padding-left:18px}
 .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+/* Lưu tạm (bản nháp trong trình duyệt) */
+.nhap-tt{font-size:12px;color:var(--text-muted);text-align:right;min-height:16px}
+.nhap-band{background:#FFFBEB;border:1px solid #FCD34D;color:#78350F;border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.5;display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap}
+.nhap-band[hidden]{display:none}
+.nhap-band .txt{flex:1 1 260px}
 
 /* Dialog dự án */
 .ov{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:6000;padding:16px}
@@ -181,6 +186,11 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
 <template id="tplForm">
 <form class="cols" id="frm" novalidate autocomplete="off">
   <div class="col-main">
+    <div class="nhap-band" id="nhapBand" hidden>
+      <span class="txt" id="nhapTxt"></span>
+      <button type="button" class="btn btn-pri btn-sm" id="btnKhoiPhuc">Khôi phục</button>
+      <button type="button" class="btn btn-out btn-sm" id="btnBoNhap">Bỏ bản nháp</button>
+    </div>
     <div class="cha-band" id="chaBand" hidden></div>
 
     <section class="panel">
@@ -296,8 +306,10 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
     </section>
     <div class="actions">
       <button type="button" class="btn btn-out" id="btnHuy">Huỷ</button>
+      <button type="button" class="btn btn-out" id="btnLuuTam" hidden>Lưu tạm</button>
       <button type="submit" class="btn btn-pri" id="btnLuu">Giao việc</button>
     </div>
+    <div class="nhap-tt" id="nhapTT"></div>
   </aside>
 </form>
 </template>
@@ -368,6 +380,15 @@ function tachHan(ts) {
     const o = {}; f.formatToParts(new Date(ts)).forEach(x => { o[x.type] = x.value; }); return o;
   })();
   return { ngay: p.year + '-' + p.month + '-' + p.day, gio: (p.hour === '24' ? '00' : p.hour) + ':' + p.minute };
+}
+// Lưu tạm: bản nháp form giao việc mới / thêm việc con, giữ trong trình duyệt (localStorage) theo người dùng.
+let nhapKey = null;
+function docNhap() { try { return nhapKey ? JSON.parse(localStorage.getItem(nhapKey) || 'null') : null; } catch (e) { return null; } }
+function xoaNhap() { try { if (nhapKey) localStorage.removeItem(nhapKey); } catch (e) { /* bỏ qua */ } }
+function gioPhut(ms) {
+  const o = {}; new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', hour12: false })
+    .formatToParts(new Date(ms)).forEach(x => { o[x.type] = x.value; });
+  return o.hour + ':' + o.minute + ' ngày ' + o.day + '/' + o.month;
 }
 function autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.max(64, el.scrollHeight + 2) + 'px'; }
 function setErr(key, msg) {
@@ -696,6 +717,7 @@ async function luu(e) {
     if (chaId) {
       const p = Object.assign({}, v, { checklist: st.checklist.map(s => String(s).trim()).filter(Boolean) });
       await CV.rpc('cv_tao_viec_con', { p_cha: chaId, p });
+      xoaNhap();
       CV.toast('Đã thêm việc con', 'ok');
       location.href = 'cong-viec-chi-tiet.html?id=' + chaId;
       return;
@@ -703,6 +725,7 @@ async function luu(e) {
     if (!editId) {
       const p = Object.assign({}, v, { checklist: st.checklist.map(s => String(s).trim()).filter(Boolean) });
       const id = await CV.rpc('cv_tao_viec', { p });
+      xoaNhap();
       const loiCon = [];
       for (const c of conHopLe().ds) {
         try { await CV.rpc('cv_tao_viec_con', { p_cha: id, p: c }); }
@@ -980,7 +1003,73 @@ async function init() {
 
   // Cập nhật nhóm ưu tiên khi thời gian trôi (mốc 48 giờ)
   setInterval(() => { if (!st.saving) veUuTien(); }, 60000);
-  if (!editId) $('fTieuDe').focus();
+
+  // Lưu tạm — chỉ khi giao việc mới / thêm việc con (sửa việc đã có thì không cần)
+  if (!editId && st.me) {
+    nhapKey = 'cvNhapGiao:' + st.me.id + ':' + (chaId ? 'cha' + chaId : 'moi');
+    const coId = id => id && nguoiTheoId(id) ? id : null;
+    const chupNhap = () => ({
+      luc: Date.now(),
+      tieu_de: $('fTieuDe').value, mo_ta: $('fMoTa').value,
+      nguoi_lam: st.nguoiLam, phoi_hop: st.phoiHop.slice(),
+      bo_phan: $('fBoPhan').value, du_an: $('fDuAn').value,
+      han_ngay: $('fHanNgay').value, han_gio: $('fHanGio').value,
+      quan_trong: st.quanTrong, gap: st.gap, lap_lai: st.lapLai, hien_thi: st.hienThi, can_duyet: st.canDuyetTuChon,
+      checklist: st.checklist.slice(), lien_ket: st.lienKet.slice(), con: st.con.map(c => Object.assign({}, c)),
+    });
+    const coNoiDung = d => !!(d.tieu_de.trim() || d.mo_ta.trim() || d.checklist.some(s => String(s).trim()) || d.con.some(c => String(c.tieu_de || '').trim()));
+    const luuNhap = (bao) => {
+      if (st.saving) return;
+      const d = chupNhap();
+      if (!coNoiDung(d)) { if (bao) CV.toast('Chưa có nội dung để lưu tạm.'); return; }
+      try { localStorage.setItem(nhapKey, JSON.stringify(d)); }
+      catch (e) { if (bao) CV.toast('Trình duyệt không cho lưu tạm (chế độ ẩn danh?).', 'err'); return; }
+      $('nhapTT').textContent = 'Đã lưu tạm lúc ' + gioPhut(d.luc) + ' — ra khỏi trang vẫn khôi phục được';
+      if (bao) CV.toast('Đã lưu tạm', 'ok');
+    };
+    const napNhap = d => {
+      $('fTieuDe').value = d.tieu_de || ''; $('fMoTa').value = d.mo_ta || '';
+      st.nguoiLam = coId(d.nguoi_lam);
+      st.phoiHop = (d.phoi_hop || []).filter(id => coId(id) && id !== st.nguoiLam);
+      if (!chaId) {
+        if (d.bo_phan && st.boPhan.includes(d.bo_phan)) $('fBoPhan').value = d.bo_phan;
+        if (/^\d+$/.test(d.du_an || '')) veDuAn(d.du_an);
+        st.quanTrong = !!d.quan_trong; st.hienThi = d.hien_thi || 'cong_khai';
+      }
+      if (d.han_ngay) $('fHanNgay').value = d.han_ngay;
+      if (d.han_gio) $('fHanGio').value = d.han_gio;
+      st.gap = !!d.gap; st.lapLai = d.lap_lai || 'khong'; st.canDuyetTuChon = d.can_duyet !== false;
+      st.checklist = Array.isArray(d.checklist) ? d.checklist.slice() : [];
+      st.lienKet = Array.isArray(d.lien_ket) ? d.lien_ket.filter(x => x && x.loai && x.ma) : [];
+      if (!chaId) st.con = (Array.isArray(d.con) ? d.con : []).map(c => ({ tieu_de: c.tieu_de || '', nguoi_lam: coId(c.nguoi_lam), ngay: c.ngay || '', gio: c.gio || '17:00' }));
+      pkLam.ve(); pkPh.ve();
+      veChecklist(); veLienKet(); veUuTien(); veHienThi(); veCon(); veHanSau(); veTaiViec(); veXemTruoc();
+      autoGrow($('fMoTa'));
+    };
+
+    $('btnLuuTam').hidden = false;
+    $('btnLuuTam').addEventListener('click', () => luuNhap(true));
+    // Tự lưu tạm 1,5 giây sau mỗi lần sửa — lỡ bấm ra ngoài vẫn còn
+    let hen = null;
+    const henLuu = e => {
+      if (!$('nhapBand').hidden) {
+        if (e.type !== 'input') return;        // còn bản cũ chờ chọn: chưa ghi đè
+        $('nhapBand').hidden = true;           // gõ nội dung mới = bỏ qua bản cũ
+      }
+      clearTimeout(hen); hen = setTimeout(() => luuNhap(false), 1500);
+    };
+    ['input', 'change', 'click'].forEach(ev => frm.addEventListener(ev, henLuu));
+
+    const cu = docNhap();
+    if (cu && coNoiDung(Object.assign({ tieu_de: '', mo_ta: '', checklist: [], con: [] }, cu))) {
+      $('nhapTxt').innerHTML = '📝 Có nội dung ' + (chaId ? 'việc con' : 'giao việc') + ' <b>lưu tạm lúc ' + esc(gioPhut(cu.luc)) + '</b>' +
+        (cu.tieu_de ? ': "' + esc(cu.tieu_de.slice(0, 80)) + '"' : '') + ' — chưa gửi.';
+      $('nhapBand').hidden = false;
+      $('btnKhoiPhuc').addEventListener('click', () => { napNhap(cu); $('nhapBand').hidden = true; $('nhapTT').textContent = 'Đã khôi phục bản lưu tạm lúc ' + gioPhut(cu.luc); CV.toast('Đã khôi phục nội dung lưu tạm', 'ok'); });
+      $('btnBoNhap').addEventListener('click', () => { if (!confirm('Bỏ bản lưu tạm này? Nội dung sẽ mất hẳn.')) return; xoaNhap(); $('nhapBand').hidden = true; });
+    }
+  }
+  if (!editId && $('nhapBand').hidden) $('fTieuDe').focus();
 }
 init();
 })();
