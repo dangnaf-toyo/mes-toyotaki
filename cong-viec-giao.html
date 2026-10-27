@@ -86,9 +86,10 @@ textarea.inp{resize:vertical;line-height:1.45;min-height:64px;overflow:hidden}
 
 /* Việc con (T165) */
 .cons{display:flex;flex-direction:column;gap:8px}
-.con{display:grid;grid-template-columns:22px minmax(0,2fr) minmax(0,1.5fr) 150px 112px 32px;gap:6px;align-items:start}
+.con{display:grid;grid-template-columns:22px minmax(0,1fr) 190px 150px 112px 32px;gap:6px;align-items:start}
 .con .no{color:var(--text-dim);font-size:12px;font-weight:600;padding-top:11px;text-align:right}
 .con .inp{min-height:40px}
+.con textarea.inp{min-height:40px;resize:none;padding-top:9px;padding-bottom:9px}
 .cha-band{background:#EEF2FF;border:1px solid #C7D2FE;color:#312E81;border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.5}
 .cha-band b{color:#1E1B4B}
 .han-sau{font-size:12px;color:var(--warn-fg);font-weight:600}
@@ -458,7 +459,7 @@ function themBuoc() {
 function veCon() {
   $('cons').innerHTML = st.con.map((c, i) =>
     '<div class="con" data-i="' + i + '"><span class="no">' + (i + 1) + '.</span>' +
-    '<input class="inp" data-con="tieu_de" value="' + esc(c.tieu_de) + '" maxlength="300" placeholder="Tên việc con" aria-label="Tên việc con ' + (i + 1) + '">' +
+    '<textarea class="inp" data-con="tieu_de" rows="1" maxlength="300" placeholder="Nội dung việc con" aria-label="Nội dung việc con ' + (i + 1) + '">' + esc(c.tieu_de) + '</textarea>' +
     '<div class="pk" data-pk="' + i + '"></div>' +
     '<input class="inp" type="date" data-con="ngay" value="' + esc(c.ngay) + '" min="' + CV.ngayVN() + '" aria-label="Ngày hạn việc con ' + (i + 1) + '">' +
     '<input class="inp" type="time" data-con="gio" value="' + esc(c.gio) + '" aria-label="Giờ hạn việc con ' + (i + 1) + '">' +
@@ -468,7 +469,10 @@ function veCon() {
     get: () => c.nguoi_lam ? [c.nguoi_lam] : [], add: id => { c.nguoi_lam = id; }, remove: () => { c.nguoi_lam = null; },
     exclude: () => [], onChange: () => { setErr('con', ''); veXemTruoc(); },
   }));
+  $('cons').querySelectorAll('textarea[data-con]').forEach(conGrow);
 }
+// Ô nội dung việc con: tự giãn theo số dòng (tối thiểu 1 dòng = 40px).
+function conGrow(el) { el.style.height = 'auto'; el.style.height = Math.max(40, el.scrollHeight + 2) + 'px'; }
 function themCon() {
   st.con.push({ tieu_de: '', nguoi_lam: null, ngay: $('fHanNgay').value || ngayCong(7), gio: $('fHanGio').value || '17:00' });
   veCon();
@@ -922,6 +926,7 @@ async function init() {
   $('cons').addEventListener('input', e => {
     const k = e.target.dataset.con, row = e.target.closest('[data-i]');
     if (!k || !row) return;
+    if (e.target.tagName === 'TEXTAREA') conGrow(e.target);
     st.con[Number(row.dataset.i)][k] = e.target.value; setErr('con', ''); veXemTruoc();
   });
   $('cons').addEventListener('click', e => { const b = e.target.closest('[data-xoacon]'); if (!b) return; st.con.splice(Number(b.dataset.xoacon), 1); veCon(); veXemTruoc(); });
