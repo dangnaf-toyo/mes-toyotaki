@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Giao việc từ Excel — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="shared/cong-viec.css?v=t165">
+<!--
+  cong-viec-nhap-excel.html — Giao việc hàng loạt từ file Excel (biên bản họp) (T175).
+  - "Tải file mẫu": SheetJS tạo file mẫu ngay trên trình duyệt (sheet Giao viec + Huong dan + Danh sach
+    người/bộ phận lấy từ hệ thống) → không có file tĩnh nào phải cập nhật tay.
+  - Chọn file: tìm dòng tiêu đề (ô chứa "Nội dung công việc"), đọc "Tên cuộc họp"/"Ngày họp" ở các dòng trên.
+    Tên người khớp theo họ tên / mã NV (bỏ dấu, không phân biệt hoa thường; khớp tên gọi nếu chỉ 1 người).
+  - Bảng xem trước sửa được từng dòng; "Giao N việc" gọi cv_tao_viec lần lượt (như giao tay: chuông, lịch sử).
+  - Gom các việc vào 1 Dự án (chọn có sẵn hoặc tạo mới theo tên cuộc họp) → theo dõi ở Bảng công việc ?du_an=.
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#475569;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--info-bg:#EFF6FF;--info-border:#93C5FD;--info-fg:#1D4ED8;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+button,input,select,textarea{font-family:inherit}
+a{color:var(--accent)}a:hover{color:var(--accent-hover)}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+
+.panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm)}
+.h{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase}
+.small{font-weight:400;color:var(--text-muted);font-size:12px;line-height:1.5}
+.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:#334155;min-width:0}
+.inp{border:1px solid var(--border-strong);border-radius:6px;padding:7px 9px;font-size:13px;font-weight:400;color:var(--text);min-height:36px;width:100%;background:#fff}
+.inp:focus{outline:2px solid #93C5FD;outline-offset:0;border-color:var(--accent)}
+.inp.bad{border-color:var(--alarm-fg);background:#FFFBFB}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{min-height:40px;padding:8px 16px;border-radius:6px;border:none;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn-pri{background:var(--accent);color:#fff}.btn-pri:hover:not(:disabled){background:var(--accent-hover);color:#fff}
+.btn-out{background:#fff;color:var(--text);border:1px solid var(--border-strong)}.btn-out:hover{background:var(--bg-sunken);color:var(--text)}
+.btn-sm{min-height:34px;padding:5px 12px;font-size:13px}
+.steps-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.steps-guide div{border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;background:var(--bg-sunken)}
+.steps-guide b{display:block;margin-bottom:2px}
+.drop{border:2px dashed var(--border-strong);border-radius:8px;padding:18px;text-align:center;color:var(--text-muted);cursor:pointer;background:#fff}
+.drop.on{border-color:var(--accent);background:var(--info-bg)}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.sum{display:flex;gap:8px;flex-wrap:wrap;font-size:13px}
+.sum span{padding:4px 10px;border-radius:14px;background:var(--bg-sunken);font-weight:600}
+.sum .ok{background:var(--run-bg);color:var(--run-fg)}
+.sum .bad{background:var(--alarm-bg);color:var(--alarm-fg)}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table.tbl{border-collapse:collapse;width:100%;min-width:1120px;font-size:13px}
+.tbl th{background:var(--bg-sunken);text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);padding:7px 6px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
+.tbl td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:top}
+.tbl tr.off td{opacity:.45}
+.tbl tr.err td{background:#FFFBFB}
+.tbl tr.done td{background:var(--run-bg)}
+.tbl textarea.inp{resize:vertical;min-height:36px;line-height:1.4;overflow:hidden}
+.tbl .c-no{width:28px;color:var(--text-dim);font-weight:600;padding-top:12px;text-align:right}
+.tbl .c-chk{width:30px;padding-top:12px}
+.tbl .c-nd{min-width:260px}
+.tbl .c-ng{width:180px}
+.tbl .c-ph{width:170px}
+.tbl .c-han{width:150px}
+.tbl .c-bp{width:140px}
+.tbl .c-uu{width:104px;font-size:12px;white-space:nowrap}
+.tbl .c-tt{width:190px;font-size:12px;line-height:1.45}
+.tbl .goc{font-size:11px;color:var(--text-muted);margin-top:2px}
+.tbl .goc.bad{color:var(--alarm-fg);font-weight:600}
+.loi{color:var(--alarm-fg);font-weight:600}
+.xong{color:var(--run-fg);font-weight:600}
+.uu label{display:flex;gap:4px;align-items:center;cursor:pointer}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.loading{padding:24px;text-align:center;color:var(--text-muted)}
+@media (max-width:760px){ .steps-guide,.g3{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:640px){
+  body{padding:4px 4px 60px}
+  header{gap:8px 10px;padding:8px 10px}
+  .header-clock,.header-divider{display:none}
+  .panel{padding:12px}
+  .actions .btn{flex:1}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki · Quản lý công việc</div>
+      <div class="title">Giao việc từ Excel</div>
+    </div>
+    <div class="header-divider"></div>
+    <nav class="cv-modtabs" data-cv-tabs=""></nav>
+    <div class="header-clock">
+      <div class="date" id="hdrClockDate"></div>
+      <div class="time" id="hdrClockTime"></div>
+    </div>
+  </header>
+
+  <div id="root"><div class="panel loading">Đang tải…</div></div>
+</div>
+
+<template id="tplMain">
+  <section class="panel">
+    <span class="h">Giao nhiều việc cùng lúc từ biên bản họp</span>
+    <div class="steps-guide">
+      <div><b>1. Tải file mẫu</b>File có sẵn danh sách người và bộ phận trong MES để chép cho đúng tên.<br>
+        <button type="button" class="btn btn-out btn-sm" id="btnMau" style="margin-top:8px">⬇ Tải file mẫu Excel</button></div>
+      <div><b>2. Chép biên bản vào file mẫu</b>Mỗi việc 1 dòng: nội dung, người thực hiện, hạn, bộ phận. Ghi tên cuộc họp ở đầu file.</div>
+      <div><b>3. Chọn file, kiểm tra, bấm Giao</b>Xem trước từng dòng, sửa chỗ tô đỏ. Các việc được gom vào 1 dự án theo cuộc họp để theo dõi tiến độ.</div>
+    </div>
+    <label class="drop" id="drop">
+      <input type="file" id="fFile" accept=".xlsx,.xls" hidden>
+      <span id="dropTxt">📄 Bấm để chọn file Excel, hoặc kéo thả file vào đây</span>
+    </label>
+  </section>
+
+  <section class="panel" id="blkXem" hidden>
+    <span class="h">Cuộc họp &amp; theo dõi</span>
+    <div class="g3">
+      <label class="f">Tên cuộc họp
+        <input class="inp" id="fHop" maxlength="200" placeholder="VD: Họp giao ban sản xuất tuần 44"></label>
+      <label class="f">Ngày họp
+        <input class="inp" type="date" id="fNgayHop"></label>
+      <label class="f">Gom các việc vào dự án (để theo dõi tiến độ)
+        <select class="inp" id="fDuAn"></select></label>
+    </div>
+    <div class="small">Mỗi việc ghi thêm vào mô tả: "Từ biên bản họp: <i>tên cuộc họp</i> (ngày)". Người thực hiện nhận chuông như khi giao việc bình thường.</div>
+  </section>
+
+  <section class="panel" id="blkBang" hidden>
+    <div class="row" style="justify-content:space-between">
+      <span class="h">Xem trước các việc sẽ giao</span>
+      <div class="sum" id="sum"></div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th class="c-chk"><input type="checkbox" id="chkAll" checked aria-label="Chọn tất cả"></th><th class="c-no">#</th>
+          <th class="c-nd">Nội dung công việc / yêu cầu kết quả</th><th class="c-ng">Người thực hiện</th><th class="c-ph">Người phối hợp</th>
+          <th class="c-han">Hạn hoàn thành</th><th class="c-bp">Bộ phận</th><th class="c-uu">Ưu tiên</th><th class="c-tt">Kiểm tra</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <span class="small" id="tienDo"></span>
+      <button type="button" class="btn btn-out" id="btnChonLai">Chọn file khác</button>
+      <button type="button" class="btn btn-pri" id="btnGiao">Giao việc</button>
+    </div>
+  </section>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="shared/cong-viec.js?v=t165"></script>
+<script>
+(function () {
+const $ = id => document.getElementById(id);
+const esc = s => CV.esc(s);
+const st = { me: null, nguoi: [], boPhan: [], duAn: [], dong: [], dangGiao: false };
+
+// Cột của file mẫu — nhận theo từ khoá trong tiêu đề (không phụ thuộc thứ tự cột)
+const COT = [
+  { k: 'noi_dung', ten: 'Nội dung công việc (*)', nhan: ['noi dung', 'cong viec', 'van de'] },
+  { k: 'mo_ta', ten: 'Yêu cầu kết quả / mô tả', nhan: ['yeu cau', 'mo ta', 'ket qua mong muon'] },
+  { k: 'nguoi_lam', ten: 'Người thực hiện (*)', nhan: ['nguoi thuc hien', 'phu trach', 'nguoi lam', 'dam nhiem', 'pic'] },
+  { k: 'phoi_hop', ten: 'Người phối hợp', nhan: ['phoi hop', 'ho tro'] },
+  { k: 'han', ten: 'Hạn hoàn thành (*) (ngày/tháng/năm)', nhan: ['han', 'deadline', 'thoi han'] },
+  { k: 'gio', ten: 'Giờ hạn (mặc định 17:00)', nhan: ['gio'] },
+  { k: 'bo_phan', ten: 'Bộ phận (*)', nhan: ['bo phan'] },
+  { k: 'quan_trong', ten: 'Quan trọng (x)', nhan: ['quan trong'] },
+  { k: 'gap', ten: 'Gấp (x)', nhan: ['gap'] },
+  { k: 'checklist', ten: 'Các bước (mỗi bước 1 dòng trong ô)', nhan: ['cac buoc', 'checklist'] },
+];
+
+// ── Tiện ích ─────────────────────────────────────────────────────────────────
+function boDau(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function startClock() {
+  const tick = () => {
+    const d = new Date();
+    $('hdrClockDate').textContent = d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    $('hdrClockTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh' });
+  };
+  tick(); setInterval(tick, 1000);
+}
+const pad = n => String(n).padStart(2, '0');
+// Ô ngày Excel (Date / số serial / "15/11/2026" / "15/11" / "2026-11-15") → 'YYYY-MM-DD' | null
+function docNgay(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) return v.getFullYear() + '-' + pad(v.getMonth() + 1) + '-' + pad(v.getDate());
+  if (typeof v === 'number') { const d = XLSX.SSF.parse_date_code(v); return d ? d.y + '-' + pad(d.m) + '-' + pad(d.d) : null; }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + '-' + pad(m[2]) + '-' + pad(m[3]);
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?/);
+  if (m) {
+    const nam = m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) : CV.ngayVN().slice(0, 4);
+    const d = Number(m[1]), th = Number(m[2]);
+    if (d >= 1 && d <= 31 && th >= 1 && th <= 12) return nam + '-' + pad(th) + '-' + pad(d);
+  }
+  return null;
+}
+// Ô giờ (Date / phân số ngày / "17:00" / "17h30") → 'HH:MM' | null
+function docGio(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) return pad(v.getHours()) + ':' + pad(v.getMinutes());
+  if (typeof v === 'number') { const p = Math.round((v % 1) * 1440); return pad(Math.floor(p / 60)) + ':' + pad(p % 60); }
+  const m = String(v).trim().match(/^(\d{1,2})\s*[:hH]\s*(\d{0,2})/);
+  return m && Number(m[1]) < 24 ? pad(m[1]) + ':' + pad(m[2] || 0) : null;
+}
+const coDanh = v => /^(x|v|✓|✔|co|có|yes|1|true)$/i.test(String(v == null ? '' : v).trim());
+
+// Tên trong biên bản → user_id. Khớp họ tên đủ / mã NV; nếu chỉ ghi tên gọi ("Tuấn", "a Mẫn") thì khớp
+// khi có đúng 1 người có họ tên kết thúc bằng tên đó.
+function timNguoi(ten) {
+  const t = boDau(ten).replace(/^(anh|chi|em|a|c|e|mr|ms)\.?\s+/, '');
+  if (!t) return { id: null };
+  const du = st.nguoi.filter(n => boDau(n.ten) === t);
+  if (du.length === 1) return { id: du[0].user_id };
+  const goi = st.nguoi.filter(n => (' ' + boDau(n.ten)).endsWith(' ' + t));
+  if (du.length > 1 || goi.length > 1) return { id: null, nhieu: true };   // trùng tên → bắt chọn, kể cả khi trùng mã NV
+  const ma = st.nguoi.filter(n => n.username && boDau(n.username) === t);
+  if (ma.length === 1) return { id: ma[0].user_id };
+  return goi.length === 1 ? { id: goi[0].user_id } : { id: null };
+}
+function tachTen(s) { return String(s == null ? '' : s).split(/[,;\/\n+]| và /i).map(x => x.trim()).filter(Boolean); }
+function timBoPhan(s) { const t = boDau(s); return st.boPhan.find(b => boDau(b) === t) || st.boPhan.find(b => t && boDau(b).includes(t)) || ''; }
+
+// ── File mẫu ─────────────────────────────────────────────────────────────────
+function taiMau() {
+  const ten = id => (st.nguoi.find(n => n.user_id === id) || {}).ten;
+  const nguoiVD = st.nguoi.find(n => n.user_id !== st.me.id) || st.nguoi[0] || { ten: 'Nguyễn Văn A' };
+  const ngay = (n) => { const d = new Date(Date.now() + n * 864e5); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); };
+  const aoa = [
+    ['BIÊN BẢN HỌP — DANH SÁCH VIỆC GIAO'],
+    ['Tên cuộc họp:', 'Họp giao ban sản xuất tuần ...'],
+    ['Ngày họp:', ngay(0)],
+    ['Chủ trì:', ten(st.me.id) || ''],
+    [],
+    ['STT'].concat(COT.map(c => c.ten)),
+    [1, 'Ví dụ: Khắc phục rò dầu thủy lực máy DC6', 'Không còn rò dầu sau 3 ca chạy liên tục', nguoiVD.ten, '', ngay(3), '17:00', st.boPhan[0] || 'Đúc', 'x', '', 'Kiểm tra khớp nối\nThay gioăng\nChạy thử 3 ca'],
+    [2, 'Ví dụ: Cập nhật tiêu chuẩn kiểm tra bavia mã A-1023', '', nguoiVD.ten, '', ngay(7), '', st.boPhan[0] || 'Đúc', '', '', ''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 14 }, { wch: 46 }, { wch: 34 }, { wch: 24 }, { wch: 22 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 11 }, { wch: 8 }, { wch: 34 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  const hd = XLSX.utils.aoa_to_sheet([
+    ['HƯỚNG DẪN NHẬP BIÊN BẢN HỌP VÀO MES'],
+    [],
+    ['1', 'Ghi Tên cuộc họp và Ngày họp ở đầu sheet "Giao viec". Các việc sẽ được gom vào 1 dự án mang tên cuộc họp để theo dõi tiến độ.'],
+    ['2', 'Mỗi việc 1 dòng, bắt đầu ngay dưới dòng tiêu đề. Xoá 2 dòng ví dụ trước khi nhập. Không đổi tên các cột.'],
+    ['3', 'Cột có (*) là bắt buộc: Nội dung công việc, Người thực hiện, Hạn hoàn thành, Bộ phận.'],
+    ['4', 'Người thực hiện: ghi đúng 1 người, chép họ tên ở sheet "Danh sach" cho chắc. Ghi tên gọi (VD "Tuấn") cũng được nếu MES chỉ có 1 người tên đó.'],
+    ['5', 'Người phối hợp: nhiều người thì cách nhau dấu phẩy.'],
+    ['6', 'Hạn hoàn thành: ngày/tháng/năm (VD 15/11/2026). Giờ hạn bỏ trống = 17:00. Hạn phải sau thời điểm giao.'],
+    ['7', 'Bộ phận: chép đúng tên ở sheet "Danh sach".'],
+    ['8', 'Quan trọng / Gấp: đánh "x" nếu có. Việc Quan trọng luôn cần người giao duyệt khi hoàn thành.'],
+    ['9', 'Các bước: mỗi bước 1 dòng trong cùng ô (Alt+Enter để xuống dòng). Người làm phải tick đủ các bước mới báo xong.'],
+    ['10', 'Vào MES › Công việc › Giao việc › "Nhập từ Excel", chọn file, kiểm tra bảng xem trước (sửa ô tô đỏ) rồi bấm Giao việc.'],
+  ]);
+  hd['!cols'] = [{ wch: 5 }, { wch: 120 }];
+  const n = Math.max(st.nguoi.length, st.boPhan.length);
+  const dsRows = [['Họ tên người dùng', 'Mã NV', '', 'Bộ phận']];
+  for (let i = 0; i < n; i++) dsRows.push([st.nguoi[i] ? st.nguoi[i].ten : '', st.nguoi[i] ? (st.nguoi[i].username || '') : '', '', st.boPhan[i] || '']);
+  const ds = XLSX.utils.aoa_to_sheet(dsRows);
+  ds['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 3 }, { wch: 24 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Giao viec');
+  XLSX.utils.book_append_sheet(wb, hd, 'Huong dan');
+  XLSX.utils.book_append_sheet(wb, ds, 'Danh sach');
+  XLSX.writeFile(wb, 'Mau_giao_viec_bien_ban_hop.xlsx');
+}
+
+// ── Đọc file ─────────────────────────────────────────────────────────────────
+async function docFile(file) {
+  if (!file) return;
+  if (!/\.xlsx?$/i.test(file.name)) { CV.toast('Chỉ nhận file Excel (.xlsx, .xls).', 'err'); return; }
+  let wb;
+  try { wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true }); }
+  catch (e) { CV.toast('Không đọc được file: ' + (e.message || e), 'err'); return; }
+  // Sheet có dòng tiêu đề chứa "Nội dung công việc" (ưu tiên sheet "Giao viec")
+  let rows = null, hdr = -1;
+  const ten = ['Giao viec'].concat(wb.SheetNames.filter(n => n !== 'Giao viec'));
+  for (const sn of ten) {
+    if (!wb.Sheets[sn]) continue;
+    const r = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '' });
+    const i = r.findIndex(x => x.some(c => /noi dung|cong viec/.test(boDau(c))) && x.some(c => /nguoi|phu trach|han/.test(boDau(c))));
+    if (i >= 0) { rows = r; hdr = i; break; }
+  }
+  if (!rows) { CV.toast('Không thấy dòng tiêu đề có cột "Nội dung công việc" và "Người thực hiện". Hãy dùng file mẫu.', 'err'); return; }
+
+  // Tên / ngày cuộc họp ở các dòng phía trên tiêu đề
+  let hop = '', ngayHop = null;
+  rows.slice(0, hdr).forEach(r => r.forEach((c, j) => {
+    const t = boDau(c), v = r.slice(j + 1).find(x => String(x).trim() !== '');
+    if (/ten cuoc hop|cuoc hop|noi dung hop/.test(t) && v != null && !hop) hop = String(v).trim();
+    if (/ngay hop/.test(t) && v != null && !ngayHop) ngayHop = docNgay(v);
+  }));
+  hop = hop.replace(/\.\.\.$/, '').trim();
+
+  // Cột → chỉ số (khớp từ khoá dài trước để "giờ" không ăn "người", "gấp" không ăn "phối hợp")
+  const h = rows[hdr].map(boDau), idx = {};
+  COT.forEach(c => {
+    const j = h.findIndex((x, jj) => x && !Object.values(idx).includes(jj) && c.nhan.some(n => x === n || x.startsWith(n + ' ') || x.includes(n) && n.length > 4));
+    if (j >= 0) idx[c.k] = j;
+  });
+  if (idx.noi_dung == null) { CV.toast('Không thấy cột "Nội dung công việc".', 'err'); return; }
+
+  const homNay = CV.ngayVN();
+  st.dong = rows.slice(hdr + 1).map((r, i) => {
+    const g = k => idx[k] == null ? '' : r[idx[k]];
+    const nd = String(g('noi_dung')).trim();
+    if (!nd || /^vi du:/i.test(boDau(nd))) return null;
+    const tenLam = String(g('nguoi_lam')).trim();
+    const lam = timNguoi(tenLam);
+    const phTen = tachTen(g('phoi_hop'));
+    const ph = phTen.map(t => ({ ten: t, id: timNguoi(t).id }));
+    const hanGoc = g('han');
+    const bpGoc = String(g('bo_phan')).trim();
+    return {
+      dongExcel: hdr + 2 + i, chon: true, ketQua: null,
+      tieu_de: nd.slice(0, 300), mo_ta: String(g('mo_ta')).trim(),
+      tenLam, nguoi_lam: lam.id, lamNhieu: !!lam.nhieu,
+      phoiHop: ph.filter(x => x.id).map(x => x.id), phThieu: ph.filter(x => !x.id).map(x => x.ten),
+      hanGoc: hanGoc instanceof Date ? '' : String(hanGoc).trim(), ngay: docNgay(hanGoc) || '', gio: docGio(g('gio')) || '17:00',
+      bpGoc, bo_phan: timBoPhan(bpGoc),
+      quan_trong: coDanh(g('quan_trong')), gap: coDanh(g('gap')),
+      checklist: String(g('checklist')).split(/\r?\n/).map(x => x.replace(/^\s*[-•*\d.)]+\s*/, '').trim()).filter(Boolean),
+    };
+  }).filter(Boolean);
+  if (!st.dong.length) { CV.toast('File không có dòng việc nào (dưới dòng tiêu đề).', 'err'); return; }
+
+  $('fHop').value = hop; $('fNgayHop').value = ngayHop || homNay;
+  veDuAn(); veBang();
+  $('dropTxt').textContent = '📄 ' + file.name + ' — ' + st.dong.length + ' việc. Bấm để chọn file khác.';
+  $('blkXem').hidden = false; $('blkBang').hidden = false;
+  $('blkBang').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Dự án ────────────────────────────────────────────────────────────────────
+function veDuAn() {
+  const hop = $('fHop').value.trim(), cu = $('fDuAn').value;
+  const trung = st.duAn.find(d => boDau(d.ten) === boDau(hop));
+  $('fDuAn').innerHTML = (hop && !trung ? '<option value="__moi__">+ Tạo dự án mới: ' + esc(hop) + '</option>' : '') +
+    '<option value="">— Không gom vào dự án —</option>' +
+    st.duAn.map(d => '<option value="' + d.id + '">' + esc(d.ten) + '</option>').join('');
+  $('fDuAn').value = cu && [...$('fDuAn').options].some(o => o.value === cu) ? cu : (trung ? String(trung.id) : (hop ? '__moi__' : ''));
+}
+
+// ── Bảng xem trước ───────────────────────────────────────────────────────────
+function loiDong(d) {
+  const l = [];
+  if (!d.tieu_de.trim()) l.push('Thiếu nội dung');
+  if (!d.nguoi_lam) l.push(d.tenLam ? (d.lamNhieu ? 'Nhiều người tên "' + d.tenLam + '" — chọn đúng người' : 'Không thấy "' + d.tenLam + '" trong MES — chọn người') : 'Chưa có người thực hiện');
+  if (!d.ngay) l.push(d.hanGoc ? 'Không hiểu hạn "' + d.hanGoc + '"' : 'Chưa có hạn');
+  else if (Date.parse(d.ngay + 'T' + d.gio + ':00+07:00') <= Date.now()) l.push('Hạn đã qua');
+  if (!d.bo_phan) l.push(d.bpGoc ? 'Không có bộ phận "' + d.bpGoc + '"' : 'Chưa có bộ phận');
+  return l;
+}
+function optNguoi(chon) {
+  return '<option value="">— Chọn người —</option>' + st.nguoi.map(n => '<option value="' + n.user_id + '"' + (n.user_id === chon ? ' selected' : '') + '>' + esc(n.ten) + '</option>').join('');
+}
+function veBang() {
+  $('tb').innerHTML = st.dong.map((d, i) => {
+    const loi = loiDong(d), xong = d.ketQua && d.ketQua.id;
+    const tt = xong ? '<span class="xong">✓ Đã giao — <a href="cong-viec-chi-tiet.html?id=' + d.ketQua.id + '" target="_blank">#' + d.ketQua.id + '</a></span>'
+      : d.ketQua && d.ketQua.loi ? '<span class="loi">✗ ' + esc(d.ketQua.loi) + '</span>'
+      : loi.length ? loi.map(x => '<div class="loi">• ' + esc(x) + '</div>').join('') : '<span class="xong">Sẵn sàng</span>';
+    const dis = xong || st.dangGiao ? ' disabled' : '';
+    return '<tr data-i="' + i + '" class="' + (xong ? 'done' : !d.chon ? 'off' : loi.length ? 'err' : '') + '">' +
+      '<td class="c-chk"><input type="checkbox" data-k="chon"' + (d.chon ? ' checked' : '') + dis + ' aria-label="Giao dòng ' + (i + 1) + '"></td>' +
+      '<td class="c-no" title="Dòng ' + d.dongExcel + ' trong Excel">' + (i + 1) + '</td>' +
+      '<td class="c-nd"><textarea class="inp" rows="1" data-k="tieu_de" maxlength="300"' + dis + '>' + esc(d.tieu_de) + '</textarea>' +
+        (d.mo_ta ? '<div class="goc">Yêu cầu: ' + esc(d.mo_ta) + '</div>' : '') +
+        (d.checklist.length ? '<div class="goc">' + d.checklist.length + ' bước: ' + esc(d.checklist.join(' · ')) + '</div>' : '') + '</td>' +
+      '<td class="c-ng"><select class="inp' + (d.nguoi_lam ? '' : ' bad') + '" data-k="nguoi_lam"' + dis + '>' + optNguoi(d.nguoi_lam) + '</select>' +
+        (d.tenLam && !d.nguoi_lam ? '<div class="goc bad">Excel: ' + esc(d.tenLam) + '</div>' : '') + '</td>' +
+      '<td class="c-ph">' + (d.phoiHop.map(id => esc((st.nguoi.find(n => n.user_id === id) || {}).ten || '')).join(', ') || '<span class="goc">—</span>') +
+        (d.phThieu.length ? '<div class="goc bad">Bỏ qua (không có trong MES): ' + esc(d.phThieu.join(', ')) + '</div>' : '') + '</td>' +
+      '<td class="c-han"><input class="inp' + (d.ngay ? '' : ' bad') + '" type="date" data-k="ngay" value="' + esc(d.ngay) + '"' + dis + '>' +
+        '<input class="inp" type="time" data-k="gio" value="' + esc(d.gio) + '" style="margin-top:4px"' + dis + '></td>' +
+      '<td class="c-bp"><select class="inp' + (d.bo_phan ? '' : ' bad') + '" data-k="bo_phan"' + dis + '><option value="">— Chọn —</option>' +
+        st.boPhan.map(b => '<option' + (b === d.bo_phan ? ' selected' : '') + '>' + esc(b) + '</option>').join('') + '</select></td>' +
+      '<td class="c-uu uu"><label><input type="checkbox" data-k="quan_trong"' + (d.quan_trong ? ' checked' : '') + dis + '>Quan trọng</label>' +
+        '<label><input type="checkbox" data-k="gap"' + (d.gap ? ' checked' : '') + dis + '>Gấp</label></td>' +
+      '<td class="c-tt">' + tt + '</td></tr>';
+  }).join('');
+  $('tb').querySelectorAll('textarea').forEach(gian);
+  veTong();
+}
+function gian(el) { el.style.height = 'auto'; el.style.height = Math.max(36, el.scrollHeight + 2) + 'px'; }
+function veTong() {
+  const chua = st.dong.filter(d => !(d.ketQua && d.ketQua.id));
+  const chon = chua.filter(d => d.chon), loi = chon.filter(d => loiDong(d).length);
+  const xong = st.dong.length - chua.length;
+  $('sum').innerHTML = '<span>' + st.dong.length + ' dòng</span>' + (xong ? '<span class="ok">' + xong + ' đã giao</span>' : '') +
+    '<span>' + chon.length + ' sẽ giao</span>' + (loi.length ? '<span class="bad">' + loi.length + ' dòng cần sửa</span>' : '');
+  $('btnGiao').textContent = 'Giao ' + chon.length + ' việc';
+  $('btnGiao').disabled = st.dangGiao || !chon.length;
+  $('chkAll').checked = chua.length > 0 && chua.every(d => d.chon);
+}
+
+// ── Giao việc ────────────────────────────────────────────────────────────────
+async function giao() {
+  const ds = st.dong.filter(d => d.chon && !(d.ketQua && d.ketQua.id));
+  const loi = ds.filter(d => loiDong(d).length);
+  if (loi.length) { CV.toast('Còn ' + loi.length + ' dòng chưa hợp lệ (tô đỏ). Sửa lại hoặc bỏ tick các dòng đó.', 'err'); const tr = $('tb').querySelector('tr.err'); if (tr) tr.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+  const hop = $('fHop').value.trim(), ngayHop = $('fNgayHop').value;
+  if (!confirm('Giao ' + ds.length + ' việc' + (hop ? ' từ "' + hop + '"' : '') + '? Mỗi người thực hiện sẽ nhận chuông thông báo.')) return;
+  st.dangGiao = true; veBang();
+  try {
+    let duAnId = null;
+    if ($('fDuAn').value === '__moi__') {
+      duAnId = await CV.rpc('cv_tao_du_an', { p: { ten: hop, bo_phan: ds[0].bo_phan || null, ngay_bat_dau: ngayHop || CV.ngayVN(), ngay_ket_thuc: null, mo_ta: 'Theo dõi việc giao từ biên bản họp' + (ngayHop ? ' ngày ' + ngayHop.split('-').reverse().join('/') : '') } });
+      st.duAn.push({ id: duAnId, ten: hop });
+      veDuAn(); $('fDuAn').value = String(duAnId);
+    } else if (/^\d+$/.test($('fDuAn').value)) duAnId = Number($('fDuAn').value);
+    const nguon = hop ? 'Từ biên bản họp: ' + hop + (ngayHop ? ' (' + ngayHop.split('-').reverse().join('/') + ')' : '') : '';
+    let n = 0;
+    for (const d of ds) {
+      $('tienDo').textContent = 'Đang giao ' + (++n) + '/' + ds.length + '…';
+      try {
+        const id = await CV.rpc('cv_tao_viec', { p: {
+          tieu_de: d.tieu_de.trim(), mo_ta: [d.mo_ta, nguon].filter(Boolean).join('\n\n') || null,
+          nguoi_lam: d.nguoi_lam, phoi_hop: d.phoiHop.filter(x => x !== d.nguoi_lam), bo_phan: d.bo_phan, du_an_id: duAnId,
+          quan_trong: d.quan_trong, gap: d.gap, han: d.ngay + 'T' + d.gio + ':00+07:00', can_duyet: true,
+          hien_thi: 'cong_khai', lien_ket: [], lap_lai: 'khong', checklist: d.checklist,
+        } });
+        d.ketQua = { id };
+      } catch (err) { d.ketQua = { loi: err.message || String(err) }; }
+      veBang();
+    }
+    const ok = ds.filter(d => d.ketQua && d.ketQua.id).length, hong = ds.length - ok;
+    $('tienDo').innerHTML = 'Đã giao ' + ok + '/' + ds.length + ' việc' + (duAnId ? ' — <a href="cong-viec.html?du_an=' + duAnId + '">theo dõi tiến độ trên Bảng công việc</a>' : '') + '.';
+    if (hong) CV.toast(hong + ' việc chưa giao được — xem cột Kiểm tra, sửa rồi bấm Giao lại.', 'err');
+    else CV.toast('Đã giao ' + ok + ' việc', 'ok');
+  } catch (err) {
+    CV.toast(err.message || String(err), 'err');
+  } finally { st.dangGiao = false; veBang(); }
+}
+
+// ── Khởi tạo ─────────────────────────────────────────────────────────────────
+async function init() {
+  startClock();
+  await MesAuth.requireAuth();
+  if (window.MesNav) try { MesNav.setTitle('Giao việc từ Excel', null); } catch (e) {}
+  try {
+    const kq = await Promise.all([
+      CV.me(), CV.nguoi(), CV.boPhan(),
+      Promise.resolve(sb.from('cv_du_an').select('id,ten').eq('trang_thai', 'dang_chay').order('ten')).then(r => r.data || []).catch(() => []),
+    ]);
+    st.me = kq[0]; st.nguoi = kq[1] || []; st.boPhan = kq[2] || []; st.duAn = kq[3] || [];
+  } catch (err) {
+    $('root').innerHTML = '<div class="panel loading">Lỗi tải dữ liệu: ' + esc(err.message || err) + '</div>'; return;
+  }
+  if (!st.me) { $('root').innerHTML = '<div class="panel loading">Bạn cần đăng nhập.</div>'; return; }
+  $('root').innerHTML = '';
+  $('root').appendChild($('tplMain').content.cloneNode(true));
+  CV.veTabModule();
+
+  $('btnMau').addEventListener('click', e => { e.preventDefault(); taiMau(); });
+  $('fFile').addEventListener('change', e => { docFile(e.target.files[0]); e.target.value = ''; });
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('on'); }));
+  drop.addEventListener('drop', e => docFile(e.dataTransfer.files[0]));
+  $('btnChonLai').addEventListener('click', () => $('fFile').click());
+  $('fHop').addEventListener('input', veDuAn);
+  $('btnGiao').addEventListener('click', giao);
+  $('chkAll').addEventListener('change', e => { st.dong.forEach(d => { if (!(d.ketQua && d.ketQua.id)) d.chon = e.target.checked; }); veBang(); });
+
+  const sua = e => {
+    const tr = e.target.closest('tr[data-i]'), k = e.target.dataset.k;
+    if (!tr || !k) return;
+    const d = st.dong[Number(tr.dataset.i)];
+    d[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    if (d.ketQua && d.ketQua.loi) d.ketQua = null;
+    if (e.target.tagName === 'TEXTAREA') { gian(e.target); veTong(); return; }   // gõ chữ: không vẽ lại (giữ con trỏ)
+    veBang();
+  };
+  $('tb').addEventListener('input', e => { if (e.target.tagName === 'TEXTAREA') sua(e); });
+  $('tb').addEventListener('change', sua);
+}
+init();
+})();
+</script>
+</body>
+</html>
