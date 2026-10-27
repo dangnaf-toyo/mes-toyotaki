@@ -1,6 +1,6 @@
 # IQC staging — 27/10/2026 (GMT+7)
 
-Trạng thái: **đã sửa và kiểm thử cục bộ, chưa triển khai, chưa xác nhận hoàn tất staging**.
+Trạng thái: **đã push staging và triển khai frontend + migration T176; đã kiểm thử DB staging trong transaction rollback. Chưa kiểm thử E2E bằng phiên đăng nhập người dùng trong trình duyệt**.
 
 Nhánh `fix/iqc-dashboard-staging-20261027`, từ `origin/staging` commit `97fda9c`. Worktree `.iqc-dashboard-staging`; checkout gốc có merge conflict được giữ nguyên. Không sửa production, cấu hình Supabase, phân quyền, OQC, IPQC, kho hay sản xuất.
 
@@ -60,3 +60,16 @@ Chưa tạo/sửa/xóa LOT thật, chưa chạy migration trên Supabase, chưa 
 ## Chuẩn bị đẩy staging
 
 Đã fetch staging mới nhất: 04a567e (tính năng giao việc Excel, T175). Đổi migration IQC sang T176 để tránh trùng số; giữ nguyên thay đổi giao việc và navbar của staging.
+
+## Triển khai staging thực tế
+
+- Đã nhập staging mới nhất `04a567e`, giữ nguyên chức năng giao việc Excel/navbar.
+- Push `origin/staging`: `04a567e` → **`1f9d245`** (commit thay đổi IQC `6fd099c`). Không push master/production.
+- Migration **T176** chạy thành công qua Supabase Management API với `--linked --project-ref jcjbleugnclzsghfpmvk`.
+- Kiểm thử thật dưới `set local role authenticated`, auth context từ tài khoản admin staging hiện có: insert/read/update đủ 7 Phạm vi, đổi đủ 5 NCC, kiểm tra mã/tên người kiểm, chặn Phạm vi/NCC ngoài danh sách, hoàn thành NG và truy vấn nguồn Dashboard. **PASS; toàn bộ transaction ROLLBACK**, không giữ LOT thử. SQL tái hiện: `tests/iqc-workspace-staging.sql`.
+- Số LOT cũ trước/sau là **1**; checksum các cột gốc trước/sau migration và kiểm thử giống nhau: **a432286214553b506aac5bfe64f98200**. Không đổi/xóa nội dung LOT cũ.
+- Trước triển khai: đối chiếu **97** asset frontend đang chạy với base staging, **0 sai khác nội dung** (chuẩn hóa CRLF/LF).
+- Worker cũ: version `88078cd6-47b1-4df4-b5ad-6049c6d56c92`; phiên bản mới: **`c014e664-cc49-4c01-8a47-aed08ebe0e10`**, URL **https://mes-toyotaki.dangnaf.workers.dev/iqc.html**. Giữ compatibility date `2026-10-23`, assets-only, không bindings.
+- Sau triển khai: **98/98 asset khớp SHA-256** của gói build, không lỗi HTTP; schema 3 cột mới HTTP 200; HTML staging đã nạp `mes-iqc-workspace.js`. Gói frontend không chứa SQL, test, dependency hoặc tài liệu review.
+- Chạy lại 9 nhóm Chromium/API mô phỏng và 5 nhóm PostgreSQL cục bộ sau khi tích hợp staging: PASS.
+- Mục “Bước còn lại” phía trên là kế hoạch tại thời điểm chưa triển khai. Bước migration/push/deploy/xác minh asset đã hoàn tất; còn xác nhận nghiệp vụ bằng phiên đăng nhập MES thật (gồm cập nhật giữa hai trình duyệt, quyền tài khoản hiện có). Không khẳng định đã test E2E đăng nhập/Storage thật.
