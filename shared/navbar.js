@@ -31,6 +31,7 @@
       { label: 'Việc của tôi', href: 'cong-viec-cua-toi.html' },
       { label: 'Bảng công việc', href: 'cong-viec.html' },
       { label: 'Giao việc mới', href: 'cong-viec-giao.html' },
+      { label: 'Giao việc từ Excel (biên bản họp)', href: 'cong-viec-nhap-excel.html' },
       { label: 'Thông báo', href: 'thong-bao.html' },
     ] },
     { label: 'Sản xuất', items: [
@@ -134,6 +135,7 @@
     'cong-viec.html': { icon: '🗂️', title: 'Bảng công việc', desc: 'Kanban theo trạng thái · ma trận ưu tiên Quan trọng × Gấp', noTitleBar: true },
     'cong-viec-chi-tiet.html': { icon: '📄', title: 'Chi tiết công việc', desc: 'Các bước, tệp/ảnh, trao đổi & góp ý, lịch sử', noTitleBar: true },
     'cong-viec-giao.html': { icon: '➕', title: 'Giao việc', desc: 'Giao việc mới hoặc sửa việc — người làm, hạn, mức ưu tiên, các bước', noTitleBar: true },
+    'cong-viec-nhap-excel.html': { icon: '📥', title: 'Giao việc từ Excel', desc: 'Giao nhiều việc cùng lúc từ biên bản họp (file mẫu Excel) — gom theo cuộc họp để theo dõi', noTitleBar: true },
     'thong-bao.html': { icon: '🔔', title: 'Thông báo', desc: 'Thông báo công việc — chưa đọc, cần tôi xử lý', noTitleBar: true },
   };
 
