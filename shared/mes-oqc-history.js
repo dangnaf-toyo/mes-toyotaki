@@ -274,9 +274,7 @@ const MesOqcHistory = (() => {
           ) +
           '</td><td>' + E(r.context?.inspection_scope ? (MesOqcScope.labels[r.context.inspection_scope] || r.context.inspection_scope) : '—') +
           '</td><td>' + (Number(r.total_qty)>0 ? (Number(r.ng_qty||0)/Number(r.total_qty)*100).toFixed(2)+'%' : '—') +
-          '</td><td><button class="btn secondary" onclick="editRow(' +
-          Number(r.id) +
-          ')">Sửa</button></td></tr>',
+          '</td><td>' + OqcReportAccess.actions(r) + '</td></tr>',
       )
       .join("");
     const groups = new Map(),
