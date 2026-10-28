@@ -3267,19 +3267,24 @@ async function submitAddIncident(){
 // =============================================================================
 async function openBulkIncidentModal(){
   if (!(await ensureAuth())) return;
-  const eligible = state.rows.filter(r => r.ma_sp && !r.open_gio_phat_sinh)
+  // T179: máy đang có sự cố vẫn chọn được nếu còn chỗ (tối đa SU_CO_MO_TOI_DA sự cố mở / máy)
+  const eligible = state.rows.filter(r => r.ma_sp && suCoMoCuaDong(r).length < SU_CO_MO_TOI_DA)
     .sort((a,b) => naturalCompare(a.ma_may, b.ma_may));
 
   const list = document.getElementById('bi-machine-list');
   if (eligible.length === 0) {
-    list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-style:italic;font-size:12px">Không có máy nào đang chạy để chọn (máy đã có sự cố mở sẽ không hiện ở đây).</div>';
+    list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-style:italic;font-size:12px">Không có máy nào để chọn (máy đã đủ ' + SU_CO_MO_TOI_DA + ' sự cố mở sẽ không hiện ở đây).</div>';
   } else {
-    list.innerHTML = eligible.map(r =>
-      '<label style="display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:12px;cursor:pointer">' +
-        '<input type="checkbox" class="bi-machine-cb" value="' + escapeHtml(r.id_dong) + '" checked>' +
+    // Máy đang có sự cố: hiện kèm số sự cố, mặc định KHÔNG tick (tick tay nếu sự cố mới cũng ảnh hưởng máy đó).
+    list.innerHTML = eligible.map(r => {
+      const n = suCoMoCuaDong(r).length;
+      return '<label style="display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:12px;cursor:pointer">' +
+        '<input type="checkbox" class="bi-machine-cb" value="' + escapeHtml(r.id_dong) + '"' + (n ? '' : ' checked') + '>' +
         '<span style="font-weight:600">' + escapeHtml(r.ma_may) + '</span>' +
         '<span style="color:var(--text-muted);font-family:\'JetBrains Mono\',monospace;font-size:11px">' + escapeHtml(r.ma_sp) + '</span>' +
-      '</label>').join('');
+        (n ? '<span style="color:var(--alarm-fg);font-size:11px">· đang có ' + n + ' sự cố</span>' : '') +
+      '</label>';
+    }).join('');
   }
 
   populateLoaiSuCo('bi-loai');
