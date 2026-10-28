@@ -1,4 +1,5 @@
--- T176 (27/10/2026): mỗi dòng máy (duc_ca_hien_tai) mở được TỐI ĐA 3 sự cố cùng lúc.
+-- T178 (27/10/2026): mỗi dòng máy (duc_ca_hien_tai) mở được TỐI ĐA 3 sự cố cùng lúc.
+-- (Viết ban đầu với mã T176 — đổi sang T178 vì T176/T177 đồng đội đã dùng cho QC. DB staging đã chạy bản mang dấu "T176" trong chú thích hàm.)
 --
 -- Thiết kế (ít đụng code cũ nhất):
 --  * Sự cố CHÍNH vẫn ở các cột open_* của duc_ca_hien_tai — mọi logic cũ (máy dừng/chạy, chặn đổi SP,
@@ -104,7 +105,7 @@ begin
   v_new_version := coalesce(v_current.version, 0) + 1;
 
   if v_current.open_gio_phat_sinh is not null then
-    -- T176: đã có sự cố chính → thêm sự cố phụ (tối đa 3 sự cố đang mở / dòng)
+    -- T178: đã có sự cố chính → thêm sự cố phụ (tối đa 3 sự cố đang mở / dòng)
     if (select count(*) from duc_su_co_mo_them where id_dong = p_id_dong) >= 2 then
       return jsonb_build_object('ok', false, 'error', 'Máy này đã có 3 sự cố đang mở (tối đa 3). Xử lý xong 1 sự cố rồi mới thêm được.');
     end if;
@@ -134,7 +135,7 @@ begin
     open_noi_dung_xu_ly = '', open_dam_nhiem = '', open_id_su_co = null,
     version = coalesce(version, 0) + 1, last_updated_by = p_user, last_updated_at = now()
   where id_dong = p_id_dong;
-  perform duc_su_co_phu_len_chinh(p_id_dong);   -- T176
+  perform duc_su_co_phu_len_chinh(p_id_dong);   -- T178
 end $$;
 
 -- ── 5. Đóng / sửa / xoá theo mã sự cố (giao diện mới) ───────────────────────
@@ -189,36 +190,36 @@ declare d text;
 begin
   -- 6a. IPQC OK tự đóng F1: F1 nằm ở chỗ phụ thì đổi lên chỗ chính trước
   d := replace(pg_get_functiondef('public.duc_close_f1_incident_if_open'::regproc), E'\r\n', E'\n');
-  if strpos(d, 'T176') = 0 then
+  if strpos(d, 'T178') = 0 then
     d := replace(d, E'begin\n  select ngay, ca, ma_may, ma_sp, ten_sp, so_khuon, open_loai_su_co, open_gio_phat_sinh,',
-      E'begin\n  -- T176: sự cố F1 đang ở chỗ phụ → đổi lên chỗ chính để đóng\n' ||
+      E'begin\n  -- T178: sự cố F1 đang ở chỗ phụ → đổi lên chỗ chính để đóng\n' ||
       E'  if exists (select 1 from duc_ca_hien_tai where id_dong = p_id_dong and left(coalesce(open_loai_su_co, ''''), 2) <> ''F1'') then\n' ||
       E'    perform duc_su_co_doi_cho(p_id_dong, (select id_su_co from duc_su_co_mo_them where id_dong = p_id_dong and left(loai_su_co, 2) = ''F1'' order by gio_phat_sinh, id limit 1));\n' ||
       E'  end if;\n  select ngay, ca, ma_may, ma_sp, ten_sp, so_khuon, open_loai_su_co, open_gio_phat_sinh,');
-    if strpos(d, 'T176') = 0 then raise exception 'T176: không vá được duc_close_f1_incident_if_open'; end if;
+    if strpos(d, 'T178') = 0 then raise exception 'T178: không vá được duc_close_f1_incident_if_open'; end if;
     execute d;
   end if;
 
   -- 6b. Kết ca chuyển tiếp: sự cố phụ đi theo dòng sang ca sau
   d := replace(pg_get_functiondef('public.duc_carry_over_shift'::regproc), E'\r\n', E'\n');
-  if strpos(d, 'T176') = 0 then
+  if strpos(d, 'T178') = 0 then
     d := replace(d, E'    v_old_to_new := jsonb_set(v_old_to_new, array[v_old.id_dong], to_jsonb(v_new_id_dong));',
-      E'    -- T176: sự cố mở thêm (2, 3) đi theo dòng sang ca sau\n' ||
+      E'    -- T178: sự cố mở thêm (2, 3) đi theo dòng sang ca sau\n' ||
       E'    update duc_su_co_mo_them set id_dong = v_new_id_dong,\n' ||
       E'      noi_dung_xu_ly = noi_dung_xu_ly || case when noi_dung_xu_ly <> '''' then E''\\n'' else '''' end || ''[Chuyển tiếp từ '' || p_ca || '' '' || to_char(p_ngay, ''DD/MM/YYYY'') || '']''\n' ||
       E'    where id_dong = v_old.id_dong;\n' ||
       E'    v_old_to_new := jsonb_set(v_old_to_new, array[v_old.id_dong], to_jsonb(v_new_id_dong));');
-    if strpos(d, 'T176') = 0 then raise exception 'T176: không vá được duc_carry_over_shift'; end if;
+    if strpos(d, 'T178') = 0 then raise exception 'T178: không vá được duc_carry_over_shift'; end if;
     execute d;
   end if;
 
   -- 6c. Thêm ảnh: chấp nhận mã sự cố phụ
   d := pg_get_functiondef('public.duc_su_co_them_anh'::regproc);
-  if strpos(d, 'T176') = 0 then
+  if strpos(d, 'T178') = 0 then
     d := replace(d, 'if not exists (select 1 from duc_ca_hien_tai where open_id_su_co = v_id)',
       'if not exists (select 1 from duc_ca_hien_tai where open_id_su_co = v_id)' || E'\n' ||
-      '     and not exists (select 1 from duc_su_co_mo_them where id_su_co = v_id)   -- T176');
-    if strpos(d, 'T176') = 0 then raise exception 'T176: không vá được duc_su_co_them_anh'; end if;
+      '     and not exists (select 1 from duc_su_co_mo_them where id_su_co = v_id)   -- T178');
+    if strpos(d, 'T178') = 0 then raise exception 'T178: không vá được duc_su_co_them_anh'; end if;
     execute d;
   end if;
 end $$;
@@ -226,7 +227,7 @@ end $$;
 -- ── 7. Phút dừng máy tính 1 lần (sự cố chồng giờ trên cùng máy + mã SP) ──────
 alter table public.duc_su_co_log add column if not exists phut_dung_may numeric;
 comment on column public.duc_su_co_log.phut_dung_may is
-  'T176: phút dừng MÁY của bản ghi sau khi trừ phần chồng giờ với sự cố phát sinh trước (cùng máy + mã SP). Tổng theo máy/ca = thời gian dừng thực tế. thoi_gian_dung_phut = phút của riêng sự cố.';
+  'T178: phút dừng MÁY của bản ghi sau khi trừ phần chồng giờ với sự cố phát sinh trước (cùng máy + mã SP). Tổng theo máy/ca = thời gian dừng thực tế. thoi_gian_dung_phut = phút của riêng sự cố.';
 
 create or replace function public.duc_moc_phut_dung_may()
 returns timestamptz language sql immutable as $$ select timestamptz '2026-10-27 00:00:00+07' $$;
@@ -281,9 +282,9 @@ do $$
 declare d text;
 begin
   d := replace(pg_get_functiondef('public.duc_end_shift'::regproc), E'\r\n', E'\n');
-  if strpos(d, 'T176') > 0 then return; end if;
+  if strpos(d, 'T178') > 0 then return; end if;
   d := replace(d, '    select ma_may, ma_sp, sum(coalesce(thoi_gian_dung_phut, 0)) * 60 as sec',
-                  '    select ma_may, ma_sp, sum(coalesce(phut_dung_may, thoi_gian_dung_phut, 0)) * 60 as sec   -- T176');
+                  '    select ma_may, ma_sp, sum(coalesce(phut_dung_may, thoi_gian_dung_phut, 0)) * 60 as sec   -- T178');
   d := replace(d,
 E'  for v_row in select ma_may, ma_sp, open_gio_phat_sinh from duc_ca_hien_tai
     where ngay = p_ngay and ca = p_ca and open_gio_phat_sinh is not null
@@ -296,7 +297,7 @@ E'  for v_row in select ma_may, ma_sp, open_gio_phat_sinh from duc_ca_hien_tai
       to_jsonb(coalesce((v_downtime_by_key->>v_key)::numeric, 0) + greatest(0, extract(epoch from (v_seg_end - v_seg_start)))));
     v_tong_phut_open := v_tong_phut_open + greatest(0, round(extract(epoch from (v_seg_end - v_seg_start)) / 60));
   end loop;',
-E'  -- T176: phần trong ca của các sự cố còn mở (chính + phụ), lấy HỢP các khoảng rồi trừ phần đã nằm
+E'  -- T178: phần trong ca của các sự cố còn mở (chính + phụ), lấy HỢP các khoảng rồi trừ phần đã nằm
   -- trong sự cố đã đóng của ca → máy dừng bao lâu tính bấy nhiêu, không cộng trùng.
   for v_row in
     with w as (select (v_shift_window->>\'start\')::timestamptz s, least(v_now, (v_shift_window->>\'end\')::timestamptz) e),
@@ -326,9 +327,9 @@ E'  -- T176: phần trong ca của các sự cố còn mở (chính + phụ), l�
   d := replace(d, '  select count(*) into v_so_su_co_dang_do from duc_ca_hien_tai where ngay = p_ngay and ca = p_ca and open_gio_phat_sinh is not null;',
                   '  select count(*) + (select count(*) from duc_su_co_mo_them t join duc_ca_hien_tai c on c.id_dong = t.id_dong where c.ngay = p_ngay and c.ca = p_ca)
     into v_so_su_co_dang_do from duc_ca_hien_tai where ngay = p_ngay and ca = p_ca and open_gio_phat_sinh is not null;');
-  if (length(d) - length(replace(d, 'T176', ''))) / 4 < 2 or strpos(d, 'coalesce(phut_dung_may, thoi_gian_dung_phut)), 0) into v_tong_phut_resolved') = 0
+  if (length(d) - length(replace(d, 'T178', ''))) / 4 < 2 or strpos(d, 'coalesce(phut_dung_may, thoi_gian_dung_phut)), 0) into v_tong_phut_resolved') = 0
      or strpos(d, 'from duc_su_co_mo_them t join duc_ca_hien_tai c on c.id_dong = t.id_dong where c.ngay = p_ngay') = 0 then
-    raise exception 'T176: không vá đủ 4 chỗ trong duc_end_shift';
+    raise exception 'T178: không vá đủ 4 chỗ trong duc_end_shift';
   end if;
   execute d;
 end $$;

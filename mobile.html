@@ -891,7 +891,7 @@ async function loadShiftState(){
       rawRows = data || [];
     }
 
-    // T176: sự cố thứ 2, 3 đang mở của mỗi dòng (sự cố chính vẫn ở cột open_*).
+    // T178: sự cố thứ 2, 3 đang mở của mỗi dòng (sự cố chính vẫn ở cột open_*).
     const phuByIdDong = {};
     if (rawRows.some(r => r.open_gio_phat_sinh)) {
       const { data, error } = await sb.from('duc_su_co_mo_them').select('*')
@@ -941,7 +941,7 @@ function formatDateDisplayMobile(d){ return pad(d.getDate())+'/'+pad(d.getMonth(
 // =============================================================================
 // MACHINE LIST
 // =============================================================================
-// T176: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
+// T178: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
 const SU_CO_MO_TOI_DA = 3;
 function suCoMoCuaDongM(row){
   if (!row || !row.open_gio_phat_sinh) return [];
@@ -1045,7 +1045,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
       <div class="detail-stat"><div class="num">${pct}%</div><div class="lbl">Hoàn thành</div></div>
     </div>`;
 
-  // T176: tối đa 3 sự cố mở / máy — mỗi sự cố 1 khối, bấm "Xử lý xong" từng cái.
+  // T178: tối đa 3 sự cố mở / máy — mỗi sự cố 1 khối, bấm "Xử lý xong" từng cái.
   const suCoList = suCoMoCuaDongM(row);
   if (suCoList.length) {
     issueBox.classList.remove('hidden');
@@ -1182,7 +1182,7 @@ async function submitIncidentMobile(){
       p_dam_nhiem: damNhiem, p_user: state.user,
     });
     if (anhSuCoM.add && anhSuCoM.add.hasPending()) {
-      // Mã sự cố do duc_open_incident sinh (T176: có thể là sự cố phụ) -> gắn ảnh theo mã trả về.
+      // Mã sự cố do duc_open_incident sinh (T178: có thể là sự cố phụ) -> gắn ảnh theo mã trả về.
       showOverlay('Đang tải ảnh hiện trạng...');
       try {
         await SuCoAnh.uploadPending(anhSuCoM.add, d && d.id_su_co);
