@@ -40,3 +40,7 @@ Chỉ staging. Base `481a9eb`; không viết lại IQC/OQC, không migration ho�
 Lệnh: `node tests/iqc-workspace-browser.cjs` (10 nhóm PASS); `node tests/qc-scope-rate-browser.cjs` (4 nhóm PASS); `node tests/oqc-workspace-math.cjs` (6 nhóm PASS). Browser thật Chromium, API/Storage mô phỏng trong test; không đưa fixture vào ứng dụng. Đã xem ảnh OQC desktop. `git diff --check` và kiểm tra cú pháp đạt; review không có mức CAO/TB.
 
 Đối chiếu trước deploy: 100/100 asset đang chạy khớp base staging. Truy vấn chỉ đọc trực tiếp Supabase staging xác nhận 1 LOT IQC, 5 báo cáo OQC, 3 nhóm model/phạm vi và 3 báo cáo thiếu phạm vi; không ghi/xóa/backfill dữ liệu. Chưa dùng phiên đăng nhập MES thật để kiểm thử browser E2E.
+
+## Bản triển khai
+
+Đã push staging commit 9cdb25c. Worker version 8621b453-a112-4661-b625-8ea026c883e6. URL: https://mes-toyotaki.dangnaf.workers.dev/iqc.html và /oqc-daily.html. Sau deploy: 100/100 asset khớp SHA-256 gói build, 0 sai khác. Không triển khai production; không có SQL/migration hoặc test/dependency trong gói frontend.
