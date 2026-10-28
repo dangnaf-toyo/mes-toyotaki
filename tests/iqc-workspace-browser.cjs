@@ -197,7 +197,7 @@ function backend() {
     await page.waitForFunction(() => document.getElementById("iqcDash-total").textContent === "2");
     assert.equal(await page.locator("#iqcDash-waiting").textContent(), "1");
     assert.equal(await page.locator("#iqcDash-ok").textContent(), "1");
-    assert.ok((await page.locator("#iqcChartScope").textContent()).includes("Chưa xác định"));
+    assert.ok((await page.locator("#iqcChartScope").textContent()).includes("—"));
     assert.ok((await page.locator("#iqcChartScope").textContent()).includes("Mạ"));
     await page.locator("#iqcDashProduct").fill("SP02");
     assert.equal(await page.locator("#iqcDash-total").textContent(), "1");
@@ -244,10 +244,17 @@ function backend() {
     await page.locator("#iqcFilterInspector").fill("");
     await page.evaluate(async () => renderHistory(await IqcApi.searchLotHistory("", "", "")));
     assert.ok((await page.locator("#historyTable").textContent()).includes("In"));
+    await page.locator("details:has(#historyTable) > summary").click();
+    await page.selectOption("#iqcHistoryScope", "Mạ");
+    assert.equal(await page.locator("#historyTable tr td").count(), 1);
+    await page.selectOption("#iqcHistoryScope", "In");
+    assert.equal(await page.locator("#historyTable tr").count(), 1);
+    assert.ok((await page.locator("#historyTable").textContent()).includes("In"));
+    assert.equal(await page.locator("#lotForm #lotNo").count(), 1);
+    await page.evaluate(() => editLot("new-1"));
+    assert.equal(await page.locator("#lotNo").inputValue(), "TEST-LOT");
     await page.evaluate(() => openDetail("old"));
-    await page.waitForFunction(() =>
-      document.getElementById("detailBody").textContent.includes("Chưa xác định (dữ liệu cũ)"),
-    );
+    await page.waitForFunction(() => document.getElementById("detailBody").textContent.includes("—"));
     assert.ok((await page.locator("#detailBody").textContent()).includes("Người kiểm cũ"));
     assert.equal(await page.evaluate(() => sb.tables.iqc_lots[0].sampled_at), "2026-10-01T02:00:00Z");
     await page.evaluate(() => closeDetail());
@@ -260,9 +267,9 @@ function backend() {
     console.log("PASS CSV report includes scope and inspector identity");
     await page.evaluate(() => openDefect());
     assert.equal(await page.locator("#defectModal").isVisible(), true);
-    assert.equal(await page.locator("#defectLot").inputValue(), "");
+    assert.equal(await page.locator("#defectLot").inputValue(), "new-1");
     assert.equal(await page.locator("#defectModal").evaluate((e) => !!e.closest("#lotForm")), false);
-    await page.locator("#defectLot").selectOption("new-1");
+    assert.equal(await page.locator("#defectLot").isVisible(), false);
     await page.evaluate(() => IqcWorkspace.refresh());
     assert.equal(await page.locator("#defectLot").inputValue(), "new-1");
     await page.screenshot({ path: ".review/iqc-inline-errors.png", fullPage: true });

@@ -73,7 +73,7 @@
   actions.append(dashboardButton);
   const defectPanel = make("div", "iqc-report-defects"),
     empty = make("div", "iqc-defect-empty");
-  empty.innerHTML = "<h3>Lỗi IQC</h3><p>Chọn LOT đã lưu để nhập hoặc sửa lỗi.</p>";
+  empty.innerHTML = "<h3>Lỗi IQC</h3><p>Lưu LOT hoặc mở Sửa ở danh sách để nhập lỗi.</p>";
   const open = make("button", "button btn-secondary");
   open.type = "button";
   open.textContent = "+ Nhập lỗi";
@@ -81,6 +81,33 @@
   empty.append(open);
   defectPanel.append(empty);
   const editor = el("defectModal");
+  // Retain the internal LOT key used by the defect API, without a second LOT field.
+  el("defectLot").closest(".field").classList.add("hidden");
+  const lotContext = make("p", "help");
+  lotContext.id = "iqcDefectLotContext";
+  editor.querySelector(".modal-body").prepend(lotContext);
+  let activeLot = null,
+    pendingSave = null;
+  function context() {
+    const lot = dashboard.lots.find((l) => String(l.id) === String(activeLot));
+    lotContext.textContent = lot ? "Lỗi của: " + lot.lotNo : "Lỗi của LOT vừa lưu";
+  }
+  for (const method of ["addLot", "updateLot"]) {
+    const save = IqcApi[method].bind(IqcApi);
+    IqcApi[method] = async (...args) => {
+      const result = await save(...args);
+      pendingSave = result.id;
+      return result;
+    };
+  }
+  const oldReset = resetForm;
+  resetForm = function () {
+    oldReset();
+    activeLot = pendingSave;
+    pendingSave = null;
+    closeDefect();
+    context();
+  };
   editor.classList.remove("modal");
   editor.classList.add("iqc-inline-editor");
   editor.querySelector(".modal-box").removeAttribute("style");
@@ -101,17 +128,21 @@
   // The editor stays outside lotForm: its buttons cannot accidentally submit a LOT.
   const oldOpen = openDefect;
   openDefect = function () {
+    const selected = editingId || activeLot;
+    if (!selected) return alert("Lưu LOT trước hoặc mở Sửa ở danh sách LOT để nhập lỗi.");
     oldOpen();
     showPage("iqc");
     empty.classList.add("hidden");
-    const selected = typeof editingId !== "undefined" ? editingId : null;
-    if (selected) el("defectLot").value = selected;
-    else el("defectLot").insertBefore(new Option("-- Chọn LOT đã lưu --", "", true, true), el("defectLot").firstChild);
+    activeLot = selected;
+    el("defectLot").value = selected;
+    context();
     editor.scrollIntoView({ block: "nearest" });
   };
   const oldEditDefect = editDefect;
   editDefect = function (id) {
     oldEditDefect(id);
+    activeLot = el("defectLot").value;
+    context();
     showPage("iqc");
     empty.classList.add("hidden");
     editor.scrollIntoView({ block: "nearest" });
@@ -140,6 +171,9 @@
   editLot = async function (id) {
     showPage("iqc");
     await oldEdit(id);
+    activeLot = id;
+    closeDefect();
+    context();
     optional.open = true;
   };
 })();

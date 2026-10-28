@@ -304,6 +304,7 @@ const OqcDashboard = (() => {
   })();
   const baseRender = renderStats,
     baseLoad = loadStats;
+  style.textContent += '#modelSummary table{min-width:1250px}#modelSummary th,#modelSummary td{white-space:nowrap}#modelSummary td:nth-last-child(2){min-width:190px;max-width:230px;white-space:normal}#rows td:nth-last-child(3){min-width:190px;max-width:230px;white-space:normal}#rows td:nth-last-child(2),#modelSummary td:last-child{min-width:80px;white-space:nowrap}';
   setPeriod = function (value) {
     if (value === "custom") return;
     const end = today(),
@@ -411,7 +412,7 @@ const OqcDashboard = (() => {
       dataRows = records;
       snapshot = { records, plans, from, to, outside: raw.length - records.length, scope };
       renderStats();
-      if (modelDialog.open && modelCode) renderModel(modelCode);
+      if (modelDialog.open && modelCode) renderModel(modelCode, modelScope);
     } catch (e) {
       if (ticket === loadToken) {
         message(e, true, "Không tải được dashboard đầy đủ");
@@ -468,17 +469,21 @@ const OqcDashboard = (() => {
       target.append(c);
     }
   }
+  let modelScope;
+  const scopeText = scope => scope ? (MesOqcScope.labels[scope] || scope) : '—';
+  const defectPercent = (ng,total) => Number(total)>0 ? (Number(ng||0)/Number(total)*100).toFixed(2)+'%' : '—';
   function renderDashboard() {
     const s = M.summary(snapshot.records, snapshot.plans);
     cards($("cards"), s);
     const products = MesOqcHistory.products();
-    const rows = M.group(snapshot.records, snapshot.plans).map((g) => {
+    const rows = M.groupByScope(snapshot.records, snapshot.plans).map((g) => {
       const b = node("button", g.code + " — " + (products.find((p) => p.ma_sp === g.code)?.ten_sp || ""));
       b.type = "button";
       b.className = "oqc-model-button";
       b.onclick = () => {
         modelCode = g.code;
-        renderModel(g.code);
+        modelScope = g.scope;
+        renderModel(g.code, g.scope);
         modelDialog.showModal();
       };
       return [
@@ -491,11 +496,13 @@ const OqcDashboard = (() => {
         value(g.hours, "Thiếu giờ công thực tế"),
         g.people,
         efficiency(g),
+        scopeText(g.scope),
+        defectPercent(g.ng,g.reportTotal),
       ];
     });
     table(
       $("modelSummary"),
-      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Số người kiểm", "Hiệu suất"],
+      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Số người kiểm", "Hiệu suất", "Phạm vi kiểm", "% lỗi"],
       rows,
     );
     $("modelSummary").title =
@@ -504,21 +511,23 @@ const OqcDashboard = (() => {
     demand.hidden = true;
     OqcDefectCharts.render($("oqcDefectSummary"), snapshot.records, $("oqcTrendUnit").value, MesQcFields.defectName, {
       pcs: true,
+      scopeLabel: scopeText,
     });
   }
-  function renderModel(code) {
+  function renderModel(code, scope) {
     if (!snapshot) return;
-    const records = snapshot.records.filter((r) => r.product_code === code),
-      plans = snapshot.plans.filter((p) => p.product_code === code);
+    const records = snapshot.records.filter((r) => r.product_code === code && (scope===undefined || (r.context?.inspection_scope||'')===scope)),
+      plans = snapshot.plans.filter((p) => p.product_code === code && (scope===undefined || scope==='FULL_POST_MACHINING'));
     $("oqcModelTitle").textContent =
-      code + " · " + MesQcFields.date(snapshot.from) + " – " + MesQcFields.date(snapshot.to);
+      code + " · " + scopeText(scope) + " · " + MesQcFields.date(snapshot.from) + " – " + MesQcFields.date(snapshot.to);
     cards($("oqcModelMetrics"), M.summary(records, plans));
     OqcDefectCharts.render($("oqcModelDefects"), records, $("oqcTrendUnit").value, MesQcFields.defectName, {
       pcs: true,
+      scopeLabel: scopeText,
     });
     table(
       $("oqcModelRecords"),
-      ["Ngày kiểm", "Người kiểm", "Đã kiểm", "OK", "NG", "Giờ công", "Thông tin / ảnh"],
+      ["Ngày kiểm", "Người kiểm", "Đã kiểm", "OK", "NG", "Giờ công", "Thông tin / ảnh", "Phạm vi kiểm", "% lỗi"],
       records.map((r) => {
         const b = node("button", "Xem thông tin / ảnh");
         b.className = "btn secondary";
@@ -531,6 +540,8 @@ const OqcDashboard = (() => {
           r.ng_qty,
           r.work?.labor?.length ? fmt(r.work.labor.reduce((n, l) => n + Number(l.hours), 0)) : "Chưa ghi nhận",
           b,
+          scopeText(r.context?.inspection_scope),
+          defectPercent(r.ng_qty,r.total_qty),
         ];
       }),
     );
