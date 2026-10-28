@@ -69,6 +69,26 @@ const IqcWorkspace = (() => {
   }
   const lotSection = $("lotTable").closest(".section");
   lotSection.querySelector(".table-wrap").before(filters("iqcFilter", true));
+  const historyScope = node("select");
+  historyScope.id = "iqcHistoryScope";
+  historyScope.append(new Option("Tất cả phạm vi", ""));
+  for (const scope of scopes) historyScope.append(new Option(scope, scope));
+  const historyLabel = node("label", "Phạm vi kiểm");
+  historyLabel.append(historyScope);
+  $("historyProductCode").before(historyLabel);
+  let historyRows = [];
+  const baseHistory = renderHistory;
+  renderHistory = function (rows) {
+    historyRows = rows;
+    baseHistory(rows.filter((l) => !historyScope.value || l.scope === historyScope.value));
+  };
+  historyScope.onchange = () => renderHistory(historyRows);
+  const baseClearHistory = clearHistory;
+  clearHistory = function () {
+    historyScope.value = "";
+    historyRows = [];
+    baseClearHistory();
+  };
   const dash = node("div");
   dash.id = "iqcDashboard";
   dash.className = "container hidden";
@@ -149,7 +169,7 @@ const IqcWorkspace = (() => {
         l.productName,
         l.lotNo,
         l.supplier,
-        l.scope || "Chưa xác định",
+        l.scope || "—",
         l.inspectorId,
         l.inspectorName || l.inspector,
         l.status,
@@ -217,7 +237,10 @@ const IqcWorkspace = (() => {
       (l) =>
         (!from || day(l) >= from) &&
         (!to || day(l) <= to) &&
-        (!product || (l.productCode + " " + l.productName).toLocaleLowerCase("vi").includes(product)) &&
+        (!product ||
+          (l.productCode + " " + l.productName + (full ? " " + (l.scope || "") : ""))
+            .toLocaleLowerCase("vi")
+            .includes(product)) &&
         (!full ||
           ((!val(prefix + "Supplier") || l.supplier === val(prefix + "Supplier")) &&
             (!val(prefix + "Scope") || l.scope === val(prefix + "Scope")) &&
@@ -241,7 +264,7 @@ const IqcWorkspace = (() => {
   function chart(target, rows, key) {
     const groups = new Map();
     for (const l of rows) {
-      const k = key(l) || "Chưa xác định";
+      const k = key(l) || "—";
       const g = groups.get(k) || { total: 0, ok: 0, ng: 0 };
       g.total++;
       if (l.result === "OK") g.ok++;

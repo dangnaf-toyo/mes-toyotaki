@@ -30,5 +30,6 @@ const save=(p,id=null)=>v('select oqc_save_dashboard_inspection($1,$2) as v',[id
  if(process.env.MES_TEST_OQC_WORKSPACE==='1')await require('./oqc-workspace-postgres.cjs')({db,q,v,test,read,first});
  if(process.env.MES_TEST_OQC_SCOPES==='1')await require('./oqc-scopes-order-postgres.cjs')({db,q,v,test,read,first});
  if(process.env.MES_TEST_OQC_REPORT_INPUT==='1')await require('./oqc-report-input-postgres.cjs')({db,q,v,test,read,first});
+ if(process.env.MES_TEST_OQC_OWNER==='1')await require('./oqc-owner-postgres.cjs')({db,q,v,test,read});
  console.log('TOTAL '+passed+' OQC dashboard PostgreSQL/formula groups; no live writes.');
 })().catch(e=>{console.error(e.message,e.where||'',e.internalQuery||'',e.stack?.split('\n').slice(0,3).join('\n'));process.exitCode=1;}).finally(()=>db?.close());

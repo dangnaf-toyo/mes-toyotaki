@@ -272,20 +272,21 @@ const MesOqcHistory = (() => {
               .map((d) => MesQcFields.defectName(d) + ": " + d.qty)
               .join("; "),
           ) +
-          '</td><td><button class="btn secondary" onclick="editRow(' +
-          Number(r.id) +
-          ')">Sửa</button></td></tr>',
+          '</td><td>' + E(r.context?.inspection_scope ? (MesOqcScope.labels[r.context.inspection_scope] || r.context.inspection_scope) : '—') +
+          '</td><td>' + (Number(r.total_qty)>0 ? (Number(r.ng_qty||0)/Number(r.total_qty)*100).toFixed(2)+'%' : '—') +
+          '</td><td>' + OqcReportAccess.actions(r) + '</td></tr>',
       )
       .join("");
     const groups = new Map(),
       faults = new Map();
     for (const r of dataRows) {
-      const g = groups.get(r.product_code) || { code: r.product_code, count: 0, total: 0, ok: 0, ng: 0 };
+      const scope=r.context?.inspection_scope||'',groupKey=JSON.stringify([r.product_code,scope]);
+      const g = groups.get(groupKey) || { code: r.product_code, scope, count: 0, total: 0, ok: 0, ng: 0 };
       g.count++;
       g.total += Number(r.total_qty || 0);
       g.ok += Number(r.ok_qty || 0);
       g.ng += Number(r.ng_qty || 0);
-      groups.set(r.product_code, g);
+      groups.set(groupKey, g);
       for (const d of r.defects || [])
         if (Number(d.qty) > 0) {
           const name = MesQcFields.defectName(d);
@@ -296,8 +297,8 @@ const MesOqcHistory = (() => {
     target.replaceChildren();
     Qc02View.table(
       target,
-      ["Model", "Lần kiểm", "Tổng kiểm", "OK", "NG"],
-      [...groups.values()].map((g) => [g.code, g.count, g.total, g.ok, g.ng]),
+      ["Model", "Lần kiểm", "Tổng kiểm", "OK", "NG", "Phạm vi kiểm", "% lỗi"],
+      [...groups.values()].map((g) => [g.code, g.count, g.total, g.ok, g.ng, g.scope?(MesOqcScope.labels[g.scope]||g.scope):'—',g.total>0?(g.ng/g.total*100).toFixed(2)+'%':'—']),
     );
     [...target.querySelectorAll("tr")]
       .filter((tr) => tr.querySelector("td"))
