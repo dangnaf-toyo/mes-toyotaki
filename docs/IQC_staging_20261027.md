@@ -73,3 +73,11 @@ Chưa tạo/sửa/xóa LOT thật, chưa chạy migration trên Supabase, chưa 
 - Sau triển khai: **98/98 asset khớp SHA-256** của gói build, không lỗi HTTP; schema 3 cột mới HTTP 200; HTML staging đã nạp `mes-iqc-workspace.js`. Gói frontend không chứa SQL, test, dependency hoặc tài liệu review.
 - Chạy lại 9 nhóm Chromium/API mô phỏng và 5 nhóm PostgreSQL cục bộ sau khi tích hợp staging: PASS.
 - Mục “Bước còn lại” phía trên là kế hoạch tại thời điểm chưa triển khai. Bước migration/push/deploy/xác minh asset đã hoàn tất; còn xác nhận nghiệp vụ bằng phiên đăng nhập MES thật (gồm cập nhật giữa hai trình duyệt, quyền tài khoản hiện có). Không khẳng định đã test E2E đăng nhập/Storage thật.
+## Bố cục nhập báo cáo theo OQC — 28/10/2026
+
+- Theo ảnh người dùng: form LOT được đặt đầu trang, thông tin chung thành hàng trên; người kiểm/tiêu chuẩn/rút kiểm/kết quả nằm cột trái, lỗi nằm vùng phải; nút Lưu LOT/Làm mới/Dashboard IQC ở cuối.
+- Thu gọn các bảng LOT/lịch sử/lỗi dưới form và bỏ thẻ tổng hợp trùng với Dashboard khỏi màn nhập. Giữ đầy đủ tìm kiếm/lọc/xem/sửa trong phần mở rộng.
+- Thời gian bắt đầu/kết thúc, vị trí, trạng thái, ghi chú và hướng dẫn AQL nằm trong “Thông tin bổ sung”; giữ nguyên xác nhận thời gian và quy tắc kiểm. Khi sửa LOT tự mở phần bổ sung.
+- Đưa editor lỗi hiện có vào ngay trang, không còn popup nhập lỗi. Vẫn lưu LOT và lỗi theo hai thao tác hiện có; không tự gộp giao dịch hay gán lỗi sang LOT khác. Chọn LOT rỗng khi nhập lỗi mới, giữ lựa chọn khi tự refresh. Editor nằm ngoài lotForm để nút lỗi không gửi nhầm form LOT.
+- File: `iqc.html` nạp hai asset mới `shared/mes-iqc-report.js`, `shared/mes-iqc-report.css`; cập nhật `tests/iqc-workspace-browser.cjs`. Không sửa OQC/shared data/API/schema.
+- Chromium: 10 nhóm PASS với API mô phỏng, gồm bố cục mới, bảng thu gọn, editor inline và giữ LOT khi refresh, cùng các kiểm tra dữ liệu trước đó. Đã xem ảnh `.review/iqc-compact-entry.png`, `.review/iqc-inline-errors.png`. Kiểm tra cú pháp và `git diff --check` PASS, không có cảnh báo review mức CAO/TB.
