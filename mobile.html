@@ -891,8 +891,18 @@ async function loadShiftState(){
       rawRows = data || [];
     }
 
+    // T176: sự cố thứ 2, 3 đang mở của mỗi dòng (sự cố chính vẫn ở cột open_*).
+    const phuByIdDong = {};
+    if (rawRows.some(r => r.open_gio_phat_sinh)) {
+      const { data, error } = await sb.from('duc_su_co_mo_them').select('*')
+        .in('id_dong', rawRows.filter(r => r.open_gio_phat_sinh).map(r => r.id_dong)).order('gio_phat_sinh');
+      if (error) throw new Error(error.message);
+      (data || []).forEach(x => { (phuByIdDong[x.id_dong] = phuByIdDong[x.id_dong] || []).push(x); });
+    }
+
     state.rows = rawRows.map(r => {
       const out = Object.assign({}, r);
+      out.su_co_phu = phuByIdDong[r.id_dong] || [];
       out._rowIndex = Number(r.row_seq) || 0;
       const ipqc = ipqcById[r.id_dong];
       if (ipqc) { out.ipqc_cho_kiem = true; out.ipqc_loai_kiem = ipqc.loai_kiem; out.ipqc_phut_cho = Number(ipqc.phut_da_troi) || 0; }
@@ -911,7 +921,8 @@ async function loadShiftState(){
     }
     state.incidents = incRows;
     // Số ảnh sự cố đang mở (T87) cho biểu tượng 📷.
-    state.anhSuCoCount = await SuCoAnh.count(state.rows.map(r => r.open_id_su_co));
+    state.anhSuCoCount = await SuCoAnh.count(state.rows.map(r => r.open_id_su_co)
+      .concat(...state.rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
 
     hideOverlay();
     updateCtxSummaryLine();
@@ -930,6 +941,21 @@ function formatDateDisplayMobile(d){ return pad(d.getDate())+'/'+pad(d.getMonth(
 // =============================================================================
 // MACHINE LIST
 // =============================================================================
+// T176: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
+const SU_CO_MO_TOI_DA = 3;
+function suCoMoCuaDongM(row){
+  if (!row || !row.open_gio_phat_sinh) return [];
+  return [row].concat((row.su_co_phu || []).map(x => Object.assign({}, row, {
+    open_loai_su_co: x.loai_su_co, open_gio_phat_sinh: x.gio_phat_sinh, open_van_de: x.van_de, open_id_su_co: x.id_su_co,
+  })));
+}
+// Sự cố đang chọn ở màn Xử lý xong (state.currentIdSuCo rỗng = sự cố chính).
+function suCoDangChonM(){
+  const list = suCoMoCuaDongM(state.rows.find(r => r.id_dong === state.currentIdDong));
+  const id = state.currentIdSuCo;
+  return (id && list.find(s => s.open_id_su_co === id)) || (id ? null : list[0]) || null;
+}
+
 function computeStateMobile(row){
   if (!row.ma_sp) return 'no-plan';
   if (!row.open_gio_phat_sinh) return 'run';
@@ -1019,14 +1045,18 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
       <div class="detail-stat"><div class="num">${pct}%</div><div class="lbl">Hoàn thành</div></div>
     </div>`;
 
-  if (row.open_gio_phat_sinh) {
-    const start = new Date(row.open_gio_phat_sinh);
-    const elapsed = Math.round((nowServer() - start) / 60000);
+  // T176: tối đa 3 sự cố mở / máy — mỗi sự cố 1 khối, bấm "Xử lý xong" từng cái.
+  const suCoList = suCoMoCuaDongM(row);
+  if (suCoList.length) {
     issueBox.classList.remove('hidden');
-    issueBox.innerHTML = `
-      <div class="code">${escapeHtml(row.open_loai_su_co||'—')}${SuCoAnh.badge((state.anhSuCoCount || {})[row.open_id_su_co], ' onclick="openResolveScreen()"')}</div>
-      <div class="desc">${escapeHtml(IpqcText.gon(row.open_van_de) || '(chưa nhập mô tả)')}</div>
-      <div class="timer">${elapsed}' đang dừng</div>`;
+    issueBox.innerHTML = suCoList.map((s, i) => {
+      const elapsed = Math.round((nowServer() - new Date(s.open_gio_phat_sinh)) / 60000);
+      const arg = escapeHtml(JSON.stringify(s.open_id_su_co || null));
+      return `<div${i ? ' style="border-top:1px solid #FCA5A5;margin-top:.6rem;padding-top:.6rem"' : ''}>
+      <div class="code">${escapeHtml(s.open_loai_su_co||'—')}${SuCoAnh.badge((state.anhSuCoCount || {})[s.open_id_su_co], ` onclick="openResolveScreen(${arg})"`)}</div>
+      <div class="desc">${escapeHtml(IpqcText.gon(s.open_van_de) || '(chưa nhập mô tả)')}</div>
+      <div class="timer">${elapsed}' đang dừng</div></div>`;
+    }).join('');
   } else {
     issueBox.classList.add('hidden');
   }
@@ -1034,7 +1064,13 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
   const btns = [];
   btns.push(`<button class="action-btn" onclick='openPlanScreen(${JSON.stringify(idDong)})'><span class="ic">📋</span>Sửa kế hoạch<span class="chev">›</span></button>`);
   if (row.open_gio_phat_sinh) {
-    btns.push(`<button class="action-btn primary" onclick="openResolveScreen()"><span class="ic">✓</span>Xử lý xong sự cố<span class="chev">›</span></button>`);
+    suCoList.forEach(s => {
+      const arg = escapeHtml(JSON.stringify(s.open_id_su_co || null));
+      btns.push(`<button class="action-btn primary" onclick="openResolveScreen(${arg})"><span class="ic">✓</span>Xử lý xong ${suCoList.length > 1 ? escapeHtml((s.open_loai_su_co || '').split(' ')[0]) : 'sự cố'}<span class="chev">›</span></button>`);
+    });
+    if (suCoList.length < SU_CO_MO_TOI_DA) {
+      btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo thêm sự cố (${suCoList.length}/${SU_CO_MO_TOI_DA})<span class="chev">›</span></button>`);
+    }
   } else {
     btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo sự cố<span class="chev">›</span></button>`);
     btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm<span class="chev">›</span></button>`);
@@ -1140,17 +1176,16 @@ async function submitIncidentMobile(){
   const damNhiem = document.getElementById('in-dam-nhiem').value;
   showOverlay('Đang ghi nhận...');
   try {
-    await rpcWrite('duc_open_incident', {
+    const d = await rpcWrite('duc_open_incident', {
       p_id_dong: state.currentIdDong, p_loai: loai, p_gio_phat_sinh: new Date(gio).toISOString(),
       p_van_de: document.getElementById('in-van-de').value, p_noi_dung_xu_ly: document.getElementById('in-xu-ly').value,
       p_dam_nhiem: damNhiem, p_user: state.user,
     });
     if (anhSuCoM.add && anhSuCoM.add.hasPending()) {
-      // Mã sự cố do duc_open_incident sinh -> đọc lại open_id_su_co rồi gắn ảnh.
+      // Mã sự cố do duc_open_incident sinh (T176: có thể là sự cố phụ) -> gắn ảnh theo mã trả về.
       showOverlay('Đang tải ảnh hiện trạng...');
       try {
-        const { data: r } = await sb.from('duc_ca_hien_tai').select('open_id_su_co').eq('id_dong', state.currentIdDong).maybeSingle();
-        await SuCoAnh.uploadPending(anhSuCoM.add, r && r.open_id_su_co);
+        await SuCoAnh.uploadPending(anhSuCoM.add, d && d.id_su_co);
       } catch (e) {
         hideOverlay();
         showToast('Sự cố đã ghi nhận nhưng chưa lưu được ảnh: ' + e.message + ' — thêm ảnh ở màn Xử lý xong', true);
@@ -1170,8 +1205,10 @@ async function submitIncidentMobile(){
 // =============================================================================
 // XỬ LÝ XONG SỰ CỐ
 // =============================================================================
-async function openResolveScreen(){
+async function openResolveScreen(idSuCoChon){
   if (!(await ensureAuth())) return;
+  state.currentIdSuCo = idSuCoChon || null;
+  if (!suCoDangChonM()) return showToast('Không tìm thấy sự cố đang mở — tải lại', true);
   const nowStr = toLocalInputValue(nowServer());
   document.getElementById('rs-gio').value = nowStr;
   document.getElementById('rs-gio').max = nowStr;
@@ -1179,15 +1216,15 @@ async function openResolveScreen(){
   updateResolveMinutesMobile();
   document.getElementById('rs-gio').oninput = updateResolveMinutesMobile;
   showScreen('scr-resolve');
-  const rowAnh = state.rows.find(r => r.id_dong === state.currentIdDong);
+  const rowAnh = suCoDangChonM();
   const idSuCo = rowAnh && rowAnh.open_id_su_co;
   await mountAnhSuCoM('rs-anh-truoc', 'truoc', idSuCo, true);
   anhSuCoM.sau = idSuCo ? await mountAnhSuCoM('rs-anh-sau', 'sau', idSuCo, false) : null;
   if (!idSuCo) document.getElementById('rs-anh-sau').innerHTML = '';
 }
 function updateResolveMinutesMobile(){
-  const row = state.rows.find(r => r.id_dong === state.currentIdDong);
-  if (!row || !row.open_gio_phat_sinh) return;
+  const row = suCoDangChonM();
+  if (!row) return;
   const gio = document.getElementById('rs-gio').value;
   if (!gio) return;
   const mins = Math.round((new Date(gio) - new Date(row.open_gio_phat_sinh)) / 60000);
@@ -1200,15 +1237,15 @@ async function submitResolveMobile(){
 
   // Ảnh sau xử lý: lưu TRƯỚC khi đóng sự cố (lỗi ảnh thì dừng để thử lại).
   if (anhSuCoM.sau && anhSuCoM.sau.hasPending()) {
-    const rowAnh = state.rows.find(r => r.id_dong === state.currentIdDong);
+    const rowAnh = suCoDangChonM();
     showOverlay('Đang tải ảnh sau xử lý...');
     try { await SuCoAnh.uploadPending(anhSuCoM.sau, rowAnh && rowAnh.open_id_su_co); }
     catch (e) { hideOverlay(); return showToast('Lỗi tải ảnh sau xử lý: ' + e.message + ' — thử lại hoặc bỏ ảnh', true); }
   }
   showOverlay('Đang lưu...');
   try {
-    const d = await rpcWrite('duc_resolve_incident', {
-      p_id_dong: state.currentIdDong, p_gio_tro_lai: new Date(gio).toISOString(),
+    const d = await rpcWrite('duc_resolve_incident_x', {
+      p_id_dong: state.currentIdDong, p_id_su_co: state.currentIdSuCo || null, p_gio_tro_lai: new Date(gio).toISOString(),
       p_bonus_note: document.getElementById('rs-bonus').value,
       p_truong_ca: document.getElementById('sel-truong-ca').value || '', p_user: state.user,
     });

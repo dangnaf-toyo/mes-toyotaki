@@ -218,15 +218,22 @@ async function load(){
   if (!tu || !den) return;
   $('tbody').innerHTML = '<tr><td colspan="10" class="empty">Đang tải…</td></tr>';
   try {
-    const [log, mo] = await Promise.all([
+    const [log, mo, moThem] = await Promise.all([
       fetchAll(() => sb.from('duc_su_co_log')
         .select('id_ban_ghi,id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,loai_su_co,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut,van_de,noi_dung_xu_ly,dam_nhiem,ghi_chu,truong_ca')
         .gte('ngay', tu).lte('ngay', den).order('gio_phat_sinh', { ascending: true })),
       sb.from('duc_ca_hien_tai')
-        .select('open_id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
+        .select('id_dong,open_id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
         .not('open_id_su_co', 'is', null),
+      sb.from('duc_su_co_mo_them').select('*'),
     ]);
     if (mo.error) throw new Error(mo.error.message);
+    if (moThem.error) throw new Error(moThem.error.message);
+    // T176: sự cố thứ 2, 3 đang mở của cùng máy — đưa về cùng dạng dòng open_* để gộp chung bên dưới.
+    const dongMo = new Map((mo.data || []).map(r => [r.id_dong, r]));
+    const moTatCa = (mo.data || []).concat((moThem.data || []).filter(x => dongMo.has(x.id_dong)).map(x => Object.assign({}, dongMo.get(x.id_dong), {
+      open_id_su_co: x.id_su_co, open_loai_su_co: x.loai_su_co, open_gio_phat_sinh: x.gio_phat_sinh, open_van_de: x.van_de,
+      open_noi_dung_xu_ly: x.noi_dung_xu_ly, open_dam_nhiem: x.dam_nhiem })));
     // Gộp các dòng log cùng id_su_co (sự cố vắt ca); dòng không có id giữ riêng.
     const map = new Map();
     for (const r of log) {
@@ -253,7 +260,7 @@ async function load(){
     }
     // Sự cố đang mở (chưa vào log, hoặc phần còn lại của sự cố vắt ca).
     const now = Date.now();
-    for (const r of (mo.data || [])) {
+    for (const r of moTatCa) {
       if (r.ngay < tu || r.ngay > den) { if (!map.has(r.open_id_su_co)) continue; }
       const phutMo = r.open_gio_phat_sinh ? Math.max(0, Math.round((now - new Date(r.open_gio_phat_sinh)) / 60000)) : 0;
       const g = map.get(r.open_id_su_co);
