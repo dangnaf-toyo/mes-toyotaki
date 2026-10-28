@@ -1969,7 +1969,7 @@ async function fetchShiftState(){
     rawRows = data || [];
   }
 
-  // T176: sự cố thứ 2, 3 đang mở của mỗi dòng (sự cố chính vẫn ở cột open_*).
+  // T178: sự cố thứ 2, 3 đang mở của mỗi dòng (sự cố chính vẫn ở cột open_*).
   const phuByIdDong = {};
   if (rawRows.some(r => r.open_gio_phat_sinh)) {
     const { data, error } = await sb.from('duc_su_co_mo_them').select('*')
@@ -2159,7 +2159,7 @@ async function loadKanbanProgress(){
   if (changed) renderTable();
 }
 
-// T176: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
+// T178: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
 const SU_CO_MO_TOI_DA = 3;
 function suCoMoCuaDong(row){
   if (!row || !row.open_gio_phat_sinh) return [];
@@ -2386,7 +2386,7 @@ function makeRowHTML(row, stateClass, isActive){
 
   let issueHTML;
   if (row.open_gio_phat_sinh) {
-    // T176: tối đa 3 sự cố mở / máy — sự cố chính + sự cố phụ (duc_su_co_mo_them), sửa / xong từng cái.
+    // T178: tối đa 3 sự cố mở / máy — sự cố chính + sự cố phụ (duc_su_co_mo_them), sửa / xong từng cái.
     const list = suCoMoCuaDong(row);
     issueHTML = list.map(s => {
       const startTime = new Date(s.open_gio_phat_sinh);
@@ -2563,7 +2563,7 @@ function updateSummary(){
   // Bỏ sự cố "mồ côi" (kế hoạch đã bị xoá) khỏi tổng phút dừng, giống bản cũ.
   const activeKeys = new Set(state.rows.filter(r => r.ma_sp).map(r => r.ma_may + '|' + r.ma_sp));
   const activeIncidents = state.incidents.filter(i => activeKeys.has(i.ma_may + '|' + i.ma_sp));
-  // T176: phut_dung_may = phút dừng máy sau khi trừ phần chồng giờ với sự cố khác cùng máy.
+  // T178: phut_dung_may = phút dừng máy sau khi trừ phần chồng giờ với sự cố khác cùng máy.
   const totalResolvedMin = activeIncidents.reduce((s,i) => s + Math.round(Number(i.phut_dung_may != null ? i.phut_dung_may : i.thoi_gian_dung_phut) || 0), 0);
   const nowMs = nowServer();
   const totalOpenMin = opens.reduce((s, r) => s + Math.round((nowMs - new Date(r.open_gio_phat_sinh)) / 60000), 0);
@@ -3247,7 +3247,7 @@ async function submitAddIncident(){
     hideOverlay(); closeModal();
     showToast('✓ Đã ghi nhận sự cố đang xử lý');
     if (anhSuCo.add && anhSuCo.add.hasPending()) {
-      // Mã sự cố do duc_open_incident sinh (T176: có thể là sự cố phụ) -> gắn ảnh theo mã trả về.
+      // Mã sự cố do duc_open_incident sinh (T178: có thể là sự cố phụ) -> gắn ảnh theo mã trả về.
       try {
         const n = await SuCoAnh.uploadPending(anhSuCo.add, d && d.id_su_co);
         showToast('✓ Đã ghi nhận sự cố + ' + n + ' ảnh hiện trạng');
