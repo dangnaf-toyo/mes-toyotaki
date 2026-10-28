@@ -40,7 +40,7 @@
     productCode: "Mã sản phẩm *",
     lotNo: "Số LOT *",
     productName: "Tên sản phẩm",
-    lotQty: "SL LOT *",
+    lotQty: "Số lượng sản phẩm (PCS) *",
     inspector: "Người kiểm *",
     inspectionType: "Tiêu chuẩn *",
     sampleQty: "Rút kiểm",
