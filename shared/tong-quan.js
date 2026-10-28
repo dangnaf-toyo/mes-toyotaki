@@ -126,7 +126,7 @@
       if (ngHopLe(num(b.tt), num(b.ng))) { a.ng += num(b.ng); a.ngTT += num(b.tt); }
       var oe = num(b.oee); if (oe > 0.01 && oe <= 1.5) a.oee.push(oe);
     });
-    (D.su_co || []).forEach(function (s) { var a = dayAgg[s.ngay]; if (!a) return; a.suCo++; a.dung += num(s.phut); });
+    (D.su_co || []).forEach(function (s) { var a = dayAgg[s.ngay]; if (!a) return; a.suCo++; a.dung += num(s.phut_may != null ? s.phut_may : s.phut); });   // T179: phút dừng máy đã trừ chồng giờ
     // Hôm nay = ca đã kết + ca đang chạy (nếu cùng ngày sản xuất)
     var T = dayAgg[ngay];
     var homNay = { kh: T.kh, tt: T.tt, ng: T.ng, ngTT: T.ngTT };
@@ -143,7 +143,7 @@
     (D.su_co || []).forEach(function (s) {
       if (s.ngay !== ngay || !s.xong) return;
       var k = loaiTen(s.loai); var o = dungTheoLoai[k] || (dungTheoLoai[k] = { loai: k, phut: 0, n: 0 });
-      o.phut += num(s.phut); o.n++; dungPhut += num(s.phut); suCoN++;
+      o.phut += num(s.phut); o.n++; dungPhut += num(s.phut_may != null ? s.phut_may : s.phut); suCoN++;
     });
     dangDung.forEach(function (m) {
       var k = loaiTen(m.loai); var o = dungTheoLoai[k] || (dungTheoLoai[k] = { loai: k, phut: 0, n: 0 });

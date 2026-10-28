@@ -356,7 +356,7 @@ async function loadPeriod(mode, refDate){
   const [bccRes, sucoRes, lssxRes, chtRes, khsxRes, actionRes] = await Promise.all([
     sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_bao_cao')),
-    sbTaiHet(() => sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,van_de,truong_ca')
+    sbTaiHet(() => sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,phut_dung_may,van_de,truong_ca')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_ban_ghi')),
     sbTaiHet(() => sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id')),
@@ -506,12 +506,15 @@ function computeAll(ctx){
   }
   const ca1 = caStat(1), ca2 = caStat(2);
 
+  // T179: tổng dừng theo máy / mã SP / toàn bộ dùng phút dừng MÁY (sự cố chồng giờ trên cùng máy không cộng 2 lần);
+  // theo loại vấn đề vẫn là phút của từng sự cố.
+  const phutMay = r => r.phut_dung_may != null ? r.phut_dung_may : r.thoi_gian_dung_phut;
   // ── Dừng máy theo máy ──
   const byMay = groupBy(suco, r=>r.ma_may);
   const downtimeMachine = [...byMay.entries()].map(([ma_may, rs]) => ({
-    ma_may, phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs),
+    ma_may, phut: sumBy(rs,phutMay), count: rs.length, top3: top3VanDe(rs),
   })).sort((a,b)=> b.phut - a.phut);
-  const totalDowntimeSuco = sumBy(suco, r=>r.thoi_gian_dung_phut);
+  const totalDowntimeSuco = sumBy(suco, phutMay);
 
   // ── Dừng máy theo loại vấn đề (gộp mã trùng, ưu tiên nhãn có mô tả dài nhất) ──
   const byIssue = groupBy(suco, r=>issueCode(r.loai_su_co));
@@ -522,7 +525,7 @@ function computeAll(ctx){
   // ── Dừng máy theo mã SP ──
   const bySp = groupBy(suco, r=>r.ma_sp || '(không rõ)');
   const downtimeProduct = [...bySp.entries()].map(([ma_sp, rs]) => ({
-    ma_sp, ten_sp: rs[0].ten_sp || '', phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs),
+    ma_sp, ten_sp: rs[0].ten_sp || '', phut: sumBy(rs,phutMay), count: rs.length, top3: top3VanDe(rs),
   })).sort((a,b)=> b.phut - a.phut);
 
   // ── Sản lượng theo máy / mã SP — KH từ kế hoạch tuần đã duyệt (duc_khsx_tuan_plan),
