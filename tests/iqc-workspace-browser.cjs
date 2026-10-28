@@ -126,7 +126,7 @@ function backend() {
       }),
       page = await context.newPage(),
       errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("pageerror", (e) => errors.push(e.stack));
     page.on("dialog", (d) => d.accept());
     await context.addInitScript({
       content:
@@ -143,7 +143,7 @@ function backend() {
         return route.fulfill({ status: 404, body: "" });
       return route.fulfill({
         body: fs.readFileSync(file),
-        contentType: file.endsWith(".js") ? "application/javascript" : "text/html",
+        contentType: file.endsWith(".js") ? "application/javascript" : file.endsWith(".css") ? "text/css" : "text/html",
       });
     });
     await page.goto("https://mes.test/iqc.html");
@@ -197,7 +197,7 @@ function backend() {
     await page.waitForFunction(() => document.getElementById("iqcDash-total").textContent === "2");
     assert.equal(await page.locator("#iqcDash-waiting").textContent(), "1");
     assert.equal(await page.locator("#iqcDash-ok").textContent(), "1");
-    assert.ok((await page.locator("#iqcChartScope").textContent()).includes("Chưa xác định"));
+    assert.ok((await page.locator("#iqcChartScope").textContent()).includes("—"));
     assert.ok((await page.locator("#iqcChartScope").textContent()).includes("Mạ"));
     await page.locator("#iqcDashProduct").fill("SP02");
     assert.equal(await page.locator("#iqcDash-total").textContent(), "1");
@@ -232,6 +232,10 @@ function backend() {
     assert.match(await page.locator("#iqcRates").textContent(), /50.00%/);
     console.log("PASS edit and completion reread update dashboard counts, supplier, scope and 50% rates");
     await page.locator("#tabIqc").click();
+    await page.screenshot({ path: ".review/iqc-compact-entry.png", fullPage: true });
+    assert.equal(await page.locator("#formSection").evaluate((e) => e.parentElement.firstElementChild === e), true);
+    assert.equal(await page.locator(".iqc-report-list[open]").count(), 0);
+    await page.locator("details:has(#lotTable) > summary").click();
     await page.locator("#iqcFilterScope").selectOption("In");
     assert.equal(await page.locator("#lotTable tr").count(), 1);
     await page.locator("#iqcFilterScope").selectOption("");
@@ -240,10 +244,17 @@ function backend() {
     await page.locator("#iqcFilterInspector").fill("");
     await page.evaluate(async () => renderHistory(await IqcApi.searchLotHistory("", "", "")));
     assert.ok((await page.locator("#historyTable").textContent()).includes("In"));
+    await page.locator("details:has(#historyTable) > summary").click();
+    await page.selectOption("#iqcHistoryScope", "Mạ");
+    assert.equal(await page.locator("#historyTable tr td").count(), 1);
+    await page.selectOption("#iqcHistoryScope", "In");
+    assert.equal(await page.locator("#historyTable tr").count(), 1);
+    assert.ok((await page.locator("#historyTable").textContent()).includes("In"));
+    assert.equal(await page.locator("#lotForm #lotNo").count(), 1);
+    await page.evaluate(() => editLot("new-1"));
+    assert.equal(await page.locator("#lotNo").inputValue(), "TEST-LOT");
     await page.evaluate(() => openDetail("old"));
-    await page.waitForFunction(() =>
-      document.getElementById("detailBody").textContent.includes("Chưa xác định (dữ liệu cũ)"),
-    );
+    await page.waitForFunction(() => document.getElementById("detailBody").textContent.includes("—"));
     assert.ok((await page.locator("#detailBody").textContent()).includes("Người kiểm cũ"));
     assert.equal(await page.evaluate(() => sb.tables.iqc_lots[0].sampled_at), "2026-10-01T02:00:00Z");
     await page.evaluate(() => closeDetail());
@@ -254,6 +265,16 @@ function backend() {
     assert.ok(csv.includes("In"));
     assert.ok(csv.includes("Nhân sự mới"));
     console.log("PASS CSV report includes scope and inspector identity");
+    await page.evaluate(() => openDefect());
+    assert.equal(await page.locator("#defectModal").isVisible(), true);
+    assert.equal(await page.locator("#defectLot").inputValue(), "new-1");
+    assert.equal(await page.locator("#defectModal").evaluate((e) => !!e.closest("#lotForm")), false);
+    assert.equal(await page.locator("#defectLot").isVisible(), false);
+    await page.evaluate(() => IqcWorkspace.refresh());
+    assert.equal(await page.locator("#defectLot").inputValue(), "new-1");
+    await page.screenshot({ path: ".review/iqc-inline-errors.png", fullPage: true });
+    await page.evaluate(() => closeDefect());
+    console.log("PASS compact report, collapsed tables and inline defect editor preserve selected LOT across refresh");
     const denied = await page.evaluate(async () => {
       const data = { supplier: "BRV", scope: "In", productCode: "SP01", inspector: "SX01_Nguyễn Sản Xuất" };
       const out = [];
@@ -272,12 +293,17 @@ function backend() {
     console.log("PASS invalid supplier/scope/product/inspector rejected; zero browser JS errors");
     const total = await page.evaluate(async () => {
       const existing = sb.tables.iqc_lots.slice();
-      sb.tables.iqc_lots.push(...Array.from({ length: 1001 }, (_, i) => ({ id: 'page-' + i, status: 'Đang chờ kiểm' })));
-      try { return (await IqcApi.getDashboardData()).summary.total; }
-      finally { sb.tables.iqc_lots = existing; }
+      sb.tables.iqc_lots.push(
+        ...Array.from({ length: 1001 }, (_, i) => ({ id: "page-" + i, status: "Đang chờ kiểm" })),
+      );
+      try {
+        return (await IqcApi.getDashboardData()).summary.total;
+      } finally {
+        sb.tables.iqc_lots = existing;
+      }
     });
-    assert.equal(total,1003);
-    console.log('PASS dashboard reads all 1003 LOTs across backend pagination');
+    assert.equal(total, 1003);
+    console.log("PASS dashboard reads all 1003 LOTs across backend pagination");
     await context.close();
   } finally {
     await browser.close();
