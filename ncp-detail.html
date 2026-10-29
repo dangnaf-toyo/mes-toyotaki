@@ -445,6 +445,23 @@ async function loadCachLy(){
   state.cachLy = data || [];
 }
 
+// T184 (sửa theo review): chỉ người mở phiếu, Trưởng phòng QC, Admin được đổi hạn trả lời đối sách
+// (người trả lời không tự lùi hạn). Server kiểm lại trong duc_ncp_update_root_cause.
+let quyenDoiHanP = null;
+async function capNhatQuyenDoiHan(c){
+  quyenDoiHanP = quyenDoiHanP || (async () => {
+    const s = await MesAuth.getSession();
+    if (!s) return { uid: null, role: null };
+    const { data } = await sb.from('user_roles').select('role').eq('user_id', s.user.id).maybeSingle();
+    return { uid: s.user.id, role: data ? data.role : null };
+  })().catch(() => ({ uid: null, role: null }));
+  const q = await quyenDoiHanP;
+  const duoc = ['admin', 'qc_manager'].includes(q.role) || (q.uid && q.uid === c.nguoi_mo_uid);
+  const o = document.getElementById('f-han-tra-loi');
+  o.readOnly = state.locked || !duoc;
+  o.title = duoc ? '' : 'Chỉ người mở phiếu, Trưởng phòng QC hoặc Admin được đổi hạn';
+}
+
 function renderAll(){
   const c = state.case;
   Qc02Ncp.render(document.getElementById('qc02-ncp-detail'),c,state.checkpoint);
@@ -467,6 +484,7 @@ function renderAll(){
   document.getElementById('f-nn-luu-xuat').value = c.nguyen_nhan_luu_xuat || '';
 
   ['f-han-tra-loi', 'f-nguoi-dam-nhiem', 'f-nn-phat-sinh', 'f-nn-luu-xuat'].forEach(id => { document.getElementById(id).readOnly = state.locked; });
+  capNhatQuyenDoiHan(c);
   document.getElementById('upload-btn-phat_sinh').classList.toggle('disabled', state.locked);
   document.getElementById('upload-btn-luu_xuat').classList.toggle('disabled', state.locked);
   DS_KEYS.forEach(key => document.getElementById('add-btn-' + key).classList.toggle('hidden', state.locked));

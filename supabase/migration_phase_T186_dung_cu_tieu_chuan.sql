@@ -1,5 +1,5 @@
 -- T186: giới hạn dụng cụ khi lưu hạng mục tiêu chuẩn; không cập nhật dữ liệu lịch sử.
--- Đã chạy STAGING 29/10/2026; chưa chạy PRODUCTION.
+-- Đã chạy STAGING + PRODUCTION 29/10/2026 (sửa theo review: xem migration_phase_T187_sua_review_t184_t186.sql).
 begin;
 create or replace function public.ipqc_kiem_tra_dung_cu()
 returns trigger language plpgsql set search_path=public as $$

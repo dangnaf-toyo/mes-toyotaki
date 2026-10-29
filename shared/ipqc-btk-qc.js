@@ -22,6 +22,7 @@
     'Thước kẹp', 'CMM', 'OMM', 'Máy đo biên dạng', 'Máy đo độ nhám', 'Thước đo cao',
     'Thước lá', 'Máy phân tích nguyên vật liệu', 'Máy kiểm tra độ cứng',
     'Máy kiểm tra lực nén', 'Máy kiểm tra màu sắc', 'Máy đo độ dày sơn',
+    'Panme', 'JIG', 'Kiểm bằng mắt',
   ]);
   const COT_SAO_CHEP = Object.freeze([
     'hang_muc', 'kieu', 'danh_nghia', 'dung_sai_tren', 'dung_sai_duoi',
@@ -284,16 +285,27 @@
       const b = st.xem;
       const cur = st.versions.find(x => x.dang_dung) || null;
       const nhap = st.versions.find(x => x.trang_thai !== 'da_duyet') || null;
+      // T185: IPQC đo theo bản đã duyệt có ngày hiệu lực <= hôm nay (ipqc_tc_hieu_luc), có thể khác bản "đang dùng".
+      const homNay = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+      const ngayVi = d => d ? d.split('-').reverse().join('/') : '';
+      const hieuLuc = st.versions.filter(x => x.trang_thai === 'da_duyet' && (!x.ngay_hieu_luc || x.ngay_hieu_luc <= homNay))
+        .sort((x, y) => String(y.ngay_hieu_luc || '').localeCompare(String(x.ngay_hieu_luc || ''))
+          || String(y.phe_duyet_luc || '').localeCompare(String(x.phe_duyet_luc || '')) || y.id - x.id)[0] || null;
+      const choHl = v => !!(v && v.dang_dung && v.ngay_hieu_luc && v.ngay_hieu_luc > homNay);
       const laNhap = !!(b && b.trang_thai !== 'da_duyet');
       const cu = b && !laNhap && !b.dang_dung;
       const ss = laNhap ? soSanh(cur) : null;
       const sua = q.soan && st.sua;   // đang ở chế độ chỉnh sửa
       const dis = sua ? '' : ' disabled';
-      const tenPb = v => esc(v.phien_ban) + (v.dang_dung ? ' (đang dùng)' : v.trang_thai !== 'da_duyet' ? ' (' + TT_NGAN[v.trang_thai] + ')' : ' (cũ)');
+      const tenPb = v => esc(v.phien_ban) + (choHl(v) ? ' (chờ hiệu lực ' + ngayVi(v.ngay_hieu_luc) + ')'
+        : v.dang_dung ? ' (đang dùng)' : hieuLuc && v.id === hieuLuc.id ? ' (IPQC đang dùng)'
+        : v.trang_thai !== 'da_duyet' ? ' (' + TT_NGAN[v.trang_thai] + ')' : ' (cũ)');
       let canhBao = '';
       if (cu) canhBao = 'Đang xem phiên bản cũ ' + esc(b.phien_ban) + ' (chỉ xem). Gửi duyệt sẽ tạo bản nháp từ nội dung này' + (nhap ? ', ghi đè bản nháp ' + esc(nhap.phien_ban) : '') + '.';
       else if (!laNhap && nhap) canhBao = 'Mã này đang có bản nháp ' + esc(nhap.phien_ban) + ' (' + esc(TT_NGAN[nhap.trang_thai]) + ') — chọn ở ô "Đang xem". Gửi duyệt từ đây sẽ ghi đè bản nháp đó.';
       else if (!cur) canhBao = 'Mã chưa có bảng tuần kiểm ' + CD[st.cd] + ' được duyệt — IPQC ' + CD[st.cd] + ' chưa đo theo bảng tuần kiểm cho mã này.';
+      if (choHl(cur)) canhBao = (canhBao ? canhBao + ' ' : '') + 'Phiên bản ' + esc(cur.phien_ban) + ' đã duyệt, có hiệu lực từ ' + ngayVi(cur.ngay_hieu_luc) +
+        ' — đến ngày đó IPQC vẫn đo theo ' + (hieuLuc ? 'phiên bản ' + esc(hieuLuc.phien_ban) : 'không có bảng tuần kiểm') + '.';
       const cdKhac = st.cd === 'duc' ? 'gia_cong' : 'duc';
       main.innerHTML =
         '<div class="card"><div class="flds">' +
@@ -365,7 +377,9 @@
         '</div>' +
         '<div class="card"><div class="ttl"><span class="sp">Lịch sử sửa đổi</span></div><div class="tbl"><table style="min-width:720px"><tr><th>Phiên bản</th><th>Trạng thái</th><th>Ngày hiệu lực</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>TP QC kiểm tra</th><th>GĐ SX phê duyệt</th></tr>' +
           (st.versions.map(v => {
-            const tag = v.dang_dung ? '<span class="tag ok">đang dùng</span>' : v.trang_thai !== 'da_duyet' ? '<span class="tag ' + (v.trang_thai === 'tra_lai' ? 'ng' : 'w') + '">' + esc(TT[v.trang_thai]) + '</span>' : '<span class="hint">đã thay thế</span>';
+            const tag = choHl(v) ? '<span class="tag w">chờ hiệu lực ' + ngayVi(v.ngay_hieu_luc) + '</span>'
+              : v.dang_dung ? '<span class="tag ok">đang dùng</span>'
+              : hieuLuc && v.id === hieuLuc.id ? '<span class="tag ok">IPQC đang dùng</span>' : v.trang_thai !== 'da_duyet' ? '<span class="tag ' + (v.trang_thai === 'tra_lai' ? 'ng' : 'w') + '">' + esc(TT[v.trang_thai]) + '</span>' : '<span class="hint">đã thay thế</span>';
             const ai = (ten, luc) => ten ? esc(ten) + '<div class="hint" style="margin:0">' + esc(ngayVN(luc)) + '</div>' : '';
             return '<tr><td><b>' + esc(v.phien_ban) + '</b></td><td>' + tag + '</td><td>' + esc(v.ngay_hieu_luc || '') + '</td><td>' + esc(v.noi_dung_sua_doi || '') + '</td>' +
               '<td>' + ai(v.nguoi_lap, v.gui_luc || v.tao_luc) + '</td><td>' + ai(v.nguoi_kiem_tra, v.kiem_tra_luc) + '</td>' +

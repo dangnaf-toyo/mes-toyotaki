@@ -115,6 +115,9 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 .filter-grid{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:4px 6px}
 .filter-field{display:flex;flex-direction:column;gap:4px;min-width:150px}
 .filter-field label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em}
+.filter-field input[type=date]{padding:6px 8px;border:1px solid var(--border-strong);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:var(--text);min-height:32px}
+.ncp-han-loc{margin:10px 0}
+.ncp-han{white-space:nowrap}.ncp-han .d{font-family:'JetBrains Mono',monospace;font-weight:700}.ncp-han .s{font-size:11px;font-weight:700}.ncp-han .t{font-size:11px;color:var(--text-muted)}
 .filter-field select{padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;color:var(--text)}
 
 .tc-form{display:flex;flex-direction:column;gap:10px;padding:10px 14px}
@@ -291,14 +294,25 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
   </div>
 
   <!-- ===================== TAB: XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP ===================== -->
-  <div class="tabpanel" id="tab-ncp"><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><label>Tiến độ <select id="ncp-progress" onchange="renderNcpList()"><option value="">Tất cả</option><option value="chua_tra_loi">Chưa trả lời</option><option value="dang_thuc_hien">Đang thực hiện</option><option value="da_tra_loi">Đã trả lời</option><option value="qua_han">Quá hạn</option></select></label><label>Thời hạn <select id="ncp-deadline-status" onchange="renderNcpList()"><option value="">Tất cả</option><option value="con_han">Còn hạn</option><option value="sap_den_han">Sắp đến hạn</option><option value="hom_nay">Đến hạn hôm nay</option><option value="qua_han">Quá hạn</option><option value="hoan_thanh">Đã hoàn thành</option><option value="chua_co_han">Chưa có hạn</option></select></label><label>Hạn từ <input type="date" id="ncp-due-from" onchange="renderNcpList()"></label><label>Đến <input type="date" id="ncp-due-to" onchange="renderNcpList()"></label><label>Sắp xếp <select id="ncp-due-sort" onchange="renderNcpList()"><option value="">Theo trạng thái xử lý</option><option value="due">Hạn gần nhất</option></select></label></div>
+  <div class="tabpanel" id="tab-ncp">
+    <!-- T184 (sửa theo review): lọc theo hạn trả lời đối sách -->
+    <div class="filter-grid ncp-han-loc">
+      <div class="filter-field"><label for="ncp-progress">Tiến độ trả lời</label>
+        <select id="ncp-progress" onchange="renderNcpList()"><option value="">Tất cả</option><option value="chua_tra_loi">Chưa trả lời</option><option value="dang_thuc_hien">Đang thực hiện</option><option value="da_tra_loi">Đã trả lời</option><option value="qua_han">Quá hạn</option></select></div>
+      <div class="filter-field"><label for="ncp-deadline-status">Thời hạn</label>
+        <select id="ncp-deadline-status" onchange="renderNcpList()"><option value="">Tất cả</option><option value="con_han">Còn hạn</option><option value="sap_den_han">Sắp đến hạn</option><option value="hom_nay">Đến hạn hôm nay</option><option value="qua_han">Quá hạn</option><option value="hoan_thanh">Đã hoàn thành</option><option value="chua_co_han">Chưa có hạn</option></select></div>
+      <div class="filter-field"><label for="ncp-due-from">Hạn từ ngày</label><input type="date" lang="vi" id="ncp-due-from" onchange="renderNcpList()"></div>
+      <div class="filter-field"><label for="ncp-due-to">Đến ngày</label><input type="date" lang="vi" id="ncp-due-to" onchange="renderNcpList()"></div>
+      <div class="filter-field"><label for="ncp-due-sort">Sắp xếp</label>
+        <select id="ncp-due-sort" onchange="renderNcpList()"><option value="">Theo trạng thái xử lý</option><option value="due">Hạn gần nhất</option></select></div>
+    </div>
     <label>Tìm số phiếu <input id="qc02-ncp-search" placeholder="Nhập số phiếu hoặc một phần số phiếu" oninput="renderNcpList()"></label>
     <div class="panel">
       <div class="panel-head">🚧 Phiếu đang xử lý <span class="count" id="ncp-open-count">0</span></div>
       <div class="panel-actions"><button class="btn btn-primary" onclick="openNcpNewModal()">+ Mở phiếu mới</button></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Đã lọc</th><th>OK</th><th>NG</th><th>Bước hiện tại</th><th>Hạn trả lời đối sách</th><th>Tiến độ trả lời</th><th>Trạng thái thời hạn</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian</th><th></th></tr></thead>
+          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Đã lọc</th><th>OK</th><th>NG</th><th>Bước hiện tại</th><th>Hạn đối sách</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian</th><th></th></tr></thead>
           <tbody id="ncp-open-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="ncp-open-empty">Không có phiếu nào đang xử lý.</div>
@@ -309,7 +323,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
       <div class="panel-head">📁 Phiếu đã xử lý xong <span class="count" id="ncp-closed-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Lưu thông (lọc+sửa OK)</th><th>Đã phế</th><th>Hạn trả lời đối sách</th><th>Tiến độ trả lời</th><th>Trạng thái thời hạn</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian mở</th><th></th></tr></thead>
+          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Lưu thông (lọc+sửa OK)</th><th>Đã phế</th><th>Hạn đối sách</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian mở</th><th></th></tr></thead>
           <tbody id="ncp-closed-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="ncp-closed-empty">Chưa có phiếu nào xử lý xong.</div>
@@ -497,7 +511,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 <script src="shared/qc02-data.js?v=T183"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/ipqc-spc.js"></script>
-<script src="shared/ipqc-btk-qc.js?v=T186"></script>
+<script src="shared/ipqc-btk-qc.js?v=T187"></script>
 <script src="shared/mes-ng-status.js?v=T141"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBlob: null, currentUserEmail: '' };
@@ -1013,12 +1027,16 @@ const NCP_TRANG_THAI_LABEL = { da_cach_ly: 'Đã cách ly — chờ lọc', dang
 const NCP_BADGE_LABEL = { do: '🔴 Đỏ', vang: '🟡 Vàng', xanh: '🟢 Xanh' };
 const NCP_RC_BADGE_LABEL = { nhap: 'Nháp', cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' };
 
+// T184: 1 ô "Hạn đối sách" = ngày hạn + trạng thái thời hạn + tiến độ trả lời (view duc_ncp_theo_doi).
+const NCP_TIEN_DO = { chua_tra_loi: 'Chưa trả lời', dang_thuc_hien: 'Đang thực hiện', da_tra_loi: 'Đã trả lời', qua_han: 'Quá hạn' };
+const NCP_THOI_HAN = { con_han: 'Còn hạn', sap_den_han: 'Sắp đến hạn', hom_nay: 'Đến hạn hôm nay', qua_han: 'Quá hạn', hoan_thanh: 'Đã hoàn thành', chua_co_han: 'Chưa có hạn' };
 function ncpDeadlineCells(c){
- const progress={chua_tra_loi:'Chưa trả lời',dang_thuc_hien:'Đang thực hiện',da_tra_loi:'Đã trả lời',qua_han:'Quá hạn'};
- const status={con_han:'Còn hạn',sap_den_han:'Sắp đến hạn',hom_nay:'Đến hạn hôm nay',qua_han:'Quá hạn',hoan_thanh:'Đã hoàn thành',chua_co_han:'Chưa có hạn'};
- const color=c.trang_thai_han==='hoan_thanh'?'#15803d':c.trang_thai_han==='qua_han'?'#b91c1c':['sap_den_han','hom_nay'].includes(c.trang_thai_han)?'#92400e':'#64748b';
- const date=c.han_tra_loi_doi_sach?c.han_tra_loi_doi_sach.split('-').reverse().join('/'):'—';
- return '<td style="color:'+color+'">'+escapeHtml(date)+'</td><td>'+escapeHtml(progress[c.tien_do_tra_loi]||'Chưa trả lời')+'</td><td style="color:'+color+'">'+escapeHtml(status[c.trang_thai_han]||'Chưa có hạn')+'</td>';
+  const th = c.trang_thai_han || 'chua_co_han';
+  const color = th === 'hoan_thanh' ? '#15803d' : th === 'qua_han' ? '#b91c1c' : ['sap_den_han', 'hom_nay'].includes(th) ? '#92400e' : '#64748b';
+  const date = c.han_tra_loi_doi_sach ? c.han_tra_loi_doi_sach.split('-').reverse().join('/') : '—';
+  return '<td class="ncp-han"><div class="d" style="color:' + color + '">' + escapeHtml(date) + '</div>' +
+    '<div class="s" style="color:' + color + '">' + escapeHtml(NCP_THOI_HAN[th]) + '</div>' +
+    '<div class="t">' + escapeHtml(NCP_TIEN_DO[c.tien_do_tra_loi] || 'Chưa trả lời') + '</div></td>';
 }
 async function loadNcpList(){
   const data = [];

@@ -66,12 +66,15 @@
     el.replaceChildren(root); el.classList.add('hidden');
     // T183: điểm kiểm IPQC Đúc → bảng tuần kiểm công đoạn Đúc.
     const { data, error } = await sb.rpc('ipqc_do_du_lieu', { p_ma_sp: cp.ma_sp, p_tu: null, p_den: null, p_so_lan: 30, p_cong_doan: 'duc' });
-    if (error || !data || !data.btk) {
-      el.classList.remove('hidden');root.textContent=error?'Không tải được tiêu chuẩn Đúc. Thử lại trước khi kiểm tra.':'Chưa có bảng tuần kiểm Đúc có hiệu lực cho mã '+cp.ma_sp+'. Liên hệ QC Manager.';
-      if(error)throw new Error(error.message);
-      return null;
+    if (error) {
+      el.classList.remove('hidden');
+      root.textContent = 'Không tải được tiêu chuẩn Đúc. Thử lại trước khi kiểm tra.';
+      throw new Error(error.message);
     }
-    data.lan=(data.lan||[]).filter(l=>l.id_btk===data.btk.id);
+    // Sửa theo review T185: đa số mã chưa có bảng tuần kiểm → không hiện gì (như trước), không làm phiền IPQC.
+    if (!data || !data.btk) return null;
+    // Lịch sử / quy tắc biểu đồ chỉ tính các lần đo cùng phiên bản đang hiệu lực.
+    data.lan = (data.lan || []).filter(l => l.id_btk === data.btk.id);
     const btk = data.btk, mucs = data.muc || [], soMau = btk.so_mau || 1;
     const nhap = {};   // muc_no -> [giá trị chuỗi] | true/false
     mucs.forEach(m => { nhap[m.muc_no] = m.kieu === 'so' ? new Array(soMau).fill('') : null; });

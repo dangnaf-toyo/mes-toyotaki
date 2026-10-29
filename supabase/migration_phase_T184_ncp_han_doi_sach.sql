@@ -1,4 +1,4 @@
--- Đã chạy STAGING 29/10/2026; chưa chạy PRODUCTION.
+-- Đã chạy STAGING + PRODUCTION 29/10/2026 (sửa theo review: xem migration_phase_T187_sua_review_t184_t186.sql).
 -- T184 — STAGING: hạn trả lời, tiến độ và nhắc hạn NCP qua chuông chung.
 -- Phiếu cũ giữ NULL (không tự gán hạn); không thay đổi nghiệp vụ duyệt đối sách.
 begin;
@@ -15,6 +15,7 @@ create table if not exists public.ncp_cau_hinh_nhac_han (
 );
 insert into public.ncp_cau_hinh_nhac_han(id) values(true) on conflict do nothing;
 alter table public.ncp_cau_hinh_nhac_han enable row level security;
+drop policy if exists ncp_cau_hinh_doc on public.ncp_cau_hinh_nhac_han;
 create policy ncp_cau_hinh_doc on public.ncp_cau_hinh_nhac_han for select to authenticated using(true);
 grant select on public.ncp_cau_hinh_nhac_han to authenticated;
 revoke all on public.ncp_cau_hinh_nhac_han from anon;
@@ -62,6 +63,7 @@ create table if not exists public.ncp_nhac_han_log (
  so_thong_bao integer not null default 0,gui_luc timestamptz not null default now()
 );
 alter table public.ncp_nhac_han_log enable row level security;
+drop policy if exists ncp_nhac_han_log_doc on public.ncp_nhac_han_log;
 create policy ncp_nhac_han_log_doc on public.ncp_nhac_han_log for select to authenticated
  using(auth.uid()=any(nguoi_nhan) or has_role('admin','qc_manager','giam_doc_sx'));
 revoke all on public.ncp_nhac_han_log from anon,authenticated;
@@ -105,7 +107,7 @@ end $$;
 revoke all on function public.ncp_quet_nhac_han() from public,anon,authenticated;
 -- 07:00..22:00 GMT+7, mỗi giờ; bù mốc nếu server gián đoạn, không bắn các mốc đã qua.
 select cron.schedule('ncp_nhac_han_doi_sach','0 0-15 * * *','select public.ncp_quet_nhac_han();');
-drop function public.duc_ncp_open_case(text,text,text,text,text,text,numeric,numeric,text,text,text,text);
+drop function if exists public.duc_ncp_open_case(text,text,text,text,text,text,numeric,numeric,text,text,text,text);
 CREATE OR REPLACE FUNCTION public.duc_ncp_open_case(p_id_checkpoint_goc text, p_ma_may text, p_ma_sp text, p_ten_sp text, p_so_khuon text, p_mo_ta_loi text, p_so_luong_nghi_van numeric, p_so_luong_ng_du_kien numeric, p_vi_tri_cach_ly text, p_nguoi_dam_nhiem text, p_nguoi_dam_nhiem_doi_sach text, p_user text, p_han_tra_loi_doi_sach date default null)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -211,7 +213,7 @@ end $function$
 revoke execute on function public.duc_ncp_open_source(p_data jsonb) from public,anon;
 grant execute on function public.duc_ncp_open_source(p_data jsonb) to authenticated;
 
-drop function public.duc_ncp_update_root_cause(text,text,text,text,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,text);
+drop function if exists public.duc_ncp_update_root_cause(text,text,text,text,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,text);
 CREATE OR REPLACE FUNCTION public.duc_ncp_update_root_cause(p_id_ncp text, p_nguoi_dam_nhiem_doi_sach text, p_nguyen_nhan_phat_sinh text, p_nguyen_nhan_luu_xuat text, p_hinh_anh_phat_sinh jsonb, p_hinh_anh_luu_xuat jsonb, p_doi_sach_ps_tam_thoi jsonb, p_doi_sach_ps_lau_dai jsonb, p_doi_sach_lx_tam_thoi jsonb, p_doi_sach_lx_lau_dai jsonb, p_user text, p_han_tra_loi_doi_sach date default null)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -263,5 +265,6 @@ begin
  return new;
 end $$;
 revoke all on function public.ncp_dong_nhac_han() from public,anon,authenticated;
+drop trigger if exists ncp_dong_nhac_han on public.duc_ncp;
 create trigger ncp_dong_nhac_han after update on public.duc_ncp for each row execute function public.ncp_dong_nhac_han();
 commit;
