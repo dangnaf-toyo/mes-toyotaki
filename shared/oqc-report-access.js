@@ -20,7 +20,7 @@ const OqcReportAccess = (() => {
       info?.can_actual &&
       row &&
       !row.da_xoa &&
-      (info.is_admin || (row.created_by && row.created_by === info.user_id))
+      (info.is_admin || info.quan_ly_tat_ca || (row.created_by && row.created_by === info.user_id))
     );
   }
   function actions(row) {
@@ -37,7 +37,7 @@ const OqcReportAccess = (() => {
   async function remove(id) {
     if (busy.has(id)) return;
     const row = dataRows.find((r) => r.id === id);
-    if (!canManage(row)) return alert("Chỉ người nhập báo cáo hoặc Admin được sửa/xóa.");
+    if (!canManage(row)) return alert("Chỉ người nhập báo cáo, QC Manager hoặc Admin được sửa/xóa.");
     if (
       !confirm(
         "Xóa báo cáo OQC #" +

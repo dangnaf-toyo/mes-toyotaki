@@ -1,4 +1,4 @@
--- T176 — STAGING ONLY: additive IQC scope / inspector identity. No backfill or deletion.
+-- T176 — chạy staging 27/10, prod 29/10/2026: additive IQC scope / inspector identity. No backfill or deletion.
 begin;
 alter table public.iqc_lots add column if not exists pham_vi text;
 alter table public.iqc_lots add column if not exists nguoi_kiem_id text;
