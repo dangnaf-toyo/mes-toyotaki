@@ -64,7 +64,8 @@
     // Khung con mới mỗi lần mở điểm kiểm (không cộng dồn bộ xử lý sự kiện).
     const root = document.createElement('div');
     el.replaceChildren(root); el.classList.add('hidden');
-    const { data, error } = await sb.rpc('ipqc_do_du_lieu', { p_ma_sp: cp.ma_sp, p_tu: null, p_den: null, p_so_lan: 30 });
+    // T183: điểm kiểm IPQC Đúc → bảng tuần kiểm công đoạn Đúc.
+    const { data, error } = await sb.rpc('ipqc_do_du_lieu', { p_ma_sp: cp.ma_sp, p_tu: null, p_den: null, p_so_lan: 30, p_cong_doan: 'duc' });
     if (error || !data || !data.btk) return null;
     const btk = data.btk, mucs = data.muc || [], soMau = btk.so_mau || 1;
     const nhap = {};   // muc_no -> [giá trị chuỗi] | true/false
