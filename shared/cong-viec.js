@@ -56,7 +56,7 @@
     giao_viec: 'Giao việc', nhan_viec: 'Đã nhận', cho_duyet: 'Chờ duyệt', hoan_thanh: 'Hoàn thành',
     tra_lai: 'Trả lại', xin_gia_han: 'Xin gia hạn', tra_loi_gia_han: 'Gia hạn', nhac_viec: 'Nhắc việc',
     cap_nhat_viec: 'Cập nhật', mo_lai: 'Mở lại', huy_viec: 'Huỷ việc', binh_luan: 'Bình luận',
-    gop_y: 'Góp ý', nhac_ten: 'Nhắc tên', qua_han: 'Quá hạn',
+    gop_y: 'Góp ý', nhac_ten: 'Nhắc tên', qua_han: 'Quá hạn', giao_mau: 'Đã giao mẫu',
     // T162 — thông báo từ các luồng phê duyệt sẵn có (KHSX, BD khuôn, IPQC, NCP, tài liệu).
     can_duyet: 'Chờ bạn duyệt', da_duyet: 'Đã duyệt', tu_choi_duyet: 'Bị từ chối',
   };
