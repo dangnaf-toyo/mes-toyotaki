@@ -18,6 +18,28 @@
   const esc = s => S().esc(s);
   // T183: tiêu chuẩn tách theo công đoạn (cột cong_doan của ipqc_btk / ipqc_do_lan / ipqc_gioi_han).
   const CD = { duc: 'Đúc', gia_cong: 'Gia công' };
+  const DUNG_CU = Object.freeze([
+    'Thước kẹp', 'CMM', 'OMM', 'Máy đo biên dạng', 'Máy đo độ nhám', 'Thước đo cao',
+    'Thước lá', 'Máy phân tích nguyên vật liệu', 'Máy kiểm tra độ cứng',
+    'Máy kiểm tra lực nén', 'Máy kiểm tra màu sắc', 'Máy đo độ dày sơn',
+  ]);
+  const COT_SAO_CHEP = Object.freeze([
+    'hang_muc', 'kieu', 'danh_nghia', 'dung_sai_tren', 'dung_sai_duoi',
+    'tieu_chuan', 'dung_cu', 'tan_suat',
+  ]);
+  let dongDaSaoChep = null;
+  const noiDungDong = row => Object.fromEntries(COT_SAO_CHEP.map(key => [key, row[key] ?? '']));
+  const dungCuHopLe = value => !String(value || '').trim() || DUNG_CU.includes(String(value).trim());
+
+  function chonDungCu(value, disabled) {
+    const old = String(value || '');
+    const legacy = old && !DUNG_CU.includes(old)
+      ? '<option value="' + esc(old) + '" selected disabled>Dữ liệu cũ: ' + esc(old) + '</option>' : '';
+    return '<select data-c="dung_cu" aria-label="Dụng cụ kiểm tra" style="width:190px"' + disabled + '>' +
+      '<option value="">Chọn dụng cụ</option>' + legacy + DUNG_CU.map(name =>
+        '<option value="' + esc(name) + '"' + (name === old ? ' selected' : '') + '>' + esc(name) + '</option>'
+      ).join('') + '</select>';
+  }
   const COT = ['Mã SP', 'Phiên bản', 'Ngày hiệu lực', 'Số mẫu/lần', 'No', 'Hạng mục', 'Kiểu (Đo số / OK-NG)',
     'Danh nghĩa', 'Dung sai +', 'Dung sai −', 'Tiêu chuẩn (OK-NG)', 'Dụng cụ KT', 'Tần suất', 'Nội dung sửa đổi', 'Người phê duyệt'];
 
@@ -311,7 +333,8 @@
                 '<button class="btn sm d" type="button" data-xoavt>Xoá vị trí</button>' : '') + '</div>' +
               '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' : '') + 'Bản vẽ + vị trí đo đi cùng khi gửi duyệt.</div>' : '') +
             (st.banVe ? '<div class="hint">Phóng to bằng nút + / − hoặc giữ Ctrl + lăn chuột trên bản vẽ; kéo chuột để di chuyển bản vẽ.</div>' : '') + '</div>' +
-          '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span>' + (sua ? '<button class="btn sm" type="button" data-them>+ Thêm hạng mục</button>' : '') + '</div>' +
+          '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span>' + (sua ? '<button class="btn sm" type="button" data-them>+ Thêm hạng mục</button>' +
+            '<button class="btn sm" type="button" data-dan-moi' + (dongDaSaoChep ? '' : ' disabled') + '>Dán thành dòng mới</button>' : '') + '</div>' +
             '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>Dung sai +</th><th>Dung sai −</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th><th></th></tr>' +
             st.rows.map((r, i) => {
               const so = r.kieu === 'so';
@@ -326,15 +349,18 @@
                 td('dung_sai_tren') + '<input data-c="dung_sai_tren" value="' + esc(r.dung_sai_tren ?? '') + '" style="width:60px" inputmode="decimal"' + dso + '></td>' +
                 td('dung_sai_duoi') + '<input data-c="dung_sai_duoi" value="' + esc(r.dung_sai_duoi ?? '') + '" style="width:60px" inputmode="decimal"' + dso + '></td>' +
                 td('tieu_chuan') + '<input data-c="tieu_chuan" value="' + esc(r.tieu_chuan || '') + '" style="width:170px"' + (so ? ' placeholder="(tuỳ chọn)"' : '') + dis + '></td>' +
-                td('dung_cu') + '<input data-c="dung_cu" value="' + esc(r.dung_cu || '') + '" style="width:110px"' + dis + '></td>' +
+                td('dung_cu') + chonDungCu(r.dung_cu, dis) + '</td>' +
                 td('tan_suat') + '<input data-c="tan_suat" value="' + esc(r.tan_suat || '') + '" style="width:70px"' + dis + '></td>' +
                 '<td class="mono" style="white-space:nowrap;color:#475569">' + (so && (sp.usl !== null || sp.lsl !== null) ? (sp.lsl !== null ? S().fmt(sp.lsl, S().soLe(r)) : '—') + ' – ' + (sp.usl !== null ? S().fmt(sp.usl, S().soLe(r)) : '—') : '—') + '</td>' +
-                '<td>' + (sua ? '<button class="btn sm d" type="button" data-xoa="' + i + '" aria-label="Xoá hạng mục">✕</button>' : '') + '</td></tr>';
+                '<td style="white-space:nowrap"><button class="btn sm" type="button" data-sao-chep="' + i + '">Sao chép</button>' +
+                  (sua ? ' <button class="btn sm" type="button" data-dan="' + i + '"' + (dongDaSaoChep ? '' : ' disabled') + '>Dán</button>' +
+                    ' <button class="btn sm d" type="button" data-xoa="' + i + '" aria-label="Xoá hạng mục">✕</button>' : '') + '</td></tr>';
             }).join('') + '</table></div>' +
             (ss ? '<div class="hint"><b>So với bản đang dùng ' + esc(ss.cur.phien_ban) + ':</b> ô vàng = đã sửa, vạch xanh đầu dòng = hạng mục mới' +
               (ss.bo.length ? '; bỏ: ' + ss.bo.map(g => 'No ' + esc(g.muc_no) + ' ' + esc(g.hang_muc)).join(', ') : '') +
               (b.so_mau !== ss.cur.so_mau ? '; số mẫu/lần ' + ss.cur.so_mau + ' → ' + b.so_mau : '') +
               (b.ban_ve_url !== ss.cur.ban_ve_url ? '; bản vẽ mới' : JSON.stringify(b.ban_ve_vi_tri || []) !== JSON.stringify(ss.cur.ban_ve_vi_tri || []) ? '; đổi vị trí đo trên bản vẽ' : '') + '.</div>' : '') +
+            '<div class="hint">Sao chép rồi Dán vào dòng đích hoặc Dán thành dòng mới. Dán giữ nguyên No và vị trí đo của dòng đích.</div>' +
             '<div class="hint">Dung sai −: ghi độ lớn (VD 0.2 nghĩa là −0.2). Ghi 0 nếu dung sai bằng 0; để trống = không giới hạn phía đó. Hạng mục OK/NG chỉ theo dõi tỉ lệ NG.</div></div>' +
         '</div>' +
         '<div class="card"><div class="ttl"><span class="sp">Lịch sử sửa đổi</span></div><div class="tbl"><table style="min-width:720px"><tr><th>Phiên bản</th><th>Trạng thái</th><th>Ngày hiệu lực</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>TP QC kiểm tra</th><th>GĐ SX phê duyệt</th></tr>' +
@@ -417,6 +443,13 @@
         return baoDoi();
       }
       if (t.closest('[data-xuat]')) return xuatExcel(st.ma, st.xem, st.rows);
+      const copy = t.closest('[data-sao-chep]');
+      if (copy) {
+        docBang();
+        dongDaSaoChep = noiDungDong(st.rows[+copy.dataset.saoChep]);
+        el.querySelectorAll('[data-dan],[data-dan-moi]').forEach(button => { button.disabled = false; });
+        return msg(main.querySelector('[data-msg]'), 'Đã sao chép dòng No ' + st.rows[+copy.dataset.saoChep].muc_no + '. Chọn Dán hoặc Dán thành dòng mới.');
+      }
       const zb = t.closest('[data-zoom]');
       if (zb) {
         const k = zb.dataset.zoom;
@@ -442,6 +475,17 @@
       if (t.closest('[data-sua]')) { st.sua = true; return ve(); }
       if (t.closest('[data-huysua]')) return napPhienBan(st.xem);
       if (!st.sua) return;
+      const paste = t.closest('[data-dan]');
+      if (paste || t.closest('[data-dan-moi]')) {
+        if (!dongDaSaoChep) return;
+        docBang();
+        if (paste) Object.assign(st.rows[+paste.dataset.dan], noiDungDong(dongDaSaoChep));
+        else {
+          const no = Math.max(0, ...st.rows.map(row => +row.muc_no || 0)) + 1;
+          st.rows.push({ ...noiDungDong(dongDaSaoChep), muc_no: no });
+        }
+        return ve();
+      }
       if (t.closest('[data-them]')) { docBang(); const mx = Math.max(0, ...st.rows.map(r => +r.muc_no || 0)); st.rows.push({ muc_no: mx + 1, kieu: 'so', tan_suat: '2h/lần' }); return ve(); }
       const x = t.closest('[data-xoa]');
       if (x) { docBang(); st.rows.splice(+x.dataset.xoa, 1); return ve(); }
@@ -459,6 +503,8 @@
       if (t.closest('[data-luu]')) {
         const m = main.querySelector('[data-msg]');
         const pl = payload();
+        const invalid = pl.muc.find(row => !dungCuHopLe(row.dung_cu));
+        if (invalid) return msg(m, 'No ' + invalid.muc_no + ': chọn dụng cụ kiểm tra trong danh sách cho phép.', 'err');
         if (!pl.noi_dung_sua_doi.trim()) return msg(m, 'Nhập nội dung sửa đổi.', 'err');
         const btn = t.closest('[data-luu]'); btn.disabled = true;
         try {
@@ -506,11 +552,11 @@
   function taiFileMau() {
     if (typeof XLSX === 'undefined') return alert('Chưa tải được thư viện Excel — tải lại trang.');
     const rows = [COT,
-      ['FCC-OUT-01', 'A', '2025-06-06', 1, 1, 'Chiều sâu', 'Đo số', 14.8, 0, 0.2, '', 'Thước đo sâu', '2h/lần', 'Lập mới', 'Mr Dũng'],
+      ['FCC-OUT-01', 'A', '2025-06-06', 1, 1, 'Chiều sâu', 'Đo số', 14.8, 0, 0.2, '', 'Thước kẹp', '2h/lần', 'Lập mới', 'Mr Dũng'],
       ['FCC-OUT-01', 'A', '2025-06-06', 1, 2, 'Kích thước', 'Đo số', 8.1, 0.1, 0, '', 'Thước kẹp', '2h/lần', '', ''],
       ['FCC-OUT-01', 'A', '2025-06-06', 1, 4, 'Kích thước', 'Đo số', 14, 0.25, 0.25, '', 'Thước kẹp', '2h/lần', '', ''],
       ['FCC-OUT-01', 'A', '2025-06-06', 1, 5, 'Đường kính', 'Đo số', 4.2, 0.1, 0.1, '', 'Thước kẹp', '2h/lần', '', ''],
-      ['FCC-OUT-01', 'A', '2025-06-06', 1, 6, 'Lắp ghép linh kiện', 'OK-NG', '', '', '', 'Không có độ dơ', 'Linh kiện (351819)', '2h/lần', '', '']];
+      ['FCC-OUT-01', 'A', '2025-06-06', 1, 6, 'Lắp ghép linh kiện', 'OK-NG', '', '', '', 'Không có độ dơ', '', '2h/lần', '', '']];
     const hd = [['HƯỚNG DẪN NHẬP BẢNG TUẦN KIỂM'], [''],
       ['• Mỗi dòng = 1 hạng mục của 1 mã. Các dòng cùng Mã SP gộp thành 1 phiên bản bảng tuần kiểm.'],
       ['• Mã SP phải có trong Danh mục SP. Phiên bản để trống = tự tăng (A, B, ...). Phiên bản đã có sẽ bị từ chối.'],
@@ -518,7 +564,8 @@
       ['• Dung sai −: ghi độ lớn dương (0.2 = −0.2). Ghi 0 nếu dung sai bằng 0; để trống = không giới hạn phía đó.'],
       ['• Danh nghĩa có thể ghi Ø4.2 — ký hiệu Ø sẽ được bỏ. Dùng dấu chấm hoặc phẩy thập phân đều được.'],
       ['• Số mẫu/lần: 1–5 (1 = biểu đồ I-MR; 2–5 = X̄-R). Ngày hiệu lực dạng yyyy-mm-dd.'],
-      ['• Bản vẽ vị trí đo: tải ảnh trên màn hình QC Manager → Quản lý tiêu chuẩn sau khi nhập.']];
+      ['• Bản vẽ vị trí đo: tải ảnh trên màn hình QC Manager → Quản lý tiêu chuẩn sau khi nhập.'],
+      ['• Dụng cụ KT chỉ chọn trong danh sách: ' + DUNG_CU.join('; ') + '.']];
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = COT.map((c, i) => ({ wch: [14, 9, 12, 9, 5, 22, 14, 10, 9, 9, 22, 18, 9, 22, 14][i] }));
     XLSX.utils.book_append_sheet(wb, ws, 'Bang tuan kiem');
@@ -569,6 +616,7 @@
           dung_sai_tren: soVN(v(C.tren)), dung_sai_duoi: soVN(v(C.duoi)).replace(/^-/, ''), tieu_chuan: String(v(C.tc)).trim(),
           dung_cu: String(v(C.dc)).trim(), tan_suat: String(v(C.ts)).trim() };
         const dong = 'Dòng ' + (hi + k + 2);
+        if (!dungCuHopLe(m.dung_cu)) g.loi.push(dong + ': dụng cụ kiểm tra không có trong danh sách cho phép');
         if (!m.muc_no || !/^\d+$/.test(m.muc_no)) g.loi.push(dong + ': No phải là số');
         if (!m.hang_muc) g.loi.push(dong + ': thiếu Hạng mục');
         if (kieu === 'so' && (dn === '' || !isFinite(+dn))) g.loi.push(dong + ': Danh nghĩa không phải số');
