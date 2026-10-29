@@ -34,9 +34,11 @@
     (log || []).forEach(l => {
       const k = l.ngay + '|' + l.ca;
       const g = m.get(k);
-      if (!g) m.set(k, { ...l, phut: Number(l.thoi_gian_dung_phut) || 0, ma_sps: [l.ma_sp] });
+      const xl = l.phut_xu_ly != null ? Number(l.phut_xu_ly) : null, cl = l.phut_xac_nhan_cl != null ? Number(l.phut_xac_nhan_cl) : null;
+      if (!g) m.set(k, { ...l, phut: Number(l.thoi_gian_dung_phut) || 0, xl, cl, ma_sps: [l.ma_sp] });
       else {
         g.phut = Math.max(g.phut, Number(l.thoi_gian_dung_phut) || 0);
+        if (xl != null) { g.xl = Math.max(g.xl || 0, xl); g.cl = Math.max(g.cl || 0, cl || 0); }   // T180
         if (!g.ma_sps.includes(l.ma_sp)) g.ma_sps.push(l.ma_sp);
         if (l.gio_tro_lai && (!g.gio_tro_lai || l.gio_tro_lai > g.gio_tro_lai)) g.gio_tro_lai = l.gio_tro_lai;
         ['noi_dung_xu_ly', 'dam_nhiem', 'ghi_chu'].forEach(f => { if (l[f]) g[f] = l[f]; });
@@ -123,6 +125,9 @@
     Object.values(nhomAnh).forEach(({ a, urls }) => add(a.thoi_diem, a.loai === 'sau' ? 'xanh' : 'cam',
       a.loai === 'sau' ? '📷 Ảnh sau xử lý' : '📷 Ảnh hiện trạng', a.nguoi, anhHtml(urls)));
 
+    // T180: "Hoàn thành mẫu & giao QC" — mốc tách thời gian xử lý / xác nhận chất lượng.
+    nk.filter(k => k.su_kien === 'giao_qc').forEach(k => add(k.thoi_diem, 'lam',
+      '📦 Hoàn thành mẫu & giao QC' + (k.du_lieu && k.du_lieu.lan > 1 ? ' (lần ' + k.du_lieu.lan + ')' : ''), k.nguoi, ''));
     nk.filter(k => k.su_kien === 'cap_nhat').forEach(k => add(k.thoi_diem, 'lam', '✏️ Cập nhật nội dung sự cố', k.nguoi, diffHtml(k.thay_doi)));
     nk.filter(k => k.su_kien === 'sua_sau_dong').forEach(k => add(k.thoi_diem, 'lam', '✏️ Sửa sự cố sau khi đã đóng', k.nguoi, diffHtml(k.thay_doi)));
     nk.filter(k => k.su_kien === 'xoa').forEach(k => add(k.thoi_diem, 'do', '🗑 Xoá 1 phần sự cố (ca ' + esc(k.ca || '') + ')', k.nguoi, ''));
@@ -186,11 +191,23 @@
       (m && m.gio_phat_sinh ? Math.max(0, Math.round((Date.now() - new Date(m.gio_phat_sinh)) / 60000)) : 0);
     const st = m ? '<span class="sclh-st dung">⛔ Máy đang dừng — ' + Math.round(phut) + ' phút</span>'
       : '<span class="sclh-st chay">▶ Đã chạy lại ' + tg(log.length ? log[log.length - 1].gio_tro_lai : null) + ' — dừng ' + Math.round(phut) + ' phút</span>';
+    // T180: tách phút dừng = xử lý sự cố (đến lần giao QC cuối) + xác nhận chất lượng (sau giao QC).
+    let tach = '';
+    const giao = (d.nhat_ky || []).filter(k => k.su_kien === 'giao_qc').pop();
+    if (m && giao && m.gio_phat_sinh) {
+      const tg0 = new Date(m.gio_phat_sinh), tg1 = new Date(giao.thoi_diem);
+      tach = 'Xử lý ' + Math.max(0, Math.round((tg1 - tg0) / 60000)) + ' phút · đã giao QC ' + tg(giao.thoi_diem) +
+        ', chờ / xác nhận chất lượng ' + Math.max(0, Math.round((Date.now() - tg1) / 60000)) + ' phút';
+    } else if (!m && log.some(l => l.xl != null)) {
+      tach = 'Xử lý sự cố ' + Math.round(log.reduce((s, l) => s + (l.xl || 0), 0)) + ' phút · Xác nhận chất lượng (sau giao QC) ' +
+        Math.round(log.reduce((s, l) => s + (l.cl || 0), 0)) + ' phút';
+    }
     return '<div class="sclh-sum">' +
       '<div><span class="code">' + esc(d.id_su_co) + '</span> ' + esc(goc.loai_su_co || goc.loai || '') + '</div>' +
       '<div><b>Máy</b> ' + esc(goc.ma_may || '') + ' · <b>SP</b> ' + esc(sps.join(', ') || goc.ma_sp || '') + (goc.so_khuon ? ' · <b>Khuôn</b> ' + esc(goc.so_khuon) : '') +
         ' · <b>Phát sinh</b> ' + tg(phatSinh) + '</div>' +
       '<div>' + st + '</div>' +
+      (tach ? '<div><b>⏱ Chia thời gian dừng:</b> ' + esc(tach) + '</div>' : '') +
       '<div><b>Vấn đề / nguyên nhân:</b> ' + esc(gonIpqc(cuoi.van_de || goc.van_de) || '—') + '</div>' +
       '<div><b>Nội dung xử lý:</b> ' + esc(cuoi.noi_dung_xu_ly || '—') + '</div>' +
       '<div><b>Đảm nhiệm:</b> ' + esc(cuoi.dam_nhiem || '—') + '</div>' +

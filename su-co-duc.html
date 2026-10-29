@@ -220,7 +220,7 @@ async function load(){
   try {
     const [log, mo, moThem] = await Promise.all([
       fetchAll(() => sb.from('duc_su_co_log')
-        .select('id_ban_ghi,id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,loai_su_co,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut,van_de,noi_dung_xu_ly,dam_nhiem,ghi_chu,truong_ca')
+        .select('id_ban_ghi,id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,loai_su_co,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut,phut_xu_ly,phut_xac_nhan_cl,van_de,noi_dung_xu_ly,dam_nhiem,ghi_chu,truong_ca')
         .gte('ngay', tu).lte('ngay', den).order('gio_phat_sinh', { ascending: true })),
       sb.from('duc_ca_hien_tai')
         .select('id_dong,open_id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
@@ -236,6 +236,16 @@ async function load(){
       open_noi_dung_xu_ly: x.noi_dung_xu_ly, open_dam_nhiem: x.dam_nhiem })));
     // Gộp các dòng log cùng id_su_co (sự cố vắt ca); dòng không có id giữ riêng.
     const map = new Map();
+    // T180: phút xử lý / xác nhận chất lượng (sau giao QC) — cùng quy tắc vắt ca / khuôn kép như phút dừng.
+    const tach = (g, r) => {
+      if (r.phut_xu_ly == null) return;
+      const kCa = r.ngay + '|' + r.ca, xl = Number(r.phut_xu_ly) || 0, cl = Number(r.phut_xac_nhan_cl) || 0;
+      g.tachCa = g.tachCa || {};
+      const o = g.tachCa[kCa];
+      if (!o || xl + cl > o.xl + o.cl) g.tachCa[kCa] = { xl, cl };
+      g.xl = Object.values(g.tachCa).reduce((s, x) => s + x.xl, 0);
+      g.cl = Object.values(g.tachCa).reduce((s, x) => s + x.cl, 0);
+    };
     for (const r of log) {
       const k = r.id_su_co || ('#' + r.id_ban_ghi);
       const g = map.get(k);
@@ -257,6 +267,7 @@ async function load(){
         if (r.dam_nhiem) g.dam_nhiem = r.dam_nhiem;
         if (r.ghi_chu) g.ghi_chu = r.ghi_chu;
       }
+      tach(map.get(k), r);
     }
     // Sự cố đang mở (chưa vào log, hoặc phần còn lại của sự cố vắt ca).
     const now = Date.now();
@@ -381,11 +392,15 @@ function render(){
   setUrl();
   const rows = filtered();
   const tong = rows.reduce((s, r) => s + r.phut, 0), dangMo = rows.filter(r => r.dang_mo).length;
+  const coTach = rows.filter(r => r.xl != null), tXl = coTach.reduce((s, r) => s + r.xl, 0), tCl = coTach.reduce((s, r) => s + r.cl, 0);
   $('kpis').innerHTML =
     '<div class="kpi"><div class="l">Số sự cố</div><div class="v">' + fmtNum(rows.length) + '</div></div>' +
     '<div class="kpi"><div class="l">Tổng phút dừng</div><div class="v">' + fmtNum(Math.round(tong)) + '</div></div>' +
     '<div class="kpi"><div class="l">Tổng giờ dừng</div><div class="v">' + (tong / 60).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + '</div></div>' +
     '<div class="kpi"><div class="l">TB phút / vụ</div><div class="v">' + (rows.length ? fmtNum(Math.round(tong / rows.length)) : '—') + '</div></div>' +
+    (coTach.length ? '<div class="kpi" title="' + coTach.length + ' sự cố cần IPQC có bấm &quot;Hoàn thành mẫu &amp; giao QC&quot; (từ 29/10/2026)">' +
+      '<div class="l">Xử lý / Xác nhận CL</div><div class="v">' + fmtNum(Math.round(tXl)) + ' <span style="color:var(--text-muted);font-size:14px">/</span> ' +
+      fmtNum(Math.round(tCl)) + '<span style="font-size:12px;color:var(--text-muted)"> p · ' + Math.round(tCl / Math.max(1, tXl + tCl) * 100) + '% CL</span></div></div>' : '') +
     '<div class="kpi"><div class="l">Đang mở</div><div class="v' + (dangMo ? ' alarm' : '') + '">' + fmtNum(dangMo) + '</div></div>';
   $('stats').innerHTML =
     statBlock('Theo loại vấn đề', 'loai', filtered('loai'), r => r.ma, m => m + ' — ' + (TEN_LOAI[m] || 'Không rõ'), $('fLoai').value) +
@@ -413,7 +428,8 @@ function render(){
       '<td class="nw b">' + (r.so_khuons.map(escapeHtml).join('<br>') || '—') + '</td>' +
       '<td class="nw"><span class="loai ' + r.ma[0] + '" title="' + escapeHtml(r.loai_su_co) + '">' + r.ma + '</span><small>' + escapeHtml(TEN_LOAI[r.ma] || r.loai_su_co || '') + '</small></td>' +
       '<td class="nw">' + fmtTs(r.gio_phat_sinh) + ' → ' + (r.dang_mo ? '<span class="mo">đang mở</span>' : fmtTs(r.gio_tro_lai) || '—') + '<small>' + escapeHtml(r.id_su_co) + '</small></td>' +
-      '<td class="n' + (r.dang_mo ? ' mo' : '') + '">' + fmtNum(Math.round(r.phut)) + '</td>' +
+      '<td class="n' + (r.dang_mo ? ' mo' : '') + '">' + fmtNum(Math.round(r.phut)) +
+        (r.xl != null ? '<small title="Xử lý sự cố / Xác nhận chất lượng sau giao QC">XL ' + fmtNum(Math.round(r.xl)) + ' · CL ' + fmtNum(Math.round(r.cl)) + '</small>' : '') + '</td>' +
       '<td class="vd">' + escapeHtml(IpqcText.gon(r.van_de)) + '</td>' +
       '<td class="vd">' + escapeHtml(r.noi_dung_xu_ly) + '</td>' +
       '<td>' + escapeHtml(r.dam_nhiem) + '</td></tr>' +
@@ -471,11 +487,12 @@ function xuatExcel(){
   const data = rows.map(r => ({
     'Mã sự cố': r.id_su_co, 'Ngày SX': fmtDM(r.ngay), 'Ca': r.cas.join(' + '), 'Máy': r.ma_may, 'Mã SP': r.ma_sps.join(', '), 'Tên SP': r.ten_sp || '',
     'Khuôn': r.so_khuons.join(', '), 'Mã loại': r.ma, 'Loại sự cố': TEN_LOAI[r.ma] || r.loai_su_co || '', 'Phát sinh': ts(r.gio_phat_sinh),
-    'Trở lại': r.dang_mo ? 'Đang mở' : ts(r.gio_tro_lai), 'Phút dừng': Math.round(r.phut), 'Vấn đề': r.van_de || '',
+    'Trở lại': r.dang_mo ? 'Đang mở' : ts(r.gio_tro_lai), 'Phút dừng': Math.round(r.phut),
+    'Phút xử lý': r.xl != null ? Math.round(r.xl) : '', 'Phút xác nhận CL': r.cl != null ? Math.round(r.cl) : '', 'Vấn đề': r.van_de || '',
     'Nội dung xử lý': r.noi_dung_xu_ly || '', 'Đảm nhiệm': r.dam_nhiem || '', 'Ghi chú': r.ghi_chu || '', 'Trưởng ca': r.truong_ca || '',
   }));
   const ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [18, 11, 12, 9, 14, 22, 12, 7, 22, 16, 16, 9, 40, 40, 18, 24, 16].map(w => ({ wch: w }));
+  ws['!cols'] = [18, 11, 12, 9, 14, 22, 12, 7, 22, 16, 16, 9, 9, 12, 40, 40, 18, 24, 16].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Su co');
   XLSX.writeFile(wb, 'Su_co_Duc_' + loaded.tu + '_' + loaded.den + '.xlsx');

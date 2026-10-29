@@ -139,9 +139,10 @@
     var xongNgay = !cungNgay; // ca đang chờ thuộc ngày sau → ngày SX hôm nay đã chạy xong
 
     // Dừng máy hôm nay: log đã xong + sự cố đang mở (tính đến giờ)
-    var dungTheoLoai = {}, dungPhut = 0, suCoN = 0;
+    var dungTheoLoai = {}, dungPhut = 0, suCoN = 0, tach = { xl: 0, cl: 0, n: 0 };
     (D.su_co || []).forEach(function (s) {
       if (s.ngay !== ngay || !s.xong) return;
+      if (s.phut_xl != null) { tach.xl += num(s.phut_xl); tach.cl += num(s.phut_cl); tach.n++; }   // T180: sự cố cần IPQC đã giao QC
       var k = loaiTen(s.loai); var o = dungTheoLoai[k] || (dungTheoLoai[k] = { loai: k, phut: 0, n: 0 });
       o.phut += num(s.phut); o.n++; dungPhut += num(s.phut_may != null ? s.phut_may : s.phut); suCoN++;
     });
@@ -214,7 +215,7 @@
       duc: { caTT: caTT, caKH: caKH, caKHNow: caKHNow, pace: pace, duBao: duBao, khNgay: num(D.kh_ngay), homNay: homNay, ngPct: ngDuc, ngMt: MUC_TIEU_NG_DUC,
         khDenGio: khDenGio, pNgay: pNgay, xongNgay: xongNgay },
       oee: { ganNhat: oeeGanNhat, truoc: oeeTruoc },
-      dung: { phut: dungPhut, n: suCoN, list: dungList, dangDung: dangDung },
+      dung: { phut: dungPhut, n: suCoN, list: dungList, dangDung: dangDung, tach: tach },
       machines: machines, demSt: demSt,
       oqc: { n: oqcT ? num(oqcT.n) : 0, ng: oqcT ? num(oqcT.ng) : 0, pct: oqcNg, mt: oqcMt, ucl: oqcUcl, byDay: oqcByDay },
       ncp: ncp, ncpQuaHan: ncpQuaHan, ipqc: ipqc, ipqcTre: num(D.ipqc_tre), nhapKho: num(D.nhap_kho),

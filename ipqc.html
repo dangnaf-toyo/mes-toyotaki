@@ -538,6 +538,15 @@ async function loadQueue(){
 
   const priorityOf = cp => PRIORITY[cp.loai_kiem] != null ? PRIORITY[cp.loai_kiem] : 2;
 
+  // T180: sản xuất đã bấm "Hoàn thành mẫu & giao QC" cho sự cố gốc chưa (lần gần nhất).
+  const idsGoc = [...new Set(fromCheckpoints.filter(cp => cp.loai_kiem !== 'dinh_ky' && cp.id_su_co_goc).map(cp => cp.id_su_co_goc))];
+  if (idsGoc.length) {
+    const { data: giao, error: gErr } = await sb.from('duc_su_co_giao_qc').select('id_su_co,thoi_diem').in('id_su_co', idsGoc).order('thoi_diem');
+    if (gErr) console.warn('duc_su_co_giao_qc:', gErr.message);
+    const gMap = {}; (giao || []).forEach(g => { gMap[g.id_su_co] = g.thoi_diem; });
+    fromCheckpoints.forEach(cp => { if (cp.loai_kiem !== 'dinh_ky' && cp.id_su_co_goc) cp.giao_qc = gMap[cp.id_su_co_goc] || null; });
+  }
+
   // 1 máy (id_dong) có thể đến hạn nhiều loại kiểm cùng lúc. "Định kỳ" chỉ
   // là gợi ý theo thời gian — nếu máy đó đã có sự cố/đổi khuôn thật (ưu tiên
   // cao) đang chờ thì ẩn bớt "định kỳ" trùng, đỡ rối. NHƯNG sự cố/đổi khuôn
@@ -654,7 +663,9 @@ function queueCardHtml(cp){
       <div class="qcard-main">
         <div class="qcard-may">${escapeHtml(cp.ma_may)}</div>
         ${spHtml}
-        <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.kh ? ' · theo KHSX (chưa có KH ca)' : ''}${cp.da_den_han ? '' : ' · sắp tới'}${cp.id_su_co_goc ? ' · ' + escapeHtml(cp.id_su_co_goc) : ''}</div>
+        <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.kh ? ' · theo KHSX (chưa có KH ca)' : ''}${cp.da_den_han ? '' : ' · sắp tới'}${cp.id_su_co_goc ? ' · ' + escapeHtml(cp.id_su_co_goc) : ''}${cp.giao_qc !== undefined ? (cp.giao_qc
+          ? ' · <b style="color:#2563EB">📦 Đã giao mẫu ' + new Date(cp.giao_qc).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) + '</b>'
+          : ' · <span style="color:#B45309">⏳ SX chưa giao mẫu</span>') : ''}</div>
       </div>
       <div style="text-align:right">
         <div class="qcard-time ${lvl === 'ok' ? '' : lvl}" title="Đã chờ ${cp.phut_da_troi} phút">${timeLabel}</div>
