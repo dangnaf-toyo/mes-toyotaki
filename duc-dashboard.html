@@ -208,6 +208,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .btn-resolve:hover{background:#059669}
 .btn-edit-open{background:#F59E0B;color:#FFF;border:none;padding:2px 6px;border-radius:3px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;margin-right:4px}
 .btn-edit-open:hover{background:#D97706}
+.btn-giao-qc{background:#2563EB;color:#FFF;border:none;padding:2px 6px;border-radius:3px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;margin-right:4px}
+.btn-giao-qc:hover{background:#1D4ED8}
+.btn-giao-qc.lai{background:transparent;color:#2563EB;border:1px solid #2563EB;padding:1px 5px}
+.giao-qc-da{font-size:10px;font-weight:600;color:#2563EB;margin-right:4px;white-space:nowrap}
+.giao-qc-da .giao-timer{font-family:'JetBrains Mono',monospace}
 .running-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:rgba(16,185,129,.1);color:var(--run-fg);border-radius:4px;font-size:11px;font-weight:600;align-self:flex-start}
 .running-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--run-stripe);animation:pulse 2s ease-in-out infinite}
 .no-issue-add{margin-top:3px;font-size:10px;color:var(--text-muted);cursor:pointer;background:none;border:none;text-align:left;padding:0;align-self:flex-start;font-family:inherit}
@@ -263,6 +268,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .wallboard-mode .no-issue-add,
 .wallboard-mode .btn-resolve,
 .wallboard-mode .btn-edit-open,
+.wallboard-mode .btn-giao-qc,
 .wallboard-mode .btn-swap-inline{display:none!important}
 .wallboard-mode .col-shot-dau input,
 .wallboard-mode .col-shot-cuoi input,
@@ -1911,6 +1917,7 @@ async function loadShiftState(showLoader){
     state.incidents = data.incidents;
     state.warnings = data.warnings;
     state.anhSuCoCount = data.anhCount || {};
+    state.giaoQc = data.giaoQc || {};
     renderTable(); updateSummary(); renderOpsWarnings();
     loadKanbanProgress();
     updateLiveStatus('OK — poll ' + (CONFIG.POLL_MS / 1000) + 's');
@@ -2105,7 +2112,9 @@ async function fetchShiftState(){
   // Số ảnh sự cố (T87) cho biểu tượng 📷 trên danh sách sự cố.
   const anhCount = await SuCoAnh.count(rows.map(r => r.open_id_su_co)
     .concat(...rows.map(r => r.su_co_phu.map(x => x.id_su_co)), incidents.map(i => i.id_su_co)));
-  return { rows, incidents, warnings, anhCount };
+  // T180: lần "Hoàn thành mẫu & giao QC" gần nhất của từng sự cố đang mở.
+  const giaoQc = await taiGiaoQc(rows.map(r => r.open_id_su_co).concat(...rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
+  return { rows, incidents, warnings, anhCount, giaoQc };
 }
 
 function startPolling(){
@@ -2121,6 +2130,7 @@ function startPolling(){
       state.incidents = data.incidents;
       state.warnings = data.warnings;
       state.anhSuCoCount = data.anhCount || {};
+      state.giaoQc = data.giaoQc || {};
       renderTable();       // renderTable tự bảo toàn ô người dùng đang gõ dở
       updateSummary();
       renderOpsWarnings();
@@ -2172,6 +2182,42 @@ function suCoMoCuaDong(row){
 function timSuCoMo(idDong, idSuCo){
   const list = suCoMoCuaDong(state.rows.find(r => r.id_dong === idDong));
   return (idSuCo && list.find(s => s.open_id_su_co === idSuCo)) || (idSuCo ? null : list[0]) || null;
+}
+
+// T180: sự cố cần IPQC xác nhận mới đóng được → phải bấm "Hoàn thành mẫu & giao QC" trước (duc_giao_qc_x).
+const LOAI_CAN_IPQC = ['A1','A2','A3','B1','B2','C3','E1','F1'];
+function canIpqc(loai){ return LOAI_CAN_IPQC.includes(String(loai || '').slice(0, 2)); }
+async function taiGiaoQc(ids){
+  ids = Array.from(new Set(ids.filter(Boolean)));
+  if (!ids.length) return {};
+  const { data, error } = await sb.from('duc_su_co_giao_qc').select('id_su_co,thoi_diem,nguoi').in('id_su_co', ids).order('thoi_diem');
+  if (error) { console.warn('duc_su_co_giao_qc:', error.message); return {}; }
+  const m = {};
+  (data || []).forEach(g => { const o = m[g.id_su_co] || (m[g.id_su_co] = { lan: 0 }); o.lan++; o.thoi_diem = g.thoi_diem; o.nguoi = g.nguoi; });
+  return m;
+}
+function giaoQcHTML(s, args){
+  if (!canIpqc(s.open_loai_su_co) || !s.open_id_su_co) return '';
+  const g = (state.giaoQc || {})[s.open_id_su_co];
+  if (!g) return '<button class="btn-giao-qc" title="Xử lý xong, đã lấy mẫu — giao IPQC kiểm" onclick=\'giaoQc(' + args + ')\'>📦 Hoàn thành mẫu & giao QC</button>';
+  const t = new Date(g.thoi_diem);
+  return '<span class="giao-qc-da" title="' + escapeHtml('Giao QC bởi ' + (g.nguoi || '—')) + '">📦 Đã giao QC ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) +
+    (g.lan > 1 ? ' (lần ' + g.lan + ')' : '') + ' · ⏱ <span class="giao-timer" data-start="' + t.toISOString() + '">--:--</span></span>' +
+    '<button class="btn-giao-qc lai" title="IPQC kiểm NG, đã xử lý tiếp và lấy mẫu mới — giao QC lại" onclick=\'giaoQc(' + args + ')\'>Giao lại</button>';
+}
+async function giaoQc(idDong, idSuCo){
+  const s = timSuCoMo(idDong, idSuCo);
+  if (!s) return showToast('Không tìm thấy sự cố đang mở — tải lại trang', true);
+  if (!(await ensureAuth())) return;
+  if (!confirm('Xác nhận ĐÃ XỬ LÝ XONG sự cố ' + (s.open_id_su_co || '') + ' (' + (s.open_loai_su_co || '') + ') trên ' + s.ma_may +
+    ' và đã lấy mẫu giao IPQC kiểm?\n\nTừ lúc này thời gian dừng được tính là "xác nhận chất lượng".')) return;
+  showOverlay('Đang giao QC...');
+  try {
+    const d = await rpcWrite('duc_giao_qc_x', { p_id_dong: idDong, p_id_su_co: idSuCo || null, p_user: state.user });
+    hideOverlay();
+    showToast('✓ Đã giao QC' + (d.lan > 1 ? ' (lần ' + d.lan + ')' : '') + ' — chờ IPQC kiểm, OK/Cảnh báo rồi bấm ✓ Xong');
+    loadShiftState(false);
+  } catch (e) { onError(e); }
 }
 
 function computeState(row){
@@ -2402,6 +2448,7 @@ function makeRowHTML(row, stateClass, isActive){
         '<div class="issue-meta">' +
           '<span>🕐 ' + pad(startTime.getHours()) + ':' + pad(startTime.getMinutes()) + ' · 👤 ' + escapeHtml(s.open_dam_nhiem || '—') + '</span>' +
           '<span class="meta-actions">' +
+            giaoQcHTML(s, args) +
             '<button class="btn-edit-open" title="Chỉnh sửa nội dung sự cố đang mở" onclick=\'openEditOpenIncidentModal(' + args + ')\'>✎ Sửa</button>' +
             '<button class="btn-resolve" onclick=\'openResolveModal(' + args + ')\'>✓ Xong</button>' +
           '</span>' +
@@ -2500,7 +2547,7 @@ function makeNoPlanRowHTML(maMay){
 
 function updateTimers(){
   const now = nowServer();
-  document.querySelectorAll('.timer[data-start]').forEach(el => {
+  document.querySelectorAll('.timer[data-start], .giao-timer[data-start]').forEach(el => {
     el.textContent = fmtElapsedFromMs(now - new Date(el.dataset.start));
   });
 }

@@ -356,7 +356,7 @@ async function loadPeriod(mode, refDate){
   const [bccRes, sucoRes, lssxRes, chtRes, khsxRes, actionRes] = await Promise.all([
     sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_bao_cao')),
-    sbTaiHet(() => sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,phut_dung_may,van_de,truong_ca')
+    sbTaiHet(() => sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,phut_dung_may,phut_xu_ly,phut_xac_nhan_cl,van_de,truong_ca')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_ban_ghi')),
     sbTaiHet(() => sb.from('duc_lich_su_san_xuat').select('ngay,ca,ma_may,ma_sp,ten_sp,kh_ca,tt_ca,so_luong_ng')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id')),
@@ -522,6 +522,18 @@ function computeAll(ctx){
     { code, label: issueLabel(code, rs), phut: sumBy(rs,r=>r.thoi_gian_dung_phut), count: rs.length, top3: top3VanDe(rs) }
   )).sort((a,b)=> b.phut - a.phut);
 
+  // ── T180: sự cố cần IPQC có bấm "Hoàn thành mẫu & giao QC" → tách phút xử lý / xác nhận chất lượng ──
+  const sucoTach = suco.filter(r => r.phut_xu_ly != null);
+  const tachRow = (key, rs) => {
+    const xl = sumBy(rs, r=>r.phut_xu_ly), cl = sumBy(rs, r=>r.phut_xac_nhan_cl);
+    return { key, xl, cl, tong: xl + cl, count: rs.length };
+  };
+  const tachIssue = [...groupBy(sucoTach, r=>issueCode(r.loai_su_co)).entries()]
+    .map(([code, rs]) => ({ ...tachRow(code, rs), label: issueLabel(code, rs) })).sort((a,b)=> b.tong - a.tong);
+  const tachMachine = [...groupBy(sucoTach, r=>r.ma_may).entries()]
+    .map(([ma_may, rs]) => ({ ...tachRow(ma_may, rs), label: ma_may })).sort((a,b)=> b.cl - a.cl);
+  const tachTong = tachRow('', sucoTach);
+
   // ── Dừng máy theo mã SP ──
   const bySp = groupBy(suco, r=>r.ma_sp || '(không rõ)');
   const downtimeProduct = [...bySp.entries()].map(([ma_sp, rs]) => ({
@@ -555,7 +567,8 @@ function computeAll(ctx){
   }).sort((a,b)=> b.ht - a.ht);
 
   return { days, maxKh, totalKh, totalTt, totalSc, totalPhut, totalNg, avgHt, nDaysClosed, worstShifts,
-    ca1, ca2, downtimeMachine, downtimeIssue, downtimeProduct, totalDowntimeSuco, prodMachine, prodProduct };
+    ca1, ca2, downtimeMachine, downtimeIssue, downtimeProduct, totalDowntimeSuco, prodMachine, prodProduct,
+    tachIssue, tachMachine, tachTong };
 }
 
 // ── Render ───────────────────────────────────────────────────────────────
@@ -662,6 +675,20 @@ function renderReport(ctx){
     '<b>' + escapeHtml(x.label) + '</b> <span class="pm">— ' + fmtNum(x.phut) + "' (" + fmtPct(c.totalDowntimeSuco>0?x.phut/c.totalDowntimeSuco*100:0) + ')</span>' +
     '<div class="lydo">Lý do ảnh hưởng nhiều nhất là: ' + lyDoAnhHuong(x) + '</div>'));
   html += '</div>';
+
+  // T180: Xử lý sự cố vs Xác nhận chất lượng (sự cố cần IPQC, từ lúc có nút "Hoàn thành mẫu & giao QC")
+  if (c.tachTong.count) {
+    const T = c.tachTong, pctCl = x => fmtPct(x.tong > 0 ? x.cl / x.tong * 100 : 0);
+    html += '<div class="card"><h3>Sự cố cần IPQC — thời gian xử lý và xác nhận chất lượng</h3><span class="sec-note">' + T.count +
+      ' lượt có bấm "Hoàn thành mẫu &amp; giao QC" · Xử lý ' + fmtNum(T.xl) + "' (phát sinh → giao QC) · Xác nhận CL " + fmtNum(T.cl) +
+      "' (giao QC → chạy lại) · " + pctCl(T) + ' là xác nhận CL</span>';
+    const maxT = Math.max(1, ...c.tachIssue.map(x=>Math.max(x.xl, x.cl)), ...c.tachMachine.map(x=>Math.max(x.xl, x.cl)));
+    const dongTach = x => '<tr><td class="rowname">' + escapeHtml(x.label) + '</td><td>' + barCell(x.xl, maxT) + '</td><td>' + barCell(x.cl, maxT) + '</td>' +
+      '<td class="num">' + pctCl(x) + '</td><td class="num">' + x.count + '</td></tr>';
+    html += '<div class="subhead2">Theo loại vấn đề</div>' + tableWrap(['Mã lỗi','Xử lý sự cố','Xác nhận CL','% xác nhận CL','Lượt'], c.tachIssue.map(dongTach).join(''));
+    html += '<div class="subhead2">Theo máy (xếp theo phút xác nhận CL)</div>' + tableWrap(['Máy','Xử lý sự cố','Xác nhận CL','% xác nhận CL','Lượt'], c.tachMachine.map(dongTach).join(''));
+    html += '</div>';
+  }
 
   // So sánh Ca 1 / Ca 2 (gộp cả tên "Ca ngày"/"Ca đêm" nếu tuần dùng phương án 2 ca 12h)
   const CA1_LABEL = 'Ca 1/Ngày', CA2_LABEL = 'Ca 2/Đêm';
