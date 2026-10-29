@@ -122,6 +122,10 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 .tc-form input[type=text],.tc-form select{width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:var(--text)}
 .muc-row{display:flex;gap:6px;margin-bottom:6px}
 .tc-note{font-size:12px;color:var(--text-muted)}.tc-note:empty{display:none}
+.tc-cd-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px}
+.tc-cd-bar .lb{font-size:12px;font-weight:700;color:var(--text-muted)}
+.tc-cd-bar button{min-height:36px;padding:6px 18px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg-card,#fff);font:inherit;font-weight:700;font-size:13px;cursor:pointer;color:var(--text)}
+.tc-cd-bar button.on{background:#0F5FA5;border-color:#0F5FA5;color:#fff}
 .tc-msg{padding:8px 10px;border-radius:6px;font-weight:600;font-size:12px}.tc-msg.ok{background:var(--run-bg);color:var(--run-fg)}.tc-msg.err{background:var(--alarm-bg);color:var(--alarm-fg)}
 .tc-cho-row{cursor:pointer}.tc-cho-row:hover td{background:var(--bg-sunken)}
 .tc-form input[type=text]:disabled{background:var(--bg-sunken);color:var(--text)}
@@ -429,6 +433,13 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
   <!-- T136: Biểu đồ kiểm soát + NG OQC chuyển sang bieu-do-chat-luong.html -->
 
   <div class="tabpanel" id="tab-tieuchuan">
+    <!-- T183: tiêu chuẩn tách theo công đoạn — Đúc / Gia công (checklist + PDF và bảng tuần kiểm) -->
+    <div class="tc-cd-bar" id="tc-cd-bar">
+      <span class="lb">Công đoạn</span>
+      <button type="button" data-cd="duc" class="on" onclick="chonCongDoanTc('duc')">Đúc</button>
+      <button type="button" data-cd="gia_cong" onclick="chonCongDoanTc('gia_cong')">Gia công</button>
+      <span class="tc-note" id="tc-cd-note"></span>
+    </div>
     <!-- T163: mọi tiêu chuẩn mới / sửa đổi phải qua NV QC soạn → TP QC kiểm tra → GĐ SX phê duyệt -->
     <div class="panel" style="margin-bottom:14px">
       <div class="panel-head">Tiêu chuẩn đang chờ duyệt <span class="count" id="tc-cho-count">0</span></div>
@@ -438,12 +449,12 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
     <div id="btk-root" style="margin-bottom:14px"></div>
     <div class="grid2">
       <div class="panel">
-        <div class="panel-head">Checklist + PDF tiêu chuẩn theo mã <span class="count" id="tc-count">0</span></div>
+        <div class="panel-head"><span>Checklist + PDF tiêu chuẩn <span class="tc-cd-ten">Đúc</span> theo mã</span> <span class="count" id="tc-count">0</span></div>
         <div id="tc-list"></div>
       </div>
 
       <div class="panel" id="tc-form-panel">
-        <div class="panel-head">Soạn / sửa checklist + PDF tiêu chuẩn</div>
+        <div class="panel-head">Soạn / sửa checklist + PDF tiêu chuẩn <span class="tc-cd-ten">Đúc</span></div>
         <div class="tc-form tc-ro" id="tc-form">
           <div>
             <label>Mã sản phẩm</label>
@@ -468,6 +479,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
           <button class="btn btn-primary hidden" onclick="tcCheDoSua(true)" id="tc-sua-btn">✏️ Chỉnh sửa</button>
           <button class="btn btn-primary hidden" onclick="guiTieuChuan()" id="tc-gui-btn">Gửi duyệt</button>
           <button class="btn btn-outline hidden" onclick="editTieuChuan(document.getElementById('tc-ma-sp').value)" id="tc-huy-sua-btn">Huỷ chỉnh sửa</button>
+          <button class="btn btn-outline hidden" onclick="doiCongDoanChecklist()" id="tc-doi-cd-btn" title="Xếp lại: chuyển checklist + PDF (bản đang dùng, bản nháp, lịch sử) của mã này sang công đoạn kia">Chuyển sang Gia công</button>
           <div class="tc-note" id="tc-hint"></div>
           <div id="tc-msg"></div>
         </div>
@@ -482,10 +494,10 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 <script src="shared/navbar.js"></script>
 <script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
-<script src="shared/qc02-data.js"></script>
+<script src="shared/qc02-data.js?v=T183"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/ipqc-spc.js"></script>
-<script src="shared/ipqc-btk-qc.js?v=T164"></script>
+<script src="shared/ipqc-btk-qc.js?v=T183"></script>
 <script src="shared/mes-ng-status.js?v=T141"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBlob: null, currentUserEmail: '' };
@@ -1314,20 +1326,41 @@ function printNcpTag(idNcp){
 // T163: checklist + PDF và bảng tuần kiểm đều phải duyệt: NV QC soạn → TP QC kiểm tra → GĐ SX
 // phê duyệt. duc_ipqc_tieuchuan = bản đang dùng (IPQC đọc); duc_ipqc_tieuchuan_de_xuat = bản
 // nháp chờ duyệt + lịch sử. Khối duyệt / quyền dùng chung với IpqcBtkQc (shared/ipqc-btk-qc.js).
-let tieuChuanList = [], tcNhap = {}, tcQuyen = {}, btkCtl = null;
+// T183: tiêu chuẩn tách theo công đoạn (cong_doan 'duc' | 'gia_cong') — cả tab đang xem 1 công đoạn (tcCd).
+let tieuChuanList = [], tcNhap = {}, tcQuyen = {}, btkCtl = null, tcCd = 'duc';
+const TC_CD = { duc: 'Đúc', gia_cong: 'Gia công' };
 const tcPill = tt => '<span class="pill ' + (tt === 'tra_lai' ? 'ng' : 'warn') + '">' + escapeHtml(IpqcBtkQc.TT[tt] || tt) + '</span>';
 function tcMsg(text, loi){ document.getElementById('tc-msg').innerHTML = text ? '<div class="tc-msg ' + (loi ? 'err' : 'ok') + '">' + escapeHtml(text) + '</div>' : ''; }
 
+function veCongDoanTc(){
+  document.querySelectorAll('#tc-cd-bar [data-cd]').forEach(b => b.classList.toggle('on', b.dataset.cd === tcCd));
+  document.querySelectorAll('.tc-cd-ten').forEach(x => { x.textContent = TC_CD[tcCd]; });
+  document.getElementById('tc-cd-note').textContent = tcCd === 'duc'
+    ? 'IPQC Đúc kiểm theo tiêu chuẩn Đúc (checklist, PDF, bảng tuần kiểm dưới đây).'
+    : 'Tiêu chuẩn cho IPQC công đoạn Gia công — IPQC Đúc không dùng các tiêu chuẩn này.';
+}
+async function chonCongDoanTc(cd){
+  if (!TC_CD[cd] || cd === tcCd) return;
+  tcCd = cd;
+  veCongDoanTc();
+  editTieuChuan('');
+  if (btkCtl) await btkCtl.doiCongDoan(cd);
+  await loadTieuChuanList();
+}
+
 async function moTabTieuChuan(){
+  const qs = new URLSearchParams(location.search);
   if (!state.btkMounted) {
     state.btkMounted = true;
+    if (TC_CD[qs.get('cd')]) tcCd = qs.get('cd');
+    veCongDoanTc();
     tcQuyen = await IpqcBtkQc.quyen();
-    btkCtl = await IpqcBtkQc.mountEditor(document.getElementById('btk-root'), { doiTrangThai: loadChoDuyet });
+    btkCtl = await IpqcBtkQc.mountEditor(document.getElementById('btk-root'), { doiTrangThai: loadChoDuyet, congDoan: tcCd });
   }
   await loadTieuChuanList();
   loadChoDuyet();
-  // Link từ chuông thông báo: ?tab=tieuchuan&ma=...
-  const ma = new URLSearchParams(location.search).get('ma');
+  // Link từ chuông thông báo: ?tab=tieuchuan&ma=...&cd=...
+  const ma = qs.get('ma');
   if (ma && !state.tcMoMa) {
     state.tcMoMa = true;
     if (tcNhap[ma]) { editTieuChuan(ma); document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' }); }
@@ -1337,7 +1370,7 @@ async function moTabTieuChuan(){
 
 async function loadChoDuyet(){
   const el = document.getElementById('tc-cho-list');
-  const cot = 'id,ma_sp,trang_thai,noi_dung_sua_doi,nguoi_lap,nguoi_lap_uid,gui_luc,ly_do_tra_lai';
+  const cot = 'id,ma_sp,cong_doan,trang_thai,noi_dung_sua_doi,nguoi_lap,nguoi_lap_uid,gui_luc,ly_do_tra_lai';
   const [b, c] = await Promise.all([
     sb.from('ipqc_btk').select(cot + ',phien_ban').neq('trang_thai', 'da_duyet'),
     sb.from('duc_ipqc_tieuchuan_de_xuat').select(cot).neq('trang_thai', 'da_duyet'),
@@ -1348,8 +1381,9 @@ async function loadChoDuyet(){
     || (x.trang_thai === 'tra_lai' && tcQuyen.uid && x.nguoi_lap_uid === tcQuyen.uid);
   document.getElementById('tc-cho-count').textContent = ds.length;
   if (!ds.length) { el.innerHTML = '<div class="empty-note">Không có tiêu chuẩn nào đang chờ duyệt.</div>'; return; }
-  el.innerHTML = '<table style="min-width:680px"><thead><tr><th>Loại</th><th>Mã SP</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>Gửi lúc</th><th>Trạng thái</th></tr></thead><tbody>' +
-    ds.map(x => `<tr class="tc-cho-row" onclick="moChoDuyet('${x.loai}','${escapeHtml(x.ma_sp)}')">
+  el.innerHTML = '<table style="min-width:740px"><thead><tr><th>Công đoạn</th><th>Loại</th><th>Mã SP</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>Gửi lúc</th><th>Trạng thái</th></tr></thead><tbody>' +
+    ds.map(x => `<tr class="tc-cho-row" onclick="moChoDuyet('${x.loai}','${escapeHtml(x.ma_sp)}','${escapeHtml(x.cong_doan)}')">
+      <td style="font-weight:700">${TC_CD[x.cong_doan] || ''}</td>
       <td>${x.loai === 'btk' ? 'Bảng tuần kiểm ' + escapeHtml(x.phien_ban) : 'Checklist + PDF'}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtml(x.ma_sp)}</td>
       <td>${escapeHtml(x.noi_dung_sua_doi || '')}${x.trang_thai === 'tra_lai' && x.ly_do_tra_lai ? '<div style="color:var(--alarm-fg);font-size:11px">Lý do trả lại: ' + escapeHtml(x.ly_do_tra_lai) + '</div>' : ''}</td>
@@ -1358,7 +1392,8 @@ async function loadChoDuyet(){
       <td style="white-space:nowrap">${tcPill(x.trang_thai)}${choToi(x) ? ' <span class="pill ok">Tới lượt bạn</span>' : ''}</td></tr>`).join('') + '</tbody></table>';
 }
 
-function moChoDuyet(loai, ma){
+async function moChoDuyet(loai, ma, cd){
+  await chonCongDoanTc(cd);
   if (loai === 'btk') return btkCtl.mo(ma);
   editTieuChuan(ma);
   document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' });
@@ -1366,8 +1401,8 @@ function moChoDuyet(loai, ma){
 
 async function loadTieuChuanList(){
   const [a, d] = await Promise.all([
-    sb.from('duc_ipqc_tieuchuan').select('*').order('ma_sp'),
-    sb.from('duc_ipqc_tieuchuan_de_xuat').select('*').neq('trang_thai', 'da_duyet'),
+    sb.from('duc_ipqc_tieuchuan').select('*').eq('cong_doan', tcCd).order('ma_sp'),
+    sb.from('duc_ipqc_tieuchuan_de_xuat').select('*').eq('cong_doan', tcCd).neq('trang_thai', 'da_duyet'),
   ]);
   if (a.error) return;
   tieuChuanList = (a.data || []).map(t => ({ ma_sp: t.ma_sp, muc_kiem: Array.isArray(t.danh_sach_muc_kiem_json) ? t.danh_sach_muc_kiem_json : [], file_pdf_url: t.file_pdf_url || '' }));
@@ -1375,7 +1410,7 @@ async function loadTieuChuanList(){
   const mas = [...new Set(tieuChuanList.map(t => t.ma_sp).concat(Object.keys(tcNhap)))].sort();
   document.getElementById('tc-count').textContent = mas.length;
   const list = document.getElementById('tc-list');
-  if (!mas.length) { list.innerHTML = '<div class="empty-note">Chưa có mã SP nào được khai báo tiêu chuẩn.</div>'; return; }
+  if (!mas.length) { list.innerHTML = '<div class="empty-note">Chưa có mã SP nào được khai báo tiêu chuẩn ' + TC_CD[tcCd] + '.</div>'; return; }
   list.innerHTML = mas.map(ma => {
     const t = tieuChuanList.find(x => x.ma_sp === ma), n = tcNhap[ma];
     return `<div class="tc-list-item" onclick="editTieuChuan('${escapeHtml(ma)}')">
@@ -1401,7 +1436,7 @@ function editTieuChuan(maSp){
     ss.innerHTML = '<b>So với bản đang dùng (' + t.muc_kiem.length + ' mục):</b> ' +
       ([them.length ? 'thêm ' + them.map(escapeHtml).join('; ') : '', bo.length ? 'bỏ ' + bo.map(escapeHtml).join('; ') : '',
         (n.file_pdf_url || '') !== t.file_pdf_url ? 'PDF mới' : ''].filter(Boolean).join(' · ') || 'chỉ đổi thứ tự mục kiểm');
-  } else if (n) ss.textContent = 'Mã chưa có tiêu chuẩn được duyệt — IPQC chưa có checklist cho mã này.';
+  } else if (n) ss.textContent = 'Mã chưa có tiêu chuẩn ' + TC_CD[tcCd] + ' được duyệt — IPQC ' + TC_CD[tcCd] + ' chưa có checklist cho mã này.';
   else ss.textContent = '';
   const url = n ? n.file_pdf_url : t && t.file_pdf_url;
   const pdfTarget = document.getElementById('tc-pdf-current'); pdfTarget.replaceChildren();
@@ -1425,6 +1460,10 @@ function tcCheDoSua(on){
   document.getElementById('tc-sua-btn').classList.toggle('hidden', on || !soan || !coMa);
   document.getElementById('tc-gui-btn').classList.toggle('hidden', !on);
   document.getElementById('tc-huy-sua-btn').classList.toggle('hidden', !on);
+  const maHt = document.getElementById('tc-ma-sp').value, coTc = !!(tcNhap[maHt] || tieuChuanList.some(x => x.ma_sp === maHt));
+  const doiBtn = document.getElementById('tc-doi-cd-btn');
+  doiBtn.classList.toggle('hidden', on || !tcQuyen.huyMoi || !coTc);
+  doiBtn.textContent = 'Chuyển sang ' + TC_CD[tcCd === 'duc' ? 'gia_cong' : 'duc'];
   document.getElementById('tc-hint').textContent = on ? 'Đang chỉnh sửa. Gửi duyệt → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. IPQC dùng bản đang dùng đến khi bản mới được phê duyệt.'
     : !tcQuyen.uid ? 'Đăng nhập để soạn / duyệt.' : !soan ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn tiêu chuẩn.'
     : coMa ? 'Đang ở chế độ xem. Bấm "Chỉnh sửa" để sửa rồi gửi duyệt.' : 'Chọn mã SP để xem / soạn.';
@@ -1471,12 +1510,12 @@ async function guiTieuChuan(){
       pdfUrl = sb.storage.from('report-files').getPublicUrl(path).data.publicUrl;
     }
     const { data, error } = await sb.rpc('ipqc_tc_luu_checklist', { p_ma_sp: maSp, p_muc_kiem: rows, p_pdf_url: pdfUrl, p_noi_dung: noiDung,
-      p_nguoi: state.currentUserEmail || (await MesAuth.getCurrentUserIdentity()) || '' });
+      p_nguoi: state.currentUserEmail || (await MesAuth.getCurrentUserIdentity()) || '', p_cong_doan: tcCd });
     if (error) throw new Error(error.message);
     if (data && data.ok === false) throw new Error(data.error);
     await loadTieuChuanList();
     editTieuChuan(maSp);
-    tcMsg('Đã gửi duyệt checklist ' + maSp + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.');
+    tcMsg('Đã gửi duyệt checklist ' + TC_CD[tcCd] + ' ' + maSp + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.');
     loadChoDuyet();
   } catch (e) {
     tcMsg(e.message, true);
@@ -1484,6 +1523,18 @@ async function guiTieuChuan(){
   } finally {
     btn.disabled = false;
   }
+}
+
+// Xếp lại công đoạn (Trưởng phòng QC / admin): chuyển cả bản đang dùng + nháp + lịch sử, không qua duyệt.
+async function doiCongDoanChecklist(){
+  const maSp = document.getElementById('tc-ma-sp').value, den = tcCd === 'duc' ? 'gia_cong' : 'duc';
+  if (!maSp || !confirm('Chuyển checklist + PDF tiêu chuẩn mã ' + maSp + ' từ ' + TC_CD[tcCd] + ' sang ' + TC_CD[den] + '?')) return;
+  const { data, error } = await sb.rpc('ipqc_tc_doi_cong_doan', { p_loai: 'checklist', p_ma_sp: maSp, p_tu: tcCd, p_den: den });
+  if (error || !data || !data.ok) return tcMsg((error && error.message) || (data && data.error) || 'Không chuyển được', true);
+  await chonCongDoanTc(den);
+  editTieuChuan(maSp);
+  tcMsg('Đã chuyển checklist mã ' + maSp + ' sang công đoạn ' + TC_CD[den] + '.');
+  loadChoDuyet();
 }
 
 function onPdfSelected(e){

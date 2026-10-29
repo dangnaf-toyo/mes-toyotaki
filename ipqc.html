@@ -296,7 +296,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/su-co-lich-su.js?v=T180"></script>
 <script src="shared/ipqc-bao-mau.js?v=T182"></script>
 <script src="shared/ipqc-spc.js"></script>
-<script src="shared/ipqc-btk-do.js"></script>
+<script src="shared/ipqc-btk-do.js?v=T183"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 10;
@@ -831,20 +831,17 @@ async function openCheck(idCheckpoint, maSpChon){
   pdfBtn.textContent = 'Đang tải tiêu chuẩn...';
   state.tieuChuan = { ma_sp: cp.ma_sp, muc_kiem: IPQC_DEFAULT_CHECKLIST.slice(), file_pdf_url: '' };
   try {
-    const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').eq('ma_sp', cp.ma_sp).maybeSingle();
+    // T183: IPQC Đúc chỉ dùng tiêu chuẩn công đoạn Đúc (tiêu chuẩn Gia công tách riêng).
+    const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('*').eq('ma_sp', cp.ma_sp).eq('cong_doan', 'duc').maybeSingle();
     if (state.referenceRequest !== request || state.current?.id_checkpoint !== cp.id_checkpoint) return;
     if (error) throw new Error(error.message);
-    const process = data?.cong_doan || data?.process;
     const filePdfUrl = data?.file_pdf_url || '';
-    if (process && process !== 'Đúc' && process !== 'IPQC') {
-      pdfBtn.textContent = 'Chưa có tiêu chuẩn cho công đoạn này'; return;
-    }
     state.tieuChuan.file_pdf_url = filePdfUrl;
     if (filePdfUrl && Qc02View.safeUrl(filePdfUrl)) {
-      pdfBtn.disabled = false; pdfBtn.textContent = 'Xem tiêu chuẩn';
-      pdfBtn.title = process ? 'Tiêu chuẩn ' + process : 'Tiêu chuẩn theo model; nguồn hiện chưa có mapping công đoạn';
+      pdfBtn.disabled = false; pdfBtn.textContent = 'Xem tiêu chuẩn Đúc';
+      pdfBtn.title = 'Tiêu chuẩn kiểm tra công đoạn Đúc';
       pdfBtn.onclick = () => Qc02View.pdf(filePdfUrl);
-    } else pdfBtn.textContent = 'Chưa có file tiêu chuẩn';
+    } else pdfBtn.textContent = 'Chưa có tiêu chuẩn Đúc';
   } catch (error) {
     if (state.referenceRequest === request && state.current?.id_checkpoint === cp.id_checkpoint) {
       pdfBtn.textContent = 'Không tải được tiêu chuẩn'; showToast(error.message, true);

@@ -16,6 +16,8 @@
 (function () {
   const S = () => window.IpqcSpc;
   const esc = s => S().esc(s);
+  // T183: tiêu chuẩn tách theo công đoạn (cột cong_doan của ipqc_btk / ipqc_do_lan / ipqc_gioi_han).
+  const CD = { duc: 'Đúc', gia_cong: 'Gia công' };
   const COT = ['Mã SP', 'Phiên bản', 'Ngày hiệu lực', 'Số mẫu/lần', 'No', 'Hạng mục', 'Kiểu (Đo số / OK-NG)',
     'Danh nghĩa', 'Dung sai +', 'Dung sai −', 'Tiêu chuẩn (OK-NG)', 'Dụng cụ KT', 'Tần suất', 'Nội dung sửa đổi', 'Người phê duyệt'];
 
@@ -148,17 +150,21 @@
     css();
     const q = await quyen();
     const baoDoi = () => { if (opts && opts.doiTrangThai) opts.doiTrangThai(); };
-    const st = { products: [], btk: {}, nhap: {}, ma: null, versions: [], xem: null, rows: [], viTri: [], banVe: null, noDat: 1, sua: false, zoom: 1 };
-    el.innerHTML = '<div class="bq"><div class="side"><div class="ttl"><span class="sp">Bảng tuần kiểm theo mã</span></div>' +
+    const st = { cd: (opts && opts.congDoan) || 'duc', products: [], btk: {}, nhap: {}, ma: null, versions: [], xem: null, rows: [], viTri: [], banVe: null, noDat: 1, sua: false, zoom: 1 };
+    el.innerHTML = '<div class="bq"><div class="side"><div class="ttl"><span class="sp" data-sidettl>Bảng tuần kiểm ' + CD[st.cd] + ' theo mã</span></div>' +
       '<input type="search" data-tim placeholder="Tìm mã SP…" aria-label="Tìm mã SP" style="width:100%;margin-bottom:8px"><div data-list></div></div>' +
-      '<div class="main" data-main><div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để xem / soạn bảng tuần kiểm kích thước. ' +
-      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button></div></div></div></div>';
+      '<div class="main" data-main></div></div>';
     const listEl = el.querySelector('[data-list]'), main = el.querySelector('[data-main]');
+    function veTrong() {
+      main.innerHTML = '<div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để xem / soạn bảng tuần kiểm kích thước công đoạn <b>' + CD[st.cd] + '</b>. ' +
+        '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button></div></div>';
+    }
+    veTrong();
 
     async function taiDanhSach() {
       const [p, b] = await Promise.all([
         sb.from('master_products').select('ma_sp,ten_sp,ten_khach_hang').order('ma_sp'),
-        sb.from('ipqc_btk').select('ma_sp,phien_ban,id,dang_dung,trang_thai').or('dang_dung.eq.true,trang_thai.neq.da_duyet'),
+        sb.from('ipqc_btk').select('ma_sp,phien_ban,id,dang_dung,trang_thai').eq('cong_doan', st.cd).or('dang_dung.eq.true,trang_thai.neq.da_duyet'),
       ]);
       st.products = p.data || [];
       st.btk = {}; st.nhap = {};
@@ -185,7 +191,7 @@
       // Danh sách có thanh trượt riêng: bấm mã ở cuối danh sách thì đưa nội dung bên phải lên đầu màn hình.
       const top = main.getBoundingClientRect().top;
       if (top < 0 || top > window.innerHeight * 0.5) main.scrollIntoView({ block: 'start' });
-      const v = await sb.from('ipqc_btk').select('*').eq('ma_sp', ma).order('tao_luc', { ascending: false });
+      const v = await sb.from('ipqc_btk').select('*').eq('ma_sp', ma).eq('cong_doan', st.cd).order('tao_luc', { ascending: false });
       st.versions = v.data || [];
       const ids = st.versions.map(x => x.id);
       const m = ids.length ? await sb.from('ipqc_btk_muc').select('*').in('id_btk', ids).order('muc_no') : { data: [] };
@@ -265,14 +271,16 @@
       let canhBao = '';
       if (cu) canhBao = 'Đang xem phiên bản cũ ' + esc(b.phien_ban) + ' (chỉ xem). Gửi duyệt sẽ tạo bản nháp từ nội dung này' + (nhap ? ', ghi đè bản nháp ' + esc(nhap.phien_ban) : '') + '.';
       else if (!laNhap && nhap) canhBao = 'Mã này đang có bản nháp ' + esc(nhap.phien_ban) + ' (' + esc(TT_NGAN[nhap.trang_thai]) + ') — chọn ở ô "Đang xem". Gửi duyệt từ đây sẽ ghi đè bản nháp đó.';
-      else if (!cur) canhBao = 'Mã chưa có bảng tuần kiểm được duyệt — IPQC chưa đo theo bảng tuần kiểm cho mã này.';
+      else if (!cur) canhBao = 'Mã chưa có bảng tuần kiểm ' + CD[st.cd] + ' được duyệt — IPQC ' + CD[st.cd] + ' chưa đo theo bảng tuần kiểm cho mã này.';
+      const cdKhac = st.cd === 'duc' ? 'gia_cong' : 'duc';
       main.innerHTML =
         '<div class="card"><div class="flds">' +
           '<div style="flex:1 1 220px"><div style="font-size:11px;color:#64748B;font-weight:600">Biểu kiểm tra tuần kiểm · ' + esc((b && b.ma_bieu) || 'QP-82405-B') + '</div>' +
-          '<div style="font-size:19px;font-weight:800">' + esc(st.ma) + ' <span style="font-size:13px;color:#475569;font-weight:600">' + esc(p.ten_sp || '') + '</span></div></div>' +
+          '<div style="font-size:19px;font-weight:800">' + esc(st.ma) + ' <span class="tag ' + (st.cd === 'duc' ? 'ok' : 'w') + '" style="font-size:12px;vertical-align:middle">' + CD[st.cd] + '</span> <span style="font-size:13px;color:#475569;font-weight:600">' + esc(p.ten_sp || '') + '</span></div></div>' +
           '<label class="f">Đang xem<select data-pb>' + (st.versions.length ? st.versions.map(v => '<option value="' + v.id + '"' + (b && v.id === b.id ? ' selected' : '') + '>' + tenPb(v) + ' — ' + esc(v.ngay_hieu_luc || '') + '</option>').join('') : '<option>Chưa có — lập mới</option>') + '</select></label>' +
           (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button>' +
           (b ? '<button class="btn" type="button" data-xuat>Xuất Excel</button>' : '') +
+          (q.huyMoi && st.versions.length && !sua ? '<button class="btn" type="button" data-doicd="' + cdKhac + '" title="Xếp lại: chuyển mọi phiên bản + kết quả đo + giới hạn kiểm soát của mã này sang công đoạn ' + CD[cdKhac] + '">Chuyển sang ' + CD[cdKhac] + '</button>' : '') +
         '</div>' +
         (laNhap ? khoiDuyet(b, q) : '') +
         (canhBao ? '<div class="msg ' + (cu || nhap ? 'err' : 'ok') + '">' + canhBao + '</div>' : '') +
@@ -392,7 +400,22 @@
       const li = t.closest('[data-ma]');
       if (li) return chonMa(li.dataset.ma);
       if (t.closest('[data-mau]')) return taiFileMau();
-      if (t.closest('[data-nhap]')) return nhapExcel(() => { taiDanhSach(); if (st.ma) chonMa(st.ma); baoDoi(); });
+      if (t.closest('[data-nhap]')) return nhapExcel(st.cd, () => { taiDanhSach(); if (st.ma) chonMa(st.ma); baoDoi(); });
+      const dc = t.closest('[data-doicd]');
+      if (dc) {
+        const den = dc.dataset.doicd;
+        if (!confirm('Chuyển bảng tuần kiểm mã ' + st.ma + ' (mọi phiên bản, kết quả đo, giới hạn kiểm soát) từ ' + CD[st.cd] + ' sang ' + CD[den] + '?')) return;
+        dc.disabled = true;
+        const { data, error } = await sb.rpc('ipqc_tc_doi_cong_doan', { p_loai: 'btk', p_ma_sp: st.ma, p_tu: st.cd, p_den: den });
+        if (error || !data || !data.ok) {
+          dc.disabled = false;
+          return msg(main.querySelector('[data-msg]'), (error && error.message) || (data && data.error) || 'Không chuyển được', 'err');
+        }
+        const ma = st.ma;
+        await doiCongDoan(den); await chonMa(ma);
+        msg(main.querySelector('[data-msg]'), 'Đã chuyển bảng tuần kiểm mã ' + ma + ' sang công đoạn ' + CD[den] + '.');
+        return baoDoi();
+      }
       if (t.closest('[data-xuat]')) return xuatExcel(st.ma, st.xem, st.rows);
       const zb = t.closest('[data-zoom]');
       if (zb) {
@@ -439,7 +462,7 @@
         if (!pl.noi_dung_sua_doi.trim()) return msg(m, 'Nhập nội dung sửa đổi.', 'err');
         const btn = t.closest('[data-luu]'); btn.disabled = true;
         try {
-          const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: st.ma, p_data: pl, p_nguoi: await nguoi() });
+          const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: st.ma, p_data: pl, p_nguoi: await nguoi(), p_cong_doan: st.cd });
           if (error) throw new Error(error.message);
           if (!data || !data.ok) throw new Error((data && data.error) || 'Không lưu được');
           await xong('Đã gửi duyệt phiên bản ' + data.phien_ban + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.', data.id);
@@ -468,8 +491,15 @@
       const up = () => { bv.classList.remove('keo'); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
     });
+    async function doiCongDoan(cd) {
+      if (!CD[cd] || cd === st.cd) return;
+      st.cd = cd; st.ma = null; st.versions = []; st.xem = null;
+      el.querySelector('[data-sidettl]').textContent = 'Bảng tuần kiểm ' + CD[cd] + ' theo mã';
+      veTrong();
+      await taiDanhSach();
+    }
     await taiDanhSach();
-    return { mo: ma => chonMa(ma) };
+    return { mo: async (ma, cd) => { if (cd) await doiCongDoan(cd); return chonMa(ma); }, doiCongDoan };
   }
 
   // ── Excel: file mẫu / xuất / nhập ──────────────────────────────────────
@@ -504,7 +534,7 @@
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Bang tuan kiem');
     XLSX.writeFile(wb, 'Bang_tuan_kiem_' + ma.replace(/[^\w-]/g, '_') + (b ? '_' + b.phien_ban : '') + '.xlsx');
   }
-  function nhapExcel(xong) {
+  function nhapExcel(cd, xong) {
     if (typeof XLSX === 'undefined') return alert('Chưa tải được thư viện Excel — tải lại trang.');
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.xlsx,.xls';
     inp.onchange = async () => {
@@ -552,14 +582,14 @@
         if (!coMa.has(g.ma)) g.loi.unshift('Mã SP không có trong Danh mục SP');
         const nos = g.data.muc.map(m => m.muc_no); if (new Set(nos).size !== nos.length) g.loi.push('Trùng No');
       });
-      xemTruoc(ds, xong);
+      xemTruoc(ds, cd, xong);
     };
     inp.click();
   }
-  function xemTruoc(ds, xong) {
+  function xemTruoc(ds, cd, xong) {
     const ok = ds.filter(g => !g.loi.length);
     const mask = document.createElement('div'); mask.className = 'bq-mask';
-    mask.innerHTML = '<div class="bq-dlg bq"><div style="display:block;width:100%"><div style="font-weight:800;font-size:16px;margin-bottom:8px">Nhập bảng tuần kiểm — ' + ds.length + ' mã</div>' +
+    mask.innerHTML = '<div class="bq-dlg bq"><div style="display:block;width:100%"><div style="font-weight:800;font-size:16px;margin-bottom:8px">Nhập bảng tuần kiểm công đoạn ' + CD[cd] + ' — ' + ds.length + ' mã</div>' +
       '<table><tr><th>Mã SP</th><th>Phiên bản</th><th>Hạng mục</th><th>Kiểm tra</th></tr>' +
       ds.map(g => '<tr><td class="mono"><b>' + esc(g.ma) + '</b></td><td>' + esc(g.data.phien_ban || '(tự tăng)') + '</td><td>' + g.data.muc.length + ' (' + g.data.muc.filter(m => m.kieu === 'so').length + ' đo số)</td>' +
         '<td>' + (g.loi.length ? '<span class="tag ng">Lỗi</span> ' + g.loi.map(esc).join('<br>') : '<span class="tag ok">Hợp lệ</span>') + '</td></tr>').join('') + '</table>' +
@@ -571,7 +601,7 @@
       ev.target.disabled = true;
       const ten = await nguoi(), kq = [];
       for (const g of ok) {
-        const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: g.ma, p_data: g.data, p_nguoi: ten });
+        const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: g.ma, p_data: g.data, p_nguoi: ten, p_cong_doan: cd });
         kq.push(g.ma + ': ' + (error ? error.message : data && data.ok ? 'đã gửi duyệt phiên bản ' + data.phien_ban : (data && data.error) || 'lỗi'));
       }
       mask.querySelector('[data-kq]').innerHTML = '<div class="msg ok">' + kq.map(esc).join('<br>') + '</div>';
@@ -582,7 +612,9 @@
   // ═══════════════════════════ BIỂU ĐỒ KIỂM SOÁT ═══════════════════════════
   async function mountChart(el) {
     css();
-    const st = { dsMa: [], cache: {}, ma: null, no: null, may: '', khuon: '', ngay: 30 };
+    const st = { dsMa: [], cache: {}, cd: 'duc', ma: null, no: null, may: '', khuon: '', ngay: 30 };
+    const dsCd = () => st.dsMa.filter(x => x.cong_doan === st.cd);
+    const khoa = (ma, cd, ngay) => cd + '|' + ma + '|' + ngay;
     el.innerHTML = '<div class="bq" style="flex-direction:column;align-items:stretch">' +
       '<div class="card flds" data-loc></div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">' +
@@ -597,21 +629,22 @@
         '</div></div></div>';
     const locEl = el.querySelector('[data-loc]'), trai = el.querySelector('[data-trai]');
 
-    async function layDuLieu(ma, ngay) {
-      const k = ma + '|' + ngay;
+    async function layDuLieu(ma, ngay, cd) {
+      const k = khoa(ma, cd, ngay);
       if (st.cache[k]) return st.cache[k];
       const tu = ngay ? new Date(Date.now() - ngay * 86400e3).toISOString() : null;
-      const { data, error } = await sb.rpc('ipqc_do_du_lieu', { p_ma_sp: ma, p_tu: tu, p_den: null, p_so_lan: null });
+      const { data, error } = await sb.rpc('ipqc_do_du_lieu', { p_ma_sp: ma, p_tu: tu, p_den: null, p_so_lan: null, p_cong_doan: cd });
       if (error) throw new Error(error.message);
       st.cache[k] = data; return data;
     }
 
     async function khoiDong() {
-      const { data, error } = await sb.from('ipqc_btk').select('ma_sp,phien_ban').eq('dang_dung', true).order('ma_sp');
+      const { data, error } = await sb.from('ipqc_btk').select('ma_sp,phien_ban,cong_doan').eq('dang_dung', true).order('ma_sp');
       if (error) { trai.innerHTML = '<div class="card msg err">' + esc(error.message) + ' — cần đăng nhập.</div>'; return; }
       st.dsMa = data || [];
       if (!st.dsMa.length) { trai.innerHTML = '<div class="card hint">Chưa có mã nào có bảng tuần kiểm — lập ở tab Quản lý tiêu chuẩn.</div>'; el.querySelector('[data-canh]').innerHTML = '<div class="hint">—</div>'; return; }
-      st.ma = st.dsMa[0].ma_sp;
+      if (!dsCd().length) st.cd = st.dsMa[0].cong_doan;
+      st.ma = dsCd()[0].ma_sp;
       await ve();
       taiCanhBao();
     }
@@ -627,13 +660,14 @@
 
     async function ve() {
       let data;
-      try { data = await layDuLieu(st.ma, st.ngay); } catch (e) { trai.innerHTML = '<div class="card msg err">' + esc(e.message) + '</div>'; return; }
+      try { data = await layDuLieu(st.ma, st.ngay, st.cd); } catch (e) { trai.innerHTML = '<div class="card msg err">' + esc(e.message) + '</div>'; return; }
       const mucSo = (data.muc || []).filter(m => m.kieu === 'so');
       if (!st.no || !mucSo.some(m => m.muc_no === st.no)) st.no = mucSo.length ? mucSo[0].muc_no : null;
       const mays = [...new Set((data.lan || []).map(l => l.ma_may).filter(Boolean))].sort();
       const khuons = [...new Set((data.lan || []).map(l => l.so_khuon).filter(Boolean))].sort();
       locEl.innerHTML =
-        '<label class="f">Mã SP<select data-l="ma">' + st.dsMa.map(x => '<option' + (x.ma_sp === st.ma ? ' selected' : '') + '>' + esc(x.ma_sp) + '</option>').join('') + '</select></label>' +
+        '<label class="f">Công đoạn<select data-l="cd">' + Object.keys(CD).map(c => '<option value="' + c + '"' + (c === st.cd ? ' selected' : '') + '>' + CD[c] + ' (' + st.dsMa.filter(x => x.cong_doan === c).length + ' mã)</option>').join('') + '</select></label>' +
+        '<label class="f">Mã SP<select data-l="ma">' + dsCd().map(x => '<option' + (x.ma_sp === st.ma ? ' selected' : '') + '>' + esc(x.ma_sp) + '</option>').join('') + '</select></label>' +
         '<label class="f">Hạng mục<select data-l="no">' + mucSo.map(m => '<option value="' + m.muc_no + '"' + (m.muc_no === st.no ? ' selected' : '') + '>' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(S().chuanText(m)) + '</option>').join('') + '</select></label>' +
         '<label class="f">Máy<select data-l="may"><option value="">Tất cả</option>' + mays.map(x => '<option' + (x === st.may ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khuôn<select data-l="khuon"><option value="">Tất cả</option>' + khuons.map(x => '<option' + (x === st.khuon ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
@@ -693,7 +727,7 @@
 
     async function veGioiHan(m, lim, d) {
       const box = el.querySelector('[data-gh]');
-      const { data: ls } = await sb.from('ipqc_gioi_han').select('*').eq('ma_sp', st.ma).eq('muc_no', m.muc_no).order('tao_luc', { ascending: false }).limit(10);
+      const { data: ls } = await sb.from('ipqc_gioi_han').select('*').eq('ma_sp', st.ma).eq('cong_doan', st.cd).eq('muc_no', m.muc_no).order('tao_luc', { ascending: false }).limit(10);
       const CACH = { tu_dong: 'Tự khoá 30 lần đầu', tinh_lai: 'Tính lại', tay: 'Nhập tay' };
       const homNay = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
       box.innerHTML = '<div class="ttl"><span class="sp">Giới hạn kiểm soát — hạng mục ' + m.muc_no + '</span></div>' +
@@ -701,7 +735,7 @@
         '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;color:#0F5FA5">Đặt lại giới hạn (cải tiến / điều chỉnh)</summary>' +
           '<div class="flds" style="margin-top:8px"><label class="f">Cách<select data-gc><option value="tinh_lai">Tính lại từ khoảng thời gian</option><option value="tay">Nhập tay</option></select></label></div>' +
           '<div class="flds" data-gtl style="margin-top:6px"><label class="f">Từ ngày<input type="date" data-gtu value="' + homNay + '"></label><label class="f">Đến ngày<input type="date" data-gden></label></div>' +
-          '<div class="flds" data-gtay style="margin-top:6px;display:none"><label class="f">CL<input data-gcl style="width:80px"></label><label class="f">UCL<input data-gucl style="width:80px"></label><label class="f">LCL<input data-glcl style="width:80px"></label><label class="f">' + (((st.cache[st.ma + '|' + st.ngay] || {}).btk || {}).so_mau > 1 ? 'R̄' : 'MR̄') + '<input data-gr style="width:80px"></label></div>' +
+          '<div class="flds" data-gtay style="margin-top:6px;display:none"><label class="f">CL<input data-gcl style="width:80px"></label><label class="f">UCL<input data-gucl style="width:80px"></label><label class="f">LCL<input data-glcl style="width:80px"></label><label class="f">' + (((st.cache[khoa(st.ma, st.cd, st.ngay)] || {}).btk || {}).so_mau > 1 ? 'R̄' : 'MR̄') + '<input data-gr style="width:80px"></label></div>' +
           '<label class="f" style="margin-top:6px">Lý do (bắt buộc)<input data-gly placeholder="VD: Sửa khuôn ngày 20/10, đo lại 30 lần"></label>' +
           '<div style="margin-top:8px"><button class="btn p sm" type="button" data-gluu>Lưu giới hạn mới</button></div>' +
           '<div class="hint">Tính lại: dùng tối đa 30 lần đo đầu tiên từ "Từ ngày" (cần ≥ 10 lần). Chỉ QC Manager / admin.</div><div data-gmsg></div></details>' +
@@ -717,7 +751,7 @@
         const tu = cach === 'tinh_lai' && g('[data-gtu]') ? g('[data-gtu]') + 'T00:00:00+07:00' : null;
         const den = cach === 'tinh_lai' && g('[data-gden]') ? g('[data-gden]') + 'T23:59:59+07:00' : null;
         const gt = cach === 'tay' ? { cl: soVN(g('[data-gcl]')), ucl: soVN(g('[data-gucl]')), lcl: soVN(g('[data-glcl]')), cl_r: soVN(g('[data-gr]')) || 0, ucl_r: (+soVN(g('[data-gr]')) || 0) * 3.267 } : null;
-        const { data, error } = await sb.rpc('ipqc_gioi_han_dat', { p_ma_sp: st.ma, p_muc_no: m.muc_no, p_cach: cach, p_tu: tu, p_den: den, p_gt: gt, p_ghi_chu: g('[data-gly]'), p_nguoi: await nguoi() });
+        const { data, error } = await sb.rpc('ipqc_gioi_han_dat', { p_ma_sp: st.ma, p_muc_no: m.muc_no, p_cach: cach, p_tu: tu, p_den: den, p_gt: gt, p_ghi_chu: g('[data-gly]'), p_nguoi: await nguoi(), p_cong_doan: st.cd });
         if (error || !data || !data.ok) return msg(box.querySelector('[data-gmsg]'), (error && error.message) || (data && data.error), 'err');
         st.cache = {}; await ve(); taiCanhBao();
       };
@@ -729,28 +763,29 @@
       const moc = Date.now() - 7 * 86400e3, ds = [];
       for (const x of st.dsMa) {
         let data;
-        try { data = await layDuLieu(x.ma_sp, 0); } catch (e) { continue; }
+        try { data = await layDuLieu(x.ma_sp, 0, x.cong_doan); } catch (e) { continue; }
+        const tenMa = x.ma_sp + (x.cong_doan === 'gia_cong' ? ' (Gia công)' : '');
         (data.muc || []).forEach(m => {
           if (m.kieu !== 'so') {
             (data.lan || []).filter(l => new Date(l.thoi_diem) >= moc).forEach(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && !k.dat)
-              .forEach(() => ds.push({ ng: true, ma: x.ma_sp, no: m.muc_no, t: l.thoi_diem, tieuDe: x.ma_sp + ' · ' + m.muc_no + '. ' + m.hang_muc + ' NG', moTa: (l.ma_may || '') + (l.so_khuon ? ' · ' + l.so_khuon : '') })));
+              .forEach(() => ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' NG', moTa: (l.ma_may || '') + (l.so_khuon ? ' · ' + l.so_khuon : '') })));
             return;
           }
           const r = diemVaViPham(data, m), d = S().soLe(m);
           r.pts.forEach((p, i) => {
             if (new Date(p.t) < moc) return;
             const ngoai = p.vals.filter(v => S().datGiaTri(v, r.sp) === false);
-            if (ngoai.length) ds.push({ ng: true, ma: x.ma_sp, no: m.muc_no, t: p.t, tieuDe: x.ma_sp + ' · ' + m.muc_no + '. ' + m.hang_muc + ' = ' + ngoai.map(v => S().fmt(v, d)).join(' / ') + ' ngoài tiêu chuẩn', moTa: (p.may || '') + (p.khuon ? ' · ' + p.khuon : '') + ' · ' + (p.nguoi || '') });
+            if (ngoai.length) ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: p.t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' = ' + ngoai.map(v => S().fmt(v, d)).join(' / ') + ' ngoài tiêu chuẩn', moTa: (p.may || '') + (p.khuon ? ' · ' + p.khuon : '') + ' · ' + (p.nguoi || '') });
           });
-          r.vp.filter(v => new Date(r.pts[v.i].t) >= moc).forEach(v => ds.push({ ma: x.ma_sp, no: m.muc_no, t: r.pts[v.i].t, tieuDe: x.ma_sp + ' · ' + m.muc_no + '. ' + m.hang_muc + ' — ' + v.msg, moTa: 'Quy tắc ' + v.quy_tac + (r.lim && r.lim.tam ? ' (giới hạn tạm)' : '') + ' · ' + (r.pts[v.i].may || '') }));
+          r.vp.filter(v => new Date(r.pts[v.i].t) >= moc).forEach(v => ds.push({ ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: r.pts[v.i].t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' — ' + v.msg, moTa: 'Quy tắc ' + v.quy_tac + (r.lim && r.lim.tam ? ' (giới hạn tạm)' : '') + ' · ' + (r.pts[v.i].may || '') }));
         });
       }
       ds.sort((a, b) => new Date(b.t) - new Date(a.t));
       // 1 chuỗi vi phạm kéo dài sinh cảnh báo ở mỗi điểm → giữ lần mới nhất mỗi (mã, hạng mục, quy tắc).
       const daCo = new Set();
-      const gon = ds.filter(a => { if (a.ng) return true; const k = a.ma + '|' + a.no + '|' + a.moTa.split(' ·')[0]; if (daCo.has(k)) return false; daCo.add(k); return true; });
+      const gon = ds.filter(a => { if (a.ng) return true; const k = a.cd + '|' + a.ma + '|' + a.no + '|' + a.moTa.split(' ·')[0]; if (daCo.has(k)) return false; daCo.add(k); return true; });
       ds.length = 0; ds.push(...gon);
-      box.innerHTML = ds.length ? ds.slice(0, 40).map(a => '<div class="al' + (a.ng ? ' ng' : '') + '" data-al="' + esc(a.ma) + '|' + a.no + '" role="button" tabindex="0"><div class="h"><span class="tag ' + (a.ng ? 'ng' : 'w') + '">' + (a.ng ? 'NG' : 'Bất thường') + '</span><span style="flex:1">' + esc(a.tieuDe) + '</span></div>' +
+      box.innerHTML = ds.length ? ds.slice(0, 40).map(a => '<div class="al' + (a.ng ? ' ng' : '') + '" data-al="' + esc(a.cd) + '|' + esc(a.ma) + '|' + a.no + '" role="button" tabindex="0"><div class="h"><span class="tag ' + (a.ng ? 'ng' : 'w') + '">' + (a.ng ? 'NG' : 'Bất thường') + '</span><span style="flex:1">' + esc(a.tieuDe) + '</span></div>' +
         '<div class="s">' + esc(ngayVN(a.t)) + ' · ' + esc(a.moTa) + '</div></div>').join('') + (ds.length > 40 ? '<div class="hint">… và ' + (ds.length - 40) + ' cảnh báo khác</div>' : '')
         : '<div class="hint">Không có cảnh báo trong 7 ngày.</div>';
     }
@@ -758,6 +793,7 @@
     el.addEventListener('change', async e => {
       const t = e.target.closest('[data-l]'); if (!t) return;
       const k = t.dataset.l;
+      if (k === 'cd') { st.cd = t.value; st.ma = (dsCd()[0] || {}).ma_sp || null; st.no = null; st.may = ''; st.khuon = ''; }
       if (k === 'ma') { st.ma = t.value; st.no = null; st.may = ''; st.khuon = ''; }
       if (k === 'no') st.no = +t.value;
       if (k === 'may') st.may = t.value;
@@ -769,7 +805,7 @@
       const r = e.target.closest('[data-chonno]');
       if (r) { st.no = +r.dataset.chonno; return ve(); }
       const a = e.target.closest('[data-al]');
-      if (a) { const [ma, no] = a.dataset.al.split('|'); st.ma = ma; st.no = +no; st.may = ''; st.khuon = ''; await ve(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      if (a) { const [cd, ma, no] = a.dataset.al.split('|'); st.cd = cd; st.ma = ma; st.no = +no; st.may = ''; st.khuon = ''; await ve(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
     await khoiDong();
     return { taiLai: async () => { st.cache = {}; await ve(); taiCanhBao(); } };

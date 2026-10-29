@@ -97,14 +97,19 @@ const Qc02Data = (() => {
     target.hidden = true; target.replaceChildren();
     if (!code) return;
 
-    const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('file_pdf_url').eq('ma_sp', code).maybeSingle();
+    // T183: 1 mã có thể có tiêu chuẩn Đúc và Gia công → mỗi bản 1 nút.
+    const { data, error } = await sb.from('duc_ipqc_tieuchuan').select('cong_doan,file_pdf_url').eq('ma_sp', code).order('cong_doan');
     if (!target.isConnected || target.dataset.standardRequest !== request) return;
     if (error) { target.textContent = 'Không tải được tiêu chuẩn: ' + error.message; return; }
     target.replaceChildren();
-    if (!data || !Qc02View.safeUrl(data.file_pdf_url)) return;
+    const ds = (data || []).filter(x => Qc02View.safeUrl(x.file_pdf_url));
+    if (!ds.length) return;
     target.hidden = false;
-    const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Xem tiêu chuẩn';
-    button.onclick = () => Qc02View.pdf(data.file_pdf_url); target.append(button);
+    ds.forEach(x => {
+      const button = document.createElement('button'); button.type = 'button';
+      button.textContent = ds.length > 1 ? 'Xem tiêu chuẩn ' + (x.cong_doan === 'gia_cong' ? 'Gia công' : 'Đúc') : 'Xem tiêu chuẩn';
+      button.onclick = () => Qc02View.pdf(x.file_pdf_url); target.append(button);
+    });
   }
   function lotDetails(row, target) {
     const labels = { id:'Mã hồ sơ', supplier:'NCC', product_code:'Mã sản phẩm', product_name:'Tên / model', lot_no:'Số LOT',
