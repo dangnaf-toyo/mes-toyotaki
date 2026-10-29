@@ -119,6 +119,11 @@ button{cursor:pointer;font-family:inherit}
 .empty-note{text-align:center;color:var(--text-muted);font-size:.95rem;padding:3rem 1rem}
 
 .daynight-btn{flex-shrink:0}
+.bao-mau{margin:.7rem .75rem 0;padding:.8rem .9rem;border-radius:.7rem;background:#1D4ED8;color:#fff;display:flex;flex-direction:column;gap:.45rem;box-shadow:0 0 0 3px #93C5FD;animation:bm-nhay 1s ease-in-out 6}
+.bao-mau .bm-ti{font-weight:800;font-size:1rem}
+.bao-mau .bm-ds{font-size:.9rem;display:flex;flex-direction:column;gap:.15rem}
+.bao-mau button{align-self:flex-start;min-height:36px;padding:.45rem 1rem;border:none;border-radius:.45rem;background:#fff;color:#1D4ED8;font-weight:700;font-size:.9rem;cursor:pointer}
+@keyframes bm-nhay{50%{box-shadow:0 0 0 7px #FCD34D}}
 .daynight-banner{margin:.7rem .75rem 0;padding:.8rem .9rem;border-radius:.7rem;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A5F;display:flex;flex-direction:column;gap:.55rem;font-size:.85rem}
 .daynight-banner button{padding:.7rem;border:none;border-radius:.5rem;background:var(--accent);color:#fff;font-weight:700;font-size:.9rem}
 
@@ -209,6 +214,7 @@ button{cursor:pointer;font-family:inherit}
     </div>
     <div class="head-actions">
       <a class="hbtn" href="qc-manager.html?tab=tracuu" target="_blank" rel="noopener" title="Tra cứu lịch sử IPQC và ảnh kiểm tra (mở tab mới)">🔎 Tra cứu lịch sử</a>
+      <button type="button" class="hbtn" id="btn-bao-mau">🔔 Bật thông báo</button>
       <button class="hbtn daynight-btn hidden" id="btn-ket-thuc-ngay" onclick="onKetThucNgay()">🌙 Kết thúc ngày</button>
     </div>
     <div class="header-clock"><span class="date" id="ipqc-clock-date">—</span><span class="time" id="ipqc-clock-time">--:--</span></div>
@@ -288,6 +294,7 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script src="shared/su-co-lich-su.js?v=T180"></script>
+<script src="shared/ipqc-bao-mau.js?v=T182"></script>
 <script src="shared/ipqc-spc.js"></script>
 <script src="shared/ipqc-btk-do.js"></script>
 <script>
@@ -586,6 +593,8 @@ window.addEventListener('load', async () => {
     renderQueue();
     startPolling();
   } catch (e) { onError(e); startPolling(); }
+  // T182: sản xuất bấm "Hoàn thành mẫu & giao QC" → chuông + rung + dải cảnh báo, tải lại hàng đợi ngay.
+  IpqcBaoMau.start({ onMoi: async () => { try { state.queue = await loadQueue(); renderQueue(); } catch (e) { /* giữ hàng đợi cũ */ } } });
 });
 
 function startPolling(){
