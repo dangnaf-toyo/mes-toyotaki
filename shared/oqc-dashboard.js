@@ -820,7 +820,7 @@ const OqcDashboard = (() => {
   const oldEdit = editRow;
   editRow = function (id) {
     if (saveBusy) return;
-    if(!OqcReportAccess.canManage(dataRows.find(r=>r.id===id)))return alert('Chỉ người nhập báo cáo hoặc Admin được sửa/xóa.');
+    if(!OqcReportAccess.canManage(dataRows.find(r=>r.id===id)))return alert('Chỉ người nhập báo cáo, QC Manager hoặc Admin được sửa/xóa.');
     oldEdit(id);
     const r = dataRows.find((r) => r.id === id);
     if (!r) return;

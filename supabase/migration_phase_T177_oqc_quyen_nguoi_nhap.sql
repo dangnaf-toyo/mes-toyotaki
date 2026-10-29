@@ -1,4 +1,4 @@
--- T177 — Đã chạy STAGING 28/10/2026; chưa chạy production.
+-- T177 — chạy staging 28/10, prod 29/10/2026 (QC Manager sửa/xoá mọi báo cáo: xem T181).
 -- Owner/Admin edit + audited logical deletion of OQC reports.
 -- No historical ownership backfill. Existing reports and audit rows are preserved.
 begin;
