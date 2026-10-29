@@ -1,4 +1,4 @@
--- Đã chạy STAGING 29/10/2026; chưa chạy PRODUCTION.
+-- Đã chạy STAGING + PRODUCTION 29/10/2026 (sửa theo review: xem migration_phase_T187_sua_review_t184_t186.sql).
 -- T185 — Tiêu chuẩn theo công đoạn, dùng chung T133/T163, giữ nguyên ID phiên bản cũ.
 -- Nguồn cũ đã xác minh chỉ được ipqc.html (Đúc) đọc; không suy đoán từ mã sản phẩm.
 begin;
@@ -10,14 +10,15 @@ alter table public.duc_ipqc_tieuchuan add column if not exists cong_doan text no
 alter table public.ipqc_btk drop constraint if exists ipqc_btk_ma_sp_phien_ban_key;
 alter table public.ipqc_btk drop constraint if exists ipqc_btk_ma_sp_cd_phien_ban_key;
 drop function if exists public.ipqc_btk_luu(text,jsonb,text);
+alter table public.ipqc_btk drop constraint if exists ipqc_btk_cd_ma_pb_key;
 alter table public.ipqc_btk add constraint ipqc_btk_cd_ma_pb_key unique(cong_doan,ma_sp,phien_ban);
-drop index public.ipqc_btk_dang_dung_uq;
+drop index if exists public.ipqc_btk_dang_dung_uq;
 create unique index ipqc_btk_dang_dung_uq on public.ipqc_btk(cong_doan,ma_sp) where dang_dung;
-drop index public.ipqc_btk_nhap_uq;
+drop index if exists public.ipqc_btk_nhap_uq;
 create unique index ipqc_btk_nhap_uq on public.ipqc_btk(cong_doan,ma_sp) where trang_thai<>'da_duyet';
-drop index public.duc_ipqc_tc_dx_nhap_uq;
+drop index if exists public.duc_ipqc_tc_dx_nhap_uq;
 create unique index duc_ipqc_tc_dx_nhap_uq on public.duc_ipqc_tieuchuan_de_xuat(cong_doan,ma_sp) where trang_thai<>'da_duyet';
-alter table public.duc_ipqc_tieuchuan drop constraint duc_ipqc_tieuchuan_pkey;
+alter table public.duc_ipqc_tieuchuan drop constraint if exists duc_ipqc_tieuchuan_pkey;
 alter table public.duc_ipqc_tieuchuan add primary key(cong_doan,ma_sp);
 CREATE OR REPLACE FUNCTION public.ipqc_btk_luu(p_ma_sp text, p_data jsonb, p_nguoi text, p_cong_doan text DEFAULT 'duc'::text)
  RETURNS jsonb
@@ -370,7 +371,7 @@ $function$
 revoke execute on function public.ipqc_do_du_lieu(p_ma_sp text, p_tu timestamp with time zone, p_den timestamp with time zone, p_so_lan integer, p_cong_doan text) from public,anon;
 grant execute on function public.ipqc_do_du_lieu(p_ma_sp text, p_tu timestamp with time zone, p_den timestamp with time zone, p_so_lan integer, p_cong_doan text) to authenticated;
 
-drop function public.ipqc_do_luu(text,jsonb,text);
+drop function if exists public.ipqc_do_luu(text,jsonb,text);
 CREATE OR REPLACE FUNCTION public.ipqc_do_luu(p_id_checkpoint text, p_kq jsonb, p_nguoi text, p_id_btk bigint default null)
  RETURNS jsonb
  LANGUAGE plpgsql
