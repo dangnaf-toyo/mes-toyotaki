@@ -66,7 +66,12 @@
     el.replaceChildren(root); el.classList.add('hidden');
     // T183: điểm kiểm IPQC Đúc → bảng tuần kiểm công đoạn Đúc.
     const { data, error } = await sb.rpc('ipqc_do_du_lieu', { p_ma_sp: cp.ma_sp, p_tu: null, p_den: null, p_so_lan: 30, p_cong_doan: 'duc' });
-    if (error || !data || !data.btk) return null;
+    if (error || !data || !data.btk) {
+      el.classList.remove('hidden');root.textContent=error?'Không tải được tiêu chuẩn Đúc. Thử lại trước khi kiểm tra.':'Chưa có bảng tuần kiểm Đúc có hiệu lực cho mã '+cp.ma_sp+'. Liên hệ QC Manager.';
+      if(error)throw new Error(error.message);
+      return null;
+    }
+    data.lan=(data.lan||[]).filter(l=>l.id_btk===data.btk.id);
     const btk = data.btk, mucs = data.muc || [], soMau = btk.so_mau || 1;
     const nhap = {};   // muc_no -> [giá trị chuỗi] | true/false
     mucs.forEach(m => { nhap[m.muc_no] = m.kieu === 'so' ? new Array(soMau).fill('') : null; });
@@ -201,7 +206,7 @@
           if (m.kieu === 'so') nhap[m.muc_no].forEach((v, i) => kq.push({ muc_no: m.muc_no, mau: i + 1, gia_tri: String(v).replace(',', '.') }));
           else kq.push({ muc_no: m.muc_no, mau: 1, dat: nhap[m.muc_no] });
         });
-        const { data: r, error: e } = await sb.rpc('ipqc_do_luu', { p_id_checkpoint: idCheckpoint, p_kq: kq, p_nguoi: nguoi });
+        const { data: r, error: e } = await sb.rpc('ipqc_do_luu', { p_id_checkpoint: idCheckpoint, p_id_btk: btk.id, p_kq: kq, p_nguoi: nguoi });
         if (e) throw new Error(e.message);
         if (!r || !r.ok) throw new Error((r && r.error) || 'Không lưu được kết quả đo kích thước');
         return r;
