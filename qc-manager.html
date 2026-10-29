@@ -291,14 +291,14 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
   </div>
 
   <!-- ===================== TAB: XỬ LÝ SẢN PHẨM KHÔNG PHÙ HỢP ===================== -->
-  <div class="tabpanel" id="tab-ncp">
+  <div class="tabpanel" id="tab-ncp"><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><label>Tiến độ <select id="ncp-progress" onchange="renderNcpList()"><option value="">Tất cả</option><option value="chua_tra_loi">Chưa trả lời</option><option value="dang_thuc_hien">Đang thực hiện</option><option value="da_tra_loi">Đã trả lời</option><option value="qua_han">Quá hạn</option></select></label><label>Thời hạn <select id="ncp-deadline-status" onchange="renderNcpList()"><option value="">Tất cả</option><option value="con_han">Còn hạn</option><option value="sap_den_han">Sắp đến hạn</option><option value="hom_nay">Đến hạn hôm nay</option><option value="qua_han">Quá hạn</option><option value="hoan_thanh">Đã hoàn thành</option><option value="chua_co_han">Chưa có hạn</option></select></label><label>Hạn từ <input type="date" id="ncp-due-from" onchange="renderNcpList()"></label><label>Đến <input type="date" id="ncp-due-to" onchange="renderNcpList()"></label><label>Sắp xếp <select id="ncp-due-sort" onchange="renderNcpList()"><option value="">Theo trạng thái xử lý</option><option value="due">Hạn gần nhất</option></select></label></div>
     <label>Tìm số phiếu <input id="qc02-ncp-search" placeholder="Nhập số phiếu hoặc một phần số phiếu" oninput="renderNcpList()"></label>
     <div class="panel">
       <div class="panel-head">🚧 Phiếu đang xử lý <span class="count" id="ncp-open-count">0</span></div>
       <div class="panel-actions"><button class="btn btn-primary" onclick="openNcpNewModal()">+ Mở phiếu mới</button></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Đã lọc</th><th>OK</th><th>NG</th><th>Bước hiện tại</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian</th><th></th></tr></thead>
+          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Đã lọc</th><th>OK</th><th>NG</th><th>Bước hiện tại</th><th>Hạn trả lời đối sách</th><th>Tiến độ trả lời</th><th>Trạng thái thời hạn</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian</th><th></th></tr></thead>
           <tbody id="ncp-open-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="ncp-open-empty">Không có phiếu nào đang xử lý.</div>
@@ -309,7 +309,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
       <div class="panel-head">📁 Phiếu đã xử lý xong <span class="count" id="ncp-closed-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Lưu thông (lọc+sửa OK)</th><th>Đã phế</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian mở</th><th></th></tr></thead>
+          <thead><tr><th>Thẻ</th><th>Số phiếu</th><th>Máy</th><th>Mã SP</th><th>Nghi vấn</th><th>Lưu thông (lọc+sửa OK)</th><th>Đã phế</th><th>Hạn trả lời đối sách</th><th>Tiến độ trả lời</th><th>Trạng thái thời hạn</th><th>Duyệt NN & ĐS</th><th>Người đảm nhiệm</th><th>Thời gian mở</th><th></th></tr></thead>
           <tbody id="ncp-closed-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="ncp-closed-empty">Chưa có phiếu nào xử lý xong.</div>
@@ -372,7 +372,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
         </div>
         <div class="field-row">
           <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
-          <input type="text" autocomplete="off" id="ncp-nguoi-dam-nhiem-doi-sach">
+          <input type="text" autocomplete="off" id="ncp-nguoi-dam-nhiem-doi-sach"></div><div class="field-row"><label for="ncp-han-tra-loi">Hạn trả lời đối sách *</label><input id="ncp-han-tra-loi" type="date" lang="vi" required>
         </div>
       </div>
       <div class="modal-foot">
@@ -1013,10 +1013,17 @@ const NCP_TRANG_THAI_LABEL = { da_cach_ly: 'Đã cách ly — chờ lọc', dang
 const NCP_BADGE_LABEL = { do: '🔴 Đỏ', vang: '🟡 Vàng', xanh: '🟢 Xanh' };
 const NCP_RC_BADGE_LABEL = { nhap: 'Nháp', cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', tu_choi: 'Từ chối' };
 
+function ncpDeadlineCells(c){
+ const progress={chua_tra_loi:'Chưa trả lời',dang_thuc_hien:'Đang thực hiện',da_tra_loi:'Đã trả lời',qua_han:'Quá hạn'};
+ const status={con_han:'Còn hạn',sap_den_han:'Sắp đến hạn',hom_nay:'Đến hạn hôm nay',qua_han:'Quá hạn',hoan_thanh:'Đã hoàn thành',chua_co_han:'Chưa có hạn'};
+ const color=c.trang_thai_han==='hoan_thanh'?'#15803d':c.trang_thai_han==='qua_han'?'#b91c1c':['sap_den_han','hom_nay'].includes(c.trang_thai_han)?'#92400e':'#64748b';
+ const date=c.han_tra_loi_doi_sach?c.han_tra_loi_doi_sach.split('-').reverse().join('/'):'—';
+ return '<td style="color:'+color+'">'+escapeHtml(date)+'</td><td>'+escapeHtml(progress[c.tien_do_tra_loi]||'Chưa trả lời')+'</td><td style="color:'+color+'">'+escapeHtml(status[c.trang_thai_han]||'Chưa có hạn')+'</td>';
+}
 async function loadNcpList(){
   const data = [];
   for(let offset=0;;offset+=500){
-    const result=await sb.from('duc_ncp').select('*').order('ngay_tao',{ascending:false}).order('id_ncp').range(offset,offset+499);
+    const result=await sb.from('duc_ncp_theo_doi').select('*').order('ngay_tao',{ascending:false}).order('id_ncp').range(offset,offset+499);
     if(result.error){console.error('Không tải được phiếu NCP',result.error);return;}
     data.push(...(result.data||[]));
     if(!result.data||result.data.length<500)break;
@@ -1033,7 +1040,13 @@ async function loadNcpList(){
 
 function renderNcpList(){
   const term = document.getElementById('qc02-ncp-search').value.trim().toLowerCase();
-  const list = state.ncpList.filter(c => !term || String(c.id_ncp).toLowerCase().includes(term));
+  const val=id=>document.getElementById(id).value;
+  const list = state.ncpList.filter(c => (!term || String(c.id_ncp).toLowerCase().includes(term))
+    && (!val('ncp-progress') || c.tien_do_tra_loi===val('ncp-progress'))
+    && (!val('ncp-deadline-status') || c.trang_thai_han===val('ncp-deadline-status'))
+    && (!val('ncp-due-from') || c.han_tra_loi_doi_sach && c.han_tra_loi_doi_sach>=val('ncp-due-from'))
+    && (!val('ncp-due-to') || c.han_tra_loi_doi_sach && c.han_tra_loi_doi_sach<=val('ncp-due-to')));
+  if(val('ncp-due-sort'))list.sort((a,b)=>(a.han_tra_loi_doi_sach||'9999').localeCompare(b.han_tra_loi_doi_sach||'9999'));
   const open = list.filter(c => c.trang_thai !== 'dong');
   const closed = list.filter(c => c.trang_thai === 'dong');
 
@@ -1049,7 +1062,7 @@ function renderNcpList(){
       <td class="ncp-qty" style="color:var(--run-fg)">${c.so_luong_loc_ok}</td>
       <td class="ncp-qty" style="color:${c.so_luong_loc_ng > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_loc_ng}</td>
       <td>${escapeHtml(NCP_TRANG_THAI_LABEL[c.trang_thai] || c.trang_thai)}</td>
-      <td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
+      ${ncpDeadlineCells(c)}<td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
       <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
@@ -1070,7 +1083,7 @@ function renderNcpList(){
       <td class="ncp-qty">${c.so_luong_nghi_van}</td>
       <td class="ncp-qty" style="color:var(--run-fg)">${c.so_luong_loc_ok + c.so_luong_sua_ok}</td>
       <td class="ncp-qty" style="color:${c.so_luong_phe_da_duyet > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_phe_da_duyet}</td>
-      <td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
+      ${ncpDeadlineCells(c)}<td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
       <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
@@ -1098,6 +1111,7 @@ async function openNcpNewModal(){
   document.getElementById('ncp-vi-tri').value = '';
   document.getElementById('ncp-nguoi-dam-nhiem').value = '';
   document.getElementById('ncp-nguoi-dam-nhiem-doi-sach').value = '';
+  document.getElementById('ncp-han-tra-loi').value = '';
   document.querySelector('input[name=ncp-src][value=ng]').checked = true;
   populateSoKhuonField('ncp', '', '');
   ncpSourceChanged();
@@ -1138,6 +1152,7 @@ function onNcpNgSelected(){
 }
 
 async function submitNcpNewCase(){
+  if (!document.getElementById('ncp-han-tra-loi').reportValidity()) return;
   if (!(await ensureAuth())) return;
   const isNg = document.querySelector('input[name=ncp-src]:checked').value === 'ng';
   const idCheckpoint = isNg ? document.getElementById('ncp-src-ng').value : '';
@@ -1171,6 +1186,7 @@ async function submitNcpNewCase(){
   if (!p.nguoiDamNhiemDoiSach) return alert('Nhập người đảm nhiệm trả lời Nguyên nhân & Đối sách');
 
   const { data, error } = await sb.rpc('duc_ncp_open_case', {
+    p_han_tra_loi_doi_sach: document.getElementById('ncp-han-tra-loi').value,
     p_id_checkpoint_goc: p.idCheckpoint, p_ma_may: p.maMay, p_ma_sp: p.maSp, p_ten_sp: p.tenSp, p_so_khuon: p.soKhuon,
     p_mo_ta_loi: p.moTaLoi, p_so_luong_nghi_van: p.soLuong, p_so_luong_ng_du_kien: p.soLuongNgDuKien,
     p_vi_tri_cach_ly: p.viTri, p_nguoi_dam_nhiem: p.nguoiDamNhiem, p_nguoi_dam_nhiem_doi_sach: p.nguoiDamNhiemDoiSach,
@@ -1549,7 +1565,7 @@ loadQcFilters();
 setInterval(loadBoard, 15000);
 </script>
 <script>Qc02Data.attachEmployees(["ncp-nguoi-dam-nhiem","ncp-nguoi-dam-nhiem-doi-sach"]);</script>
-<script src="shared/mes-ncp-source.js"></script>
+<script src="shared/mes-ncp-source.js?v=T184"></script>
 <script>/* ?tab=… mở thẳng tab; T136: bieudo / ngoqc đã chuyển sang bieu-do-chat-luong.html */(function(){var t=new URLSearchParams(location.search).get('tab');var moi={bieudo:'kiemsoat',ngoqc:'pchart'};if(moi[t]){location.replace('bieu-do-chat-luong.html?tab='+moi[t]);return;}if(t&&document.getElementById('tab-'+t))setTimeout(function(){switchTab(t);},0);})();</script>
 </body>
 </html>

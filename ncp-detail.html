@@ -225,7 +225,7 @@ details.panel>summary{cursor:pointer;font-weight:700;font-size:13px;min-height:3
     <div class="field-row"><label>Ảnh lỗi</label><div class="img-gallery" id="ipqc-evidence"></div></div>
     <div class="field-row">
       <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
-      <input type="text" autocomplete="off" id="f-nguoi-dam-nhiem">
+      <input type="text" autocomplete="off" id="f-nguoi-dam-nhiem"></div><div class="field-row"><label for="f-han-tra-loi">Hạn trả lời đối sách</label><input type="date" lang="vi" id="f-han-tra-loi">
     </div>
   </div>
 
@@ -462,10 +462,11 @@ function renderAll(){
   document.getElementById('ipqc-evidence').innerHTML=(state.ipqcEvidence||[]).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" data-qc-photo></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
   document.getElementById('i-nguoi-dam-nhiem').textContent = c.nguoi_dam_nhiem || '—';
   document.getElementById('f-nguoi-dam-nhiem').value = c.nguoi_dam_nhiem_doi_sach || '';
+ document.getElementById('f-han-tra-loi').value=c.han_tra_loi_doi_sach||'';
   document.getElementById('f-nn-phat-sinh').value = c.nguyen_nhan_phat_sinh || '';
   document.getElementById('f-nn-luu-xuat').value = c.nguyen_nhan_luu_xuat || '';
 
-  ['f-nguoi-dam-nhiem', 'f-nn-phat-sinh', 'f-nn-luu-xuat'].forEach(id => { document.getElementById(id).readOnly = state.locked; });
+  ['f-han-tra-loi', 'f-nguoi-dam-nhiem', 'f-nn-phat-sinh', 'f-nn-luu-xuat'].forEach(id => { document.getElementById(id).readOnly = state.locked; });
   document.getElementById('upload-btn-phat_sinh').classList.toggle('disabled', state.locked);
   document.getElementById('upload-btn-luu_xuat').classList.toggle('disabled', state.locked);
   DS_KEYS.forEach(key => document.getElementById('add-btn-' + key).classList.toggle('hidden', state.locked));
@@ -642,6 +643,7 @@ async function saveDraft(){
     p_hinh_anh_phat_sinh: p.p_hinh_anh_phat_sinh, p_hinh_anh_luu_xuat: p.p_hinh_anh_luu_xuat,
     p_doi_sach_ps_tam_thoi: p.p_doi_sach_ps_tam_thoi, p_doi_sach_ps_lau_dai: p.p_doi_sach_ps_lau_dai,
     p_doi_sach_lx_tam_thoi: p.p_doi_sach_lx_tam_thoi, p_doi_sach_lx_lau_dai: p.p_doi_sach_lx_lau_dai,
+    p_han_tra_loi_doi_sach: document.getElementById('f-han-tra-loi').value || null,
     p_user: p.p_user,
   });
   hideOverlay();
@@ -661,6 +663,7 @@ async function submitForApproval(){
     p_hinh_anh_phat_sinh: p.p_hinh_anh_phat_sinh, p_hinh_anh_luu_xuat: p.p_hinh_anh_luu_xuat,
     p_doi_sach_ps_tam_thoi: p.p_doi_sach_ps_tam_thoi, p_doi_sach_ps_lau_dai: p.p_doi_sach_ps_lau_dai,
     p_doi_sach_lx_tam_thoi: p.p_doi_sach_lx_tam_thoi, p_doi_sach_lx_lau_dai: p.p_doi_sach_lx_lau_dai,
+    p_han_tra_loi_doi_sach: document.getElementById('f-han-tra-loi').value || null,
     p_user: p.p_user,
   });
   if (e1) return showError('Chưa gửi được phê duyệt', e1);
