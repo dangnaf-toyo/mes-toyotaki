@@ -54,7 +54,19 @@
       '.bd-pop .bd-act{display:flex;gap:6px;justify-content:flex-end;padding:8px}' +
       '.bd-pop .bd-act button{border:1px solid #CBD5E1;background:#fff;border-radius:6px;padding:5px 10px;font:inherit;font-weight:600;cursor:pointer;color:#0F172A}' +
       '.bd-pop .bd-act .ok{background:#0F5FA5;border-color:#0F5FA5;color:#fff}' +
-      '@media print{.bd-khung{max-height:none!important;overflow:visible!important}.bd-nut{display:none}}';
+      '.bd-nhanh{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:6px 0 8px;font-size:12px}' +
+      '.bd-nhom{display:flex;flex-wrap:wrap;gap:4px;align-items:center}' +
+      '.bd-nhom>b{font-size:10.5px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-right:3px}' +
+      '.bd-chip{border:1px solid #CBD5E1;background:#fff;color:#0F172A;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;line-height:1.3}' +
+      '.bd-chip:hover{border-color:#64748B}' +
+      '.bd-chip small{color:#64748B;font-weight:500;margin-left:4px}' +
+      '.bd-chip.on{background:#0F172A;border-color:#0F172A;color:#fff}.bd-chip.on small{color:#CBD5E1}' +
+      '.bd-chip.het:not(.on){opacity:.45}' +
+      '.bd-dem{color:#475569}.bd-dem b{color:#0F172A}' +
+      '.bd-nhanh select{border:1px solid #CBD5E1;border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;font-weight:600;background:#fff;color:#0F172A;max-width:240px;cursor:pointer}' +
+      '.bd-nhanh select.on{border-color:#0F172A;box-shadow:0 0 0 1px #0F172A}' +
+      '.bd-xoa{border:none;background:none;color:#B91C1C;font:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:3px 4px}' +
+      '@media print{.bd-khung{max-height:none!important;overflow:visible!important}.bd-nut,.bd-nhanh{display:none}}';
     document.head.appendChild(st);
   }
 
@@ -170,6 +182,115 @@
       r.classList.toggle('bd-an', an);
     });
     hdr.querySelectorAll('.bd-nut').forEach(b => b.classList.toggle('dang-loc', !!loc[b.dataset.cot]));
+    veNhanh(tb, hdr);
+  }
+  function datLoc(tb, cot, s){
+    const ky = chuKy(dongTieuDe(tb));
+    const m = Object.assign({}, boLocTheoBang.get(ky) || {});
+    if (s && s.size) m[cot] = s; else delete m[cot];
+    if (Object.keys(m).length) boLocTheoBang.set(ky, m); else boLocTheoBang.delete(ky);
+    apLoc(tb);
+  }
+
+  // ── Nút lọc nhanh trên bảng: Máy / Mã SP / Khuôn / Người / Ca / Công đoạn ────
+  // Tự nhận cột theo tên tiêu đề. Ít giá trị (≤ 12) → nút bấm; nhiều → ô chọn.
+  // Cột gần như mỗi dòng một giá trị (cột gộp "Máy / SP / Lot"...) thì bỏ qua.
+  const NHOM_NHANH = [
+    { ten: 'Máy', re: /^(máy|máy đúc|line|dây chuyền)$/ },
+    { ten: 'Mã SP', re: /^(mã sp|mã sản phẩm|sản phẩm|sp|mã hàng)$/ },
+    { ten: 'Khuôn', re: /^(khuôn|số khuôn|mã khuôn)$/ },
+    { ten: 'Người', re: /^(người|nhân sự|nhân viên|phụ trách|đảm nhiệm|trưởng ca|người phụ trách|nv\b)/ },
+    { ten: 'Ca', re: /^(ca|ca sx|ca làm việc)$/ },
+    { ten: 'Công đoạn', re: /^công đoạn$/ },
+  ];
+  const NUT_TOI_DA = 12, GIA_TRI_TOI_DA = 60;
+  function timNhom(tb, hdr, loc){
+    const rows = dongDuLieu(tb, hdr), n = soCot(hdr);
+    const day = rows.filter(r => soCot(r) >= Math.ceil(n / 2));
+    const cots = Object.keys(loc).map(Number);
+    const out = [];
+    let cot = 0;
+    [...hdr.cells].forEach(c => {
+      const span = c.colSpan || 1;
+      const ten = (c.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const g = span === 1 && NHOM_NHANH.find(x => x.re.test(ten));
+      if (g && !out.some(o => o.ten === g.ten)) {
+        // Số đếm theo các lọc đang chọn ở CỘT KHÁC (giá trị hết dòng → 0, làm mờ).
+        const dem = new Map(), khac = cots.filter(x => x !== cot);
+        day.forEach(r => {
+          const v = giaTri(oTaiCot(r, cot)); if (v === '') return;
+          const khop = !khac.some(x => !loc[x].has(giaTri(oTaiCot(r, x))));
+          dem.set(v, (dem.get(v) || 0) + (khop ? 1 : 0));
+        });
+        if (dem.size >= 2 && dem.size <= GIA_TRI_TOI_DA && dem.size <= Math.max(4, day.length * 0.7)) {
+          out.push({ ten: g.ten, cot, vals: [...dem.entries()].sort((a, b) => a[0].localeCompare(b[0], 'vi', { numeric: true })) });
+        }
+      }
+      cot += span;
+    });
+    return out;
+  }
+  // Thanh lọc nhanh đặt ngay trên khung cuộn (ngoài khung → luôn hiện khi cuộn bảng).
+  function neo(tb){
+    if (tb.parentElement.classList.contains('bd-khung')) return tb.parentElement;
+    for (let e = tb.parentElement; e && e !== document.body; e = e.parentElement) {
+      const s = getComputedStyle(e);
+      if (/(auto|scroll)/.test(s.overflowY + s.overflowX)) return e.children.length === 1 ? e : tb;
+    }
+    return tb;
+  }
+  function veNhanh(tb, hdr){
+    const a = neo(tb);
+    let bar = a.previousElementSibling && a.previousElementSibling.classList.contains('bd-nhanh') ? a.previousElementSibling : null;
+    const loc = boLocTheoBang.get(chuKy(hdr)) || {};
+    const rows = dongDuLieu(tb, hdr);
+    const nhom = rows.length >= MIN_DONG_LOC ? timNhom(tb, hdr, loc) : [];
+    if (!nhom.length) { if (bar) bar.remove(); return; }
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const html = nhom.map((g, gi) => {
+      const s = loc[g.cot];
+      if (g.vals.length <= NUT_TOI_DA) {
+        return '<span class="bd-nhom"><b>' + g.ten + '</b>' +
+          '<button type="button" class="bd-chip' + (s ? '' : ' on') + '" data-g="' + gi + '" data-i="-1">Tất cả</button>' +
+          g.vals.map(([v, c], i) => '<button type="button" class="bd-chip' + (s && s.has(v) ? ' on' : '') + (c ? '' : ' het') + '" data-g="' + gi + '" data-i="' + i +
+            '" title="Bấm để lọc — giữ Ctrl để chọn thêm">' + esc(v) + '<small>' + c + '</small></button>').join('') + '</span>';
+      }
+      const mot = s && s.size === 1 ? [...s][0] : null;
+      return '<span class="bd-nhom"><b>' + g.ten + '</b><select class="' + (s ? 'on' : '') + '" data-g="' + gi + '">' +
+        '<option value="-1">Tất cả (' + g.vals.length + ')</option>' +
+        (s && !mot ? '<option value="-2" selected>' + s.size + ' giá trị đã chọn</option>' : '') +
+        g.vals.map(([v, c], i) => '<option value="' + i + '"' + (v === mot ? ' selected' : '') + '>' + esc(v) + ' (' + c + ')</option>').join('') +
+        '</select></span>';
+    }).join('') + (Object.keys(loc).length
+      ? '<span class="bd-dem">Đang hiện <b>' + rows.filter(r => !r.classList.contains('bd-an')).length + '</b> / ' + rows.length + ' dòng</span>' +
+        '<button type="button" class="bd-xoa" data-xoa>✕ Bỏ tất cả lọc</button>'
+      : '');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'bd-nhanh';
+      a.parentNode.insertBefore(bar, a);
+      bar.addEventListener('click', e => {
+        const t = e.target.closest('.bd-chip,.bd-xoa'); if (!t) return;
+        const b = bar._tb;
+        if (t.dataset.xoa != null) { boLocTheoBang.delete(chuKy(dongTieuDe(b))); apLoc(b); return; }
+        const g = bar._nhom[+t.dataset.g], i = +t.dataset.i;
+        if (i < 0) return datLoc(b, g.cot, null);
+        const v = g.vals[i][0];
+        const cu = (boLocTheoBang.get(chuKy(dongTieuDe(b))) || {})[g.cot];
+        let s;
+        if (e.ctrlKey || e.metaKey) { s = new Set(cu || []); s.has(v) ? s.delete(v) : s.add(v); }
+        else s = cu && cu.size === 1 && cu.has(v) ? null : new Set([v]);
+        datLoc(b, g.cot, s);
+      });
+      bar.addEventListener('change', e => {
+        const t = e.target.closest('select'); if (!t) return;
+        const g = bar._nhom[+t.dataset.g], i = +t.value;
+        if (i === -2) return;
+        datLoc(bar._tb, g.cot, i < 0 ? null : new Set([g.vals[i][0]]));
+      });
+    }
+    bar._tb = tb; bar._nhom = nhom;
+    if (bar._html !== html) { bar.innerHTML = html; bar._html = html; }
   }
 
   let popMo = null;
@@ -215,12 +336,7 @@
       pop.querySelectorAll('label[data-v]').forEach(l => { l.style.display = !q || l.dataset.v.includes(q) ? '' : 'none'; });
       capNhatTat();
     };
-    const luu = s => {
-      const m = Object.assign({}, boLocTheoBang.get(ky) || {});
-      if (s) m[cot] = s; else delete m[cot];
-      if (Object.keys(m).length) boLocTheoBang.set(ky, m); else boLocTheoBang.delete(ky);
-      apLoc(tb); dongPop();
-    };
+    const luu = s => { datLoc(tb, cot, s); dongPop(); };
     pop.querySelector('[data-bo]').onclick = () => luu(null);
     pop.querySelector('[data-ok]').onclick = () => {
       // Đang tìm: chỉ lấy giá trị khớp ô tìm (như Excel); không tìm: lấy các ô đã tích.
@@ -262,13 +378,13 @@
     document.querySelectorAll('table').forEach(tb => {
       if (!tb.offsetParent || boQua(tb)) return;
       const hdr = dongTieuDe(tb); if (!hdr) return;
-      if (tb.parentElement.classList.contains('bd-khung')) datCao(tb.parentElement);
-      else {
+      if (!tb.parentElement.classList.contains('bd-khung')) {
         if (tb.offsetHeight <= caoTai(tb)) return;   // vừa màn hình, không cần
         if (!daTuDinh(tb, hdr)) codinh(tb, hdr);
       }
       if (dongDuLieu(tb, hdr).length >= MIN_DONG_LOC && !hdr.querySelector('.bd-nut')) ganNutLoc(tb, hdr);
-      if (boLocTheoBang.has(chuKy(hdr))) apLoc(tb);
+      apLoc(tb);   // áp lọc (nếu có) + vẽ / cập nhật thanh lọc nhanh
+      if (tb.parentElement.classList.contains('bd-khung')) datCao(tb.parentElement);   // sau khi thanh lọc nhanh chiếm chỗ
     });
   }
   let hen = 0;
@@ -277,14 +393,17 @@
   function batDau(){
     css();
     quet();
+    // Bỏ qua thay đổi do chính bang-dai gây ra (popup, nút lọc, thanh lọc nhanh) để không quét lặp.
+    const cuaBd = n => n.nodeType === 1 && /\bbd-(pop|nut|nhanh)\b/.test(n.className || '');
     new MutationObserver(ms => {
-      if (ms.every(m => [...m.addedNodes, ...m.removedNodes].every(n => n.nodeType !== 1 || n.classList && (n.classList.contains('bd-pop') || n.classList.contains('bd-nut'))))) return;
+      if (ms.every(m => (m.target.closest && m.target.closest('.bd-nhanh,.bd-pop')) ||
+        [...m.addedNodes, ...m.removedNodes].every(n => n.nodeType !== 1 || cuaBd(n)))) return;
       henQuet();
     }).observe(document.body, { childList: true, subtree: true });
     window.addEventListener('resize', henQuet);
     window.addEventListener('load', henQuet);
     // Chuyển tab / mở rộng vùng thường chỉ đổi thuộc tính hidden/class (không đổi cây DOM).
-    document.addEventListener('click', e => { if (!e.target.closest('.bd-pop,.bd-nut')) henQuet(); }, true);
+    document.addEventListener('click', e => { if (!e.target.closest('.bd-pop,.bd-nut,.bd-nhanh')) henQuet(); }, true);
   }
   window.BangDai = { quet: henQuet };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', batDau); else batDau();
