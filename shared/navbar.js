@@ -17,6 +17,12 @@
  * ============================================================================
  */
 (function () {
+  // T189: bảng dài — cố định tiêu đề + nút lọc từng cột (shared/bang-dai.js), cả khi nhúng.
+  if (document.currentScript && !window.BangDai) {
+    const s = document.createElement('script');
+    s.src = document.currentScript.src.replace(/navbar\.js(\?.*)?$/, 'bang-dai.js');
+    document.head.appendChild(s);
+  }
   const MENU = [
     { label: 'Điều hành & Báo cáo', items: [
       { label: 'Dashboard Sản lượng', href: 'sanluong-supabase.html' },
