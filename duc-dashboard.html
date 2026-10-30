@@ -670,7 +670,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div id="es-warning" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;color:#B45309;border-radius:6px;padding:10px 12px;font-size:12px"></div>
+      <div id="es-plan-warning" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;border-radius:6px;padding:10px 12px;font-size:12px"></div>
+      <div id="es-warning"style="display:none;background:#FEF3C7;border:1px solid #F59E0B;color:#B45309;border-radius:6px;padding:10px 12px;font-size:12px"></div>
 
       <div id="es-review-section" style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:#FFFBEB">
         <div style="font-weight:600;color:var(--text);font-size:12px;margin-bottom:6px">📊 Xác nhận số liệu ca (bắt buộc)</div>
@@ -1622,11 +1623,7 @@ function attachEventListeners(){
   document.getElementById('btn-end-shift').addEventListener('click', endShift);
 
   const cb = document.getElementById('es-confirm-inputs');
-  const btn = document.getElementById('es-btn-submit');
-  cb.addEventListener('change', () => {
-    btn.disabled = !cb.checked;
-    btn.title = cb.checked ? '' : 'Cần xác nhận số liệu ca trước khi kết ca';
-  });
+  cb.addEventListener('change', capNhatNutKetCa_);
 
   document.getElementById('ext-new-end').addEventListener('input', _updateExtendDelta);
   document.getElementById('ei-gio-phat-sinh').addEventListener('input', _updateEiPhutCalc);
@@ -4439,6 +4436,21 @@ async function endShift(){
       '<span style="font-size:11px">Không chặn kết ca — số thùng chưa quét sẽ được <b>sản xuất bù ca sau</b> (quét lúc đó tính vào ca sau).</span>';
   } else kbWarn.style.display = 'none';
 
+  // T194: số máy chạy ca này phải khớp số máy có KH trong KHSX tuần (trừ máy
+  // khai báo ca này là ca nghỉ). Lệch → trưởng ca phải tick đã kiểm tra lại.
+  const lech = await soSanhMayVoiKhsxTuan_(state.ngay, state.ca, state.phuongAnCa,
+    [...new Set(allWithPlan.map(r => r.ma_may))]);
+  const planWarn = document.getElementById('es-plan-warning');
+  if (lech && (lech.thieu.length || lech.thua.length)) {
+    planWarn.style.display = 'block';
+    planWarn.innerHTML = '⚠ <b>Số máy chạy ca này không khớp kế hoạch tuần</b> — KH: <b>' + lech.soKh + '</b> máy · Thực tế: <b>' + lech.soChay + '</b> máy.<br>' +
+      (lech.thieu.length ? '• <b>Thiếu</b> (có KH nhưng không chạy): ' + lech.thieu.map(escapeHtml).join(', ') + '<br>' : '') +
+      (lech.thua.length ? '• <b>Thừa</b> (chạy nhưng không có KH): ' + lech.thua.map(escapeHtml).join(', ') + '<br>' : '') +
+      '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-weight:600">' +
+        '<input type="checkbox" id="es-plan-ack" onchange="capNhatNutKetCa_()" style="cursor:pointer">' +
+        '<span>Trưởng ca đã kiểm tra lại danh sách máy chạy ca này</span></label>';
+  } else { planWarn.style.display = 'none'; planWarn.innerHTML = ''; }
+
   const list = document.getElementById('es-machine-list');
   list.innerHTML = '';
   if (withPlan.length === 0) {
@@ -4494,6 +4506,47 @@ async function endShift(){
   _populateEndShiftReview(allWithPlan);
 }
 
+/**
+ * So máy chạy ca (ngay, ca) với máy có KH ngày đó trong KHSX tuần. Máy khai
+ * báo số ca mà ca này là ca nghỉ thì không tính vào KH. Lỗi mạng → null.
+ */
+async function soSanhMayVoiKhsxTuan_(ngayStr, ca, phuongAnCa, mayChay){
+  try {
+    const d = new Date(ngayStr + 'T00:00:00');
+    const jsDay = d.getDay();
+    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const monday = new Date(d);
+    monday.setDate(monday.getDate() + (jsDay === 0 ? -6 : 1 - jsDay));
+    const mondayStr = monday.getFullYear() + '-' + pad(monday.getMonth() + 1) + '-' + pad(monday.getDate());
+    const col = ['t2', 't3', 't4', 't5', 't6', 't7', 'cn'][dayIdx];
+    const { data, error } = await sb.from('duc_khsx_tuan_plan').select('ma_may,' + col).eq('tuan_bat_dau', mondayStr);
+    if (error) throw error;
+    const khMay = [...new Set((data || []).filter(r => (Number(r[col]) || 0) > 0).map(r => r.ma_may))];
+    const soCaMay = await loadSoCaMay_(mondayStr, dayIdx, khMay);
+    const keHoach = new Set(khMay.filter(m => !caNghiTheoSoCa_(soCaMay[m], phuongAnCa, ca)));
+    const chay = new Set(mayChay);
+    return {
+      soKh: keHoach.size, soChay: chay.size,
+      thieu: [...keHoach].filter(m => !chay.has(m)).sort(naturalCompare),
+      thua: [...chay].filter(m => !keHoach.has(m)).sort(naturalCompare),
+    };
+  } catch (e) {
+    console.error('soSanhMayVoiKhsxTuan_ lỗi:', e);
+    return null;
+  }
+}
+
+/** Nút "Xác nhận kết ca": cần tick xác nhận số liệu + (nếu lệch KH) tick đã kiểm tra máy. */
+function capNhatNutKetCa_(){
+  const btn = document.getElementById('es-btn-submit');
+  const soLieu = document.getElementById('es-confirm-inputs').checked;
+  const ack = document.getElementById('es-plan-ack');
+  const may = !ack || ack.checked;
+  btn.disabled = !(soLieu && may);
+  btn.title = !soLieu ? 'Cần xác nhận số liệu ca trước khi kết ca'
+    : !may ? 'Số máy chạy lệch kế hoạch tuần — trưởng ca cần tick đã kiểm tra lại' : '';
+}
+
 function toggleAllCarryOver(check){
   document.querySelectorAll('#es-machine-list input[type="checkbox"]').forEach(cb => {
     if (cb.disabled) return;
@@ -4513,16 +4566,15 @@ function _populateEndShiftReview(rowsWithPlan){
   const wrap = document.getElementById('es-review-section');
   const list = document.getElementById('es-review-list');
   const cb = document.getElementById('es-confirm-inputs');
-  const btn = document.getElementById('es-btn-submit');
   list.innerHTML = '';
 
   if (rowsWithPlan.length === 0) {
     wrap.style.display = 'none';
-    cb.checked = true; btn.disabled = false; btn.title = '';
+    cb.checked = true; capNhatNutKetCa_();
     return;
   }
   wrap.style.display = '';
-  cb.checked = false; btn.disabled = true; btn.title = 'Cần tick "Tôi xác nhận" để kết ca';
+  cb.checked = false; capNhatNutKetCa_();
 
   const cols = '1fr 62px 62px 60px 64px 90px';
   const header = document.createElement('div');
