@@ -177,7 +177,12 @@
     dongDuLieu(tb, hdr).forEach(r => {
       let an = false;
       if (cots.length && soCot(r) >= Math.ceil(n / 2)) {
-        an = cots.some(cot => !loc[cot].has(giaTri(oTaiCot(r, cot))));
+        an = cots.some(cot => {
+          const c = oTaiCot(r, cot), v = giaTri(c);
+          // Dòng đang nhập dở (ô nhập còn trống, vd vừa bấm "+ Thêm dòng") không bị ẩn.
+          if (v === '' && c && c.querySelector('input,select,textarea')) return false;
+          return !loc[cot].has(v);
+        });
       }
       r.classList.toggle('bd-an', an);
     });
@@ -196,7 +201,7 @@
   // Tự nhận cột theo tên tiêu đề. Ít giá trị (≤ 12) → nút bấm; nhiều → ô chọn.
   // Cột gần như mỗi dòng một giá trị (cột gộp "Máy / SP / Lot"...) thì bỏ qua.
   const NHOM_NHANH = [
-    { ten: 'Máy', re: /^(máy|máy đúc|line|dây chuyền)$/ },
+    { ten: 'Máy', re: /^(máy|mã máy|máy đúc|line|dây chuyền)$/ },
     { ten: 'Mã SP', re: /^(mã sp|mã sản phẩm|sản phẩm|sp|mã hàng)$/ },
     { ten: 'Khuôn', re: /^(khuôn|số khuôn|mã khuôn)$/ },
     { ten: 'Người', re: /^(người|nhân sự|nhân viên|phụ trách|đảm nhiệm|trưởng ca|người phụ trách|nv\b)/ },
@@ -222,7 +227,7 @@
           const khop = !khac.some(x => !loc[x].has(giaTri(oTaiCot(r, x))));
           dem.set(v, (dem.get(v) || 0) + (khop ? 1 : 0));
         });
-        if (dem.size >= 2 && dem.size <= GIA_TRI_TOI_DA && dem.size <= Math.max(4, day.length * 0.7)) {
+        if (dem.size >= 2 && dem.size <= GIA_TRI_TOI_DA) {
           out.push({ ten: g.ten, cot, vals: [...dem.entries()].sort((a, b) => a[0].localeCompare(b[0], 'vi', { numeric: true })) });
         }
       }
@@ -379,7 +384,8 @@
       if (!tb.offsetParent || boQua(tb)) return;
       const hdr = dongTieuDe(tb); if (!hdr) return;
       if (!tb.parentElement.classList.contains('bd-khung')) {
-        if (tb.offsetHeight <= caoTai(tb)) return;   // vừa màn hình, không cần
+        // Vừa màn hình: không cần khung cuộn / nút ▾, nhưng bảng >= 8 dòng vẫn có hàng lọc nhanh.
+        if (tb.offsetHeight <= caoTai(tb)) { apLoc(tb); return; }
         if (!daTuDinh(tb, hdr)) codinh(tb, hdr);
       }
       if (dongDuLieu(tb, hdr).length >= MIN_DONG_LOC && !hdr.querySelector('.bd-nut')) ganNutLoc(tb, hdr);
