@@ -54,17 +54,10 @@
       '.bd-pop .bd-act{display:flex;gap:6px;justify-content:flex-end;padding:8px}' +
       '.bd-pop .bd-act button{border:1px solid #CBD5E1;background:#fff;border-radius:6px;padding:5px 10px;font:inherit;font-weight:600;cursor:pointer;color:#0F172A}' +
       '.bd-pop .bd-act .ok{background:#0F5FA5;border-color:#0F5FA5;color:#fff}' +
-      '.bd-nhanh{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:6px 0 8px;font-size:12px}' +
-      '.bd-nhom{display:flex;flex-wrap:wrap;gap:4px;align-items:center}' +
-      '.bd-nhom>b{font-size:10.5px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-right:3px}' +
-      '.bd-chip{border:1px solid #CBD5E1;background:#fff;color:#0F172A;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;line-height:1.3}' +
-      '.bd-chip:hover{border-color:#64748B}' +
-      '.bd-chip small{color:#64748B;font-weight:500;margin-left:4px}' +
-      '.bd-chip.on{background:#0F172A;border-color:#0F172A;color:#fff}.bd-chip.on small{color:#CBD5E1}' +
-      '.bd-chip.het:not(.on){opacity:.45}' +
-      '.bd-dem{color:#475569}.bd-dem b{color:#0F172A}' +
-      '.bd-nhanh select{border:1px solid #CBD5E1;border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;font-weight:600;background:#fff;color:#0F172A;max-width:240px;cursor:pointer}' +
-      '.bd-nhanh select.on{border-color:#0F172A;box-shadow:0 0 0 1px #0F172A}' +
+      '.bd-nhanh{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:4px 0 8px;font-size:12px}' +
+      '.bd-dem{color:#64748B;font-weight:600}.bd-dem b{color:#0F172A}' +
+      '.bd-nhanh select{border:1.5px solid #B8C1CC;border-radius:6px;padding:3px 6px;font:inherit;font-size:12px;background:#fff;color:#0F172A;max-width:220px;cursor:pointer}' +
+      '.bd-nhanh select.on{border-color:#0F5FA5;background:#EFF6FF;font-weight:600}' +
       '.bd-xoa{border:none;background:none;color:#B91C1C;font:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:3px 4px}' +
       '@media print{.bd-khung{max-height:none!important;overflow:visible!important}.bd-nut,.bd-nhanh{display:none}}';
     document.head.appendChild(st);
@@ -197,18 +190,19 @@
     apLoc(tb);
   }
 
-  // ── Nút lọc nhanh trên bảng: Máy / Mã SP / Khuôn / Người / Ca / Công đoạn ────
-  // Tự nhận cột theo tên tiêu đề. Ít giá trị (≤ 12) → nút bấm; nhiều → ô chọn.
-  // Cột gần như mỗi dòng một giá trị (cột gộp "Máy / SP / Lot"...) thì bỏ qua.
+  // ── Lọc nhanh trên bảng: Máy / Mã SP / Khuôn / Người / Ca / Công đoạn ───────
+  // Tự nhận cột theo tên tiêu đề, mỗi cột 1 ô chọn gọn ("Mọi máy ▾") như dòng lọc
+  // của các danh sách sẵn có (vd Công việc không theo kế hoạch). Bảng mà trang đã
+  // có ô lọc riêng ngay phía trên thì không thêm.
   const NHOM_NHANH = [
-    { ten: 'Máy', re: /^(máy|mã máy|máy đúc|line|dây chuyền)$/ },
-    { ten: 'Mã SP', re: /^(mã sp|mã sản phẩm|sản phẩm|sp|mã hàng)$/ },
-    { ten: 'Khuôn', re: /^(khuôn|số khuôn|mã khuôn)$/ },
-    { ten: 'Người', re: /^(người|nhân sự|nhân viên|phụ trách|đảm nhiệm|trưởng ca|người phụ trách|nv\b)/ },
-    { ten: 'Ca', re: /^(ca|ca sx|ca làm việc)$/ },
-    { ten: 'Công đoạn', re: /^công đoạn$/ },
+    { ten: 'máy', re: /^(máy|mã máy|máy đúc|line|dây chuyền)$/ },
+    { ten: 'mã SP', re: /^(mã sp|mã sản phẩm|sản phẩm|sp|mã hàng)$/ },
+    { ten: 'khuôn', re: /^(khuôn|số khuôn|mã khuôn)$/ },
+    { ten: 'người', re: /^(người|nhân sự|nhân viên|phụ trách|đảm nhiệm|trưởng ca|người phụ trách|nv\b)/ },
+    { ten: 'ca', re: /^(ca|ca sx|ca làm việc)$/ },
+    { ten: 'công đoạn', re: /^công đoạn$/ },
   ];
-  const NUT_TOI_DA = 12, GIA_TRI_TOI_DA = 60;
+  const GIA_TRI_TOI_DA = 60;
   function timNhom(tb, hdr, loc){
     const rows = dongDuLieu(tb, hdr), n = soCot(hdr);
     const day = rows.filter(r => soCot(r) >= Math.ceil(n / 2));
@@ -220,7 +214,7 @@
       const ten = (c.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
       const g = span === 1 && NHOM_NHANH.find(x => x.re.test(ten));
       if (g && !out.some(o => o.ten === g.ten)) {
-        // Số đếm theo các lọc đang chọn ở CỘT KHÁC (giá trị hết dòng → 0, làm mờ).
+        // Số đếm theo các lọc đang chọn ở CỘT KHÁC (giống Excel).
         const dem = new Map(), khac = cots.filter(x => x !== cot);
         day.forEach(r => {
           const v = giaTri(oTaiCot(r, cot)); if (v === '') return;
@@ -235,7 +229,7 @@
     });
     return out;
   }
-  // Thanh lọc nhanh đặt ngay trên khung cuộn (ngoài khung → luôn hiện khi cuộn bảng).
+  // Hàng lọc nhanh đặt ngay trên khung cuộn (ngoài khung → luôn hiện khi cuộn bảng).
   function neo(tb){
     if (tb.parentElement.classList.contains('bd-khung')) return tb.parentElement;
     for (let e = tb.parentElement; e && e !== document.body; e = e.parentElement) {
@@ -244,48 +238,41 @@
     }
     return tb;
   }
+  // Trang đã có ô lọc riêng ngay trên bảng (>= 2 ô chọn / ô tìm trong 3 phần tử liền trước).
+  function coLocRieng(a){
+    let e = a.previousElementSibling, k = 0;
+    for (; e && k < 3; e = e.previousElementSibling, k++) {
+      if (e.classList.contains('bd-nhanh')) continue;
+      if (e.querySelectorAll('select, input[type=search]').length >= 2) return true;
+    }
+    return false;
+  }
   function veNhanh(tb, hdr){
     const a = neo(tb);
     let bar = a.previousElementSibling && a.previousElementSibling.classList.contains('bd-nhanh') ? a.previousElementSibling : null;
     const loc = boLocTheoBang.get(chuKy(hdr)) || {};
     const rows = dongDuLieu(tb, hdr);
-    const nhom = rows.length >= MIN_DONG_LOC ? timNhom(tb, hdr, loc) : [];
+    const nhom = rows.length >= MIN_DONG_LOC && !coLocRieng(a) ? timNhom(tb, hdr, loc) : [];
     if (!nhom.length) { if (bar) bar.remove(); return; }
     const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
     const html = nhom.map((g, gi) => {
-      const s = loc[g.cot];
-      if (g.vals.length <= NUT_TOI_DA) {
-        return '<span class="bd-nhom"><b>' + g.ten + '</b>' +
-          '<button type="button" class="bd-chip' + (s ? '' : ' on') + '" data-g="' + gi + '" data-i="-1">Tất cả</button>' +
-          g.vals.map(([v, c], i) => '<button type="button" class="bd-chip' + (s && s.has(v) ? ' on' : '') + (c ? '' : ' het') + '" data-g="' + gi + '" data-i="' + i +
-            '" title="Bấm để lọc — giữ Ctrl để chọn thêm">' + esc(v) + '<small>' + c + '</small></button>').join('') + '</span>';
-      }
-      const mot = s && s.size === 1 ? [...s][0] : null;
-      return '<span class="bd-nhom"><b>' + g.ten + '</b><select class="' + (s ? 'on' : '') + '" data-g="' + gi + '">' +
-        '<option value="-1">Tất cả (' + g.vals.length + ')</option>' +
-        (s && !mot ? '<option value="-2" selected>' + s.size + ' giá trị đã chọn</option>' : '') +
+      const s = loc[g.cot], mot = s && s.size === 1 ? [...s][0] : null;
+      return '<select class="' + (s ? 'on' : '') + '" data-g="' + gi + '" title="Lọc theo ' + g.ten + '">' +
+        '<option value="-1">Mọi ' + g.ten + '</option>' +
+        (s && !mot ? '<option value="-2" selected>' + s.size + ' ' + g.ten + ' đã chọn</option>' : '') +
         g.vals.map(([v, c], i) => '<option value="' + i + '"' + (v === mot ? ' selected' : '') + '>' + esc(v) + ' (' + c + ')</option>').join('') +
-        '</select></span>';
+        '</select>';
     }).join('') + (Object.keys(loc).length
-      ? '<span class="bd-dem">Đang hiện <b>' + rows.filter(r => !r.classList.contains('bd-an')).length + '</b> / ' + rows.length + ' dòng</span>' +
-        '<button type="button" class="bd-xoa" data-xoa>✕ Bỏ tất cả lọc</button>'
+      ? '<span class="bd-dem">Hiện <b>' + rows.filter(r => !r.classList.contains('bd-an')).length + '</b> / ' + rows.length + ' dòng</span>' +
+        '<button type="button" class="bd-xoa" data-xoa>✕ Bỏ lọc</button>'
       : '');
     if (!bar) {
       bar = document.createElement('div');
       bar.className = 'bd-nhanh';
       a.parentNode.insertBefore(bar, a);
       bar.addEventListener('click', e => {
-        const t = e.target.closest('.bd-chip,.bd-xoa'); if (!t) return;
-        const b = bar._tb;
-        if (t.dataset.xoa != null) { boLocTheoBang.delete(chuKy(dongTieuDe(b))); apLoc(b); return; }
-        const g = bar._nhom[+t.dataset.g], i = +t.dataset.i;
-        if (i < 0) return datLoc(b, g.cot, null);
-        const v = g.vals[i][0];
-        const cu = (boLocTheoBang.get(chuKy(dongTieuDe(b))) || {})[g.cot];
-        let s;
-        if (e.ctrlKey || e.metaKey) { s = new Set(cu || []); s.has(v) ? s.delete(v) : s.add(v); }
-        else s = cu && cu.size === 1 && cu.has(v) ? null : new Set([v]);
-        datLoc(b, g.cot, s);
+        if (!e.target.closest('.bd-xoa')) return;
+        boLocTheoBang.delete(chuKy(dongTieuDe(bar._tb))); apLoc(bar._tb);
       });
       bar.addEventListener('change', e => {
         const t = e.target.closest('select'); if (!t) return;
