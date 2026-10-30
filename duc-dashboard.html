@@ -599,6 +599,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div style="color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em" id="cp-current-info-label">SẢN PHẨM HIỆN TẠI</div>
         <div id="cp-current-info" style="font-weight:600;margin-top:4px">—</div>
       </div>
+      <div id="cp-su-co-warn" style="display:none;margin-top:8px;background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.45"></div>
 
       <div class="field">
         <label>Mã sản phẩm mới <span class="req">*</span></label>
@@ -2346,9 +2347,9 @@ function makeRowHTML(row, stateClass, isActive){
   const pct = row.kh_ca > 0 ? Math.round((row.tt_ca / row.kh_ca) * 100) : 0;
   const progressClass = pct >= 80 ? '' : (pct >= 40 ? 'low' : 'crit');
 
-  const canSwap = isActive && !row.open_gio_phat_sinh;
+  const canSwap = isActive;   // T188: đang có sự cố vẫn đổi SP được
   const swapBtn = canSwap
-    ? '<button class="btn-swap-inline" title="Đổi sản phẩm" onclick=\'openChangeProductModal(' + JSON.stringify(row.id_dong) + ')\'>⇄</button>'
+    ? '<button class="btn-swap-inline" title="' + (row.open_gio_phat_sinh ? 'Đổi sản phẩm (sự cố chưa xử lý xong)' : 'Đổi sản phẩm') + '" onclick=\'openChangeProductModal(' + JSON.stringify(row.id_dong) + ')\'>⇄</button>'
     : '';
   const closedBadge = !isActive ? '<span class="badge-closed">SP đã kết thúc</span>' : '';
 
@@ -3482,10 +3483,8 @@ async function submitResolve(){
 async function openChangeProductModal(idDong){
   const row = state.rows.find(r => r.id_dong === idDong);
   if (!row) return;
-  if (row.open_gio_phat_sinh) return showToast('Dòng này đang có sự cố mở — xử lý xong mới đổi SP được', true);
   const partner = row.khuon_kep_voi ? state.rows.find(r => r.id_dong === row.khuon_kep_voi) : null;
   if (row.khuon_kep_voi && !partner) return showToast('Không tìm thấy dòng ghép cặp khuôn kép — báo kỹ thuật', true);
-  if (partner && partner.open_gio_phat_sinh) return showToast('Dòng ghép cặp (' + partner.ma_sp + ') đang có sự cố mở — xử lý xong mới đổi SP được', true);
   if (!(await ensureAuth())) return;
   state.currentTarget = { id_dong: idDong, ma_may: row.ma_may, isPairOut: !!partner, so_khuon: row.so_khuon };
 
@@ -3514,6 +3513,18 @@ async function openChangeProductModal(idDong){
   document.getElementById('cp-gio-bat-dau').value = nowStr;
   document.getElementById('cp-gio-bat-dau').max = nowStr;
   document.getElementById('cp-dam-nhiem').value = '';
+
+  // T188: đang có sự cố mở → báo trước hệ thống sẽ kết thúc sự cố tại giờ đổi khuôn
+  const dsSuCo = suCoMoCuaDong(row).concat(partner ? suCoMoCuaDong(partner) : []);
+  document.getElementById('cp-gio-bat-dau').min = dsSuCo.length
+    ? toLocalInputValue(new Date(Math.max(...dsSuCo.map(s => new Date(s.open_gio_phat_sinh).getTime())))) : '';
+  const warn = document.getElementById('cp-su-co-warn');
+  warn.innerHTML = dsSuCo.length
+    ? '⚠ Đang có sự cố mở: <b>' + dsSuCo.map(s => escapeHtml((s.open_id_su_co || '') + ' ' + (s.open_loai_su_co || ''))).join(', ') + '</b>.<br>' +
+      'Đổi SP sẽ <b>kết thúc sự cố tại giờ bắt đầu đổi khuôn</b> (ghi thời gian dừng đến lúc đó, ghi chú "chưa xử lý xong"). ' +
+      'Sự cố khuôn / chất lượng: khuôn <b>' + escapeHtml(row.so_khuon || '') + '</b> chuyển tổ khuôn xử lý dứt điểm — chưa ghi xử lý thì không lên lại máy được.'
+    : '';
+  warn.style.display = dsSuCo.length ? '' : 'none';
 
   document.getElementById('cp-pair-toggle').checked = false;
   document.getElementById('cp-pair-block').style.display = 'none';
