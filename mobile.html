@@ -292,6 +292,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 <div class="screen" id="scr-changeproduct">
   <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">⇄ Đổi sản phẩm</div></div>
   <div class="form-wrap">
+    <div id="cp-su-co-warn" class="hidden" style="background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45"></div>
     <div class="field ac-field">
       <label>Mã sản phẩm mới <span class="req">*</span></label>
       <input type="text" id="cp-ma-sp" placeholder="Chạm để chọn hoặc gõ tìm" autocomplete="off">
@@ -1115,6 +1116,8 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
     if (suCoList.length < SU_CO_MO_TOI_DA) {
       btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo thêm sự cố (${suCoList.length}/${SU_CO_MO_TOI_DA})<span class="chev">›</span></button>`);
     }
+    // T188: sự cố lớn chưa xử lý ngay được → đổi sang khuôn khác cho máy chạy
+    btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm (sự cố chưa xong)<span class="chev">›</span></button>`);
   } else {
     btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo sự cố<span class="chev">›</span></button>`);
     btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm<span class="chev">›</span></button>`);
@@ -1314,6 +1317,18 @@ async function openChangeProductScreen(){
   document.getElementById('cp-gio').value = nowStr;
   document.getElementById('cp-gio').max = nowStr;
   document.getElementById('cp-dam-nhiem').value = '';
+  // T188: đang có sự cố mở → báo trước hệ thống sẽ kết thúc sự cố tại giờ đổi khuôn
+  const row = state.rows.find(r => r.id_dong === state.currentIdDong);
+  const warn = document.getElementById('cp-su-co-warn');
+  const dsSuCo = row && row.open_gio_phat_sinh ? suCoMoCuaDongM(row) : [];
+  document.getElementById('cp-gio').min = dsSuCo.length
+    ? toLocalInputValue(new Date(Math.max(...dsSuCo.map(s => new Date(s.open_gio_phat_sinh).getTime())))) : '';
+  warn.innerHTML = dsSuCo.length
+    ? '⚠ Đang có sự cố mở: <b>' + dsSuCo.map(s => escapeHtml((s.open_id_su_co || '') + ' ' + (s.open_loai_su_co || ''))).join(', ') + '</b>.<br>' +
+      'Đổi SP sẽ <b>kết thúc sự cố tại giờ bắt đầu đổi khuôn</b> (ghi thời gian dừng đến lúc đó, ghi chú "chưa xử lý xong"). ' +
+      'Sự cố khuôn / chất lượng: khuôn <b>' + escapeHtml(row.so_khuon || '') + '</b> chuyển tổ khuôn xử lý dứt điểm — chưa ghi xử lý thì không lên lại máy được.'
+    : '';
+  warn.classList.toggle('hidden', !dsSuCo.length);
   showScreen('scr-changeproduct');
 }
 async function submitChangeProductMobile(){
