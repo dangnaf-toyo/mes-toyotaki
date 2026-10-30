@@ -94,7 +94,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .btn-danger:disabled{background:#F3F4F6;border-color:var(--border);color:var(--text-dim);cursor:not-allowed}
 .live-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:500}
 .live-dot{width:6px;height:6px;background:#10B981;border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
-.table-wrap{background:var(--bg-panel);border-radius:8px;overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);flex:1}
+.table-wrap{background:var(--bg-panel);border-radius:8px;overflow:auto;border:1px solid var(--border);box-shadow:var(--shadow-sm);flex:1}
 .row-head,.row{display:grid;grid-template-columns:
   5px
   clamp(65px, 53.57px + 1.116vw, 75px)
@@ -114,7 +114,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
-.row-head{align-items:center;background:var(--bg-sunken);padding:5px 0;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.row-head{position:sticky;top:0;z-index:4;align-items:center;background:var(--bg-sunken);padding:5px 0;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
 .row-head>div{padding:0 8px}
 .row{min-height:42px;position:relative;transition:background .15s}
 .row:last-child{border-bottom:none}
@@ -2340,7 +2340,19 @@ function renderTable(){
   });
 
   updateTimers();
+  datCaoBangMay();
 }
+
+// T189: danh sách máy cuộn trong khung cao vừa phần màn hình còn lại — hàng tiêu đề
+// (.row-head, sticky) và các bộ lọc / tóm tắt phía trên luôn hiện.
+function datCaoBangMay(){
+  const w = document.querySelector('.table-wrap');
+  if (!w) return;
+  if (window.innerWidth < 700) { w.style.maxHeight = ''; return; }
+  const top = w.getBoundingClientRect().top + window.scrollY;
+  w.style.maxHeight = Math.max(300, Math.floor(window.innerHeight - top - 8)) + 'px';
+}
+window.addEventListener('resize', datCaoBangMay);
 
 function makeRowHTML(row, stateClass, isActive){
   const inc = state.incidents.filter(i => i.ma_may === row.ma_may && i.ma_sp === row.ma_sp);
