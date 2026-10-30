@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo tuần tổ khuôn — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!--
+  bao-cao-to-khuon-tuan.html — T193: báo cáo quản trị tuần của tổ khuôn, tính
+  TRỰC TIẾP từ dữ liệu gốc mỗi lần mở (không lưu số). Chỉ đọc.
+    - Kế hoạch bảo dưỡng: duc_khuon_bd_kh_tuan (dòng KH) ↔ duc_khuon_checksheet
+      (id_ke_hoach, trang_thai='hoan_thanh' = đã làm; ngay_thuc_hien > ngay = trễ).
+      Kết quả: ket_luan + hang_muc[].ket_qua (OK / NG / NA), thoi_gian_dung_phut.
+    - Vấn đề khuôn: duc_van_de_khuon (ngay_phat_hien trong tuần, lan_tai_phat).
+    - Sự cố khuôn / chất lượng A2 · B1 · F1: duc_su_co_log (gộp theo id_su_co)
+      + phiếu xử lý tổ khuôn duc_khuon_xu_ly_bat_thuong.
+    - Linh kiện dự phòng: khuon_lk_danh_muc (tồn chờ sử dụng vs tồn tối thiểu)
+      + khuon_lk_giao_dich trong tuần.
+    - Tình trạng shot khuôn: duc_shot_khuon (cùng công thức khuon-ds.js).
+  Biểu đồ QC: P-chart % hoàn thành KH (12 tuần, giới hạn nhị thức theo n từng
+  tuần), C-chart số vấn đề khuôn mới / tuần (c̄ ± 3√c̄), Pareto vấn đề theo khuôn
+  (một trục 0–100%: cột = tỷ trọng, đường = luỹ kế), histogram thời gian xử lý.
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);
+  /* biểu đồ: thứ tự màu cố định (dataviz palette) + màu trạng thái dành riêng */
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--grid:#E7EBF0;--good:#16A34A;--warn:#F59E0B;--bad:#DC2626;--muted-mark:#CBD5E1}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2;white-space:nowrap}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
+.week-nav{display:flex;align-items:center;gap:6px}
+.week-nav button,.btn-ghost{border:1px solid #475569;background:#334155;border-radius:5px;padding:6px 10px;font-family:inherit;font-size:12.5px;cursor:pointer;font-weight:600;color:#F1F5F9}
+.week-nav button:hover,.btn-ghost:hover{background:#3F5266}
+.week-label{font-size:12.5px;font-weight:700;color:#F1F5F9;white-space:nowrap}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:10px 12px}
+.card-title{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.card-title small{font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-dim)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+@media (max-width:1100px){.grid2,.grid3{grid-template-columns:1fr}}
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}}
+.kpi{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:var(--shadow-sm);border-top:3px solid var(--border-strong)}
+.kpi.good{border-top-color:var(--good)}.kpi.warn{border-top-color:var(--warn)}.kpi.bad{border-top-color:var(--bad)}
+.kpi .lbl{font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi .val{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:2px}
+.kpi .val small{font-size:13px;color:var(--text-muted);font-weight:600}
+.kpi .sub{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.kpi .sub b{color:var(--text)}
+.st{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;white-space:nowrap}
+.st.good{color:var(--run-fg)}.st.warn{color:var(--warn-fg)}.st.bad{color:var(--alarm-fg)}.st.muted{color:var(--text-muted)}
+/* bảng */
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:6px;max-height:420px}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--border);padding:5px 7px;text-align:left;vertical-align:top}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;position:sticky;top:0;z-index:2;white-space:nowrap}
+td.num,th.num{text-align:right;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+td.nowrap{white-space:nowrap}
+.empty{color:var(--text-dim);font-style:italic;padding:14px;text-align:center}
+.mute{color:var(--text-muted)}
+/* biểu đồ */
+.chart{width:100%;max-width:860px;height:auto;display:block;margin:0 auto}
+.chart text{font-family:'Inter',sans-serif;font-size:10.5px;fill:var(--text-muted)}
+.chart .lbl-strong{fill:var(--text);font-weight:700}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text-muted);margin:2px 0 6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.legend i.line{height:2px;border-radius:1px;vertical-align:3px;width:14px}
+.legend i.dash{height:0;border-top:2px dashed var(--bad);border-radius:0;vertical-align:3px;width:14px;background:none}
+.note{font-size:11.5px;color:var(--text-muted);margin-top:6px;line-height:1.45}
+.note b{color:var(--text)}
+#tip{position:fixed;z-index:1000;pointer-events:none;background:#0F172A;color:#F8FAFC;font-size:11.5px;line-height:1.4;padding:6px 9px;border-radius:6px;box-shadow:0 6px 18px rgba(15,23,42,.25);max-width:320px;display:none;white-space:pre-line}
+#msg{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:999}
+.loading{padding:40px;text-align:center;color:var(--text-muted)}
+@media print{header nav,.week-nav,#btnIn,.header-clock{display:none}body{background:#fff}.card,.kpi{break-inside:avoid;box-shadow:none}.tbl-wrap{max-height:none;overflow:visible}}
+</style>
+</head>
+<body>
+<div id="tip"></div>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="co">Toyotaki</div><div class="title">Tổ khuôn</div></div>
+    <nav data-subtabs="to_khuon"></nav>
+    <div class="header-divider"></div>
+    <div class="week-nav">
+      <button type="button" id="btnPrev" title="Tuần trước">‹ Trước</button>
+      <div class="week-label" id="weekLabel">—</div>
+      <button type="button" id="btnNext" title="Tuần sau">Sau ›</button>
+    </div>
+    <button type="button" class="btn-ghost" id="btnNay">Tuần này</button>
+    <button type="button" class="btn-ghost" id="btnIn" title="In / lưu PDF">🖨 In</button>
+    <div class="header-clock"><div class="date" id="ckDate"></div><div class="time" id="ckTime"></div></div>
+  </header>
+  <div id="noiDung"><div class="card loading">Đang tải báo cáo…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js?v=T169"></script>
+<script src="shared/navbar.js"></script>
+<script>
+'use strict';
+// ── Tiện ích ──────────────────────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const dm = s => { if (!s) return '—'; const [y, m, d] = String(s).slice(0, 10).split('-'); return d + '/' + m; };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => (Number(n) || 0).toLocaleString('vi-VN');
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const gio = ph => { ph = Math.round(Number(ph) || 0); return ph < 60 ? ph + ' phút' : Math.floor(ph / 60) + ' giờ' + (ph % 60 ? ' ' + ph % 60 + "'" : ''); };
+function mondayOf(d){ const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); const w = (x.getDay() + 6) % 7; return addDays(x, -w); }
+const THU = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const MOLD = { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000, WARN_RATIO: 0.8 };   // = khuon-ds.js
+const SO_TUAN_XU_HUONG = 12;
+
+let tuan = (() => {
+  const q = new URLSearchParams(location.search).get('tuan');
+  return mondayOf(q ? new Date(q + 'T00:00:00') : new Date());
+})();
+
+// ── Tooltip (hover cho mọi phần tử có data-tip) ───────────────────────────────
+const tip = document.getElementById('tip');
+document.addEventListener('mousemove', e => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (!t) { tip.style.display = 'none'; return; }
+  tip.textContent = t.getAttribute('data-tip');
+  tip.style.display = 'block';
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - w - 8) + 'px';
+  tip.style.top = (e.clientY + 16 + h > innerHeight ? e.clientY - h - 10 : e.clientY + 16) + 'px';
+});
+
+// ── Biểu đồ SVG (một trục, nét mảnh, đầu cột bo 4px, có hover) ────────────────
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(w, h){ return '<svg class="chart" viewBox="0 0 ' + w + ' ' + h + '">'; }
+// Cột bo 4px ở đầu dữ liệu, vuông ở chân.
+function cot(x, y, w, h, fill, tipTxt){
+  if (h <= 0) return '';
+  const r = Math.min(4, h, w / 2);
+  const d = 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + w - r) +
+    'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z';
+  return '<path d="' + d + '" fill="' + fill + '"' + (tipTxt ? ' data-tip="' + esc(tipTxt) + '"' : '') + '/>';
+}
+function trucY(x0, x1, yOf, ticks, fmtT){
+  return ticks.map(t => '<line x1="' + x0 + '" x2="' + x1 + '" y1="' + yOf(t) + '" y2="' + yOf(t) + '" stroke="var(--grid)" stroke-width="1"/>' +
+    '<text x="' + (x0 - 6) + '" y="' + (yOf(t) + 3.5) + '" text-anchor="end">' + fmtT(t) + '</text>').join('');
+}
+function tickDep(max){
+  if (max <= 5) return [0, 1, 2, 3, 4, 5].filter(t => t <= Math.max(1, Math.ceil(max)));
+  const buoc = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500].find(b => max / b <= 5) || 1000;
+  const out = []; for (let t = 0; t <= max + buoc * 0.001; t += buoc) out.push(t);
+  if (out[out.length - 1] < max) out.push(out[out.length - 1] + buoc);
+  return out;
+}
+
+// Biểu đồ kiểm soát (P-chart / C-chart): đường dữ liệu + CL + UCL/LCL bậc thang theo n.
+// pts: [{lbl, v, ucl, lcl, tip, cur}] — v theo đơn vị trục (0..1 với P, số đếm với C).
+function veKiemSoat(pts, cl, opts){
+  const W = 640, H = 230, L = 40, R = 52, T = 14, B = 26;
+  const vmax = opts.max != null ? opts.max : Math.max(1, ...pts.map(p => Math.max(p.v ?? 0, p.ucl ?? 0))) * 1.08;
+  const ticks = opts.ticks || tickDep(vmax);
+  const top = Math.max(vmax, ticks[ticks.length - 1]);
+  const yOf = v => T + (H - T - B) * (1 - v / top);
+  const step = (W - L - R) / Math.max(1, pts.length);
+  const xOf = i => L + step * (i + 0.5);
+  let s = svgEl(W, H) + trucY(L, W - R, yOf, ticks, opts.fmtT);
+  // UCL / LCL bậc thang
+  const thang = key => {
+    let d = '';
+    pts.forEach((p, i) => { if (p[key] == null) return; const y = yOf(p[key]); d += (d ? 'L' : 'M') + (xOf(i) - step / 2) + ',' + y + 'L' + (xOf(i) + step / 2) + ',' + y; });
+    return d ? '<path d="' + d + '" fill="none" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="5 4"/>' : '';
+  };
+  s += thang('ucl') + thang('lcl');
+  s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yOf(cl) + '" y2="' + yOf(cl) + '" stroke="var(--text-muted)" stroke-width="1.5"/>';
+  s += '<text x="' + (W - R + 4) + '" y="' + (yOf(cl) + 3.5) + '" class="lbl-strong">CL ' + opts.fmtT(cl, true) + '</text>';
+  const last = pts.filter(p => p.ucl != null).slice(-1)[0];
+  if (last) {
+    s += '<text x="' + (W - R + 4) + '" y="' + (yOf(last.ucl) + 3.5) + '">UCL</text>';
+    if (last.lcl != null && last.lcl > 0) s += '<text x="' + (W - R + 4) + '" y="' + (yOf(last.lcl) + 3.5) + '">LCL</text>';
+  }
+  // đường dữ liệu
+  const co = pts.map((p, i) => p.v == null ? null : [xOf(i), yOf(p.v)]);
+  let d = ''; co.forEach(c => { if (c) d += (d ? 'L' : 'M') + c[0] + ',' + c[1]; else d += ''; });
+  s += '<path d="' + d + '" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  pts.forEach((p, i) => {
+    s += '<text x="' + xOf(i) + '" y="' + (H - 8) + '" text-anchor="middle"' + (p.cur ? ' class="lbl-strong"' : '') + '>' + esc(p.lbl) + '</text>';
+    if (p.v == null) return;
+    const ngoai = (p.ucl != null && p.v > p.ucl + 1e-9) || (p.lcl != null && p.v < p.lcl - 1e-9);
+    s += '<circle cx="' + xOf(i) + '" cy="' + yOf(p.v) + '" r="' + (p.cur ? 6 : 4.5) + '" fill="' + (ngoai ? 'var(--bad)' : 'var(--s1)') +
+      '" stroke="#fff" stroke-width="2"/>';
+    s += '<rect x="' + (xOf(i) - step / 2) + '" y="' + T + '" width="' + step + '" height="' + (H - T - B) + '" fill="transparent" data-tip="' +
+      esc(p.tip + (ngoai ? '\n⚠ Ngoài giới hạn kiểm soát' : '')) + '"/>';
+  });
+  return s + '</svg>';
+}
+
+// Pareto một trục 0–100%: cột = tỷ trọng từng mục, đường = luỹ kế; vạch 80%.
+function vePareto(items, tongTxt){
+  const W = 640, H = 240, L = 40, R = 14, T = 12, B = 58;
+  const tong = items.reduce((a, x) => a + x.n, 0) || 1;
+  const yOf = v => T + (H - T - B) * (1 - v / 100);
+  const step = (W - L - R) / Math.max(1, items.length), bw = Math.min(24, step * 0.6);
+  let s = svgEl(W, H) + trucY(L, W - R, yOf, [0, 20, 40, 60, 80, 100], t => t + '%');
+  s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yOf(80) + '" y2="' + yOf(80) + '" stroke="var(--warn)" stroke-width="1"/>';
+  let luyKe = 0, d = '';
+  items.forEach((it, i) => {
+    const x = L + step * i + (step - bw) / 2, ty = it.n / tong * 100;
+    luyKe += ty;
+    s += cot(x, yOf(ty), bw, yOf(0) - yOf(ty), it.color || 'var(--s1)', it.lbl + ': ' + it.n + ' ' + tongTxt + ' (' + Math.round(ty) + '%)\nLuỹ kế ' + Math.round(luyKe) + '%' + (it.tip ? '\n' + it.tip : ''));
+    s += '<text x="' + (x + bw / 2) + '" y="' + (yOf(ty) - 4) + '" text-anchor="middle" class="lbl-strong">' + it.n + '</text>';
+    const lx = L + step * (i + 0.5);
+    s += '<text transform="translate(' + lx + ',' + (H - B + 12) + ') rotate(-35)" text-anchor="end">' + esc(it.lbl.length > 16 ? it.lbl.slice(0, 15) + '…' : it.lbl) + '</text>';
+    d += (d ? 'L' : 'M') + lx + ',' + yOf(luyKe);
+  });
+  s += '<path d="' + d + '" fill="none" stroke="var(--s2)" stroke-width="2" stroke-linejoin="round"/>';
+  luyKe = 0;
+  items.forEach((it, i) => { luyKe += it.n / tong * 100; s += '<circle cx="' + (L + step * (i + 0.5)) + '" cy="' + yOf(luyKe) + '" r="4" fill="var(--s2)" stroke="#fff" stroke-width="2"/>'; });
+  return s + '</svg>';
+}
+
+// Thanh ngang xếp chồng (phân tầng): rows [{lbl, parts:[{v,color,name}]}]; khe 2px giữa đoạn.
+function veXepChong(rows, donVi){
+  const W = 640, rowH = 26, L = 150, R = 50, T = 4;
+  const H = T + rows.length * rowH + 6;
+  const max = Math.max(1, ...rows.map(r => r.parts.reduce((a, p) => a + p.v, 0)));
+  const sc = (W - L - R) / max;
+  let s = svgEl(W, H);
+  rows.forEach((r, i) => {
+    const y = T + i * rowH + 5, h = 16;
+    s += '<text x="' + (L - 8) + '" y="' + (y + 12) + '" text-anchor="end" class="lbl-strong">' + esc(r.lbl.length > 22 ? r.lbl.slice(0, 21) + '…' : r.lbl) + '</text>';
+    let x = L; const tong = r.parts.reduce((a, p) => a + p.v, 0);
+    r.parts.forEach(p => {
+      if (!p.v) return;
+      const w = Math.max(2, p.v * sc - 2);
+      s += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="2" fill="' + p.color + '" data-tip="' + esc(r.lbl + '\n' + p.name + ': ' + fmt(p.v) + ' ' + donVi) + '"/>';
+      x += p.v * sc;
+    });
+    s += '<text x="' + (x + 6) + '" y="' + (y + 12) + '">' + fmt(tong) + '</text>';
+  });
+  return s + '</svg>';
+}
+
+// Histogram (phân bố) — cột liền nhau cách khe 2px.
+function veHistogram(vals, bins, donVi){
+  const W = 640, H = 200, L = 34, R = 10, T = 14, B = 30;
+  const dem = bins.map(b => vals.filter(v => v >= b.tu && v < b.den).length);
+  const max = Math.max(1, ...dem), ticks = tickDep(max), top = ticks[ticks.length - 1];
+  const yOf = v => T + (H - T - B) * (1 - v / top);
+  const step = (W - L - R) / bins.length;
+  let s = svgEl(W, H) + trucY(L, W - R, yOf, ticks, t => t);
+  bins.forEach((b, i) => {
+    const x = L + step * i + 1;
+    s += cot(x, yOf(dem[i]), step - 2, yOf(0) - yOf(dem[i]), 'var(--s3)', b.lbl + ': ' + dem[i] + ' ' + donVi);
+    if (dem[i]) s += '<text x="' + (x + step / 2) + '" y="' + (yOf(dem[i]) - 4) + '" text-anchor="middle" class="lbl-strong">' + dem[i] + '</text>';
+    s += '<text x="' + (x + step / 2) + '" y="' + (H - 10) + '" text-anchor="middle">' + esc(b.lbl) + '</text>';
+  });
+  return s + '</svg>';
+}
+
+// Cột theo ngày: KH (nền nhạt) + đã làm (đậm) — dạng cột chồng có khe.
+function veTheoNgay(ngay){
+  const W = 640, H = 200, L = 30, R = 10, T = 14, B = 28;
+  const max = Math.max(1, ...ngay.map(n => n.kh)), ticks = tickDep(max), top = ticks[ticks.length - 1];
+  const yOf = v => T + (H - T - B) * (1 - v / top);
+  const step = (W - L - R) / 7, bw = Math.min(24, step * 0.45);
+  let s = svgEl(W, H) + trucY(L, W - R, yOf, ticks, t => t);
+  ngay.forEach((n, i) => {
+    const x = L + step * i + (step - bw) / 2;
+    const parts = [['Xong đúng hạn', n.dung, 'var(--good)'], ['Xong trễ', n.tre, 'var(--warn)'], ['Chưa làm (quá hạn)', n.chua, 'var(--bad)'], ['Chưa đến hạn', n.sau, 'var(--muted-mark)']];
+    let y0 = yOf(0);
+    parts.forEach(([ten, v, c], k) => {
+      if (!v) return;
+      const h = yOf(0) - yOf(v);
+      const laDinh = parts.slice(k + 1).every(p => !p[1]);
+      const tipTxt = THU[i] + ' ' + dm(n.ngay) + '\n' + ten + ': ' + v + ' / KH ' + n.kh + ' khuôn';
+      s += laDinh ? cot(x, y0 - h, bw, h - (y0 < yOf(0) ? 2 : 0), c, tipTxt)
+        : '<rect x="' + x + '" y="' + (y0 - h + 2) + '" width="' + bw + '" height="' + Math.max(0, h - 2) + '" fill="' + c + '" data-tip="' + esc(tipTxt) + '"/>';
+      y0 -= h;
+    });
+    if (n.kh) s += '<text x="' + (x + bw / 2) + '" y="' + (yOf(n.kh) - 4) + '" text-anchor="middle" class="lbl-strong">' + n.kh + '</text>';
+    s += '<text x="' + (x + bw / 2) + '" y="' + (H - 10) + '" text-anchor="middle"' + (n.homNay ? ' class="lbl-strong"' : '') + '>' + THU[i] + ' ' + dm(n.ngay) + '</text>';
+  });
+  return s + '</svg>';
+}
+
+// ── Tải dữ liệu ───────────────────────────────────────────────────────────────
+async function tai(){
+  const tu = ymd(tuan), den = ymd(addDays(tuan, 7));
+  const tuXH = ymd(addDays(tuan, -7 * (SO_TUAN_XU_HUONG - 1)));
+  const [kh, vd, sc, lk, gd, shot] = await Promise.all([
+    sbTaiHet(() => sb.from('duc_khuon_bd_kh_tuan').select('*').gte('tuan_bat_dau', tuXH).lte('tuan_bat_dau', tu).order('id')),
+    sbTaiHet(() => sb.from('duc_van_de_khuon').select('id_van_de,ma_khuon,ngay_phat_hien,ma_may,ma_sp,mo_ta,trang_thai,lan_tai_phat,id_su_co,nguoi_xu_ly,ngay_xu_ly,noi_dung_xu_ly')
+      .gte('ngay_phat_hien', tuXH).lt('ngay_phat_hien', den).order('id_van_de')),
+    sbTaiHet(() => sb.from('duc_su_co_log').select('id_su_co,ngay,ma_may,ma_sp,so_khuon,loai_su_co,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut,van_de')
+      .gte('ngay', tu).lt('ngay', den).not('id_su_co', 'is', null).order('id_ban_ghi')),
+    sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,don_vi,ton_toi_thieu,ton_cho_su_dung,ton_cho_sua,lead_time_ngay').eq('dang_dung', true),
+    sb.from('khuon_lk_giao_dich').select('loai,ma_lk,ten_lk,so_luong,ma_khuon,muc_dich,thoi_diem,nguoi')
+      .gte('thoi_diem', tu + 'T00:00:00+07:00').lt('thoi_diem', den + 'T00:00:00+07:00').order('thoi_diem'),
+    sb.from('duc_shot_khuon').select('ma_khuon,tong_shot_luy_ke,nguong_bao_duong,nguong_lam_moi,shot_tai_lan_bao_duong_gan_nhat,tinh_trang'),
+  ]);
+  for (const r of [kh, vd, sc, lk, gd, shot]) if (r.error) throw new Error(r.error.message);
+  const khIds = kh.data.map(r => r.id);
+  const cs = khIds.length ? await sbTaiTheoLo(khIds, ds => sb.from('duc_khuon_checksheet')
+    .select('id,id_ke_hoach,ma_khuon,loai,ngay_ke_hoach,ngay_thuc_hien,nguoi_thuc_hien,nguoi_thuc_hien_phu,thoi_gian_dung_phut,hang_muc,ket_luan,trang_thai,phu_tung_thay')
+    .in('id_ke_hoach', ds)) : { data: [] };
+  if (cs.error) throw new Error(cs.error.message);
+  const scA = sc.data.filter(r => ['A2', 'B1', 'F1'].includes(String(r.loai_su_co || '').slice(0, 2)));
+  const ids = [...new Set(scA.map(r => r.id_su_co))];
+  const xl = ids.length ? await sbTaiTheoLo(ids, ds => sb.from('duc_khuon_xu_ly_bat_thuong').select('*').in('id_su_co', ds)) : { data: [] };
+  if (xl.error) throw new Error(xl.error.message);
+  return { kh: kh.data, cs: cs.data, vd: vd.data, sc: scA, xl: xl.data, lk: lk.data, gd: gd.data, shot: shot.data };
+}
+
+// ── Tính toán ─────────────────────────────────────────────────────────────────
+function tinh(d){
+  const tu = ymd(tuan), homNay = ymd(new Date());
+  const csByKh = {}; d.cs.forEach(c => { if (c.trang_thai === 'hoan_thanh') csByKh[c.id_ke_hoach] = c; });
+  const trangThaiKh = r => {
+    const c = csByKh[r.id];
+    if (c) return c.ngay_thuc_hien && c.ngay_thuc_hien > r.ngay ? 'tre' : 'dung';
+    return r.ngay < homNay ? 'chua' : 'sau';
+  };
+  // Kế hoạch tuần đang xem
+  const khTuan = d.kh.filter(r => r.tuan_bat_dau === tu).map(r => Object.assign({}, r, { tt: trangThaiKh(r), cs: csByKh[r.id] || null }));
+  const ngay = THU.map((_, i) => {
+    const n = ymd(addDays(tuan, i)), rs = khTuan.filter(r => r.ngay === n);
+    return { ngay: n, homNay: n === homNay, kh: rs.length, dung: rs.filter(r => r.tt === 'dung').length, tre: rs.filter(r => r.tt === 'tre').length,
+      chua: rs.filter(r => r.tt === 'chua').length, sau: rs.filter(r => r.tt === 'sau').length };
+  });
+  const xong = khTuan.filter(r => r.tt === 'dung' || r.tt === 'tre');
+  // Kết quả bảo dưỡng
+  const csTuan = xong.map(r => r.cs);
+  const hmNg = [];
+  csTuan.forEach(c => (c.hang_muc || []).forEach(h => { if (h && h.ket_qua === 'NG') hmNg.push({ khuon: c.ma_khuon, nd: h.noi_dung, nhom: h.nhom, gc: h.ghi_chu }); }));
+  const hmTong = csTuan.reduce((a, c) => a + (c.hang_muc || []).filter(h => h && h.ket_qua && h.ket_qua !== 'NA').length, 0);
+  const phutBd = csTuan.reduce((a, c) => a + (Number(c.thoi_gian_dung_phut) || 0), 0);
+  // P-chart 12 tuần (chỉ tính KH đã đến hạn — tuần hiện tại bỏ phần chưa đến ngày)
+  const tuans = [];
+  for (let k = SO_TUAN_XU_HUONG - 1; k >= 0; k--) tuans.push(ymd(addDays(tuan, -7 * k)));
+  const pW = tuans.map(w => {
+    const rs = d.kh.filter(r => r.tuan_bat_dau === w && trangThaiKh(r) !== 'sau');
+    return { w, n: rs.length, x: rs.filter(r => ['dung', 'tre'].includes(trangThaiKh(r))).length };
+  });
+  const sn = pW.reduce((a, p) => a + p.n, 0), sx = pW.reduce((a, p) => a + p.x, 0);
+  const pbar = sn ? sx / sn : 0;
+  // Vấn đề khuôn
+  const vdTuan = d.vd.filter(v => v.ngay_phat_hien >= tu);
+  const cW = tuans.map(w => ({ w, c: d.vd.filter(v => v.ngay_phat_hien >= w && v.ngay_phat_hien < ymd(addDays(new Date(w + 'T00:00:00'), 7))).length }));
+  const cbar = cW.reduce((a, x) => a + x.c, 0) / cW.length;
+  // Sự cố A2/B1/F1 gộp theo mã sự cố
+  const scMap = new Map();
+  d.sc.forEach(r => {
+    const x = scMap.get(r.id_su_co) || { id: r.id_su_co, loai: String(r.loai_su_co).slice(0, 2), may: r.ma_may, khuon: r.so_khuon, sp: r.ma_sp, van_de: r.van_de, ps: r.gio_phat_sinh, phut: 0 };
+    x.phut += Number(r.thoi_gian_dung_phut) || 0;
+    if (r.gio_phat_sinh < x.ps) x.ps = r.gio_phat_sinh;
+    scMap.set(r.id_su_co, x);
+  });
+  const xlBy = {}; d.xl.forEach(x => { xlBy[x.id_su_co] = x; });
+  const scDs = [...scMap.values()].map(s => {
+    const x = xlBy[s.id];
+    const tt = !x ? 'cho' : x.trang_thai === 'hoan_thanh' ? 'xong' : 'dang';
+    const phutXl = x && x.bat_dau && x.ket_thuc ? Math.max(0, (new Date(x.ket_thuc) - new Date(x.bat_dau)) / 60000) : null;
+    return Object.assign(s, { xl: x || null, tt, phutXl });
+  }).sort((a, b) => String(a.ps).localeCompare(String(b.ps)));
+  // Linh kiện
+  const lkDuoi = d.lk.filter(l => Number(l.ton_toi_thieu) > 0 && Number(l.ton_cho_su_dung) < Number(l.ton_toi_thieu))
+    .sort((a, b) => (Number(a.ton_cho_su_dung) / Number(a.ton_toi_thieu)) - (Number(b.ton_cho_su_dung) / Number(b.ton_toi_thieu)));
+  const lkHet = lkDuoi.filter(l => Number(l.ton_cho_su_dung) <= 0);
+  // Shot khuôn
+  const stShot = d.shot.filter(m => !m.tinh_trang || m.tinh_trang === 'dang_sx').map(m => {
+    const nb = Number(m.nguong_bao_duong) || MOLD.MAINTENANCE_SHOT, nl = Number(m.nguong_lam_moi) || MOLD.REPLACEMENT_SHOT;
+    const t = Number(m.tong_shot_luy_ke) || 0, s = t - (Number(m.shot_tai_lan_bao_duong_gan_nhat) || 0);
+    return t >= nl ? 'lm' : s >= nb ? 'bd' : s >= nb * MOLD.WARN_RATIO ? 'sap' : 'ok';
+  });
+  // Theo người
+  const ng = new Map();
+  const nguoi = ten => { ten = String(ten || '').trim() || '(chưa giao)'; if (!ng.has(ten)) ng.set(ten, { ten, kh: 0, dung: 0, tre: 0, chua: 0, sau: 0, phutBd: 0, xlXong: 0, xlDang: 0, phutXl: 0 }); return ng.get(ten); };
+  khTuan.forEach(r => { const p = nguoi(r.nguoi_phu_trach); p.kh++; p[r.tt]++; if (r.cs) p.phutBd += Number(r.cs.thoi_gian_dung_phut) || 0; });
+  scDs.forEach(s => {
+    if (!s.xl) return;
+    [s.xl.nguoi_dam_nhiem, s.xl.nguoi_dam_nhiem_phu].filter(Boolean).forEach((t, i) => {
+      const p = nguoi(t); s.tt === 'xong' ? p.xlXong++ : p.xlDang++;
+      if (i === 0 && s.phutXl) p.phutXl += s.phutXl;
+    });
+  });
+  return { khTuan, ngay, xong, csTuan, hmNg, hmTong, phutBd, pW, pbar, vdTuan, cW, cbar, scDs, lkDuoi, lkHet, stShot,
+    nguoi: [...ng.values()].sort((a, b) => (b.kh + b.xlXong + b.xlDang) - (a.kh + a.xlXong + a.xlDang)), lk: d.lk, gd: d.gd };
+}
+
+// ── Vẽ ────────────────────────────────────────────────────────────────────────
+const TT_KH = { dung: ['good', '✓ Xong đúng hạn'], tre: ['warn', '✓ Xong trễ'], chua: ['bad', '✕ Chưa làm (quá hạn)'], sau: ['muted', '◷ Chưa đến hạn'] };
+const TT_XL = { xong: ['good', '✓ Hoàn thành'], dang: ['warn', '🔧 Đang xử lý'], cho: ['bad', '⏳ Chờ nhận'] };
+const LOAI_SC = { A2: 'A2 · Sự cố khuôn', B1: 'B1 · Chất lượng SP', F1: 'F1 · IPQC NG' };
+const st = (k, map) => '<span class="st ' + map[k][0] + '">' + map[k][1] + '</span>';
+
+function ve(r){
+  const daDen = r.khTuan.filter(x => x.tt !== 'sau');
+  const tlXong = pct(r.xong.length, daDen.length);
+  const chua = r.khTuan.filter(x => x.tt === 'chua');
+  const dat = r.csTuan.filter(c => c.ket_luan === 'dat').length, khongDat = r.csTuan.length - dat;
+  const vdMo = r.vdTuan.filter(v => v.trang_thai !== 'Đã đóng').length, vdTp = r.vdTuan.filter(v => Number(v.lan_tai_phat) > 0).length;
+  const scXong = r.scDs.filter(s => s.tt === 'xong').length, scCho = r.scDs.filter(s => s.tt === 'cho').length;
+  const phutA2 = r.scDs.filter(s => s.loai === 'A2').reduce((a, s) => a + s.phut, 0);
+  const nhap = r.gd.filter(g => g.loai === 'nhap'), xuat = r.gd.filter(g => g.loai === 'xuat_thay');
+  const cntShot = k => r.stShot.filter(x => x === k).length;
+  const kpi = (cls, lbl, val, sub) => '<div class="kpi ' + cls + '"><div class="lbl">' + lbl + '</div><div class="val">' + val + '</div><div class="sub">' + sub + '</div></div>';
+
+  let h = '<div class="kpis">' +
+    kpi(!daDen.length ? '' : tlXong >= 95 ? 'good' : tlXong >= 80 ? 'warn' : 'bad', 'Hoàn thành KH bảo dưỡng',
+      r.xong.length + '<small> / ' + daDen.length + ' khuôn</small>', '<b>' + tlXong + '%</b> KH đã đến hạn' + (r.khTuan.length > daDen.length ? ' · còn ' + (r.khTuan.length - daDen.length) + ' chưa đến ngày' : '')) +
+    kpi(chua.length ? 'bad' : 'good', 'Không hoàn thành', chua.length + '<small> khuôn</small>',
+      chua.length ? chua.slice(0, 3).map(x => esc(x.ma_khuon)).join(', ') + (chua.length > 3 ? '…' : '') : 'Không có khuôn quá hạn') +
+    kpi(khongDat || r.hmNg.length ? 'warn' : r.csTuan.length ? 'good' : '', 'Kết quả bảo dưỡng',
+      dat + '<small> đạt / ' + r.csTuan.length + '</small>', '<b>' + r.hmNg.length + '</b> hạng mục NG / ' + r.hmTong + ' · dừng ' + gio(r.phutBd)) +
+    kpi(vdTp ? 'bad' : vdMo ? 'warn' : 'good', 'Vấn đề khuôn mới', r.vdTuan.length + '<small> vấn đề</small>',
+      '<b>' + vdTp + '</b> tái phát · <b>' + vdMo + '</b> chưa đóng') +
+    kpi(scCho ? 'bad' : scXong < r.scDs.length ? 'warn' : 'good', 'Xử lý sự cố A2·B1·F1', scXong + '<small> / ' + r.scDs.length + ' xong</small>',
+      '<b>' + scCho + '</b> chờ nhận · dừng máy A2 ' + gio(phutA2)) +
+    kpi(r.lkHet.length ? 'bad' : r.lkDuoi.length ? 'warn' : 'good', 'Linh kiện dưới tồn tối thiểu', r.lkDuoi.length + '<small> / ' + r.lk.length + ' mã</small>',
+      '<b>' + r.lkHet.length + '</b> hết hàng · tuần: nhập ' + fmt(nhap.reduce((a, g) => a + Number(g.so_luong || 0), 0)) + ', thay ' + fmt(xuat.reduce((a, g) => a + Number(g.so_luong || 0), 0))) +
+    '</div>';
+
+  // Kế hoạch vs thực hiện
+  h += '<div class="grid2">' +
+    '<div class="card"><div class="card-title">Kế hoạch bảo dưỡng theo ngày <small>số khuôn KH / đã làm</small></div>' +
+      '<div class="legend"><span><i style="background:var(--good)"></i>Xong đúng hạn</span><span><i style="background:var(--warn)"></i>Xong trễ</span>' +
+      '<span><i style="background:var(--bad)"></i>Chưa làm (quá hạn)</span><span><i style="background:var(--muted-mark)"></i>Chưa đến hạn</span></div>' +
+      (r.khTuan.length ? veTheoNgay(r.ngay) : '<div class="empty">Tuần này chưa có kế hoạch bảo dưỡng</div>') + '</div>' +
+    '<div class="card"><div class="card-title">P-chart — % hoàn thành KH bảo dưỡng <small>' + SO_TUAN_XU_HUONG + ' tuần, giới hạn 3σ theo số khuôn KH từng tuần</small></div>' +
+      '<div class="legend"><span><i class="line" style="background:var(--s1)"></i>% hoàn thành</span><span><i class="line" style="background:var(--text-muted)"></i>CL (p̄)</span><span><i class="dash"></i>UCL / LCL</span><span><i style="background:var(--bad);border-radius:50%"></i>Ngoài giới hạn</span></div>' +
+      veKiemSoat(r.pW.map((p, i) => {
+        const sd = p.n ? Math.sqrt(r.pbar * (1 - r.pbar) / p.n) : 0;
+        return { lbl: dm(p.w), cur: i === r.pW.length - 1, v: p.n ? p.x / p.n : null,
+          ucl: p.n ? Math.min(1, r.pbar + 3 * sd) : null, lcl: p.n ? Math.max(0, r.pbar - 3 * sd) : null,
+          tip: 'Tuần ' + dm(p.w) + '\nĐã làm ' + p.x + ' / ' + p.n + ' khuôn KH' + (p.n ? ' = ' + pct(p.x, p.n) + '%' : '') };
+      }), r.pbar, { max: 1, ticks: [0, .2, .4, .6, .8, 1], fmtT: t => Math.round(t * 100) + '%' }) +
+      '<div class="note">p̄ = ' + Math.round(r.pbar * 100) + '% (tổng đã làm / tổng KH đã đến hạn trong ' + SO_TUAN_XU_HUONG + ' tuần). Điểm đỏ = tuần bất thường cần tìm nguyên nhân.</div></div>' +
+    '</div>';
+
+  // Danh sách KH + kết quả
+  h += '<div class="card"><div class="card-title">Chi tiết kế hoạch bảo dưỡng tuần <small>' + r.khTuan.length + ' khuôn</small></div>' +
+    '<div class="tbl-wrap"><table><thead><tr><th>Ngày KH</th><th>Khuôn</th><th>Loại</th><th>Người phụ trách</th><th>Tình trạng</th><th>Ngày làm</th><th>Người thực hiện</th><th>Kết luận</th><th class="num">Hạng mục NG</th><th class="num">Dừng</th><th>Phụ tùng thay</th></tr></thead><tbody>' +
+    (r.khTuan.length ? r.khTuan.slice().sort((a, b) => ({ chua: 0, tre: 1, sau: 2, dung: 3 }[a.tt] - { chua: 0, tre: 1, sau: 2, dung: 3 }[b.tt]) || a.ngay.localeCompare(b.ngay)).map(x => {
+      const c = x.cs, ng = c ? (c.hang_muc || []).filter(hh => hh && hh.ket_qua === 'NG').length : 0;
+      return '<tr><td class="nowrap">' + THU[(new Date(x.ngay + 'T00:00:00').getDay() + 6) % 7] + ' ' + dm(x.ngay) + '</td><td class="nowrap"><b>' + esc(x.ma_khuon) + '</b></td><td>' + esc(x.loai || '') + '</td>' +
+        '<td>' + esc(x.nguoi_phu_trach || '—') + '</td><td>' + st(x.tt, TT_KH) + '</td><td class="nowrap">' + (c ? dm(c.ngay_thuc_hien) : '—') + '</td>' +
+        '<td>' + (c ? esc([c.nguoi_thuc_hien, c.nguoi_thuc_hien_phu].filter(Boolean).join(', ')) : '—') + '</td>' +
+        '<td>' + (c ? (c.ket_luan === 'dat' ? '<span class="st good">Đạt</span>' : '<span class="st bad">Không đạt</span>') : '—') + '</td>' +
+        '<td class="num">' + (c ? ng : '—') + '</td><td class="num">' + (c && c.thoi_gian_dung_phut ? gio(c.thoi_gian_dung_phut) : '—') + '</td><td>' + esc(c && c.phu_tung_thay || '') + '</td></tr>';
+    }).join('') : '<tr><td colspan="11" class="empty">Chưa có kế hoạch</td></tr>') + '</tbody></table></div>' +
+    (r.hmNg.length ? '<div class="note"><b>Hạng mục NG khi bảo dưỡng:</b> ' + r.hmNg.map(x => esc(x.khuon + ' — ' + x.nd + (x.gc ? ' (' + x.gc + ')' : ''))).join(' · ') + '</div>' : '') + '</div>';
+
+  // Vấn đề khuôn
+  const theoKhuon = new Map();
+  r.vdTuan.forEach(v => { const k = String(v.ma_khuon || '?').trim(); const x = theoKhuon.get(k) || { lbl: k, n: 0, tp: 0, mo: 0 }; x.n++; if (Number(v.lan_tai_phat) > 0) x.tp++; if (v.trang_thai !== 'Đã đóng') x.mo++; theoKhuon.set(k, x); });
+  let par = [...theoKhuon.values()].sort((a, b) => b.n - a.n);
+  if (par.length > 10) { const khac = par.slice(9); par = par.slice(0, 9).concat([{ lbl: 'Khác (' + khac.length + ' khuôn)', n: khac.reduce((a, x) => a + x.n, 0), color: 'var(--muted-mark)' }]); }
+  par.forEach(p => { if (p.tp != null) p.tip = 'Tái phát ' + p.tp + ' · chưa đóng ' + p.mo; });
+  h += '<div class="grid2">' +
+    '<div class="card"><div class="card-title">Pareto — vấn đề khuôn mới theo khuôn <small>' + r.vdTuan.length + ' vấn đề trong tuần</small></div>' +
+      '<div class="legend"><span><i style="background:var(--s1)"></i>Tỷ trọng khuôn</span><span><i class="line" style="background:var(--s2)"></i>Luỹ kế</span><span><i class="line" style="background:var(--warn)"></i>Mốc 80%</span></div>' +
+      (par.length ? vePareto(par, 'vấn đề') : '<div class="empty">Không có vấn đề khuôn mới</div>') +
+      '<div class="note">Ưu tiên xử lý dứt điểm các khuôn bên trái mốc 80% — nhóm ít khuôn gây phần lớn vấn đề.</div></div>' +
+    '<div class="card"><div class="card-title">C-chart — số vấn đề khuôn mới / tuần <small>' + SO_TUAN_XU_HUONG + ' tuần, c̄ ± 3√c̄</small></div>' +
+      '<div class="legend"><span><i class="line" style="background:var(--s1)"></i>Số vấn đề</span><span><i class="line" style="background:var(--text-muted)"></i>CL (c̄)</span><span><i class="dash"></i>UCL / LCL</span></div>' +
+      veKiemSoat(r.cW.map((c, i) => ({ lbl: dm(c.w), cur: i === r.cW.length - 1, v: c.c, ucl: r.cbar + 3 * Math.sqrt(r.cbar), lcl: Math.max(0, r.cbar - 3 * Math.sqrt(r.cbar)),
+        tip: 'Tuần ' + dm(c.w) + '\n' + c.c + ' vấn đề khuôn mới' })), r.cbar, { fmtT: (t, cl) => cl ? (Math.round(t * 10) / 10) : Math.round(t) }) +
+      '<div class="note">c̄ = ' + (Math.round(r.cbar * 10) / 10) + ' vấn đề/tuần. Gồm vấn đề tự tạo từ sự cố A2/B1/F1 và IPQC NG / cảnh báo.</div></div>' +
+    '</div>';
+  const vdBang = r.vdTuan.filter(v => v.trang_thai !== 'Đã đóng' || Number(v.lan_tai_phat) > 0)
+    .sort((a, b) => (Number(b.lan_tai_phat) || 0) - (Number(a.lan_tai_phat) || 0) || String(b.ngay_phat_hien).localeCompare(String(a.ngay_phat_hien)));
+  h += '<div class="card"><div class="card-title">Khuôn gặp vấn đề cần theo dõi <small>vấn đề trong tuần còn mở hoặc tái phát · ' + vdBang.length + '</small></div>' +
+    '<div class="tbl-wrap" style="max-height:320px"><table><thead><tr><th>Ngày</th><th>Khuôn</th><th>Máy</th><th>Mã SP</th><th>Vấn đề</th><th>Trạng thái</th><th class="num">Tái phát</th><th>Xử lý</th></tr></thead><tbody>' +
+    (vdBang.length ? vdBang.map(v => '<tr><td class="nowrap">' + dm(v.ngay_phat_hien) + '</td><td class="nowrap"><a href="van-de-khuon.html?khuon=' + encodeURIComponent(v.ma_khuon) + '&tab=chua-dong&vd=' + encodeURIComponent(v.id_van_de) + '" target="_blank" rel="noopener"><b>' + esc(v.ma_khuon) + '</b></a></td>' +
+      '<td class="nowrap">' + esc(v.ma_may || '') + '</td><td class="nowrap">' + esc(v.ma_sp || '') + '</td><td>' + esc(String(v.mo_ta || '').slice(0, 140)) + '</td>' +
+      '<td class="nowrap">' + (v.trang_thai === 'Mở' ? '<span class="st bad">Mở</span>' : v.trang_thai === 'Chờ xác nhận' ? '<span class="st warn">Chờ xác nhận</span>' : '<span class="st good">Đã đóng</span>') + '</td>' +
+      '<td class="num">' + (Number(v.lan_tai_phat) || '') + '</td><td>' + esc(v.noi_dung_xu_ly || '') + '</td></tr>').join('')
+      : '<tr><td colspan="8" class="empty">Không có vấn đề tồn hoặc tái phát</td></tr>') + '</tbody></table></div></div>';
+
+  // Sự cố + xử lý
+  const loaiRows = ['A2', 'B1', 'F1'].map(l => {
+    const ds = r.scDs.filter(s => s.loai === l);
+    return { lbl: LOAI_SC[l], parts: [{ name: 'Hoàn thành', v: ds.filter(s => s.tt === 'xong').length, color: 'var(--good)' },
+      { name: 'Đang xử lý', v: ds.filter(s => s.tt === 'dang').length, color: 'var(--warn)' }, { name: 'Chờ nhận', v: ds.filter(s => s.tt === 'cho').length, color: 'var(--bad)' }] };
+  });
+  const tg = r.scDs.map(s => s.phutXl).filter(v => v != null);
+  const tb = tg.length ? tg.reduce((a, v) => a + v, 0) / tg.length : 0;
+  h += '<div class="grid2">' +
+    '<div class="card"><div class="card-title">Xử lý sự cố khuôn / chất lượng theo loại <small>' + r.scDs.length + ' vụ trong tuần</small></div>' +
+      '<div class="legend"><span><i style="background:var(--good)"></i>Hoàn thành</span><span><i style="background:var(--warn)"></i>Đang xử lý</span><span><i style="background:var(--bad)"></i>Chờ nhận</span></div>' +
+      (r.scDs.length ? veXepChong(loaiRows, 'vụ') : '<div class="empty">Không có sự cố A2 / B1 / F1</div>') +
+      '<div class="note">Dừng máy do sự cố: ' + ['A2', 'B1', 'F1'].map(l => '<b>' + l + '</b> ' + gio(r.scDs.filter(s => s.loai === l).reduce((a, s) => a + s.phut, 0))).join(' · ') + '</div></div>' +
+    '<div class="card"><div class="card-title">Histogram — thời gian tổ khuôn xử lý <small>bắt đầu → kết thúc, ' + tg.length + ' vụ có đủ giờ</small></div>' +
+      (tg.length ? veHistogram(tg, [{ tu: 0, den: 30, lbl: '< 30\'' }, { tu: 30, den: 60, lbl: '30–60\'' }, { tu: 60, den: 120, lbl: '1–2 giờ' }, { tu: 120, den: 240, lbl: '2–4 giờ' },
+        { tu: 240, den: 480, lbl: '4–8 giờ' }, { tu: 480, den: 1440, lbl: '8–24 giờ' }, { tu: 1440, den: 1e12, lbl: '> 1 ngày' }], 'vụ') : '<div class="empty">Chưa có vụ ghi đủ giờ bắt đầu / kết thúc</div>') +
+      '<div class="note">Trung bình <b>' + gio(tb) + '</b> / vụ' + (tg.length ? ' · dài nhất ' + gio(Math.max(...tg)) : '') + '.</div></div>' +
+    '</div>';
+  h += '<div class="card"><div class="card-title">Danh sách sự cố & kết quả xử lý <small>' + r.scDs.length + ' vụ</small></div>' +
+    '<div class="tbl-wrap" style="max-height:340px"><table><thead><tr><th>Phát sinh</th><th>Mã sự cố</th><th>Loại</th><th>Máy</th><th>Khuôn</th><th>Vấn đề</th><th>Kết quả</th><th>Người xử lý</th><th class="num">Thời gian XL</th><th class="num">Dừng máy</th><th>Nội dung xử lý</th></tr></thead><tbody>' +
+    (r.scDs.length ? r.scDs.map(s => '<tr><td class="nowrap">' + dm(s.ps) + ' ' + new Date(s.ps).toTimeString().slice(0, 5) + '</td><td class="nowrap">' + esc(s.id) + '</td><td>' + s.loai + '</td>' +
+      '<td class="nowrap">' + esc(s.may || '') + '</td><td class="nowrap">' + esc(s.khuon || '') + '</td><td>' + esc(String(s.van_de || '').slice(0, 110)) + '</td><td>' + st(s.tt, TT_XL) + '</td>' +
+      '<td>' + esc(s.xl ? [s.xl.nguoi_dam_nhiem, s.xl.nguoi_dam_nhiem_phu].filter(Boolean).join(', ') : '—') + '</td>' +
+      '<td class="num">' + (s.phutXl != null ? gio(s.phutXl) : '—') + '</td><td class="num">' + gio(s.phut) + '</td><td>' + esc(s.xl && s.xl.noi_dung_xu_ly || '') + '</td></tr>').join('')
+      : '<tr><td colspan="11" class="empty">Không có sự cố</td></tr>') + '</tbody></table></div></div>';
+
+  // Linh kiện + tình trạng shot
+  const lkRows = r.lkDuoi.slice(0, 12);
+  const shotRows = [['Cần làm mới', 'lm', 'var(--bad)'], ['Cần bảo dưỡng (shot)', 'bd', 'var(--warn)'], ['Sắp bảo dưỡng', 'sap', 'var(--s1)'], ['OK', 'ok', 'var(--good)']]
+    .map(([lbl, k, c]) => ({ lbl, parts: [{ name: 'Số khuôn', v: cntShot(k), color: c }] }));
+  h += '<div class="grid2">' +
+    '<div class="card"><div class="card-title">Linh kiện dự phòng dưới tồn tối thiểu <small>tồn chờ sử dụng / tối thiểu — ' + r.lkDuoi.length + ' mã, hiện ' + lkRows.length + ' thiếu nhất</small></div>' +
+      (lkRows.length ? '<div class="tbl-wrap" style="max-height:330px"><table><thead><tr><th>Mã LK</th><th>Tên</th><th class="num">Tồn</th><th class="num">Tối thiểu</th><th style="width:34%">Mức tồn</th><th class="num">Lead time</th></tr></thead><tbody>' +
+        lkRows.map(l => { const t = Number(l.ton_cho_su_dung) || 0, m = Number(l.ton_toi_thieu) || 1, p = Math.min(100, t / m * 100);
+          return '<tr><td class="nowrap"><b>' + esc(l.ma_lk) + '</b></td><td>' + esc(l.ten_lk || '') + '</td><td class="num">' + fmt(t) + '</td><td class="num">' + fmt(m) + '</td>' +
+            '<td><div data-tip="' + esc(l.ma_lk + ': tồn ' + fmt(t) + ' / tối thiểu ' + fmt(m) + ' ' + (l.don_vi || '')) + '" style="height:10px;background:var(--bg-sunken);border-radius:5px;overflow:hidden">' +
+            '<div style="height:100%;width:' + Math.max(2, p) + '%;background:' + (t <= 0 ? 'var(--bad)' : 'var(--warn)') + ';border-radius:5px"></div></div></td>' +
+            '<td class="num">' + (l.lead_time_ngay ? l.lead_time_ngay + ' ngày' : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+        : '<div class="empty">Mọi linh kiện đủ tồn tối thiểu</div>') +
+      '<div class="note">Giao dịch trong tuần: nhập <b>' + nhap.length + '</b> lượt (' + fmt(nhap.reduce((a, g) => a + Number(g.so_luong || 0), 0)) + '), xuất thay <b>' + xuat.length + '</b> lượt (' + fmt(xuat.reduce((a, g) => a + Number(g.so_luong || 0), 0)) + ')' +
+        (xuat.length ? ' — ' + esc([...new Set(xuat.map(g => g.ma_khuon).filter(Boolean))].join(', ')) : '') + '. <a href="linh-kien-khuon.html">Xem linh kiện ›</a></div></div>' +
+    '<div class="card"><div class="card-title">Tình trạng shot khuôn đang sản xuất <small>hiện tại · ' + r.stShot.length + ' khuôn</small></div>' +
+      veXepChong(shotRows, 'khuôn') +
+      '<div class="note">Theo shot từ lần bảo dưỡng gần nhất so với ngưỡng (Sắp BD ≥ 80% ngưỡng). Khuôn "Cần bảo dưỡng" chưa có trong KH tuần sau nên được đưa vào lịch.</div></div>' +
+    '</div>';
+
+  // Theo người
+  const ngRows = r.nguoi.map(p => ({ lbl: p.ten, parts: [{ name: 'BD xong đúng hạn', v: p.dung, color: 'var(--good)' }, { name: 'BD xong trễ', v: p.tre, color: 'var(--warn)' },
+    { name: 'BD chưa làm (quá hạn)', v: p.chua, color: 'var(--bad)' }, { name: 'BD chưa đến hạn', v: p.sau, color: 'var(--muted-mark)' },
+    { name: 'Xử lý sự cố xong', v: p.xlXong, color: 'var(--s1)' }, { name: 'Xử lý sự cố đang làm', v: p.xlDang, color: 'var(--s2)' }] }));
+  h += '<div class="card"><div class="card-title">Tình trạng công việc theo người thao tác <small>phân tầng: bảo dưỡng theo KH + xử lý sự cố</small></div>' +
+    '<div class="legend"><span><i style="background:var(--good)"></i>BD xong đúng hạn</span><span><i style="background:var(--warn)"></i>BD xong trễ</span><span><i style="background:var(--bad)"></i>BD chưa làm (quá hạn)</span>' +
+    '<span><i style="background:var(--muted-mark)"></i>BD chưa đến hạn</span><span><i style="background:var(--s1)"></i>Xử lý sự cố xong</span><span><i style="background:var(--s2)"></i>Xử lý sự cố đang làm</span></div>' +
+    '<div class="grid2" style="align-items:start"><div>' + (ngRows.length ? veXepChong(ngRows, 'việc') : '<div class="empty">Chưa có công việc</div>') + '</div>' +
+    '<div class="tbl-wrap"><table><thead><tr><th>Người</th><th class="num">KH BD</th><th class="num">Xong</th><th class="num">Chưa làm</th><th class="num">% HT</th><th class="num">Giờ BD</th><th class="num">Sự cố xong</th><th class="num">Đang XL</th><th class="num">Giờ XL</th></tr></thead><tbody>' +
+    r.nguoi.map(p => { const den = p.dung + p.tre + p.chua, ht = den ? pct(p.dung + p.tre, den) : null;
+      return '<tr><td><b>' + esc(p.ten) + '</b></td><td class="num">' + p.kh + '</td><td class="num">' + (p.dung + p.tre) + '</td><td class="num">' + (p.chua ? '<span class="st bad">' + p.chua + '</span>' : 0) + '</td>' +
+        '<td class="num">' + (ht == null ? '—' : ht + '%') + '</td><td class="num">' + (p.phutBd ? gio(p.phutBd) : '—') + '</td><td class="num">' + p.xlXong + '</td><td class="num">' + p.xlDang + '</td><td class="num">' + (p.phutXl ? gio(p.phutXl) : '—') + '</td></tr>'; }).join('') +
+    '</tbody></table></div></div></div>';
+
+  document.getElementById('noiDung').innerHTML = '<div class="wrap" style="margin:0">' + h + '</div>';
+}
+
+// ── Điều hướng tuần ───────────────────────────────────────────────────────────
+async function napLai(){
+  document.getElementById('weekLabel').textContent = dm(ymd(tuan)) + ' — ' + dm(ymd(addDays(tuan, 6))) + '/' + addDays(tuan, 6).getFullYear();
+  const u = new URL(location.href); u.searchParams.set('tuan', ymd(tuan)); history.replaceState(null, '', u);
+  document.getElementById('noiDung').innerHTML = '<div class="card loading">Đang tải báo cáo…</div>';
+  try { ve(tinh(await tai())); }
+  catch (e) { document.getElementById('noiDung').innerHTML = '<div class="card loading" style="color:var(--alarm-fg)">Lỗi tải báo cáo: ' + esc(e.message) + '</div>'; }
+}
+document.getElementById('btnPrev').onclick = () => { tuan = addDays(tuan, -7); napLai(); };
+document.getElementById('btnNext').onclick = () => { tuan = addDays(tuan, 7); napLai(); };
+document.getElementById('btnNay').onclick = () => { tuan = mondayOf(new Date()); napLai(); };
+document.getElementById('btnIn').onclick = () => window.print();
+(function dongHo(){ const d = new Date(); document.getElementById('ckDate').textContent = d.toLocaleDateString('vi-VN'); document.getElementById('ckTime').textContent = d.toLocaleTimeString('vi-VN', { hour12: false }); setTimeout(dongHo, 1000); })();
+
+(async () => {
+  const s = await MesAuth.getSession();
+  if (!s) { location.href = 'shared/login.html?returnTo=' + encodeURIComponent(location.pathname.split('/').pop() + location.search); return; }
+  napLai();
+})();
+</script>
+</body>
+</html>
