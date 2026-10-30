@@ -111,6 +111,7 @@
     'forecast-san-luong.html': { icon: '📈', title: 'Forecast Sản Lượng Năm', desc: 'Dự báo sản lượng từng mã SP theo tháng — giờ máy, tuổi thọ khuôn', noTitleBar: true },
     'van-de-khuon.html': { icon: '⚠', title: 'Vấn Đề Khuôn', desc: 'Vấn đề khuôn chưa đóng, lịch sử sự cố + IPQC của khuôn', noTitleBar: true },
     'linh-kien-khuon.html': { icon: '🔩', title: 'Linh Kiện Dự Phòng Khuôn', desc: 'Danh mục, tồn kho, gán khuôn, lịch sử nhập / xuất thay', noTitleBar: true },
+    'bao-cao-to-khuon-tuan.html': { icon: '📊', title: 'Báo Cáo Tuần Tổ Khuôn', desc: 'KH bảo dưỡng, vấn đề khuôn, sự cố, linh kiện, theo người — biểu đồ QC', noTitleBar: true },
     'quan-ly-khuon.html': { icon: '🧊', title: 'Quản Lý Khuôn', desc: 'Danh sách khuôn, vấn đề khuôn, hạng mục check sheet bảo dưỡng', noTitleBar: true },
     'checksheet-bao-duong-khuon.html': { icon: '📋', title: 'Check Sheet Bảo Dưỡng Khuôn', desc: 'Ghi kết quả bảo dưỡng từng khuôn theo hạng mục', noTitleBar: true },
     'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
@@ -157,6 +158,7 @@
       { label: 'Dashboard tổ khuôn', href: 'bao-duong-khuon-tuan.html', also: ['checksheet-bao-duong-khuon.html'] },
       { label: 'Quản lý khuôn', href: 'quan-ly-khuon.html', also: ['van-de-khuon.html'] },
       { label: 'Linh kiện dự phòng khuôn', href: 'linh-kien-khuon.html' },
+      { label: 'Báo cáo tuần', href: 'bao-cao-to-khuon-tuan.html' },   // T193
     ] },
   };
   function subTabPages(key) {
