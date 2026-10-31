@@ -30,12 +30,15 @@ const IS_STAGING = !IS_PROD;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Cổng đăng nhập chung: MỌI trang nạp file này đều phải đăng nhập mới được xem.
+// Cổng đăng nhập chung: MỌI trang nạp file này đều phải đăng nhập mới được xem,
+// TRỪ Wallboard (TV mở bằng link có khoá ?k=…, đọc qua RPC kiểm khoá, không đăng nhập).
 // Ẩn trang ngay, chưa có phiên → chuyển sang login (giữ returnTo); có phiên → hiện.
 // Lỗi mạng khi làm mới phiên (wifi xưởng chập chờn) → vẫn hiện trang, không đá ra login.
+const TRANG_KHONG_CAN_DANG_NHAP = ['wallboard.html'];
 (function () {
   const loginUrl = new URL('login.html', document.currentScript.src);
   if (location.pathname === loginUrl.pathname) return;
+  if (TRANG_KHONG_CAN_DANG_NHAP.includes(location.pathname.split('/').pop())) return;
   const html = document.documentElement;
   html.style.visibility = 'hidden';
   sb.auth.getSession().then(({ data, error }) => {
