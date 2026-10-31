@@ -11,11 +11,12 @@
  * ============================================================================
  */
 
-// Production = đúng domain GitHub Pages đang phục vụ xưởng. Mọi hostname khác
-// (staging trên Cloudflare Pages, mở file cục bộ, localhost khi dev) đều trỏ
-// vào Supabase project staging — không bao giờ vô tình đụng dữ liệu thật.
-const PROD_HOSTNAME = 'dangnaf-toyo.github.io';
-const IS_PROD = location.hostname === PROD_HOSTNAME;
+// Production = đúng domain đang phục vụ xưởng (mes.toyotaki.vn; github.io cũ GitHub
+// tự chuyển sang). Mọi hostname khác (staging trên Cloudflare Pages, mở file cục bộ,
+// localhost khi dev) đều trỏ vào Supabase project staging — không bao giờ vô tình
+// đụng dữ liệu thật.
+const PROD_HOSTNAMES = ['mes.toyotaki.vn', 'dangnaf-toyo.github.io'];
+const IS_PROD = PROD_HOSTNAMES.includes(location.hostname);
 
 const SUPABASE_URL = IS_PROD
   ? 'https://fgghikpzcxjqzahfiiil.supabase.co'
@@ -28,6 +29,23 @@ const SUPABASE_ANON_KEY = IS_PROD
 const IS_STAGING = !IS_PROD;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Cổng đăng nhập chung: MỌI trang nạp file này đều phải đăng nhập mới được xem.
+// Ẩn trang ngay, chưa có phiên → chuyển sang login (giữ returnTo); có phiên → hiện.
+// Lỗi mạng khi làm mới phiên (wifi xưởng chập chờn) → vẫn hiện trang, không đá ra login.
+(function () {
+  const loginUrl = new URL('login.html', document.currentScript.src);
+  if (location.pathname === loginUrl.pathname) return;
+  const html = document.documentElement;
+  html.style.visibility = 'hidden';
+  sb.auth.getSession().then(({ data, error }) => {
+    if (!data.session && !error) {
+      location.replace(loginUrl.pathname + '?returnTo=' + encodeURIComponent(location.href));
+      return;
+    }
+    html.style.visibility = '';
+  }, () => { html.style.visibility = ''; });
+})();
 
 /**
  * Supabase trả TỐI ĐA 1000 dòng mỗi lần và không báo lỗi khi cắt → bảng lớn phải lấy từng trang.
