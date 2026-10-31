@@ -781,6 +781,16 @@ async function openCheck(idCheckpoint, maSpChon){
         p_id_dong: cp.id_dong, p_loai_kiem: 'dinh_ky', p_id_su_co_goc: null, p_moc_cho_override: mocBatDau,
       });
       if (error) throw new Error(error.message);
+      if (data && data.reason === 'da_co_checkpoint_cho_kiem'){
+        // Người khác vừa bấm mở máy này (danh sách trên máy mình chưa kịp làm mới) —
+        // tải lại hàng đợi rồi mở đúng điểm kiểm thật đã được tạo.
+        state.queue = await loadQueue(); renderQueue();
+        hideOverlay();
+        const that = state.queue.find(x => x.id_dong === cp.id_dong && x.loai_kiem === 'dinh_ky' && !x.virtual);
+        if (!that) { showToast('Máy ' + cp.ma_may + ' vừa có người mở kiểm. Danh sách đã được tải lại.', true); return; }
+        showToast('Máy ' + cp.ma_may + ' vừa có người khác mở kiểm — mở điểm kiểm đã tạo.');
+        return openCheck(that.id_checkpoint);
+      }
       if (!data || data.ok !== true){
         hideOverlay();
         onError(new Error('Không tạo được điểm kiểm định kỳ: ' + (data && data.reason || 'không rõ nguyên nhân')));
@@ -790,6 +800,7 @@ async function openCheck(idCheckpoint, maSpChon){
       cp.virtual = false;
     } catch (e) { hideOverlay(); onError(e); return; }
   }
+  hideOverlay();   // tạo điểm kiểm thành công — trước đây quên tắt, vòng quay che màn kiểm
 
   state.current = cp;
   state.checkStartedAt = null;
