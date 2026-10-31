@@ -200,6 +200,9 @@
 <script>
 const ROLE_LABELS = {
   admin: 'Admin',
+  // T196: không phải role riêng trong DB — lưu role = 'admin' + chuc_danh = 'tong_giam_doc'
+  // (toàn quyền như Admin, chỉ khác tên hiển thị). Xem vaiTroHienThi() + nút Lưu ở buildUserRow().
+  tong_giam_doc: 'Tổng giám đốc (toàn quyền như Admin)',
   truong_ca: 'Trưởng ca',
   ipqc: 'IPQC',
   iqc: 'IQC (kiểm tra đầu vào)',
@@ -243,7 +246,7 @@ function toast(text, isErr){
 
 function openCreateModal(){
   document.getElementById('createForm').reset();
-  fillRoleSelect(document.getElementById('cRole'), '');
+  fillRoleSelect(document.getElementById('cRole'), '', true);
   fillBoPhanChecks(document.getElementById('cBoPhan'), []);
   document.getElementById('cBoPhanWrap').style.display = 'none';
   const m = document.getElementById('createMsg'); m.className = 'msg'; m.textContent = '';
@@ -255,8 +258,10 @@ function closeCreateModal(){
   document.body.style.overflow = '';
 }
 
-function fillRoleSelect(sel, selected){
-  sel.innerHTML = Object.entries(ROLE_LABELS).map(([v, l]) =>
+// Vai trò hiển thị: chức danh (nếu có) thay cho role thật.
+function vaiTroHienThi(row){ return (row.role === 'admin' && row.chuc_danh === 'tong_giam_doc') ? 'tong_giam_doc' : row.role; }
+function fillRoleSelect(sel, selected, khongChucDanh){
+  sel.innerHTML = Object.entries(ROLE_LABELS).filter(([v]) => !(khongChucDanh && v === 'tong_giam_doc')).map(([v, l]) =>
     `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`
   ).join('');
 }
@@ -276,7 +281,7 @@ async function loadUsers(){
   const listMsg = document.getElementById('listMsg');
   const { data, error } = await sb
     .from('user_roles')
-    .select('user_id, email, username, full_name, role, bo_phan_phu_trach, created_at')
+    .select('user_id, email, username, full_name, role, chuc_danh, bo_phan_phu_trach, created_at')
     .order('created_at', { ascending: false });
 
   if (error){
@@ -291,7 +296,7 @@ async function loadUsers(){
   // Dropdown lọc theo vai trò — chỉ các vai trò đang có trong danh sách.
   const sel = document.getElementById('uFilterRole');
   const cur = sel.value;
-  const roles = [...new Set(usersData.map(r => r.role).filter(Boolean))]
+  const roles = [...new Set(usersData.map(vaiTroHienThi).filter(Boolean))]
     .sort((a, b) => (ROLE_LABELS[a] || a).localeCompare(ROLE_LABELS[b] || b, 'vi'));
   sel.innerHTML = '<option value="">Vai trò: tất cả</option>' +
     roles.map(r => `<option value="${r}"${r === cur ? ' selected' : ''}>${ROLE_LABELS[r] || r}</option>`).join('');
@@ -302,7 +307,7 @@ async function loadUsers(){
 function userSortVal(row, k){
   if (k === 'id') return (row.username || row.email || '').toLowerCase();
   if (k === 'full_name') return (row.full_name || '').toLowerCase();
-  if (k === 'role') return (ROLE_LABELS[row.role] || row.role || '').toLowerCase();
+  if (k === 'role') return (ROLE_LABELS[vaiTroHienThi(row)] || row.role || '').toLowerCase();
   if (k === 'created_at') return row.created_at || '';
   return '';
 }
@@ -314,9 +319,9 @@ function renderUsers(){
 
   let rows = usersData.slice();
   if (uQ) rows = rows.filter(r =>
-    ((r.username || '') + ' ' + (r.email || '') + ' ' + (r.full_name || '') + ' ' + (ROLE_LABELS[r.role] || r.role || ''))
+    ((r.username || '') + ' ' + (r.email || '') + ' ' + (r.full_name || '') + ' ' + (ROLE_LABELS[vaiTroHienThi(r)] || r.role || ''))
       .toLowerCase().includes(uQ));
-  if (uRole) rows = rows.filter(r => r.role === uRole);
+  if (uRole) rows = rows.filter(r => vaiTroHienThi(r) === uRole);
   rows.sort((a, b) => {
     const va = userSortVal(a, uSort.k), vb = userSortVal(b, uSort.k);
     return String(va).localeCompare(String(vb), 'vi', { numeric: true }) * uSort.dir;
@@ -356,7 +361,7 @@ function buildUserRow(row){
     `;
     const roleTd = tr.children[2];
     const sel = document.createElement('select');
-    fillRoleSelect(sel, row.role);
+    fillRoleSelect(sel, vaiTroHienThi(row));
     roleTd.appendChild(sel);
 
     // Bộ phận phụ trách: dùng cho phân quyền tài liệu kỹ thuật ở MỌI vai trò
@@ -373,7 +378,7 @@ function buildUserRow(row){
     saveBtn.textContent = 'Lưu';
     saveBtn.disabled = true;
     function syncChanged(){
-      const roleChanged = sel.value !== row.role;
+      const roleChanged = sel.value !== vaiTroHienThi(row);
       const nowChecked = getBoPhanChecked(bpChecks);
       const before = row.bo_phan_phu_trach || [];
       const bpChanged = nowChecked.join(',') !== before.join(',');
@@ -392,7 +397,8 @@ function buildUserRow(row){
       const { error: updErr } = await sb
         .from('user_roles')
         .update({
-          role: sel.value,
+          role: sel.value === 'tong_giam_doc' ? 'admin' : sel.value,
+          chuc_danh: sel.value === 'tong_giam_doc' ? 'tong_giam_doc' : null,
           bo_phan_phu_trach: chosenBp.length ? chosenBp : null,
           updated_at: new Date().toISOString(),
         })
@@ -402,7 +408,8 @@ function buildUserRow(row){
         saveBtn.disabled = false;
         saveBtn.textContent = 'Lưu';
       } else {
-        row.role = sel.value;
+        row.role = sel.value === 'tong_giam_doc' ? 'admin' : sel.value;
+        row.chuc_danh = sel.value === 'tong_giam_doc' ? 'tong_giam_doc' : null;
         row.bo_phan_phu_trach = chosenBp.length ? chosenBp : null;
         saveBtn.textContent = 'Đã lưu';
         setTimeout(() => { saveBtn.textContent = 'Lưu'; saveBtn.disabled = true; }, 1200);
@@ -535,7 +542,7 @@ async function main(){
   }
 
   document.getElementById('adminArea').style.display = 'block';
-  fillRoleSelect(document.getElementById('cRole'), '');
+  fillRoleSelect(document.getElementById('cRole'), '', true);
   fillBoPhanChecks(document.getElementById('cBoPhan'), []);
   document.getElementById('cRole').addEventListener('change', (e) => {
     document.getElementById('cBoPhanWrap').style.display = e.target.value === 'quan_ly_bo_phan' ? '' : 'none';
