@@ -47,6 +47,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }, () => { html.style.visibility = ''; });
 })();
 
+/** Header cho fetch() thẳng vào REST API: mang token phiên đăng nhập (anon không còn quyền đọc bảng). */
+async function sbHeaders() {
+  const { data } = await sb.auth.getSession();
+  const token = data.session ? data.session.access_token : SUPABASE_ANON_KEY;
+  return { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token };
+}
+
 /**
  * Supabase trả TỐI ĐA 1000 dòng mỗi lần và không báo lỗi khi cắt → bảng lớn phải lấy từng trang.
  * sbTaiHet(mk): mk() tạo truy vấn MỚI mỗi lần gọi, có .order() theo khoá duy nhất (để các trang

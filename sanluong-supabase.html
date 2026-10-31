@@ -560,7 +560,7 @@ function isConfigured(){
 /* Đọc 1 bảng Supabase qua REST API tự sinh (PostgREST), trả JSON array of rows. */
 async function fetchSupabaseTable(table, select){
   const url = `${SUPABASE_URL}/rest/v1/${table}?select=${select || '*'}`;
-  const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } });
+  const res = await fetch(url, { headers: await sbHeaders() });
   if (!res.ok) throw new Error('HTTP ' + res.status + ' fetching ' + table);
   return res.json();
 }
