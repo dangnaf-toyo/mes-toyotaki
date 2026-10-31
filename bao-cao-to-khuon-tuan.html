@@ -480,7 +480,37 @@ function ve(r){
     '</div>';
   const vdBang = r.vdTuan.filter(v => v.trang_thai !== 'Đã đóng' || Number(v.lan_tai_phat) > 0)
     .sort((a, b) => (Number(b.lan_tai_phat) || 0) - (Number(a.lan_tai_phat) || 0) || String(b.ngay_phat_hien).localeCompare(String(a.ngay_phat_hien)));
+  // Số vấn đề phát sinh theo khuôn × ngày trong tuần
+  const kTuan = new Map();
+  r.vdTuan.forEach(v => {
+    const k = String(v.ma_khuon || '?').trim();
+    const x = kTuan.get(k) || { khuon: k, ngay: THU.map(() => 0), n: 0, mo: 0, cho: 0, dong: 0, tp: 0, may: new Set(), sp: new Set() };
+    const i = r.ngay.findIndex(nn => nn.ngay === String(v.ngay_phat_hien).slice(0, 10));
+    if (i >= 0) x.ngay[i]++;
+    x.n++;
+    if (v.trang_thai === 'Đã đóng') x.dong++; else if (v.trang_thai === 'Chờ xác nhận') x.cho++; else x.mo++;
+    if (Number(v.lan_tai_phat) > 0) x.tp++;
+    if (v.ma_may) x.may.add(v.ma_may);
+    if (v.ma_sp) x.sp.add(v.ma_sp);
+    kTuan.set(k, x);
+  });
+  const kRows = [...kTuan.values()].sort((a, b) => b.n - a.n || b.mo - a.mo || a.khuon.localeCompare(b.khuon));
+  const tongNgay = THU.map((_, i) => kRows.reduce((a, x) => a + x.ngay[i], 0));
+  const so = (v, cls) => v ? (cls ? '<span class="st ' + cls + '">' + v + '</span>' : v) : '<span style="color:var(--text-muted)">·</span>';
   h += '<div class="card"><div class="card-title">Khuôn gặp vấn đề cần theo dõi <small>vấn đề trong tuần còn mở hoặc tái phát · ' + vdBang.length + '</small></div>' +
+    '<div class="note" style="margin:0 0 6px"><b>Số vấn đề phát sinh theo khuôn trong tuần</b> — ' + kRows.length + ' khuôn · ' + r.vdTuan.length + ' vấn đề</div>' +
+    '<div class="tbl-wrap" style="max-height:320px;margin-bottom:12px"><table><thead><tr><th>Khuôn</th>' +
+    r.ngay.map((nn, i) => '<th class="num">' + THU[i] + ' ' + dm(nn.ngay) + '</th>').join('') +
+    '<th class="num">Tổng</th><th class="num">Mở</th><th class="num">Chờ XN</th><th class="num">Đã đóng</th><th class="num">Tái phát</th><th>Máy</th><th>Mã SP</th></tr></thead><tbody>' +
+    (kRows.length ? kRows.map(x => '<tr><td class="nowrap"><a href="van-de-khuon.html?khuon=' + encodeURIComponent(x.khuon) + '" target="_blank" rel="noopener"><b>' + esc(x.khuon) + '</b></a></td>' +
+      x.ngay.map(c => '<td class="num">' + so(c) + '</td>').join('') +
+      '<td class="num"><b>' + x.n + '</b></td><td class="num">' + so(x.mo, 'bad') + '</td><td class="num">' + so(x.cho, 'warn') + '</td><td class="num">' + so(x.dong) + '</td>' +
+      '<td class="num">' + so(x.tp, 'bad') + '</td><td class="nowrap">' + esc([...x.may].join(', ')) + '</td><td>' + esc([...x.sp].join(', ')) + '</td></tr>').join('') +
+      '<tr style="font-weight:600;background:var(--bg-sunken)"><td>Tổng</td>' + tongNgay.map(c => '<td class="num">' + so(c) + '</td>').join('') +
+      '<td class="num">' + r.vdTuan.length + '</td><td class="num">' + kRows.reduce((a, x) => a + x.mo, 0) + '</td><td class="num">' + kRows.reduce((a, x) => a + x.cho, 0) + '</td>' +
+      '<td class="num">' + kRows.reduce((a, x) => a + x.dong, 0) + '</td><td class="num">' + kRows.reduce((a, x) => a + x.tp, 0) + '</td><td></td><td></td></tr>'
+      : '<tr><td colspan="15" class="empty">Không có vấn đề khuôn mới trong tuần</td></tr>') + '</tbody></table></div>' +
+    '<div class="note" style="margin:0 0 6px"><b>Chi tiết vấn đề còn mở hoặc tái phát</b></div>' +
     '<div class="tbl-wrap" style="max-height:320px"><table><thead><tr><th>Ngày</th><th>Khuôn</th><th>Máy</th><th>Mã SP</th><th>Vấn đề</th><th>Trạng thái</th><th class="num">Tái phát</th><th>Xử lý</th></tr></thead><tbody>' +
     (vdBang.length ? vdBang.map(v => '<tr><td class="nowrap">' + dm(v.ngay_phat_hien) + '</td><td class="nowrap"><a href="van-de-khuon.html?khuon=' + encodeURIComponent(v.ma_khuon) + '&tab=chua-dong&vd=' + encodeURIComponent(v.id_van_de) + '" target="_blank" rel="noopener"><b>' + esc(v.ma_khuon) + '</b></a></td>' +
       '<td class="nowrap">' + esc(v.ma_may || '') + '</td><td class="nowrap">' + esc(v.ma_sp || '') + '</td><td>' + esc(String(v.mo_ta || '').slice(0, 140)) + '</td>' +
