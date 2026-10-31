@@ -40,7 +40,6 @@
       { label: 'Việc của tôi', href: 'cong-viec-cua-toi.html' },
       { label: 'Bảng công việc', href: 'cong-viec.html' },
       { label: 'Giao việc mới', href: 'cong-viec-giao.html' },
-      { label: 'Giao việc từ Excel (biên bản họp)', href: 'cong-viec-nhap-excel.html' },
       { label: 'Thông báo', href: 'thong-bao.html' },
     ] },
     { label: 'Sản xuất', items: [
