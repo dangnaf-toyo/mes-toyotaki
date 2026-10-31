@@ -39,17 +39,8 @@
   }
 
   function load(khoa) {
-    if (khoa) {
-      return fetch(SUPABASE_URL + '/rest/v1/rpc/tong_quan_hom_nay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY },
-        body: JSON.stringify({ p_khoa: khoa }),
-      }).then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(chk);
-    }
-    return sb.rpc('tong_quan_hom_nay', {}).then(function (res) {
+    // Gọi qua sb để mang phiên đăng nhập (T198: anon không còn quyền gọi RPC)
+    return sb.rpc('tong_quan_hom_nay', khoa ? { p_khoa: khoa } : {}).then(function (res) {
       if (res.error) throw new Error(res.error.message);
       return chk(res.data);
     });

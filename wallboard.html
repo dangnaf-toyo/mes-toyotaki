@@ -315,12 +315,9 @@
     if (PC.oqc) renderPC('s3', 2, 'P-Chart NG OQC sau gia công', 'kiểm', tinhPC(PC.oqc, PC.tu, PC.den, 0.03));
     if (PC.bavia) renderPC('s4', 3, 'P-Chart NG Bavia', 'SX', tinhPC(PC.bavia, PC.tu, PC.den, 0.02));
   }
-  // Gọi RPC wallboard: TV dùng khoá (không đăng nhập), máy đã đăng nhập dùng phiên
+  // Gọi RPC wallboard qua sb (mang phiên đăng nhập — T198 mọi trang bắt đăng nhập, anon không còn quyền RPC)
   function goi(fn) {
-    var p = KHOA
-      ? fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }, body: JSON.stringify({ p_khoa: KHOA }) })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      : sb.rpc(fn, {}).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; });
+    var p = sb.rpc(fn, KHOA ? { p_khoa: KHOA } : {}).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; });
     return p.then(function (d) { if (!d || d.ok === false) throw new Error((d && d.error) || 'Không có dữ liệu'); return d; });
   }
   function taiP() {
