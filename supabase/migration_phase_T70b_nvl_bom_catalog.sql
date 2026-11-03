@@ -1,3 +1,6 @@
+-- T70b (đổi tên từ T70_nvl_bom_catalog — trùng số với T70_chi_phi_bao_phe_thang9). Chỉ đã chạy STAGING.
+-- PROD KHÔNG chạy file này: phần nạp 25 mã NVL mẫu trùng nghĩa với danh mục NVL thật đang dùng ở kho NVL.
+-- Phần cột + hàm đã gộp vào migration_phase_T208_bom_len_prod.sql.
 -- Share the managed NVL catalog with BOM and inventory across browsers/devices.
 -- Run in Supabase SQL Editor for each environment.
 

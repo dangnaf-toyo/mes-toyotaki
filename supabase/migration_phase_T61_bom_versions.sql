@@ -1,3 +1,4 @@
+-- Chỉ đã chạy STAGING. PROD dùng bản đã sửa theo review trong migration_phase_T208_bom_len_prod.sql.
 -- ============================================================================
 -- T61 — BOM theo model, 3 phiên bản/model
 -- Chạy file này trong Supabase SQL Editor (Production và Staging nếu dùng cả 2).
