@@ -25,13 +25,15 @@ const MesIpqcWarning = (() => {
         .eq("id_checkpoint", cp.id_checkpoint)
         .maybeSingle();
       if (saved.error) throw new Error(saved.error.message);
-      if (
-        !saved.data ||
-        saved.data.id_dong !== cp.id_dong ||
-        saved.data.ma_may !== cp.ma_may ||
-        saved.data.ma_sp !== cp.ma_sp
-      )
+      // T204: chỉ chặn khi KHÁC máy hoặc KHÁC mã SP. Cùng máy + mã mà điểm kiểm đã chuyển sang
+      // dòng ca mới (kết ca giữa chừng) thì nhận dòng mới.
+      if (!saved.data || saved.data.ma_may !== cp.ma_may || saved.data.ma_sp !== cp.ma_sp)
         throw new Error("Không xác minh được đúng phiên kiểm tra.");
+      if ((saved.data.id_dong ?? null) !== (cp.id_dong ?? null)) {
+        for (const k of ["id_dong", "ngay", "ca", "phuong_an_ca"]) cp[k] = saved.data[k];
+        if (state.current?.id_checkpoint === cp.id_checkpoint)
+          for (const k of ["id_dong", "ngay", "ca", "phuong_an_ca"]) state.current[k] = saved.data[k];
+      }
       if (saved.data.trang_thai === "da_kiem") {
         if (saved.data.ket_qua !== "CANH_BAO")
           throw new Error("Phiên này đã được lưu với kết quả khác; không ghi đè lịch sử.");
@@ -44,10 +46,14 @@ const MesIpqcWarning = (() => {
         return;
       }
       // D71: điểm kiểm theo KHSX (id_dong NULL — trưởng ca chưa nhập KH ca) không có dòng ca để đối chiếu.
+      // T204: máy vẫn đang chạy đúng mã này (dòng ca nào cũng được) thì cho ghi; máy cũ đã đóng ca thì
+      // máy chủ tự gắn điểm kiểm sang dòng đang chạy lúc lưu (duc_submit_ipqc_session).
       if (cp.id_dong) {
-        const job = (await MesIpqcFlow.jobs()).find((r) => r.id_dong === cp.id_dong);
-        if (!job || job.ma_may !== cp.ma_may || job.ma_sp !== cp.ma_sp)
-          throw new Error("Phiên sản xuất đã thay đổi; không ghi cảnh báo cho máy/model khác.");
+        const jobs = await MesIpqcFlow.jobs();
+        if (!jobs.some((r) => r.ma_may === cp.ma_may && r.ma_sp === cp.ma_sp))
+          throw new Error(
+            "Máy " + cp.ma_may + " hiện không còn chạy mã " + cp.ma_sp + "; không ghi cảnh báo cho máy/model khác.",
+          );
       }
       if (state.current?.id_checkpoint !== cp.id_checkpoint) throw new Error("Phiên kiểm tra đã thay đổi.");
       const result = await submitCheck("CANH_BAO");
@@ -62,7 +68,6 @@ const MesIpqcWarning = (() => {
           !confirmed.error &&
           confirmed.data?.trang_thai === "da_kiem" &&
           confirmed.data.ket_qua === "CANH_BAO" &&
-          confirmed.data.id_dong === cp.id_dong &&
           confirmed.data.ma_may === cp.ma_may &&
           confirmed.data.ma_sp === cp.ma_sp
         ) {

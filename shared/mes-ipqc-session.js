@@ -105,13 +105,14 @@ const MesIpqcSession = (() => {
           (!Number.isFinite(Date.parse(s.completed_at)) || Date.parse(s.completed_at) < Date.parse(s.started_at))) ||
         (s.owner_id && s.owner_id !== userId) ||
         (s.machine && s.machine !== cp.ma_may) ||
-        (s.product_code && s.product_code !== cp.ma_sp) ||
-        (s.job_id != null && s.job_id !== cp.id_dong))
+        (s.product_code && s.product_code !== cp.ma_sp))
     )
       throw {
         code: "INVALID_SESSION",
         message: "Phiên máy chủ trả về không khớp lần kiểm, người kiểm hoặc thời điểm hợp lệ. Không sử dụng phiên này.",
       };
+    // T204: cùng máy + mã SP, máy chủ đã chuyển điểm kiểm sang dòng ca mới (kết ca giữa chừng) → nhận dòng mới.
+    if (s && s.job_id != null && s.job_id !== cp.id_dong) cp.id_dong = s.job_id;
     return s;
   }
   function db() {
@@ -219,13 +220,11 @@ const MesIpqcSession = (() => {
         .eq("id_checkpoint", cp.id_checkpoint)
         .maybeSingle();
       if (checkpoint.error) throw checkpoint.error;
-      if (
-        !checkpoint.data ||
-        checkpoint.data.ma_may !== cp.ma_may ||
-        checkpoint.data.ma_sp !== cp.ma_sp ||
-        (checkpoint.data.id_dong ?? null) !== (cp.id_dong ?? null)
-      )
+      if (!checkpoint.data || checkpoint.data.ma_may !== cp.ma_may || checkpoint.data.ma_sp !== cp.ma_sp)
         throw Error("Điểm kiểm không còn khớp máy/model/Task đã chọn.");
+      // T204: điểm kiểm đã chuyển sang dòng ca mới của cùng máy + mã → nhận dòng mới.
+      for (const k of ["id_dong", "ngay", "ca", "phuong_an_ca"])
+        if (k in checkpoint.data) cp[k] = checkpoint.data[k];
       cp.trang_thai = checkpoint.data.trang_thai;
       const r = await sb.rpc("duc_ipqc_session", { p_checkpoint: cp.id_checkpoint, p_start: false });
       if (token !== loadToken || state.current?.id_checkpoint !== cp.id_checkpoint) return;
