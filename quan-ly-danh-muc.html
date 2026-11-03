@@ -48,9 +48,9 @@
   @media (max-width:800px){.form-grid{grid-template-columns:1fr 1fr;}}
   @media (max-width:480px){.form-grid{grid-template-columns:1fr;}}
   label{display:block;font-size:12.5px;font-weight:600;color:var(--text-muted);margin-bottom:5px;}
-  input,select{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--text);}
+  input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--text);}
   input:disabled{background:var(--bg-sunken);color:var(--text-dim);}
-  input:focus,select:focus{outline:none;border-color:var(--accent);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
   button{padding:10px 20px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;}
   button:hover:not(:disabled){background:var(--accent-hover);}
   button:disabled{opacity:.6;cursor:default;}
@@ -144,6 +144,7 @@
       <div class="pane-toolbar">
         <input type="search" class="list-search" id="may-search" placeholder="Lọc nhanh trong bảng…" autocomplete="off">
         <select class="list-filter" id="may-filt-bo_phan"></select>
+        <select class="list-filter" id="may-filt-loai_may"></select>
         <button type="button" class="btn-reset" id="may-clear">Xoá lọc</button>
         <span class="list-count" id="may-count"></span>
         <button type="button" class="btn-add" id="may-add">＋ Thêm mới</button>
@@ -181,6 +182,20 @@
                 <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:9px 0">
                   <input type="checkbox" id="may-kanban" style="width:auto"> In tem chỉ thị trước, quét QR ghi nhận
                 </label>
+              </div>
+              <div>
+                <label for="may-loai">Loại máy</label>
+                <input type="text" autocomplete="off" id="may-loai" list="may-loai-list" placeholder="vd: Phay CNC (bỏ trống nếu không cần)">
+                <datalist id="may-loai-list">
+                  <option value="Phay CNC">
+                  <option value="Tiện CNC">
+                  <option value="Chuốt">
+                </datalist>
+              </div>
+              <div><label for="may-sotruc">Số trục</label><input type="number" min="1" step="1" id="may-sotruc" placeholder="vd: 3"></div>
+              <div style="grid-column:1/-1">
+                <label for="may-masp">Dùng cho mã sản phẩm</label>
+                <textarea id="may-masp" rows="3" placeholder="Các mã cách nhau bởi dấu phẩy, vd: EXE-CEN-01, EXE-OUT-01"></textarea>
               </div>
             </div>
             <div class="form-actions"><button type="submit" id="may-submit">Thêm máy-line</button></div>
@@ -533,6 +548,9 @@ function mayFillForm(r){
   document.getElementById('may-ma').disabled = true;
   document.getElementById('may-bophan').value = r.bo_phan || '';
   document.getElementById('may-kanban').checked = !!r.kanban;
+  document.getElementById('may-loai').value = r.loai_may || '';
+  document.getElementById('may-sotruc').value = r.so_truc ?? '';
+  document.getElementById('may-masp').value = (r.ma_sp_dung || []).join(', ');
   document.getElementById('may-form-title').textContent = 'Sửa máy-line: ' + r.ma_may;
   document.getElementById('may-submit').textContent = 'Lưu thay đổi';
 }
@@ -541,12 +559,18 @@ document.getElementById('may-form').addEventListener('submit', async (e) => {
   const ma_may = document.getElementById('may-ma').value.trim();
   const kanban = document.getElementById('may-kanban').checked;
   const bo_phan = document.getElementById('may-bophan').value.trim() || null;
+  const loai_may = document.getElementById('may-loai').value.trim() || null;
+  const soTrucRaw = document.getElementById('may-sotruc').value.trim();
+  const so_truc = soTrucRaw ? parseInt(soTrucRaw, 10) : null;
+  const maSp = [...new Set(document.getElementById('may-masp').value.split(/[,;\n]+/).map(s => s.trim().replace(/\.$/, '').toUpperCase()).filter(Boolean))];
+  const ma_sp_dung = maSp.length ? maSp : null;
   if (!ma_may) return;
+  const payload = { kanban, bo_phan, loai_may, so_truc, ma_sp_dung };
   let error;
   if (mayEditing){
-    ({ error } = await sb.from('master_machines').update({ kanban, bo_phan }).eq('ma_may', mayEditing));
+    ({ error } = await sb.from('master_machines').update(payload).eq('ma_may', mayEditing));
   } else {
-    ({ error } = await sb.from('master_machines').insert({ ma_may, kanban, bo_phan }));
+    ({ error } = await sb.from('master_machines').insert({ ma_may, ...payload }));
   }
   if (error) return showMsg('may-msg', 'error', 'Lỗi: ' + error.message);
   toast(mayEditing ? 'Đã lưu ' + ma_may : 'Đã thêm máy-line ' + ma_may);
@@ -556,15 +580,18 @@ document.getElementById('may-form').addEventListener('submit', async (e) => {
 initCatalog({
   id: 'may',
   emptyText: 'Chưa có máy-line nào.',
-  fetch: () => sb.from('master_machines').select('ma_may, kanban, bo_phan'),
+  fetch: () => sb.from('master_machines').select('ma_may, kanban, bo_phan, loai_may, so_truc, ma_sp_dung'),
   pk: r => r.ma_may,
   resetForm: mayResetForm,
   fillForm: mayFillForm,
   remove: r => sb.from('master_machines').delete().eq('ma_may', r.ma_may),
-  filters: [{ k: 'bo_phan', label: 'Bộ phận', valOf: r => r.bo_phan }],
+  filters: [{ k: 'bo_phan', label: 'Bộ phận', valOf: r => r.bo_phan }, { k: 'loai_may', label: 'Loại máy', valOf: r => r.loai_may }],
   columns: [
     { k: 'ma_may', label: 'Mã máy / line', sortable: true, sortVal: r => r.ma_may, text: r => r.ma_may, render: r => escapeHtml(r.ma_may) },
     { k: 'bo_phan', label: 'Bộ phận', sortable: true, sortVal: r => r.bo_phan || '', text: r => r.bo_phan || '', render: r => escapeHtml(r.bo_phan) || DASH },
+    { k: 'loai_may', label: 'Loại máy', sortable: true, sortVal: r => r.loai_may || '', text: r => r.loai_may || '', render: r => escapeHtml(r.loai_may) || DASH },
+    { k: 'so_truc', label: 'Số trục', sortable: true, sortVal: r => r.so_truc ?? -1, text: r => r.so_truc != null ? String(r.so_truc) : '', render: r => r.so_truc != null ? r.so_truc + ' trục' : DASH },
+    { k: 'ma_sp_dung', label: 'Dùng cho mã SP', text: r => (r.ma_sp_dung || []).join(' '), render: r => (r.ma_sp_dung || []).length ? '<span style="font-size:12px">' + escapeHtml(r.ma_sp_dung.join(', ')) + '</span>' : DASH },
     { k: 'kanban', label: 'Kanban', sortable: true, sortVal: r => !!r.kanban, text: r => r.kanban ? 'kanban' : '', render: r => r.kanban ? '<span style="color:var(--run-fg);font-weight:600">✔ Kanban</span>' : DASH },
   ],
 });
