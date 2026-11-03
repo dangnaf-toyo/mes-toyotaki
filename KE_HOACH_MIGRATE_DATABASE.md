@@ -147,28 +147,24 @@
 
 ---
 
-## 8. Domain riêng cho công ty (mes.toyotaki.vn) — KẾ HOẠCH, CHƯA TRIỂN KHAI
+## 8. Domain riêng cho công ty (mes.toyotaki.vn) — ĐÃ TRIỂN KHAI 03/11/2026
 
-> **Trạng thái hiện tại:** hệ thống vẫn đang chạy ở link mặc định `https://dangnaf-toyo.github.io/Toyotaki/`. Mục này chỉ là kế hoạch cho tương lai — đã thử thêm file `CNAME` vào repo nhưng đã **gỡ lại** vì DNS phía `toyotaki.vn` chưa được cấu hình nên domain riêng chưa thể dùng được trong thực tế. Khi nào sẵn sàng triển khai thật, làm lại theo đúng các bước dưới đây.
+Hệ thống MES chạy tại **`https://mes.toyotaki.vn/`** (repo `dangnaf-toyo/mes-toyotaki`, nhánh `master`, GitHub Pages). Địa chỉ cũ `https://dangnaf-toyo.github.io/mes-toyotaki/...` tự chuyển hướng 301 sang tên miền mới, giữ nguyên đường dẫn trang.
 
-Mục tiêu: thay vì dùng link mặc định `dangnaf-toyo.github.io/Toyotaki`, hệ thống chạy trên domain riêng của công ty để trông chuyên nghiệp và dễ nhớ hơn cho nhân viên.
+Cấu hình đang dùng:
 
-**Quyết định đã chốt (khi triển khai):** dùng subdomain **`mes.toyotaki.vn`**, không dùng domain gốc `toyotaki.vn` vì domain gốc đang chạy website công ty hiện tại — trỏ domain gốc sang GitHub Pages sẽ ghi đè mất website đó.
+| Nơi | Cài đặt |
+|---|---|
+| DNS `toyotaki.vn` (quản trị tại **P.A Việt Nam**, ns1/ns2.pavietnam.vn) | CNAME `mes` → `dangnaf-toyo.github.io`; TXT `_github-pages-challenge-dangnaf-toyo` (mã xác minh GitHub) |
+| GitHub tài khoản `dangnaf-toyo` → Settings → Pages | Tên miền `toyotaki.vn` đã **Verified** (chống chiếm tên miền con) |
+| GitHub repo `mes-toyotaki` → Settings → Pages | Custom domain `mes.toyotaki.vn` + **Enforce HTTPS**; GitHub tự tạo tệp `CNAME` trên `master` — **không xoá tệp này** |
+| Supabase prod `fgghikpzcxjqzahfiiil` → Authentication → URL Configuration | Site URL `https://mes.toyotaki.vn` + Redirect URLs |
+| Code `shared/supabase-client.js` | `PROD_HOSTNAMES = ['mes.toyotaki.vn', 'dangnaf-toyo.github.io']` — đổi tên miền lần nữa thì PHẢI thêm vào đây, không thì trang trỏ vào DB staging |
 
-**Các bước cần làm khi triển khai thật (chưa làm bước nào):**
-
-- [ ] Thêm lại file `CNAME` ở root repo với nội dung `mes.toyotaki.vn`.
-- [ ] Vào trang quản lý DNS của `toyotaki.vn`, thêm bản ghi:
-  | Loại | Host/Tên | Giá trị |
-  |---|---|---|
-  | CNAME | `mes` | `dangnaf-toyo.github.io` |
-
-  (Nếu nhà cung cấp không hỗ trợ CNAME cho subdomain, dùng loại `ALIAS`/`ANAME` trỏ tới cùng giá trị trên.)
-- [ ] Vào GitHub repo `Toyotaki` → **Settings → Pages** → xác nhận ô "Custom domain" hiện `mes.toyotaki.vn` → bấm **Save**.
-- [ ] Đợi DNS lan truyền (thường 5-30 phút, đôi khi vài giờ) đến khi GitHub hiện dấu ✓ xác nhận domain hợp lệ.
-- [ ] Tick chọn **"Enforce HTTPS"** trong Settings → Pages sau khi có dấu ✓, để trang chạy an toàn qua `https://mes.toyotaki.vn`.
-- [ ] Thông báo lại địa chỉ mới cho toàn bộ nhân viên đang dùng link cũ; có thể giữ link GitHub Pages cũ chạy song song một thời gian (không xung đột, cả 2 domain đều trỏ về cùng 1 trang).
-- [ ] Sau khi domain công ty hoạt động ổn định, cân nhắc đặt thêm subdomain tương tự cho các module khác nếu tách riêng dashboard Đúc/Tồn kho NVL ra domain (ví dụ `duc.toyotaki.vn`, `nvl.toyotaki.vn`) thay vì gộp chung vào trang chủ `mes.toyotaki.vn`.
+Ghi chú:
+- Chỉ dùng tên miền con `mes`; **không** sửa bản ghi `@`/`www` (website chính của công ty).
+- Phiên đăng nhập lưu theo từng tên miền: máy/TV chuyển từ địa chỉ cũ sang phải đăng nhập lại 1 lần.
+- Tài khoản `admin@mes.local` chỉ có ở staging, không dùng được trên prod.
 
 ---
 
