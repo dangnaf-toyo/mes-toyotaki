@@ -118,11 +118,11 @@
         esc(uniq(ng.map(n => caNgan(n.ca)))),
         'Đúc',
         esc(uniq(ng.map(n => tenNguoi(n.nguoi)))),
-        num(ng.reduce((s, n) => s + Number(n.so_luong_lay), 0)),
+        num(t.so_luong),
         '',
         esc(uniq(ng.map(n => String(n.tag_no || '').slice(-4)))),
       ]) +
-      r(['', 'Trimming', '', 'Cắt cuống liệu', '', '', '', '']) +
+      r(['', 'Trimming', '', 'Cắt cuống liệu', '', num(t.so_luong), '', '']) +
       r([
         dmyNgan(ngayBavia(t)),
         'Xử Lý Bavia',
@@ -133,9 +133,10 @@
         '',
         '',
       ]) +
+      // T203: OK mọi công đoạn (Đúc, Trimming, Bavia, Ktra ngoại quan, Phun bi) = số lượng trên tem (user chốt 03/11/2026).
       // T151: Ktra ngoại quan = người kiểm tra của Line, Sandblast = người phun bi của Line (user chốt 23/10/2026).
-      r(['', 'Ktra ngoại quan', '', 'Ktra ngoại quan', esc(tenNguoi(t.nguoi_kiem)), '', '', '']) +
-      r(['', 'Sandblast No', '', 'Tạo nhám ( Phun bi)', esc(nguoiDs(t.nguoi_phun_bi)), '', '', '']) +
+      r(['', 'Ktra ngoại quan', '', 'Ktra ngoại quan', esc(tenNguoi(t.nguoi_kiem)), num(t.so_luong), '', '']) +
+      r(['', 'Sandblast No', '', 'Tạo nhám ( Phun bi)', esc(nguoiDs(t.nguoi_phun_bi)), num(t.so_luong), '', '']) +
       trong(2) +
       '</table>' +
       '<div class="xs">Xuất sang công đoạn sau</div>' +
