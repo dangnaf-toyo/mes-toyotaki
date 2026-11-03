@@ -118,6 +118,7 @@
                 <option value="phay_3_truc">Phay 3 trục</option>
                 <option value="phay_4_truc">Phay 4 trục</option>
                 <option value="tien">Tiện</option>
+                <option value="chuot">Chuốt</option>
               </select>
             </div>
             <div><label for="rt-ct">Cycle time (giây/pcs)</label><input type="number" step="any" min="0" id="rt-ct" required></div>
@@ -176,6 +177,7 @@
             <div><label for="cfg-p3">Số máy phay 3 trục hiện có</label><input type="number" step="any" min="0" id="cfg-p3"></div>
             <div><label for="cfg-p4">Số máy phay 4 trục hiện có</label><input type="number" step="any" min="0" id="cfg-p4"></div>
             <div><label for="cfg-tien">Số máy tiện hiện có</label><input type="number" step="any" min="0" id="cfg-tien"></div>
+            <div><label for="cfg-chuot">Số máy chuốt hiện có</label><input type="number" step="any" min="0" id="cfg-chuot"></div>
           </div>
           <div class="form-actions"><button type="submit">Lưu giả định</button></div>
         </form>
@@ -197,8 +199,8 @@
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
 <script>
-const LOAI_MAY_LABELS = { phay_3_truc: 'Phay 3 trục', phay_4_truc: 'Phay 4 trục', tien: 'Tiện' };
-const LOAI_MAY_ORDER = ['phay_3_truc', 'phay_4_truc', 'tien'];
+const LOAI_MAY_LABELS = { phay_3_truc: 'Phay 3 trục', phay_4_truc: 'Phay 4 trục', tien: 'Tiện', chuot: 'Chuốt' };
+const LOAI_MAY_ORDER = ['phay_3_truc', 'phay_4_truc', 'tien', 'chuot'];
 const THANG_LABELS = ['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'];
 
 function escapeHtml(s){
@@ -381,6 +383,7 @@ async function loadCapacityConfig(){
   document.getElementById('cfg-p3').value = capacityConfig.so_may_phay_3_truc;
   document.getElementById('cfg-p4').value = capacityConfig.so_may_phay_4_truc;
   document.getElementById('cfg-tien').value = capacityConfig.so_may_tien;
+  document.getElementById('cfg-chuot').value = capacityConfig.so_may_chuot ?? 1;
 }
 
 document.getElementById('cfg-form').addEventListener('submit', async (e) => {
@@ -394,6 +397,7 @@ document.getElementById('cfg-form').addEventListener('submit', async (e) => {
     so_may_phay_3_truc: Number(document.getElementById('cfg-p3').value) || 0,
     so_may_phay_4_truc: Number(document.getElementById('cfg-p4').value) || 0,
     so_may_tien: Number(document.getElementById('cfg-tien').value) || 0,
+    so_may_chuot: Number(document.getElementById('cfg-chuot').value) || 0,
   };
   const { error } = await sb.from('cnc_capacity_config').upsert(payload, { onConflict: 'id' });
   if (error) return showMsg('cfg-msg', 'error', 'Lỗi lưu: ' + error.message);
@@ -431,10 +435,11 @@ async function computeAndRenderCapacity(){
     phay_3_truc: capacityConfig.so_may_phay_3_truc || 0,
     phay_4_truc: capacityConfig.so_may_phay_4_truc || 0,
     tien: capacityConfig.so_may_tien || 0,
+    chuot: capacityConfig.so_may_chuot || 0,
   };
 
   // requiredHours[loai_may][thang]
-  const requiredHours = { phay_3_truc: Array(12).fill(0), phay_4_truc: Array(12).fill(0), tien: Array(12).fill(0) };
+  const requiredHours = { phay_3_truc: Array(12).fill(0), phay_4_truc: Array(12).fill(0), tien: Array(12).fill(0), chuot: Array(12).fill(0) };
   Object.keys(routingBySp).forEach(sp => {
     for (let thang = 1; thang <= 12; thang++){
       const qty = fcMap[sp + '|' + thang] || 0;
