@@ -667,14 +667,18 @@ function updateKanbanOnly(item){
 /** Danh sách khuôn của 1 mã SP lưu dạng "KPH #13-14, KPH #15-16" (text, xem
     migration_phase_S7_sokhuon_real.sql) -- chỉ 1 khuôn thì điền thẳng vào ô,
     nhiều khuôn thì hiện chip để chọn (ô vẫn sửa tay được nếu cần khuôn khác). */
-function populateSoKhuonChips(prefix, soKhuonRaw){
+function populateSoKhuonChips(prefix, soKhuonRaw, khuonChon){
   var chipsEl = document.getElementById(prefix + "soKhuon-chips");
   var inputEl = document.getElementById(prefix + "soKhuon");
   var molds = String(soKhuonRaw || "").split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+  // T201: khuôn đang chạy truyền từ màn hình điều khiển đúc (?soKhuon=) → chọn sẵn
+  // đúng khuôn đó thay vì khuôn đầu danh sách (khuôn ưu tiên).
+  khuonChon = String(khuonChon || "").trim();
 
   if (molds.length <= 1){
     chipsEl.innerHTML = "";
-    inputEl.value = molds[0] || "";
+    inputEl.oninput = null;
+    inputEl.value = khuonChon || molds[0] || "";
     return;
   }
 
@@ -687,14 +691,26 @@ function populateSoKhuonChips(prefix, soKhuonRaw){
       [].forEach.call(chipsEl.querySelectorAll(".chip-opt"), function(b){ b.classList.toggle("sel", b === btn); });
     });
   });
-  inputEl.value = molds[0];
-  chipsEl.querySelector(".chip-opt").classList.add("sel");
+  var chon = khuonChon || molds[0];
+  inputEl.value = chon;
+  [].forEach.call(chipsEl.querySelectorAll(".chip-opt"), function(b){
+    b.classList.toggle("sel", b.dataset.mk.toLowerCase() === chon.toLowerCase());
+  });
+  // Sửa tay ô số khuôn → chip sáng theo đúng giá trị đang nhập.
+  inputEl.oninput = function(){
+    var v = inputEl.value.trim().toLowerCase();
+    [].forEach.call(chipsEl.querySelectorAll(".chip-opt"), function(b){ b.classList.toggle("sel", b.dataset.mk.toLowerCase() === v); });
+  };
 }
 
 function applyPrefill(){
   if (!PREFILL || !PREFILL.maSP) return;
   document.getElementById("maSP").value = PREFILL.maSP;
   onMaChange('');
+  if (PREFILL.soKhuon) {
+    var pm = masterMap[PREFILL.maSP];
+    populateSoKhuonChips('', pm ? pm.soKhuon : "", PREFILL.soKhuon);
+  }
   // Mã chỉ thị Kanban không có trong danh sách → báo lý do thay vì để trống im lặng.
   var pf = masterMap[PREFILL.maSP];
   if (pf && pf.chiThiKanban) { updateKanbanOnly(pf); return; }
