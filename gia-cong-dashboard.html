@@ -248,6 +248,7 @@
     </select>
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">↻ Tải lại</button>
+  <button type="button" class="btn btn-ghost" id="btnPlan" title="Gán mã SP + KH ca cho máy theo KHSX tuần Gia công hôm nay">⚡ Nạp KH từ KHSX tuần</button>
   <button type="button" class="btn btn-ghost" id="btnChep" title="Mở lại các máy của ca trước với cùng mã SP, KH ca, người đứng máy">Chép máy từ ca trước</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa">Báo cáo kết ca</button>
   <a class="btn btn-ghost" href="cong-doan-dashboard.html?cd=Gia+C%C3%B4ng" title="Cắt viền chưa có danh mục máy — vẫn dùng màn cũ">Cắt viền ↗</a>
@@ -290,6 +291,24 @@
     <div class="acts">
       <button class="mbtn ghost" type="button" data-close>Huỷ</button>
       <button class="mbtn" type="button" id="mmSave">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nạp kế hoạch từ KHSX tuần -->
+<div class="modal-bg" id="planModal" hidden>
+  <div class="modal xl" role="dialog" aria-modal="true" aria-labelledby="plTitle">
+    <h4 id="plTitle">Nạp kế hoạch Gia công từ KHSX tuần</h4>
+    <div class="sub" id="plSub"></div>
+    <div class="tbl"><table class="t" style="min-width:900px">
+      <thead><tr><th>Mã SP</th><th style="text-align:right">KH ngày</th><th>Số ca</th><th style="text-align:right">KH ca</th><th>Chọn máy (máy trống làm được mã này)</th><th>Người đứng máy</th></tr></thead>
+      <tbody id="plRows"></tbody>
+    </table></div>
+    <div class="err" id="plErr"></div>
+    <div class="acts">
+      <span id="plCount" style="font-size:12px;color:var(--text-muted)"></span><span class="sp"></span>
+      <button class="mbtn ghost" type="button" data-close>Huỷ</button>
+      <button class="mbtn" type="button" id="plSave">Nạp kế hoạch</button>
     </div>
   </div>
 </div>
@@ -471,6 +490,7 @@ function renderAll() {
   kb.textContent = D && D.ket_ca ? 'Báo cáo ca (đã kết)' : 'Báo cáo kết ca';
   kb.classList.toggle('done', !!(D && D.ket_ca));
   $('#btnChep').disabled = !D || !!D.ket_ca;
+  $('#btnPlan').disabled = !D || !!D.ket_ca;
 }
 
 function renderKpis() {
@@ -805,6 +825,81 @@ $('#dmSave').onclick = async () => {
     $('#dungModal').hidden = true; setFlash('warn', '⛔ ' + esc(m.ma_may) + ' đang dừng. Khi chạy lại bấm "Máy chạy lại…".');
     await taiLai();
   } catch (e) { $('#dmErr').textContent = errText(e); }
+};
+
+/* ── Nạp kế hoạch từ KHSX tuần ─────────────────────────────────────────────
+   Mỗi mã có KH ngày > 0: chia theo số ca (mặc định 2) → KH ca của mã, chia đều cho các
+   máy được chọn. Chỉ liệt kê máy CHƯA mở trong ca và đã khai làm được mã đó. */
+let planSel = {}, planR = [];
+function planRows() {
+  const K = ((D && D.kh) || []).filter(k => Number(k.kh_ngay) > 0);
+  const trong = MAY().filter(m => !m.tram);
+  return K.map(k => ({ k, may: trong.filter(m => (m.ma_sp_dung || []).includes(k.ma_sp)),
+    dangChay: MAY().filter(m => m.tram && m.tram.ma_sp === k.ma_sp).map(m => m.ma_may) }));
+}
+function planCount() {
+  const n = Object.values(planSel).reduce((s, x) => s + x.size, 0);
+  $('#plCount').textContent = n ? 'Sẽ mở ' + n + ' máy' : 'Chưa chọn máy nào';
+}
+function planChia(i) {
+  const n = (planSel[i] || new Set()).size, kh = Number(document.querySelector('[data-pkh="' + i + '"]').value) || 0;
+  document.querySelector('[data-pdiv="' + i + '"]').textContent = n ? fmt(Math.round(kh / n)) + ' / máy' : '';
+}
+function renderPlan() {
+  const R = planRows();
+  const inp = 'border:1.5px solid var(--border-strong);border-radius:6px;padding:4px 6px;';
+  $('#plSub').textContent = $('#fCa').value + ' · ' + dmy($('#fNgay').value) + ' — tick máy cho từng mã; KH ca của mã chia đều cho các máy được chọn. Máy đã mở trong ca không hiện ở đây (sửa bằng "Sửa máy").';
+  $('#plRows').innerHTML = R.length ? R.map((r, i) => {
+    const k = r.k, khCa = Math.round(Number(k.kh_ngay) / 2);
+    const chips = r.may.length ? r.may.map(m => '<label style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;margin:2px;font-size:12px;font-weight:600;cursor:pointer"><input type="checkbox" data-pm="' + i + '" value="' + esc(m.ma_may) + '">' + esc(m.ma_may) + '</label>').join('')
+      : '<span style="color:var(--alarm-fg);font-size:12px;font-weight:600">' + (Number(k.so_may_lam_duoc) ? 'Không còn máy trống làm được mã này' : 'Chưa khai máy nào làm được mã này (Quản lý danh mục → Máy-Line)') + '</span>';
+    return '<tr><td style="min-width:150px"><b class="mono" style="white-space:nowrap">' + esc(k.ma_sp) + '</b><div style="font-size:11px;color:var(--text-muted)">' + esc(k.ten_sp || '') + (r.dangChay.length ? ' · đang chạy ' + esc(r.dangChay.join(', ')) : '') + '</div></td>' +
+      '<td class="n">' + fmt(k.kh_ngay) + '</td>' +
+      '<td><input type="number" min="1" max="3" value="2" data-psc="' + i + '" style="width:56px;' + inp + '"></td>' +
+      '<td class="n"><input type="number" min="0" value="' + khCa + '" data-pkh="' + i + '" style="width:80px;text-align:right;font-family:var(--mono);' + inp + '"><div style="font-size:11px;color:var(--text-muted);font-weight:500" data-pdiv="' + i + '"></div></td>' +
+      '<td>' + chips + '</td>' +
+      '<td><input list="dsNguoi" data-png="' + i + '" placeholder="Gõ tên" style="width:150px;' + inp + '"' + (r.may.length ? '' : ' disabled') + '></td></tr>';
+  }).join('') : '<tr><td colspan="6"><div class="empty-box">KHSX tuần Gia công không có mã nào có kế hoạch cho ngày này.</div></td></tr>';
+  planSel = {};
+  document.querySelectorAll('[data-pm]').forEach(c => c.onchange = () => {
+    const i = c.dataset.pm; planSel[i] = planSel[i] || new Set();
+    if (c.checked) planSel[i].add(c.value); else planSel[i].delete(c.value);
+    // 1 máy chỉ nhận 1 mã: bỏ chọn máy này ở các mã khác
+    if (c.checked) document.querySelectorAll('[data-pm]').forEach(o => {
+      if (o !== c && o.value === c.value && o.checked) { o.checked = false; planSel[o.dataset.pm].delete(o.value); planChia(o.dataset.pm); }
+    });
+    planChia(i); planCount();
+  });
+  document.querySelectorAll('[data-psc]').forEach(x => x.oninput = () => {
+    const i = x.dataset.psc, sc = Math.max(1, Number(x.value) || 1);
+    document.querySelector('[data-pkh="' + i + '"]').value = Math.round(Number(R[i].k.kh_ngay) / sc); planChia(i);
+  });
+  document.querySelectorAll('[data-pkh]').forEach(x => x.oninput = () => planChia(x.dataset.pkh));
+  $('#plErr').textContent = ''; planCount();
+  return R;
+}
+$('#btnPlan').onclick = () => { if (!D) return; planR = renderPlan(); $('#planModal').hidden = false; };
+$('#plSave').onclick = async () => {
+  const viec = [];
+  Object.entries(planSel).forEach(([i, set]) => {
+    if (!set.size) return;
+    const kh = Number(document.querySelector('[data-pkh="' + i + '"]').value) || 0;
+    const nguoi = document.querySelector('[data-png="' + i + '"]').value;
+    [...set].forEach(ma => viec.push({ ma, sp: planR[i].k.ma_sp, kh: Math.round(kh / set.size), nguoi }));
+  });
+  if (!viec.length) { $('#plErr').textContent = 'Chưa chọn máy nào.'; return; }
+  $('#plSave').disabled = true;
+  const loi = [];
+  for (const v of viec) {
+    try { await rpc('gc_may_luu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ma_may: v.ma, p_ma_sp: v.sp, p_kh_ca: v.kh, p_nguoi: v.nguoi }); }
+    catch (e) { loi.push(v.ma + ': ' + errText(e)); }
+  }
+  $('#plSave').disabled = false;
+  await taiLai();
+  if (loi.length) { planR = renderPlan(); $('#plErr').textContent = 'Đã mở ' + (viec.length - loi.length) + '/' + viec.length + ' máy. Lỗi: ' + loi.join(' · '); return; }
+  $('#planModal').hidden = true;
+  setFlash('ok', '✓ Đã nạp kế hoạch: mở ' + viec.length + ' máy. Máy nào chưa có người đứng máy thì bấm "Sửa máy" để chọn.');
+  renderWs();
 };
 
 /* ── Chép máy từ ca trước ────────────────────────────────────────────────── */
