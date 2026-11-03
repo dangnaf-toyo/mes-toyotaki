@@ -84,6 +84,6 @@ Kể từ 2026-08-22, báo cáo tuần có **trang thật trong app**: `bao-cao-
 2. Lấy dữ liệu Supabase (đọc thôi, không ghi — cloud routine không có phiên đăng nhập nên không ghi được bảng `duc_bao_cao_tuan_van_de`, việc đó để user tự làm trên trang).
 3. Rút ra 3-5 điểm nổi bật nhất tuần (vd ca yếu nhất, máy/mã SP thiếu hụt nhiều nhất, vấn đề lặp lại nhiều nhất) — dùng đúng logic mục 3.
 4. Kết thúc bằng 1 tin nhắn ngắn gồm: link trực tiếp đến đúng tuần đó —
-   `https://dangnaf-toyo.github.io/mes-toyotaki/bao-cao-tuan.html?monday=<Thứ Hai tuần đó, YYYY-MM-DD>`
+   `https://mes.toyotaki.vn/bao-cao-tuan.html?monday=<Thứ Hai tuần đó, YYYY-MM-DD>`
    — và danh sách 3-5 gạch đầu dòng điểm nổi bật. Không liệt lại toàn bộ số liệu (trang đã có đủ).
 - Không có ai để hỏi lại — nếu dữ liệu tuần đó thiếu/bất thường (vd thiếu hẳn 1 ngày không có `duc_bao_cao_ca` nào), vẫn nêu điểm nổi bật với dữ liệu đang có, ghi chú rõ chỗ thiếu, không suy diễn số liệu.

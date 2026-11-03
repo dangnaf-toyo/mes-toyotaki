@@ -4,12 +4,12 @@
 
 | | Production | Staging |
 |---|---|---|
-| URL | `https://dangnaf-toyo.github.io/mes-toyotaki/` | Cloudflare Pages (branch `staging`) |
+| URL | `https://mes.toyotaki.vn/` (địa chỉ cũ `dangnaf-toyo.github.io/mes-toyotaki/` tự chuyển hướng sang) | Cloudflare Pages (branch `staging`) |
 | Nhánh Git | `master` | `staging` |
 | Supabase project | `fgghikpzcxjqzahfiiil` | project staging riêng (xem `shared/supabase-client.js`) |
 | Ai được deploy | **Chỉ chủ repo** (merge PR vào `master`) | Mọi dev (merge PR vào `staging`) |
 
-`shared/supabase-client.js` tự chọn URL/anon key theo `location.hostname` — hostname đúng domain GitHub Pages production thì dùng DB production, mọi hostname khác (staging, localhost, mở file trực tiếp) đều dùng DB staging. Không cần đổi code khi merge giữa 2 nhánh.
+`shared/supabase-client.js` tự chọn URL/anon key theo `location.hostname` — hostname nằm trong `PROD_HOSTNAMES` (`mes.toyotaki.vn`, `dangnaf-toyo.github.io`) thì dùng DB production, mọi hostname khác (staging, localhost, mở file trực tiếp) đều dùng DB staging. Không cần đổi code khi merge giữa 2 nhánh.
 
 ## Quy trình
 
