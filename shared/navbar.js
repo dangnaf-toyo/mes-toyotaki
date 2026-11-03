@@ -23,6 +23,8 @@
     s.src = document.currentScript.src.replace(/navbar\.js(\?.*)?$/, 'bang-dai.js');
     document.head.appendChild(s);
   }
+  // T208: trang nhúng trong tab quản trị (vd bom.html?embed=1 trong Quản lý danh mục) không cần thanh menu thứ hai.
+  if (new URLSearchParams(location.search).has('embed')) return;
   const MENU = [
     { label: 'Điều hành & Báo cáo', items: [
       { label: 'Dashboard Sản lượng', href: 'sanluong-supabase.html' },
@@ -134,6 +136,7 @@
     'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin', noTitleBar: true },
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
+    'bom.html': { icon: '🧾', title: 'Quản lý BOM', desc: 'Danh mục NVL, BOM theo sản phẩm (3 phiên bản) — chỉ Admin', noTitleBar: true },
     'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
