@@ -923,7 +923,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/khuon-nam-van-de.js"></script>
 <script src="shared/su-co-anh.js"></script>
-<script src="shared/khuon-can-thiep.js?v=T210b"></script>
+<script src="shared/khuon-can-thiep.js?v=T210d"></script>
 <script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
@@ -2250,7 +2250,7 @@ async function taiCanThiep(ids){
 }
 function ctDat(s){
   const c = (state.canThiep || {})[s.open_id_su_co];
-  return !!c && (c.trang_thai === 'khong_tac_dong' || (c.trang_thai === 'da_duyet' && (c.an_toan || []).length > 0));
+  return !!c && (c.trang_thai === 'khong_tac_dong' || c.trang_thai === 'da_duyet');   // T210d: bỏ cam kết an toàn
 }
 function ctHTML(s, args){
   if (!canCt(s)) return '';
@@ -2258,8 +2258,7 @@ function ctHTML(s, args){
   let cls = 'can', label = '🔧 Can thiệp khuôn', tip = 'Chưa khai — chọn việc làm trên khuôn (hoặc "Không tác động")';
   if (c && c.trang_thai === 'cho_duyet') { cls = 'cho'; label = '⏳ Chờ duyệt cấp ' + c.cap; tip = 'Chưa được giao QC / đóng sự cố tới khi duyệt'; }
   else if (c && c.trang_thai === 'tu_choi') { cls = 'can'; label = '❌ Cấp ' + c.cap + ' bị từ chối'; tip = 'Khai lại hạng mục'; }
-  else if (c && c.trang_thai === 'da_duyet' && !(c.an_toan || []).length) { cls = 'cho'; label = '🦺 Cấp ' + c.cap + ' — chưa cam kết AT'; tip = 'Tick cam kết an toàn'; }
-  else if (c && c.trang_thai === 'da_duyet') { cls = 'ok'; label = '🔧 Cấp ' + c.cap + ' ✓'; tip = 'Đã duyệt + cam kết an toàn'; }
+  else if (c && c.trang_thai === 'da_duyet') { cls = 'ok'; label = '🔧 Cấp ' + c.cap + ' ✓'; tip = 'Đã duyệt — được giao QC'; }
   else if (c && c.trang_thai === 'khong_tac_dong') { cls = 'ok'; label = '🔧 Không tác động'; tip = 'Đã khai không tác động vào khuôn'; }
   return '<button class="btn-ct ' + cls + '" title="' + escapeHtml(tip) + '" onclick=\'moKhuonCT(' + args + ')\'>' + label + '</button>';
 }
