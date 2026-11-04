@@ -326,7 +326,7 @@ let activeTab = TABS.includes(requestedTab) ? requestedTab : TABS[0];
 let ducRows = [];
 let cdRows = [];
 let editingId = null;
-let myRole = null, myBoPhan = null;
+let myRole = null, myBoPhan = null, myChucDanh = null;   // T211
 let duyetInfo = null;   // { trang_thai, updated_by, updated_at } | null (chưa gửi duyệt lần nào = 'nhap')
 let changeLog = [];
 
@@ -400,8 +400,9 @@ const LOG_LABEL = {
 async function loadMyRoleInfo(){
   const session = await MesAuth.getSession();
   if (!session) return;
-  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
+  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach,chuc_danh').eq('user_id', session.user.id).maybeSingle();
   myRole = data ? data.role : null;
+  myChucDanh = data ? data.chuc_danh : null;   // T211: admin kiêm GĐSX
   myBoPhan = data ? data.bo_phan_phu_trach : null;
   renderDuyetBar();
 }
@@ -435,7 +436,7 @@ function renderDuyetBar(){
   // KHÔNG được tự duyệt (khác canGui, vẫn cho admin gửi duyệt hộ khi cần).
   const canDuyetTruongPhong = tt === 'cho_truong_phong' && myRole === 'qlsx_truong_phong';
   const canDuyetBoPhan = tt === 'cho_quan_ly_bo_phan' && myRole === 'quan_ly_bo_phan' && Array.isArray(myBoPhan) && myBoPhan.includes(activeTab);
-  const canDuyetGiamDoc = tt === 'cho_giam_doc' && myRole === 'giam_doc_sx';
+  const canDuyetGiamDoc = tt === 'cho_giam_doc' && (myRole === 'giam_doc_sx' || myChucDanh === 'giam_doc_sx');
 
   if (canGui) {
     actions = '<button type="button" class="btn" id="btnGuiDuyet">📤 Gửi duyệt</button>';

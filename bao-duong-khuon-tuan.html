@@ -454,6 +454,7 @@ let weekMonday = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(locatio
 let csByKh = {};           // id lịch -> {trang_thai, ket_luan} (duc_khuon_checksheet)
 let canEdit = false;
 let canEditXl = false;   // T210g
+let myChucDanh = null;   // T211
 let myRole = null, myBoPhan = [];
 let duyetInfo = null;      // duc_khuon_bd_duyet của tuần
 let duyetLog = [];
@@ -541,11 +542,12 @@ function computeMoldStatus(tongShot, shotBdgn, nguongBd, nguongLm){
 async function loadPermission(){
   const session = await MesAuth.getSession();
   if (!session) { canEdit = false; return; }
-  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach').eq('user_id', session.user.id).maybeSingle();
+  const { data } = await sb.from('user_roles').select('role,bo_phan_phu_trach,chuc_danh').eq('user_id', session.user.id).maybeSingle();
   myRole = data ? data.role : null;
+  myChucDanh = data ? data.chuc_danh : null;   // T211: admin kiêm GĐSX
   myBoPhan = data && Array.isArray(data.bo_phan_phu_trach) ? data.bo_phan_phu_trach : [];
   canEdit = EDIT_ROLES.includes(myRole) || laNguoiKiemTra();
-  canEditXl = canEdit || myRole === 'giam_doc_sx';   // T210g: GĐSX ghi được phiếu xử lý bất thường (KH tuần vẫn chỉ người lập)
+  canEditXl = canEdit || laNguoiPheDuyet();   // T210g: GĐSX ghi được phiếu xử lý bất thường (KH tuần vẫn chỉ người lập)
 }
 
 async function loadEmployees(){
@@ -938,7 +940,7 @@ function rpcErr(data, error){ return error ? error.message : (data && data.error
 function trangThai(){ return duyetInfo ? duyetInfo.trang_thai : 'nhap'; }
 function fmtTs(ts){ return ts ? new Date(ts).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
 function laNguoiKiemTra(){ return myRole === 'quan_ly_bo_phan' && myBoPhan.includes('Đúc'); }
-function laNguoiPheDuyet(){ return myRole === 'giam_doc_sx'; }
+function laNguoiPheDuyet(){ return myRole === 'giam_doc_sx' || myChucDanh === 'giam_doc_sx'; }
 
 function renderDuyet(){
   const tt = trangThai();
