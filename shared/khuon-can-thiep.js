@@ -19,7 +19,7 @@
 (function () {
   const CAP = {
     0: { ten: 'Cấp 0 · Được tự làm', duyet: 'Không cần duyệt — ghi phiếu', mau: '#047857', nen: '#ECFDF5' },
-    1: { ten: 'Cấp 1 · Tổ trưởng duyệt', duyet: 'Tổ trưởng khuôn', mau: '#B45309', nen: '#FFFBEB' },
+    1: { ten: 'Cấp 1 · Tổ trưởng duyệt', duyet: 'Tổ trưởng khuôn (hoặc trưởng ca chỉ thị)', mau: '#B45309', nen: '#FFFBEB' },
     2: { ten: 'Cấp 2 · QLBP Đúc duyệt', duyet: 'Quản lý bộ phận Đúc', mau: '#C2410C', nen: '#FFF7ED' },
     3: { ten: 'Cấp 3 · Giám đốc SX duyệt', duyet: 'Giám đốc sản xuất', mau: '#B91C1C', nen: '#FEF2F2' },
   };
