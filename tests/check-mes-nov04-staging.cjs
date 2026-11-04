@@ -7,7 +7,7 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
     ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-gia-cong.html']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
-    ['ipqc-gia-cong.html',['gcMeasureForm','gcDrawingFile']],
+    ['ipqc-gia-cong.html',['gcMeasureForm','id="gcDrawing"']],
     ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','ipqc_gc_luu_tieu_chuan']],
     ['shared/ncp-doi-sach-board.js',['ncp-doi-sach-saved','ncp_doi_sach_theo_doi']]
   ]){

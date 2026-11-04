@@ -78,3 +78,5 @@ Kết quả cuối:
 Chưa xác nhận UAT đăng nhập đầu cuối bằng người dùng IPQC/QC Manager/GĐ SX vì staging chưa có các vai trò này. Không đổi vai trò lâu dài để giả lập tài khoản sử dụng. OCR đã thử bằng file thực; vẫn cần người dùng đối chiếu từng ứng viên, đặc biệt ký hiệu phức tạp/dung sai xếp chồng và ghi chú chung.
 
 Triển khai: chỉ `origin/staging`, migrations T210–T215 chỉ chạy project `jcjbleugnclzsghfpmvk`. Không merge master/main, không ghi database production. Rollback mã bằng revert commit theo thứ tự ngược trên staging; thay đổi database là bổ sung, giữ các bảng/cột mới và dữ liệu/lịch sử khi rollback ứng dụng. Nếu cần đổi lại hành vi RPC, tạo migration tiến mới khôi phục định nghĩa từ commit trước tương ứng; không xóa bảng hoặc reset database.
+
+Commit tích hợp nhóm 5: `0d7f84a`, push thành công. Kiểm tra asset sau deploy dùng `node tests/check-mes-nov04-staging.cjs` (chỉ đọc hostname staging); dùng đúng ID upload `gcDrawing` của form.
