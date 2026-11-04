@@ -1,4 +1,5 @@
--- Run only on STAGING, inside a transaction that is rolled back by the caller.
+-- Kiểm thử STAGING trong transaction tự rollback, không lưu dữ liệu thử.
+begin;
 do $$
 declare u uuid;caseid text;ds uuid;d ncp_doi_sach%rowtype;stamp timestamptz;created timestamptz;
 begin
@@ -23,3 +24,4 @@ begin
  if not exists(select 1 from ncp_lich_su_han where id_ncp=caseid and nguoi_uid=u)then raise exception 'Missing deadline audit';end if;
 end $$;
 select 'PASS immutable creation, optional deadline, both types, yellow/red/green, server response time, late flag and audit history' as result;
+rollback;

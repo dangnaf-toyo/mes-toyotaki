@@ -52,3 +52,29 @@ Kiểm thử:
 - Script tái hiện: `node scripts/check-ipqc-drawings.mjs <PDF...>`. Thư viện test trong `.review/tools`: `pdfjs-dist@4.10.38`, `tesseract.js@6.0.1`, `@napi-rs/canvas@0.1.80`; DOM test dùng `linkedom@0.18.12`. Không commit bản vẽ, mô hình OCR hoặc ảnh render riêng tư.
 
 T213 đã áp dụng STAGING 04/11/2026. Không tạo hoặc đổi vai trò tài khoản lâu dài; bucket bản vẽ private. Chưa dùng tài khoản người dùng thực tế để kiểm thử đăng nhập trình duyệt.
+
+Nhóm 4 đã push `2403783`. File chính: `ipqc-gia-cong.html`, `shared/ipqc-gia-cong.js`, `shared/ipqc-drawing-{parser,reader}.js`, `shared/ipqc-gc-math.js`, `shared/ipqc-spc.js`, `shared/ipqc-btk-qc.js`, `shared/navbar.js`, T213 và các bài test `ipqc-gc-*`. Các trang IPQC Đúc, QC Manager, biểu đồ chất lượng và dashboard Gia công có liên kết sang module mới.
+
+## Nhóm 5 — Kiểm thử và tích hợp cuối
+
+T214 bổ sung ID cố định cho dòng đối sách trong luồng cũ, đồng bộ hai chiều nội dung/người thực hiện khi sửa từ bảng theo dõi. Đổi thứ tự không đổi danh tính; bỏ dòng chuyển sang lưu trữ, giữ nguyên bản ghi/lịch sử. Bảng đang theo dõi bỏ các dòng đã lưu trữ. Phiếu có nhiều đối sách chỉ được coi đã trả lời khi tất cả dòng còn hoạt động có nội dung; trạng thái trả lời không thay cho phê duyệt đối sách. T215 giữ nghiệp vụ soạn/duyệt hiện có, bổ sung kiểm tra đăng nhập và lấy danh tính server cho `ipqc_btk_luu`/`ipqc_tc_duyet`.
+
+T215 cũng giữ khóa nội dung/người thực hiện đối sách nguồn cũ khi đã gửi duyệt/đã duyệt; hạn và phân loại vẫn được cập nhật. Khi lưu từ bảng theo dõi, form dòng cũ trên cùng trang cập nhật ngay nội dung/người thực hiện tương ứng, giữ phần đánh giá chưa lưu của người dùng, tránh lưu đè từ dữ liệu cũ trên giao diện.
+
+Sửa điều kiện ẩn trường gia công ngoài để không bị CSS `.field` ghi đè. Sửa vị trí script bảng đối sách trong QC Manager: đặt ngoài mẫu in tem, cuối trang; kiểm tra cú pháp tất cả script nhúng của các trang liên quan. Định dạng các file module mới để có thể review. Cập nhật cache OQC và bảng đối sách sang T214.
+
+File nhóm 1: `oqc-daily.html`, `shared/oqc-dashboard.js`, `shared/oqc-dashboard-math.js`, T210 và test nhân lực. Nhóm 2 thêm `shared/mes-oqc-scope.js`, T211 và test PostgreSQL. Nhóm 3: `qc-manager.html`, `ncp-detail.html`, `shared/ncp-doi-sach-board.js`, T212 và test rollback NCP. Nhóm 5 bổ sung T214/T215, `tests/mes-nov04-integration.cjs`, `tests/ncp-integration-rollback.sql`; hoàn thiện các file/test liên quan.
+
+Kết quả cuối:
+
+- PASS các test `oqc-headcount`, `oqc-workspace-math`, `oqc-nov04-postgres`, `ipqc-gc-parser`, `ipqc-gc-dom`, `mes-nov04-integration`.
+- PASS `ipqc-start-integration.cjs`: hai nhóm hồi quy IPQC Đúc về bắt đầu phiên kiểm và khôi phục trạng thái khóa nhập khi lưu bất đồng bộ, dùng fixture API.
+- PASS trực tiếp trên database staging: `ncp-nov04-rollback.sql`, `ncp-integration-rollback.sql`, `ipqc-gc-staging-rollback.sql`. Tất cả tự BEGIN/ROLLBACK; kiểm tra bảng, RPC, timestamp, retry, quyền và duyệt thật qua ba danh tính tạm trong transaction. Không để lại bản đo/tiêu chuẩn thử hoặc thay đổi vai trò.
+- `scripts/code-review-check.cjs` không còn mức CAO sau sửa. Các cảnh báo còn lại gồm định dạng/CSS cũ và quyền `duc_ncp_open_case` cho người đăng nhập theo nghiệp vụ hiện có; wrapper NCP ủy quyền kiểm tra vai trò/người phụ trách cho hàm T212 đã thu hồi quyền gọi trực tiếp.
+- Bộ test cũ `qc-session-ui.cjs` chạy được ba ca đầu rồi dừng do fixture thiếu global `sbTaiHet`, chưa tương thích các thay đổi staging đã có. Không tính bộ này là PASS; hai bài hồi quy IPQC Đúc chuyên biệt và các bài mới nêu trên đã PASS.
+- Postflight: 6 báo cáo OQC, 3 phiếu NCP, 0 lần đo Đúc/Gia công (không lưu fixture vào hệ thống), vai trò vẫn 5 Admin + 1 OQC; RLS kết quả đo bật, anon không gọi được RPC ghi, bucket bản vẽ private.
+- Trang `https://mes-toyotaki.dangnaf.workers.dev/ipqc-gia-cong.html` trả HTTP 200 và có form đo mới; GitHub check Workers Builds của nhóm 4 báo success. Hạ tầng thực tế đang dùng Workers Builds, khác mô tả Cloudflare Pages cũ trong CONTRIBUTING.
+
+Chưa xác nhận UAT đăng nhập đầu cuối bằng người dùng IPQC/QC Manager/GĐ SX vì staging chưa có các vai trò này. Không đổi vai trò lâu dài để giả lập tài khoản sử dụng. OCR đã thử bằng file thực; vẫn cần người dùng đối chiếu từng ứng viên, đặc biệt ký hiệu phức tạp/dung sai xếp chồng và ghi chú chung.
+
+Triển khai: chỉ `origin/staging`, migrations T210–T215 chỉ chạy project `jcjbleugnclzsghfpmvk`. Không merge master/main, không ghi database production. Rollback mã bằng revert commit theo thứ tự ngược trên staging; thay đổi database là bổ sung, giữ các bảng/cột mới và dữ liệu/lịch sử khi rollback ứng dụng. Nếu cần đổi lại hành vi RPC, tạo migration tiến mới khôi phục định nghĩa từ commit trước tương ứng; không xóa bảng hoặc reset database.

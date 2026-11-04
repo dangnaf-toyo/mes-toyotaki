@@ -1,4 +1,4 @@
--- T212 STAGING: theo dõi nhiều đối sách/phiếu; giữ nguyên dữ liệu JSON cũ.
+-- Đã áp dụng STAGING 04/11/2026. Giữ nguyên dữ liệu lịch sử.
 begin;
 alter table public.duc_ncp add column if not exists nguoi_cap_nhat_uid uuid;
 create table public.ncp_doi_sach (

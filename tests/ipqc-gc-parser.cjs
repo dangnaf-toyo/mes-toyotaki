@@ -1,15 +1,38 @@
-const assert=require('node:assert/strict');const P=require('../shared/ipqc-drawing-parser.js');const M=require('../shared/ipqc-gc-math.js');
-const a=P.parseText('Ø20 ±0.05',{page:2,method:'pdf-text'})[0];
-assert.equal(a.danh_nghia,20);assert.equal(a.lsl,19.95);assert.equal(a.usl,20.05);assert.equal(a.da_xac_nhan,false);assert.equal(a.nguon_nhan_dien.trang,2);
-const signed=P.parseText('R10 +0.2 -0.1')[0];assert.equal(signed.lsl,9.9);assert.equal(signed.usl,10.2);
-const max=P.parseText('20 MAX')[0];assert.equal(max.usl,20);assert.equal(max.lsl,'');assert.equal(max.danh_nghia,'');
-assert.equal(P.parseText('20')[0].lsl,'');assert.equal(P.parseText('M6 x 1')[0].kieu,'okng');
-assert.equal(P.parseText('⌖ 0.02 A B')[0].kieu,'okng');assert.equal(P.parseText('NOT READABLE').length,0);
-assert.equal(P.parseText("3. DRAFT SHALL BE 1°30' MAX")[0].kieu,'okng');
-assert.equal(P.parseText('30°')[0].danh_nghia,30);
-assert.equal(P.parseText('24.7+0.1')[0].lsl,'');
-assert.equal(M.capability([],{lsl:19.95,usl:20.05}),null);
-const groups=Array.from({length:40},(_,i)=>({x:20,r:.02,vals:[19.99,20,20.01]}));
-const cap=M.capability(groups,{lsl:19.95,usl:20.05});assert.ok(cap.cp>1);assert.ok(Math.abs(cap.cp-cap.cpk)<1e-8);
-assert.equal(M.capability(groups.map(g=>({...g,vals:[20,20,20],r:0})),{lsl:19.95,usl:20.05}),null);
-console.log('PASS exact/asymmetric/one-sided tolerance, no invented bounds, thread/GDT review, unconfirmed candidates, within-subgroup sigma and capability prerequisites');
+const assert = require("node:assert/strict");
+const P = require("../shared/ipqc-drawing-parser.js");
+const M = require("../shared/ipqc-gc-math.js");
+const a = P.parseText("Ø20 ±0.05", { page: 2, method: "pdf-text" })[0];
+assert.equal(a.danh_nghia, 20);
+assert.equal(a.lsl, 19.95);
+assert.equal(a.usl, 20.05);
+assert.equal(a.da_xac_nhan, false);
+assert.equal(a.nguon_nhan_dien.trang, 2);
+const signed = P.parseText("R10 +0.2 -0.1")[0];
+assert.equal(signed.lsl, 9.9);
+assert.equal(signed.usl, 10.2);
+const max = P.parseText("20 MAX")[0];
+assert.equal(max.usl, 20);
+assert.equal(max.lsl, "");
+assert.equal(max.danh_nghia, "");
+assert.equal(P.parseText("20")[0].lsl, "");
+assert.equal(P.parseText("M6 x 1")[0].kieu, "okng");
+assert.equal(P.parseText("⌖ 0.02 A B")[0].kieu, "okng");
+assert.equal(P.parseText("NOT READABLE").length, 0);
+assert.equal(P.parseText("3. DRAFT SHALL BE 1°30' MAX")[0].kieu, "okng");
+assert.equal(P.parseText("30°")[0].danh_nghia, 30);
+assert.equal(P.parseText("24.7+0.1")[0].lsl, "");
+assert.equal(M.capability([], { lsl: 19.95, usl: 20.05 }), null);
+const groups = Array.from({ length: 40 }, (_, i) => ({ x: 20, r: 0.02, vals: [19.99, 20, 20.01] }));
+const cap = M.capability(groups, { lsl: 19.95, usl: 20.05 });
+assert.ok(cap.cp > 1);
+assert.ok(Math.abs(cap.cp - cap.cpk) < 1e-8);
+assert.equal(
+  M.capability(
+    groups.map((g) => ({ ...g, vals: [20, 20, 20], r: 0 })),
+    { lsl: 19.95, usl: 20.05 },
+  ),
+  null,
+);
+console.log(
+  "PASS exact/asymmetric/one-sided tolerance, no invented bounds, thread/GDT review, unconfirmed candidates, within-subgroup sigma and capability prerequisites",
+);

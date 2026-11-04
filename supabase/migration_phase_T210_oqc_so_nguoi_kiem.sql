@@ -1,4 +1,4 @@
--- T210: STAGING, chưa chạy. Không backfill số người hoặc thời gian lịch sử.
+-- Đã áp dụng STAGING 04/11/2026. Giữ nguyên dữ liệu lịch sử.
 begin;
 alter table public.oqc_daily_inspection add column if not exists so_nguoi_kiem integer check(so_nguoi_kiem>=1);
 alter table public.oqc_daily_inspection add column if not exists gio_kiem_thuc_te numeric check(gio_kiem_thuc_te>0 and gio_kiem_thuc_te<=24);
