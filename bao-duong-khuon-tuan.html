@@ -453,6 +453,7 @@ let weekMonday = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(locatio
   ? new Date(new URLSearchParams(location.search).get('tuan') + 'T00:00:00') : new Date());
 let csByKh = {};           // id lịch -> {trang_thai, ket_luan} (duc_khuon_checksheet)
 let canEdit = false;
+let canEditXl = false;   // T210g
 let myRole = null, myBoPhan = [];
 let duyetInfo = null;      // duc_khuon_bd_duyet của tuần
 let duyetLog = [];
@@ -544,6 +545,7 @@ async function loadPermission(){
   myRole = data ? data.role : null;
   myBoPhan = data && Array.isArray(data.bo_phan_phu_trach) ? data.bo_phan_phu_trach : [];
   canEdit = EDIT_ROLES.includes(myRole) || laNguoiKiemTra();
+  canEditXl = canEdit || myRole === 'giam_doc_sx';   // T210g: GĐSX ghi được phiếu xử lý bất thường (KH tuần vẫn chỉ người lập)
 }
 
 async function loadEmployees(){
@@ -1044,7 +1046,7 @@ async function loadXl(){
       || (new Date(b.gio_phat_sinh) - new Date(a.gio_phat_sinh)));
     xlAnh = await SuCoAnh.count(xlAll.map(r => r.id_su_co));
     document.getElementById('xlNote').textContent = 'Sự cố phát sinh từ ' + fmtTs(res[0].data.tu_thoi_diem) +
-      (canEdit ? ' · bấm vào dòng để xử lý' : ' · 🔒 chỉ xem — tổ trưởng / NV bảo dưỡng khuôn / QLBP Đúc mới ghi được');
+      (canEditXl ? ' · bấm vào dòng để xử lý' : ' · 🔒 chỉ xem — tổ trưởng / NV bảo dưỡng khuôn / QLBP Đúc / GĐSX mới ghi được');
     renderXl();
     renderSummary();
   } finally { xlLoading = false; }
@@ -1185,7 +1187,7 @@ async function openXl(id){
   xlEditing = r;
   const x = r.xl || {};
   const xong = x.trang_thai === 'hoan_thanh';
-  const sua = canEdit && !xong;
+  const sua = canEditXl && !xong;
   const ma = xlLoaiMa(r);
   document.getElementById('xlTitle').textContent = ma + ' · ' + (LOAI_XL[ma] || '') + ' — ' + r.id_su_co;
   document.getElementById('xl-info').innerHTML =
@@ -1210,7 +1212,7 @@ async function openXl(id){
   document.querySelectorAll('[data-now]').forEach(b => { b.disabled = !sua; });
   document.getElementById('xlLuu').style.display = sua ? '' : 'none';
   document.getElementById('xlXong').style.display = sua ? '' : 'none';
-  document.getElementById('xlMoLai').style.display = canEdit && xong ? '' : 'none';
+  document.getElementById('xlMoLai').style.display = canEditXl && xong ? '' : 'none';
   xlBaoLoi([]);
   // T210: cấp công việc + phê duyệt + cam kết an toàn — server chặn "bắt đầu" khi chưa đủ.
   KhuonCT.mount(document.getElementById('xl-ct'), { nguon: 'xlbt', nguonId: r.id_su_co, onChange: () => ctReload() });
