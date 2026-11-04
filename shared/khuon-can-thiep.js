@@ -8,7 +8,7 @@
  *
  *   KhuonCT.mount(el, { nguon: 'xlbt'|'cs', nguonId, choPhepKhongTacDong, onChange })
  *       → khối "Cấp công việc & phê duyệt" (chọn hạng mục → tự ra cấp → gửi duyệt
- *         → duyệt / từ chối → cam kết an toàn). Trả { reload(), state() }.
+ *         → duyệt / từ chối; T210d bỏ cam kết an toàn). Trả { reload(), state() }.
  *   KhuonCT.queue(el, { onChange })   → danh sách chờ duyệt + duyệt thay ca đêm chờ QLBP xác nhận.
  *   KhuonCT.lichSu(el, { maKhuon })   → lịch sử can thiệp theo khuôn.
  *   KhuonCT.modal({ nguon, nguonId, tieuDe, choPhepKhongTacDong, onChange }) → mở khối trong hộp thoại.
@@ -94,8 +94,7 @@
     if (ct.trang_thai === 'khong_tac_dong') return '<span class="kct-st ktd">Không tác động khuôn</span>';
     if (ct.trang_thai === 'cho_duyet') return capChip(ct.cap) + ' <span class="kct-st cho">⏳ Chờ ' + esc(CAP[ct.cap].duyet) + ' duyệt · ' + phut(ct.de_nghi_luc) + ' ph</span>';
     if (ct.trang_thai === 'tu_choi') return capChip(ct.cap) + ' <span class="kct-st no">❌ Bị từ chối</span>';
-    return capChip(ct.cap) + ' <span class="kct-st ok">✓ ' + (ct.cap === 0 ? 'Không cần duyệt' : 'Đã duyệt') + '</span>' +
-      (jsonbLen(ct.an_toan) ? '' : ' <span class="kct-st cho">Chưa cam kết an toàn</span>');
+    return capChip(ct.cap) + ' <span class="kct-st ok">✓ ' + (ct.cap === 0 ? 'Không cần duyệt' : 'Đã duyệt') + '</span>';
   }
   function jsonbLen(a){ return Array.isArray(a) ? a.length : 0; }
 
@@ -166,16 +165,6 @@
         if (ct.duyet_thay_ca_dem) h += '<div class="kct-note">🌙 Trưởng ca duyệt thay ca đêm — ' + (ct.qlbp_xac_nhan ? 'QLBP Đúc ' + esc(ct.qlbp_xac_nhan) + ' đã xác nhận ' + ts(ct.qlbp_xac_nhan_luc) : 'chờ QLBP Đúc xác nhận') + '.</div>';
       }
       if (ct && ct.trang_thai === 'khong_tac_dong') h += '<div class="kct-note">Khai bởi <b>' + esc(ct.nguoi_de_nghi) + '</b> lúc ' + ts(ct.de_nghi_luc) + (ct.mo_ta ? ': ' + esc(ct.mo_ta) : '') + '.</div>';
-
-      // Cam kết an toàn
-      if (ct && ct.trang_thai === 'da_duyet') {
-        if (jsonbLen(ct.an_toan)) h += '<div class="kct-okbox">🦺 Đã cam kết an toàn — ' + esc(ct.nguoi_an_toan) + ' · ' + ts(ct.an_toan_luc) + '</div>';
-        else if (sua) {
-          h += '<div class="kct-grp" style="border-color:#B91C1C;background:#FEF2F2"><div class="kct-grp-h" style="color:#B91C1C">🦺 Cam kết an toàn trước khi bắt đầu (tick đủ)</div>' +
-            dm.at.map(a => '<label class="kct-it"><input type="checkbox" data-at="' + esc(a.ma) + '"><span>' + esc(a.noi_dung) + '</span></label>').join('') +
-            '<div class="kct-row"><span class="sp"></span><button type="button" class="kct-b" data-a="antoan">🦺 Xác nhận cam kết</button></div></div>';
-        } else h += '<div class="kct-warn">Chưa cam kết an toàn.</div>';
-      }
 
       // Chọn hạng mục
       if (sua) {
