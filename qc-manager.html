@@ -386,7 +386,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
         </div>
         <div class="field-row">
           <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
-          <input type="text" autocomplete="off" id="ncp-nguoi-dam-nhiem-doi-sach"></div><div class="field-row"><label for="ncp-han-tra-loi">Hạn trả lời đối sách *</label><input id="ncp-han-tra-loi" type="date" lang="vi" required>
+          <input type="text" autocomplete="off" id="ncp-nguoi-dam-nhiem-doi-sach"></div><div class="field-row"><label for="ncp-han-tra-loi">Hạn trả lời đối sách</label><input id="ncp-han-tra-loi" type="date" lang="vi">
         </div>
       </div>
       <div class="modal-foot">
@@ -963,7 +963,7 @@ function onSoKhuonSelectChange(prefix){
 function populateDynamicFilterOptions(list){
   const dates = Array.from(new Set(list.map(x => x.thoi_diem_kiem_thuc_te ? toVnDateStr(x.thoi_diem_kiem_thuc_te) : null).filter(Boolean))).sort().reverse();
   const dateSel = document.getElementById('fl-ngay');
-  dates.forEach(dt => { const opt = document.createElement('option'); opt.value = dt; opt.textContent = new Date(dt + 'T00:00:00').toLocaleDateString('vi-VN'); dateSel.appendChild(opt); });
+  dates.forEach(dt => { const opt = document.createElement('option'); opt.value = dt; opt.textContent = new Date(dt + 'T00:00:00').toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour12:false}); dateSel.appendChild(opt); });
   const inspectors = Array.from(new Set(list.map(x => x.nguoi_kiem).filter(Boolean)));
   fillSelect('fl-nguoi-kiem', inspectors);
 }
@@ -1082,7 +1082,7 @@ function renderNcpList(){
       <td>${escapeHtml(NCP_TRANG_THAI_LABEL[c.trang_thai] || c.trang_thai)}</td>
       ${ncpDeadlineCells(c)}<td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
-      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
         <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
         <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
@@ -1103,7 +1103,7 @@ function renderNcpList(){
       <td class="ncp-qty" style="color:${c.so_luong_phe_da_duyet > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_phe_da_duyet}</td>
       ${ncpDeadlineCells(c)}<td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
-      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
         <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
         <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
@@ -1140,7 +1140,7 @@ async function openNcpNewModal(){
   else {
     state.ncpAvailableNg = data.map(x => ({ id_checkpoint: x.id_checkpoint, ma_may: x.ma_may, ma_sp: x.ma_sp, so_khuon: x.so_khuon, thoi_diem_kiem_thuc_te: x.thoi_diem_kiem_thuc_te, mo_ta_de_xuat: x.mo_ta_de_xuat }));
     sel.innerHTML = '<option value="">-- Chọn --</option>' + state.ncpAvailableNg.map(x =>
-      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false })}</option>`).join('');
+      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false })}</option>`).join('');
     onNcpNgSelected();
   }
   document.getElementById('ncp-modal-new').classList.add('show');
@@ -1347,12 +1347,13 @@ function printNcpTag(idNcp){
           <tr><td class="k">Mã SP</td><td><b>${escapeHtml(c.ma_sp)}</b></td></tr>
           <tr><td class="k">Số lượng</td><td><b>${c.so_luong_nghi_van}</b></td></tr>
           <tr><td class="k">Vị trí cách ly</td><td>${escapeHtml(c.vi_tri_cach_ly)}</td></tr>
-          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : ''}</td></tr>
+          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : ''}</td></tr>
           <tr><td class="k">Người mở</td><td>${escapeHtml(c.nguoi_mo_case)}</td></tr>
         </table>
         <div class="desc">${escapeHtml(c.mo_ta_loi)}</div>
       </div>
-    </body></html>`);
+    <script src="shared/ncp-doi-sach-board.js?v=T212"></script>
+</body></html>`);
   w.document.close();
 }
 
@@ -1422,7 +1423,7 @@ async function loadChoDuyet(){
       <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtml(x.ma_sp)}</td>
       <td>${escapeHtml(x.noi_dung_sua_doi || '')}${x.trang_thai === 'tra_lai' && x.ly_do_tra_lai ? '<div style="color:var(--alarm-fg);font-size:11px">Lý do trả lại: ' + escapeHtml(x.ly_do_tra_lai) + '</div>' : ''}</td>
       <td>${escapeHtml(x.nguoi_lap || '')}</td>
-      <td style="white-space:nowrap">${x.gui_luc ? new Date(x.gui_luc).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</td>
+      <td style="white-space:nowrap">${x.gui_luc ? new Date(x.gui_luc).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</td>
       <td style="white-space:nowrap">${tcPill(x.trang_thai)}${choToi(x) ? ' <span class="pill ok">Tới lượt bạn</span>' : ''}</td></tr>`).join('') + '</tbody></table>';
 }
 
