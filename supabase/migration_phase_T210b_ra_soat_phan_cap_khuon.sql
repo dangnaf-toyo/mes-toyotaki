@@ -1,11 +1,12 @@
 -- T210b — Vá theo rà soát độc lập T210 (04/11/2026) + quyết định user: chỉ TỰ DUYỆT (người khai = người duyệt)
--- trong khung 22:00–08:00 (admin / GĐSX luôn được — không còn cấp trên).
+-- trong khung 22:00–08:00 — 08:00–22:00 KHÔNG AI được tự duyệt (kể cả admin / GĐSX).
+-- User 04/11: sự cố F1 giữ như T210 — đóng (trưởng ca / IPQC OK tự đóng) không bắt buộc phiếu; vẫn phải khai trước giao QC.
 --   1. Phiếu không hạ cấp được: cấp phiếu = max(cấp hạng mục, cấp cao nhất từng khai) (cap_max) — bị từ chối rồi khai
 --      lại việc nhẹ hơn vẫn phải người duyệt cấp cũ.
 --   2. "Không tác động vào khuôn": chỉ trưởng ca / QLBP Đúc / GĐSX / admin; cấm khi phiếu đã từng khai việc (cap_max ≥ 0 có
 --      hạng mục) hoặc tổ khuôn đã ghi giờ bắt đầu.
---   3. F1 tự đóng khi IPQC OK (duc_close_f1_incident_if_open) cũng phải qua kiểm tra phân cấp.
---   4. Đóng sự cố A2/B1/F1 (trong phạm vi áp dụng) phải có phiếu; quyền vượt IPQC không vượt phân cấp.
+--   3. (bỏ theo user — F1 tự đóng khi IPQC OK giữ nguyên.)
+--   4. Đóng sự cố A2/B1 (trong phạm vi áp dụng) phải có phiếu; quyền vượt IPQC không vượt phân cấp.
 --   5. Check sheet: mốc áp dụng theo giờ bắt đầu ĐÃ LƯU (không theo giờ người dùng nhập); chặn giờ bắt đầu tương lai /
 --      sớm hơn ngày KH − 1 ngày.
 --   7. Giờ bắt đầu so với lần duyệt ĐẦU TIÊN (duyet_luc_dau) — phát sinh việc mới giữa chừng không bắt sửa giờ.
@@ -22,8 +23,7 @@ update public.duc_khuon_can_thiep set cap_max = greatest(cap_max, coalesce(cap, 
 create or replace function public.duc_khuon_ct_tu_duyet_duoc() returns boolean
 language sql stable security definer set search_path to 'public' as $$
   select extract(hour from (now() at time zone 'Asia/Ho_Chi_Minh')) >= 22
-      or extract(hour from (now() at time zone 'Asia/Ho_Chi_Minh')) < 8
-      or exists (select 1 from user_roles u where u.user_id = auth.uid() and u.role in ('admin', 'giam_doc_sx'));
+      or extract(hour from (now() at time zone 'Asia/Ho_Chi_Minh')) < 8;
 $$;
 
 -- Quyền duyệt 1 phiếu cụ thể (áp quy tắc tự duyệt).
@@ -49,6 +49,7 @@ begin
 
   select * into c from duc_khuon_can_thiep where nguon = p_nguon and nguon_id = p_nguon_id;
   if c.id is null then
+    if p_muc = 'dong' and n.o_loai = 'F1' then return null; end if;   -- F1: đóng như cũ (user 04/11)
     if p_muc in ('giao_qc', 'dong') then
       return '⛔ Chưa khai can thiệp khuôn cho sự cố ' || p_nguon_id || ' — chưa được '
         || case p_muc when 'giao_qc' then 'giao QC' else 'đóng sự cố' end
@@ -323,21 +324,6 @@ end $$;
 do $patch$
 declare d text; n text;
 begin
-  -- 3. F1 tự đóng khi IPQC OK: phiếu can thiệp chưa đạt → không tự đóng (trưởng ca đóng sau khi đủ điều kiện).
-  d := pg_get_functiondef('public.duc_close_f1_incident_if_open(text,text)'::regprocedure);
-  if position('duc_khuon_ct_kiem' in d) = 0 then
-    n := replace(d, E'  select count(*) + 1 into v_stt from duc_su_co_log',
-      E'  -- T210b: công việc can thiệp khuôn chưa duyệt / chưa cam kết an toàn / chưa khai → KHÔNG tự đóng F1.\n'
-      || E'  if v_cht.open_id_su_co is not null and duc_khuon_ct_kiem(''xlbt'', v_cht.open_id_su_co, ''dong'') is not null then\n'
-      || E'    return false;\n'
-      || E'  end if;\n\n'
-      || E'  select count(*) + 1 into v_stt from duc_su_co_log');
-    if n = d or (length(n) - length(replace(n, 'duc_khuon_ct_kiem', ''))) <> length('duc_khuon_ct_kiem') then
-      raise exception 'T210b: không vá được duc_close_f1_incident_if_open';
-    end if;
-    execute n;
-  end if;
-
   -- 5. Check sheet: chặn giờ bắt đầu ở tương lai / sớm hơn ngày KH − 1 ngày.
   d := pg_get_functiondef('public.duc_khuon_cs_luu(bigint,jsonb,boolean)'::regprocedure);
   if position('T210b' in d) = 0 then
