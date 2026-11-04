@@ -132,12 +132,16 @@
       const ds = chon(); if (!ds.length) return null;
       let c = Math.max(...ds.map(m => (dm.cv.find(d => d.ma === m) || {}).cap || 0));
       if (el.querySelector('#kct-kc') && el.querySelector('#kct-kc').checked) c = Math.min(3, c + 1);
+      const ct = st && st.ct;   // T210b: phiếu không hạ cấp — giữ cấp cao nhất từng khai (trừ khi khai lại trong phạm vi đã duyệt)
+      if (ct && ct.cap_max > c && !(ct.trang_thai === 'da_duyet' && ds.every(m => (ct.hang_muc_duyet || []).some(h => h.ma === m)))) c = ct.cap_max;
       return c;
     }
     function capNhatTinh(){
       const c = capTinh(), box = el.querySelector('.kct-tinh'), btn = el.querySelector('[data-a=gui]');
       if (!box) return;
-      box.innerHTML = c == null ? '<span style="color:#64748B">Chưa chọn hạng mục</span>' : capChip(c) + ' → ' + esc(CAP[c].duyet);
+      const ct = st && st.ct;
+      box.innerHTML = c == null ? '<span style="color:#64748B">Chưa chọn hạng mục</span>' : capChip(c) + ' → ' + esc(CAP[c].duyet) +
+        (ct && ct.cap_max === c && c > 0 && ct.trang_thai !== 'da_duyet' ? ' <span style="color:#64748B;font-weight:600">(giữ cấp cao nhất đã khai — không hạ cấp)</span>' : '');
       if (btn) { btn.disabled = c == null; btn.textContent = c === 0 ? '💾 Lưu (cấp 0 — làm ngay)' : '📤 Gửi duyệt'; }
     }
 
@@ -151,6 +155,8 @@
 
       if (ct && ct.trang_thai === 'cho_duyet') {
         h += '<div class="kct-note">Đề nghị bởi <b>' + esc(ct.nguoi_de_nghi) + '</b> lúc ' + ts(ct.de_nghi_luc) + '. Chưa được bắt đầu xử lý, giao QC hay đóng sự cố tới khi duyệt.</div>';
+        if (!st.quyen_duyet && st.ct.de_nghi_uid && !st.tu_duyet_duoc && st.duoc_khai)
+          h += '<div class="kct-note">Người khai không tự duyệt việc của mình ngoài khung 22:00–08:00 — chuông đã gửi người duyệt.</div>';
         if (st.quyen_duyet) h += '<div class="kct-row"><span>Bạn duyệt với vai trò <b>' + esc(st.quyen_duyet) + '</b>:</span><span class="sp"></span>' +
           '<button type="button" class="kct-b g" data-a="duyet">✅ Duyệt</button><button type="button" class="kct-b r" data-a="tuchoi">❌ Từ chối</button></div>';
       }
@@ -182,7 +188,7 @@
           '<label class="kct-it" style="margin-top:6px"><input type="checkbox" id="kct-kc"' + (ct && ct.khong_chac ? ' checked' : '') + '><span><b>Không chắc việc thuộc cấp nào</b> → hệ thống nâng lên 1 cấp (hỏi trước khi làm)</span></label>' +
           '<div class="kct-row"><input type="text" id="kct-mt" maxlength="300" placeholder="Mô tả thêm (vị trí, tình trạng…)" value="' + esc(ct ? ct.mo_ta : '') + '"></div>' +
           '<div class="kct-row"><span>Cấp tính được:</span><span class="kct-tinh"></span><span class="sp"></span>' +
-            (o.choPhepKhongTacDong && n.loai !== 'A2' && !(ct && ct.trang_thai === 'khong_tac_dong') ? '<button type="button" class="kct-b o" data-a="ktd" title="Chỉ chỉnh thông số / máy, không đụng vào khuôn">Không tác động vào khuôn</button>' : '') +
+            (o.choPhepKhongTacDong && st.duoc_khong_tac_dong && n.loai !== 'A2' && !ct ? '<button type="button" class="kct-b o" data-a="ktd" title="Chỉ chỉnh thông số / máy, không đụng vào khuôn">Không tác động vào khuôn</button>' : '') +
             '<button type="button" class="kct-b" data-a="gui">📤 Gửi duyệt</button></div></div>';
         if (!moSan) h += '<div class="kct-row"><span class="kct-note" style="margin:0">Hạng mục: ' + esc((ct.hang_muc || []).map(x => x.noi_dung).join('; ')) + '</span><span class="sp"></span>' +
           '<button type="button" class="kct-b o" data-a="sua">✎ Đổi hạng mục</button></div>';
@@ -232,12 +238,12 @@
       }
       if (a === 'duyet') {
         if (!confirm('Duyệt công việc cấp ' + ct.cap + ' trên khuôn ' + (ct.ma_khuon || '') + '?\n\n' + (ct.hang_muc || []).map(x => '• ' + x.noi_dung).join('\n'))) return;
-        return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: true, p_ly_do: '' }, '✓ Đã duyệt');
+        return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: true, p_ly_do: '', p_cap_nhat_luc: ct.cap_nhat_luc }, '✓ Đã duyệt');
       }
       if (a === 'tuchoi') {
         const l = (prompt('Lý do từ chối (bắt buộc):') || '').trim();
         if (!l) return;
-        return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: false, p_ly_do: l }, '✓ Đã từ chối');
+        return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: false, p_ly_do: l, p_cap_nhat_luc: ct.cap_nhat_luc }, '✓ Đã từ chối');
       }
       if (a === 'antoan') {
         const ma = [...el.querySelectorAll('input[data-at]:checked')].map(i => i.dataset.at);
@@ -284,10 +290,10 @@
       let fn, args;
       if (a === 'duyet') {
         if (!confirm('Duyệt công việc cấp ' + r.cap + ' trên khuôn ' + (r.ma_khuon || '') + '?\n\n' + (r.hang_muc || []).map(x => '• ' + x.noi_dung).join('\n'))) return;
-        fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: true, p_ly_do: '' };
+        fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: true, p_ly_do: '', p_cap_nhat_luc: r.cap_nhat_luc };
       } else if (a === 'tuchoi') {
         const l = (prompt('Lý do từ chối (bắt buộc):') || '').trim(); if (!l) return;
-        fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: false, p_ly_do: l };
+        fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: false, p_ly_do: l, p_cap_nhat_luc: r.cap_nhat_luc };
       } else {
         fn = 'duc_khuon_ct_qlbp_xac_nhan'; args = { p_id: id, p_ghi_chu: '' };
       }
