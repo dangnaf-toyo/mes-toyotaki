@@ -27,3 +27,28 @@ T212 giữ nguyên JSON cũ, bổ sung bảng theo dõi đối sách nhiều lo�
 Ngày mở NCP lấy server lúc insert; trigger giữ nguyên ngày mở khi update, lưu riêng người/thời điểm cập nhật. Hạn khi mở phiếu có thể trống theo yêu cầu mới. Bảng theo dõi có lọc loại/trạng thái, liên kết phiếu, các mốc thời gian Việt Nam và màu tự tính: chưa trả lời vàng (gồm chưa đặt hạn), quá hạn chưa trả lời đỏ, đã trả lời xanh; trả lời muộn vẫn xanh và giữ cờ muộn. Dữ liệu cũ chưa có mốc trả lời không được gán thời gian giả.
 
 Kiểm thử trực tiếp `tests/ncp-nov04-rollback.sql` kèm migration trong transaction rollback: PASS ngày tạo bất biến, hạn tùy chọn, hai loại, ưu tiên trạng thái, thời gian trả lời server, cờ muộn và lịch sử hạn. Chưa QA giao diện đăng nhập đầu cuối.
+
+T212 đã áp dụng staging; nhóm 3 push thành công `d0cb5bc`.
+
+## Nhóm 4 — IPQC Gia công và đọc bản vẽ
+
+T213 tái sử dụng `ipqc_btk`, `ipqc_btk_muc` và luồng duyệt ba bước hiện có; mở rộng metadata bản vẽ/Revision/bước gia công, đặc tính, đơn vị, phương pháp, cỡ mẫu, giới hạn LSL/USL trực tiếp và dấu xác nhận. Cùng Model/Revision có thể quản lý độc lập theo bước gia công. Giữ nguyên khóa và hành vi tiêu chuẩn Đúc khi bước gia công NULL. Tiêu chuẩn đã duyệt không được sửa trực tiếp bởi API soạn.
+
+`ipqc-gia-cong.html` và các script mới: nhập tiêu chuẩn thủ công hoặc PDF/JPG/JPEG/PNG; trái là bản gốc, phải là bảng gợi ý có trang/vị trí, nguồn chữ/OCR, mức tin cậy và ô xác nhận. PDF.js 4.10.38 đọc lớp chữ trước; Tesseract.js 6.0.1 xử lý scan/ảnh và phần hình khi lớp chữ chưa đủ. OCR chạy cục bộ trong trình duyệt, không gửi bản vẽ tới dịch vụ AI. Bản gốc chỉ upload vào bucket private trên staging khi người có quyền lưu bản nháp; lấy signed URL khi xem. Lưu lịch sử soạn và người/thời điểm xác minh từng đặc tính. Phát hành tiếp tục dùng QC Manager → Giám đốc sản xuất.
+
+Các kích thước/ren/GD&T/ghi chú chưa rõ luôn chưa xác nhận; không tự áp dung sai chung hoặc gán dung sai 0. Giới hạn Min/Max có thể lưu mà không tự tạo danh nghĩa. Nhận diện là bước gợi ý, không phải cam kết đọc đầy đủ bản vẽ kỹ thuật phức tạp. Người dùng bắt buộc đối chiếu/sửa/xóa/thêm và xác nhận trước gửi duyệt.
+
+Kết quả đo Gia công lưu riêng theo phiên bản/ca/máy/lô/người/thời điểm server; từng mẫu được kiểm tra trên server, retry dùng request ID, snapshot tiêu chuẩn không đổi khi tiêu chuẩn nguồn thay đổi. Không dùng checkpoint hoặc ghi kết quả vào IPQC Đúc.
+
+Dashboard có Đúc/Gia công/Tất cả, bộ lọc ngày/model/Revision/bước/máy/ca/người/lô/đặc tính, tổng hợp và bảng chi tiết, đặc tính NG, Excel và in/lưu PDF bằng trình duyệt. Biểu đồ kích thước có danh nghĩa và LSL/USL; I–MR hoặc Xbar–R chỉ khi có >=25 nhóm cùng cỡ mẫu 1–5 và một máy. Cp/Cpk cần >=100 giá trị, >=30 nhóm, không có tín hiệu mất kiểm soát và xác nhận điều kiện quá trình/phân phối; sigma lấy từ MR/R trong nhóm, không dùng nhầm độ lệch chuẩn tổng thể.
+
+Kiểm thử:
+
+- `tests/ipqc-gc-staging-rollback.sql`: PASS soạn/duyệt/đo nhiều mẫu, biên 19.95 OK và 20.06 NG cho 20±0.05; thiếu mẫu bị chặn; retry không trùng; snapshot bất biến; dashboard tổng hợp và cách ly Đúc; Max-only không tự tạo danh nghĩa; cùng Revision khác bước độc lập.
+- Staging hiện chỉ có 5 Admin và 1 OQC. Kiểm thử ba vai trò dùng thay đổi tạm trong transaction rollback, không lưu phân quyền mới. Chưa có tài khoản IPQC/QC Manager/GĐ SX để người dùng chạy quy trình thực tế, cần phân công bởi chủ hệ thống.
+- `node tests/ipqc-gc-dom.cjs`: PASS sự kiện form thực, tải Revision đã duyệt, đo nhiều mẫu/NG, tự tính giới hạn có dấu, xác nhận/gửi draft, lọc dashboard hai công đoạn/tất cả, biểu đồ theo phiên bản, chặn SPC khi thiếu dữ liệu, Excel theo bộ lọc. Đây là DOM test bằng fixture, không phải trình duyệt đăng nhập staging.
+- `node tests/ipqc-gc-parser.cjs`: PASS dung sai đối xứng/lệch/một phía, không tự tạo dung sai, ren/GD&T/ghi chú cần xác minh, điều kiện Cp/Cpk.
+- Thử bằng bản vẽ thực tế trong thư mục BẢN VẼ: `1FC, 1PB - CL CENTER.pdf` và `1012-BẢN VẼ ĐÚC CỦ NHÔM LIGO PRO-v1.pdf` là scan, OCR tạo lần lượt 73 và 19 ứng viên ở lần thử sparse-text; tất cả chưa xác nhận. `20240604-CL CENTER-3A26020000_SOZAI_Rev1.pdf` có 105 text items, phần chữ kết hợp OCR cho ra 100 ứng viên ở lần thử sau (bao gồm ghi chú), không tự xác nhận. Đã render và kiểm tra hình gốc. Số ứng viên không phải số kích thước đã đọc chính xác; không đưa dữ liệu thử vào dashboard.
+- Script tái hiện: `node scripts/check-ipqc-drawings.mjs <PDF...>`. Thư viện test trong `.review/tools`: `pdfjs-dist@4.10.38`, `tesseract.js@6.0.1`, `@napi-rs/canvas@0.1.80`; DOM test dùng `linkedom@0.18.12`. Không commit bản vẽ, mô hình OCR hoặc ảnh render riêng tư.
+
+T213 đã áp dụng STAGING 04/11/2026. Không tạo hoặc đổi vai trò tài khoản lâu dài; bucket bản vẽ private. Chưa dùng tài khoản người dùng thực tế để kiểm thử đăng nhập trình duyệt.
