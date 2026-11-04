@@ -116,8 +116,12 @@ const OqcDashboard = (() => {
   const hourField = node("div");
   hourField.className = "field";
   hourField.innerHTML =
-    '<label for="oqcInspectionHours">Số giờ kiểm tra</label><input id="oqcInspectionHours" type="text" inputmode="decimal" placeholder="Ví dụ: 1,5" autocomplete="off"><small>Giờ của người kiểm đang chọn dành riêng cho báo cáo/model này.</small>';
-  $("inspectorCode").closest(".field").after(hourField);
+    '<label for="oqcInspectionHours">Số giờ kiểm tra</label><input id="oqcInspectionHours" type="text" inputmode="decimal" placeholder="Ví dụ: 1,5" autocomplete="off"><small>Thời gian thực tế/người dành cho báo cáo này; người chưa ghi giờ riêng dùng thời gian này.</small>';
+  const countField = node("div");
+  countField.className = "field";
+  countField.innerHTML = '<label for="oqcInspectorCount">Số người kiểm tra</label><input id="oqcInspectorCount" type="number" min="1" step="1" value="1" required>';
+  $("inspectorCode").closest(".field").querySelector("label").textContent = "Người kiểm tra chính";
+  $("inspectorCode").closest(".field").after(countField, hourField);
   const guidance = node("p");
   guidance.id = "oqcDefectGuide";
   guidance.textContent = "Mỗi sản phẩm NG chỉ ghi một loại lỗi chính, tránh đếm trùng.";
@@ -456,7 +460,9 @@ const OqcDashboard = (() => {
       ["NG", fmt(s.ng)],
       ["Tỷ lệ NG", value(s.ngRate, "Chưa có sản lượng đã kiểm", "%")],
       ["Giờ công", value(s.hours, "Thiếu giờ công thực tế; đã ghi " + fmt(s.knownHours) + " giờ")],
-      ["Số người kiểm", s.people],
+      ["Lượt nhân lực", s.personTurns],
+      ["NV QC đã định danh (không trùng)", s.people],
+      ["PCS/người/giờ", value(s.productivity, "Thiếu giờ công thực tế")],
       ["Hiệu suất", efficiency(s)],
     ];
     for (const [label, val] of values) {
@@ -494,7 +500,9 @@ const OqcDashboard = (() => {
         fmt(g.ok),
         fmt(g.ng),
         value(g.hours, "Thiếu giờ công thực tế"),
+        g.personTurns,
         g.people,
+        value(g.productivity, "Thiếu giờ công thực tế"),
         efficiency(g),
         scopeText(g.scope),
         defectPercent(g.ng,g.reportTotal),
@@ -502,7 +510,7 @@ const OqcDashboard = (() => {
     });
     table(
       $("modelSummary"),
-      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Số người kiểm", "Hiệu suất", "Phạm vi kiểm", "% lỗi"],
+      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Lượt nhân lực", "QC định danh", "PCS/người/giờ", "Hiệu suất", "Phạm vi kiểm", "% lỗi"],
       rows,
     );
     $("modelSummary").title =
@@ -538,7 +546,7 @@ const OqcDashboard = (() => {
           Number(r.ok_qty) + Number(r.ng_qty),
           r.ok_qty,
           r.ng_qty,
-          r.work?.labor?.length ? fmt(r.work.labor.reduce((n, l) => n + Number(l.hours), 0)) : "Chưa ghi nhận",
+          M.reportHours(r) == null ? "Chưa ghi nhận" : fmt(M.reportHours(r)),
           b,
           scopeText(r.context?.inspection_scope),
           defectPercent(r.ng_qty,r.total_qty),
@@ -742,14 +750,18 @@ const OqcDashboard = (() => {
   function laborTotal() {
     try {
       const all = reportLabor();
-      $("oqcLaborTotal").textContent = all.length
-        ? "Giờ công đã nhập: " + fmt(all.reduce((n, l) => n + (l.hours || 0), 0)) + " giờ-người."
-        : "Chưa có giờ kiểm tra — chưa đủ dữ liệu tính hiệu suất.";
+      const hours = M.reportHours({ work: { labor: all },
+        so_nguoi_kiem: Number($("oqcInspectorCount").value),
+        gio_kiem_thuc_te: parseHours($("oqcInspectionHours").value) });
+      $("oqcLaborTotal").textContent = hours == null
+        ? "Chưa có giờ kiểm tra — chưa đủ dữ liệu tính hiệu suất."
+        : "Giờ công đã nhập: " + fmt(hours) + " giờ-người.";
     } catch (e) {
       $("oqcLaborTotal").textContent = e.message;
     }
   }
   $("oqcInspectionHours").oninput = laborTotal;
+  $("oqcInspectorCount").oninput = laborTotal;
   $("inspectorCode").addEventListener("change", laborTotal);
   function renderPhotos() {
     const box = $("oqcReportPhotoList");
@@ -807,6 +819,7 @@ const OqcDashboard = (() => {
     files = [];
     request = null;
     $("oqcInspectionHours").value = "";
+    $("oqcInspectorCount").value = "1";
     $("oqcFormMessage").textContent = "";
     $("ng").value = "0";
     $("date").value = today();
@@ -830,7 +843,8 @@ const OqcDashboard = (() => {
     const primary = (r.work?.labor || []).find(
       (l) => String(l.employee_code).toLowerCase() === String(r.inspector_code).toLowerCase(),
     );
-    $("oqcInspectionHours").value = primary?.hours ?? "";
+    $("oqcInspectorCount").value = r.so_nguoi_kiem ?? Math.max(1, r.work?.labor?.length || 0);
+    $("oqcInspectionHours").value = r.gio_kiem_thuc_te ?? primary?.hours ?? "";
     labor = (r.work?.labor || [])
       .filter((l) => String(l.employee_code).toLowerCase() !== String(r.inspector_code).toLowerCase())
       .map((l) => ({ ...l }));
@@ -891,7 +905,10 @@ const OqcDashboard = (() => {
       const defects = defectsPayload();
       if (defects.some((d) => !Number.isInteger(Number(d.qty)) || Number(d.qty) < 0 || Number(d.qty) > ng))
         throw Error("Số lượng từng lỗi phải nguyên, không âm và không vượt NG.");
+      const count = Number($("oqcInspectorCount").value);
+      if (!Number.isInteger(count) || count < 1) throw Error("Số người kiểm tra phải là số nguyên dương.");
       const allLabor = reportLabor();
+      if (allLabor.length > count) throw Error("Số người kiểm tra không được ít hơn số người đã ghi giờ riêng.");
       const codes = new Set();
       for (const l of allLabor) {
         if (
@@ -932,6 +949,7 @@ const OqcDashboard = (() => {
           scope: $("inspectionScope").value || null,
           // T153: lần sơn chỉ gửi cho phạm vi "Kiểm tra sau Sơn"
           ...($("inspectionScope").value === "POST_PAINTING" && $("oqcLanSon") ? { lan_son: $("oqcLanSon").value } : {}),
+          so_nguoi_kiem: count,
           inspection_hours: parseHours($("oqcInspectionHours").value),
           labor: allLabor.map((l) => ({ employee_code: l.employee_code, hours: Number(l.hours) })),
           images,
