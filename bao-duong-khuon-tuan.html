@@ -262,6 +262,14 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
     </div>
   </div>
 
+  <div class="card" id="cardCt">
+    <div class="card-title">
+      Phê duyệt can thiệp khuôn (QĐ phân cấp bảo dưỡng khuôn)
+      <span class="ro-note">Cấp 1 Tổ trưởng · Cấp 2 QLBP Đúc · Cấp 3 Giám đốc SX — cấp trên duyệt thay được · ca đêm 18:00–06:00 trưởng ca duyệt thay cấp ≤2, QLBP Đúc xác nhận sau</span>
+    </div>
+    <div id="ctQueue"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">
       Công việc theo kế hoạch — lịch bảo dưỡng theo khuôn
@@ -316,6 +324,17 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
   <div class="card">
     <div class="card-title">Phê duyệt kế hoạch tuần</div>
     <div class="duyet" id="duyetBar"></div>
+  </div>
+
+  <div class="card" id="cardLsCt">
+    <div class="card-title">
+      Lịch sử can thiệp khuôn — ai làm, ai duyệt, kết quả
+      <input class="xl-sel" id="lsCtKhuon" list="dlKhuonCt" placeholder="Mã khuôn (để trống = mọi khuôn)">
+      <datalist id="dlKhuonCt"></datalist>
+      <input type="date" class="xl-sel" id="lsCtTu" title="Từ ngày">
+      <button type="button" class="btn-now" id="lsCtXem">Xem</button>
+    </div>
+    <div class="tbl-wrap" id="lsCt" style="max-height:480px;min-height:0"></div>
   </div>
 </div>
 
@@ -374,6 +393,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
     </div>
     <div class="modal-body">
       <div class="info-box full" id="xl-info"></div>
+      <div class="full" id="xl-ct"></div>
       <div class="fg">
         <label>Đảm nhiệm chính</label>
         <select id="xl-chinh"></select>
@@ -414,6 +434,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/su-co-anh.js"></script>
+<script src="shared/khuon-can-thiep.js?v=T210"></script>
 <script>
 const THU_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
 const THU_LABEL = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -616,6 +637,7 @@ async function loadAndRender(){
     };
   }).sort((a, b) => a.ma_khuon.localeCompare(b.ma_khuon, 'vi', { numeric: true }));
   moldMap = Object.fromEntries(molds.map(m => [m.ma_khuon, m]));
+  if (typeof lsCtDatalist === 'function') lsCtDatalist();   // T210
 
   render();
 }
@@ -772,7 +794,8 @@ function renderSummary(){
     '<span style="color:var(--accent)">Chưa làm: <b>' + (khRows.length - done - late - ng - doing) + '</b></span>' +
     '<span style="color:var(--alarm-fg)">Trễ: <b>' + late + '</b></span>' +
     (noPerson ? '<span style="color:var(--alarm-fg)">Chưa giao người: <b>' + noPerson + '</b></span>' : '') +
-    '<span style="color:var(--warn-fg)">Khuôn cần chú ý chưa lên KH: <b>' + chuaLen + '</b></span>' + xlSummaryHtml();
+    '<span style="color:var(--warn-fg)">Khuôn cần chú ý chưa lên KH: <b>' + chuaLen + '</b></span>' + xlSummaryHtml() +
+    (ctChoDuyet ? '<a href="#cardCt" style="color:var(--alarm-fg);text-decoration:none">Can thiệp khuôn chờ duyệt: <b>' + ctChoDuyet + '</b></a>' : '');
 }
 
 function renderNguoi(){
@@ -1189,6 +1212,8 @@ async function openXl(id){
   document.getElementById('xlXong').style.display = sua ? '' : 'none';
   document.getElementById('xlMoLai').style.display = canEdit && xong ? '' : 'none';
   xlBaoLoi([]);
+  // T210: cấp công việc + phê duyệt + cam kết an toàn — server chặn "bắt đầu" khi chưa đủ.
+  KhuonCT.mount(document.getElementById('xl-ct'), { nguon: 'xlbt', nguonId: r.id_su_co, onChange: () => ctReload() });
 
   const anhTruoc = document.getElementById('xl-anh-truoc'), anhSau = document.getElementById('xl-anh-sau');
   anhTruoc.innerHTML = anhSau.innerHTML = '<div class="info-box">Đang tải ảnh…</div>';
@@ -1426,6 +1451,29 @@ document.getElementById('xlXong').addEventListener('click', () => luuXl('hoan_th
 document.getElementById('xlMoLai').addEventListener('click', () => luuXl('mo_lai'));
 // Tự làm mới danh sách bất thường mỗi phút (bỏ qua khi đang mở form / tab ẩn).
 setInterval(() => { if (!document.getElementById('modalXl').classList.contains('open') && !document.hidden) loadXl(); }, 60000);
+
+// ── T210: phê duyệt can thiệp khuôn (chờ duyệt + duyệt thay ca đêm) + lịch sử theo khuôn ──
+var ctChoDuyet = 0, ctQ = null;
+function ctReload(){ if (ctQ) ctQ.reload(); }
+ctQ = KhuonCT.queue(document.getElementById('ctQueue'), {
+  onCount: (cho) => { ctChoDuyet = cho; renderSummary(); },
+  onChange: () => loadXl(),
+});
+setInterval(() => { if (!document.hidden) ctReload(); }, 60000);
+function lsCtXem(){
+  KhuonCT.lichSu(document.getElementById('lsCt'), {
+    maKhuon: document.getElementById('lsCtKhuon').value.trim() || null,
+    tu: document.getElementById('lsCtTu').value || null,
+  });
+}
+document.getElementById('lsCtXem').addEventListener('click', lsCtXem);
+document.getElementById('lsCtKhuon').addEventListener('change', lsCtXem);
+document.getElementById('lsCtTu').addEventListener('change', lsCtXem);
+function lsCtDatalist(){
+  document.getElementById('dlKhuonCt').innerHTML = molds.map(m => '<option value="' + escapeHtml(m.ma_khuon) + '">').join('');
+}
+lsCtXem();
+
 
 startHeaderClock();
 updateWeekLabel();

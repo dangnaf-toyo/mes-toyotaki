@@ -210,6 +210,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .btn-edit-open:hover{background:#D97706}
 .btn-giao-qc{background:#2563EB;color:#FFF;border:none;padding:2px 6px;border-radius:3px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;margin-right:4px}
 .btn-giao-qc:hover{background:#1D4ED8}
+.btn-ct{border:1px solid;padding:1px 5px;border-radius:3px;font-family:inherit;font-size:10px;font-weight:700;cursor:pointer;margin-right:4px;background:#fff}
+.btn-ct.can{color:#B91C1C;border-color:#FCA5A5;background:#FEF2F2}.btn-ct.cho{color:#92400E;border-color:#F59E0B;background:#FFFBEB}.btn-ct.ok{color:#047857;border-color:#6EE7B7;background:#ECFDF5}
 .btn-giao-qc.lai{background:transparent;color:#2563EB;border:1px solid #2563EB;padding:1px 5px}
 .giao-qc-da{font-size:10px;font-weight:600;color:#2563EB;margin-right:4px;white-space:nowrap}
 .giao-qc-da .giao-timer{font-family:'JetBrains Mono',monospace}
@@ -269,6 +271,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .wallboard-mode .btn-resolve,
 .wallboard-mode .btn-edit-open,
 .wallboard-mode .btn-giao-qc,
+.wallboard-mode .btn-ct,
 .wallboard-mode .btn-swap-inline{display:none!important}
 .wallboard-mode .col-shot-dau input,
 .wallboard-mode .col-shot-cuoi input,
@@ -920,6 +923,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/khuon-nam-van-de.js"></script>
 <script src="shared/su-co-anh.js"></script>
+<script src="shared/khuon-can-thiep.js?v=T210"></script>
 <script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
@@ -1916,6 +1920,7 @@ async function loadShiftState(showLoader){
     state.warnings = data.warnings;
     state.anhSuCoCount = data.anhCount || {};
     state.giaoQc = data.giaoQc || {};
+    state.canThiep = data.canThiep || {};
     renderTable(); updateSummary(); renderOpsWarnings();
     loadKanbanProgress();
     updateLiveStatus('OK — poll ' + (CONFIG.POLL_MS / 1000) + 's');
@@ -2112,7 +2117,9 @@ async function fetchShiftState(){
     .concat(...rows.map(r => r.su_co_phu.map(x => x.id_su_co)), incidents.map(i => i.id_su_co)));
   // T180: lần "Hoàn thành mẫu & giao QC" gần nhất của từng sự cố đang mở.
   const giaoQc = await taiGiaoQc(rows.map(r => r.open_id_su_co).concat(...rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
-  return { rows, incidents, warnings, anhCount, giaoQc };
+  // T210: phiếu can thiệp khuôn (phân cấp phê duyệt) của sự cố A2/B1/F1 đang mở.
+  const canThiep = await taiCanThiep(rows.map(r => r.open_id_su_co).concat(...rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
+  return { rows, incidents, warnings, anhCount, giaoQc, canThiep };
 }
 
 function startPolling(){
@@ -2129,6 +2136,7 @@ function startPolling(){
       state.warnings = data.warnings;
       state.anhSuCoCount = data.anhCount || {};
       state.giaoQc = data.giaoQc || {};
+    state.canThiep = data.canThiep || {};
       renderTable();       // renderTable tự bảo toàn ô người dùng đang gõ dở
       updateSummary();
       renderOpsWarnings();
@@ -2207,6 +2215,11 @@ async function giaoQc(idDong, idSuCo){
   const s = timSuCoMo(idDong, idSuCo);
   if (!s) return showToast('Không tìm thấy sự cố đang mở — tải lại trang', true);
   if (!(await ensureAuth())) return;
+  // T210: A2/B1/F1 phải khai can thiệp khuôn (hoặc "không tác động"), được duyệt + cam kết an toàn mới giao QC (server chặn cứng).
+  if (canCt(s) && !ctDat(s)) {
+    showToast('⛔ Chưa đủ điều kiện can thiệp khuôn — khai / chờ duyệt trước khi giao QC', true);
+    return moKhuonCT(idDong, s.open_id_su_co);
+  }
   if (!confirm('Xác nhận ĐÃ XỬ LÝ XONG sự cố ' + (s.open_id_su_co || '') + ' (' + (s.open_loai_su_co || '') + ') trên ' + s.ma_may +
     ' và đã lấy mẫu giao IPQC kiểm?\n\nTừ lúc này thời gian dừng được tính là "xác nhận chất lượng".')) return;
   showOverlay('Đang giao QC...');
@@ -2216,6 +2229,49 @@ async function giaoQc(idDong, idSuCo){
     showToast('✓ Đã giao QC' + (d.lan > 1 ? ' (lần ' + d.lan + ')' : '') + ' — chờ IPQC kiểm, OK/Cảnh báo rồi bấm ✓ Xong');
     loadShiftState(false);
   } catch (e) { onError(e); }
+}
+
+// ── T210: phân cấp phê duyệt can thiệp khuôn ─────────────────────────────────
+const LOAI_CAN_CT = ['A2', 'B1', 'F1'];
+function canCt(s){
+  return !!s.open_id_su_co && LOAI_CAN_CT.includes(String(s.open_loai_su_co || '').slice(0, 2))
+    && (!state.ctMoc || new Date(s.open_gio_phat_sinh) >= state.ctMoc);
+}
+async function taiCanThiep(ids){
+  ids = Array.from(new Set(ids.filter(Boolean)));
+  if (state.ctMoc === undefined) {
+    const { data } = await sb.from('duc_cau_hinh').select('gia_tri').eq('khoa', 'ct_tu_thoi_diem').maybeSingle();
+    state.ctMoc = data && data.gia_tri ? new Date(data.gia_tri) : null;
+  }
+  if (!ids.length) return {};
+  const { data, error } = await sb.from('duc_khuon_can_thiep').select('nguon_id,trang_thai,cap,an_toan').eq('nguon', 'xlbt').in('nguon_id', ids);
+  if (error) { console.warn('duc_khuon_can_thiep:', error.message); return {}; }
+  return Object.fromEntries((data || []).map(r => [r.nguon_id, r]));
+}
+function ctDat(s){
+  const c = (state.canThiep || {})[s.open_id_su_co];
+  return !!c && (c.trang_thai === 'khong_tac_dong' || (c.trang_thai === 'da_duyet' && (c.an_toan || []).length > 0));
+}
+function ctHTML(s, args){
+  if (!canCt(s)) return '';
+  const c = (state.canThiep || {})[s.open_id_su_co];
+  let cls = 'can', label = '🔧 Can thiệp khuôn', tip = 'Chưa khai — chọn việc làm trên khuôn (hoặc "Không tác động")';
+  if (c && c.trang_thai === 'cho_duyet') { cls = 'cho'; label = '⏳ Chờ duyệt cấp ' + c.cap; tip = 'Chưa được giao QC / đóng sự cố tới khi duyệt'; }
+  else if (c && c.trang_thai === 'tu_choi') { cls = 'can'; label = '❌ Cấp ' + c.cap + ' bị từ chối'; tip = 'Khai lại hạng mục'; }
+  else if (c && c.trang_thai === 'da_duyet' && !(c.an_toan || []).length) { cls = 'cho'; label = '🦺 Cấp ' + c.cap + ' — chưa cam kết AT'; tip = 'Tick cam kết an toàn'; }
+  else if (c && c.trang_thai === 'da_duyet') { cls = 'ok'; label = '🔧 Cấp ' + c.cap + ' ✓'; tip = 'Đã duyệt + cam kết an toàn'; }
+  else if (c && c.trang_thai === 'khong_tac_dong') { cls = 'ok'; label = '🔧 Không tác động'; tip = 'Đã khai không tác động vào khuôn'; }
+  return '<button class="btn-ct ' + cls + '" title="' + escapeHtml(tip) + '" onclick=\'moKhuonCT(' + args + ')\'>' + label + '</button>';
+}
+async function moKhuonCT(idDong, idSuCo){
+  const s = timSuCoMo(idDong, idSuCo);
+  if (!s || !s.open_id_su_co) return showToast('Không tìm thấy sự cố đang mở — tải lại trang', true);
+  if (!(await ensureAuth())) return;
+  KhuonCT.modal({
+    nguon: 'xlbt', nguonId: s.open_id_su_co, choPhepKhongTacDong: true,
+    tieuDe: '🔧 Can thiệp khuôn — ' + (s.ma_may || '') + ' · ' + (s.so_khuon || '') + ' · ' + s.open_id_su_co + ' (' + String(s.open_loai_su_co || '').slice(0, 2) + ')',
+    onChange: () => loadShiftState(false),
+  });
 }
 
 function computeState(row){
@@ -2458,6 +2514,7 @@ function makeRowHTML(row, stateClass, isActive){
         '<div class="issue-meta">' +
           '<span>🕐 ' + pad(startTime.getHours()) + ':' + pad(startTime.getMinutes()) + ' · 👤 ' + escapeHtml(s.open_dam_nhiem || '—') + '</span>' +
           '<span class="meta-actions">' +
+            ctHTML(s, args) +
             giaoQcHTML(s, args) +
             '<button class="btn-edit-open" title="Chỉnh sửa nội dung sự cố đang mở" onclick=\'openEditOpenIncidentModal(' + args + ')\'>✎ Sửa</button>' +
             '<button class="btn-resolve" onclick=\'openResolveModal(' + args + ')\'>✓ Xong</button>' +
@@ -3483,7 +3540,11 @@ async function submitResolve(){
     showToast('✓ Đã lưu sự cố — dừng ' + d.thoi_gian_dung_phut + ' phút');
     // T170: sự cố A1/A2/A3/B1/B2/C3/E1/F1 chưa có IPQC OK thì RPC từ chối (⛔) → onError hiện hộp thoại.
     loadShiftState(false);
-  } catch (e) { onError(e); }
+  } catch (e) {
+    onError(e);
+    // T210: bị chặn vì công việc can thiệp khuôn chưa duyệt / chưa cam kết an toàn → mở khối khai.
+    if (row && /can thiệp khuôn/.test(e && e.message || '')) { const idDong = row.id_dong; closeModal(); moKhuonCT(idDong, row.open_id_su_co); }
+  }
 }
 
 // =============================================================================

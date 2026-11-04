@@ -208,6 +208,7 @@ tr.row-ng td{background:#FFF5F5}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/khuon-can-thiep.js?v=T210"></script>
 <script>
 // Người ghi check sheet = NV bảo dưỡng khuôn / Quản lý bộ phận Đúc (D68) / admin — khớp RPC duc_khuon_cs_luu.
 const EDIT_ROLES = ['nhan_vien_bao_duong_khuon','to_truong_khuon','admin'];
@@ -343,6 +344,8 @@ function render(){
     (kh.ghi_chu ? '<div style="margin-top:8px;font-size:12px"><b>Nội dung KH:</b> ' + escapeHtml(kh.ghi_chu) + '</div>' : '') +
     '</div>';
 
+  // T210: cấp công việc + phê duyệt + cam kết an toàn (chưa đủ thì server chặn ghi giờ bắt đầu / hoàn thành).
+  html += '<div class="no-print" id="ctCard" style="margin-bottom:8px"></div>';
   html += '<div class="card"><div class="card-title">Thực hiện</div><div class="form-grid">' +
     '<div class="fg"><label>Ngày thực hiện</label><input type="date" id="f-ngay" value="' + (cs ? cs.ngay_thuc_hien : kh.ngay) + '"' + dis + '></div>' +
     '<div class="fg"><label>Đảm nhiệm chính</label><select id="f-nguoi"' + dis + '>' + nguoiOpts(cs ? cs.nguoi_thuc_hien : kh.nguoi_phu_trach) + '</select></div>' +
@@ -400,6 +403,7 @@ function render(){
     '</div></div>';
 
   document.getElementById('main').innerHTML = html;
+  KhuonCT.mount(document.getElementById('ctCard'), { nguon: 'cs', nguonId: idKh });
   if (done) loadSauBd();
   lkLoad();
   renderItems();
