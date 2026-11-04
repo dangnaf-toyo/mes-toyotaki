@@ -101,7 +101,10 @@ const OqcDashboard = (() => {
   const outsideFilter=node("div");outsideFilter.className="field";
   outsideFilter.innerHTML='<label for="oqcOutsourceFilter">Công đoạn gia công ngoài</label><select id="oqcOutsourceFilter"><option value="">Tất cả</option><option value="ma">Mạ</option><option value="in">In</option><option value="anode">Anode</option><option value="unknown">Chưa phân loại</option></select>';
   scopeField.after(outsideFilter);
-  const syncOutside=()=>{outsourced.hidden=$("inspectionScope").value!=="POST_OUTSOURCED_MACHINING";};
+  const syncOutside=()=>{
+    outsourced.hidden=$("inspectionScope").value!=="POST_OUTSOURCED_MACHINING";
+    outsourced.style.display=outsourced.hidden?'none':'';
+  };
   $("inspectionScope").addEventListener("change",syncOutside);syncOutside();
   $("oqcOutsourceFilter").onchange=()=>loadStats();
   const clearModels = $("clearModels");

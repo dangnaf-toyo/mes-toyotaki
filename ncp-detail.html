@@ -430,8 +430,15 @@ async function load(){
   state.currentUserEmail = (await MesAuth.getCurrentUserIdentity()) || '';
   state.images.phat_sinh = jsonArr(data.hinh_anh_phat_sinh_json).slice();
   state.images.luu_xuat = jsonArr(data.hinh_anh_luu_xuat_json).slice();
+  const tracked = await sb.from('ncp_doi_sach').select('id,nhom_cu,vi_tri_cu')
+    .eq('id_ncp',state.id).eq('da_luu_tru',false);
+  if(tracked.error){showPageMessage('⚠️','Chưa tải được đối sách','Vui lòng tải lại trang.',tracked.error);return;}
   DS_KEYS.forEach(key => {
-    state.doiSach[key] = jsonArr(data['doi_sach_' + key + '_json']).map(x => Object.assign({ noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: [] }, x));
+    state.doiSach[key] = jsonArr(data['doi_sach_' + key + '_json']).map((x,index) => Object.assign({
+      noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: []
+    },x,{
+      id_doi_sach:x.id_doi_sach||(tracked.data||[]).find(d=>d.nhom_cu===key&&d.vi_tri_cu===index+1)?.id||crypto.randomUUID()
+    }));
   });
   await loadCachLy();
   renderAll();
@@ -581,11 +588,21 @@ async function onCauseImageSelected(e, key){
 
 // ===================== Đối sách =====================
 function addDoiSach(key){
-  state.doiSach[key].push({ noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: [] });
+  state.doiSach[key].push({ id_doi_sach:crypto.randomUUID(),noi_dung: '', nguoi_thuc_hien: '', thoi_han: '', danh_gia: '', hinh_anh: [] });
   renderDoiSachList(key);
 }
 function removeDoiSach(key, idx){ state.doiSach[key].splice(idx, 1); renderDoiSachList(key); }
 function updateDoiSachField(key, idx, field, value){ state.doiSach[key][idx][field] = value; }
+
+window.addEventListener('ncp-doi-sach-saved',event=>{
+  const {id,nhom_cu:key,data}=event.detail;
+  if(!key||data.id_ncp!==state.id)return;
+  const item=state.doiSach[key]?.find(x=>x.id_doi_sach===id);
+  if(!item)return;
+  item.noi_dung=data.noi_dung_tra_loi||'';
+  item.nguoi_thuc_hien=data.nguoi_phu_trach||'';
+  renderDoiSachList(key);
+});
 
 function renderDoiSachList(key){
   const list = state.doiSach[key];
@@ -928,6 +945,6 @@ window.addEventListener('beforeprint',()=>{if(state.case && !document.getElement
 window.addEventListener('afterprint',()=>document.getElementById('qc02-print')?.remove());
 function printQc02Ncp(){if(!state.case)return;const c={...state.case,nguoi_dam_nhiem_doi_sach:document.getElementById('f-nguoi-dam-nhiem').value,nguyen_nhan_phat_sinh:document.getElementById('f-nn-phat-sinh').value,nguyen_nhan_luu_xuat:document.getElementById('f-nn-luu-xuat').value};return Qc02Ncp.print(c,state.checkpoint,state.ipqcEvidence,state.images,state.doiSach,state.cachLy);}
 </script>
-<script src="shared/ncp-doi-sach-board.js?v=T212"></script>
+<script src="shared/ncp-doi-sach-board.js?v=T214"></script>
 </body>
 </html>

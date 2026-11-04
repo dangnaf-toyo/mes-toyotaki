@@ -1,4 +1,4 @@
--- T211 STAGING: phân loại mới, giữ NULL lịch sử.
+-- Đã áp dụng STAGING 04/11/2026. Giữ nguyên dữ liệu lịch sử.
 begin;
 alter table public.oqc_daily_inspection add column if not exists cong_doan_gia_cong_ngoai text check(cong_doan_gia_cong_ngoai in ('ma','in','anode'));
 CREATE OR REPLACE FUNCTION public.oqc_save_daily_report(p_id bigint, p_data jsonb)
