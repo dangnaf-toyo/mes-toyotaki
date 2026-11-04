@@ -3,7 +3,8 @@ const assert=require('node:assert/strict'),vm=require('node:vm');
 const base='https://mes-toyotaki.dangnaf.workers.dev/';
 (async()=>{
   for(const [file,markers] of [
-    ['oqc-daily.html',['oqc-dashboard.js?v=T214']],
+    ['oqc-daily.html',['oqc-dashboard.js?v=20261104-outsource']],
+    ['shared/oqc-scope.js',['Kiểm tra sau Gia Công ngoài','recordLabel','matches']],
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
     ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-gia-cong.html']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
