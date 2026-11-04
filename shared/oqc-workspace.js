@@ -155,6 +155,7 @@ const OqcWorkspace = (() => {
       inspectionTask: "Task / tem",
       inspectionScope: "Phạm vi",
       inspectorCode: "Người kiểm",
+      oqcInspectorCount: "Số người kiểm tra",
       oqcInspectionHours: "Số giờ kiểm",
       total: "Đã kiểm",
       ng: "NG",
@@ -165,7 +166,7 @@ const OqcWorkspace = (() => {
     };
     for (const [id, label] of Object.entries(labels))
       if (field(id)?.querySelector("label")) field(id).querySelector("label").textContent = label;
-    for (const id of ["inspectorCode", "oqcInspectionHours", "total", "ok", "ng", "okPct", "ngPct", "plan"])
+    for (const id of ["inspectorCode", "oqcInspectorCount", "oqcInspectionHours", "total", "ok", "ng", "okPct", "ngPct", "plan"])
       left.append(field(id));
     const extra = node("details", "oqc-extra-info");
     extra.append(node("summary", "", "Thông tin bổ sung"));

@@ -12,7 +12,8 @@ for (const file of ['oqc-daily.html', 'qc-manager.html', 'ncp-detail.html', 'ipq
 const oqc = fs.readFileSync('shared/oqc-dashboard.js', 'utf8');
 const sync = oqc.match(/const syncOutside\s*=\s*\(\)\s*=>\s*\{[\s\S]*?\};/)[0];
 const outsourced = { style: {} }, scope = { value: 'POST_PAINTING' };
-const context = vm.createContext({ outsourced, $: () => scope });
+const context = vm.createContext({ outsourced, $: () => scope, editing:null, dataRows:[],
+  OqcScope:require('../shared/oqc-scope.js') });
 vm.runInContext(sync + ';syncOutside();', context);
 assert.equal(outsourced.hidden, true);
 assert.equal(outsourced.style.display, 'none');

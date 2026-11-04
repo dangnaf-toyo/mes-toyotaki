@@ -326,6 +326,7 @@ const MesOqcRecord = (() => {
           "Tên SP": r.product_name,
           "Mã NV": r.inspector_code,
           "Người kiểm": r.inspector_name,
+          "Phạm vi kiểm tra": OqcScope.recordLabel(r),
           "Tổng kiểm": r.total_qty,
           OK: r.ok_qty,
           NG: r.ng_qty,
