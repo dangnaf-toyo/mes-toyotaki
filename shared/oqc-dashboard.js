@@ -94,6 +94,16 @@ const OqcDashboard = (() => {
     filterButtons.className = "oqc-filter-actions";
     filterBar.insertBefore(scopeField, filterButtons);
   } else filterBar.append(scopeField);
+  const outsourced = node("div");
+  outsourced.className="field";
+  outsourced.innerHTML='<label for="oqcOutsourceProcess">Công đoạn gia công ngoài</label><select id="oqcOutsourceProcess"><option value="">Chọn công đoạn</option><option value="ma">Mạ</option><option value="in">In</option><option value="anode">Anode</option></select>';
+  $("inspectionScope").closest(".field").after(outsourced);
+  const outsideFilter=node("div");outsideFilter.className="field";
+  outsideFilter.innerHTML='<label for="oqcOutsourceFilter">Công đoạn gia công ngoài</label><select id="oqcOutsourceFilter"><option value="">Tất cả</option><option value="ma">Mạ</option><option value="in">In</option><option value="anode">Anode</option><option value="unknown">Chưa phân loại</option></select>';
+  scopeField.after(outsideFilter);
+  const syncOutside=()=>{outsourced.hidden=$("inspectionScope").value!=="POST_OUTSOURCED_MACHINING";};
+  $("inspectionScope").addEventListener("change",syncOutside);syncOutside();
+  $("oqcOutsourceFilter").onchange=()=>loadStats();
   const clearModels = $("clearModels");
   clearModels.className = "oqc-clear-models";
   clearModels.textContent = "×";
@@ -514,7 +524,7 @@ const OqcDashboard = (() => {
       rows,
     );
     $("modelSummary").title =
-      "Kế hoạch từ KH tuần OQC đã liên kết sau gia công; không gán sang Sơn/Gia Công ngoài. Giờ công cộng theo từng người/báo cáo; hiệu suất = giờ công chuẩn / giờ công thực tế × 100%.";
+      "Kế hoạch từ KH tuần OQC đã liên kết sau gia công; không gán sang sơn/gia công ngoài. Giờ công cộng theo từng người/báo cáo; hiệu suất = giờ công chuẩn / giờ công thực tế × 100%.";
     demand.replaceChildren();
     demand.hidden = true;
     OqcDefectCharts.render($("oqcDefectSummary"), snapshot.records, $("oqcTrendUnit").value, MesQcFields.defectName, {
@@ -825,6 +835,7 @@ const OqcDashboard = (() => {
     $("date").value = today();
     $("inspectionScope").value = "FULL_POST_MACHINING";
     $("oqcReportPhotos").value = "";
+    $("oqcOutsourceProcess").value = "";syncOutside();
     renderLabor();
     renderPhotos();
     calcWork();
@@ -853,6 +864,7 @@ const OqcDashboard = (() => {
     request = null;
     $("oqcReportPhotos").value = "";
     MesOqcScope.selectValue(r.context?.inspection_scope);
+    $("oqcOutsourceProcess").value=r.cong_doan_gia_cong_ngoai||"";syncOutside();
     $("inspectionScope").disabled =
       !info?.can_actual || !r.context || !MesOqcScope.current.includes(r.context.inspection_scope);
     $("ng").value = r.ng_qty;
@@ -907,6 +919,9 @@ const OqcDashboard = (() => {
         throw Error("Số lượng từng lỗi phải nguyên, không âm và không vượt NG.");
       const count = Number($("oqcInspectorCount").value);
       if (!Number.isInteger(count) || count < 1) throw Error("Số người kiểm tra phải là số nguyên dương.");
+      const outside=$("inspectionScope").value==="POST_OUTSOURCED_MACHINING"?$("oqcOutsourceProcess").value:null;
+      const oldRow=editing&&dataRows.find(r=>r.id===editing);
+      if($("inspectionScope").value==="POST_OUTSOURCED_MACHINING"&&!outside&&!(oldRow?.context?.inspection_scope==="POST_OUTSOURCED_MACHINING"&&!oldRow.cong_doan_gia_cong_ngoai))throw Error("Chọn công đoạn gia công ngoài: Mạ, In hoặc Anode.");
       const allLabor = reportLabor();
       if (allLabor.length > count) throw Error("Số người kiểm tra không được ít hơn số người đã ghi giờ riêng.");
       const codes = new Set();
@@ -947,8 +962,9 @@ const OqcDashboard = (() => {
           task_no: $("inspectionTask").value.trim() || null,
           ...MesOqcHistory.customerPayload($("code").value, original),
           scope: $("inspectionScope").value || null,
-          // T153: lần sơn chỉ gửi cho phạm vi "Kiểm tra sau Sơn"
+          // T153: lần sơn chỉ gửi cho phạm vi "Kiểm tra sau sơn"
           ...($("inspectionScope").value === "POST_PAINTING" && $("oqcLanSon") ? { lan_son: $("oqcLanSon").value } : {}),
+          cong_doan_gia_cong_ngoai: outside,
           so_nguoi_kiem: count,
           inspection_hours: parseHours($("oqcInspectionHours").value),
           labor: allLabor.map((l) => ({ employee_code: l.employee_code, hours: Number(l.hours) })),
