@@ -403,7 +403,9 @@
         ban_ve_url: st.banVe || '', ban_ve_vi_tri: st.viTri,
         muc: st.rows.map(r => ({ muc_no: String(r.muc_no ?? '').trim(), hang_muc: r.hang_muc, kieu: r.kieu,
           danh_nghia: soVN(r.danh_nghia), dung_sai_tren: soVN(r.dung_sai_tren), dung_sai_duoi: soVN(r.dung_sai_duoi),
-          tieu_chuan: r.tieu_chuan, dung_cu: r.dung_cu, tan_suat: r.tan_suat })),
+          tieu_chuan: r.tieu_chuan, dung_cu: r.dung_cu, tan_suat: r.tan_suat,
+          ma_dac_tinh:r.ma_dac_tinh,don_vi:r.don_vi,phuong_phap:r.phuong_phap,
+          lsl:r.lsl,usl:r.usl,co_mau:r.co_mau,nguon_nhan_dien:r.nguon_nhan_dien })),
       };
     }
 
@@ -486,7 +488,10 @@
         return;
       }
       if (!q.soan) return;
-      if (t.closest('[data-sua]')) { st.sua = true; return ve(); }
+      if (t.closest('[data-sua]')) {
+        if(st.cd==='gia_cong'&&st.xem?.buoc_gia_cong){location.href='ipqc-gia-cong.html?standard='+encodeURIComponent(st.ma)+'&version='+st.xem.id;return;}
+        st.sua = true; return ve();
+      }
       if (t.closest('[data-huysua]')) return napPhienBan(st.xem);
       if (!st.sua) return;
       const paste = t.closest('[data-dan]');
@@ -873,5 +878,5 @@
     return { taiLai: async () => { st.cache = {}; await ve(); taiCanhBao(); } };
   }
 
-  window.IpqcBtkQc = { mountEditor, mountChart, quyen, khoiDuyet, duyet, huy, TT };
+  window.IpqcBtkQc = { mountEditor, mountChart, quyen, khoiDuyet, duyet, huy, TT, DUNG_CU };
 })();

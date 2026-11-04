@@ -28,7 +28,8 @@
   function specMuc(m) {
     const dn = num(m.danh_nghia);
     const tren = num(m.dung_sai_tren), duoi = num(m.dung_sai_duoi);
-    return { usl: dn !== null && tren !== null ? dn + tren : null, lsl: dn !== null && duoi !== null ? dn - duoi : null };
+    return { usl: num(m.usl) ?? (dn !== null && tren !== null ? dn + tren : null),
+      lsl: num(m.lsl) ?? (dn !== null && duoi !== null ? dn - duoi : null) };
   }
   // "14.8 +0/−0.2", "Ø4.2 ±0.1"
   function chuanText(m) {
@@ -120,7 +121,7 @@
     const W = 820, H = o.h || 280, L = 56, R = 76, T = 10, B = 24;
     const pw = W - L - R, ph = H - T - B;
     const ys = o.pts.map(p => p.x);
-    [o.usl, o.lsl, o.lim && o.lim.ucl, o.lim && o.lim.lcl, o.lim && o.lim.cl].forEach(v => { if (v !== null && v !== undefined && isFinite(v)) ys.push(v); });
+    [o.usl, o.lsl, o.nominal, o.lim && o.lim.ucl, o.lim && o.lim.lcl, o.lim && o.lim.cl].forEach(v => { if (v !== null && v !== undefined && isFinite(v)) ys.push(v); });
     if (!ys.length) return '<div class="spc-empty">Chưa có dữ liệu</div>';
     let lo = Math.min(...ys), hi = Math.max(...ys);
     if (hi - lo < 1e-9) { hi += 0.01; lo -= 0.01; }
@@ -143,6 +144,7 @@
     };
     line(o.usl, '#B91C1C', '6 4', 1.5, 'USL', true);
     line(o.lsl, '#B91C1C', '6 4', 1.5, 'LSL', true);
+    line(o.nominal, '#2563EB', '2 3', 1, 'Danh nghĩa', false);
     if (o.lim) {
       const nh = o.nhanGH || ['UCL', 'X̄', 'LCL'];
       line(o.lim.ucl, '#B45309', '3 3', 1.2, nh[0], true);

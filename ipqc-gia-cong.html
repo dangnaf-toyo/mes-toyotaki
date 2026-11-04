@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IPQC Gia công — TOYOTAKI MES</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg-page:#f3f5f7;--bg-panel:#fff;--bg-header:#132537;--text:#172b40;--text-muted:#64748b;--border:#d7dfe7;--accent:#0f5fa5;--run-fg:#166534;--warn-fg:#92400e;--alarm-fg:#b91c1c}
+*{box-sizing:border-box}html,body{margin:0;font:13px Inter,Arial,sans-serif;color:var(--text);background:var(--bg-page)}
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 20px;background:var(--bg-header);color:#fff}.brand{font-weight:800;font-size:18px}.brand small{display:block;font-size:12px;font-weight:500}.header-clock{margin-left:auto}
+main{padding:16px;width:100%}.panel{padding:16px;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;background:#fff}h2,h3{margin:0 0 12px}h2{font-size:18px}h3{font-size:15px}
+.toolbar,.tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:12px}button,.btn{min-height:34px;padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--accent);font:600 13px Inter;cursor:pointer}button:disabled{opacity:.5;cursor:default}.primary,.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+label{display:flex;flex-direction:column;gap:5px;font-weight:600}input,select,textarea{font:13px Inter;padding:8px;border:1px solid var(--border);border-radius:5px;min-height:34px;max-width:100%}textarea{min-height:64px}input[type=checkbox]{min-height:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:12px}.drawing-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,2fr);gap:16px}.drawing{width:100%;height:65vh;border:1px solid var(--border);object-fit:contain}.scroll{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border);font-size:12px}th{background:#f1f5f9}td input,td select{min-width:95px}td input[type=checkbox]{min-width:18px}.muted{color:var(--text-muted)}.notice{white-space:pre-wrap;min-height:20px}.bad{color:var(--alarm-fg)}.good{color:var(--run-fg)}.metrics{display:flex;gap:12px;flex-wrap:wrap}.metric{padding:12px;background:#f1f5f9;border-radius:8px;min-width:130px}.metric b{display:block;font-size:20px}.hidden,[hidden]{display:none!important}.source{font-size:11px;min-width:170px;max-width:240px}.number{font-family:'JetBrains Mono',monospace}svg{max-width:100%;height:auto}
+@media(max-width:800px){main{padding:8px}.drawing-grid{grid-template-columns:minmax(0,1fr)}.drawing{height:45vh}.panel{padding:10px}.grid{grid-template-columns:minmax(0,1fr)}}
+@media print{header,.tabs,button,.no-print,input[type=file]{display:none!important}.panel{border:0;padding:0;break-inside:avoid}main{padding:0}.scroll{overflow:visible}body{background:#fff}table{font-size:10px}}
+</style></head><body>
+<header><div class="brand">TOYOTAKI<small>IPQC Gia công</small></div><a class="btn" href="ipqc.html">IPQC Đúc</a><a class="btn" href="gia-cong-dashboard.html">Bảng điều khiển Gia công</a><span class="header-clock" id="clock"></span></header>
+<main>
+<nav class="tabs"><button data-tab="standards" class="active">Tiêu chuẩn Gia công</button><button data-tab="measure">Nhập kết quả</button><button data-tab="dashboard">Dashboard IPQC</button><button onclick="print()">In / lưu PDF</button></nav>
+<p id="gcMessage" class="notice" role="status"></p>
+<section data-panel="standards">
+<div class="panel"><h2>Tiêu chuẩn kích thước Gia công</h2><p class="muted">Nhân viên QC soạn và xác minh → Trưởng phòng QC kiểm tra → Giám đốc sản xuất phát hành. Phiên bản đã áp dụng không bị ghi đè.</p>
+<div class="toolbar"><label>Khách hàng <select id="gcCustomer"><option value="">Tất cả</option></select></label><label>Model <input id="gcProduct" list="gcProducts" placeholder="Mã sản phẩm"></label><datalist id="gcProducts"></datalist>
+<label>Phiên bản đã lưu <select id="gcVersion"><option value="">Tiêu chuẩn mới</option></select></label><button id="gcLoadVersion">Mở phiên bản</button><button id="gcClone">Tạo Revision mới từ bản đang xem</button></div>
+<p id="gcProductInfo" class="muted"></p><div id="gcApproval"></div></div>
+<form id="gcStandardForm"><div class="panel grid">
+<label>Mã bản vẽ <input id="gcDrawingCode" required></label><label>Revision <input id="gcRevision" required></label>
+<label>Bước gia công <input id="gcProcess" required placeholder="Theo quy trình thực tế"></label><label>Ngày áp dụng <input id="gcEffective" type="date" required></label>
+<label>Nội dung sửa đổi <input id="gcChange" required value="Lập mới"></label>
+<label>Bản vẽ gốc PDF / JPG / PNG <input id="gcDrawing" type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.jpg,.jpeg,.png"></label>
+</div><div class="drawing-grid"><div class="panel"><h3>Bản vẽ gốc</h3><div id="gcDrawingPreview"><p class="muted">Chọn bản vẽ để đọc hoặc nhập tiêu chuẩn thủ công.</p></div><p id="gcReadProgress" role="status" class="notice"></p></div>
+<div class="panel"><h3>Đặc tính kích thước — kiểm tra và xác nhận</h3><div class="toolbar"><button id="gcAddFeature" type="button">Thêm dòng thủ công</button><button id="gcConfirmFeatures" type="button">Xác nhận các dòng đã đối chiếu</button></div>
+<p class="muted">Dung sai dưới nhập có dấu (ví dụ −0.05). Có thể nhập trực tiếp LSL/USL. Ô trống là chưa có thông tin; hệ thống không tự coi là 0.</p>
+<div class="scroll"><table><thead><tr><th>No</th><th>Mã đặc tính</th><th>Tên / vị trí</th><th>Kiểu</th><th>Danh nghĩa</th><th>Sai lệch trên</th><th>Sai lệch dưới</th><th>LSL</th><th>USL</th><th>Đơn vị</th><th>Phương pháp</th><th>Dụng cụ</th><th>Tần suất</th><th>Cỡ mẫu</th><th>Tiêu chuẩn OK/NG</th><th>Nguồn / tin cậy</th><th>Xác nhận</th><th></th></tr></thead><tbody id="gcFeatureRows"></tbody></table></div>
+<p id="gcReadWarning" class="notice"></p><button id="gcSaveStandard" class="primary" type="submit">Lưu bản nháp & gửi kiểm tra</button></div></div></form>
+<div class="panel"><h3>Lịch sử bản vẽ / soạn tiêu chuẩn</h3><div id="gcStandardHistory"></div></div>
+</section>
+<section data-panel="measure" hidden><form id="gcMeasureForm" class="panel"><h2>Nhập kết quả IPQC Gia công</h2><div class="grid">
+<label>Model <input id="gcMeasureProduct" list="gcProducts" required></label><label>Revision có hiệu lực <select id="gcMeasureVersion" required></select></label>
+<label>Máy Gia công <select id="gcMachine" required></select></label><label>Ca <select id="gcShift"><option>Ca ngày</option><option>Ca đêm</option><option>Ca 1</option><option>Ca 2</option></select></label>
+<label>Mã lô <input id="gcLot" required></label></div><p id="gcMeasureInfo"></p><div id="gcMeasureRows"></div><button class="primary" id="gcSaveMeasure" type="submit">Lưu kết quả đo</button></form></section>
+<section data-panel="dashboard" hidden><div class="panel"><h2>Dashboard IPQC Đúc / Gia công</h2><div class="grid">
+<label>Từ ngày <input id="gcFrom" type="date"></label><label>Đến ngày <input id="gcTo" type="date"></label>
+<label>Công đoạn <select id="gcDashboardProcess"><option value="gia_cong">IPQC Gia công</option><option value="duc">IPQC Đúc</option><option value="">Tất cả</option></select></label>
+<label>Model <input id="gcFilterProduct" list="gcProducts"></label><label>Revision <input id="gcFilterRevision"></label><label>Bước gia công <input id="gcFilterStep"></label>
+<label>Máy <input id="gcFilterMachine" list="gcMachines"></label><datalist id="gcMachines"></datalist><label>Ca <select id="gcFilterShift"><option value="">Tất cả</option><option>Ca ngày</option><option>Ca đêm</option><option>Ca 1</option><option>Ca 2</option></select></label>
+<label>Người kiểm <input id="gcFilterInspector" placeholder="Tên / mã"></label><label>Mã lô <input id="gcFilterLot"></label>
+<label>Đặc tính (theo phiên bản) <select id="gcFilterFeature"><option value="">Tất cả</option></select></label></div>
+<div class="toolbar"><button id="gcRefresh">Xem / tải lại</button><button id="gcExcel">Xuất Excel</button></div><div id="gcMetrics" class="metrics"></div></div>
+<div class="panel"><h3>Kích thước thực tế so với danh nghĩa và LSL/USL</h3><div id="gcValueChart"></div><h3>SPC — UCL/LCL thống kê</h3><div id="gcSpcChart"></div>
+<label class="no-print"><input type="checkbox" id="gcCapabilityConfirmed"> Tôi đã xác minh quá trình ổn định, phân phối và cách lấy mẫu phù hợp để đánh giá Cp/Cpk</label><p id="gcCapability"></p></div>
+<div class="panel"><h3>Đặc tính thường phát sinh NG</h3><div id="gcTopNg"></div></div><div class="panel"><h3>Dữ liệu đo chi tiết</h3><div id="gcDataRows" class="scroll"></div><button id="gcMoreRows">Tải thêm</button></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script><script src="shared/supabase-client.js"></script><script src="shared/navbar.js?v=T213"></script>
+<script src="shared/qc02-data.js?v=T183"></script><script src="shared/ipqc-spc.js?v=T213"></script><script src="shared/ipqc-btk-qc.js?v=T213"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="shared/ipqc-drawing-parser.js?v=T213"></script><script src="shared/ipqc-drawing-reader.js?v=T213"></script><script src="shared/ipqc-gc-math.js?v=T213"></script><script src="shared/ipqc-gia-cong.js?v=T213"></script>
+</body></html>
