@@ -98,252 +98,265 @@
   không chỉ nhập số lượng — RPC duc_kanban_ghi_nhan_ng đổi chữ ký thêm
   p_loai_ng (bảng duc_kanban_ng_log thêm cột loai_ng).
 
+  T209 — giao diện theo Bảng điều khiển Bavia: thanh tiêu đề tối chứa Công
+  đoạn / Mã SP / Người kiểm / Trạm, dải KPI, 1 khung làm việc có 1 Ô QUÉT
+  CHUNG (thay cho 2 ô quét "Tem Đúc đang dùng" + "Quét tem thành phẩm" cũ):
+  routeScan() — chế độ Kanban: mọi mã = tem chỉ thị; còn lại tem mã TP… =
+  ghi nhận thùng (cd_ghi_nhan_tem_thanh_pham), mã khác = tem Đúc → khai báo
+  nguồn (cd_khai_bao_nguon_dang_dung). Bước 1 Tem Đúc đang dùng (+ NG), bước
+  2 quy cách thùng / đủ cho bao nhiêu thùng. Không đổi RPC nào.
+
   Xem supabase/migration_phase_T40_tem_thanh_pham.sql + T41 (người kiểm) + T43 (khai báo nguồn) + T46 (NG) + T48/T49 (tồn kho) + T50 (Line) + T51 (đổi tên + lọc người kiểm + tự tạo Line 1) + T52 (gộp Kanban Đúc Kẽm) + T53 (giữ KPI/tồn kho + máy đúc + NG cho Đúc Kẽm) + T54 (bỏ phiên làm việc + chủng loại NG).
 -->
 <style>
+/* T209 — giao diện theo Bảng điều khiển Bavia (bavia-dashboard.html): thanh tiêu đề tối
+   chứa các ô chọn, dải KPI, 1 khung làm việc với 1 Ô QUÉT CHUNG (tem Đúc = khai báo nguồn,
+   tem TP… = ghi nhận thùng, chế độ Kanban = tem chỉ thị), bên dưới bước 1 / bước 2. */
 :root{
-  --bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--border:#D9DFE5;--border-strong:#B8C1CC;
-  --text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;
-  --accent:#0F5FA5;--accent-hover:#0A4681;
+  --bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;
+  --border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;
+  --accent:#0F5FA5;--accent-hover:#0A4681;--accent-soft:#E8F1FA;
+  --flow:#0E7490;--flow-soft:#E6F6F9;--flow-bd:#A5DCE6;
   --ok-fg:#047857;--ok-bg:#ECFDF5;--ok-bd:#A7E3C6;
   --warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-bd:#F5DFB0;
   --alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--alarm-bd:#FCA5A5;
-  --shadow-sm:0 1px 2px rgba(15,23,42,.05);--shadow-md:0 4px 14px rgba(15,23,42,.10);
+  --shadow-sm:0 1px 2px rgba(15,23,42,.04);
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:14px;line-height:1.35;-webkit-font-smoothing:antialiased}
-body{padding:8px 8px 14px}
-.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
-.card{background:var(--bg-panel);border-radius:11px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:11px 13px}
-.card h2{font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
-label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:3px}
-select,input[type=text],input[type=number]{width:100%;padding:9px 10px;border:1.5px solid var(--border-strong);border-radius:8px;
-  font-family:inherit;font-size:14.5px;font-weight:600;background:#fff;color:var(--text);outline:none}
-select:focus,input:focus{border-color:var(--accent)}
-.field+.field{margin-top:8px}
-.btn{width:100%;border:none;border-radius:10px;padding:12px;font-family:inherit;font-size:15px;font-weight:800;
-  cursor:pointer;transition:background .12s;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn:active{background:var(--accent-hover)}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.btn.mini{padding:9px 12px;font-size:12.5px;width:auto;border-radius:8px}
-.row{display:flex;gap:8px;align-items:center}
-.row input[type=text],.row input[type=number]{flex:1;width:auto;min-width:0}
-.muted{font-size:12px;color:var(--text-muted)}
-.hint{font-size:11px;color:var(--text-dim);margin-top:5px;line-height:1.4}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);color:var(--text);font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
-/* ── Dải KPI Kế hoạch / Thực tế / NG hôm nay ── */
-.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
-.kpi-tile{background:var(--bg-panel);border:1px solid var(--border);border-radius:11px;padding:9px 10px;text-align:center;box-shadow:var(--shadow-sm)}
-.kpi-tile .kv{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:800;color:var(--text)}
-.kpi-tile.kh .kv{color:var(--text-muted)}
-.kpi-tile.tt .kv{color:var(--accent)}
-.kpi-tile.ng .kv{color:var(--alarm-fg)}
-.kpi-tile .kl{font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-top:1px}
-@media (max-width:820px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:560px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+/* ── Thanh tiêu đề tối ── */
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px 14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;margin:6px 12px 0}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px;min-width:0}
+.header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;white-space:nowrap}
+.header-select{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;outline:none;min-height:28px;max-width:240px}
+.header-select:focus{border-color:#93C5FD}
+.btn-ghost{padding:6px 12px;border-radius:5px;font-size:12px;font-weight:600;min-height:32px;background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
+.header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15}
+.header-clock .date{font-size:10px;color:#94A3B8}
+.header-clock .time{font-family:var(--mono);font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em}
 
-/* ── Khai báo NG theo tem Đúc ── */
-.n-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
-.btn.ng-toggle{width:auto;padding:6px 9px;font-size:11.5px;font-weight:700;border-radius:7px;background:var(--alarm-bg);color:var(--alarm-fg);border:1.5px solid var(--alarm-bd)}
-.ng-form{display:none;margin-top:7px;padding:8px 9px;border-radius:8px;background:#fff;border:1.5px dashed var(--alarm-bd)}
-.ng-form.show{display:flex;flex-direction:column;gap:6px}
-.ng-form .ng-row{display:flex;gap:6px}
-.ng-form select,.ng-form input[type=text],.ng-form input[type=number]{padding:7px 8px;font-size:13px;border-radius:7px;border:1.5px solid var(--border-strong);font-family:inherit;font-weight:600}
-.ng-form select{flex:1.3;min-width:0}
-.ng-form input[type=number]{width:70px}
-.ng-form input[type=text].ng-khac{flex:1}
-.ng-form .btn.mini{padding:7px 10px;font-size:12px}
-.ng-form .btn.ng-submit{background:var(--alarm-fg)}
-.ng-form .btn.ng-submit:active{background:#8f1616}
+.page{padding:8px 12px 40px;display:flex;flex-direction:column;gap:10px;max-width:1400px;margin:0 auto}
+.card{background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;min-width:0}
+.card h3{margin:0 0 9px;font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h3 .sp{flex:1}
+.card h3 .cnt{font-family:var(--mono);color:var(--text-dim);font-weight:700}
+.step{font-size:11px;font-weight:800;color:#fff;background:var(--bg-header);border-radius:4px;padding:1px 6px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap;text-transform:none;letter-spacing:0}
+.chip.ok{color:var(--ok-fg);background:var(--ok-bg);border-color:var(--ok-bd)}
+.chip.flow{color:var(--flow);background:var(--flow-soft);border-color:var(--flow-bd)}
+.chip.mute{color:var(--text-muted);background:var(--bg-sunken);border-color:var(--border)}
+.hint{font-size:11.5px;color:var(--text-muted);margin-top:8px;line-height:1.45}
+.empty{border:1.5px dashed var(--border);border-radius:8px;padding:14px;text-align:center;color:var(--text-dim);font-size:12.5px}
 
-/* ── Hàng thiết lập gọn: Người kiểm / Công đoạn / Trạm / Mã SP ── */
-.settings-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-@media (max-width:900px){.settings-row{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:480px){.settings-row{grid-template-columns:1fr}}
+/* ── KPI ── */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.kpi{background:var(--bg-panel);border:1px solid var(--border);border-radius:9px;padding:8px 12px;min-width:0}
+.kpi .l{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .v{font-family:var(--mono);font-size:20px;font-weight:700}
+.kpi.kh .v{color:var(--text-muted)}
+.kpi.tt .v{color:var(--accent)}
+.kpi.ng .v{color:var(--alarm-fg)}
 
 /* ── Tồn kho theo mã SP (dọc theo lưu trình) ── */
-#tonKhoRow{display:none;margin-top:9px;padding-top:9px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px}
-#tonKhoRow.show{display:flex}
-.tk-tile{flex:1;min-width:84px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:9px;padding:7px 9px;text-align:center}
+#tonKhoCard{display:none}
+#tonKhoCard.show{display:block}
+#tonKhoRow{display:flex;flex-wrap:wrap;gap:6px}
+.tk-tile{flex:1;min-width:96px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px;padding:6px 9px}
 .tk-tile.here{background:var(--ok-bg);border-color:var(--ok-bd)}
-.tk-tile .tk-v{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;color:var(--text)}
+.tk-tile .tk-v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text)}
 .tk-tile.here .tk-v{color:var(--ok-fg)}
-.tk-tile .tk-l{font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-top:1px}
+.tk-tile .tk-l{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
 
-/* ── Lưới chính 2 cột ── */
-.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
-@media (max-width:820px){.main-grid{grid-template-columns:1fr}}
+/* ── Khung làm việc + 1 ô quét chung ── */
+.ws-id .l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ws-id .l1 b{font-size:18px;font-weight:800}
+.ws-id .l2{margin-top:3px;color:var(--text-muted);font-size:12.5px}
+.ws-id .l2 .mono{color:var(--text);font-weight:700}
+.scan{display:flex;gap:8px;align-items:stretch;margin-top:12px;background:var(--bg-sunken);border:1.5px solid var(--border-strong);border-radius:10px;padding:8px}
+.scan:focus-within{border-color:var(--accent);background:var(--accent-soft)}
+.scan .ic{width:42px;display:grid;place-items:center;border-radius:7px;background:var(--bg-header);color:#fff;flex:none}
+.scan input{flex:1;min-width:0;border:none;background:transparent;font-family:var(--mono);font-size:17px;font-weight:700;color:var(--text);outline:none;padding:4px 2px}
+.scan input::placeholder{font-family:inherit;font-weight:500;font-size:14px;color:var(--text-dim)}
+.scan .cam{border:1px solid var(--border-strong);background:#fff;border-radius:7px;padding:0 12px;font-size:16px}
+.scan .go{border:none;background:var(--accent);color:#fff;border-radius:7px;padding:0 14px;font-size:13px;font-weight:700}
+.scan .go:hover{background:var(--accent-hover)}
+.scan-hint{margin-top:6px;font-size:11.5px;color:var(--text-muted)}
+.scan-hint b{color:var(--text)}
 
-/* ── Thẻ xác nhận sau khi quét ── */
+#msg{margin-top:8px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;display:none;border:1px solid}
+#msg.err{background:var(--alarm-bg);color:var(--alarm-fg);border-color:var(--alarm-bd);display:block}
+#msg.ok{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-bd);display:block}
+#msg.wait,#msg.warn{background:var(--warn-bg);color:var(--warn-fg);border-color:var(--warn-bd);display:block}
+
+/* ── Thẻ kết quả sau khi quét ── */
 #result{display:none;margin-top:8px}
 #result.show{display:block}
-.res-card{border-radius:10px;padding:12px 14px;border:2px solid}
+.res-card{border-radius:9px;padding:10px 12px;border:1.5px solid}
 .res-card.ok{background:var(--ok-bg);border-color:var(--ok-bd)}
 .res-card.warn{background:var(--warn-bg);border-color:var(--warn-bd)}
 .res-card.err{background:var(--alarm-bg);border-color:var(--alarm-bd)}
-.res-icon{font-size:22px;line-height:1;display:inline}
-.res-title{font-size:14.5px;font-weight:800;margin:2px 0 4px;display:inline-block;margin-left:6px}
+.res-icon{font-size:18px;line-height:1}
+.res-title{font-size:14px;font-weight:800;margin-left:6px}
 .res-card.ok .res-title{color:var(--ok-fg)}
 .res-card.warn .res-title{color:var(--warn-fg)}
 .res-card.err .res-title{color:var(--alarm-fg)}
-.res-lines{margin-top:6px;font-size:13px}
+.res-lines{margin-top:6px;font-size:12.5px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:2px 16px}
 .res-lines div{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-top:1px dashed rgba(0,0,0,.10)}
-.res-lines div:first-child{border-top:none}
 .res-lines .k{color:var(--text-muted);font-weight:600}
 .res-lines .v{font-weight:800;text-align:right}
-.res-flag{display:none;margin-top:8px;font-size:12.5px;font-weight:800;color:var(--warn-fg)}
-.mono{font-family:'JetBrains Mono',monospace}
+.res-flag{display:none;margin-top:6px;font-size:12.5px;font-weight:800;color:var(--warn-fg)}
 
-/* ── Kanban Đúc Kẽm (T52 — gộp từ ghi-nhan-kanban.html) — card "Phiên làm
-   việc" (T53) đã bỏ (T54): trùng với dải KPI/score card chung phía trên. ── */
+.ws-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start}
 
-.empty{padding:12px;text-align:center;color:var(--text-dim);font-style:italic;font-size:12.5px}
+/* ── Bước 1: Tem Đúc đang dùng (dạng dòng như Bavia) ── */
+#nguonList{display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto}
+.nguon-item-wrap{border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.nguon-item-wrap.first{border-color:var(--accent)}
+.nguon-item{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.nguon-item .n-tag{font-family:var(--mono);font-weight:700;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nguon-item .n-sp{font-size:11.5px;color:var(--text-muted);margin-top:1px}
+.nguon-item .n-con{font-family:var(--mono);font-weight:700;font-size:15px}
+.n-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.tiny{border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text-muted);border-radius:6px;padding:3px 9px;font-size:11.5px;font-weight:700;min-height:28px}
+.tiny.bad{color:var(--alarm-fg);border-color:var(--alarm-bd)}
+.tiny.bad:hover{background:var(--alarm-bg)}
+.ng-form{display:none;margin-top:7px;padding:6px 8px;border-radius:7px;background:var(--alarm-bg);border:1px solid var(--alarm-bd)}
+.ng-form.show{display:flex;flex-direction:column;gap:6px}
+.ng-form .ng-row{display:flex;gap:6px;flex-wrap:wrap}
+.ng-form select,.ng-form input{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--text);min-height:30px}
+.ng-form select{flex:1;min-width:0}
+.ng-form input[type=number]{width:80px;font-family:var(--mono)}
+.ng-form .ng-submit{align-self:flex-end;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;background:var(--alarm-fg);color:#fff;min-height:30px}
+.balance{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font-size:12px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.balance b{font-family:var(--mono);color:var(--text)}
+.het-banner,.insufficient-banner{display:none;margin-top:8px;padding:9px 11px;border-radius:8px;font-size:12.5px;font-weight:700;border:1px solid}
+.het-banner{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-fg)}
+.insufficient-banner{background:var(--alarm-bg);border-color:var(--alarm-bd);color:var(--alarm-fg)}
+.het-banner.show,.insufficient-banner.show{display:block}
 
-/* ── Tem Đúc đang dùng (T43) ── */
-#nguonList{margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto}
-.nguon-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 10px;
-  border-radius:8px;border:1.5px solid var(--ok-bd);background:var(--ok-bg)}
-.nguon-item .n-tag{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12.5px;color:var(--text)}
-.nguon-item .n-sp{font-size:11px;color:var(--text-muted);margin-top:1px}
-.nguon-item .n-con{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:13.5px;color:var(--ok-fg)}
-.het-banner{display:none;margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--warn-bg);
-  border:1.5px solid var(--warn-bd);color:var(--warn-fg);font-size:12.5px;font-weight:700}
-.het-banner.show{display:block}
-.insufficient-banner{display:none;margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--alarm-bg);
-  border:1.5px solid var(--alarm-bd);color:var(--alarm-fg);font-size:12.5px;font-weight:700}
-.insufficient-banner.show{display:block}
+/* ── Bước 2: Thùng thành phẩm ── */
+.spec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.spec > div{background:var(--bg-sunken);border:1px solid var(--border);border-radius:8px;padding:7px 9px;min-width:0}
+.spec .l{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.spec .v{font-family:var(--mono);font-weight:700;font-size:16px}
+.spec .v small{font-size:11px;color:var(--text-dim);font-weight:500}
+.howto{display:flex;flex-direction:column;gap:6px;font-size:12.5px;margin-top:10px}
+.howto div{display:flex;gap:8px;align-items:flex-start}
+.howto .n{flex:none;width:20px;height:20px;border-radius:50%;background:var(--flow);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center}
+
+/* ── Kanban Đúc Kẽm: Ghi nhận NG ── */
+.fld{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.fld:first-of-type{margin-top:0}
+.fld > span{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+.fld select,.fld input,.ng-khac-k{border:1.5px solid var(--border-strong);border-radius:7px;padding:8px 10px;font-family:inherit;font-size:13.5px;font-weight:600;background:#fff;color:var(--text);min-height:36px;width:100%}
+.fld .row{display:flex;gap:8px}
+.fld .row input{flex:1;min-width:0}
+.mbtn{border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;background:var(--alarm-fg);color:#fff;min-height:36px;white-space:nowrap}
 
 /* ── Chặn khi chưa đăng nhập ── */
-#authGate{display:none;text-align:center;padding:28px 16px}
+#authGate{display:none;text-align:center;padding:28px 16px;max-width:420px;margin:30px auto}
 #authGate.show{display:block}
-#authGate .btn{margin-top:16px}
+#authGate .mbtn{background:var(--accent);margin-top:14px}
 
-/* ── Modal quét QR (theo intem.html) ── */
+/* ── Modal quét QR bằng camera ── */
 .qr-modal{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column}
 .qr-modal.show{display:flex}
 .qr-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px;background:rgba(0,0,0,.7);flex-shrink:0}
 .qr-modal-hdr span{color:#fff;font-size:14px;font-weight:700}
-.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:9px;font-family:inherit;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer}
+.qr-modal-close{background:var(--alarm-fg);color:#fff;border:none;border-radius:9px;padding:10px 16px;font-size:14px;font-weight:700}
 #qrReaderDiv{position:relative;flex:1;overflow:hidden}
 #qrReaderDiv video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
 
-#msg{padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;display:none}
-#msg.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid var(--alarm-bd);display:block}
-#msg.ok{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-bd);display:block}
-#msg.wait{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);display:block}
-#msg.warn{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);display:block}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:820px){.ws-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  header{gap:8px}
+  .header-group{flex:1 1 100%}
+  .header-select{flex:1;max-width:none}
+  .header-clock{display:none}
+}
 </style>
 </head>
 <body>
 
-<div class="wrap">
+<header id="hdr">
+  <div class="brand">
+    <div class="co">Toyotaki · Sản xuất</div>
+    <div class="title" id="hdrTitle">Ghi nhận thùng thành phẩm</div>
+  </div>
+  <div class="header-group">
+    <span class="header-label">Công đoạn</span>
+    <select id="congDoan" class="header-select" aria-label="Công đoạn"></select>
+  </div>
+  <div class="header-group">
+    <span class="header-label">Mã SP</span>
+    <select id="spDangSx" class="header-select" aria-label="Mã SP đang sản xuất"><option value="">-- Chọn mã SP --</option></select>
+  </div>
+  <div class="header-group">
+    <span class="header-label" id="lblNguoiKiem">Người kiểm tra</span>
+    <select id="nguoiKiem" class="header-select" aria-label="Người kiểm tra"></select>
+  </div>
+  <div class="header-group">
+    <span class="header-label" id="lblTram">Trạm/tổ</span>
+    <select id="tram" class="header-select" aria-label="Trạm/tổ"><option value="">-- Không gắn trạm --</option></select>
+  </div>
+  <button type="button" class="btn-ghost" id="btnReload" title="Tải lại dữ liệu">↻ Tải lại</button>
+  <div class="header-clock">
+    <div class="date" id="hdrDate">—</div>
+    <div class="time" id="hdrTime">--:--:--</div>
+  </div>
+</header>
 
-  <div id="msg"></div>
+<!-- Chưa đăng nhập -->
+<div class="card" id="authGate">
+  <div style="font-size:32px">🔒</div>
+  <h3 style="justify-content:center;margin-top:8px">Cần đăng nhập</h3>
+  <div class="hint">Trang ghi nhận thùng thành phẩm yêu cầu đăng nhập bằng tài khoản hệ thống.</div>
+  <button type="button" class="mbtn" id="btnGoLogin">Đến trang đăng nhập</button>
+</div>
 
-  <!-- Chưa đăng nhập -->
-  <div class="card" id="authGate">
-    <div style="font-size:32px">🔒</div>
-    <h2 style="margin-top:8px">Cần đăng nhập</h2>
-    <p class="muted">Trang ghi nhận thùng thành phẩm yêu cầu đăng nhập bằng tài khoản hệ thống.</p>
-    <button type="button" class="btn" id="btnGoLogin">Đến trang đăng nhập</button>
+<!-- Nội dung chính -->
+<div class="page" id="mainUI" style="display:none">
+
+  <section class="kpis" id="kpiRowTP" aria-label="Chỉ số hôm nay">
+    <div class="kpi kh"><div class="l">KH thùng hôm nay</div><div class="v" id="kpiKhThung">0</div></div>
+    <div class="kpi kh"><div class="l">KH pcs hôm nay</div><div class="v" id="kpiKhPcs">0</div></div>
+    <div class="kpi tt"><div class="l">TT thùng hôm nay</div><div class="v" id="kpiTtThung">0</div></div>
+    <div class="kpi tt"><div class="l">TT pcs hôm nay</div><div class="v" id="kpiTtPcs">0</div></div>
+    <div class="kpi ng"><div class="l">NG pcs hôm nay</div><div class="v" id="kpiNgPcs">0</div></div>
+    <div class="kpi ng"><div class="l">Tỷ lệ NG hôm nay</div><div class="v" id="kpiNgRate">0%</div></div>
+  </section>
+
+  <div class="card" id="tonKhoCard">
+    <h3>Tồn kho theo công đoạn <span class="sp"></span><span class="cnt" id="tonKhoMa"></span></h3>
+    <div id="tonKhoRow"></div>
   </div>
 
-  <!-- Nội dung chính -->
-  <div id="mainUI" style="display:none;flex-direction:column;gap:8px">
-
-    <div class="kpi-row" id="kpiRowTP">
-      <div class="kpi-tile kh"><div class="kv" id="kpiKhThung">0</div><div class="kl">KH thùng hôm nay</div></div>
-      <div class="kpi-tile kh"><div class="kv" id="kpiKhPcs">0</div><div class="kl">KH pcs hôm nay</div></div>
-      <div class="kpi-tile tt"><div class="kv" id="kpiTtThung">0</div><div class="kl">TT thùng hôm nay</div></div>
-      <div class="kpi-tile tt"><div class="kv" id="kpiTtPcs">0</div><div class="kl">TT pcs hôm nay</div></div>
-      <div class="kpi-tile ng"><div class="kv" id="kpiNgPcs">0</div><div class="kl">NG pcs hôm nay</div></div>
-      <div class="kpi-tile ng"><div class="kv" id="kpiNgRate">0%</div><div class="kl">Tỷ lệ NG hôm nay</div></div>
+  <!-- Khung làm việc: 1 ô quét chung -->
+  <div class="card">
+    <div class="ws-id">
+      <div class="l1"><b id="wsTitle">Đánh bóng Kẽm</b><span id="wsChip"></span></div>
+      <div class="l2" id="wsSub"></div>
     </div>
-
-    <div class="card">
-      <div class="settings-row">
-        <div class="field" style="margin:0">
-          <label for="spDangSx">Mã SP đang sản xuất</label>
-          <select id="spDangSx"><option value="">-- Chọn mã SP --</option></select>
-        </div>
-        <div class="field" style="margin:0">
-          <label for="nguoiKiem"><span id="lblNguoiKiem">Người kiểm tra</span></label>
-          <select id="nguoiKiem"></select>
-        </div>
-        <div class="field" style="margin:0">
-          <label for="congDoan">Công đoạn</label>
-          <select id="congDoan"></select>
-        </div>
-        <div class="field" style="margin:0">
-          <label for="tram"><span id="lblTram">Trạm/tổ (không bắt buộc)</span></label>
-          <select id="tram"><option value="">-- Không gắn trạm --</option></select>
-        </div>
-      </div>
-      <div id="tonKhoRow"></div>
+    <div class="scan">
+      <span class="ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M11 8v8M14 8v8M17 8v8"/></svg></span>
+      <input id="scan" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Ô quét mã QR" placeholder="Quét QR tem…">
+      <button type="button" class="go" id="btnScanGo" title="Ghi nhận mã vừa nhập tay">Ghi nhận</button>
+      <button type="button" class="cam" id="btnCam" title="Quét bằng camera">📷</button>
+      <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
     </div>
-
-    <div class="main-grid" id="mainGridTP">
-      <div class="card">
-        <h2>Tem Đúc đang dùng</h2>
-        <button type="button" class="btn" id="btnScanNguon">📷 Đọc tem thùng Đúc đang đánh</button>
-        <input type="file" id="qrFileInputNguon" accept="image/*" capture="environment" style="display:none">
-        <div class="field" style="margin-top:8px">
-          <div class="row">
-            <input type="text" id="tagInputNguon" placeholder="…hoặc nhập Tag No — VD TKD20260919-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
-            <button type="button" class="btn mini" id="btnKhaiBao">Khai báo</button>
-          </div>
-        </div>
-        <div class="het-banner" id="hetBanner"></div>
-        <div id="nguonList"><div class="empty">Chưa khai báo tem Đúc nào.</div></div>
-        <div class="hint">Lấy nhiều thùng Đúc về chuyền thì đọc lần lượt từng tem — hệ thống trừ nguồn đúng thứ tự đã đọc. Tem đã dùng hết không đọc lại được.</div>
-      </div>
-
-      <div class="card">
-        <h2>Quét tem thành phẩm</h2>
-        <button type="button" class="btn" id="btnScan">📷 Quét QR trên tem</button>
-        <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
-        <div class="field" style="margin-top:8px">
-          <div class="row">
-            <input type="text" id="tagInput" placeholder="…hoặc nhập Tag No — VD TP20260919-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
-            <button type="button" class="btn mini" id="btnGhiNhan">Ghi nhận</button>
-          </div>
-        </div>
-        <div class="insufficient-banner" id="insufficientBanner"></div>
-      </div>
-    </div>
-
-    <div class="main-grid" id="mainGridKanban" style="display:none">
-      <div class="card">
-        <h2>Quét tem chỉ thị Kanban</h2>
-        <button type="button" class="btn" id="btnScanKanban">📷 Quét QR trên tem</button>
-        <input type="file" id="qrFileInputKanban" accept="image/*" capture="environment" style="display:none">
-        <div class="field" style="margin-top:8px">
-          <div class="row">
-            <input type="text" id="tagInputKanban" placeholder="VD: TKD20260829-0012" autocomplete="off" autocapitalize="characters" spellcheck="false">
-            <button type="button" class="btn mini" id="btnGhiNhanKanban">Ghi nhận</button>
-          </div>
-        </div>
-        <div class="hint">Máy đúc lấy từ ô "Máy đúc" phía trên — đổi ở đó nếu chỉ thị in sai máy.</div>
-      </div>
-
-      <div class="card">
-        <h2>Ghi nhận NG</h2>
-        <div class="field" style="margin:0">
-          <label for="ngKanbanLoai">Chủng loại NG (mã SP đang chọn ở trên)</label>
-          <select id="ngKanbanLoai"></select>
-        </div>
-        <input type="text" class="ng-khac" id="ngKanbanKhac" placeholder="Ghi rõ loại NG khác…" style="display:none;margin-top:8px">
-        <div class="field">
-          <label for="ngKanbanInput">Số lượng NG</label>
-          <div class="row">
-            <input type="number" id="ngKanbanInput" min="1" step="1" placeholder="Số lượng NG">
-            <button type="button" class="btn mini" id="btnNgKanban">Ghi nhận NG</button>
-          </div>
-        </div>
-        <div class="hint">Nhập bất kỳ lúc nào phát sinh NG, hoặc gộp nhập 1 lần cuối ca — mỗi lần nhập cộng dồn vào "NG pcs hôm nay" phía trên.</div>
-      </div>
-    </div>
-
+    <div class="scan-hint" id="scanHint"></div>
+    <div id="msg"></div>
     <div id="result">
       <div class="res-card" id="resCard">
         <span class="res-icon" id="resIcon"></span><span class="res-title" id="resTitle"></span>
@@ -351,8 +364,53 @@ select:focus,input:focus{border-color:var(--accent)}
         <div class="res-flag" id="resFlag"></div>
       </div>
     </div>
-
   </div>
+
+  <!-- Chế độ tem thành phẩm (Đánh bóng Kẽm / OQC) -->
+  <div class="ws-grid" id="mainGridTP">
+    <div class="card">
+      <h3><span class="step">1</span> Tem Đúc đang dùng <span class="sp"></span><span class="cnt" id="nguonCnt"></span></h3>
+      <div id="nguonList"><div class="empty">Chưa khai báo tem Đúc nào.</div></div>
+      <div class="balance" id="nguonBalance"></div>
+      <div class="het-banner" id="hetBanner"></div>
+      <div class="hint">Lấy nhiều thùng Đúc về chuyền thì quét lần lượt từng tem: hệ thống trừ nguồn đúng thứ tự đã quét. Tem đã dùng hết không quét lại được.</div>
+    </div>
+    <div class="card">
+      <h3><span class="step">2</span> Quét tem thùng thành phẩm <span class="sp"></span><span class="chip flow" id="tpChip">Tem TP in sẵn</span></h3>
+      <div class="spec">
+        <div><div class="l">Quy cách</div><div class="v" id="specSlThung">— <small>pcs/thùng</small></div></div>
+        <div><div class="l">Đủ cho</div><div class="v" id="specDuCho">— <small>thùng</small></div></div>
+      </div>
+      <div class="insufficient-banner" id="insufficientBanner"></div>
+      <div class="howto">
+        <div><span class="n">1</span><span>Quét QR <b>tem thùng Đúc</b> đang đánh bóng để khai báo nguồn (bước 1).</span></div>
+        <div><span class="n">2</span><span>Đóng đủ thùng thì dán tem thành phẩm in sẵn và quét QR <b>tem thành phẩm</b> vào cùng ô quét. Hệ thống trừ nguồn từ tem Đúc đang dùng.</span></div>
+        <div><span class="n">3</span><span>Hàng NG: bấm <b>NG</b> trên dòng tem Đúc ở bước 1, số NG trừ thẳng vào tem đó.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chế độ Kanban Đúc Kẽm -->
+  <div class="ws-grid" id="mainGridKanban" style="display:none">
+    <div class="card">
+      <h3>Ghi nhận NG</h3>
+      <label class="fld"><span>Chủng loại NG (mã SP đang chọn)</span><select id="ngKanbanLoai"></select></label>
+      <input type="text" class="ng-khac-k" id="ngKanbanKhac" placeholder="Ghi rõ loại NG khác…" style="display:none;margin-top:8px">
+      <label class="fld"><span>Số lượng NG</span>
+        <div class="row"><input type="number" id="ngKanbanInput" min="1" step="1" placeholder="Số lượng NG"><button type="button" class="mbtn" id="btnNgKanban">Ghi nhận NG</button></div>
+      </label>
+      <div class="hint">Nhập bất kỳ lúc nào phát sinh NG, hoặc gộp nhập 1 lần cuối ca. Mỗi lần nhập cộng dồn vào "NG pcs hôm nay".</div>
+    </div>
+    <div class="card">
+      <h3>Cách làm</h3>
+      <div class="howto" style="margin-top:0">
+        <div><span class="n">1</span><span>Chọn <b>Mã SP</b> và <b>Máy đúc</b> trên thanh tiêu đề (đổi máy nếu tem chỉ thị in sai máy).</span></div>
+        <div><span class="n">2</span><span>Quét QR <b>tem chỉ thị Kanban</b> vào ô quét để ghi nhận thùng.</span></div>
+        <div><span class="n">3</span><span>Hàng NG nhập ở ô "Ghi nhận NG" bên cạnh.</span></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Modal camera quét QR -->
@@ -487,13 +545,35 @@ function applyMode(){
   document.getElementById('mainGridTP').style.display = kb ? 'none' : '';
   document.getElementById('mainGridKanban').style.display = kb ? '' : 'none';
   document.getElementById('lblNguoiKiem').textContent = kb ? 'Người thao tác' : 'Người kiểm tra';
-  document.getElementById('lblTram').textContent = kb ? 'Máy đúc' : 'Trạm/tổ (không bắt buộc)';
+  document.getElementById('lblTram').textContent = kb ? 'Máy đúc' : 'Trạm/tổ';
+  const cd = document.getElementById('congDoan').value;
+  document.getElementById('hdrTitle').textContent = kb ? 'Ghi nhận thùng Kanban' : 'Ghi nhận thùng thành phẩm';
+  document.getElementById('wsTitle').textContent = cd;
+  document.getElementById('wsChip').innerHTML = kb ? '<span class="chip flow">Kanban · tem chỉ thị</span>' : '<span class="chip flow">Tem Đúc → tem thành phẩm</span>';
+  document.getElementById('scan').placeholder = kb ? 'Quét QR tem chỉ thị Kanban…' : 'Quét QR tem Đúc hoặc tem thành phẩm…';
+  document.getElementById('scanHint').innerHTML = kb
+    ? 'Quét <b>tem chỉ thị Kanban</b> để ghi nhận thùng. Máy đúc lấy từ ô "Máy đúc" trên thanh tiêu đề.'
+    : 'Cùng 1 ô quét: <b>tem thùng Đúc</b> = khai báo nguồn (bước 1), <b>tem thành phẩm</b> (mã TP…) = ghi nhận thùng (bước 2). Đầu đọc QR rời hoặc nút 📷 đều được.';
+  updateWsSub();
   if (kb) loadMayKemOptions();
   else loadTrams();
   if (window.MesNav) MesNav.setTitle(
     kb ? 'Ghi nhận thùng (Kanban) — Đúc Kẽm' : 'Ghi nhận thùng thành phẩm',
     kb ? 'Quét QR tem chỉ thị — máy chạy theo tem in trước' : 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc'
   );
+}
+// Dòng phụ dưới tên khung làm việc: mã SP + quy cách thùng theo công đoạn đang chọn.
+function updateWsSub(){
+  const maSp = document.getElementById('spDangSx').value;
+  const p = productMap[maSp];
+  const sl = isKanban() ? 0 : slThungTp(maSp, document.getElementById('congDoan').value);
+  document.getElementById('wsSub').innerHTML = maSp
+    ? '<span class="mono">' + escapeHtml(maSp) + '</span>' + (p && p.ten_sp ? ' · ' + escapeHtml(p.ten_sp) : '') + (sl ? ' · ' + fmtNum(sl) + ' pcs/thùng' : '')
+    : 'Chọn <b>Mã SP</b> đang sản xuất trên thanh tiêu đề.';
+}
+function focusScan(){
+  const s = document.getElementById('scan');
+  if (s && document.getElementById('mainUI').style.display !== 'none') s.focus({ preventScroll: true });
 }
 function onCongDoanChange(){
   applyMode();
@@ -529,8 +609,10 @@ async function loadSpDangSx(){
 
 async function loadTonKho(maSp){
   const row = document.getElementById('tonKhoRow');
-  if (!maSp) { row.classList.remove('show'); row.innerHTML = ''; return; }
-  row.classList.add('show');
+  const card = document.getElementById('tonKhoCard');
+  document.getElementById('tonKhoMa').textContent = maSp || '';
+  if (!maSp) { card.classList.remove('show'); row.innerHTML = ''; return; }
+  card.classList.add('show');
   row.innerHTML = '<div class="empty">Đang tải tồn kho…</div>';
 
   const { data, error } = await sb.rpc('cd_ton_kho_theo_ma_sp', { p_ma_sp: maSp });
@@ -765,7 +847,6 @@ async function khaiBaoNguon(raw){
   if (/^TP/i.test(tagNo)) { showMsg('Tem thành phẩm không dùng làm nguồn được — hãy đọc đúng tem của công đoạn ĐÚC.', 'err', 6000); beep(false); return; }
   if (busyNguon) return;
   busyNguon = true;
-  document.getElementById('btnKhaiBao').disabled = true;
   showMsg('⏳ Đang khai báo ' + tagNo + '…', 'wait');
 
   const congDoan = document.getElementById('congDoan').value;
@@ -787,8 +868,7 @@ async function khaiBaoNguon(raw){
     beep(false);
   } finally {
     busyNguon = false;
-    document.getElementById('btnKhaiBao').disabled = false;
-    document.getElementById('tagInputNguon').value = '';
+    focusScan();
   }
 }
 
@@ -800,14 +880,15 @@ function updateGhiNhanGate(){
   const congDoan = document.getElementById('congDoan').value;
   const required = slThungCanGate(congDoan);
   const banner = document.getElementById('insufficientBanner');
-  const btn = document.getElementById('btnGhiNhan');
+  const slTp = slThungTp(document.getElementById('spDangSx').value, congDoan);
+  document.getElementById('specSlThung').innerHTML = (slTp ? fmtNum(slTp) : '—') + ' <small>pcs/thùng</small>';
+  document.getElementById('specDuCho').innerHTML = (slTp ? fmtNum(Math.floor(nguonTotal / slTp)) : '—') + ' <small>thùng</small>';
+  updateWsSub();
   if (required > 0 && nguonTotal < required) {
-    banner.textContent = '⛔ Số lượng sản phẩm hiện có không đủ 1 thùng thành phẩm (' + fmtNum(nguonTotal) + '/' + fmtNum(required) + ' pcs) — đọc thêm tem thùng Đúc trước khi ghi nhận.';
+    banner.textContent = '⛔ Số lượng trên tem Đúc đang dùng chưa đủ 1 thùng thành phẩm (' + fmtNum(nguonTotal) + '/' + fmtNum(required) + ' pcs). Quét thêm tem thùng Đúc trước khi quét tem thành phẩm.';
     banner.classList.add('show');
-    btn.disabled = true;
   } else {
     banner.classList.remove('show');
-    btn.disabled = false;
   }
 }
 
@@ -822,19 +903,22 @@ async function loadNguonList(){
   const rows = data || [];
   nguonTotal = rows.reduce((s, r) => s + (Number(r.so_luong) || 0), 0);
   updateGhiNhanGate();
-  if (!rows.length){ box.innerHTML = '<div class="empty">Chưa khai báo tem Đúc nào.</div>'; return; }
+  document.getElementById('nguonCnt').textContent = rows.length + ' tem';
+  document.getElementById('nguonBalance').innerHTML = rows.length ? '<span>Còn trên tem Đúc đang dùng:</span> <b>' + fmtNum(nguonTotal) + '</b> pcs' : '';
+  if (!rows.length){ box.innerHTML = '<div class="empty">Chưa khai báo tem Đúc nào.<br>Quét QR tem Đúc của thùng đang đánh bóng.</div>'; return; }
   // Bavia (T65): "NG chờ sửa" là thao tác riêng, tạo tem NG chờ sửa để xử lý
   // tiếp qua bavia_sua_hang (cong-doan-dashboard.html) — khác với "⚠ Báo NG"
   // (cd_khai_bao_ng) là phế ngay, trừ thẳng không tạo tem.
   const isBavia = document.getElementById('congDoan').value === 'Bavia';
-  box.innerHTML = rows.map(r =>
-    '<div class="nguon-item-wrap" data-tag-no="' + escapeHtml(r.tag_no) + '">' +
+  box.innerHTML = rows.map((r, i) =>
+    '<div class="nguon-item-wrap' + (i === 0 ? ' first' : '') + '" data-tag-no="' + escapeHtml(r.tag_no) + '">' +
     '<div class="nguon-item">' +
-      '<div><div class="n-tag">' + escapeHtml(r.tag_no) + '</div><div class="n-sp">' + escapeHtml(r.ma_sp) + (r.ten_sp ? ' — ' + escapeHtml(r.ten_sp) : '') + '</div></div>' +
+      '<div><div class="n-tag">' + escapeHtml(r.tag_no) + ' ' + (i === 0 ? '<span class="chip ok">đang trừ</span>' : '<span class="chip mute">tiếp theo</span>') + '</div>' +
+        '<div class="n-sp">' + escapeHtml(r.ma_sp) + (r.ten_sp ? ' — ' + escapeHtml(r.ten_sp) : '') + '</div></div>' +
       '<div class="n-actions">' +
-        '<div class="n-con">' + fmtNum(r.so_luong) + ' pcs</div>' +
-        '<button type="button" class="btn ng-toggle" data-act="ng-toggle">⚠ Báo NG</button>' +
-        (isBavia ? '<button type="button" class="btn ng-toggle" data-act="ng-sua-toggle">🔧 NG cần sửa</button>' : '') +
+        '<div class="n-con">' + fmtNum(r.so_luong) + ' <small style="font-size:11px;color:var(--text-dim);font-weight:500">pcs</small></div>' +
+        '<button type="button" class="tiny bad" data-act="ng-toggle">NG</button>' +
+        (isBavia ? '<button type="button" class="tiny bad" data-act="ng-sua-toggle">NG cần sửa</button>' : '') +
       '</div>' +
     '</div>' +
     '<div class="ng-form" data-role="ng-form">' +
@@ -843,7 +927,7 @@ async function loadNguonList(){
         '<input type="number" data-role="ng-sl" min="1" step="1" placeholder="SL NG">' +
       '</div>' +
       '<input type="text" class="ng-khac" data-role="ng-khac" placeholder="Ghi rõ loại NG khác…" style="display:none">' +
-      '<button type="button" class="btn mini ng-submit" data-act="ng-submit">Ghi nhận NG</button>' +
+      '<button type="button" class="ng-submit" data-act="ng-submit">Ghi nhận NG</button>' +
     '</div>' +
     (isBavia ?
       '<div class="ng-form" data-role="ng-sua-form">' +
@@ -851,7 +935,7 @@ async function loadNguonList(){
           '<input type="text" data-role="ng-sua-ly-do" placeholder="Lý do cần sửa…">' +
           '<input type="number" data-role="ng-sua-sl" min="1" step="1" placeholder="SL cần sửa">' +
         '</div>' +
-        '<button type="button" class="btn mini ng-submit" data-act="ng-sua-submit">Tạo tem NG chờ sửa</button>' +
+        '<button type="button" class="ng-submit" data-act="ng-sua-submit">Tạo tem NG chờ sửa</button>' +
       '</div>' : '') +
     '</div>').join('');
 }
@@ -971,7 +1055,6 @@ async function ghiNhan(raw){
   }
   if (busy) return;
   busy = true;
-  document.getElementById('btnGhiNhan').disabled = true;
   showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
 
   const p_id_tram = document.getElementById('tram').value || null;
@@ -1024,7 +1107,7 @@ async function ghiNhan(raw){
   } finally {
     busy = false;
     updateGhiNhanGate();
-    document.getElementById('tagInput').value = '';
+    focusScan();
   }
 }
 
@@ -1047,7 +1130,6 @@ async function ghiNhanKanban(raw){
   if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
   if (busyKanban) return;
   busyKanban = true;
-  document.getElementById('btnGhiNhanKanban').disabled = true;
   showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
 
   const p_may_tt = document.getElementById('tram').value || null;
@@ -1081,8 +1163,7 @@ async function ghiNhanKanban(raw){
     showMsg('', '');
   } finally {
     busyKanban = false;
-    document.getElementById('btnGhiNhanKanban').disabled = false;
-    document.getElementById('tagInputKanban').value = '';
+    focusScan();
   }
 }
 
@@ -1121,17 +1202,25 @@ async function ghiNhanNgKanban(){
   }
 }
 
-// ── Quét QR (theo pattern intem.html — 1 instance duy nhất, dùng chung cho cả
-// "Tem Đúc đang dùng" lẫn "Quét tem thành phẩm" qua scanTarget) ─────────────
+// ── 1 Ô QUÉT CHUNG (T209, như Bảng điều khiển Bavia) ───────────────────────
+// Chế độ Kanban: mọi mã quét = tem chỉ thị. Chế độ tem thành phẩm: tem mã
+// TP… = ghi nhận thùng thành phẩm, mã khác = tem Đúc → khai báo nguồn.
+function routeScan(raw){
+  const tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
+  if (!tagNo) return;
+  if (isKanban()) ghiNhanKanban(tagNo);
+  else if (/^TP/i.test(tagNo)) ghiNhan(tagNo);
+  else khaiBaoNguon(tagNo);
+}
+
+// ── Camera (theo pattern intem.html — 1 instance duy nhất) ──────────────────
 let html5QrCode = null, scanningActive = false;
-let scanTarget = 'thanhpham'; // 'thanhpham' (ghiNhan) | 'nguon' (khaiBaoNguon) | 'kanban' (ghiNhanKanban)
 function getScanner(){ if (!html5QrCode) html5QrCode = new Html5Qrcode('qrReaderDiv'); return html5QrCode; }
 
-async function openCamera(target){
-  scanTarget = target || 'thanhpham';
+async function openCamera(){
   showMsg('', '');
   if (typeof Html5Qrcode !== 'function') {
-    showMsg('Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang. Có thể nhập Tag No thủ công.', 'err');
+    showMsg('Lỗi tải thư viện đọc QR — kiểm tra mạng rồi tải lại trang. Có thể nhập Tag No vào ô quét.', 'err');
     return;
   }
   document.getElementById('qrModal').classList.add('show');
@@ -1149,8 +1238,7 @@ async function openCamera(target){
     await closeQrModal();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showMsg('📷 Trình duyệt không hỗ trợ camera trực tiếp — mở chế độ chụp ảnh…', 'wait');
-      const fileInputId = scanTarget === 'nguon' ? 'qrFileInputNguon' : (scanTarget === 'kanban' ? 'qrFileInputKanban' : 'qrFileInput');
-      document.getElementById(fileInputId).click();
+      document.getElementById('qrFileInput').click();
       return;
     }
     showMsg('Không mở được camera: ' + e + '. Kiểm tra quyền Camera cho trang này.', 'err');
@@ -1169,11 +1257,9 @@ async function onScanSuccess(decodedText){
   await closeQrModal();
   const tagNo = String(decodedText).split('>')[0].trim();
   if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
-  if (scanTarget === 'nguon') khaiBaoNguon(tagNo);
-  else if (scanTarget === 'kanban') ghiNhanKanban(tagNo);
-  else ghiNhan(tagNo);
+  routeScan(tagNo);
 }
-function onFileChosen(evt, target){
+function onFileChosen(evt){
   const file = evt.target.files && evt.target.files[0];
   evt.target.value = '';
   if (!file) { showMsg('Không nhận được ảnh (có thể bạn đã huỷ chụp).', 'err', 4000); return; }
@@ -1182,70 +1268,59 @@ function onFileChosen(evt, target){
     .then(decodedText => {
       const tagNo = String(decodedText).split('>')[0].trim();
       if (!tagNo) { showMsg('Mã QR không đúng định dạng tem TOYOTAKI.', 'err', 4000); return; }
-      if (target === 'nguon') khaiBaoNguon(tagNo);
-      else if (target === 'kanban') ghiNhanKanban(tagNo);
-      else ghiNhan(tagNo);
+      routeScan(tagNo);
     })
     .catch(() => showMsg('Không đọc được mã QR trong ảnh — chụp lại, để mã QR rõ nét và nằm giữa khung.', 'err', 5000));
 }
 
+// ── Đồng hồ trên thanh tiêu đề ──────────────────────────────────────────────
+function tickClock(){
+  const d = new Date();
+  const dows = ['Chủ nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'];
+  document.getElementById('hdrDate').textContent = dows[d.getDay()] + ', ' + String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+  document.getElementById('hdrTime').textContent = fmtTime(d.toISOString());
+}
+
 // ── Wire ───────────────────────────────────────────────────────────────────
+var lastScanSubmitAt = 0;
 function wire(){
   document.getElementById('congDoan').addEventListener('change', onCongDoanChange);
-  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); if (!isKanban()) updateGhiNhanGate(); });
-  document.getElementById('btnScan').addEventListener('click', () => openCamera('thanhpham'));
-  document.getElementById('btnScanNguon').addEventListener('click', () => openCamera('nguon'));
-  document.getElementById('btnScanKanban').addEventListener('click', () => openCamera('kanban'));
+  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); updateWsSub(); if (!isKanban()) updateGhiNhanGate(); });
+  document.getElementById('btnCam').addEventListener('click', openCamera);
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
-  document.getElementById('qrFileInput').addEventListener('change', (e) => onFileChosen(e, 'thanhpham'));
-  document.getElementById('qrFileInputNguon').addEventListener('change', (e) => onFileChosen(e, 'nguon'));
-  document.getElementById('qrFileInputKanban').addEventListener('change', (e) => onFileChosen(e, 'kanban'));
-  document.getElementById('btnGhiNhan').addEventListener('click', () => ghiNhan(document.getElementById('tagInput').value));
-  document.getElementById('btnKhaiBao').addEventListener('click', () => khaiBaoNguon(document.getElementById('tagInputNguon').value));
-  document.getElementById('btnGhiNhanKanban').addEventListener('click', () => ghiNhanKanban(document.getElementById('tagInputKanban').value));
+  document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
+  document.getElementById('btnReload').addEventListener('click', async () => {
+    const tasks = [loadKpi(), loadTonKho(document.getElementById('spDangSx').value)];
+    if (!isKanban()) tasks.push(loadNguonList());
+    await Promise.all(tasks);
+    focusScan();
+  });
   document.getElementById('btnNgKanban').addEventListener('click', ghiNhanNgKanban);
   document.getElementById('ngKanbanLoai').addEventListener('change', (e) => {
     document.getElementById('ngKanbanKhac').style.display = e.target.value === 'Khác' ? '' : 'none';
   });
-  document.getElementById('tagInputKanban').addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    var v = e.target.value;
-    e.target.value = '';
+  const scan = document.getElementById('scan');
+  const submitScan = () => {
+    const v = scan.value;
+    scan.value = '';                     // xoá ngay: ký tự còn lại của chuỗi QR
+                                         // (máy quét gõ tiếp sau Enter) không dồn vào
     if (!v.replace(/\s+/g, '')) return;
-    var now = Date.now();
-    if (now - lastScanSubmitAtKanban < 1500) return;
-    lastScanSubmitAtKanban = now;
-    ghiNhanKanban(v);
-  });
-  document.getElementById('tagInput').addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    var v = e.target.value;
-    e.target.value = '';               // xoá ngay: ký tự còn lại của chuỗi QR
-                                        // (máy quét gõ tiếp sau Enter) không dồn vào
-    if (!v.replace(/\s+/g, '')) return;
-    var now = Date.now();
+    const now = Date.now();
     if (now - lastScanSubmitAt < 1500) return;  // gộp nhiều Enter máy quét gửi liền
                                                  // nhau (QR có \n giữa các trường)
     lastScanSubmitAt = now;
-    ghiNhan(v);
+    routeScan(v);
+  };
+  scan.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; e.preventDefault(); submitScan(); });
+  document.getElementById('btnScanGo').addEventListener('click', submitScan);
+  // Đầu đọc QR rời gõ như bàn phím: bấm ra chỗ trống thì đưa con trỏ về ô quét.
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('input,select,textarea,button,label,.ng-form')) return;
+    focusScan();
   });
-  document.getElementById('tagInputNguon').addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    var v = e.target.value;
-    e.target.value = '';
-    if (!v.replace(/\s+/g, '')) return;
-    var now = Date.now();
-    if (now - lastScanSubmitAtNguon < 1500) return;
-    lastScanSubmitAtNguon = now;
-    khaiBaoNguon(v);
-  });
+  tickClock(); setInterval(tickClock, 1000);
+  focusScan();
 }
-var lastScanSubmitAt = 0;
-var lastScanSubmitAtNguon = 0;
-var lastScanSubmitAtKanban = 0;
 
 boot();
 </script>
