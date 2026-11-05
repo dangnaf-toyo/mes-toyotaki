@@ -122,12 +122,14 @@
         const { data } = await sb.from('user_roles').select('role,chuc_danh').eq('user_id', s.user.id).maybeSingle();
         const role = data ? data.role : null;
         const laGdsx = role === 'giam_doc_sx' || !!(data && data.chuc_danh === 'giam_doc_sx');   // T211: admin kiêm GĐSX
-        return { uid: s.user.id, role, soan: SOAN.includes(role), kiemTra: role === 'qc_manager', pheDuyet: laGdsx, huyMoi: role === 'qc_manager' || role === 'admin' };
+        const admin = role === 'admin' && typeof IS_PROD !== 'undefined' && !IS_PROD;
+        return { uid: s.user.id, role, soan: SOAN.includes(role), kiemTra: admin || role === 'qc_manager', pheDuyet: admin || laGdsx,
+          huyMoi: role === 'qc_manager' || role === 'admin' };
       } catch (e) { return { uid: null, role: null }; }
     })();
     return quyenP;
   }
-  const DA_XONG = { kiem_tra: 'Đã kiểm tra — chuyển Giám đốc SX phê duyệt.', phe_duyet: 'Đã phê duyệt — có hiệu lực ngay cho IPQC.', tra_lai: 'Đã trả lại cho người soạn.' };
+  const DA_XONG = { kiem_tra: 'Đã kiểm tra — chuyển Giám đốc SX phê duyệt.', phe_duyet: 'Đã phê duyệt — IPQC áp dụng theo ngày hiệu lực của tiêu chuẩn.', tra_lai: 'Đã trả lại cho người soạn.' };
   /** Kiểm tra / phê duyệt / trả lại 1 bản nháp. Trả null nếu người dùng bấm huỷ; ném lỗi nếu không được. */
   async function duyet(loai, id, hanhDong) {
     let lyDo = null;
@@ -136,7 +138,7 @@
       if (lyDo === null) return null;
       if (!lyDo.trim()) throw new Error('Nhập lý do trả lại.');
     }
-    if (hanhDong === 'phe_duyet' && !confirm('Phê duyệt? Bản này có hiệu lực ngay cho IPQC, thay bản đang dùng.')) return null;
+    if (hanhDong === 'phe_duyet' && !confirm('Phê duyệt tiêu chuẩn này? IPQC sẽ dùng bản được duyệt theo ngày hiệu lực đã khai báo.')) return null;
     const { data, error } = await sb.rpc('ipqc_tc_duyet', { p_loai: loai, p_id: id, p_hanh_dong: hanhDong, p_ly_do: lyDo, p_nguoi: await nguoi() });
     if (error) throw new Error(error.message);
     if (!data || !data.ok) throw new Error((data && data.error) || 'Không thực hiện được');
