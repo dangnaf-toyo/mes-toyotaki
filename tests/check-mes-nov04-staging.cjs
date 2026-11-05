@@ -6,7 +6,7 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     ['oqc-daily.html',['oqc-dashboard.js?v=20261104-outsource']],
     ['shared/oqc-scope.js',['Kiểm tra sau Gia Công ngoài','recordLabel','matches']],
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
-    ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-gia-cong.html','ipqc-btk-qc.js?v=20261105-standards','ipqc-drawing-reader.js']],
+    ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-gia-cong.html','ipqc-btk-qc.js?v=20261105-admin-approve','ipqc-drawing-reader.js']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
     ['ipqc-gia-cong.html',['gcMeasureForm','qc-manager.html?tab=tieuchuan&amp;cd=gia_cong','gcResultFile','ipqc-gc-entry.js?v=20261105-entry','ipqc-result-import.js?v=20261105-dashboard','ipqc-gia-cong.js?v=20261105-standards']],
     ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','sourceLabel','Xem file gốc']],
