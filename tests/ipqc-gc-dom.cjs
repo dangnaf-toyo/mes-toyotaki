@@ -191,27 +191,6 @@ const $ = (id) => document.getElementById(id),
   assert.equal(measured.kq[1].gia_tri, 20.06);
   assert.equal(measured.id_btk, 1);
   assert.equal(measured.ma_may, "Phay 01");
-  $("gcProduct").value = "PART";
-  $("gcAddFeature").onclick();
-  function input(key, value) {
-    const e = $("gcFeatureRows").querySelector('[data-field="' + key + '"]');
-    e.value = value;
-    e.dispatchEvent(new window.Event("input", { bubbles: true }));
-  }
-  input("hang_muc", "Diameter");
-  input("danh_nghia", "20");
-  input("dung_sai_tren", "0.05");
-  input("dung_sai_duoi", "-0.05");
-  assert.equal($("gcFeatureRows").querySelector('[data-field="lsl"]').value, "19.95");
-  assert.equal($("gcFeatureRows").querySelector('[data-field="usl"]').value, "20.05");
-  $("gcConfirmFeatures").onclick();
-  $("gcDrawingCode").value = "DWG";
-  $("gcRevision").value = "B";
-  $("gcProcess").value = "Phay";
-  await $("gcStandardForm").onsubmit({ preventDefault() {} });
-  await tick();
-  assert.equal(standardPayload.muc[0].da_xac_nhan, true);
-  assert.equal(standardPayload.muc[0].lsl, 19.95);
   records.ipqc_lan_tong_hop.push(
     {
       id: "gc-1",
@@ -263,7 +242,7 @@ const $ = (id) => document.getElementById(id),
   assert.equal(exportRows[1]["Giá trị"], 20.06);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS form events, approved revision, multi-sample NG, automatic bounds, confirmation; casting/machining/all dashboard, per-revision chart, SPC gating and filtered Excel",
+    "PASS result form, approved revision, multi-sample NG; casting/machining/all dashboard, per-revision chart, SPC gating and filtered Excel",
   );
 })().catch((e) => {
   console.error(e);

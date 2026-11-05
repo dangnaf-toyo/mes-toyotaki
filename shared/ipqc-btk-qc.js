@@ -179,6 +179,26 @@
       '<input type="search" data-tim placeholder="Tìm mã SP…" aria-label="Tìm mã SP" style="width:100%;margin-bottom:8px"><div data-list></div></div>' +
       '<div class="main" data-main></div></div>';
     const listEl = el.querySelector('[data-list]'), main = el.querySelector('[data-main]');
+    let drawingSerial = 0, selectionSerial = 0, previewUrl = null;
+    const gc = () => st.cd === 'gia_cong';
+    const sameStep = v => !gc() || (v.buoc_gia_cong || '') === (st.xem?.buoc_gia_cong || '');
+    const number = v => String(v ?? '').trim() === '' ? null : Number(soVN(v));
+    const field = (key, fallback) => gc() && st.sua && Object.hasOwn(st.fields || {}, key) ? st.fields[key] : fallback;
+    const copyContent = row => ({...noiDungDong(row),...(gc()?Object.fromEntries(
+      ['don_vi','phuong_phap','lsl','usl','co_mau'].map(key=>[key,row[key]??''])):{})});
+    function showFailure(error) {
+      console.error(error);
+      let target=main.querySelector('[data-msg]');
+      if(!target){target=document.createElement('div');target.dataset.msg='';main.prepend(target);}
+      msg(target,'Chưa tải hoặc lưu được tiêu chuẩn. Thử lại hoặc báo quản lý QC.','err');
+      target.insertAdjacentHTML('beforeend','<details><summary>Chi tiết kỹ thuật</summary><pre>'+esc(error.message||String(error))+'</pre></details>');
+    }
+    function releaseDrawing() {
+      ++drawingSerial;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      st.drawingBusy = false;
+    }
     function veTrong() {
       main.innerHTML = '<div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để xem / soạn bảng tuần kiểm kích thước công đoạn <b>' + CD[st.cd] + '</b>. ' +
         '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button></div></div>';
@@ -190,6 +210,7 @@
         sb.from('master_products').select('ma_sp,ten_sp,ten_khach_hang').order('ma_sp'),
         sb.from('ipqc_btk').select('ma_sp,phien_ban,id,dang_dung,trang_thai').eq('cong_doan', st.cd).or('dang_dung.eq.true,trang_thai.neq.da_duyet'),
       ]);
+      if (p.error || b.error) throw p.error || b.error;
       st.products = p.data || [];
       st.btk = {}; st.nhap = {};
       (b.data || []).forEach(x => { if (x.dang_dung) st.btk[x.ma_sp] = x; else st.nhap[x.ma_sp] = x; });
@@ -211,33 +232,58 @@
 
     // idXem: phiên bản muốn mở; mặc định bản nháp đang chờ duyệt (nếu có), không thì bản đang dùng.
     async function chonMa(ma, idXem) {
+      const serial=++selectionSerial;
+      releaseDrawing();
       st.ma = ma; st.zoom = 1; veDanhSach();
       // Danh sách có thanh trượt riêng: bấm mã ở cuối danh sách thì đưa nội dung bên phải lên đầu màn hình.
       const top = main.getBoundingClientRect().top;
       if (top < 0 || top > window.innerHeight * 0.5) main.scrollIntoView({ block: 'start' });
+      st.sua=false;
+      main.innerHTML='<div class="card hint">Đang tải tiêu chuẩn '+esc(ma)+'…</div>';
       const v = await sb.from('ipqc_btk').select('*').eq('ma_sp', ma).eq('cong_doan', st.cd).order('tao_luc', { ascending: false });
+      if(serial!==selectionSerial)return;
+      if (v.error) throw v.error;
       st.versions = v.data || [];
       const ids = st.versions.map(x => x.id);
       const m = ids.length ? await sb.from('ipqc_btk_muc').select('*').in('id_btk', ids).order('muc_no') : { data: [] };
+      if(serial!==selectionSerial)return;
+      if (m.error) throw m.error;
       st.mucAll = m.data || [];
       const chon = (idXem && st.versions.find(x => x.id === idXem)) || st.versions.find(x => x.trang_thai !== 'da_duyet') || st.versions.find(x => x.dang_dung) || null;
-      napPhienBan(chon);
+      await napPhienBan(chon);
     }
     // Mở 1 phiên bản ở chế độ chỉ xem (bỏ mọi chỉnh sửa chưa gửi).
-    function napPhienBan(b) {
+    async function napPhienBan(b) {
+      releaseDrawing();
       st.xem = b; st.sua = false;
       st.rows = b ? st.mucAll.filter(x => x.id_btk === b.id).map(x => ({ ...x })) : [{ muc_no: 1, kieu: 'so', hang_muc: 'Kích thước', tan_suat: '2h/lần' }];
       st.viTri = b ? (b.ban_ve_vi_tri || []).map(x => ({ ...x })) : [];
       st.banVe = b ? b.ban_ve_url : null;
+      st.fields = {}; st.drawingFile = null; st.uploaded = null;
+      st.taiLieuGoc = b?.tai_lieu_goc || null; st.drawingPreview = null; st.history = []; st.drawingStatus='';
+      if (gc() && b) {
+        const serial = drawingSerial;
+        const history = await sb.from('ipqc_gc_tieu_chuan_lich_su').select('id,thoi_diem,du_lieu').eq('id_btk', b.id).order('id');
+        if (serial !== drawingSerial) return;
+        if (history.error) throw history.error;
+        st.history = history.data || [];
+        if (st.taiLieuGoc?.path) {
+          const signed = await sb.storage.from('ipqc-gia-cong-ban-ve').createSignedUrl(st.taiLieuGoc.path, 3600);
+          if (serial !== drawingSerial) return;
+          if (signed.error) st.drawingStatus='Chưa mở được file bản vẽ gốc. Kiểm tra quyền truy cập hoặc thử lại.';
+          else st.drawingPreview = signed.data.signedUrl;
+        }
+      }
       ve();
     }
     function phienBanMoi() {
-      const cur = st.versions.find(x => x.dang_dung);
+      const cur = st.versions.find(x => x.dang_dung && sameStep(x));
       if (!cur) return 'A';
       return /^[A-Y]$/.test(cur.phien_ban) ? String.fromCharCode(cur.phien_ban.charCodeAt(0) + 1) : cur.phien_ban + '.1';
     }
     // So bản nháp với bản đang dùng: ô đã sửa / hạng mục mới / hạng mục bị bỏ.
-    const COT_SS = ['hang_muc', 'kieu', 'danh_nghia', 'dung_sai_tren', 'dung_sai_duoi', 'tieu_chuan', 'dung_cu', 'tan_suat'];
+    const COT_SS = ['hang_muc', 'kieu', 'danh_nghia', 'dung_sai_tren', 'dung_sai_duoi', 'tieu_chuan', 'dung_cu', 'tan_suat',
+      'ma_dac_tinh','don_vi','phuong_phap','lsl','usl','co_mau'];
     function giongNhau(a, b) {
       const x = String(a ?? '').trim(), y = String(b ?? '').trim();
       return x === y || (x !== '' && y !== '' && isFinite(+soVN(x)) && isFinite(+soVN(y)) && +soVN(x) === +soVN(y));
@@ -281,15 +327,45 @@
       const pct = main.querySelector('[data-zpct]'); if (pct) pct.textContent = Math.round(z * 100) + '%';
     }
 
+    function gcFields(dis) {
+      const b=st.xem||{};
+      return '<div class="hint">Tiêu chuẩn dùng để đối chiếu kết quả. File CMM/kết quả đo nhập tại IPQC Gia công → Nhập kết quả.</div>' +
+        '<div class="flds" style="margin-top:10px">' +
+        [['ma_ban_ve','Mã bản vẽ'],['buoc_gia_cong','Bước gia công']].map(([key,label])=>
+          '<label class="f">'+label+'<input data-f="'+key+'" value="'+esc(field(key,b[key]||''))+'"'+dis+'></label>').join('') +
+        '<span class="hint">Bước phân biệt nguyên công cùng Model/Revision; kết quả đo tự lấy theo tiêu chuẩn. Giữ trống nếu tiêu chuẩn cũ chưa phân loại.</span></div>';
+    }
+    function gcCells(row,dis,doi) {
+      return ['ma_dac_tinh','don_vi','phuong_phap','lsl','usl','co_mau'].map(key=>
+        '<td'+(doi?.includes(key)?' class="doi"':'')+'><input data-c="'+key+'" value="'+esc(row[key]??'')+'"'+
+        (key==='co_mau'?' type="number" min="1" max="100" step="1"':'')+dis+' style="width:100px"></td>').join('')+
+        '<td><input type="checkbox" data-c="da_xac_nhan" aria-label="Xác nhận đặc tính '+esc(row.muc_no)+'"'+
+        (row.da_xac_nhan?' checked':'')+dis+'></td>';
+    }
+    function gcDrawing(sua) {
+      const url=st.drawingPreview||st.banVe;
+      const pdf=/\.pdf(?:\?|$)/i.test(st.drawingFile?.name||st.taiLieuGoc?.name||url||'');
+      return '<div class="card"><div class="ttl">Bản vẽ tiêu chuẩn Gia công</div>'+
+        (url ? (pdf?'<iframe title="Bản vẽ gốc" src="'+esc(url)+'" style="width:100%;height:440px;border:0"></iframe>':
+          '<img alt="Bản vẽ gốc" src="'+esc(url)+'" style="max-width:100%;max-height:440px">'):'<p class="hint">Chưa có bản vẽ gốc. Có thể soạn tiêu chuẩn thủ công.</p>')+
+        (sua?'<label class="f">Bản vẽ PDF / JPG / PNG (tùy chọn)<input type="file" data-up accept="application/pdf,image/png,image/jpeg,.pdf,.jpg,.jpeg,.png"></label>'+
+          '<p class="hint">Đọc bản vẽ để gợi ý đặc tính; đối chiếu và xác nhận từng dòng trước gửi duyệt. Không tải báo cáo kết quả CMM tại đây.</p>':'')+
+        '<p data-drawing-status class="hint">'+esc(st.drawingStatus||'')+'</p></div>';
+    }
+    function gcHistory() {
+      return '<div class="card"><div class="ttl">Lịch sử lưu nội dung tiêu chuẩn</div><div class="tbl"><table><tr><th>Lần lưu</th><th>Thời điểm</th><th>Revision</th><th>Bản vẽ</th><th>Số đặc tính</th></tr>'+
+        st.history.map(row=>'<tr><td>'+esc(row.id)+'</td><td>'+esc(ngayVN(row.thoi_diem))+'</td><td>'+esc(row.du_lieu?.tieu_chuan?.phien_ban||'')+'</td><td>'+
+          esc(row.du_lieu?.tieu_chuan?.ma_ban_ve||'')+'</td><td>'+esc(row.du_lieu?.muc?.length||0)+'</td></tr>').join('')+'</table></div></div>';
+    }
     function veNoiDung() {
       const p = st.products.find(x => x.ma_sp === st.ma) || {};
       const b = st.xem;
-      const cur = st.versions.find(x => x.dang_dung) || null;
-      const nhap = st.versions.find(x => x.trang_thai !== 'da_duyet') || null;
+      const cur = st.versions.find(x => x.dang_dung && sameStep(x)) || null;
+      const nhap = st.versions.find(x => x.trang_thai !== 'da_duyet' && sameStep(x)) || null;
       // T185: IPQC đo theo bản đã duyệt có ngày hiệu lực <= hôm nay (ipqc_tc_hieu_luc), có thể khác bản "đang dùng".
       const homNay = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
       const ngayVi = d => d ? d.split('-').reverse().join('/') : '';
-      const hieuLuc = st.versions.filter(x => x.trang_thai === 'da_duyet' && (!x.ngay_hieu_luc || x.ngay_hieu_luc <= homNay))
+      const hieuLuc = st.versions.filter(x => sameStep(x) && x.trang_thai === 'da_duyet' && (!x.ngay_hieu_luc || x.ngay_hieu_luc <= homNay))
         .sort((x, y) => String(y.ngay_hieu_luc || '').localeCompare(String(x.ngay_hieu_luc || ''))
           || String(y.phe_duyet_luc || '').localeCompare(String(x.phe_duyet_luc || '')) || y.id - x.id)[0] || null;
       const choHl = v => !!(v && v.dang_dung && v.ngay_hieu_luc && v.ngay_hieu_luc > homNay);
@@ -298,7 +374,7 @@
       const ss = laNhap ? soSanh(cur) : null;
       const sua = q.soan && st.sua;   // đang ở chế độ chỉnh sửa
       const dis = sua ? '' : ' disabled';
-      const tenPb = v => esc(v.phien_ban) + (choHl(v) ? ' (chờ hiệu lực ' + ngayVi(v.ngay_hieu_luc) + ')'
+      const tenPb = v => esc(v.phien_ban) + (gc()?' · '+esc(v.buoc_gia_cong||'Chưa phân loại bước'):'') + (choHl(v) ? ' (chờ hiệu lực ' + ngayVi(v.ngay_hieu_luc) + ')'
         : v.dang_dung ? ' (đang dùng)' : hieuLuc && v.id === hieuLuc.id ? ' (IPQC đang dùng)'
         : v.trang_thai !== 'da_duyet' ? ' (' + TT_NGAN[v.trang_thai] + ')' : ' (cũ)');
       let canhBao = '';
@@ -311,7 +387,7 @@
       main.innerHTML =
         '<div class="card"><div class="flds">' +
           '<div style="flex:1 1 220px"><div style="font-size:11px;color:#64748B;font-weight:600">Biểu kiểm tra tuần kiểm · ' + esc((b && b.ma_bieu) || 'QP-82405-B') + '</div>' +
-          '<div style="font-size:19px;font-weight:800">' + esc(st.ma) + ' <span class="tag ' + (st.cd === 'duc' ? 'ok' : 'w') + '" style="font-size:12px;vertical-align:middle">' + CD[st.cd] + '</span> <span style="font-size:13px;color:#475569;font-weight:600">' + esc(p.ten_sp || '') + '</span></div></div>' +
+          '<div style="font-size:19px;font-weight:800">' + esc(st.ma) + ' <span class="tag ' + (st.cd === 'duc' ? 'ok' : 'w') + '" style="font-size:12px;vertical-align:middle">' + CD[st.cd] + '</span> <span style="font-size:13px;color:#475569;font-weight:600">' + esc(p.ten_sp || '') + '</span></div>'+ (gc()?'<div class="hint">Khách hàng: '+esc(p.ten_khach_hang||'Chưa khai báo')+'</div>':'')+'</div>' +
           '<label class="f">Đang xem<select data-pb>' + (st.versions.length ? st.versions.map(v => '<option value="' + v.id + '"' + (b && v.id === b.id ? ' selected' : '') + '>' + tenPb(v) + ' — ' + esc(v.ngay_hieu_luc || '') + '</option>').join('') : '<option>Chưa có — lập mới</option>') + '</select></label>' +
           (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button>' +
           (b ? '<button class="btn" type="button" data-xuat>Xuất Excel</button>' : '') +
@@ -319,9 +395,10 @@
         '</div>' +
         (laNhap ? khoiDuyet(b, q) : '') +
         (canhBao ? '<div class="msg ' + (cu || nhap ? 'err' : 'ok') + '">' + canhBao + '</div>' : '') +
+        (gc()?gcFields(dis):'')+
         '<div class="flds" style="margin-top:10px">' +
-          '<label class="f">Phiên bản' + (laNhap ? '' : ' mới') + '<input data-f="phien_ban" value="' + esc(nhap ? nhap.phien_ban : phienBanMoi()) + '" style="width:70px"' + dis + '></label>' +
-          '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc(laNhap && b.ngay_hieu_luc ? b.ngay_hieu_luc : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)) + '"' + dis + '></label>' +
+          '<label class="f">Phiên bản' + (sua && !laNhap ? ' mới' : '') + '<input data-f="phien_ban" value="' + esc(!sua&&b?b.phien_ban:nhap ? nhap.phien_ban : phienBanMoi()) + '" style="width:70px"' + dis + '></label>' +
+          '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc((laNhap||!sua) && b?.ngay_hieu_luc ? b.ngay_hieu_luc : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)) + '"' + dis + '></label>' +
           '<label class="f">Số mẫu đo / lần<select data-f="so_mau"' + dis + '>' + [1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (((b && b.so_mau) || 1) === n ? ' selected' : '') + '>' + n + (n === 1 ? ' (I-MR)' : ' (X̄-R)') + '</option>').join('') + '</select></label>' +
           '<label class="f">Tần suất<input data-f="tan_suat" value="' + esc((b && b.tan_suat) || '2h/lần') + '" style="width:90px"' + dis + '></label>' +
           '<label class="f">Mã biểu<input data-f="ma_bieu" value="' + esc((b && b.ma_bieu) || 'QP-82405-B') + '" style="width:110px"' + dis + '></label>' +
@@ -334,7 +411,7 @@
           : q.soan ? 'Đang ở chế độ xem. Bấm "Chỉnh sửa" để sửa rồi gửi duyệt.'
           : q.uid ? 'Chỉ nhân viên QC / Trưởng phòng QC được soạn bảng tuần kiểm.' : 'Đăng nhập để soạn / duyệt.') + '</div><div data-msg></div></div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:stretch">' +
-          '<div class="card bvcard" style="flex:1 1 280px;min-width:0"><div class="ttl"><span class="sp">Bản vẽ vị trí đo</span>' +
+          (gc()?gcDrawing(sua):'<div class="card bvcard" style="flex:1 1 280px;min-width:0"><div class="ttl"><span class="sp">Bản vẽ vị trí đo</span>' +
             (st.banVe ? '<div class="bvtool"><button class="btn sm" type="button" data-zoom="-" title="Thu nhỏ" aria-label="Thu nhỏ">−</button>' +
               '<span class="z" data-zpct>' + Math.round(st.zoom * 100) + '%</span><button class="btn sm" type="button" data-zoom="+" title="Phóng to" aria-label="Phóng to">+</button>' +
               '<button class="btn sm" type="button" data-zoom="1" title="Vừa khung">Vừa khung</button>' +
@@ -345,10 +422,10 @@
               (st.banVe ? '<label class="f">Đặt vị trí cho No<select data-nodat>' + st.rows.map(r => '<option' + (+r.muc_no === +st.noDat ? ' selected' : '') + '>' + esc(r.muc_no) + '</option>').join('') + '</select></label>' +
                 '<button class="btn sm d" type="button" data-xoavt>Xoá vị trí</button>' : '') + '</div>' +
               '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' : '') + 'Bản vẽ + vị trí đo đi cùng khi gửi duyệt.</div>' : '') +
-            (st.banVe ? '<div class="hint">Phóng to bằng nút + / − hoặc giữ Ctrl + lăn chuột trên bản vẽ; kéo chuột để di chuyển bản vẽ.</div>' : '') + '</div>' +
+            (st.banVe ? '<div class="hint">Phóng to bằng nút + / − hoặc giữ Ctrl + lăn chuột trên bản vẽ; kéo chuột để di chuyển bản vẽ.</div>' : '') + '</div>') +
           '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span>' + (sua ? '<button class="btn sm" type="button" data-them>+ Thêm hạng mục</button>' +
             '<button class="btn sm" type="button" data-dan-moi' + (dongDaSaoChep ? '' : ' disabled') + '>Dán thành dòng mới</button>' : '') + '</div>' +
-            '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>Dung sai +</th><th>Dung sai −</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th><th></th></tr>' +
+            '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>Dung sai +</th><th>Dung sai −</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th>'+ (gc()?'<th>Mã đặc tính</th><th>Đơn vị</th><th>Phương pháp</th><th>LSL</th><th>USL</th><th>Cỡ mẫu</th><th>Xác nhận</th>':'')+'<th></th></tr>' +
             st.rows.map((r, i) => {
               const so = r.kieu === 'so';
               const sp = so ? S().specMuc(r) : null;
@@ -365,6 +442,7 @@
                 td('dung_cu') + chonDungCu(r.dung_cu, dis) + '</td>' +
                 td('tan_suat') + '<input data-c="tan_suat" value="' + esc(r.tan_suat || '') + '" style="width:70px"' + dis + '></td>' +
                 '<td class="mono" style="white-space:nowrap;color:#475569">' + (so && (sp.usl !== null || sp.lsl !== null) ? (sp.lsl !== null ? S().fmt(sp.lsl, S().soLe(r)) : '—') + ' – ' + (sp.usl !== null ? S().fmt(sp.usl, S().soLe(r)) : '—') : '—') + '</td>' +
+                (gc()?gcCells(r,dis,doi):'')+
                 '<td style="white-space:nowrap"><button class="btn sm" type="button" data-sao-chep="' + i + '">Sao chép</button>' +
                   (sua ? ' <button class="btn sm" type="button" data-dan="' + i + '"' + (dongDaSaoChep ? '' : ' disabled') + '>Dán</button>' +
                     ' <button class="btn sm d" type="button" data-xoa="' + i + '" aria-label="Xoá hạng mục">✕</button>' : '') + '</td></tr>';
@@ -386,13 +464,18 @@
               '<td>' + ai(v.nguoi_lap, v.gui_luc || v.tao_luc) + '</td><td>' + ai(v.nguoi_kiem_tra, v.kiem_tra_luc) + '</td>' +
               '<td>' + (v.nguoi_phe_duyet ? ai(v.nguoi_phe_duyet, v.phe_duyet_luc) : esc(v.nguoi_xac_nhan || '')) + '</td></tr>';
           }).join('') || '<tr><td colspan="7" class="hint">Chưa có phiên bản nào.</td></tr>') +
-        '</table></div></div>';
+        '</table></div></div>'+ (gc()?gcHistory():'');
+      if(gc()&&st.sua){
+        main.querySelectorAll('[data-f]').forEach(input=>{if(Object.hasOwn(st.fields,input.dataset.f))input.value=st.fields[input.dataset.f];});
+        if(st.drawingBusy)main.querySelectorAll('input,select,button').forEach(input=>input.disabled=true);
+      }
     }
 
     function docBang() {
+      if(gc())main.querySelectorAll('[data-f]').forEach(input=>{st.fields[input.dataset.f]=input.value;});
       main.querySelectorAll('tr[data-r]').forEach(tr => {
         const r = st.rows[+tr.dataset.r];
-        tr.querySelectorAll('[data-c]').forEach(i => { r[i.dataset.c] = i.value; });
+        tr.querySelectorAll('[data-c]').forEach(i => { r[i.dataset.c] = i.type==='checkbox'?i.checked:i.value; });
       });
     }
     function payload() {
@@ -402,15 +485,17 @@
         phien_ban: f('phien_ban').trim(), ngay_hieu_luc: f('ngay_hieu_luc'), so_mau: +f('so_mau') || 1, tan_suat: f('tan_suat'),
         ma_bieu: f('ma_bieu'), noi_dung_sua_doi: f('noi_dung_sua_doi'),
         ban_ve_url: st.banVe || '', ban_ve_vi_tri: st.viTri,
+        ...(gc()?{ma_sp:st.ma,ma_ban_ve:f('ma_ban_ve'),buoc_gia_cong:f('buoc_gia_cong'),tai_lieu_goc:st.uploaded||st.taiLieuGoc}:{}),
         muc: st.rows.map(r => ({ muc_no: String(r.muc_no ?? '').trim(), hang_muc: r.hang_muc, kieu: r.kieu,
           danh_nghia: soVN(r.danh_nghia), dung_sai_tren: soVN(r.dung_sai_tren), dung_sai_duoi: soVN(r.dung_sai_duoi),
           tieu_chuan: r.tieu_chuan, dung_cu: r.dung_cu, tan_suat: r.tan_suat,
           ma_dac_tinh:r.ma_dac_tinh,don_vi:r.don_vi,phuong_phap:r.phuong_phap,
-          lsl:r.lsl,usl:r.usl,co_mau:r.co_mau,nguon_nhan_dien:r.nguon_nhan_dien })),
+          lsl:r.lsl,usl:r.usl,co_mau:r.co_mau,nguon_nhan_dien:r.nguon_nhan_dien,da_xac_nhan:r.da_xac_nhan })),
       };
     }
 
     async function upBanVe(file) {
+      if(gc())return readGcDrawing(file);
       const m = main.querySelector('[data-msg]');
       try {
         const ext = (file.name.split('.').pop() || 'png').toLowerCase();
@@ -422,6 +507,42 @@
         docBang(); ve(); msg(main.querySelector('[data-msg]'), 'Đã tải bản vẽ — chọn No rồi bấm lên bản vẽ để đặt vị trí đo, xong bấm gửi duyệt.');
       } catch (e) { msg(m, 'Không tải được bản vẽ: ' + e.message, 'err'); }
     }
+    async function readGcDrawing(file) {
+      if(st.drawingBusy||!st.sua)return;
+      if(!/\.(pdf|jpe?g|png)$/i.test(file.name)||file.size>20*1024*1024)
+        return msg(main.querySelector('[data-msg]'),'Chọn bản vẽ PDF/JPG/PNG tối đa 20 MB.','err');
+      docBang();
+      if(st.rows.some(row=>row.ma_dac_tinh||number(row.danh_nghia)!=null)&&
+        !confirm('Đọc bản vẽ này sẽ thay danh sách đặc tính đang soạn bằng các dòng nhận diện chưa xác nhận. Tiếp tục?'))return;
+      releaseDrawing();
+      const serial=drawingSerial;
+      st.rows.forEach(row=>row.da_xac_nhan=false);
+      st.drawingFile=file;st.uploaded=null;st.viTri=[];st.drawingPreview=previewUrl=URL.createObjectURL(file);
+      st.drawingBusy=true;st.drawingStatus='Đang đọc bản vẽ…';ve();
+      try{
+        const read=await IpqcDrawingReader.read(file,text=>{
+          if(serial!==drawingSerial)return;
+          st.drawingStatus=text;
+          const status=main.querySelector('[data-drawing-status]');if(status)status.textContent=text;
+        });
+        if(serial!==drawingSerial)return;
+        st.rows=read.rows.map(row=>({...row,dung_sai_duoi:row.dung_sai_duoi==null?'':Math.abs(Number(row.dung_sai_duoi)),da_xac_nhan:false}));
+        st.drawingStatus='Đã nhận diện '+st.rows.length+' ứng viên. '+read.warnings.join(' ')+' Đối chiếu từng dòng trước gửi duyệt.';
+      }catch(error){
+        if(serial!==drawingSerial)return;
+        st.drawingStatus='Chưa đọc được bản vẽ; có thể nhập đặc tính thủ công. Không tự tạo kích thước.';
+        console.error(error);
+      }finally{if(serial===drawingSerial){st.drawingBusy=false;ve();}}
+    }
+    async function uploadGcDrawing() {
+      if(!st.drawingFile||st.uploaded)return;
+      const path=q.uid+'/'+crypto.randomUUID()+'/'+st.drawingFile.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const file=st.drawingFile;
+      const uploaded=await sb.storage.from('ipqc-gia-cong-ban-ve').upload(path,file,{
+        contentType:file.type||(/\.pdf$/i.test(file.name)?'application/pdf':/\.png$/i.test(file.name)?'image/png':'image/jpeg')});
+      if(uploaded.error)throw uploaded.error;
+      st.uploaded={path,name:file.name,size:file.size};
+    }
     // Sau khi duyệt / huỷ / gửi: nạp lại mã đang mở rồi hiện thông báo.
     async function xong(text, idXem) {
       await taiDanhSach(); await chonMa(st.ma, idXem);
@@ -429,16 +550,40 @@
       baoDoi();
     }
 
-    el.addEventListener('input', e => { if (e.target.matches('[data-tim]')) veDanhSach(); });
+    el.addEventListener('input', e => {
+      if (e.target.matches('[data-tim]')) veDanhSach();
+      if(!gc()||!st.sua)return;
+      if(e.target.matches('[data-f]'))st.fields[e.target.dataset.f]=e.target.value;
+      const row=e.target.closest('[data-r]');
+      if(row&&e.target.matches('[data-c]')&&e.target.dataset.c!=='da_xac_nhan'){
+        st.rows[+row.dataset.r].da_xac_nhan=false;
+        row.querySelector('[data-c="da_xac_nhan"]').checked=false;
+      }
+    });
     el.addEventListener('change', async e => {
+      if(st.saveGate)return;
+      try{
       const t = e.target;
-      if (t.matches('[data-pb]')) { docBang(); napPhienBan(st.versions.find(v => String(v.id) === t.value) || null); }
+      if (t.matches('[data-pb]')) { docBang(); await napPhienBan(st.versions.find(v => String(v.id) === t.value) || null); }
       else if (t.matches('[data-c="kieu"]')) { docBang(); ve(); }
-      else if (t.matches('[data-c="danh_nghia"],[data-c="dung_sai_tren"],[data-c="dung_sai_duoi"]')) { docBang(); ve(); }
+      else if (t.matches('[data-c="danh_nghia"],[data-c="dung_sai_tren"],[data-c="dung_sai_duoi"]')) {
+        docBang();
+        if(gc()){
+          const row=st.rows[+t.closest('[data-r]').dataset.r];
+          if(!row.limitsManual){const nominal=number(row.danh_nghia),lower=number(row.dung_sai_duoi),upper=number(row.dung_sai_tren);
+            row.lsl=nominal!=null&&lower!=null?Number((nominal-Math.abs(lower)).toPrecision(12)):null;
+            row.usl=nominal!=null&&upper!=null?Number((nominal+Math.abs(upper)).toPrecision(12)):null;}
+        }
+        ve();
+      }
+      else if(gc()&&t.matches('[data-c="lsl"],[data-c="usl"]')){docBang();st.rows[+t.closest('[data-r]').dataset.r].limitsManual=true;}
       else if (t.matches('[data-nodat]')) st.noDat = t.value;
       else if (t.matches('[data-up]') && t.files[0]) upBanVe(t.files[0]);
+      }catch(error){showFailure(error);}
     });
     el.addEventListener('click', async e => {
+      if(st.saveGate)return;
+      try{
       const t = e.target;
       const li = t.closest('[data-ma]');
       if (li) return chonMa(li.dataset.ma);
@@ -463,7 +608,7 @@
       const copy = t.closest('[data-sao-chep]');
       if (copy) {
         docBang();
-        dongDaSaoChep = noiDungDong(st.rows[+copy.dataset.saoChep]);
+        dongDaSaoChep = copyContent(st.rows[+copy.dataset.saoChep]);
         el.querySelectorAll('[data-dan],[data-dan-moi]').forEach(button => { button.disabled = false; });
         return msg(main.querySelector('[data-msg]'), 'Đã sao chép dòng No ' + st.rows[+copy.dataset.saoChep].muc_no + '. Chọn Dán hoặc Dán thành dòng mới.');
       }
@@ -490,7 +635,8 @@
       }
       if (!q.soan) return;
       if (t.closest('[data-sua]')) {
-        if(st.cd==='gia_cong'&&st.xem?.buoc_gia_cong){location.href='ipqc-gia-cong.html?standard='+encodeURIComponent(st.ma)+'&version='+st.xem.id;return;}
+        st.fields={};
+        if(gc())st.rows.forEach(row=>{row.da_xac_nhan=false;row.limitsManual=row.lsl!=null||row.usl!=null;});
         st.sua = true; return ve();
       }
       if (t.closest('[data-huysua]')) return napPhienBan(st.xem);
@@ -499,10 +645,10 @@
       if (paste || t.closest('[data-dan-moi]')) {
         if (!dongDaSaoChep) return;
         docBang();
-        if (paste) Object.assign(st.rows[+paste.dataset.dan], noiDungDong(dongDaSaoChep));
+        if (paste) Object.assign(st.rows[+paste.dataset.dan], copyContent(dongDaSaoChep),{da_xac_nhan:false});
         else {
           const no = Math.max(0, ...st.rows.map(row => +row.muc_no || 0)) + 1;
-          st.rows.push({ ...noiDungDong(dongDaSaoChep), muc_no: no });
+          st.rows.push({ ...copyContent(dongDaSaoChep), muc_no: no });
         }
         return ve();
       }
@@ -521,21 +667,31 @@
         return veDiem();
       }
       if (t.closest('[data-luu]')) {
+        if(st.drawingBusy)return;
         const m = main.querySelector('[data-msg]');
         const pl = payload();
+        if(gc()&&pl.muc.some(row=>!row.da_xac_nhan))return msg(m,'Đối chiếu và xác nhận từng đặc tính trước gửi duyệt.','err');
         const invalid = pl.muc.find(row => !dungCuHopLe(row.dung_cu));
         if (invalid) return msg(m, 'No ' + invalid.muc_no + ': chọn dụng cụ kiểm tra trong danh sách cho phép.', 'err');
         if (!pl.noi_dung_sua_doi.trim()) return msg(m, 'Nhập nội dung sửa đổi.', 'err');
         const btn = t.closest('[data-luu]'); btn.disabled = true;
+        let finishSave;
+        st.saveGate=new Promise(resolve=>{finishSave=resolve;});
+        const controls=[...el.querySelectorAll('input,select,button')].map(input=>[input,input===btn?false:input.disabled]);
+        controls.forEach(([input])=>input.disabled=true);
         try {
-          const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: st.ma, p_data: pl, p_nguoi: await nguoi(), p_cong_doan: st.cd });
+          if(gc()){await uploadGcDrawing();pl.tai_lieu_goc=st.uploaded||st.taiLieuGoc;}
+          const { data, error } = gc()?await sb.rpc('ipqc_gc_luu_tieu_chuan',{p_data:pl}):
+            await sb.rpc('ipqc_btk_luu', { p_ma_sp: st.ma, p_data: pl, p_nguoi: await nguoi(), p_cong_doan: st.cd });
           if (error) throw new Error(error.message);
           if (!data || !data.ok) throw new Error((data && data.error) || 'Không lưu được');
           await xong('Đã gửi duyệt phiên bản ' + data.phien_ban + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.', data.id);
         } catch (er) { msg(m, er.message, 'err'); btn.disabled = false; }
+        finally{st.saveGate=null;finishSave();controls.forEach(([input,disabled])=>{if(input.isConnected)input.disabled=disabled;});}
       }
+      }catch(error){showFailure(error);}
     });
-    el.addEventListener('keydown', e => { const li = e.target.closest('[data-ma]'); if (li && e.key === 'Enter') chonMa(li.dataset.ma); });
+    el.addEventListener('keydown', e => { const li = e.target.closest('[data-ma]'); if (!st.saveGate && li && e.key === 'Enter') chonMa(li.dataset.ma).catch(showFailure); });
     el.addEventListener('wheel', e => {
       const bv = e.target.closest('[data-bv]');
       if (!bv || !e.ctrlKey || !bv.querySelector('.bvz')) return;
@@ -558,14 +714,20 @@
       window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
     });
     async function doiCongDoan(cd) {
+      if(st.saveGate)await st.saveGate;
       if (!CD[cd] || cd === st.cd) return;
+      ++selectionSerial;
+      releaseDrawing();
       st.cd = cd; st.ma = null; st.versions = []; st.xem = null;
       el.querySelector('[data-sidettl]').textContent = 'Bảng tuần kiểm ' + CD[cd] + ' theo mã';
       veTrong();
       await taiDanhSach();
     }
-    await taiDanhSach();
-    return { mo: async (ma, cd) => { if (cd) await doiCongDoan(cd); return chonMa(ma); }, doiCongDoan };
+    try{await taiDanhSach();}catch(error){showFailure(error);}
+    return { mo: async (ma, cd, version) => {
+      if(st.saveGate)await st.saveGate;
+      try{if (cd) await doiCongDoan(cd); await chonMa(ma,version?Number(version):null);}catch(error){showFailure(error);}
+    }, doiCongDoan };
   }
 
   // ── Excel: file mẫu / xuất / nhập ──────────────────────────────────────
