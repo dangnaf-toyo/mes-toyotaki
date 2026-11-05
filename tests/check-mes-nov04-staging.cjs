@@ -6,9 +6,9 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     ['oqc-daily.html',['oqc-dashboard.js?v=20261104-outsource']],
     ['shared/oqc-scope.js',['Kiểm tra sau Gia Công ngoài','recordLabel','matches']],
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
-    ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-gia-cong.html','ipqc-btk-qc.js?v=20261105-admin-approve','ipqc-drawing-reader.js']],
+    ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-btk-qc.js?v=20261105-admin-approve','ipqc-drawing-reader.js']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
-    ['ipqc-gia-cong.html',['gcMeasureForm','qc-manager.html?tab=tieuchuan&amp;cd=gia_cong','gcResultFile','ipqc-gc-entry.js?v=20261105-entry','ipqc-result-import.js?v=20261105-dashboard','ipqc-gia-cong.js?v=20261105-standards']],
+    ['ipqc-gia-cong.html',['TOYOTAKI – IPQC Gia công','gcMeasureForm','gcResultFile','ipqc-gc-entry.js?v=20261105-entry','ipqc-result-import.js?v=20261105-dashboard','ipqc-gia-cong.js?v=20261105-standards']],
     ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','sourceLabel','Xem file gốc']],
     ['shared/ipqc-btk-qc.js',['ipqc_gc_luu_tieu_chuan','gcFields','gcDrawing','ipqc_gc_tieu_chuan_lich_su']],
     ['shared/ipqc-gc-entry.js',['IpqcGcEntry','measure-ng']],
@@ -21,6 +21,8 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     assert.equal(response.status,200,file);
     const source=await response.text();
     if(file==='ipqc-gia-cong.html')assert.ok(!source.includes('data-tab="standards"')&&!source.includes('id="gcStandardForm"'));
+    if(file==='ipqc-gia-cong.html')for(const label of ['IPQC Đúc','Bảng điều khiển Gia công','Quản lý tiêu chuẩn','In / lưu PDF'])assert.ok(!source.includes('>'+label+'<'));
+    if(file==='qc-manager.html')assert.ok(!source.includes('>Nhập kết quả IPQC Gia công</a>'));
     for(const marker of markers)assert.ok(source.includes(marker),file+' missing '+marker);
     if(file.endsWith('.html')){
       for(const script of source.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g))
