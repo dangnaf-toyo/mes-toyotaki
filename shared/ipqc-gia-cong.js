@@ -29,13 +29,19 @@ const IpqcGiaCong = (() => {
   function notify(text, error = false) {
     $("gcMessage").textContent = text;
     $("gcMessage").className = "notice " + (error ? "bad" : "good");
+    $("gcErrorDetails").hidden = true;
   }
   function fail(error) {
     console.error(error);
     notify(
-      error.code === "P0001" ? error.message : "Chưa thực hiện được. Kiểm tra dữ liệu, quyền truy cập và thử lại.",
+      error.code === "P0001" ? error.message :
+        error.code === '42501' ? 'Bạn chưa có quyền thực hiện thao tác này. Liên hệ quản lý QC.' :
+        'Chưa tải hoặc lưu được dữ liệu. Thử lại; mở chi tiết nếu cần báo quản lý QC.',
       true,
     );
+    $("gcErrorDetails").hidden = false;
+    $("gcErrorDetails").querySelector('pre').textContent =
+      [error.code,error.message,error.details,error.hint].filter(Boolean).join('\n');
   }
   async function rpc(name, args) {
     const r = await sb.rpc(name, args);
@@ -44,6 +50,7 @@ const IpqcGiaCong = (() => {
     return r.data;
   }
   function table(target, headers, data) {
+    if (!data.length) { target.innerHTML='<p class="muted">Chưa có dữ liệu</p>';return; }
     target.innerHTML =
       "<table><thead><tr>" +
       headers.map((h) => "<th>" + E(h) + "</th>").join("") +
@@ -88,6 +95,10 @@ const IpqcGiaCong = (() => {
     const r = await sbTaiHet(() => sb.from("ipqc_btk").select("*").eq("cong_doan", "gia_cong").order("id"));
     if (r.error) throw r.error;
     versions = r.data || [];
+    const stepFilter=$('gcFilterStep'),oldStep=stepFilter.value;
+    stepFilter.innerHTML='<option value="">Tất cả nguyên công</option>'+[...new Set(versions
+      .map(v=>v.buoc_gia_cong).filter(Boolean))].sort().map(step=>'<option>'+E(step)+'</option>').join('');
+    stepFilter.value=oldStep;
     const old = $("gcVersion").value;
     $("gcVersion").innerHTML =
       '<option value="">Tiêu chuẩn mới</option>' +
@@ -856,7 +867,11 @@ const IpqcGiaCong = (() => {
     rights = await IpqcBtkQc.quyen();
     [products, machines] = await Promise.all([
       Qc02Data.readAll("master_products"),
-      Qc02Data.readAll("master_machines"),
+      (async()=>{
+        const r=await sbTaiHet(()=>sb.from('master_machines').select('*').order('ma_may'));
+        if(r.error)throw r.error;
+        return r.data||[];
+      })(),
     ]);
     $("gcProducts").innerHTML = products
       .map((p) => '<option value="' + E(p.ma_sp) + '">' + E(p.ten_sp || "") + "</option>")

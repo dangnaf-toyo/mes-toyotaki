@@ -55,6 +55,7 @@ const feature = {
   dung_cu: "CMM",
 };
 const records = {
+  master_machines: [{ma_may:'Phay 01',bo_phan:'Gia công - Sơn'}],
   ipqc_btk: [standard],
   ipqc_btk_muc: [feature],
   user_roles: [{ user_id: "u1", role: "admin" }],
