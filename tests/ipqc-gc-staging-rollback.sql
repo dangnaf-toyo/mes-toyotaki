@@ -43,6 +43,17 @@ begin
  exception when others then failed:=true;end;if not failed then raise exception 'Incomplete samples accepted';end if;
  if (select count(*)from ipqc_gc_kq where id_lan=measurement)<>2 then raise exception 'Missing per-sample results';end if;
  if not exists(select 1 from ipqc_gc_kq where id_lan=measurement and mau=1 and dat)then raise exception 'LSL boundary should be OK';end if;
+ failed:=false;begin
+  perform ipqc_gc_luu_do(payload||jsonb_build_object('request_id',gen_random_uuid(),'co_mau_thuc_te',jsonb_build_object('1',1)));
+ exception when others then failed:=true;end;if not failed then raise exception 'Reduced sample count accepted';end if;
+ r:=payload||jsonb_build_object('request_id',gen_random_uuid(),'co_mau_thuc_te',jsonb_build_object('1',3),
+  'kq',(payload->'kq')||jsonb_build_array(jsonb_build_object('muc_no',1,'mau',3,'gia_tri',20)));
+ declare extra uuid;begin
+  extra:=ipqc_gc_luu_do(r);
+  if (select co_mau_thuc_te->>'1'from ipqc_gc_lan where id=extra)<>'3'
+   or (select count(*)from ipqc_gc_kq where id_lan=extra)<>3 then raise exception 'Extra samples not stored';end if;
+  if (select co_mau from ipqc_btk_muc where id_btk=id1)<>2 then raise exception 'Measurement changed standard sample size';end if;
+ end;
  if (select count(*)from ipqc_lan_tong_hop where id=measurement::text and cong_doan='gia_cong')<>1 then raise exception 'Unified dashboard missing machining measurement';end if;
  update ipqc_btk_muc set usl=21 where id_btk=id1;
  if (select(tieu_chuan->'muc'->0->>'usl')::numeric from ipqc_gc_lan where id=measurement)<>20.05 then raise exception 'History snapshot changed';end if;
