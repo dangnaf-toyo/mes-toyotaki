@@ -3,7 +3,7 @@ function backend(options = {}) {
   const standard = {id:1,ma_sp:'PART',phien_ban:'A',cong_doan:'gia_cong',dang_dung:true,
     trang_thai:'da_duyet',ngay_hieu_luc:'2026-01-01',so_mau:2,ma_ban_ve:'DWG',buoc_gia_cong:'Phay mặt A'};
   const feature = (id,code,name,nominal,tolerance,count) => ({id,id_btk:1,muc_no:id,ma_dac_tinh:code,
-    hang_muc:name,kieu:'so',danh_nghia:nominal,dung_sai_tren:tolerance,dung_sai_duoi:-tolerance,
+    hang_muc:name,kieu:'so',danh_nghia:nominal,dung_sai_tren:tolerance,dung_sai_duoi:tolerance,
     lsl:nominal-tolerance,usl:nominal+tolerance,co_mau:count,don_vi:'mm',dung_cu:'CMM'});
   const tables = {
     master_products:[{ma_sp:'PART',ten_sp:'Part',ten_khach_hang:'Customer'}],
@@ -19,6 +19,9 @@ function backend(options = {}) {
   const db={tables,calls,orders,uploads,from(name){
     let data=[...(tables[name]||[])],single=false,error=null;
     const query={select(){return query;},eq(k,v){data=data.filter(r=>String(r[k])===String(v));return query;},
+      neq(k,v){data=data.filter(r=>String(r[k])!==String(v));return query;},
+      in(k,values){data=data.filter(r=>values.some(v=>String(r[k])===String(v)));return query;},
+      or(){return query;},limit(n){data=data.slice(0,n);return query;},
       gte(k,v){data=data.filter(r=>r[k]>=v);return query;},lte(k,v){data=data.filter(r=>r[k]<=v);return query;},
       ilike(k,v){data=data.filter(r=>String(r[k]||'').toLowerCase().includes(v.replaceAll('%','').toLowerCase()));return query;},
       order(k){orders.push({table:name,column:k});

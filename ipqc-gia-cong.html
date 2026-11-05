@@ -272,104 +272,13 @@
     </header>
     <main>
       <nav class="tabs">
-        <button data-tab="standards">Tiêu chuẩn Gia công</button
-        ><button data-tab="measure" class="active">Nhập kết quả</button><button data-tab="dashboard">Dashboard IPQC</button
+        <a class="btn" href="qc-manager.html?tab=tieuchuan&amp;cd=gia_cong">Quản lý tiêu chuẩn</a>
+        <button data-tab="measure" class="active">Nhập kết quả</button><button data-tab="dashboard">Dashboard IPQC</button
         ><button onclick="print()">In / lưu PDF</button>
       </nav>
       <p id="gcMessage" class="notice" role="status"></p>
       <details id="gcErrorDetails" hidden><summary>Chi tiết kỹ thuật</summary><pre></pre></details>
-      <section data-panel="standards" hidden>
-        <div class="panel">
-          <h2>Tiêu chuẩn kích thước Gia công</h2>
-          <p class="muted">
-            Nhân viên QC soạn và xác minh → Trưởng phòng QC kiểm tra → Giám đốc sản xuất phát hành. Phiên bản đã áp dụng
-            không bị ghi đè.
-          </p>
-          <div class="toolbar">
-            <label
-              >Khách hàng
-              <select id="gcCustomer">
-                <option value="">Tất cả</option>
-              </select></label
-            ><label>Model <input id="gcProduct" list="gcProducts" placeholder="Mã sản phẩm" /></label
-            ><datalist id="gcProducts"></datalist>
-            <label
-              >Phiên bản đã lưu
-              <select id="gcVersion">
-                <option value="">Tiêu chuẩn mới</option>
-              </select></label
-            ><button id="gcLoadVersion">Mở phiên bản</button
-            ><button id="gcClone">Tạo Revision mới từ bản đang xem</button>
-          </div>
-          <p id="gcProductInfo" class="muted"></p>
-          <div id="gcApproval"></div>
-        </div>
-        <form id="gcStandardForm">
-          <div class="panel grid">
-            <label>Mã bản vẽ <input id="gcDrawingCode" required /></label
-            ><label>Revision <input id="gcRevision" required /></label>
-            <label>Bước gia công <input id="gcProcess" required placeholder="Ví dụ: Phay mặt A / Khoan lỗ" />
-              <small>Phân biệt nguyên công cùng Model/Revision. Chỉ khai báo ở tiêu chuẩn; khi đo sẽ tự lấy theo phiên bản.</small></label
-            ><label>Ngày áp dụng <input id="gcEffective" type="date" required /></label>
-            <label>Nội dung sửa đổi <input id="gcChange" required value="Lập mới" /></label>
-            <label
-              >Bản vẽ gốc PDF / JPG / PNG
-              <input id="gcDrawing" type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.jpg,.jpeg,.png"
-            /></label>
-          </div>
-          <div class="drawing-grid">
-            <div class="panel">
-              <h3>Bản vẽ gốc</h3>
-              <div id="gcDrawingPreview"><p class="muted">Chọn bản vẽ để đọc hoặc nhập tiêu chuẩn thủ công.</p></div>
-              <p id="gcReadProgress" role="status" class="notice"></p>
-            </div>
-            <div class="panel">
-              <h3>Đặc tính kích thước — kiểm tra và xác nhận</h3>
-              <div class="toolbar">
-                <button id="gcAddFeature" type="button">Thêm dòng thủ công</button
-                ><button id="gcConfirmFeatures" type="button">Xác nhận các dòng đã đối chiếu</button>
-              </div>
-              <p class="muted">
-                Dung sai dưới nhập có dấu (ví dụ −0.05). Có thể nhập trực tiếp LSL/USL. Ô trống là chưa có thông tin; hệ
-                thống không tự coi là 0.
-              </p>
-              <div class="scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>No</th>
-                      <th>Mã đặc tính</th>
-                      <th>Tên / vị trí</th>
-                      <th>Kiểu</th>
-                      <th>Danh nghĩa</th>
-                      <th>Sai lệch trên</th>
-                      <th>Sai lệch dưới</th>
-                      <th>LSL</th>
-                      <th>USL</th>
-                      <th>Đơn vị</th>
-                      <th>Phương pháp</th>
-                      <th>Dụng cụ</th>
-                      <th>Tần suất</th>
-                      <th>Cỡ mẫu</th>
-                      <th>Tiêu chuẩn OK/NG</th>
-                      <th>Nguồn / tin cậy</th>
-                      <th>Xác nhận</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="gcFeatureRows"></tbody>
-                </table>
-              </div>
-              <p id="gcReadWarning" class="notice"></p>
-              <button id="gcSaveStandard" class="primary" type="submit">Lưu bản nháp & gửi kiểm tra</button>
-            </div>
-          </div>
-        </form>
-        <div class="panel">
-          <h3>Lịch sử bản vẽ / soạn tiêu chuẩn</h3>
-          <div id="gcStandardHistory"></div>
-        </div>
-      </section>
+      <datalist id="gcProducts"></datalist>
       <section data-panel="measure">
         <form id="gcMeasureForm" class="panel">
           <h2>Nhập kết quả IPQC Gia công</h2>
@@ -506,18 +415,16 @@
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="shared/supabase-client.js"></script>
-    <script src="shared/navbar.js?v=T213"></script>
+    <script src="shared/navbar.js?v=20261105-standards"></script>
     <script src="shared/qc02-data.js?v=T183"></script>
     <script src="shared/ipqc-spc.js?v=T213"></script>
-    <script src="shared/ipqc-btk-qc.js?v=T213-T211"></script>
+    <script src="shared/ipqc-btk-qc.js?v=20261105-standards"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="shared/ipqc-drawing-parser.js?v=T213"></script>
-    <script src="shared/ipqc-drawing-reader.js?v=T213"></script>
     <script src="shared/ipqc-gc-math.js?v=T213"></script>
     <script src="shared/ipqc-gc-entry.js?v=20261105-entry"></script>
     <script src="shared/ipqc-result-parser.js?v=20261105-import"></script>
     <script src="shared/ipqc-result-reader.js?v=20261105-import"></script>
     <script src="shared/ipqc-result-import.js?v=20261105-dashboard"></script>
-    <script src="shared/ipqc-gia-cong.js?v=20261105-dashboard"></script>
+    <script src="shared/ipqc-gia-cong.js?v=20261105-standards"></script>
   </body>
 </html>
