@@ -49,3 +49,11 @@ PASS Chrome trộn một lượt file NG và một lượt tay OK: 2 lượt, 4 
 PDF scan công ty `Kết quả kiểm tra N1-CL SHOE 3B54010210.pdf` (8 trang): OCR đọc được nội dung nhưng chưa trích đúng bảng đo ở chế độ tự động; chỉ có hai số chưa khớp (mã sản phẩm/số trang), không phải bằng chứng đọc được kích thước. Không đồng bộ/lưu các số này. Cấu trúc scan này còn cần mẫu đọc được kiểm chứng hoặc nhập tay; **chưa hoàn thành tự động đọc định dạng cụ thể này**. Các mẫu đọc cột/hàng đang có không bảo đảm xử lý mọi báo cáo máy đo. Không tự sửa mã O/0, đơn vị mờ hoặc đoán mẫu thiếu. Bảng xem trước yêu cầu xác minh rõ ràng trước đồng bộ.
 
 PDF có lớp chữ và ảnh bảng đo mẫu kiểm thử đã đọc được; hai Excel công ty nêu trên đã đọc số thật. Đây là kiểm thử Chrome dùng backend fixture và thư viện đọc file thật, kết hợp kiểm thử RPC/database staging thật trong rollback; chưa phải E2E bằng tài khoản QC đăng nhập trên dữ liệu sản xuất. Staging hiện chưa có tiêu chuẩn Gia công phát hành, cần người có quyền phát hành tiêu chuẩn thực tế trước khi nhập kết quả vận hành.
+
+## Kiểm tra cuối (nhóm 7)
+
+Các commit chức năng đã push `origin/staging`: `7c14768` (nhóm 1/2/6), merge thường `5b871db` giữ thay đổi đồng đội, `e50e33b` (nhóm 3), `2791cc6` (nhóm 4), `73d07af` (nhóm 5). Không force push, không viết lại lịch sử.
+
+Lượt cuối PASS: Chrome nhập tay/matrix, DOM tiêu chuẩn–kết quả–Dashboard, parser, Chrome file XLSX/PDF/ảnh + hai Excel công ty; SQL `tests/ipqc-gc-staging-rollback.sql` trên staging thật sau T217/T218. Hồi quy IPQC Đúc `ipqc-start-integration` (2 nhóm) và OQC `oqc-workspace-math`, `oqc-headcount` PASS. Kiểm tra tĩnh không có phát hiện với 3 file sản phẩm cuối; diff whitespace sạch. Đã xem ảnh giao diện matrix và preview import.
+
+Postflight staging: 30 máy, 0 lượt đo Gia công/Đúc, 5 Admin + 1 OQC; checksum tiêu chuẩn và đặc tính vẫn `d41d8cd98f00b204e9800998ecf8427e`, đúng preflight. Tất cả dữ liệu/quyền thử trong SQL đã rollback, không để lại tiêu chuẩn, giá trị đo hay tài khoản mẫu. Không truy cập ghi hoặc triển khai Production. Bài kiểm tra asset HTTP chỉ đọc staging có marker của matrix/parser/reader/import và bản cache mới.

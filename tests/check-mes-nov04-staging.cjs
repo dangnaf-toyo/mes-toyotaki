@@ -8,8 +8,12 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
     ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-gia-cong.html']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
-    ['ipqc-gia-cong.html',['gcMeasureForm','id="gcDrawing"']],
-    ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','ipqc_gc_luu_tieu_chuan']],
+    ['ipqc-gia-cong.html',['gcMeasureForm','id="gcDrawing"','gcResultFile','ipqc-gc-entry.js?v=20261105-entry','ipqc-result-import.js?v=20261105-dashboard','ipqc-gia-cong.js?v=20261105-dashboard']],
+    ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','ipqc_gc_luu_tieu_chuan','sourceLabel','Xem file gốc']],
+    ['shared/ipqc-gc-entry.js',['IpqcGcEntry','measure-ng']],
+    ['shared/ipqc-result-parser.js',['IpqcResultParser']],
+    ['shared/ipqc-result-reader.js',['IpqcResultReader','tesseract']],
+    ['shared/ipqc-result-import.js',['gia_tri_da_xac_minh','da_sua_sau_dong_bo']],
     ['shared/ncp-doi-sach-board.js',['ncp-doi-sach-saved','ncp_doi_sach_theo_doi']]
   ]){
     const response=await fetch(base+file+'?verify-nov04='+Date.now(),{headers:{'Cache-Control':'no-cache'}});
