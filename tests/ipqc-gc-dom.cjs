@@ -165,6 +165,7 @@ for (const f of ["shared/ipqc-spc.js", "shared/ipqc-btk-qc.js"]) vm.runInContext
 context.IpqcSpc = context.window.IpqcSpc;
 context.IpqcBtkQc = context.window.IpqcBtkQc;
 context.IpqcGcMath = require("../shared/ipqc-gc-math.js");
+vm.runInContext(fs.readFileSync('shared/ipqc-gc-entry.js','utf8'),context);
 vm.runInContext(fs.readFileSync("shared/ipqc-gia-cong.js", "utf8"), context);
 const $ = (id) => document.getElementById(id),
   tick = async () => {

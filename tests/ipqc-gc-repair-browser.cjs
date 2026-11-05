@@ -29,9 +29,33 @@ const {backend}=require('./ipqc-gc-fixture.cjs');
    if(empty){
     await page.waitForFunction(()=>document.getElementById('gcMeasureInfo').textContent.includes('Chưa có tiêu chuẩn'));
     assert.equal(await page.locator('#gcSaveMeasure').isDisabled(),true);
-   }else await page.waitForFunction(()=>document.querySelectorAll('#gcMeasureRows [data-result]').length===6);
+   }else {
+    await page.waitForFunction(()=>document.querySelectorAll('#gcMeasureRows [data-result]').length===6);
+    assert.equal(await page.locator('#gcMeasureRows table').count(),1);
+    assert.equal(await page.locator('#gcSaveMeasure').isDisabled(),true);
+    const input=(no,sample)=>page.locator('[data-result][data-no="'+no+'"][data-sample="'+sample+'"]');
+    for(const [no,values]of [[1,['20.02','20.01']],[2,['38.12','38.0']],[3,['15.15','15.0']]])
+     for(let i=0;i<values.length;i++)await input(no,i+1).fill(values[i]);
+    assert.equal(await input(3,1).evaluate(e=>e.classList.contains('measure-ng')),true);
+    assert.ok((await page.locator('#gcMeasureSummary').textContent()).includes('NG'),
+      await page.locator('#gcMeasureRows').textContent()+' / '+await page.locator('#gcMeasureSummary').textContent());
+    await input(1,1).focus();await page.keyboard.press('Enter');
+    assert.equal(await input(1,2).evaluate(e=>e===document.activeElement),true);
+    await page.locator('#gcAddSample').click();
+    assert.equal(await page.locator('#gcMeasureRows [data-result]').count(),9);
+    assert.equal(await input(1,1).inputValue(),'20.02');
+    assert.equal(await page.locator('#gcSaveMeasure').isDisabled(),true);
+    for(const [no,value]of [[1,'20'],[2,'38.1'],[3,'15']])await input(no,3).fill(value);
+    await page.locator('#gcLot').fill('LOT-MANUAL');
+    await page.locator('#gcSaveMeasure').click();
+    await page.waitForFunction(()=>sb.tables.ipqc_gc_lan.length===1);
+    assert.equal(await page.evaluate(()=>sb.tables.ipqc_gc_lan[0].dat),false);
+    assert.equal(await page.evaluate(()=>sb.calls.find(c=>c.name==='ipqc_gc_luu_do').args.p_data.kq.length),9);
+    await page.screenshot({path:'.review/ipqc-gc-entry.png',fullPage:true});
+   }
    await page.locator('[data-tab=dashboard]').click();
-   await page.waitForFunction(()=>document.getElementById('gcDataRows').textContent.includes('Chưa có dữ liệu'));
+   if(empty)await page.waitForFunction(()=>document.getElementById('gcDataRows').textContent.includes('Chưa có dữ liệu'));
+   else await page.waitForFunction(()=>document.getElementById('gcDataRows').textContent.includes('LOT-MANUAL'));
    assert.deepEqual(errors,[]);await context.close();
   }
   console.log('PASS real Chromium/catalog implementation: machine order uses ma_may; empty standards/dashboard are normal states; released features load');

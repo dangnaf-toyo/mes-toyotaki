@@ -22,6 +22,7 @@ const IpqcGiaCong = (() => {
     uploadDocument = null,
     measureRows = [],
     measureStandard = null,
+    measureEntry = null,
     measureRequest = null,
     results = [],
     rowLimit = 100,
@@ -469,17 +470,20 @@ const IpqcGiaCong = (() => {
     }
   };
   async function refreshMeasureVersions() {
+    const previous=$('gcMeasureVersion').value;
     const options = versions
       .filter(
         (v) =>
           v.ma_sp === $("gcMeasureProduct").value &&
-          v.trang_thai === "da_duyet" &&
+          v.trang_thai === "da_duyet" && v.dang_dung !== false &&
           (!v.ngay_hieu_luc || v.ngay_hieu_luc <= today()),
       )
       .sort((a, b) => (b.ngay_hieu_luc || "").localeCompare(a.ngay_hieu_luc || "") || b.id - a.id);
     $("gcMeasureVersion").innerHTML = options
       .map((v) => `<option value="${v.id}">${E(v.phien_ban)} · ${E(v.buoc_gia_cong || "Chưa khai báo bước")}</option>`)
       .join("");
+    if(options.some(v=>String(v.id)===previous))$('gcMeasureVersion').value=previous;
+    if(measureEntry&&String(measureStandard?.id)===$('gcMeasureVersion').value)return;
     await loadMeasureStandard();
   }
   async function loadMeasureStandard() {
@@ -487,7 +491,8 @@ const IpqcGiaCong = (() => {
       selected = versions.find((v) => String(v.id) === $("gcMeasureVersion").value) || null;
     measureStandard = null;
     measureRequest = null;
-    measureRows = [];
+    measureRows = [];measureEntry=null;
+    $("gcAddSample").disabled = true;
     $("gcSaveMeasure").disabled = true;
     if (!selected) {
       $("gcMeasureInfo").textContent = "Chưa có tiêu chuẩn Gia công đã duyệt/có hiệu lực cho model này.";
@@ -499,100 +504,40 @@ const IpqcGiaCong = (() => {
     if (r.error) throw r.error;
     measureRows = r.data || [];
     measureStandard = selected;
-    $("gcSaveMeasure").disabled = false;
-    $("gcMeasureInfo").textContent =
-      measureStandard.ma_sp +
-      " · Revision " +
-      measureStandard.phien_ban +
-      " · " +
-      (measureStandard.buoc_gia_cong || "Thiếu bước gia công");
-    $("gcMeasureRows").innerHTML = measureRows
-      .map((m) => {
-        const limits = bounds(m),
-          count = m.kieu === "okng" ? 1 : m.co_mau || measureStandard.so_mau || 1;
-        return (
-          '<div class="panel"><b>' +
-          E(m.ma_dac_tinh || m.muc_no) +
-          " · " +
-          E(m.hang_muc) +
-          "</b><p>LSL: " +
-          E(limits.lsl ?? "—") +
-          " · USL: " +
-          E(limits.usl ?? "—") +
-          " · " +
-          E(m.don_vi || "") +
-          '</p><div class="toolbar">' +
-          Array.from(
-            { length: count },
-            (_, i) =>
-              "<label>Mẫu " +
-              (i + 1) +
-              (m.kieu === "okng"
-                ? '<select data-result data-no="' +
-                  m.muc_no +
-                  '" data-sample="' +
-                  (i + 1) +
-                  '" required><option value="">Chọn</option><option value="true">OK</option><option value="false">NG</option></select>'
-                : '<input data-result data-no="' +
-                  m.muc_no +
-                  '" data-sample="' +
-                  (i + 1) +
-                  '" inputmode="decimal" required placeholder="Giá trị thực tế">') +
-              "</label>",
-          ).join("") +
-          '</div><p data-judgement="' +
-          m.muc_no +
-          '"></p></div>'
-        );
-      })
-      .join("");
-  }
-  $("gcMeasureProduct").onchange = () => refreshMeasureVersions().catch(fail);
-  $("gcMeasureVersion").onchange = () => loadMeasureStandard().catch(fail);
-  $("gcMeasureRows").oninput = () => {
-    for (const m of measureRows) {
-      const inputs = [...$("gcMeasureRows").querySelectorAll('[data-no="' + m.muc_no + '"]')],
-        limits = bounds(m);
-      const judgement = inputs.some((input) => input.value === "")
-        ? "Chưa đủ mẫu"
-        : inputs.every((input) =>
-              m.kieu === "okng"
-                ? input.value === "true"
-                : Number.isFinite(numeric(input.value)) && S.datGiaTri(numeric(input.value), limits),
-            )
-          ? "OK"
-          : "NG";
-      const target = $("gcMeasureRows").querySelector('[data-judgement="' + m.muc_no + '"]');
-      target.textContent = judgement;
-      target.className = judgement === "NG" ? "bad" : judgement === "OK" ? "good" : "muted";
+    if(!measureRows.length){
+      $('gcMeasureInfo').textContent='Tiêu chuẩn đã chọn chưa có đặc tính kiểm tra. Liên hệ quản lý QC.';
+      $('gcMeasureRows').textContent='Chưa có dữ liệu';return;
     }
-  };
+    $('gcMeasureInfo').textContent=selected.ma_sp+' · Revision '+selected.phien_ban+
+      (selected.buoc_gia_cong?' · Nguyên công: '+selected.buoc_gia_cong:'')+
+      ' · Tiêu chuẩn áp dụng '+(selected.ngay_hieu_luc||'theo phiên bản đã phát hành');
+    measureEntry=IpqcGcEntry.mount($('gcMeasureRows'),measureRows,selected,updateMeasureStatus);
+    const canMeasure=['admin','qc_manager','ipqc'].includes(rights.role);
+    measureEntry.setDisabled(!canMeasure);$('gcAddSample').disabled=!canMeasure;
+  }
+  function updateMeasureStatus(state){
+    $('gcMeasureSummary').textContent='Đã nhập '+state.filled+'/'+state.total+' giá trị · '+
+      (state.complete?(state.dat?'Lần kiểm: OK':'Lần kiểm: NG'):'Chưa đủ dữ liệu để kết luận lần kiểm');
+    $('gcMeasureSummary').className=state.complete?(state.dat?'good':'bad'):'muted';
+    $('gcSaveMeasure').disabled=!state.complete||!['admin','qc_manager','ipqc'].includes(rights.role);
+  }
+  $('gcAddSample').onclick=()=>measureEntry?.addSample();
+  $('gcMeasureProduct').onchange=()=>refreshMeasureVersions().catch(fail);
+  $('gcMeasureVersion').onchange=()=>loadMeasureStandard().catch(fail);
   $("gcMeasureForm").onsubmit = async (event) => {
     event.preventDefault();
     if (!measureStandard) return;
     const button = $("gcSaveMeasure");
     button.disabled = true;
     try {
-      const kq = [...$("gcMeasureRows").querySelectorAll("[data-result]")].map((input) => {
-        const m = measureRows.find((m) => String(m.muc_no) === input.dataset.no),
-          row = { muc_no: m.muc_no, mau: Number(input.dataset.sample) };
-        if (m.kieu === "okng") {
-          if (!["true", "false"].includes(input.value))
-            throw Object.assign(Error("Chọn OK/NG cho từng mẫu."), { code: "P0001" });
-          row.dat = input.value === "true";
-        } else {
-          row.gia_tri = numeric(input.value);
-          if (input.value === "" || !Number.isFinite(row.gia_tri))
-            throw Object.assign(Error("Nhập đủ giá trị đo hữu hạn."), { code: "P0001" });
-        }
-        return row;
-      });
+      const kq = measureEntry.payload();
       const payload = {
         ma_sp: measureStandard.ma_sp,
         id_btk: measureStandard.id,
         ma_may: $("gcMachine").value,
         ca: $("gcShift").value,
         ma_lo: $("gcLot").value,
+        co_mau_thuc_te:measureEntry.sampleCounts(),
         kq,
       };
       const signature = JSON.stringify(payload);
@@ -603,10 +548,11 @@ const IpqcGiaCong = (() => {
       notify("Đã lưu " + (saved.data.dat ? "OK" : "NG") + " · " + stamp(saved.data.thoi_diem));
       measureRequest = null;
       await loadMeasureStandard();
+      await loadDashboard();
     } catch (error) {
       fail(error);
     } finally {
-      button.disabled = false;
+      button.disabled = !measureEntry?.status().complete;
     }
   };
   function filteredResults() {
@@ -903,6 +849,7 @@ const IpqcGiaCong = (() => {
     const params = new URLSearchParams(location.search);
     if (params.get("view") === "dashboard") changeTab("dashboard");
     if (params.has("standard")) {
+      changeTab("standards");
       $("gcProduct").value = params.get("standard");
       productInfo();
       await refreshVersions();
