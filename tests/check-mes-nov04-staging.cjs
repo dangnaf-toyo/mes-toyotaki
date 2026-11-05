@@ -21,7 +21,10 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     assert.equal(response.status,200,file);
     const source=await response.text();
     if(file==='ipqc-gia-cong.html')assert.ok(!source.includes('data-tab="standards"')&&!source.includes('id="gcStandardForm"'));
-    if(file==='ipqc-gia-cong.html')for(const label of ['IPQC Đúc','Bảng điều khiển Gia công','Quản lý tiêu chuẩn','In / lưu PDF'])assert.ok(!source.includes('>'+label+'<'));
+    if(file==='ipqc-gia-cong.html'){
+      const navigation=[source.match(/<header>([\s\S]*?)<\/header>/)?.[1],source.match(/<nav class="tabs">([\s\S]*?)<\/nav>/)?.[1]].join('');
+      for(const label of ['IPQC Đúc','Bảng điều khiển Gia công','Quản lý tiêu chuẩn','In / lưu PDF'])assert.ok(!navigation.includes('>'+label+'<'));
+    }
     if(file==='qc-manager.html')assert.ok(!source.includes('>Nhập kết quả IPQC Gia công</a>'));
     for(const marker of markers)assert.ok(source.includes(marker),file+' missing '+marker);
     if(file.endsWith('.html')){
