@@ -121,6 +121,7 @@ const context = {
   location: { search: "", hostname: "localhost" },
   IS_PROD: false,
   setInterval() {},
+  localStorage:{getItem:()=>null,setItem(){}},
   MesAuth: { getSession: async () => ({ user: { id: "u1" } }) },
   MesNav: { setTitle() {} },
   sbTaiHet: async (make) => await make(),
@@ -166,6 +167,8 @@ context.IpqcSpc = context.window.IpqcSpc;
 context.IpqcBtkQc = context.window.IpqcBtkQc;
 context.IpqcGcMath = require("../shared/ipqc-gc-math.js");
 vm.runInContext(fs.readFileSync('shared/ipqc-gc-entry.js','utf8'),context);
+for(const file of ['shared/ipqc-result-parser.js','shared/ipqc-result-reader.js','shared/ipqc-result-import.js'])
+  vm.runInContext(fs.readFileSync(file,'utf8'),context);
 vm.runInContext(fs.readFileSync("shared/ipqc-gia-cong.js", "utf8"), context);
 const $ = (id) => document.getElementById(id),
   tick = async () => {

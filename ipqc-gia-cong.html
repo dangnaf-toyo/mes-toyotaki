@@ -394,10 +394,49 @@
             <label>Mã lô <input id="gcLot" required /></label>
           </div>
           <p id="gcMeasureInfo"></p>
+          <label>Phương thức nhập <select id="gcResultMode"><option value="manual">Cách 1 — Nhập kết quả bằng tay</option>
+            <option value="file">Cách 2 — Tải file kết quả đo, tự nhận diện</option></select></label>
+          <section id="gcResultImportPanel" hidden>
+            <h3>File kết quả đo thực tế</h3>
+            <p class="muted">Chọn báo cáo chứa giá trị đã đo. Dữ liệu tiêu chuẩn/LSL/USL không bị thay đổi.</p>
+            <div class="grid"><label>PDF / Excel / ảnh kết quả đo
+              <input id="gcResultFile" type="file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"></label>
+              <label>Trang / Sheet <select id="gcResultSheet"></select></label>
+              <label>Mẫu đọc đã lưu <select id="gcImportPreset"><option value="">Tự động / cấu hình mới</option></select></label></div>
+            <details><summary>Cấu hình mẫu đọc cho máy đo / cấu trúc riêng</summary>
+              <div class="grid"><label>Bố cục <select id="gcImport_layout"><option value="auto">Tự động</option>
+                <option value="rows">Một đặc tính / dòng</option><option value="columns">Đặc tính theo cột (bảng ngang)</option>
+                <option value="text">Dòng mã/tên = giá trị</option></select></label>
+                <label>Dòng tiêu đề (để trống: tự tìm) <input id="gcImport_headerRow" inputmode="numeric"></label>
+                <label>Cột mã <input id="gcImport_idColumn" placeholder="A"></label>
+                <label>Cột tên <input id="gcImport_nameColumn" placeholder="B"></label>
+                <label>Cột danh nghĩa (đối chiếu, không nhập đo) <input id="gcImport_nominalColumn" placeholder="C"></label>
+                <label>Cột đơn vị <input id="gcImport_unitColumn" placeholder="D"></label>
+                <label>Cột/mẫu (bảng ngang: dòng/mẫu) <input id="gcImport_sampleColumns" placeholder="I:1,J:2 hoặc 10:1,11:2"></label>
+                <label>Tên mẫu đọc <input id="gcImportProfileName" placeholder="Máy CMM / Biểu QC"></label></div>
+              <div class="toolbar"><button id="gcImportParse" type="button">Đọc lại theo cấu hình</button>
+                <button id="gcImportSavePreset" type="button">Lưu mẫu đọc trong trình duyệt</button></div>
+            </details>
+            <p id="gcImportStatus" role="status">Chọn file chứa giá trị đo của Model/Revision đang kiểm.</p>
+            <div class="drawing-grid"><div><h4>File gốc</h4><div id="gcResultOriginal"></div>
+                <details><summary>Nội dung trang / sheet gốc (25 dòng đầu)</summary><pre id="gcImportRaw"></pre></details></div>
+              <div><h4>Giá trị đo nhận diện và đối chiếu tiêu chuẩn</h4>
+                <label>Lọc <select id="gcImportFilter"><option value="">Tất cả</option><option value="matched">Đã khớp</option>
+                  <option value="unmatched">Chưa khớp</option><option value="verify">Cần xác minh giá trị/đơn vị</option></select></label>
+                <div class="scroll" id="gcImportCandidates"></div><button id="gcImportMore" type="button" hidden>Tải thêm</button>
+                <label><input id="gcImportSameUnit" type="checkbox"> Tôi đã đối chiếu: các giá trị không ghi đơn vị dùng cùng đơn vị tiêu chuẩn</label>
+                <div class="toolbar"><button id="gcImportSelectMatched" type="button">Xác nhận các dòng khớp đang hiển thị</button>
+                  <button id="gcImportSync" type="button" disabled>Đồng bộ vào bảng kết quả</button></div>
+              </div></div>
+          </section>
           <div class="toolbar"><button id="gcAddSample" type="button" disabled>+ Thêm một mẫu</button>
             <span class="muted">Cỡ mẫu lấy theo từng đặc tính; có thể bổ sung đến 100 mẫu, giữ nguyên tiêu chuẩn.</span></div>
           <p id="gcMeasureSummary" role="status">Chọn Model và Revision để tải bảng kiểm tra.</p>
           <div id="gcMeasureRows" class="scroll"></div>
+          <div id="gcResultConfirmation" hidden>
+            <label><input id="gcResultConfirmed" type="checkbox"> Tôi đã đối chiếu bảng kết quả sau đồng bộ/sửa tay trước khi lưu chính thức</label>
+            <label><input id="gcResultAttach" type="checkbox" checked> Lưu file gốc kèm lần kiểm để truy xuất (private)</label>
+          </div>
           <button class="primary" id="gcSaveMeasure" type="submit">Lưu kết quả đo</button>
         </form>
       </section>
@@ -476,6 +515,9 @@
     <script src="shared/ipqc-drawing-reader.js?v=T213"></script>
     <script src="shared/ipqc-gc-math.js?v=T213"></script>
     <script src="shared/ipqc-gc-entry.js?v=20261105-entry"></script>
-    <script src="shared/ipqc-gia-cong.js?v=20261105-entry"></script>
+    <script src="shared/ipqc-result-parser.js?v=20261105-import"></script>
+    <script src="shared/ipqc-result-reader.js?v=20261105-import"></script>
+    <script src="shared/ipqc-result-import.js?v=20261105-import"></script>
+    <script src="shared/ipqc-gia-cong.js?v=20261105-import"></script>
   </body>
 </html>
