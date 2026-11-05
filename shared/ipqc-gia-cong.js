@@ -23,6 +23,8 @@ const IpqcGiaCong = (() => {
     measureRows = [],
     measureStandard = null,
     measureEntry = null,
+    measureImport = null,
+    measureSaving = false,
     measureRequest = null,
     results = [],
     rowLimit = 100,
@@ -490,6 +492,7 @@ const IpqcGiaCong = (() => {
     const serial = ++measureSerial,
       selected = versions.find((v) => String(v.id) === $("gcMeasureVersion").value) || null;
     measureStandard = null;
+    measureImport?.reset();$('gcResultConfirmation').hidden=true;
     measureRequest = null;
     measureRows = [];measureEntry=null;
     $("gcAddSample").disabled = true;
@@ -516,17 +519,21 @@ const IpqcGiaCong = (() => {
     measureEntry.setDisabled(!canMeasure);$('gcAddSample').disabled=!canMeasure;
   }
   function updateMeasureStatus(state){
+    measureImport?.edited();
     $('gcMeasureSummary').textContent='Đã nhập '+state.filled+'/'+state.total+' giá trị · '+
       (state.complete?(state.dat?'Lần kiểm: OK':'Lần kiểm: NG'):'Chưa đủ dữ liệu để kết luận lần kiểm');
     $('gcMeasureSummary').className=state.complete?(state.dat?'good':'bad'):'muted';
-    $('gcSaveMeasure').disabled=!state.complete||!['admin','qc_manager','ipqc'].includes(rights.role);
+    $('gcSaveMeasure').disabled=measureSaving||!state.complete||!['admin','qc_manager','ipqc'].includes(rights.role);
   }
   $('gcAddSample').onclick=()=>measureEntry?.addSample();
   $('gcMeasureProduct').onchange=()=>refreshMeasureVersions().catch(fail);
   $('gcMeasureVersion').onchange=()=>loadMeasureStandard().catch(fail);
   $("gcMeasureForm").onsubmit = async (event) => {
     event.preventDefault();
-    if (!measureStandard) return;
+    if (!measureStandard || measureSaving) return;
+    measureSaving=true;
+    const inputStates=[...$('gcMeasureForm').querySelectorAll('input,select,button')].map(el=>[el,el.disabled]);
+    for(const [el]of inputStates)el.disabled=true;
     const button = $("gcSaveMeasure");
     button.disabled = true;
     try {
@@ -538,6 +545,7 @@ const IpqcGiaCong = (() => {
         ca: $("gcShift").value,
         ma_lo: $("gcLot").value,
         co_mau_thuc_te:measureEntry.sampleCounts(),
+        ...await measureImport.prepareSave(),
         kq,
       };
       const signature = JSON.stringify(payload);
@@ -552,7 +560,9 @@ const IpqcGiaCong = (() => {
     } catch (error) {
       fail(error);
     } finally {
-      button.disabled = !measureEntry?.status().complete;
+      measureSaving=false;
+      for(const [el,disabled]of inputStates)if(el.isConnected)el.disabled=disabled;
+      button.disabled = !measureEntry?.status().complete||!['admin','qc_manager','ipqc'].includes(rights.role);
     }
   };
   function filteredResults() {
@@ -864,6 +874,8 @@ const IpqcGiaCong = (() => {
     }
     setInterval(() => ($("clock").textContent = stamp(new Date())), 1000);
   }
+  measureImport=IpqcResultImport.mount({entry:()=>measureEntry,standard:()=>measureStandard,features:()=>measureRows,fail,
+    onSync:()=>{$('gcResultConfirmation').hidden=!measureImport.hasApplied();}});
   boot().catch(fail);
   return { refresh: loadDashboard };
 })();

@@ -54,6 +54,25 @@ begin
    or (select count(*)from ipqc_gc_kq where id_lan=extra)<>3 then raise exception 'Extra samples not stored';end if;
   if (select co_mau from ipqc_btk_muc where id_btk=id1)<>2 then raise exception 'Measurement changed standard sample size';end if;
  end;
+ failed:=false;begin
+  perform ipqc_gc_luu_do(payload||jsonb_build_object('request_id',gen_random_uuid(),'nguon_nhap','tu_file','nhan_dien','{}'::jsonb));
+ exception when others then failed:=true;end;if not failed then raise exception 'File source accepted without confirmation';end if;
+ declare imported uuid;file_path text:=qc::text||'/'||gen_random_uuid()::text||'.xlsx';begin
+  insert into storage.objects(bucket_id,name)values('ipqc-gia-cong-ket-qua',file_path);
+  r:=payload||jsonb_build_object('request_id',gen_random_uuid(),'nguon_nhap','tu_file','xac_nhan_file',true,
+   'nhan_dien',jsonb_build_object('ten_file','Rollback.xlsx','gia_tri_da_xac_minh','[]'::jsonb),
+   'tep_ket_qua',jsonb_build_object('bucket','ipqc-gia-cong-ket-qua','path',file_path,'name','Rollback.xlsx'));
+  imported:=ipqc_gc_luu_do(r);
+  if (select nguon_nhap from ipqc_lan_tong_hop where id=imported::text)<>'tu_file'
+   or (select tep_ket_qua->>'path' from ipqc_gc_lan where id=imported)<>file_path
+   then raise exception 'File source/provenance missing from stored results/dashboard';end if;
+  if ipqc_gc_luu_do(r)<>imported then raise exception 'Imported retry duplicated measurement';end if;
+  failed:=false;begin perform ipqc_gc_luu_do(r||jsonb_build_object('request_id',gen_random_uuid(),
+   'tep_ket_qua',jsonb_build_object('bucket','ipqc-gia-cong-ket-qua','path','another-user/other.xlsx')));
+  exception when others then failed:=true;end;if not failed then raise exception 'Foreign source path accepted';end if;
+ end;
+ if(select public from storage.buckets where id='ipqc-gia-cong-ket-qua')then raise exception 'Source file bucket is public';end if;
+ if has_function_privilege('authenticated','public.ipqc_gc_luu_do_t217(jsonb)','EXECUTE') then raise exception 'Internal writer bypass is exposed';end if;
  if (select count(*)from ipqc_lan_tong_hop where id=measurement::text and cong_doan='gia_cong')<>1 then raise exception 'Unified dashboard missing machining measurement';end if;
  update ipqc_btk_muc set usl=21 where id_btk=id1;
  if (select(tieu_chuan->'muc'->0->>'usl')::numeric from ipqc_gc_lan where id=measurement)<>20.05 then raise exception 'History snapshot changed';end if;
