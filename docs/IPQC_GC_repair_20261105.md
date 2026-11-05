@@ -37,3 +37,15 @@ PASS `tests/ipqc-result-parser.cjs`; PASS Chrome đọc XLSX, PDF có text và �
 Đã đọc file công ty thật: PREMO `Kết quả kiểm tra N1 Premo 25.04.2025.xlsx` (157.07/157.48); HITACHI `kết quả đo N1 FR khuôn 25( 25.06.2025).xls`, sheet KQ ĐO 1, bảng ngang cấu hình header dòng 7, mã cột C, danh nghĩa dòng 8, mẫu dòng 12/13 (34.91/34.84). Giá trị lấy đúng mẫu, không lấy dòng Tiêu chuẩn trên/dưới. Các đặc tính không thuộc tiêu chuẩn thử vẫn chưa xác nhận, không đưa vào database.
 
 PASS SQL rollback cho metadata nguồn/file, yêu cầu xác nhận, lưu vào dashboard, retry không trùng, chặn đường dẫn của người khác và bucket private. File gốc công ty và ảnh dựng chỉ nằm trong `.review/`, không commit. Chrome dùng tài nguyên PDF.js/Tesseract/SheetJS phiên bản ứng dụng, được phục vụ cục bộ trong bài test để tái hiện ổn định; ứng dụng tải thư viện/mô hình OCR qua CDN.
+
+## Dashboard, biểu đồ và truy xuất nguồn (nhóm 5)
+
+Dashboard và Excel ghi rõ Nhập tay/Nhập từ file; thống kê vẫn dùng chung từng kết quả đo, không phân tách công thức theo nguồn. File gốc mở bằng URL ký hạn 5 phút qua quyền đăng nhập, bucket không public. Tự tải lại sau lưu và mỗi phút khi tab đang hiện. Trace giữ giá trị nhận diện ban đầu cùng giá trị cuối được lưu, ghi nhận sửa sau đồng bộ.
+
+PASS Chrome trộn một lượt file NG và một lượt tay OK: 2 lượt, 4 mẫu, 1 OK, 1 NG, 50% NG; lọc đặc tính đường kính cho đúng 4 giá trị 20.03/20.01/20/20.02, danh nghĩa 20 và giới hạn 19.95–20.05. Chưa đủ nhóm thì khóa đánh giá SPC/Cp/Cpk. Bộ lọc Model/Revision/máy/ca/lô/người kiểm và Excel theo đặc tính cùng nguồn nhập đã kiểm tra. Dữ liệu Đúc cũ chưa có nguồn hiển thị Chưa ghi nhận, không tự gán nguồn.
+
+## Giới hạn xác minh file thực tế
+
+PDF scan công ty `Kết quả kiểm tra N1-CL SHOE 3B54010210.pdf` (8 trang): OCR đọc được nội dung nhưng chưa trích đúng bảng đo ở chế độ tự động; chỉ có hai số chưa khớp (mã sản phẩm/số trang), không phải bằng chứng đọc được kích thước. Không đồng bộ/lưu các số này. Cấu trúc scan này còn cần mẫu đọc được kiểm chứng hoặc nhập tay; **chưa hoàn thành tự động đọc định dạng cụ thể này**. Các mẫu đọc cột/hàng đang có không bảo đảm xử lý mọi báo cáo máy đo. Không tự sửa mã O/0, đơn vị mờ hoặc đoán mẫu thiếu. Bảng xem trước yêu cầu xác minh rõ ràng trước đồng bộ.
+
+PDF có lớp chữ và ảnh bảng đo mẫu kiểm thử đã đọc được; hai Excel công ty nêu trên đã đọc số thật. Đây là kiểm thử Chrome dùng backend fixture và thư viện đọc file thật, kết hợp kiểm thử RPC/database staging thật trong rollback; chưa phải E2E bằng tài khoản QC đăng nhập trên dữ liệu sản xuất. Staging hiện chưa có tiêu chuẩn Gia công phát hành, cần người có quyền phát hành tiêu chuẩn thực tế trước khi nhập kết quả vận hành.

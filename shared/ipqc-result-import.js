@@ -28,10 +28,9 @@ const IpqcResultImport = (() => {
     }
     function profile() {
       return Object.fromEntries(
-        ["layout", "headerRow", "idColumn", "nameColumn", "nominalColumn", "unitColumn", "sampleColumns"].map((key) => [
-          key,
-          $("gcImport_" + key).value.trim(),
-        ]),
+        ["layout", "headerRow", "idColumn", "nameColumn", "nominalColumn", "unitColumn", "sampleColumns"].map(
+          (key) => [key, $("gcImport_" + key).value.trim()],
+        ),
       );
     }
     function loadProfiles() {
@@ -61,7 +60,8 @@ const IpqcResultImport = (() => {
         .map((c, i) => ({ ...c, index: i }))
         .filter(
           (c) =>
-            !filter || (filter === "matched" ? c.status === "matched" : filter === "unmatched" ? !c.muc_no : !valid(c)),
+            !filter ||
+            (filter === "matched" ? c.status === "matched" : filter === "unmatched" ? !c.muc_no : !valid(c)),
         );
     }
     function render() {
@@ -156,12 +156,14 @@ const IpqcResultImport = (() => {
       if (!documentData) return;
       const selected = $("gcResultSheet").value;
       const sheets = documentData.sheets.filter((s) => selected === "*" || s.name === selected);
-      candidates = P.parse(sheets, profile()).map((c) => ({
-        ...c,
-        ...P.match(c, features()),
-        unit: c.unit || c.samples.find((s) => s.unit)?.unit || "",
-        accepted: false,
-      }));
+      candidates = P.parse(sheets, profile())
+        .map((c) => ({
+          ...c,
+          ...P.match(c, features()),
+          unit: c.unit || c.samples.find((s) => s.unit)?.unit || "",
+          accepted: false,
+        }))
+        .filter((c) => c.samples.some((s) => s.value !== null) || c.muc_no !== null);
       limit = 100;
       $("gcImportRaw").textContent = sheets
         .map(
@@ -175,9 +177,15 @@ const IpqcResultImport = (() => {
         )
         .join("\n\n");
       render();
+      if (!candidates.length) {
+        message(
+          "Chưa nhận diện được giá trị đo hợp lệ theo mẫu này. Chọn trang/sheet, cấu hình cột hoặc nhập tay; chưa đồng bộ/lưu.",
+        );
+        return;
+      }
       message(
         candidates.length +
-          " dòng giá trị được nhận diện; " +
+          " dòng cần đối chiếu; " +
           candidates.filter((c) => c.status === "matched").length +
           " dòng khớp. Chưa đồng bộ/lưu. Kiểm tra đơn vị, từng mẫu và xác nhận. " +
           documentData.warnings.join(" "),
@@ -234,7 +242,15 @@ const IpqcResultImport = (() => {
         $("gcResultSheet").innerHTML =
           '<option value="*">Tất cả trang / sheet (kiểm tra dòng trùng)</option>' +
           result.sheets.map((s) => "<option>" + E(s.name) + "</option>").join("");
-        const best = result.sheets.find((s) => P.parse([s]).length);
+        const score = (s) =>
+          P.parse([s]).reduce(
+            (n, c) =>
+              n +
+              c.samples.filter((v) => v.value !== null).length +
+              (P.match(c, features()).status === "matched" ? 10000 : 0),
+            0,
+          );
+        const best = [...result.sheets].sort((a, b) => score(b) - score(a))[0];
         $("gcResultSheet").value = best?.name || result.sheets[0]?.name || "*";
         parse();
       } catch (error) {
@@ -264,7 +280,8 @@ const IpqcResultImport = (() => {
         unitColumn: "",
         sampleColumns: "",
       };
-      for (const [key, value] of Object.entries(selected)) if ($("gcImport_" + key)) $("gcImport_" + key).value = value;
+      for (const [key, value] of Object.entries(selected))
+        if ($("gcImport_" + key)) $("gcImport_" + key).value = value;
       parse();
     };
     $("gcImportSavePreset").onclick = () => {
@@ -295,7 +312,9 @@ const IpqcResultImport = (() => {
         if (event.target.hasAttribute("data-unit")) c.unit = event.target.value;
         if (event.target.hasAttribute("data-import-value")) {
           const s = c.samples.find((s) => s.sample === Number(event.target.dataset.importValue));
-          Object.assign(s, P.valueCell(event.target.value) || { value: null, raw: "" }, { manualCorrected: true });
+          Object.assign(s, P.valueCell(event.target.value) || { value: null, raw: "" }, {
+            manualCorrected: true,
+          });
         }
       }
       render();
@@ -325,7 +344,8 @@ const IpqcResultImport = (() => {
         for (const c of chosen) {
           const m = features().find((m) => m.muc_no === Number(c.muc_no));
           for (const s of c.samples) {
-            const conversion = m.kieu === "so" ? P.convert(s.value, s.unit || c.unit, m.don_vi) : { value: s.value };
+            const conversion =
+              m.kieu === "so" ? P.convert(s.value, s.unit || c.unit, m.don_vi) : { value: s.value };
             if (conversion.error) throw Error(conversion.error);
             const k = m.muc_no + "/" + s.sample,
               value = String(conversion.value),
@@ -366,7 +386,9 @@ const IpqcResultImport = (() => {
         syncing = false;
         if (items.length) {
           applied = true;
-          appliedRows.push(...trace.filter((t) => items.some((i) => i.muc_no === t.muc_no && i.mau === t.mau)));
+          appliedRows.push(
+            ...trace.filter((t) => items.some((i) => i.muc_no === t.muc_no && i.mau === t.mau)),
+          );
         }
         $("gcResultConfirmed").checked = false;
         message(
@@ -411,9 +433,12 @@ const IpqcResultImport = (() => {
       async prepareSave() {
         if (!applied) return { nguon_nhap: "nhap_tay" };
         if (!$("gcResultConfirmed").checked)
-          throw Object.assign(Error("Đối chiếu bảng kết quả sau đồng bộ/sửa tay và xác nhận trước khi lưu."), {
-            code: "P0001",
-          });
+          throw Object.assign(
+            Error("Đối chiếu bảng kết quả sau đồng bộ/sửa tay và xác nhận trước khi lưu."),
+            {
+              code: "P0001",
+            },
+          );
         if ($("gcResultAttach").checked && !uploaded) {
           const session = await MesAuth.getSession();
           if (!session) throw Error("Cần đăng nhập để lưu file gốc.");
@@ -445,7 +470,16 @@ const IpqcResultImport = (() => {
           nguon_nhap: "tu_file",
           xac_nhan_file: true,
           tep_ket_qua: $("gcResultAttach").checked ? uploaded : null,
-          nhan_dien: { ten_file: file.name, profile: profile(), gia_tri_da_xac_minh: appliedRows },
+          nhan_dien: {
+            ten_file: file.name,
+            profile: profile(),
+            gia_tri_da_xac_minh: appliedRows.map((row) => {
+              const current = entry().get(row.muc_no, row.mau),
+                m = features().find((m) => m.muc_no === row.muc_no);
+              const saved = m?.kieu === "so" ? P.number(current) : current === "true";
+              return { ...row, gia_tri_luu: saved, da_sua_sau_dong_bo: saved !== row.value };
+            }),
+          },
         };
       },
     };

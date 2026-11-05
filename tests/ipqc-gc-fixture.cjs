@@ -43,7 +43,7 @@ function backend(options = {}) {
         buoc_gia_cong:b.buoc_gia_cong,ma_may:p.ma_may,ca:p.ca,ma_lo:p.ma_lo,
         nguoi_kiem:'Inspector',thoi_diem:new Date().toISOString(),so_mau:Math.max(...kq.map(k=>k.mau)),
         dat:kq.every(k=>k.dat),tieu_chuan:{btk:{...b},muc:features.map(m=>({...m}))},
-        nguon_nhap:p.nguon_nhap||'nhap_tay',tep_ket_qua:p.tep_ket_qua||null,kq};
+        nguon_nhap:p.nguon_nhap||'nhap_tay',tep_ket_qua:p.tep_ket_qua||null,nhan_dien:p.nhan_dien||null,kq};
       tables.ipqc_gc_lan.push(row);tables.ipqc_lan_tong_hop.push({...row,cong_doan:'gia_cong'});
       tables.ipqc_gc_kq.push(...kq.map(k=>({...k,id_lan:id})));return {data:id};
     }
