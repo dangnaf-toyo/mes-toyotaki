@@ -203,6 +203,8 @@ const ROLE_LABELS = {
   // T196: không phải role riêng trong DB — lưu role = 'admin' + chuc_danh = 'tong_giam_doc'
   // (toàn quyền như Admin, chỉ khác tên hiển thị). Xem vaiTroHienThi() + nút Lưu ở buildUserRow().
   tong_giam_doc: 'Tổng giám đốc (toàn quyền như Admin)',
+  // T211: role = 'admin' + chuc_danh = 'giam_doc_sx' — toàn quyền Admin, vẫn là người duyệt cuối / nhận chuông của GĐSX
+  admin_gdsx: 'Admin kiêm Giám đốc sản xuất (toàn quyền + duyệt cuối)',
   truong_ca: 'Trưởng ca',
   ipqc: 'IPQC',
   iqc: 'IQC (kiểm tra đầu vào)',
@@ -223,6 +225,7 @@ const ROLE_LABELS = {
   nhan_vien_thong_ke: 'Nhân viên — Thống kê (quản lý linh kiện dự phòng khuôn)',
   to_truong_khuon: 'Tổ trưởng khuôn (KH bảo dưỡng, hạng mục check sheet, linh kiện / vật tư tiêu hao)',
   iatf_admin: 'IATF admin (duy nhất được ghi/sửa tài liệu kỹ thuật)',
+  chi_xem: 'Chỉ xem (màn hình TV / tài khoản chỉ đọc — không ghi được gì)',   // T212
 };
 const BO_PHAN_LIST = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA', 'Thiết bị'];
 
@@ -259,9 +262,14 @@ function closeCreateModal(){
 }
 
 // Vai trò hiển thị: chức danh (nếu có) thay cho role thật.
-function vaiTroHienThi(row){ return (row.role === 'admin' && row.chuc_danh === 'tong_giam_doc') ? 'tong_giam_doc' : row.role; }
+const CHUC_DANH_CUA = { tong_giam_doc: 'tong_giam_doc', admin_gdsx: 'giam_doc_sx' };   // vai trò hiển thị → chức danh (role thật = admin)
+function vaiTroHienThi(row){
+  if (row.role === 'admin' && row.chuc_danh === 'tong_giam_doc') return 'tong_giam_doc';
+  if (row.role === 'admin' && row.chuc_danh === 'giam_doc_sx') return 'admin_gdsx';
+  return row.role;
+}
 function fillRoleSelect(sel, selected, khongChucDanh){
-  sel.innerHTML = Object.entries(ROLE_LABELS).filter(([v]) => !(khongChucDanh && v === 'tong_giam_doc')).map(([v, l]) =>
+  sel.innerHTML = Object.entries(ROLE_LABELS).filter(([v]) => !(khongChucDanh && CHUC_DANH_CUA[v])).map(([v, l]) =>
     `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`
   ).join('');
 }
@@ -397,8 +405,8 @@ function buildUserRow(row){
       const { error: updErr } = await sb
         .from('user_roles')
         .update({
-          role: sel.value === 'tong_giam_doc' ? 'admin' : sel.value,
-          chuc_danh: sel.value === 'tong_giam_doc' ? 'tong_giam_doc' : null,
+          role: CHUC_DANH_CUA[sel.value] ? 'admin' : sel.value,
+          chuc_danh: CHUC_DANH_CUA[sel.value] || null,
           bo_phan_phu_trach: chosenBp.length ? chosenBp : null,
           updated_at: new Date().toISOString(),
         })
@@ -408,8 +416,8 @@ function buildUserRow(row){
         saveBtn.disabled = false;
         saveBtn.textContent = 'Lưu';
       } else {
-        row.role = sel.value === 'tong_giam_doc' ? 'admin' : sel.value;
-        row.chuc_danh = sel.value === 'tong_giam_doc' ? 'tong_giam_doc' : null;
+        row.role = CHUC_DANH_CUA[sel.value] ? 'admin' : sel.value;
+        row.chuc_danh = CHUC_DANH_CUA[sel.value] || null;
         row.bo_phan_phu_trach = chosenBp.length ? chosenBp : null;
         saveBtn.textContent = 'Đã lưu';
         setTimeout(() => { saveBtn.textContent = 'Lưu'; saveBtn.disabled = true; }, 1200);

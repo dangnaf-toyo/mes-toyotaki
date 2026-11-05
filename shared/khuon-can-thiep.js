@@ -323,6 +323,37 @@
     return rows;
   }
 
+  // ── Ô chọn hạng mục gọn (form thêm sự cố — T210f) ─────────────────────────
+  //   const p = await KhuonCT.picker(el); p.giaTri() → { hang_muc:[], khong_chac, mo_ta, cap }
+  async function picker(el){
+    injectCss();
+    const dm = await taiDanhMuc();
+    el.innerHTML = [0, 1, 2, 3].map(c => '<div class="kct-grp" style="border-color:' + CAP[c].mau + ';background:' + CAP[c].nen + '">' +
+        '<div class="kct-grp-h" style="color:' + CAP[c].mau + '">' + esc(CAP[c].ten) + ' — ' + esc(CAP[c].duyet) + '</div>' +
+        dm.cv.filter(d => d.cap === c).map(d => '<label class="kct-it"><input type="checkbox" data-cv="' + esc(d.ma) + '"><span>' + esc(d.noi_dung) + '</span></label>').join('') +
+      '</div>').join('') +
+      '<label class="kct-it" style="margin-top:6px"><input type="checkbox" data-kc><span><b>Không chắc việc thuộc cấp nào</b> → nâng lên 1 cấp</span></label>' +
+      '<div class="kct-row"><input type="text" data-mt maxlength="300" placeholder="Mô tả thêm (vị trí, tình trạng…)"></div>' +
+      '<div class="kct-row" style="font-size:12px"><span>Cấp:</span><span class="kct-tinh"><span style="color:#64748B">Chưa chọn hạng mục</span></span></div>';
+    const chon = () => [...el.querySelectorAll('input[data-cv]:checked')].map(i => i.dataset.cv);
+    const cap = () => {
+      const ds = chon(); if (!ds.length) return null;
+      let c = Math.max(...ds.map(m => (dm.cv.find(d => d.ma === m) || {}).cap || 0));
+      if (el.querySelector('input[data-kc]').checked) c = Math.min(3, c + 1);
+      return c;
+    };
+    const ve = () => {
+      const c = cap();
+      el.querySelector('.kct-tinh').innerHTML = c == null ? '<span style="color:#64748B">Chưa chọn hạng mục</span>'
+        : capChip(c) + ' → ' + esc(c === 0 ? 'làm ngay, không cần duyệt' : CAP[c].duyet + ' duyệt');
+    };
+    el.querySelectorAll('input[type=checkbox]').forEach(i => i.addEventListener('change', ve));
+    return {
+      giaTri: () => ({ hang_muc: chon(), khong_chac: el.querySelector('input[data-kc]').checked,
+                       mo_ta: el.querySelector('input[data-mt]').value.trim(), cap: cap() }),
+    };
+  }
+
   // ── Hộp thoại (màn điều khiển đúc) ────────────────────────────────────────
   function modal(opts){
     injectCss();
@@ -336,5 +367,5 @@
     return mount(mask.querySelector('.kct-dlg-b'), opts);
   }
 
-  window.KhuonCT = { mount, queue, lichSu, modal, CAP, capChip };
+  window.KhuonCT = { mount, queue, lichSu, modal, picker, CAP, capChip };
 })();

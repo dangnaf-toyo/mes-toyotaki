@@ -119,9 +119,10 @@
       try {
         const s = await MesAuth.getSession();
         if (!s) return { uid: null, role: null };
-        const { data } = await sb.from('user_roles').select('role').eq('user_id', s.user.id).maybeSingle();
+        const { data } = await sb.from('user_roles').select('role,chuc_danh').eq('user_id', s.user.id).maybeSingle();
         const role = data ? data.role : null;
-        return { uid: s.user.id, role, soan: SOAN.includes(role), kiemTra: role === 'qc_manager', pheDuyet: role === 'giam_doc_sx', huyMoi: role === 'qc_manager' || role === 'admin' };
+        const laGdsx = role === 'giam_doc_sx' || !!(data && data.chuc_danh === 'giam_doc_sx');   // T211: admin kiêm GĐSX
+        return { uid: s.user.id, role, soan: SOAN.includes(role), kiemTra: role === 'qc_manager', pheDuyet: laGdsx, huyMoi: role === 'qc_manager' || role === 'admin' };
       } catch (e) { return { uid: null, role: null }; }
     })();
     return quyenP;

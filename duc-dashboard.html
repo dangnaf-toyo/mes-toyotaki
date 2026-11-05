@@ -502,6 +502,13 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       </div>
       <div class="field"><label>Vấn đề</label><textarea id="ma-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
       <div class="field"><label>Nội dung xử lý</label><textarea id="ma-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
+      <div class="field" id="ma-ct-wrap" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;color:#B45309">
+          <input type="checkbox" id="ma-ct-co" style="width:18px;height:18px">🔧 Sự cố cần can thiệp khuôn
+        </label>
+        <div id="ma-ct-note" style="font-size:11px;color:var(--text-muted);margin-top:2px">Không tick = chỉ chỉnh thông số / máy, không tác động vào khuôn.</div>
+        <div id="ma-ct" style="display:none;margin-top:6px"></div>
+      </div>
       <div class="field" id="ma-anh"></div>
     </div>
     <div class="modal-foot">
@@ -923,7 +930,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/khuon-nam-van-de.js"></script>
 <script src="shared/su-co-anh.js"></script>
-<script src="shared/khuon-can-thiep.js?v=T210e"></script>
+<script src="shared/khuon-can-thiep.js?v=T210f"></script>
 <script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
@@ -3337,14 +3344,51 @@ async function openAddIncidentModal(idDong){
   document.getElementById('ma-xu-ly').value = '';
   document.getElementById('ma-dam-nhiem').value = '';
   document.getElementById('modal-add').classList.add('open');
+  maCtReset();
   anhSuCo.add = await mountAnhSuCo('ma-anh', 'truoc', null, false);
 }
+
+// T210f: khai can thiệp khuôn ngay trong form thêm sự cố (A2/B1/F1).
+let maCtPicker = null;
+function maCtLoai(){ return String(document.getElementById('ma-loai').value || '').slice(0, 2); }
+async function maCtReset(){
+  const cb = document.getElementById('ma-ct-co');
+  cb.checked = false; cb.disabled = false;
+  document.getElementById('ma-ct').style.display = 'none';
+  document.getElementById('ma-ct').innerHTML = '';
+  maCtPicker = null;
+  maCtCapNhat();
+}
+async function maCtCapNhat(){
+  const loai = maCtLoai(), cb = document.getElementById('ma-ct-co'), box = document.getElementById('ma-ct');
+  const ap = LOAI_CAN_CT.includes(loai) && !!state.ctMoc;
+  document.getElementById('ma-ct-wrap').style.display = ap ? '' : 'none';
+  if (!ap) return;
+  if (loai === 'A2') { cb.checked = true; cb.disabled = true; }   // A2 luôn tác động khuôn
+  else cb.disabled = false;
+  document.getElementById('ma-ct-note').textContent = loai === 'A2'
+    ? 'Sự cố A2 luôn có tác động vào khuôn — chọn việc sẽ làm.'
+    : 'Không tick = chỉ chỉnh thông số / máy, không tác động vào khuôn.';
+  box.style.display = cb.checked ? '' : 'none';
+  if (cb.checked && !maCtPicker) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Đang tải hạng mục…</div>';
+    try { maCtPicker = await KhuonCT.picker(box); }
+    catch (e) { box.innerHTML = '<div style="color:var(--alarm-fg);font-size:12px">' + escapeHtml(e.message) + '</div>'; }
+  }
+}
+document.getElementById('ma-loai').addEventListener('change', maCtCapNhat);
+document.getElementById('ma-ct-co').addEventListener('change', maCtCapNhat);
 
 async function submitAddIncident(){
   const loai = document.getElementById('ma-loai').value;
   const gioPS = document.getElementById('ma-gio-phat-sinh').value;
   if (!loai) return showToast('Chọn loại sự cố', true);
   if (!gioPS) return showToast('Nhập giờ phát sinh', true);
+  // T210f: can thiệp khuôn
+  const ctAp = document.getElementById('ma-ct-wrap').style.display !== 'none';
+  const ctCo = ctAp && document.getElementById('ma-ct-co').checked;
+  const ct = ctCo && maCtPicker ? maCtPicker.giaTri() : null;
+  if (ctCo && (!ct || !ct.hang_muc.length)) return showToast('Đã tick "cần can thiệp khuôn" — chọn ít nhất 1 việc sẽ làm trên khuôn', true);
   if (!(await ensureAuthOnSubmit('modal-add'))) return;
 
   const damNhiem = document.getElementById('ma-dam-nhiem').value;
@@ -3359,6 +3403,16 @@ async function submitAddIncident(){
     });
     hideOverlay(); closeModal();
     showToast('✓ Đã ghi nhận sự cố đang xử lý');
+    // T210f: ghi phiếu can thiệp khuôn theo lựa chọn trong form (lỗi thì vẫn giữ sự cố, khai lại ở nút 🔧).
+    if (ctAp && d && d.id_su_co) {
+      const r = ct
+        ? await sb.rpc('duc_khuon_ct_luu', { p_nguon: 'xlbt', p_nguon_id: d.id_su_co, p_hang_muc: ct.hang_muc, p_khong_chac: ct.khong_chac, p_mo_ta: ct.mo_ta })
+        : await sb.rpc('duc_khuon_ct_khong_tac_dong', { p_id_su_co: d.id_su_co,
+            p_ghi_chu: 'Khai khi tạo sự cố — không cần can thiệp khuôn' + (document.getElementById('ma-xu-ly').value.trim() ? ': ' + document.getElementById('ma-xu-ly').value.trim() : '') });
+      if (r.error || !r.data || !r.data.ok) showToast('Sự cố đã ghi nhận nhưng chưa lưu được can thiệp khuôn: ' + (r.error ? r.error.message : r.data && r.data.error) + ' — khai lại ở nút 🔧', true);
+      else if (ct) showToast(r.data.trang_thai === 'da_duyet' ? '✓ Can thiệp khuôn cấp ' + r.data.cap + ' — đã duyệt, được làm ngay'
+        : '⏳ Can thiệp khuôn cấp ' + r.data.cap + ' — đã gửi duyệt, chờ ' + KhuonCT.CAP[r.data.cap].duyet);
+    }
     if (anhSuCo.add && anhSuCo.add.hasPending()) {
       // Mã sự cố do duc_open_incident sinh (T178: có thể là sự cố phụ) -> gắn ảnh theo mã trả về.
       try {
