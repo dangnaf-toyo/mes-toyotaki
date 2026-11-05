@@ -630,7 +630,7 @@ const IpqcGiaCong = (() => {
     ]
       .map(([key, value]) => '<div class="metric">' + E(key) + "<b>" + E(value) + "</b></div>")
       .join("");
-    const detail = [];
+    const detail = [],sourceRecords=[];
     const defects = new Map();
     for (const r of data)
       for (const k of r.kq || []) {
@@ -653,7 +653,10 @@ const IpqcGiaCong = (() => {
           limits.lsl,
           limits.usl,
           k.dat ? "OK" : "NG",
+          sourceLabel(r.nguon_nhap),
+          r.tep_ket_qua?.name||'—',
         ]);
+        sourceRecords.push(r);
         if (!k.dat) {
           const key = [r.ma_sp, r.revision, m.ma_dac_tinh || k.muc_no, m.hang_muc].join(" · ");
           defects.set(key, (defects.get(key) || 0) + 1);
@@ -678,9 +681,25 @@ const IpqcGiaCong = (() => {
         "LSL",
         "USL",
         "Kết quả",
+        "Nguồn nhập",
+        "File gốc",
       ],
       detail.slice(0, rowLimit),
     );
+    [...$('gcDataRows').querySelectorAll('tbody tr')].forEach((tr,index)=>{
+      const row=sourceRecords[index],file=row?.tep_ket_qua;
+      if(!file?.path||file.bucket!=='ipqc-gia-cong-ket-qua')return;
+      const button=document.createElement('button');button.type='button';button.textContent='Xem file gốc';button.title=file.name;
+      button.onclick=async()=>{
+        const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;
+        try{const result=await sb.storage.from(file.bucket).createSignedUrl(file.path,300);
+          if(result.error)throw result.error;
+          const url=new URL(result.data.signedUrl);if(url.protocol!=='https:')throw Error('Đường dẫn file không hợp lệ.');
+          if(popup)popup.location.assign(url.href);else notify('Trình duyệt đã chặn tab file. Cho phép mở tab và thử lại.');
+        }catch(error){popup?.close();fail(error);}
+      };
+      tr.lastElementChild.replaceChildren(button);
+    });
     $("gcMoreRows").hidden = detail.length <= rowLimit;
     table(
       $("gcTopNg"),
@@ -689,6 +708,7 @@ const IpqcGiaCong = (() => {
     );
     renderCharts(data);
   }
+  function sourceLabel(source){return ({nhap_tay:'Nhập tay',tu_file:'Nhập từ file'})[source]||'Chưa ghi nhận';}
   function renderCharts(data) {
     const selected = $("gcFilterFeature").value;
     $("gcValueChart").replaceChildren();
@@ -811,6 +831,8 @@ const IpqcGiaCong = (() => {
           LSL: limits.lsl,
           USL: limits.usl,
           "Kết quả": k.dat ? "OK" : "NG",
+          "Nguồn nhập":sourceLabel(r.nguon_nhap),
+          "File gốc":r.tep_ket_qua?.name||'',
         });
       }
     const workbook = XLSX.utils.book_new();
@@ -873,6 +895,7 @@ const IpqcGiaCong = (() => {
       changeTab("measure");
     }
     setInterval(() => ($("clock").textContent = stamp(new Date())), 1000);
+    setInterval(()=>{if(!document.querySelector('[data-panel="dashboard"]').hidden)loadDashboard().catch(fail);},60000);
   }
   measureImport=IpqcResultImport.mount({entry:()=>measureEntry,standard:()=>measureStandard,features:()=>measureRows,fail,
     onSync:()=>{$('gcResultConfirmation').hidden=!measureImport.hasApplied();}});
