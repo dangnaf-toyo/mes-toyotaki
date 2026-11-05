@@ -51,6 +51,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     await page.goto("https://mes.test/qc-manager.html?tab=tieuchuan&cd=gia_cong&type=btk&ma=PART&version=1");
     const root = page.locator("#btk-root");
     await root.locator("[data-f=ma_ban_ve]").waitFor();
+    assert.equal(await page.locator('#tab-tieuchuan a[href="ipqc-gia-cong.html"]').count(),0);
     assert.equal(await root.locator("[data-f=phien_ban]").inputValue(), "A");
     assert.equal(await root.locator("[data-f=ma_ban_ve]").inputValue(), "DWG");
     assert.ok((await root.textContent()).includes("CMM point") === false); // value is in readonly inputs.
@@ -117,11 +118,8 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
       await page.locator("[data-tab=standards],[data-panel=standards],#gcStandardForm").count(),
       0,
     );
-    assert.ok(
-      (
-        await page.getByRole("link", { name: "Quản lý tiêu chuẩn", exact: true }).getAttribute("href")
-      ).includes("cd=gia_cong"),
-    );
+    assert.equal(await page.locator('body > header a, main > nav a, main > nav [onclick]').count(),0);
+    assert.deepEqual(await page.locator('main > nav button').allTextContents(),['Nhập kết quả','Dashboard IPQC']);
     await page.waitForFunction(() => document.getElementById("gcMachine").options.length === 1);
     await page.locator("#gcMeasureProduct").fill("PART");
     await page.locator("#gcMeasureProduct").dispatchEvent("change");
