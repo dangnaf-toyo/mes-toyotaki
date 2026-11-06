@@ -166,6 +166,7 @@ for (const f of ["shared/ipqc-spc.js", "shared/ipqc-btk-qc.js"]) vm.runInContext
 context.IpqcSpc = context.window.IpqcSpc;
 context.IpqcBtkQc = context.window.IpqcBtkQc;
 context.IpqcGcMath = require("../shared/ipqc-gc-math.js");
+vm.runInContext(fs.readFileSync('shared/ipqc-gc-standard.js','utf8'),context);
 vm.runInContext(fs.readFileSync('shared/ipqc-gc-entry.js','utf8'),context);
 for(const file of ['shared/ipqc-result-parser.js','shared/ipqc-result-reader.js','shared/ipqc-result-import.js'])
   vm.runInContext(fs.readFileSync(file,'utf8'),context);

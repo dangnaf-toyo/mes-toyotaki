@@ -21,12 +21,12 @@ function backend(options = {}) {
     const query={select(){return query;},eq(k,v){data=data.filter(r=>String(r[k])===String(v));return query;},
       neq(k,v){data=data.filter(r=>String(r[k])!==String(v));return query;},
       in(k,values){data=data.filter(r=>values.some(v=>String(r[k])===String(v)));return query;},
-      or(){return query;},limit(n){data=data.slice(0,n);return query;},
+      or(expression){if(expression==='dang_dung.eq.true,trang_thai.neq.da_duyet')data=data.filter(r=>r.dang_dung||r.trang_thai!=='da_duyet');return query;},limit(n){data=data.slice(0,n);return query;},
       gte(k,v){data=data.filter(r=>r[k]>=v);return query;},lte(k,v){data=data.filter(r=>r[k]<=v);return query;},
       ilike(k,v){data=data.filter(r=>String(r[k]||'').toLowerCase().includes(v.replaceAll('%','').toLowerCase()));return query;},
       order(k){orders.push({table:name,column:k});
         if(name==='master_machines'&&!['ma_may','bo_phan'].includes(k))error={code:'42703',message:'column '+k+' does not exist'};
-        data.sort((a,b)=>String(a[k]||'').localeCompare(String(b[k]||'')));return query;},
+        data.sort((a,b)=>['id','muc_no'].includes(k)&&/^\d+$/.test(String(a[k]))&&/^\d+$/.test(String(b[k]))?Number(a[k])-Number(b[k]):String(a[k]||'').localeCompare(String(b[k]||'')));return query;},
       range(a,b){data=data.slice(a,b+1);return query;},single(){single=true;return query;},maybeSingle(){single=true;return query;},
       then(resolve,reject){return Promise.resolve({data:single?data[0]||null:data,error}).then(resolve,reject);}};
     return query;

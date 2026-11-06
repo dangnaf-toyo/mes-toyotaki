@@ -2,7 +2,9 @@
 const IpqcGcEntry = (() => {
   function number(value) {
     const text = String(value ?? "").trim();
-    return /^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:e[+-]?\d+)?$/i.test(text) ? Number(text.replace(",", ".")) : null;
+    return /^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:e[+-]?\d+)?$/i.test(text)
+      ? Number(text.replace(",", "."))
+      : null;
   }
   function mount(target, features, standard, onChange = () => {}) {
     const S = IpqcSpc,
@@ -10,7 +12,8 @@ const IpqcGcEntry = (() => {
       values = new Map(),
       counts = new Map();
     let disabled = false;
-    for (const m of features) counts.set(m.muc_no, Number(m.co_mau || (m.kieu === "okng" ? 1 : standard.so_mau) || 1));
+    for (const m of features)
+      counts.set(m.muc_no, Number(m.co_mau || (m.kieu === "okng" ? 1 : standard.so_mau) || 1));
     const key = (no, sample) => no + "/" + sample;
     function inputs() {
       return [...target.querySelectorAll("[data-result]")];
@@ -21,27 +24,37 @@ const IpqcGcEntry = (() => {
         filled = 0,
         total = 0;
       const rows = features.map((m) => {
-        const limits = S.specMuc(m);
+        const limits = IpqcGcStandard.numericBounds(m);
         let missing = false,
           ng = false;
         for (let sample = 1; sample <= counts.get(m.muc_no); sample++) {
           total++;
           const raw = values.get(key(m.muc_no, sample)) ?? "";
-          const value = m.kieu === "so" ? number(raw) : ["true", "false"].includes(raw) ? raw === "true" : null;
+          const value =
+            m.kieu === "so" ? number(raw) : ["true", "false"].includes(raw) ? raw === "true" : null;
           const valid =
             value !== null &&
-            (m.kieu !== "so" || (Number.isFinite(value) && (limits.lsl !== null || limits.usl !== null)));
+            (m.kieu !== "so" ||
+              (Number.isFinite(value) &&
+                IpqcGcStandard.normalized(raw) !== null &&
+                (limits.lsl !== null || limits.usl !== null)));
+          const exact = IpqcGcStandard.bounds(m);
+          const passed =
+            m.kieu === "so"
+              ? (exact.lsl == null || IpqcGcStandard.compare(raw, exact.lsl) >= 0) &&
+                (exact.usl == null || IpqcGcStandard.compare(raw, exact.usl) <= 0)
+              : value;
           if (!valid) {
             missing = true;
             complete = false;
           } else {
             filled++;
-            if (m.kieu === "so" ? !S.datGiaTri(value, limits) : !value) ng = true;
+            if (!passed) ng = true;
           }
           const input = target.querySelector('[data-no="' + m.muc_no + '"][data-sample="' + sample + '"]');
           if (input) {
-            input.classList.toggle("measure-ng", valid && (m.kieu === "so" ? !S.datGiaTri(value, limits) : !value));
-            input.classList.toggle("measure-ok", valid && (m.kieu === "so" ? S.datGiaTri(value, limits) : value));
+            input.classList.toggle("measure-ng", valid && !passed);
+            input.classList.toggle("measure-ok", valid && !!passed);
           }
         }
         if (ng) allOk = false;
@@ -78,16 +91,16 @@ const IpqcGcEntry = (() => {
         "</tr></thead><tbody>" +
         features
           .map((m) => {
-            const limits = S.specMuc(m),
+            const limits = IpqcGcStandard.numericBounds(m),
               count = counts.get(m.muc_no);
             const tolerance =
               m.kieu === "so"
-                ? [
-                    m.dung_sai_duoi == null ? "" : String(-Math.abs(m.dung_sai_duoi)),
-                    m.dung_sai_tren == null ? "" : "+" + Math.abs(m.dung_sai_tren),
-                  ]
-                    .filter(Boolean)
-                    .join(" / ")
+                ? (() => {
+                    const r = IpqcGcStandard.toSigned(m);
+                    return (
+                      IpqcGcStandard.signed(r.dung_sai_tren) + " / " + IpqcGcStandard.signed(r.dung_sai_duoi)
+                    );
+                  })()
                 : m.tieu_chuan || "OK/NG";
             return (
               "<tr><td>" +
@@ -146,7 +159,10 @@ const IpqcGcEntry = (() => {
     }
     target.oninput = target.onchange = (event) => {
       if (event?.target?.matches("[data-result]"))
-        values.set(key(Number(event.target.dataset.no), Number(event.target.dataset.sample)), event.target.value);
+        values.set(
+          key(Number(event.target.dataset.no), Number(event.target.dataset.sample)),
+          event.target.value,
+        );
       else
         for (const input of inputs())
           values.set(key(Number(input.dataset.no), Number(input.dataset.sample)), input.value);
@@ -186,7 +202,8 @@ const IpqcGcEntry = (() => {
       },
       setMany(items) {
         for (const item of items) {
-          if (!counts.has(item.muc_no) || item.mau < 1 || item.mau > 100) throw Error("Đặc tính/mẫu không hợp lệ.");
+          if (!counts.has(item.muc_no) || item.mau < 1 || item.mau > 100)
+            throw Error("Đặc tính/mẫu không hợp lệ.");
           counts.set(item.muc_no, Math.max(counts.get(item.muc_no), item.mau));
           values.set(key(item.muc_no, item.mau), String(item.value));
         }

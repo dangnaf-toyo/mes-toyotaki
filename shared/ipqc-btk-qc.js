@@ -109,8 +109,8 @@
   // ═══════════════════════════ PHÊ DUYỆT TIÊU CHUẨN (T163) ═══════════════════════════
   // Nhân viên QC soạn → Trưởng phòng QC kiểm tra → Giám đốc SX phê duyệt. Dùng chung cho
   // bảng tuần kiểm ('btk') và checklist + PDF ('checklist', qc-manager.html).
-  const TT = { cho_kiem_tra: 'Chờ TP QC kiểm tra', cho_phe_duyet: 'Chờ GĐ SX phê duyệt', tra_lai: 'Bị trả lại', da_duyet: 'Đã duyệt' };
-  const TT_NGAN = { cho_kiem_tra: 'chờ kiểm tra', cho_phe_duyet: 'chờ phê duyệt', tra_lai: 'bị trả lại' };
+  const TT = { ban_nhap:'Bản nháp', cho_kiem_tra: 'Chờ TP QC kiểm tra', cho_phe_duyet: 'Chờ GĐ SX phê duyệt', tra_lai: 'Bị trả lại', da_duyet: 'Đã duyệt' };
+  const TT_NGAN = { ban_nhap:'bản nháp', cho_kiem_tra: 'chờ kiểm tra', cho_phe_duyet: 'chờ phê duyệt', tra_lai: 'bị trả lại' };
   const SOAN = ['ipqc', 'nhan_vien_oqc', 'qc_manager', 'admin'];
   let quyenP = null;
   /** {uid, role, soan, kiemTra, pheDuyet, huyMoi} của người đang đăng nhập (uid null = chưa đăng nhập). */
@@ -187,7 +187,7 @@
     const number = v => String(v ?? '').trim() === '' ? null : Number(soVN(v));
     const field = (key, fallback) => gc() && st.sua && Object.hasOwn(st.fields || {}, key) ? st.fields[key] : fallback;
     const copyContent = row => ({...noiDungDong(row),...(gc()?Object.fromEntries(
-      ['don_vi','phuong_phap','lsl','usl','co_mau'].map(key=>[key,row[key]??''])):{})});
+      ['don_vi','phuong_phap','lsl','usl','co_mau'].map(key=>[key,row[key]??''])):{}),...(gc()?{dung_sai_co_dau:true}:{})});
     function showFailure(error) {
       console.error(error);
       let target=main.querySelector('[data-msg]');
@@ -228,7 +228,7 @@
         const nh = st.nhap[p.ma_sp];
         return '<div class="li' + (p.ma_sp === st.ma ? ' on' : '') + '" data-ma="' + esc(p.ma_sp) + '" role="button" tabindex="0">' +
           '<div style="flex:1;min-width:0"><div class="m">' + esc(p.ma_sp) + '</div><div class="t">' + esc(p.ten_sp || '') + '</div></div>' +
-          (nh ? '<span class="tag ' + (nh.trang_thai === 'tra_lai' ? 'ng' : 'w') + '" title="' + esc(TT[nh.trang_thai]) + '">' + esc(nh.phien_ban) + ' · ' + (nh.trang_thai === 'tra_lai' ? 'trả lại' : 'chờ') + '</span>' : '') +
+          (nh ? '<span class="tag ' + (nh.trang_thai === 'tra_lai' ? 'ng' : 'w') + '" title="' + esc(TT[nh.trang_thai]) + '">' + esc(nh.phien_ban) + ' · ' + (nh.trang_thai === 'ban_nhap'?'bản nháp':nh.trang_thai === 'tra_lai' ? 'trả lại' : 'chờ') + '</span>' : '') +
           (st.btk[p.ma_sp] ? '<span class="tag ok">' + esc(st.btk[p.ma_sp].phien_ban) + '</span>' : nh ? '' : '<span class="tag no">Chưa có</span>') + '</div>';
       }).join('') || '<div class="hint">Không có mã phù hợp.</div>';
     }
@@ -260,6 +260,7 @@
       releaseDrawing();
       st.xem = b; st.sua = false;
       st.rows = b ? st.mucAll.filter(x => x.id_btk === b.id).map(x => ({ ...x })) : [{ muc_no: 1, kieu: 'so', hang_muc: 'Kích thước', tan_suat: '2h/lần' }];
+      if(gc())st.rows=st.rows.map(row=>IpqcGcStandard.toSigned(row));
       st.viTri = b ? (b.ban_ve_vi_tri || []).map(x => ({ ...x })) : [];
       st.banVe = b ? b.ban_ve_url : null;
       st.fields = {}; st.drawingFile = null; st.uploaded = null;
@@ -402,11 +403,13 @@
           '<label class="f">Đang xem<select data-pb>' + (st.versions.length ? st.versions.map(v => '<option value="' + v.id + '"' + (b && v.id === b.id ? ' selected' : '') + '>' + tenPb(v) + ' — ' + esc(v.ngay_hieu_luc || '') + '</option>').join('') : '<option>Chưa có — lập mới</option>') + '</select></label>' +
           (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button>' +
           (b ? '<button class="btn" type="button" data-xuat>Xuất Excel</button>' : '') +
+          (gc()&&b&&q.soan&&!sua?'<button class="btn" type="button" data-copy-model>Sao chép tiêu chuẩn sang Model khác</button>':'')+
           (q.huyMoi && st.versions.length && !sua ? '<button class="btn" type="button" data-doicd="' + cdKhac + '" title="Xếp lại: chuyển mọi phiên bản + kết quả đo + giới hạn kiểm soát của mã này sang công đoạn ' + CD[cdKhac] + '">Chuyển sang ' + CD[cdKhac] + '</button>' : '') +
         '</div>' +
         (laNhap ? khoiDuyet(b, q) : '') +
         (canhBao ? '<div class="msg ' + (cu || nhap ? 'err' : 'ok') + '">' + canhBao + '</div>' : '') +
         (gc()?gcFields(dis):'')+
+        (gc()&&b?.nguon_sao_chep?'<div class="hint">Nguồn sao chép: '+esc(b.nguon_sao_chep.model_nguon)+' · Revision '+esc(b.nguon_sao_chep.phien_ban_nguon)+' · '+esc(b.nguon_sao_chep.nguoi_sao_chep)+' · '+esc(ngayVN(b.nguon_sao_chep.thoi_diem))+'. Đính kèm bản vẽ phù hợp Model đích.</div>':'')+
         '<div class="flds" style="margin-top:10px">' +
           '<label class="f">Phiên bản' + (sua && !laNhap ? ' mới' : '') + '<input data-f="phien_ban" value="' + esc(!sua&&b?b.phien_ban:nhap ? nhap.phien_ban : phienBanMoi()) + '" style="width:70px"' + dis + '></label>' +
           '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc((laNhap||!sua) && b?.ngay_hieu_luc ? b.ngay_hieu_luc : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)) + '"' + dis + '></label>' +
@@ -436,10 +439,13 @@
             (st.banVe ? '<div class="hint">Phóng to bằng nút + / − hoặc giữ Ctrl + lăn chuột trên bản vẽ; kéo chuột để di chuyển bản vẽ.</div>' : '') + '</div>') +
           '<div class="card" style="flex:3 1 520px;min-width:0"><div class="ttl"><span class="sp">Hạng mục kiểm tra</span>' + (sua ? '<button class="btn sm" type="button" data-them>+ Thêm hạng mục</button>' +
             '<button class="btn sm" type="button" data-dan-moi' + (dongDaSaoChep ? '' : ' disabled') + '>Dán thành dòng mới</button>' : '') + '</div>' +
-            '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>Dung sai +</th><th>Dung sai −</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th>'+ (gc()?'<th>Mã đặc tính</th><th>Đơn vị</th><th>Phương pháp</th><th>LSL</th><th>USL</th><th>Cỡ mẫu</th><th>Xác nhận</th>':'')+'<th></th></tr>' +
+            '<div class="tbl"><table style="min-width:860px"><tr><th>No</th><th>Hạng mục</th><th>Kiểu</th><th>Danh nghĩa</th><th>'+(gc()?'Sai lệch trên':'Dung sai +')+'</th><th>'+(gc()?'Sai lệch dưới':'Dung sai −')+'</th><th>Tiêu chuẩn (OK/NG)</th><th>Dụng cụ KT</th><th>Tần suất</th><th>LSL – USL</th>'+ (gc()?'<th>Mã đặc tính</th><th>Đơn vị</th><th>Phương pháp</th><th>LSL</th><th>USL</th><th>Cỡ mẫu</th><th>Xác nhận</th>':'')+'<th></th></tr>' +
             st.rows.map((r, i) => {
               const so = r.kieu === 'so';
-              const sp = so ? S().specMuc(r) : null;
+              const sp = so ? (gc()?IpqcGcStandard.numericBounds(r):S().specMuc(r)) : null;
+              const exact=gc()&&so?IpqcGcStandard.bounds(r):null;
+              const specText=exact?(exact.lsl??'—')+' – '+(exact.usl??'—'):
+                so&&(sp.usl!==null||sp.lsl!==null)?(sp.lsl!==null?S().fmt(sp.lsl,S().soLe(r)):'—')+' – '+(sp.usl!==null?S().fmt(sp.usl,S().soLe(r)):'—'):'—';
               const doi = ss ? ss.doi[i] : [];
               const td = c => '<td' + (doi && doi.includes(c) ? ' class="doi"' : '') + '>';
               const dso = so ? dis : ' disabled';
@@ -452,7 +458,8 @@
                 td('tieu_chuan') + '<input data-c="tieu_chuan" value="' + esc(r.tieu_chuan || '') + '" style="width:170px"' + (so ? ' placeholder="(tuỳ chọn)"' : '') + dis + '></td>' +
                 td('dung_cu') + chonDungCu(r.dung_cu, dis) + '</td>' +
                 td('tan_suat') + '<input data-c="tan_suat" value="' + esc(r.tan_suat || '') + '" style="width:70px"' + dis + '></td>' +
-                '<td class="mono" style="white-space:nowrap;color:#475569">' + (so && (sp.usl !== null || sp.lsl !== null) ? (sp.lsl !== null ? S().fmt(sp.lsl, S().soLe(r)) : '—') + ' – ' + (sp.usl !== null ? S().fmt(sp.usl, S().soLe(r)) : '—') : '—') + '</td>' +
+                '<td class="mono" style="white-space:nowrap;color:#475569"><span data-gc-bounds>'+esc(specText)+'</span>'+
+                (gc()&&so?'<div class="hint" data-gc-dimension>'+esc(IpqcGcStandard.dimension(r))+'</div><div class="hint" style="color:#b91c1c" data-gc-limit-error>'+esc(IpqcGcStandard.validate(r))+'</div>':'')+'</td>' +
                 (gc()?gcCells(r,dis,doi):'')+
                 '<td style="white-space:nowrap"><button class="btn sm" type="button" data-sao-chep="' + i + '">Sao chép</button>' +
                   (sua ? ' <button class="btn sm" type="button" data-dan="' + i + '"' + (dongDaSaoChep ? '' : ' disabled') + '>Dán</button>' +
@@ -463,7 +470,7 @@
               (b.so_mau !== ss.cur.so_mau ? '; số mẫu/lần ' + ss.cur.so_mau + ' → ' + b.so_mau : '') +
               (b.ban_ve_url !== ss.cur.ban_ve_url ? '; bản vẽ mới' : JSON.stringify(b.ban_ve_vi_tri || []) !== JSON.stringify(ss.cur.ban_ve_vi_tri || []) ? '; đổi vị trí đo trên bản vẽ' : '') + '.</div>' : '') +
             '<div class="hint">Sao chép rồi Dán vào dòng đích hoặc Dán thành dòng mới. Dán giữ nguyên No và vị trí đo của dòng đích.</div>' +
-            '<div class="hint">Dung sai −: ghi độ lớn (VD 0.2 nghĩa là −0.2). Ghi 0 nếu dung sai bằng 0; để trống = không giới hạn phía đó. Hạng mục OK/NG chỉ theo dõi tỉ lệ NG.</div></div>' +
+            '<div class="hint">'+(gc()?'Nhập đúng dấu sai lệch trên/dưới. USL = danh nghĩa + sai lệch trên; LSL = danh nghĩa + sai lệch dưới. Để trống là chưa có thông tin, không phải 0.':'Dung sai −: ghi độ lớn (VD 0.2 nghĩa là −0.2). Ghi 0 nếu dung sai bằng 0; để trống = không giới hạn phía đó. Hạng mục OK/NG chỉ theo dõi tỉ lệ NG.')+'</div></div>' +
         '</div>' +
         '<div class="card"><div class="ttl"><span class="sp">Lịch sử sửa đổi</span></div><div class="tbl"><table style="min-width:720px"><tr><th>Phiên bản</th><th>Trạng thái</th><th>Ngày hiệu lực</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>TP QC kiểm tra</th><th>GĐ SX phê duyệt</th></tr>' +
           (st.versions.map(v => {
@@ -496,7 +503,7 @@
         phien_ban: f('phien_ban').trim(), ngay_hieu_luc: f('ngay_hieu_luc'), so_mau: +f('so_mau') || 1, tan_suat: f('tan_suat'),
         ma_bieu: f('ma_bieu'), noi_dung_sua_doi: f('noi_dung_sua_doi'),
         ban_ve_url: st.banVe || '', ban_ve_vi_tri: st.viTri,
-        ...(gc()?{ma_sp:st.ma,ma_ban_ve:f('ma_ban_ve'),buoc_gia_cong:f('buoc_gia_cong'),tai_lieu_goc:st.uploaded||st.taiLieuGoc}:{}),
+        ...(gc()?{ma_sp:st.ma,dung_sai_co_dau:true,ma_ban_ve:f('ma_ban_ve'),buoc_gia_cong:f('buoc_gia_cong'),tai_lieu_goc:st.uploaded||st.taiLieuGoc}:{}),
         muc: st.rows.map(r => ({ muc_no: String(r.muc_no ?? '').trim(), hang_muc: r.hang_muc, kieu: r.kieu,
           danh_nghia: soVN(r.danh_nghia), dung_sai_tren: soVN(r.dung_sai_tren), dung_sai_duoi: soVN(r.dung_sai_duoi),
           tieu_chuan: r.tieu_chuan, dung_cu: r.dung_cu, tan_suat: r.tan_suat,
@@ -505,6 +512,61 @@
       };
     }
 
+    function copyModelDialog() {
+      const sourceModel=st.ma,sourceVersions=st.versions.map(v=>({...v}));
+      const dialog=document.createElement('dialog');dialog.className='bq-dlg bq';dialog.style.border='0';
+      dialog.setAttribute('aria-label','Sao chép tiêu chuẩn sang Model khác');
+      dialog.innerHTML='<form style="width:100%"><h3>Sao chép tiêu chuẩn sang Model khác</h3>'+
+        '<label class="f">Phiên bản nguồn<select data-copy-source>'+sourceVersions.map(v=>'<option value="'+v.id+'"'+(v.id===st.xem?.id?' selected':'')+'>'+esc(v.ma_sp+' · '+v.phien_ban+' · '+(v.buoc_gia_cong||'Chưa phân loại bước'))+'</option>').join('')+'</select></label>'+
+        '<label class="f">Model đích<select data-copy-target><option value="">Chọn Model đích</option>'+st.products.filter(p=>p.ma_sp!==sourceModel).map(p=>'<option value="'+esc(p.ma_sp)+'">'+esc(p.ma_sp+' · '+(p.ten_sp||'')+' · '+(p.ten_khach_hang||''))+'</option>').join('')+'</select></label>'+
+        '<label class="f">Revision mới của Model đích<input data-copy-revision required></label>'+
+        '<p data-copy-summary></p><p data-copy-warning class="hint"></p>'+
+        '<p class="hint">Chỉ sao chép hạng mục từ phiên bản đã lưu. Không sao chép kết quả đo, phê duyệt hoặc bản vẽ nguồn. Đính kèm bản vẽ phù hợp Model đích trước khi gửi duyệt.</p>'+
+        '<label><input type="checkbox" data-copy-confirm required> Tôi đã kiểm tra Model và phiên bản nguồn/đích.</label>'+
+        '<p data-copy-message class="hint"></p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">'+
+        '<button class="btn" type="button" data-copy-cancel>Hủy</button><button class="btn p" type="submit" data-copy-submit disabled>Sao chép</button></div></form>';
+      document.body.append(dialog);dialog.showModal();
+      const get=key=>dialog.querySelector('[data-copy-'+key+']');
+      let serial=0,busy=false,blocked=true;
+      const close=()=>{if(!busy){++serial;dialog.close();dialog.remove();}};
+      get('cancel').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
+      async function refresh(){
+        const current=++serial;blocked=true;get('submit').disabled=true;get('confirm').checked=false;
+        const source=sourceVersions.find(v=>String(v.id)===get('source').value),target=get('target').value;
+        const count=st.mucAll.filter(m=>m.id_btk===source?.id).length;
+        get('summary').textContent='Nguồn: '+sourceModel+' / '+source.phien_ban+' ('+count+' hạng mục) → Đích: '+(target||'chưa chọn');
+        get('warning').textContent='';get('message').textContent='';
+        if(!target){get('revision').value='';return;}
+        try{
+          const result=await sbTaiHet(()=>sb.from('ipqc_btk').select('*').eq('cong_doan','gia_cong').eq('ma_sp',target).order('id'));
+          if(current!==serial||!dialog.isConnected)return;
+          if(result.error)throw result.error;
+          const all=result.data||[],same=all.filter(v=>(v.buoc_gia_cong||'')===(source.buoc_gia_cong||''));
+          const pending=same.find(v=>v.trang_thai!=='da_duyet');
+          const previous=same.find(v=>v.dang_dung)||same.at(-1);
+          let revision=previous?(/^[A-Y]$/.test(previous.phien_ban)?String.fromCharCode(previous.phien_ban.charCodeAt(0)+1):previous.phien_ban+'.1'):'A',index=0;
+          while(same.some(v=>v.phien_ban===revision)){revision=(previous?.phien_ban||'A')+'.'+(++index);}
+          get('revision').value=revision;
+          get('warning').textContent=pending?'Model đích đã có bản nháp '+pending.phien_ban+' cho bước này. Không ghi đè; xử lý bản nháp hiện có trước.':
+            all.length?'Model đích đã có tiêu chuẩn. Chỉ tạo bản nháp/Revision mới, không ghi đè phiên bản cũ.':'Tạo bản nháp độc lập cho Model đích.';
+          blocked=!!pending;get('submit').disabled=blocked;
+        }catch(error){if(current===serial)get('message').textContent='Chưa kiểm tra được Model đích. Thử lại.';console.error(error);}
+      }
+      get('source').onchange=refresh;get('target').onchange=refresh;
+      dialog.querySelector('form').onsubmit=async e=>{
+        e.preventDefault();if(busy||blocked||!get('confirm').checked)return;
+        const target=get('target').value,version=get('revision').value.trim(),sourceId=Number(get('source').value);
+        if(!target||!version)return;
+        busy=true;dialog.querySelectorAll('input,select,button').forEach(input=>input.disabled=true);
+        try{
+          const result=await sb.rpc('ipqc_gc_sao_chep_tieu_chuan',{p_nguon_id:sourceId,p_ma_dich:target,p_phien_ban:version});
+          if(result.error)throw result.error;if(!result.data?.ok)throw Error(result.data?.error||'Chưa sao chép được');
+          busy=false;close();await taiDanhSach();await chonMa(target,result.data.id);baoDoi();
+          msg(main.querySelector('[data-msg]'),'Đã tạo bản nháp '+target+' / '+result.data.phien_ban+'. Đính kèm bản vẽ đúng Model, sửa và xác nhận hạng mục rồi gửi duyệt.');
+        }catch(error){busy=false;if(!dialog.isConnected){showFailure(error);return;}get('message').textContent=error.message;dialog.querySelectorAll('input,select,button').forEach(input=>input.disabled=false);get('submit').disabled=blocked;}
+      };
+      refresh();
+    }
     async function upBanVe(file) {
       if(gc())return attachGcDrawing(file);
       const m = main.querySelector('[data-msg]');
@@ -552,6 +614,18 @@
       if(row&&e.target.matches('[data-c]')&&e.target.dataset.c!=='da_xac_nhan'){
         st.rows[+row.dataset.r].da_xac_nhan=false;
         row.querySelector('[data-c="da_xac_nhan"]').checked=false;
+        const data=st.rows[+row.dataset.r];
+        row.querySelectorAll('[data-c]').forEach(input=>{data[input.dataset.c]=input.type==='checkbox'?input.checked:input.value;});
+        data.dung_sai_co_dau=true;
+        if(['danh_nghia','dung_sai_tren','dung_sai_duoi'].includes(e.target.dataset.c)){
+          data.lsl=IpqcGcStandard.add(data.danh_nghia,data.dung_sai_duoi);
+          data.usl=IpqcGcStandard.add(data.danh_nghia,data.dung_sai_tren);
+          for(const key of ['lsl','usl'])row.querySelector('[data-c="'+key+'"]').value=data[key]??'';
+        }
+        const b=IpqcGcStandard.bounds(data),dimension=row.querySelector('[data-gc-dimension]');
+        row.querySelector('[data-gc-bounds]').textContent=(b.lsl??'—')+' – '+(b.usl??'—');
+        if(dimension)dimension.textContent=IpqcGcStandard.dimension(data);
+        const warning=row.querySelector('[data-gc-limit-error]');if(warning)warning.textContent=IpqcGcStandard.validate(data);
       }
     });
     el.addEventListener('change', async e => {
@@ -562,13 +636,7 @@
       else if (t.matches('[data-c="kieu"]')) { docBang(); ve(); }
       else if (t.matches('[data-c="danh_nghia"],[data-c="dung_sai_tren"],[data-c="dung_sai_duoi"]')) {
         docBang();
-        if(gc()){
-          const row=st.rows[+t.closest('[data-r]').dataset.r];
-          if(!row.limitsManual){const nominal=number(row.danh_nghia),lower=number(row.dung_sai_duoi),upper=number(row.dung_sai_tren);
-            row.lsl=nominal!=null&&lower!=null?Number((nominal-Math.abs(lower)).toPrecision(12)):null;
-            row.usl=nominal!=null&&upper!=null?Number((nominal+Math.abs(upper)).toPrecision(12)):null;}
-        }
-        ve();
+        if(!gc())ve();
       }
       else if(gc()&&t.matches('[data-c="lsl"],[data-c="usl"]')){docBang();st.rows[+t.closest('[data-r]').dataset.r].limitsManual=true;}
       else if (t.matches('[data-nodat]')) st.noDat = t.value;
@@ -581,7 +649,8 @@
       const t = e.target;
       const li = t.closest('[data-ma]');
       if (li) return chonMa(li.dataset.ma);
-      if (t.closest('[data-mau]')) return taiFileMau();
+      if(gc()&&q.soan&&t.closest('[data-copy-model]'))return copyModelDialog();
+      if (t.closest('[data-mau]')) return taiFileMau(st.cd);
       if (t.closest('[data-nhap]')) return nhapExcel(st.cd, () => { taiDanhSach(); if (st.ma) chonMa(st.ma); baoDoi(); });
       const dc = t.closest('[data-doicd]');
       if (dc) {
@@ -646,7 +715,7 @@
         }
         return ve();
       }
-      if (t.closest('[data-them]')) { docBang(); const mx = Math.max(0, ...st.rows.map(r => +r.muc_no || 0)); st.rows.push({ muc_no: mx + 1, kieu: 'so', tan_suat: '2h/lần' }); return ve(); }
+      if (t.closest('[data-them]')) { docBang(); const mx = Math.max(0, ...st.rows.map(r => +r.muc_no || 0)); st.rows.push({ muc_no: mx + 1, kieu: 'so', tan_suat: '2h/lần',...(gc()?{dung_sai_co_dau:true}:{}) }); return ve(); }
       const x = t.closest('[data-xoa]');
       if (x) { docBang(); st.rows.splice(+x.dataset.xoa, 1); return ve(); }
       if (t.closest('[data-xoavt]')) { st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)); return veDiem(); }
@@ -663,6 +732,8 @@
       if (t.closest('[data-luu]')) {
         const m = main.querySelector('[data-msg]');
         const pl = payload();
+        const invalidLimits=gc()&&pl.muc.find(row=>IpqcGcStandard.validate({...row,dung_sai_co_dau:true}));
+        if(invalidLimits)return msg(m,'No '+invalidLimits.muc_no+': '+IpqcGcStandard.validate({...invalidLimits,dung_sai_co_dau:true}),'err');
         if(gc()&&pl.muc.some(row=>!row.da_xac_nhan))return msg(m,'Đối chiếu và xác nhận từng đặc tính trước gửi duyệt.','err');
         const invalid = pl.muc.find(row => !dungCuHopLe(row.dung_cu));
         if (invalid) return msg(m, 'No ' + invalid.muc_no + ': chọn dụng cụ kiểm tra trong danh sách cho phép.', 'err');
@@ -724,9 +795,10 @@
   }
 
   // ── Excel: file mẫu / xuất / nhập ──────────────────────────────────────
-  function taiFileMau() {
+  const cotExcel = cd => COT.map((label,index)=>cd==='gia_cong'?(index===8?'Sai lệch trên':index===9?'Sai lệch dưới':label):label);
+  function taiFileMau(cd='duc') {
     if (typeof XLSX === 'undefined') return alert('Chưa tải được thư viện Excel — tải lại trang.');
-    const rows = [COT,
+    const rows = [cotExcel(cd),
       ['FCC-OUT-01', 'A', '2025-06-06', 1, 1, 'Chiều sâu', 'Đo số', 14.8, 0, 0.2, '', 'Thước kẹp', '2h/lần', 'Lập mới', 'Mr Dũng'],
       ['FCC-OUT-01', 'A', '2025-06-06', 1, 2, 'Kích thước', 'Đo số', 8.1, 0.1, 0, '', 'Thước kẹp', '2h/lần', '', ''],
       ['FCC-OUT-01', 'A', '2025-06-06', 1, 4, 'Kích thước', 'Đo số', 14, 0.25, 0.25, '', 'Thước kẹp', '2h/lần', '', ''],
@@ -741,6 +813,10 @@
       ['• Số mẫu/lần: 1–5 (1 = biểu đồ I-MR; 2–5 = X̄-R). Ngày hiệu lực dạng yyyy-mm-dd.'],
       ['• Bản vẽ vị trí đo: tải ảnh trên màn hình QC Manager → Quản lý tiêu chuẩn sau khi nhập.'],
       ['• Dụng cụ KT chỉ chọn trong danh sách: ' + DUNG_CU.join('; ') + '.']];
+    if(cd==='gia_cong'){
+      for(const row of rows.slice(1))if(row[9]!=='')row[9]=-Math.abs(row[9]);
+      hd[5]=['• Sai lệch trên/dưới: nhập đúng dấu thực tế. USL = danh nghĩa + sai lệch trên; LSL = danh nghĩa + sai lệch dưới. Ô trống không phải 0.'];
+    }
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = COT.map((c, i) => ({ wch: [14, 9, 12, 9, 5, 22, 14, 10, 9, 9, 22, 18, 9, 22, 14][i] }));
     XLSX.utils.book_append_sheet(wb, ws, 'Bang tuan kiem');
@@ -750,7 +826,7 @@
   }
   function xuatExcel(ma, b, rows) {
     if (typeof XLSX === 'undefined') return alert('Chưa tải được thư viện Excel — tải lại trang.');
-    const aoa = [COT].concat(rows.map(r => [ma, b ? b.phien_ban : '', b ? b.ngay_hieu_luc : '', b ? b.so_mau : 1, r.muc_no, r.hang_muc,
+    const aoa = [cotExcel(b?.cong_doan)].concat(rows.map(r => [ma, b ? b.phien_ban : '', b ? b.ngay_hieu_luc : '', b ? b.so_mau : 1, r.muc_no, r.hang_muc,
       r.kieu === 'so' ? 'Đo số' : 'OK-NG', r.danh_nghia ?? '', r.dung_sai_tren ?? '', r.dung_sai_duoi ?? '', r.tieu_chuan || '', r.dung_cu || '', r.tan_suat || '',
       b ? b.noi_dung_sua_doi || '' : '', b ? b.nguoi_phe_duyet || b.nguoi_xac_nhan || '' : '']));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Bang tuan kiem');
@@ -770,7 +846,7 @@
       const H = aoa[hi].map(norm);
       const col = (...keys) => H.findIndex(h => keys.some(k => h.startsWith(k)));
       const C = { ma: col('mã sp'), pb: col('phiên bản'), nhl: col('ngày hiệu lực'), sm: col('số mẫu'), no: H.findIndex(h => h === 'no' || h === 'stt'),
-        hm: col('hạng mục'), kieu: col('kiểu'), dn: col('danh nghĩa'), tren: col('dung sai +'), duoi: H.findIndex(h => /^dung sai\s*[−-]/.test(h)),
+        hm: col('hạng mục'), kieu: col('kiểu'), dn: col('danh nghĩa'), tren: col('sai lệch trên','dung sai +'), duoi: H.findIndex(h => /^sai lệch dưới|^dung sai\s*[−-]/.test(h)),
         tc: col('tiêu chuẩn'), dc: col('dụng cụ'), ts: col('tần suất'), nd: col('nội dung') };
       const { data: prods } = await sb.from('master_products').select('ma_sp');
       const coMa = new Set((prods || []).map(p => p.ma_sp));
@@ -788,8 +864,13 @@
         const dn = soVN(v(C.dn));
         const kieu = /ok/.test(kieuTxt) ? 'okng' : /số|so|đo/.test(kieuTxt) ? 'so' : (dn !== '' && isFinite(+dn) ? 'so' : 'okng');
         const m = { muc_no: String(v(C.no)).trim(), hang_muc: String(v(C.hm)).trim(), kieu, danh_nghia: kieu === 'so' ? dn : '',
-          dung_sai_tren: soVN(v(C.tren)), dung_sai_duoi: soVN(v(C.duoi)).replace(/^-/, ''), tieu_chuan: String(v(C.tc)).trim(),
+          dung_sai_tren: soVN(v(C.tren)), dung_sai_duoi: cd==='gia_cong'?soVN(v(C.duoi)):soVN(v(C.duoi)).replace(/^-/, ''), tieu_chuan: String(v(C.tc)).trim(),
           dung_cu: String(v(C.dc)).trim(), tan_suat: String(v(C.ts)).trim() };
+        if(cd==='gia_cong'){
+          d.dung_sai_co_dau=true;
+          if(!H[C.duoi]?.startsWith('sai lệch'))Object.assign(m,IpqcGcStandard.toSigned(m));
+          else m.dung_sai_co_dau=true;
+        }
         const dong = 'Dòng ' + (hi + k + 2);
         if (!dungCuHopLe(m.dung_cu)) g.loi.push(dong + ': dụng cụ kiểm tra không có trong danh sách cho phép');
         if (!m.muc_no || !/^\d+$/.test(m.muc_no)) g.loi.push(dong + ': No phải là số');
@@ -891,7 +972,7 @@
       locEl.innerHTML =
         '<label class="f">Công đoạn<select data-l="cd">' + Object.keys(CD).map(c => '<option value="' + c + '"' + (c === st.cd ? ' selected' : '') + '>' + CD[c] + ' (' + st.dsMa.filter(x => x.cong_doan === c).length + ' mã)</option>').join('') + '</select></label>' +
         '<label class="f">Mã SP<select data-l="ma">' + dsCd().map(x => '<option' + (x.ma_sp === st.ma ? ' selected' : '') + '>' + esc(x.ma_sp) + '</option>').join('') + '</select></label>' +
-        '<label class="f">Hạng mục<select data-l="no">' + mucSo.map(m => '<option value="' + m.muc_no + '"' + (m.muc_no === st.no ? ' selected' : '') + '>' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(S().chuanText(m)) + '</option>').join('') + '</select></label>' +
+        '<label class="f">Hạng mục<select data-l="no">' + mucSo.map(m => '<option value="' + m.muc_no + '"' + (m.muc_no === st.no ? ' selected' : '') + '>' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</option>').join('') + '</select></label>' +
         '<label class="f">Máy<select data-l="may"><option value="">Tất cả</option>' + mays.map(x => '<option' + (x === st.may ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khuôn<select data-l="khuon"><option value="">Tất cả</option>' + khuons.map(x => '<option' + (x === st.khuon ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khoảng thời gian<select data-l="ngay">' + [[7, '7 ngày'], [30, '30 ngày'], [90, '90 ngày'], [0, 'Tất cả']].map(([v, t]) => '<option value="' + v + '"' + (v === st.ngay ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
@@ -908,7 +989,7 @@
       const ptsX = pts.map((p, i) => ({ x: p.x, mau: mau(p, i), nhan: nhan(p), tg: ngayVN(p.t) }));
       const rVals = soMau <= 1 ? pts.slice(1).map((p, i) => ({ x: Math.abs(p.x - pts[i].x), tg: ngayVN(p.t) })) : pts.map(p => ({ x: p.r, tg: ngayVN(p.t) }));
       trai.innerHTML =
-        '<div class="card"><div class="ttl"><span class="sp" style="text-transform:none;font-size:14px;color:#0F172A;letter-spacing:0">' + (soMau <= 1 ? 'Biểu đồ giá trị đơn (I)' : 'Biểu đồ trung bình (X̄), ' + soMau + ' mẫu/lần') + ' — ' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(S().chuanText(m)) + '</span>' +
+        '<div class="card"><div class="ttl"><span class="sp" style="text-transform:none;font-size:14px;color:#0F172A;letter-spacing:0">' + (soMau <= 1 ? 'Biểu đồ giá trị đơn (I)' : 'Biểu đồ trung bình (X̄), ' + soMau + ' mẫu/lần') + ' — ' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</span>' +
           (lim ? (lim.tam ? '<span class="tag w">Giới hạn tạm (' + lim.n + ' lần)</span>' : '<span class="tag ok">Giới hạn đã khoá</span>') : '<span class="tag no">Chưa đủ dữ liệu tính giới hạn</span>') + '</div>' +
           (pts.length ? S().bieuDo({ pts: ptsX, lim, usl: sp.usl, lsl: sp.lsl, d, h: 290, vung, aria: 'Biểu đồ kiểm soát ' + m.hang_muc }) : '<div class="hint">Chưa có lần đo nào trong khoảng đã chọn.</div>') +
           '<div class="lg"><span style="color:#B91C1C">- - USL / LSL (tiêu chuẩn)</span><span style="color:#B45309">··· UCL / LCL (±3σ)</span><span><span style="color:#DC2626">●</span> ngoài tiêu chuẩn</span><span><span style="color:#D97706">●</span> vi phạm quy tắc</span><span>Rê chuột lên điểm để xem chi tiết</span></div></div>' +
@@ -942,7 +1023,7 @@
         const ngoai = vals.filter(v => S().datGiaTri(v, r.sp) === false).length;
         const gan = r.vp.some(v => v.i >= r.pts.length - 10);
         const tag = ngoai ? '<span class="tag ng">Có điểm NG</span>' : gan ? '<span class="tag w">Bất thường</span>' : nl.cpk !== null && nl.cpk < 1.33 ? '<span class="tag w">Cpk thấp</span>' : '<span class="tag ok">Ổn định</span>';
-        return '<tr class="clk' + (m.muc_no === st.no ? ' sel' : '') + '" data-chonno="' + m.muc_no + '"><td><span class="no">' + m.muc_no + '</span></td><td>' + esc(m.hang_muc) + ' <span class="mono" style="color:#475569">' + esc(S().chuanText(m)) + '</span></td>' +
+        return '<tr class="clk' + (m.muc_no === st.no ? ' sel' : '') + '" data-chonno="' + m.muc_no + '"><td><span class="no">' + m.muc_no + '</span></td><td>' + esc(m.hang_muc) + ' <span class="mono" style="color:#475569">' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</span></td>' +
           '<td class="mono">' + r.pts.length + '</td><td class="mono">' + S().fmt(nl.tb, d) + '</td><td class="mono" style="font-weight:700;color:' + (nl.cpk !== null && nl.cpk < 1.33 ? '#B91C1C' : '#166534') + '">' + (nl.cpk === null ? '—' : nl.cpk.toFixed(2)) + '</td><td class="mono">' + ngoai + '</td><td>' + tag + '</td></tr>';
       }).join('');
       tq.innerHTML = '<div class="ttl"><span class="sp">Tổng quan các hạng mục — ' + esc(st.ma) + '</span></div><div class="tbl"><table style="min-width:600px"><tr><th>No</th><th>Hạng mục</th><th>Số lần</th><th>X̄</th><th>Cpk</th><th>Ngoài TC</th><th>Trạng thái</th></tr>' + rows + '</table></div>';
