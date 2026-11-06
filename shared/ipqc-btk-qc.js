@@ -199,7 +199,8 @@
       ++drawingSerial;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = null;
-      st.drawingBusy = false;
+      st.drawingViewer?.controller.destroy();
+      st.drawingViewer = null;
     }
     function veTrong() {
       main.innerHTML = '<div class="card" style="color:#64748B">Chọn 1 mã SP ở cột trái để xem / soạn bảng tuần kiểm kích thước công đoạn <b>' + CD[st.cd] + '</b>. ' +
@@ -346,13 +347,21 @@
     }
     function gcDrawing(sua) {
       const url=st.drawingPreview||st.banVe;
-      const pdf=/\.pdf(?:\?|$)/i.test(st.drawingFile?.name||st.taiLieuGoc?.name||url||'');
-      return '<div class="card"><div class="ttl">Bản vẽ tiêu chuẩn Gia công</div>'+
-        (url ? (pdf?'<iframe title="Bản vẽ gốc" src="'+esc(url)+'" style="width:100%;height:440px;border:0"></iframe>':
-          '<img alt="Bản vẽ gốc" src="'+esc(url)+'" style="max-width:100%;max-height:440px">'):'<p class="hint">Chưa có bản vẽ gốc. Có thể soạn tiêu chuẩn thủ công.</p>')+
+      return '<div class="card" data-gc-drawing style="flex:1 1 280px;min-width:0"><div class="ttl">Bản vẽ tiêu chuẩn Gia công</div>'+
+        (url ? '<div data-drawing-viewer></div>':'<p class="hint">Chưa có bản vẽ gốc. Có thể soạn tiêu chuẩn thủ công.</p>')+
         (sua?'<label class="f">Bản vẽ PDF / JPG / PNG (tùy chọn)<input type="file" data-up accept="application/pdf,image/png,image/jpeg,.pdf,.jpg,.jpeg,.png"></label>'+
-          '<p class="hint">Đọc bản vẽ để gợi ý đặc tính; đối chiếu và xác nhận từng dòng trước gửi duyệt. Không tải báo cáo kết quả CMM tại đây.</p>':'')+
+          '<p class="hint">Chỉ đính kèm để tham khảo. Nhập và xác nhận đặc tính thủ công ở bảng bên phải. File kết quả đo CMM nhập tại IPQC Gia công.</p>':'')+
         '<p data-drawing-status class="hint">'+esc(st.drawingStatus||'')+'</p></div>';
+    }
+    function mountGcDrawing() {
+      const slot = main.querySelector('[data-drawing-viewer]');
+      const url = st.drawingPreview || st.banVe;
+      if (!slot || !url) return;
+      if (st.drawingViewer?.url === url) { slot.replaceWith(st.drawingViewer.element);return; }
+      st.drawingViewer?.controller.destroy();
+      const name = st.drawingFile?.name || st.taiLieuGoc?.name || '';
+      st.drawingViewer = {url,element:slot,controller:IpqcDrawingViewer.mount(slot,{
+        url,name,pdf:/\.pdf(?:\?|$)/i.test(name || url)})};
     }
     function gcHistory() {
       return '<div class="card"><div class="ttl">Lịch sử lưu nội dung tiêu chuẩn</div><div class="tbl"><table><tr><th>Lần lưu</th><th>Thời điểm</th><th>Revision</th><th>Bản vẽ</th><th>Số đặc tính</th></tr>'+
@@ -469,8 +478,8 @@
         '</table></div></div>'+ (gc()?gcHistory():'');
       if(gc()&&st.sua){
         main.querySelectorAll('[data-f]').forEach(input=>{if(Object.hasOwn(st.fields,input.dataset.f))input.value=st.fields[input.dataset.f];});
-        if(st.drawingBusy)main.querySelectorAll('input,select,button').forEach(input=>input.disabled=true);
       }
+      if(gc())mountGcDrawing();
     }
 
     function docBang() {
@@ -497,7 +506,7 @@
     }
 
     async function upBanVe(file) {
-      if(gc())return readGcDrawing(file);
+      if(gc())return attachGcDrawing(file);
       const m = main.querySelector('[data-msg]');
       try {
         const ext = (file.name.split('.').pop() || 'png').toLowerCase();
@@ -509,39 +518,22 @@
         docBang(); ve(); msg(main.querySelector('[data-msg]'), 'Đã tải bản vẽ — chọn No rồi bấm lên bản vẽ để đặt vị trí đo, xong bấm gửi duyệt.');
       } catch (e) { msg(m, 'Không tải được bản vẽ: ' + e.message, 'err'); }
     }
-    async function readGcDrawing(file) {
-      if(st.drawingBusy||!st.sua)return;
+    function attachGcDrawing(file) {
+      if(!q.soan||!st.sua||st.saveGate)return;
       if(!/\.(pdf|jpe?g|png)$/i.test(file.name)||file.size>20*1024*1024)
         return msg(main.querySelector('[data-msg]'),'Chọn bản vẽ PDF/JPG/PNG tối đa 20 MB.','err');
-      docBang();
-      if(st.rows.some(row=>row.ma_dac_tinh||number(row.danh_nghia)!=null)&&
-        !confirm('Đọc bản vẽ này sẽ thay danh sách đặc tính đang soạn bằng các dòng nhận diện chưa xác nhận. Tiếp tục?'))return;
       releaseDrawing();
-      const serial=drawingSerial;
-      st.rows.forEach(row=>row.da_xac_nhan=false);
-      st.drawingFile=file;st.uploaded=null;st.viTri=[];st.drawingPreview=previewUrl=URL.createObjectURL(file);
-      st.drawingBusy=true;st.drawingStatus='Đang đọc bản vẽ…';ve();
-      try{
-        const read=await IpqcDrawingReader.read(file,text=>{
-          if(serial!==drawingSerial)return;
-          st.drawingStatus=text;
-          const status=main.querySelector('[data-drawing-status]');if(status)status.textContent=text;
-        });
-        if(serial!==drawingSerial)return;
-        st.rows=read.rows.map(row=>({...row,dung_sai_duoi:row.dung_sai_duoi==null?'':Math.abs(Number(row.dung_sai_duoi)),da_xac_nhan:false}));
-        st.drawingStatus='Đã nhận diện '+st.rows.length+' ứng viên. '+read.warnings.join(' ')+' Đối chiếu từng dòng trước gửi duyệt.';
-      }catch(error){
-        if(serial!==drawingSerial)return;
-        st.drawingStatus='Chưa đọc được bản vẽ; có thể nhập đặc tính thủ công. Không tự tạo kích thước.';
-        console.error(error);
-      }finally{if(serial===drawingSerial){st.drawingBusy=false;ve();}}
+      st.drawingFile=file;st.uploaded=null;st.drawingPreview=previewUrl=URL.createObjectURL(file);
+      st.drawingStatus='Đã chọn '+file.name+'. Gửi duyệt bản nháp để lưu file cùng tiêu chuẩn. Bảng đặc tính không thay đổi.';
+      main.querySelector('[data-gc-drawing]').outerHTML=gcDrawing(true);
+      mountGcDrawing();
     }
     async function uploadGcDrawing() {
       if(!st.drawingFile||st.uploaded)return;
       const path=q.uid+'/'+crypto.randomUUID()+'/'+st.drawingFile.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       const file=st.drawingFile;
       const uploaded=await sb.storage.from('ipqc-gia-cong-ban-ve').upload(path,file,{
-        contentType:file.type||(/\.pdf$/i.test(file.name)?'application/pdf':/\.png$/i.test(file.name)?'image/png':'image/jpeg')});
+        contentType:file.type||(/\.pdf$/i.test(file.name)?'application/pdf':/\.png$/i.test(file.name)?'image/png':'image/jpeg'),upsert:false});
       if(uploaded.error)throw uploaded.error;
       st.uploaded={path,name:file.name,size:file.size};
     }
@@ -669,7 +661,6 @@
         return veDiem();
       }
       if (t.closest('[data-luu]')) {
-        if(st.drawingBusy)return;
         const m = main.querySelector('[data-msg]');
         const pl = payload();
         if(gc()&&pl.muc.some(row=>!row.da_xac_nhan))return msg(m,'Đối chiếu và xác nhận từng đặc tính trước gửi duyệt.','err');

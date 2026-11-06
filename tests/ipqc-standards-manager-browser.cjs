@@ -57,7 +57,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     assert.ok((await root.textContent()).includes("CMM point") === false); // value is in readonly inputs.
     assert.equal(await root.locator("[data-c=phuong_phap]").first().inputValue(), "CMM point");
     assert.ok((await root.textContent()).includes("Lịch sử lưu nội dung tiêu chuẩn"));
-    assert.equal(await root.locator('iframe[title="Bản vẽ gốc"]').count(), 1);
+    assert.equal(await root.locator('[data-drawing-viewer]').count(), 1);
     const before = await page.evaluate(() =>
       JSON.stringify({ b: sb.tables.ipqc_btk[0], m: sb.tables.ipqc_btk_muc.filter((m) => m.id_btk === 1) }),
     );
