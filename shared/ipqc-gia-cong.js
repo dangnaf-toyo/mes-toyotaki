@@ -82,18 +82,7 @@ const IpqcGiaCong = (() => {
     return value === "" || value == null ? null : Number(String(value).replace(",", "."));
   }
   function bounds(row) {
-    return {
-      lsl:
-        numeric(row.lsl) ??
-        (numeric(row.danh_nghia) != null && numeric(row.dung_sai_duoi) != null
-          ? numeric(row.danh_nghia) - Math.abs(numeric(row.dung_sai_duoi))
-          : null),
-      usl:
-        numeric(row.usl) ??
-        (numeric(row.danh_nghia) != null && numeric(row.dung_sai_tren) != null
-          ? numeric(row.danh_nghia) + Math.abs(numeric(row.dung_sai_tren))
-          : null),
-    };
+    return IpqcGcStandard.numericBounds(row);
   }
   function changeTab(tab) {
     document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== tab));
