@@ -17,7 +17,8 @@ const IpqcResultReader = (() => {
   async function pdfjs() {
     if (!pdfPromise)
       pdfPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs").then((lib) => {
-        lib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
+        lib.GlobalWorkerOptions.workerSrc =
+          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs";
         return lib;
       });
     return pdfPromise;
@@ -40,8 +41,9 @@ const IpqcResultReader = (() => {
   function grid(lines) {
     const header = lines.find(
       (l) =>
-        /(actual|measured|sample|mẫu|ket qua do|giá trị đo|result)/i.test(l.cells.map((c) => c.text).join(" ")) &&
-        l.cells.length >= 3,
+        /(actual|measured|sample|mẫu|ket qua do|giá trị đo|result)/i.test(
+          l.cells.map((c) => c.text).join(" "),
+        ) && l.cells.length >= 3,
     );
     return lines.map((line) => {
       if (!header) return line.cells.map((c) => c.text);
@@ -60,25 +62,6 @@ const IpqcResultReader = (() => {
       }
       return values;
     });
-  }
-  function pdfLines(items) {
-    const lines = [];
-    for (const item of items
-      .filter((x) => x.str?.trim())
-      .sort((a, b) => b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4])) {
-      let line = lines.find((l) => Math.abs(l.y - item.transform[5]) < 2);
-      if (!line) {
-        line = { y: item.transform[5], cells: [] };
-        lines.push(line);
-      }
-      const cell = { text: item.str.trim(), x0: item.transform[4], x1: item.transform[4] + item.width };
-      const previous = line.cells.at(-1);
-      if (previous && cell.x0 - previous.x1 < Math.max(4, Math.abs(item.height || 10) * 0.7)) {
-        previous.text += " " + cell.text;
-        previous.x1 = cell.x1;
-      } else line.cells.push(cell);
-    }
-    return lines;
   }
   async function read(file, { progress = () => {}, features = [], signal } = {}) {
     if (file.size > 20 * 1024 * 1024) throw Error("File kết quả đo tối đa 20 MB.");
@@ -107,7 +90,10 @@ const IpqcResultReader = (() => {
           })
           .catch(() => {});
         try {
-          worker = await timed(loading, "Chưa nạp được bộ OCR/dữ liệu ngôn ngữ. Kiểm tra kết nối và thử lại.");
+          worker = await timed(
+            loading,
+            "Chưa nạp được bộ OCR/dữ liệu ngôn ngữ. Kiểm tra kết nối và thử lại.",
+          );
         } catch (error) {
           expired = true;
           throw error;
@@ -151,13 +137,15 @@ const IpqcResultReader = (() => {
       return {
         name: "Trang " + page + " (OCR)",
         rows: matrix,
+        lines,
         confidence: lines.map((l) => l.confidence),
         method: "ocr",
       };
     }
     try {
       if (["xlsx", "xls"].includes(extension)) {
-        if (typeof XLSX === "undefined") throw Error("Chưa tải được bộ đọc Excel. Kiểm tra kết nối và thử lại.");
+        if (typeof XLSX === "undefined")
+          throw Error("Chưa tải được bộ đọc Excel. Kiểm tra kết nối và thử lại.");
         const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
         check();
         for (const name of workbook.SheetNames) {
@@ -186,10 +174,20 @@ const IpqcResultReader = (() => {
           progress("Đọc PDF trang " + n + "/" + doc.numPages);
           const page = await doc.getPage(n),
             content = await page.getTextContent();
-          const sheet = { name: "Trang " + n, rows: grid(pdfLines(content.items)), method: "pdf-text" };
+          const lines = IpqcResultParser.pdfLines(content.items);
+          const sheet = { name: "Trang " + n, rows: grid(lines), lines, method: "pdf-text" };
           const candidates = IpqcResultParser.parse([sheet]);
-          if (candidates.length) sheets.push(sheet);
-          if (!candidates.some((c) => IpqcResultParser.match(c, features).status === "matched")) {
+          // Extraction does not depend on whether MES has matching characteristic codes.
+          // OCR is a fallback for unreadable text, never a retry for unmatched standards.
+          const extracted = candidates.some((c) =>
+            c.samples.some((s) => typeof s.value === "number" || typeof s.value === "boolean"),
+          );
+          let selected = sheet;
+          if (
+            !extracted &&
+            (content.items.map((i) => i.str || "").join("").length < 30 ||
+              /actual/i.test(content.items.map((i) => i.str).join(" ")))
+          ) {
             const base = page.getViewport({ scale: 1 }),
               scale = Math.min(3, 3000 / Math.max(base.width, base.height));
             const viewport = page.getViewport({ scale }),
@@ -197,10 +195,12 @@ const IpqcResultReader = (() => {
             canvas.width = Math.ceil(viewport.width);
             canvas.height = Math.ceil(viewport.height);
             await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-            sheets.push(await recognize(canvas, n));
+            const scanned = await recognize(canvas, n);
+            if (IpqcResultParser.parse([scanned]).some((c) => c.samples.some((s) => s.value !== null)))
+              selected = scanned;
             canvas.width = canvas.height = 0;
           }
-          if (!candidates.length && !sheets.some((s) => s.name.startsWith("Trang " + n + " "))) sheets.push(sheet);
+          sheets.push(selected);
           page.cleanup();
         }
       } else if (["jpg", "jpeg", "png"].includes(extension)) {

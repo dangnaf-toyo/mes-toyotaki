@@ -10,7 +10,12 @@
       .replace(/[øφ⌀]/g, " duong kinh ")
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
-  const code = (value) => norm(value).replace(/\s/g, "");
+  // Keep separators: characteristic 7-1 is not characteristic 71.
+  const code = (value) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "");
   function number(value) {
     if (typeof value === "number") return Number.isFinite(value) ? value : null;
     const s = String(value ?? "")
@@ -22,7 +27,11 @@
     const v = String(value ?? "")
       .trim()
       .toLowerCase();
-    return { µm: "um", μm: "um", micron: "um", inch: "in", inches: "in", '"': "in", "°": "deg", degree: "deg" }[v] || v;
+    return (
+      { µm: "um", μm: "um", micron: "um", inch: "in", inches: "in", '"': "in", "°": "deg", degree: "deg" }[
+        v
+      ] || v
+    );
   }
   function convert(value, from, to) {
     if (!Number.isFinite(value)) return { error: "Giá trị không phải số hữu hạn" };
@@ -33,7 +42,10 @@
     if (from === to) return { value };
     const linear = { mm: 1, cm: 10, m: 1000, um: 0.001, in: 25.4 };
     if (linear[from] && linear[to])
-      return { value: Number(((value * linear[from]) / linear[to]).toPrecision(14)), note: from + " → " + to };
+      return {
+        value: Number(((value * linear[from]) / linear[to]).toPrecision(14)),
+        note: from + " → " + to,
+      };
     if (from === "rad" && to === "deg") return { value: (value * 180) / Math.PI, note: "rad → deg" };
     if (from === "deg" && to === "rad") return { value: (value * Math.PI) / 180, note: "deg → rad" };
     return { error: "Không hỗ trợ chuyển đơn vị " + from + " → " + to };
@@ -92,7 +104,8 @@
     const ok = norm(s);
     if (["ok", "pass", "dat"].includes(ok)) return { value: true, raw: s };
     if (["ng", "fail", "khong dat"].includes(ok)) return { value: false, raw: s };
-    const m = /^([+−-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:e[+-]?\d+)?)\s*(mm|cm|µm|μm|um|in|inch|deg|rad|°)?$/i.exec(s);
+    const m =
+      /^([+−-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:e[+-]?\d+)?)\s*(mm|cm|µm|μm|um|in|inch|deg|rad|°)?$/i.exec(s);
     if (!m) return { value: null, raw: s, warning: "Không đọc được giá trị số/OK-NG" };
     return { value: number(m[1]), raw: s, unit: unit(m[2] || "") };
   }
@@ -165,8 +178,12 @@
     const nominalRow = /^\d+$/.test(profile.nominalColumn || "")
       ? Number(profile.nominalColumn) - 1
       : find(/^(nominal|nominal value|danh nghia|kich thuoc|dimension|basic|tieu chuan)$/);
-    const nameRow = /^\d+$/.test(profile.nameColumn || "") ? Number(profile.nameColumn) - 1 : find(aliases.name);
-    const unitRow = /^\d+$/.test(profile.unitColumn || "") ? Number(profile.unitColumn) - 1 : find(aliases.unit);
+    const nameRow = /^\d+$/.test(profile.nameColumn || "")
+      ? Number(profile.nameColumn) - 1
+      : find(aliases.name);
+    const unitRow = /^\d+$/.test(profile.unitColumn || "")
+      ? Number(profile.unitColumn) - 1
+      : find(aliases.unit);
     const configured = String(profile.sampleColumns || "")
       .split(",")
       .filter(Boolean)
@@ -252,9 +269,135 @@
     }
     return out;
   }
+  function pdfLines(items) {
+    const lines = [];
+    for (const item of items
+      .filter((x) => x.str?.trim())
+      .sort((a, b) => b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4])) {
+      let line = lines.find((l) => Math.abs(l.y - item.transform[5]) < 2);
+      if (!line) {
+        line = { y: item.transform[5], cells: [] };
+        lines.push(line);
+      }
+      const cell = { text: item.str.trim(), x0: item.transform[4], x1: item.transform[4] + item.width };
+      const previous = line.cells.at(-1);
+      if (previous && cell.x0 - previous.x1 < Math.max(4, Math.abs(item.height || 10) * 0.7)) {
+        previous.text += " " + cell.text;
+        previous.x1 = cell.x1;
+      } else line.cells.push(cell);
+    }
+    return lines;
+  }
+  function zeiss(sheet) {
+    const lines = sheet.lines || [];
+    const keys = {
+      actual: /^actual(?: value)?(?: mm| in| um| deg)?$/,
+      nominal: /^nominal(?: value)?$/,
+      upper: /^upper tol(?:erance)?$/,
+      lower: /^lower tol(?:erance)?$/,
+      deviation: /^deviation$/,
+    };
+    const headerIndex = lines.findIndex((l) =>
+      Object.values(keys).every((re) => l.cells.some((c) => re.test(norm(c.text)))),
+    );
+    if (headerIndex < 0) return null;
+    const header = Object.entries(keys)
+      .map(([key, re]) => {
+        const c = lines[headerIndex].cells.find((c) => re.test(norm(c.text)));
+        return { key, ...c, center: (c.x0 + c.x1) / 2 };
+      })
+      .sort((a, b) => a.center - b.center);
+    const actual = header.find((c) => c.key === "actual");
+    // Calypso prints the characteristic label above its numeric line, without an ID header.
+    // Keep the positional lines instead of flattening the label into the Actual column.
+    const out = [];
+    let pending = null;
+    const reportUnit = unit(
+      sheet.unit ||
+        lines
+          .map((l) => l.cells.map((c) => c.text).join(" "))
+          .join("\n")
+          .match(/(?:\bunits?\s*[:=]|actual\s*[\[(])\s*(mm|cm|µm|μm|um|in|inch|deg|rad|°)\b/i)?.[1],
+    );
+    function finish() {
+      if (!pending) return;
+      const source = { sheet: sheet.name, row: pending.row, method: sheet.method, template: "zeiss-calypso" };
+      const cell = valueCell(pending.values.actual || "") || {
+        value: null,
+        raw: "",
+        warning: "Thiếu ô Actual trong PDF",
+      };
+      if (typeof cell.value !== "number") {
+        cell.value = null;
+        cell.warning ||= "Ô Actual không đọc được số";
+      }
+      out.push({
+        id: pending.id,
+        name: pending.name,
+        nominal: number(pending.values.nominal),
+        upper: number(pending.values.upper),
+        lower: number(pending.values.lower),
+        deviation: number(pending.values.deviation),
+        unit: cell.unit || reportUnit,
+        template: "zeiss-calypso",
+        samples: [{ ...cell, sample: 1, source }],
+        source,
+      });
+      pending = null;
+    }
+    for (let i = headerIndex + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.cells.some((c) => /^actual$/.test(norm(c.text)))) {
+        finish();
+        continue;
+      }
+      const label = line.cells.filter(
+        (c) =>
+          c.x0 < actual.x0 - actual.text.length * 0.8 &&
+          /[a-z0-9]/i.test(c.text) &&
+          (number(c.text) === null || (c.x0 + c.x1) / 2 < actual.x0 - actual.text.length * 0.8),
+      );
+      if (label.length) {
+        finish();
+        const title = label
+          .map((c) => c.text)
+          .join(" ")
+          .trim();
+        const parts = /^(\S+)\s+(.+)$/.exec(title);
+        pending = { id: title, name: parts?.[2] || "", row: i + 1, values: {} };
+      }
+      if (!pending) continue;
+      for (const c of line.cells.filter((c) => !label.includes(c))) {
+        const x = (c.x0 + c.x1) / 2;
+        const h = header.reduce((a, b) => (Math.abs(a.center - x) < Math.abs(b.center - x) ? a : b));
+        // Bars, page numbers and annotation text are not measurements. Numeric cells on
+        // a label line are deviation graphics, except when all numeric columns are inline.
+        const numericCount = line.cells.filter(
+          (v) => valueCell(v.text)?.value != null && !label.includes(v),
+        ).length;
+        if (label.length && numericCount < 2) continue;
+        if (x < header[0].center - 50 || x > header.at(-1).center + 80) continue;
+        if (valueCell(c.text)?.value != null || (h.key === "actual" && /\d|[?]/.test(c.text))) {
+          if (pending.values[h.key] !== undefined) pending.values[h.key] += " " + c.text;
+          else pending.values[h.key] = c.text;
+        }
+      }
+      if (
+        line.cells.filter((c) => !label.includes(c) && typeof valueCell(c.text)?.value === "number").length >=
+        2
+      )
+        finish();
+    }
+    finish();
+    return out;
+  }
   function parse(sheets, profile = {}) {
     return sheets
       .flatMap((sheet) => {
+        if (!profile.layout || profile.layout === "auto") {
+          const detected = zeiss(sheet);
+          if (detected !== null) return detected;
+        }
         if (profile.layout === "columns") return columns(sheet, profile);
         if (profile.layout === "text") return text(sheet);
         const found = rows(sheet, profile);
@@ -265,7 +408,23 @@
   function match(candidate, features) {
     let found = features.filter((m) => m.ma_dac_tinh && code(m.ma_dac_tinh) === code(candidate.id)),
       reason = "Mã đặc tính";
-    if (!found.length) {
+    if (!found.length && candidate.template === "zeiss-calypso") {
+      found = features.filter(
+        (m) =>
+          candidate.name &&
+          norm(m.hang_muc) === norm(candidate.name) &&
+          candidate.nominal !== null &&
+          candidate.upper !== null &&
+          candidate.lower !== null &&
+          candidate.unit &&
+          number(m.danh_nghia) !== null &&
+          m.don_vi &&
+          (number(m.usl) !== null || number(m.dung_sai_tren) !== null) &&
+          (number(m.lsl) !== null || number(m.dung_sai_duoi) !== null) &&
+          !specWarnings(candidate, m).length,
+      );
+      reason = "Tên, danh nghĩa, dung sai và đơn vị";
+    } else if (!found.length) {
       const name = norm(candidate.name)
         .replace(/\b\d+(?: \d+)?\b/g, "")
         .trim();
@@ -274,20 +433,48 @@
       if (found.length !== 1 && candidate.nominal !== null) {
         found = features.filter(
           (m) =>
-            (norm(m.hang_muc) === name || String(m.muc_no) === String(candidate.id)) &&
+            norm(m.hang_muc) === name &&
             number(m.danh_nghia) !== null &&
             Math.abs(Number(m.danh_nghia) - candidate.nominal) < 1e-8,
         );
-        reason = "Tên/mã No và danh nghĩa";
+        reason = "Tên và danh nghĩa";
       }
     }
     return {
       muc_no: found.length === 1 ? found[0].muc_no : null,
-      reason: found.length === 1 ? reason : found.length ? "Trùng tên/mã, cần chọn lại" : "Chưa khớp tiêu chuẩn",
+      reason:
+        found.length === 1 ? reason : found.length ? "Trùng tên/mã, cần chọn lại" : "Chưa khớp tiêu chuẩn",
       status: found.length === 1 ? "matched" : found.length ? "ambiguous" : "unmatched",
+      warnings: found.length === 1 ? specWarnings(candidate, found[0]) : [],
     };
   }
-  const api = { parse, match, convert, unit, number, norm, column, valueCell };
+  function specWarnings(candidate, feature) {
+    const warnings = [];
+    const diff = (a, b) => Math.abs(a - b) > 1e-8;
+    const converted = (v) => convert(v, candidate.unit, feature.don_vi);
+    if (candidate.nominal !== null && number(feature.danh_nghia) !== null) {
+      const n = converted(candidate.nominal);
+      if (!n.error && diff(n.value, Number(feature.danh_nghia))) warnings.push("Danh nghĩa báo cáo khác MES");
+    }
+    for (const [key, bound, sign] of [
+      ["upper", "usl", 1],
+      ["lower", "lsl", -1],
+    ]) {
+      if (candidate[key] == null || candidate.nominal == null) continue;
+      const n = converted(candidate.nominal + candidate[key]);
+      const tolerance = number(feature[key === "upper" ? "dung_sai_tren" : "dung_sai_duoi"]);
+      const limit =
+        number(feature[bound]) ??
+        (number(feature.danh_nghia) !== null && tolerance !== null
+          ? Number(feature.danh_nghia) + (feature.dung_sai_co_dau ? tolerance : sign * Math.abs(tolerance))
+          : null);
+      if (!n.error && limit !== null && diff(n.value, limit))
+        warnings.push((key === "upper" ? "Giới hạn trên" : "Giới hạn dưới") + " báo cáo khác MES");
+    }
+    if (candidate.unit && converted(0).error) warnings.push("Đơn vị báo cáo khác/không tương thích MES");
+    return warnings;
+  }
+  const api = { parse, match, convert, unit, number, norm, column, valueCell, pdfLines, zeiss, specWarnings };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.IpqcResultParser = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
