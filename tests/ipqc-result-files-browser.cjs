@@ -204,7 +204,7 @@ fs.writeFileSync(".review/ipqc-report.xlsx", XLSX.write(workbook, { type: "buffe
     await page.locator("#gcResultFile").setInputFiles(".review/ipqc-report.png");
     await page.waitForFunction(
       () =>
-        document.getElementById("gcImportStatus").textContent.includes("dòng cần đối chiếu") ||
+        document.getElementById("gcImportStatus").textContent.includes("Đọc được") ||
         document.getElementById("gcImportStatus").textContent.includes("Chưa đọc được định dạng"),
       null,
       { timeout: 180000 },

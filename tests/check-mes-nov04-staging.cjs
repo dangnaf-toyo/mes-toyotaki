@@ -8,7 +8,7 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
     ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-btk-qc.js?v=20261106-signed-copy','ipqc-drawing-viewer.js?v=20261105-attachments']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
-    ['ipqc-gia-cong.html',['TOYOTAKI – IPQC Gia công','gcMeasureForm','gcResultFile','ipqc-gc-entry.js?v=20261106-signed-copy','ipqc-result-import.js?v=20261105-dashboard','ipqc-gia-cong.js?v=20261106-signed-copy']],
+    ['ipqc-gia-cong.html',['TOYOTAKI – IPQC Gia công','gcMeasureForm','gcResultFile','ipqc-gc-entry.js?v=20261106-signed-copy','ipqc-result-import.js?v=20261106-zeiss','ipqc-gia-cong.js?v=20261106-signed-copy']],
     ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','sourceLabel','Xem file gốc']],
     ['shared/ipqc-btk-qc.js',['ipqc_gc_luu_tieu_chuan','gcFields','gcDrawing','ipqc_gc_tieu_chuan_lich_su']],
     ['shared/ipqc-drawing-viewer.js',['IpqcDrawingViewer','Trang trước','Phóng to']],

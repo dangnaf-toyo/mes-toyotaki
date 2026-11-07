@@ -65,6 +65,10 @@ const IpqcResultImport = (() => {
         );
     }
     function render() {
+      for (const c of candidates) {
+        const m = features().find((m) => String(m.muc_no) === String(c.muc_no));
+        c.warnings = m ? P.specWarnings(c, m) : [];
+      }
       const data = visible();
       $("gcImportCandidates").innerHTML =
         "<table><thead><tr>" +
@@ -94,6 +98,14 @@ const IpqcResultImport = (() => {
               E(c.id) +
               "</td><td>" +
               E(c.name) +
+              (c.template
+                ? "<br>Nominal: " +
+                  E(c.nominal ?? "?") +
+                  "<br>Upper / Lower Tol.: " +
+                  E(c.upper ?? "?") +
+                  " / " +
+                  E(c.lower ?? "?")
+                : "") +
               "</td><td>" +
               c.samples
                 .map(
@@ -104,7 +116,8 @@ const IpqcResultImport = (() => {
                     s.sample +
                     '" value="' +
                     E(s.raw) +
-                    '"></label>',
+                    '"></label>' +
+                    (s.warning ? "<br>" + E(s.warning) : ""),
                 )
                 .join("") +
               '</td><td><select data-match><option value="">Chưa khớp — chọn đặc tính</option>' +
@@ -116,7 +129,15 @@ const IpqcResultImport = (() => {
                     '"' +
                     (String(m.muc_no) === String(c.muc_no) ? " selected" : "") +
                     ">" +
-                    E((m.ma_dac_tinh || m.muc_no) + " · " + m.hang_muc) +
+                    E(
+                      (m.ma_dac_tinh || m.muc_no) +
+                        " · " +
+                        m.hang_muc +
+                        " · " +
+                        (m.danh_nghia ?? "") +
+                        " " +
+                        (m.don_vi || ""),
+                    ) +
                     "</option>",
                 )
                 .join("") +
@@ -135,6 +156,11 @@ const IpqcResultImport = (() => {
                 .join("") +
               "</select></td><td>" +
               E(c.reason) +
+              (c.warnings.length
+                ? "<br><strong>" +
+                  E(c.warnings.join("; ")) +
+                  ". Đánh giá theo MES; không sửa tiêu chuẩn.</strong>"
+                : "") +
               (c.source.method === "ocr" ? "<br>OCR: cần đối chiếu bản gốc" : "") +
               (!valid(c) ? "<br>Chọn đặc tính/đơn vị và sửa giá trị chưa rõ" : "") +
               '</td><td><input type="checkbox" data-accept ' +
@@ -151,19 +177,18 @@ const IpqcResultImport = (() => {
       if (!candidates.length)
         $("gcImportCandidates").textContent =
           "Chưa nhận diện được giá trị đo theo cấu trúc đã chọn. Cấu hình cột/mẫu đọc hoặc nhập tay.";
+      if (documentData && candidates.length && !applied) summary();
     }
     function parse() {
       if (!documentData) return;
       const selected = $("gcResultSheet").value;
       const sheets = documentData.sheets.filter((s) => selected === "*" || s.name === selected);
-      candidates = P.parse(sheets, profile())
-        .map((c) => ({
-          ...c,
-          ...P.match(c, features()),
-          unit: c.unit || c.samples.find((s) => s.unit)?.unit || "",
-          accepted: false,
-        }))
-        .filter((c) => c.samples.some((s) => s.value !== null) || c.muc_no !== null);
+      candidates = P.parse(sheets, profile()).map((c) => ({
+        ...c,
+        ...P.match(c, features()),
+        unit: c.unit || c.samples.find((s) => s.unit)?.unit || "",
+        accepted: false,
+      }));
       limit = 100;
       $("gcImportRaw").textContent = sheets
         .map(
@@ -183,11 +208,24 @@ const IpqcResultImport = (() => {
         );
         return;
       }
+    }
+    function summary() {
+      const extracted = candidates.filter((c) => c.samples.some((s) => s.value !== null));
+      const matched = extracted.filter((c) => c.status === "matched").length;
       message(
-        candidates.length +
-          " dòng cần đối chiếu; " +
-          candidates.filter((c) => c.status === "matched").length +
-          " dòng khớp. Chưa đồng bộ/lưu. Kiểm tra đơn vị, từng mẫu và xác nhận. " +
+        (candidates.some((c) => c.template === "zeiss-calypso") ? "Tự nhận diện ZEISS Calypso · " : "") +
+          "Đọc được " +
+          extracted.length +
+          " / " +
+          candidates.length +
+          " đặc tính; " +
+          matched +
+          " khớp; " +
+          (extracted.length - matched) +
+          " đọc được nhưng chưa khớp; " +
+          (candidates.length - extracted.length) +
+          " lỗi trích xuất (xem lý do từng dòng). " +
+          "Chưa đồng bộ/lưu. Đối chiếu đơn vị, xác nhận rồi đồng bộ vào bảng. " +
           documentData.warnings.join(" "),
       );
     }
@@ -251,7 +289,13 @@ const IpqcResultImport = (() => {
             0,
           );
         const best = [...result.sheets].sort((a, b) => score(b) - score(a))[0];
-        $("gcResultSheet").value = best?.name || result.sheets[0]?.name || "*";
+        const zeiss = P.parse(result.sheets).some((c) => c.template === "zeiss-calypso");
+        if (zeiss) {
+          $("gcImportPreset").value = "";
+          for (const [key] of Object.entries(profile()))
+            $("gcImport_" + key).value = key === "layout" ? "auto" : "";
+        }
+        $("gcResultSheet").value = zeiss ? "*" : best?.name || result.sheets[0]?.name || "*";
         parse();
       } catch (error) {
         if (error.name !== "AbortError") {
@@ -309,9 +353,13 @@ const IpqcResultImport = (() => {
           c.status = c.muc_no ? "matched" : "unmatched";
           c.reason = "Người dùng chọn đặc tính";
         }
-        if (event.target.hasAttribute("data-unit")) c.unit = event.target.value;
+        if (event.target.hasAttribute("data-unit")) {
+          c.unit = event.target.value;
+          if (c.reason !== "Người dùng chọn đặc tính") Object.assign(c, P.match(c, features()));
+        }
         if (event.target.hasAttribute("data-import-value")) {
           const s = c.samples.find((s) => s.sample === Number(event.target.dataset.importValue));
+          delete s.warning;
           Object.assign(s, P.valueCell(event.target.value) || { value: null, raw: "" }, {
             manualCorrected: true,
           });
@@ -332,7 +380,11 @@ const IpqcResultImport = (() => {
     };
     $("gcImportSameUnit").onchange = () => {
       if (!$("gcImportSameUnit").checked) return;
-      for (const c of candidates) if (!c.unit) c.unit = "standard";
+      for (const c of candidates)
+        if (!c.unit) {
+          c.unit = "standard";
+          if (c.reason !== "Người dùng chọn đặc tính") Object.assign(c, P.match(c, features()));
+        }
       render();
     };
     $("gcImportSync").onclick = () => {
@@ -386,9 +438,12 @@ const IpqcResultImport = (() => {
         syncing = false;
         if (items.length) {
           applied = true;
-          appliedRows.push(
-            ...trace.filter((t) => items.some((i) => i.muc_no === t.muc_no && i.mau === t.mau)),
-          );
+          // A second sync replaces provenance for the same cell instead of recording
+          // stale copies of a previously accepted value.
+          const latest = new Map(appliedRows.map((t) => [t.muc_no + "/" + t.mau, t]));
+          for (const t of trace.filter((t) => items.some((i) => i.muc_no === t.muc_no && i.mau === t.mau)))
+            latest.set(t.muc_no + "/" + t.mau, t);
+          appliedRows = [...latest.values()];
         }
         $("gcResultConfirmed").checked = false;
         message(
