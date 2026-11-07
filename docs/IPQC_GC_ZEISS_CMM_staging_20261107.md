@@ -40,7 +40,7 @@ PDF công ty thực tế: `2. MẪU/8. TTI/1012/30 MAU 012/M57.pdf`, ZEISS Calyp
 
 Các kết quả ghép 36 đặc tính ở trên sử dụng tiêu chuẩn thử tương ứng, không phải tự bổ sung mã vào tiêu chuẩn thật đang sử dụng. PDF Calypso không ghi đơn vị phải được người dùng xác nhận đơn vị trước đồng bộ.
 
-Chưa được cung cấp đúng PDF chứa các giá trị `89.2988`, `87.8436`, `14.6242` trong ảnh của yêu cầu. Đã tìm trong thư mục công việc nhưng chưa thấy file đó; đã hỏi đường dẫn. Vì vậy chưa thể báo số dòng khớp/chưa khớp riêng cho PDF đó và Model/Revision người dùng đang chọn. Không lấy các giá trị minh họa để giả lập kết quả đọc file.
+Cập nhật: đã nhận đúng PDF M2 1.pdf chứa các giá trị `89.2988`, `87.8436`, `14.6242`. Đã đọc đúng 11/11 Actual trên 2 trang; [báo cáo riêng](IPQC_GC_M2_actual_file_staging_20261107.md) phân biệt kết quả đọc file, tự khớp với tiêu chuẩn MES thực tế và kiểm thử lưu trên tiêu chuẩn thử. Chưa tự ghép những vị trí hình học thiếu mapping.
 
 Checksum trước/sau kiểm thử staging giống nhau:
 

@@ -56,7 +56,7 @@ Checksum dữ liệu staging trước/sau giống nhau:
 - Đặc tính: `295020aed6fd31e83e2f64295ace1829`.
 - Các tiêu chuẩn, metadata, kết quả CMM đã lưu và số kết quả Đúc trong bản đối chiếu không đổi.
 
-**Giới hạn nghiệm thu:** chưa nhận được PDF riêng hiện có 11 đặc tính của người dùng. Đã hướng dẫn đính kèm hoặc cung cấp đường dẫn. Không báo đã kiểm thử 11/11 trên file chưa có; các số 36/36 ở trên thuộc file M57.pdf và tiêu chuẩn thử tương ứng, không phải tự cập nhật tiêu chuẩn thật để khớp báo cáo.
+**Cập nhật nghiệm thu:** đã nhận và kiểm chứng đúng file M2 1.pdf có 11 đặc tính; xem [kết quả file gốc](IPQC_GC_M2_actual_file_staging_20261107.md). Đọc đúng 11/11; với tiêu chuẩn MES hiện tại, TTI-MOT-05/A tự khớp/điền 5 dòng, TTI-MOT-04/A là 4 dòng. Các dòng còn lại chờ xác định mapping/vị trí hoặc đối chiếu giới hạn. Các số 36/36 ở bảng trên vẫn là kết quả M57.pdf trên tiêu chuẩn thử, không phải số dòng tự khớp của M2 với tiêu chuẩn thực tế.
 
 ## File và lệnh kiểm tra
 
