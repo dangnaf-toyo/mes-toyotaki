@@ -318,7 +318,7 @@ const IpqcResultImport = (() => {
       const chosen = $("gcResultFile").files[0];
       if (!chosen) return;
       if (!entry()) {
-        message("Chọn Model và Revision trước.");
+        message("Chọn Model và ngày kiểm trước.");
         return;
       }
       if (applied) {
@@ -471,7 +471,7 @@ const IpqcResultImport = (() => {
           const reason = candidates.find((c) => !valid(c))?.validation.errors[0];
           throw Error(reason || "Chọn dòng cần điền.");
         }
-        if (!entry()) throw Error("Chưa có bảng kết quả. Chọn lại Model và Revision.");
+        if (!entry()) throw Error("Chưa có bảng kết quả. Chọn lại Model và ngày kiểm.");
         const proposed = new Map(),
           trace = [];
         for (const c of chosen) {

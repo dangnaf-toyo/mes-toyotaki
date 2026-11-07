@@ -78,7 +78,7 @@ fs.writeFileSync(".review/ipqc-report.xlsx", XLSX.write(workbook, { type: "buffe
     await page.goto("https://mes.test/ipqc-gia-cong.html");
     await page.waitForFunction(() => document.getElementById("gcMachine").options.length === 1);
     await page.locator("#gcMeasureProduct").fill("PART");
-    await page.locator("#gcLot").fill("FILE-LOT");
+    await page.locator("#gcMeasureProduct").dispatchEvent("change");
     await page.waitForFunction(() => document.querySelectorAll("#gcMeasureRows [data-result]").length === 6);
     await page.locator("#gcResultMode").selectOption("file");
     const values = () =>
@@ -119,12 +119,11 @@ fs.writeFileSync(".review/ipqc-report.xlsx", XLSX.write(workbook, { type: "buffe
     const manual = ["20", "20.02", "38", "38.1", "15", "15.01"];
     for (let i = 0; i < manual.length; i++)
       await page.locator("#gcMeasureRows [data-result]").nth(i).fill(manual[i]);
-    await page.locator("#gcLot").fill("MANUAL-LOT");
     await page.locator("#gcSaveMeasure").click();
     await page.waitForFunction(() => sb.tables.ipqc_gc_lan.length === 2);
     await page.locator("[data-tab=dashboard]").click();
     await page.waitForFunction(() =>
-      document.getElementById("gcDataRows").textContent.includes("MANUAL-LOT"),
+      document.getElementById("gcDataRows").textContent.includes("Nhập tay"),
     );
     assert.ok((await page.locator("#gcDataRows").textContent()).includes("Nhập từ file"));
     assert.ok((await page.locator("#gcDataRows").textContent()).includes("Nhập tay"));
@@ -161,9 +160,6 @@ fs.writeFileSync(".review/ipqc-report.xlsx", XLSX.write(workbook, { type: "buffe
     );
     await page.locator("#gcFilterFeature").selectOption("");
     for (const [id, value, count] of [
-      ["gcFilterLot", "FILE-LOT", 1],
-      ["gcFilterRevision", "B", 0],
-      ["gcFilterRevision", "A", 2],
       ["gcFilterMachine", "OTHER", 0],
       ["gcFilterProduct", "OTHER", 0],
       ["gcFilterInspector", "Inspector", 2],

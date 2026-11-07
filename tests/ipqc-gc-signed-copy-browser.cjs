@@ -31,7 +31,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
      sb.calls.push({name,args});const source=sb.tables.ipqc_btk.find(b=>b.id===args.p_nguon_id),target=args.p_ma_dich;
      if(sb.tables.ipqc_btk.some(b=>b.ma_sp===target&&b.phien_ban===args.p_phien_ban))return {error:{message:'Revision đích đã tồn tại'}};
      const id=3;const origin={model_nguon:source.ma_sp,phien_ban_nguon:source.phien_ban,id_nguon:source.id,nguoi_sao_chep:'Admin',thoi_diem:new Date().toISOString()};
-     sb.tables.ipqc_btk.push({...source,id,ma_sp:target,phien_ban:args.p_phien_ban,trang_thai:'ban_nhap',dang_dung:false,
+     sb.tables.ipqc_btk.push({...source,id,ma_sp:target,phien_ban:args.p_phien_ban,ngay_hieu_luc:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date()),trang_thai:'ban_nhap',dang_dung:false,
       ma_ban_ve:null,tai_lieu_goc:null,ban_ve_url:null,ban_ve_vi_tri:[],nguon_sao_chep:origin,noi_dung_sua_doi:'Sao chép từ PART / Revision A'});
      const copied=sb.tables.ipqc_btk_muc.filter(m=>m.id_btk===source.id).map((m,i)=>{
       const signed=IpqcGcStandard.toSigned(m),limits=IpqcGcStandard.bounds(m);
@@ -189,7 +189,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
         ";",
     });
     await page.goto("https://mes.test/ipqc-gia-cong.html?ma=TARGET");
-    await page.waitForFunction(() => document.getElementById("gcMeasureVersion").value === "3");
+      await page.waitForFunction(() => document.querySelectorAll("#gcMeasureRows [data-result]").length === 100);
     assert.equal(await page.locator("#gcMeasureRows [data-result]").count(), 100);
     await page.locator('[data-result][data-no="1"][data-sample="1"]').fill("14.69");
     assert.equal(

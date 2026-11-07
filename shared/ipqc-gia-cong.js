@@ -21,9 +21,12 @@ const IpqcGiaCong = (() => {
     value
       ? new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false })
       : "Chưa ghi nhận";
+  const inspectionDay = (row) =>
+    row.ngay_kiem ||
+    new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(row.thoi_diem));
+  const dayLabel = (value) => (value ? value.split("-").reverse().join("/") : "—");
   let products = [],
     machines = [],
-    versions = [],
     rights = {};
   let measureSerial = 0,
     measureRows = [],
@@ -31,6 +34,8 @@ const IpqcGiaCong = (() => {
     measureEntry = null,
     measureImport = null,
     measureSaving = false,
+    measureLoading = false,
+    measureDay = "",
     measureRequest = null,
     results = [],
     rowLimit = 100,
@@ -47,7 +52,7 @@ const IpqcGiaCong = (() => {
         ? error.message
         : error.code === "42501"
           ? "Bạn chưa có quyền thực hiện thao tác này. Liên hệ quản lý QC."
-          : "Chưa tải hoặc lưu được dữ liệu. Thử lại; mở chi tiết nếu cần báo quản lý QC.",
+          : "Chưa thực hiện được. Xem chi tiết lỗi.",
       true,
     );
     $("gcErrorDetails").hidden = false;
@@ -92,79 +97,89 @@ const IpqcGiaCong = (() => {
     if (tab === "dashboard") loadDashboard().catch(fail);
   }
   document.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => changeTab(b.dataset.tab)));
-  async function refreshVersions() {
-    const r = await sbTaiHet(() => sb.from("ipqc_btk").select("*").eq("cong_doan", "gia_cong").order("id"));
-    if (r.error) throw r.error;
-    versions = r.data || [];
-    const filter = $("gcFilterStep"),
-      previous = filter.value;
-    filter.innerHTML =
-      '<option value="">Tất cả nguyên công</option>' +
-      [...new Set(versions.map((v) => v.buoc_gia_cong).filter(Boolean))]
-        .sort()
-        .map((step) => "<option>" + E(step) + "</option>")
-        .join("");
-    filter.value = previous;
-    await refreshMeasureVersions();
-  }
-  async function refreshMeasureVersions() {
-    const previous = $("gcMeasureVersion").value;
-    const options = versions
-      .filter(
-        (v) =>
-          v.ma_sp === $("gcMeasureProduct").value &&
-          v.trang_thai === "da_duyet" &&
-          v.dang_dung !== false &&
-          (!v.ngay_hieu_luc || v.ngay_hieu_luc <= today()),
-      )
-      .sort((a, b) => (b.ngay_hieu_luc || "").localeCompare(a.ngay_hieu_luc || "") || b.id - a.id);
-    $("gcMeasureVersion").innerHTML = options
-      .map(
-        (v) =>
-          `<option value="${v.id}">${E(v.phien_ban)} · ${E(v.buoc_gia_cong || "Chưa khai báo bước")}</option>`,
-      )
-      .join("");
-    if (options.some((v) => String(v.id) === previous)) $("gcMeasureVersion").value = previous;
-    if (measureEntry && String(measureStandard?.id) === $("gcMeasureVersion").value) return;
-    await loadMeasureStandard();
-  }
-  async function loadMeasureStandard() {
+  async function loadMeasureStandard(forceReset = false) {
     const serial = ++measureSerial,
-      selected = versions.find((v) => String(v.id) === $("gcMeasureVersion").value) || null;
-    measureStandard = null;
-    measureImport?.reset();
-    $("gcResultConfirmation").hidden = true;
-    measureRequest = null;
-    measureRows = [];
-    measureEntry = null;
-    $("gcAddSample").disabled = true;
-    $("gcSaveMeasure").disabled = true;
-    if (!selected) {
-      $("gcMeasureInfo").textContent = "Chưa có tiêu chuẩn Gia công đã duyệt/có hiệu lực cho model này.";
-      $("gcMeasureRows").replaceChildren();
+      model = $("gcMeasureProduct").value.trim(),
+      day = $("gcInspectionDate").value;
+    // Native blur can repeat a Model change after its data already loaded. Do not
+    // disable the destination input while focus is moving into the measurement grid.
+    if (!forceReset && measureEntry && measureStandard?.ma_sp === model && measureDay === day) {
+      measureLoading = false;
+      $("gcMeasureInput").disabled = false;
       return;
     }
-    const r = await sb.from("ipqc_btk_muc").select("*").eq("id_btk", selected.id).order("muc_no");
-    if (serial !== measureSerial) return;
-    if (r.error) throw r.error;
-    measureRows = r.data || [];
-    measureStandard = selected;
-    if (!measureRows.length) {
-      $("gcMeasureInfo").textContent = "Tiêu chuẩn đã chọn chưa có đặc tính kiểm tra. Liên hệ quản lý QC.";
-      $("gcMeasureRows").textContent = "Chưa có dữ liệu";
-      return;
+    measureLoading = true;
+    $("gcMeasureInput").disabled = true;
+    try {
+      const resolved =
+        model && day
+          ? await rpc("ipqc_gc_tieu_chuan_theo_ngay", { p_ma_sp: model, p_ngay_kiem: day })
+          : { status: "none", message: model ? "Chọn ngày kiểm." : "Chọn Model." };
+      if (serial !== measureSerial) return;
+      const selected = resolved.status === "ok" ? resolved.btk : null;
+      if (!forceReset && selected && String(selected.id) === String(measureStandard?.id) && measureEntry) {
+        measureDay = day;
+        return;
+      }
+      if (
+        !forceReset &&
+        measureEntry?.status().filled &&
+        !confirm("Đổi tiêu chuẩn sẽ xóa kết quả chưa lưu. Tiếp tục?")
+      ) {
+        $("gcMeasureProduct").value = measureStandard.ma_sp;
+        $("gcInspectionDate").value = measureDay;
+        return;
+      }
+      measureStandard = null;
+      measureImport?.reset();
+      $("gcResultConfirmation").hidden = true;
+      measureRequest = null;
+      measureRows = [];
+      measureEntry = null;
+      $("gcAddSample").disabled = true;
+      $("gcSaveMeasure").disabled = true;
+      measureDay = day;
+      if (!selected) {
+        $("gcMeasureInfo").textContent =
+          resolved.status === "ambiguous"
+            ? "Tiêu chuẩn chồng lấn."
+            : model && day
+              ? "Chưa có tiêu chuẩn."
+              : model
+                ? "Chọn ngày kiểm."
+                : "Chọn Model.";
+        $("gcMeasureInfo").title =
+          resolved.status === "ambiguous"
+            ? "Nhiều phiên bản hoặc nguyên công cùng hiệu lực. Liên hệ quản lý QC."
+            : "";
+        $("gcMeasureRows").replaceChildren();
+        return;
+      }
+      measureRows = resolved.muc || [];
+      measureStandard = selected;
+      if (!measureRows.length) {
+        $("gcMeasureInfo").textContent = "Tiêu chuẩn chưa có đặc tính.";
+        $("gcMeasureRows").textContent = "Chưa có dữ liệu";
+        return;
+      }
+      $("gcMeasureInfo").textContent = "Đã tải " + measureRows.length + " đặc tính.";
+      $("gcMeasureInfo").title =
+        selected.ma_sp + " · Revision " + selected.phien_ban + " · Hiệu lực " + selected.ngay_hieu_luc;
+      measureEntry = IpqcGcEntry.mount($("gcMeasureRows"), measureRows, selected, updateMeasureStatus);
+      const canMeasure = ["admin", "qc_manager", "ipqc"].includes(rights.role);
+      measureEntry.setDisabled(!canMeasure);
+      $("gcAddSample").disabled = !canMeasure;
+    } finally {
+      if (serial === measureSerial) {
+        measureLoading = false;
+        $("gcMeasureInput").disabled =
+          !measureEntry ||
+          !measureRows.length ||
+          measureStandard?.ma_sp !== $("gcMeasureProduct").value.trim() ||
+          measureDay !== $("gcInspectionDate").value;
+        if (measureEntry) updateMeasureStatus(measureEntry.status());
+      }
     }
-    $("gcMeasureInfo").textContent =
-      selected.ma_sp +
-      " · Revision " +
-      selected.phien_ban +
-      (selected.buoc_gia_cong ? " · Nguyên công: " + selected.buoc_gia_cong : "") +
-      " · Tiêu chuẩn áp dụng " +
-      (selected.ngay_hieu_luc || "theo phiên bản đã phát hành");
-    measureEntry = IpqcGcEntry.mount($("gcMeasureRows"), measureRows, selected, updateMeasureStatus);
-    const canMeasure = ["admin", "qc_manager", "ipqc"].includes(rights.role);
-    measureEntry.setDisabled(!canMeasure);
-    $("gcAddSample").disabled = !canMeasure;
   }
   function updateMeasureStatus(state) {
     measureImport?.edited();
@@ -174,21 +189,26 @@ const IpqcGiaCong = (() => {
       "/" +
       state.total +
       " giá trị · " +
-      (state.complete
-        ? state.dat
-          ? "Lần kiểm: OK"
-          : "Lần kiểm: NG"
-        : "Chưa đủ dữ liệu để kết luận lần kiểm");
+      (state.complete ? (state.dat ? "Lần kiểm: OK" : "Lần kiểm: NG") : "Chưa đủ mẫu");
     $("gcMeasureSummary").className = state.complete ? (state.dat ? "good" : "bad") : "muted";
     $("gcSaveMeasure").disabled =
-      measureSaving || !state.complete || !["admin", "qc_manager", "ipqc"].includes(rights.role);
+      measureSaving ||
+      measureLoading ||
+      !state.complete ||
+      !["admin", "qc_manager", "ipqc"].includes(rights.role);
   }
   $("gcAddSample").onclick = () => measureEntry?.addSample();
-  $("gcMeasureProduct").onchange = () => refreshMeasureVersions().catch(fail);
-  $("gcMeasureVersion").onchange = () => loadMeasureStandard().catch(fail);
+  $("gcMeasureProduct").onchange = $("gcInspectionDate").onchange = () => loadMeasureStandard().catch(fail);
   $("gcMeasureForm").onsubmit = async (event) => {
     event.preventDefault();
-    if (!measureStandard || measureSaving) return;
+    if (
+      !measureStandard ||
+      measureSaving ||
+      measureLoading ||
+      measureStandard.ma_sp !== $("gcMeasureProduct").value.trim() ||
+      measureDay !== $("gcInspectionDate").value
+    )
+      return;
     measureSaving = true;
     const inputStates = [...$("gcMeasureForm").querySelectorAll("input,select,button")].map((el) => [
       el,
@@ -204,7 +224,7 @@ const IpqcGiaCong = (() => {
         id_btk: measureStandard.id,
         ma_may: $("gcMachine").value,
         ca: $("gcShift").value,
-        ma_lo: $("gcLot").value,
+        ngay_kiem: $("gcInspectionDate").value,
         co_mau_thuc_te: measureEntry.sampleCounts(),
         ...(await measureImport.prepareSave()),
         kq,
@@ -214,9 +234,9 @@ const IpqcGiaCong = (() => {
       const id = await rpc("ipqc_gc_luu_do", { p_data: { ...payload, request_id: measureRequest.id } });
       const saved = await sb.from("ipqc_gc_lan").select("dat,thoi_diem").eq("id", id).single();
       if (saved.error) throw saved.error;
-      notify("Đã lưu " + (saved.data.dat ? "OK" : "NG") + " · " + stamp(saved.data.thoi_diem));
+      notify("Lưu thành công · " + (saved.data.dat ? "OK" : "NG"));
       measureRequest = null;
-      await loadMeasureStandard();
+      await loadMeasureStandard(true);
       await loadDashboard();
     } catch (error) {
       fail(error);
@@ -243,18 +263,16 @@ const IpqcGiaCong = (() => {
       let q = sb
         .from("ipqc_lan_tong_hop")
         .select("*")
-        .gte("thoi_diem", $("gcFrom").value + "T00:00:00+07:00")
-        .lte("thoi_diem", $("gcTo").value + "T23:59:59.999999+07:00")
+        .gte("ngay_kiem", $("gcFrom").value)
+        .lte("ngay_kiem", $("gcTo").value)
+        .order("ngay_kiem")
         .order("thoi_diem")
         .order("id");
       for (const [id, column] of [
         ["gcDashboardProcess", "cong_doan"],
         ["gcFilterProduct", "ma_sp"],
-        ["gcFilterRevision", "revision"],
-        ["gcFilterStep", "buoc_gia_cong"],
         ["gcFilterMachine", "ma_may"],
         ["gcFilterShift", "ca"],
-        ["gcFilterLot", "ma_lo"],
       ])
         if ($(id).value) q = q.eq(column, $(id).value);
       if ($("gcFilterInspector").value) q = q.ilike("nguoi_kiem", "%" + $("gcFilterInspector").value + "%");
@@ -284,8 +302,8 @@ const IpqcGiaCong = (() => {
       ng = data.length - ok,
       samples = data.reduce((n, r) => n + Number(r.so_mau || 0), 0);
     $("gcMetrics").innerHTML = [
-      ["Lượt kiểm", data.length],
-      ["Tổng mẫu", samples],
+      ["Lần kiểm", data.length],
+      ["Số mẫu", samples],
       ["OK", ok],
       ["NG", ng],
       ["Tỷ lệ NG", data.length ? ((ng / data.length) * 100).toFixed(2) + "%" : "Chưa có dữ liệu"],
@@ -308,6 +326,7 @@ const IpqcGiaCong = (() => {
           r.ca,
           r.ma_lo,
           r.nguoi_kiem,
+          dayLabel(inspectionDay(r)),
           stamp(r.thoi_diem),
           m.ma_dac_tinh || k.muc_no,
           m.hang_muc,
@@ -336,7 +355,8 @@ const IpqcGiaCong = (() => {
         "Ca",
         "Lô",
         "Người kiểm",
-        "Thời điểm",
+        "Ngày kiểm",
+        "Tạo lúc",
         "Mã đặc tính",
         "Tên",
         "Mẫu",
@@ -391,8 +411,7 @@ const IpqcGiaCong = (() => {
     $("gcSpcChart").replaceChildren();
     $("gcCapability").textContent = "";
     if (!selected) {
-      $("gcValueChart").textContent =
-        "Chọn một đặc tính và phiên bản để xem biểu đồ; không trộn dung sai giữa Revision.";
+      $("gcValueChart").textContent = "Chọn đặc tính.";
       return;
     }
     const [, no] = selected.split("/"),
@@ -410,8 +429,8 @@ const IpqcGiaCong = (() => {
       ks.forEach((k) =>
         values.push({
           x: Number(k.gia_tri),
-          tg: stamp(r.thoi_diem),
-          nhan: stamp(r.thoi_diem) + " · mẫu " + k.mau + " · " + (k.dat ? "OK" : "NG"),
+          tg: dayLabel(inspectionDay(r)),
+          nhan: dayLabel(inspectionDay(r)) + " · mẫu " + k.mau + " · " + (k.dat ? "OK" : "NG"),
           mau: k.dat ? "#0f5fa5" : "#b91c1c",
         }),
       );
@@ -420,7 +439,7 @@ const IpqcGiaCong = (() => {
           x: vs.reduce((n, v) => n + v, 0) / vs.length,
           r: Math.max(...vs) - Math.min(...vs),
           vals: vs,
-          tg: stamp(r.thoi_diem),
+          tg: dayLabel(inspectionDay(r)),
         });
     }
     $("gcValueChart").innerHTML = S.bieuDo({
@@ -434,7 +453,7 @@ const IpqcGiaCong = (() => {
       oneMachine = new Set(data.map((r) => r.ma_may)).size === 1;
     if (groups.length < 25 || !same || !oneMachine || n > 5) {
       $("gcSpcChart").textContent =
-        "SPC cần ít nhất 25 nhóm cùng cỡ mẫu (1–5), cùng Revision/đặc tính và một máy. Chưa đủ điều kiện.";
+        "Chưa đủ điều kiện SPC: cần 25 nhóm, cùng cỡ mẫu (1–5), tiêu chuẩn và máy.";
       $("gcCapability").textContent = "Chưa đủ điều kiện đánh giá Cp/Cpk.";
       return;
     }
@@ -446,7 +465,7 @@ const IpqcGiaCong = (() => {
     $("gcSpcChart").innerHTML =
       "<p>" +
       (n === 1 ? "I–MR" : "Xbar–R") +
-      " · UCL/LCL ước lượng từ dữ liệu, khác LSL/USL kỹ thuật.</p>" +
+      ' · <span title="UCL/LCL khác giới hạn kỹ thuật LSL/USL.">UCL/LCL thống kê</span></p>' +
       S.bieuDo({ pts: groups, lim }) +
       S.bieuDo({
         pts:
@@ -471,9 +490,7 @@ const IpqcGiaCong = (() => {
           " · σ trong nhóm: " +
           cap.sigma.toPrecision(4)
         : "Thiếu giới hạn kỹ thuật hoặc độ biến thiên để tính Cp/Cpk.";
-    } else
-      $("gcCapability").textContent =
-        "Cp/Cpk cần ít nhất 100 giá trị, 30 nhóm, không có tín hiệu mất kiểm soát và xác nhận điều kiện quá trình/phân phối. Chưa đánh giá.";
+    } else $("gcCapability").textContent = "Chưa đủ điều kiện Cp/Cpk.";
   }
   $("gcFilterFeature").onchange = () => {
     rowLimit = 100;
@@ -504,7 +521,9 @@ const IpqcGiaCong = (() => {
           Ca: r.ca,
           "Mã lô": r.ma_lo,
           "Người kiểm": r.nguoi_kiem,
-          "Thời điểm": stamp(r.thoi_diem),
+          "Ngày kiểm": inspectionDay(r),
+          "Tạo lúc": stamp(r.thoi_diem),
+          "Cập nhật lúc": r.cap_nhat_luc ? stamp(r.cap_nhat_luc) : "",
           "Đặc tính": m.ma_dac_tinh || k.muc_no,
           Tên: m.hang_muc,
           Mẫu: k.mau,
@@ -541,12 +560,13 @@ const IpqcGiaCong = (() => {
       .join("");
     $("gcMachines").innerHTML = machines.map((m) => "<option>" + E(m.ma_may) + "</option>").join("");
     $("gcFrom").value = $("gcTo").value = today();
-    await refreshVersions();
+    $("gcInspectionDate").value = today();
+    await loadMeasureStandard();
     const params = new URLSearchParams(location.search);
     if (params.get("view") === "dashboard") changeTab("dashboard");
     if (params.has("ma")) {
       $("gcMeasureProduct").value = params.get("ma");
-      await refreshMeasureVersions();
+      await loadMeasureStandard();
       changeTab("measure");
     }
     setInterval(() => ($("clock").textContent = stamp(new Date())), 1000);

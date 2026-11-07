@@ -8,7 +8,7 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     ['shared/oqc-dashboard.js',['oqcOutsourceProcess','oqcInspectorCount',"outsourced.style.display"]],
     ['qc-manager.html',['ncp-doi-sach-board.js?v=T214','ipqc-btk-qc.js?v=20261106-signed-copy','ipqc-drawing-viewer.js?v=20261105-attachments']],
     ['ncp-detail.html',['ncp-doi-sach-board.js?v=T214','ncp-doi-sach-saved']],
-    ['ipqc-gia-cong.html',['TOYOTAKI – IPQC Gia công','gcMeasureForm','gcResultFile','gcImportSummary','Áp dụng kết quả','ipqc-gc-entry.js?v=20261107-cmm-apply','ipqc-result-import.js?v=20261107-cmm-apply','ipqc-gia-cong.js?v=20261106-signed-copy']],
+    ['ipqc-gia-cong.html',['TOYOTAKI – IPQC Gia công','gcMeasureForm','gcInspectionDate','Hình thức nhập','Thủ công','Tự động','gcImportSummary','Áp dụng kết quả','ipqc-result-import.js?v=20261107-inspection-date','ipqc-gia-cong.js?v=20261107-inspection-date']],
     ['shared/ipqc-gia-cong.js',['ipqc_gc_luu_do','sourceLabel','Xem file gốc']],
     ['shared/ipqc-btk-qc.js',['ipqc_gc_luu_tieu_chuan','gcFields','gcDrawing','ipqc_gc_tieu_chuan_lich_su']],
     ['shared/ipqc-drawing-viewer.js',['IpqcDrawingViewer','Trang trước','Phóng to']],
@@ -24,6 +24,7 @@ const base='https://mes-toyotaki.dangnaf.workers.dev/';
     const source=await response.text();
     if(file==='ipqc-gia-cong.html')assert.ok(!source.includes('data-tab="standards"')&&!source.includes('id="gcStandardForm"'));
     if(file==='ipqc-gia-cong.html'){
+      for(const id of ['gcMeasureVersion','gcLot','gcFilterRevision','gcFilterStep','gcFilterLot'])assert.ok(!source.includes('id="'+id+'"'));
       const navigation=[source.match(/<header>([\s\S]*?)<\/header>/)?.[1],source.match(/<nav class="tabs">([\s\S]*?)<\/nav>/)?.[1]].join('');
       for(const label of ['IPQC Đúc','Bảng điều khiển Gia công','Quản lý tiêu chuẩn','In / lưu PDF'])assert.ok(!navigation.includes('>'+label+'<'));
     }

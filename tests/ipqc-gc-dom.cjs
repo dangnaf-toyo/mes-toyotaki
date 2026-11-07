@@ -134,6 +134,7 @@ const context = {
   sb: {
     from: query,
     async rpc(name, args) {
+      if (name === "ipqc_gc_tieu_chuan_theo_ngay") return {data:{status:"ok",btk:standard,muc:[feature]}};
       if (name === "ipqc_gc_luu_do") {
         measured = args.p_data;
         return { data: "saved" };
@@ -187,11 +188,11 @@ const $ = (id) => document.getElementById(id),
   inputs[1].value = "20.06";
   $("gcMeasureRows").oninput();
   assert.ok($("gcMeasureRows").textContent.includes("NG"));
-  $("gcLot").value = "LOT-1";
   await $("gcMeasureForm").onsubmit({ preventDefault() {} });
   assert.equal(measured.kq[1].gia_tri, 20.06);
   assert.equal(measured.id_btk, 1);
   assert.equal(measured.ma_may, "Phay 01");
+  assert.equal(measured.ngay_kiem, $("gcInspectionDate").value);
   records.ipqc_lan_tong_hop.push(
     {
       id: "gc-1",
