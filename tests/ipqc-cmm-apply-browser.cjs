@@ -92,6 +92,10 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
     assert.equal(await page.locator("[data-accept]:checked").count(), N);
     await page.locator("#gcImportSync").click();
     assert.deepEqual((await values()).map(Number), v.oracle);
+    const expectedNG = v.features.filter(
+      (m, i) => (m.lsl !== null && v.oracle[i] < m.lsl) || (m.usl !== null && v.oracle[i] > m.usl),
+    ).length;
+    assert.equal(await page.locator("#gcMeasureRows .measure-ng").count(), expectedNG);
     assert.equal(dialogs, 0, "One Apply action, without an extra confirmation dialog");
     assert.equal(await count("filled"), N);
     assert.equal(await page.evaluate(() => sb.calls.length + sb.uploads.length), 0);
@@ -117,6 +121,8 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
       saved.kq.map((k) => k.gia_tri),
       v.oracle,
     );
+    assert.equal(saved.dat, expectedNG === 0);
+    assert.equal(saved.kq.filter((k) => !k.dat).length, expectedNG);
     assert.equal(saved.nhan_dien.gia_tri_da_xac_minh.length, N);
     assert.ok(saved.nhan_dien.gia_tri_da_xac_minh.every((t) => t.don_vi_bo_sung_da_xac_nhan === "mm"));
     assert.equal(await page.evaluate(() => JSON.stringify(sb.tables.ipqc_btk_muc)), before);
