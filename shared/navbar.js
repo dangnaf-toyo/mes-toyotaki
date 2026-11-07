@@ -59,7 +59,6 @@
     { label: 'Chất lượng', items: [
       { label: 'IPQC Đúc', href: 'ipqc.html' },
       { label: 'IPQC Gia công', href: 'ipqc-gia-cong.html' },
-      { label: 'Dashboard IPQC tổng hợp', href: 'ipqc-gia-cong.html?view=dashboard' },
       { label: 'Duyệt tiếp tục SX IPQC', href: 'ipqc-approval.html' },
       { label: 'IQC đầu vào', href: 'iqc.html' },
       { label: 'OQC kiểm tra', href: 'oqc-daily.html' },
