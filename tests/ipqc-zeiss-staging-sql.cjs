@@ -2,7 +2,12 @@
 const fs = require("node:fs"),
   path = require("node:path");
 const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8"));
-const featurePayload = v.features.map((m) => ({ ...m, da_xac_nhan: true }));
+const missingUnits = process.env.MES_ZEISS_MISSING_UNITS === "1";
+const featurePayload = v.features.map((m) => ({
+  ...m,
+  ...(missingUnits ? { don_vi: null } : {}),
+  da_xac_nhan: true,
+}));
 const values = v.parsed.map((c, i) => ({ muc_no: i + 1, mau: 1, gia_tri: c.samples[0].value }));
 const trace = v.parsed.map((c, i) => ({
   muc_no: i + 1,
@@ -10,7 +15,9 @@ const trace = v.parsed.map((c, i) => ({
   raw: c.samples[0].raw,
   value: c.samples[0].value,
   source: c.source,
-  don_vi_nguon: "standard",
+  don_vi_nguon: "mm",
+  don_vi_mes: "mm",
+  don_vi_bo_sung_da_xac_nhan: missingUnits ? "mm" : null,
 }));
 const quoted = (value) => "'" + JSON.stringify(value).replaceAll("'", "''") + "'::jsonb";
 const sql = `-- STAGING jcjbleugnclzsghfpmvk ONLY. All test standards/results are rolled back.

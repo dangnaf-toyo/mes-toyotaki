@@ -25,12 +25,25 @@
   }
   function unit(value) {
     const v = String(value ?? "")
+      .normalize("NFKC")
       .trim()
-      .toLowerCase();
+      .toLowerCase()
+      .replace(/^[\[(]\s*|\s*[\])]$/g, "");
     return (
-      { µm: "um", μm: "um", micron: "um", inch: "in", inches: "in", '"': "in", "°": "deg", degree: "deg" }[
-        v
-      ] || v
+      {
+        µm: "um",
+        μm: "um",
+        micron: "um",
+        millimeter: "mm",
+        millimeters: "mm",
+        millimetre: "mm",
+        millimetres: "mm",
+        inch: "in",
+        inches: "in",
+        '"': "in",
+        "°": "deg",
+        degree: "deg",
+      }[v] || v
     );
   }
   function convert(value, from, to) {
@@ -409,20 +422,25 @@
     let found = features.filter((m) => m.ma_dac_tinh && code(m.ma_dac_tinh) === code(candidate.id)),
       reason = "Mã đặc tính";
     if (!found.length && candidate.template === "zeiss-calypso") {
-      found = features.filter(
-        (m) =>
-          candidate.name &&
-          norm(m.hang_muc) === norm(candidate.name) &&
-          candidate.nominal !== null &&
-          candidate.upper !== null &&
-          candidate.lower !== null &&
-          candidate.unit &&
-          number(m.danh_nghia) !== null &&
-          m.don_vi &&
-          (number(m.usl) !== null || number(m.dung_sai_tren) !== null) &&
-          (number(m.lsl) !== null || number(m.dung_sai_duoi) !== null) &&
-          !specWarnings(candidate, m).length,
-      );
+      // A descriptive name/position is usable without inventing a characteristic ID.
+      // Repeated names are narrowed by the full dimensional specification below.
+      const named = candidate.name ? features.filter((m) => norm(m.hang_muc) === norm(candidate.name)) : [];
+      if (named.length === 1) found = named;
+      else {
+        found = features.filter(
+          (m) =>
+            candidate.nominal !== null &&
+            candidate.upper !== null &&
+            candidate.lower !== null &&
+            candidate.unit &&
+            number(m.danh_nghia) !== null &&
+            m.don_vi &&
+            (number(m.usl) !== null || number(m.dung_sai_tren) !== null) &&
+            (number(m.lsl) !== null || number(m.dung_sai_duoi) !== null) &&
+            !specWarnings(candidate, m).length,
+        );
+        if (named.length) found = found.filter((m) => named.includes(m));
+      }
       reason = "Tên, danh nghĩa, dung sai và đơn vị";
     } else if (!found.length) {
       const name = norm(candidate.name)
@@ -471,7 +489,7 @@
       if (!n.error && limit !== null && diff(n.value, limit))
         warnings.push((key === "upper" ? "Giới hạn trên" : "Giới hạn dưới") + " báo cáo khác MES");
     }
-    if (candidate.unit && converted(0).error) warnings.push("Đơn vị báo cáo khác/không tương thích MES");
+    if (candidate.unit && feature.don_vi && converted(0).error) warnings.push("Sai đơn vị");
     return warnings;
   }
   const api = { parse, match, convert, unit, number, norm, column, valueCell, pdfLines, zeiss, specWarnings };

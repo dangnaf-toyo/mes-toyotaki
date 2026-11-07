@@ -95,7 +95,6 @@ fs.writeFileSync(".review/ipqc-report.xlsx", XLSX.write(workbook, { type: "buffe
     assert.equal(await page.locator("#gcImportCandidates [data-candidate]").count(), 3);
     assert.ok((await values()).every((v) => v === ""));
     assert.equal(await page.evaluate(() => sb.calls.filter((c) => c.name === "ipqc_gc_luu_do").length), 0);
-    await page.locator("#gcImportSelectMatched").click();
     await page.locator("#gcImportSync").click();
     assert.deepEqual(await values(), ["20.02", "20.01", "38.12", "38", "15.15", "15"]);
     await page.locator('[data-result][data-no="1"][data-sample="1"]').fill("20.03");
@@ -204,8 +203,8 @@ fs.writeFileSync(".review/ipqc-report.xlsx", XLSX.write(workbook, { type: "buffe
     await page.locator("#gcResultFile").setInputFiles(".review/ipqc-report.png");
     await page.waitForFunction(
       () =>
-        document.getElementById("gcImportStatus").textContent.includes("Đọc được") ||
-        document.getElementById("gcImportStatus").textContent.includes("Chưa đọc được định dạng"),
+        document.querySelectorAll("#gcImportCandidates [data-candidate]").length > 0 ||
+        document.getElementById("gcImportStatus").textContent.includes("Không đọc được file"),
       null,
       { timeout: 180000 },
     );

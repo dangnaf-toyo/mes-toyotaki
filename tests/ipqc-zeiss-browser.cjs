@@ -61,7 +61,7 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     async function read() {
       await page.locator("#gcResultFile").setInputFiles(validation.file);
       await page.waitForFunction(
-        () => document.getElementById("gcImportStatus").textContent.includes("Tự nhận diện ZEISS"),
+        () => document.getElementById("gcImportStatus").textContent.includes("ZEISS Calypso"),
         null,
         { timeout: 60000 },
       );
@@ -90,8 +90,8 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     );
     await read();
     assert.match(
-      await page.locator("#gcImportStatus").textContent(),
-      /0 khớp; 36 đọc được nhưng chưa khớp; 0 lỗi trích xuất/,
+      await page.locator("#gcImportSummary").textContent(),
+      /Đã đọc: 36Đã khớp: 0Chưa khớp: 36Đã điền: 0/,
     );
     assert.equal(
       await page.locator("[data-import-value]").first().inputValue(),
@@ -99,8 +99,14 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     );
     assert.ok((await values()).every((v) => v === ""));
     await page.locator("[data-match]").first().selectOption("1");
+    await page.locator("#gcImportDefaultUnit").selectOption("mm");
     await page.locator("#gcImportSameUnit").check();
-    await page.locator("[data-accept]").first().check();
+    // Only the explicitly mapped first row is selected here; ambiguous dimensional
+    // duplicates must not be assigned by ordinal.
+    for (let i = 1; i < validation.parsed.length; i++) {
+      const check = page.locator('[data-candidate="' + i + '"] [data-accept]');
+      if (await check.isChecked()) await check.uncheck();
+    }
     await page.locator("#gcImportSync").click();
     assert.equal((await values())[0], String(validation.oracle[0]));
     assert.equal(await page.evaluate(() => sb.calls.length), 0);
@@ -109,14 +115,11 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     await start();
     const before = await page.evaluate(() => JSON.stringify([sb.tables.ipqc_btk, sb.tables.ipqc_btk_muc]));
     await read();
-    assert.match(
-      await page.locator("#gcImportStatus").textContent(),
-      /36 khớp; 0 đọc được nhưng chưa khớp; 0 lỗi trích xuất/,
-    );
+    assert.equal(await page.locator('[data-count="read"]').textContent(), "36");
     assert.ok((await values()).every((v) => v === ""));
     assert.equal(await page.evaluate(() => sb.calls.length + sb.uploads.length), 0);
+    await page.locator("#gcImportDefaultUnit").selectOption("mm");
     await page.locator("#gcImportSameUnit").check();
-    await page.locator("#gcImportSelectMatched").click();
     await page.locator("#gcImportSync").click();
     assert.deepEqual((await values()).map(Number), validation.oracle);
     const first = page.locator('[data-result][data-no="1"][data-sample="1"]');
@@ -162,7 +165,7 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
       .locator("#gcResultFile")
       .setInputFiles({ name: "broken.pdf", mimeType: "application/pdf", buffer: Buffer.from("invalid PDF") });
     await page.waitForFunction(() =>
-      document.getElementById("gcImportStatus").textContent.includes("Chưa đọc được định dạng"),
+      document.getElementById("gcImportStatus").textContent.includes("Không đọc được file"),
     );
     assert.equal(await page.evaluate(() => sb.tables.ipqc_gc_lan.length), 1);
     console.log(
