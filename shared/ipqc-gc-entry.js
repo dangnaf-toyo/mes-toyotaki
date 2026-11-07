@@ -6,7 +6,8 @@ const IpqcGcEntry = (() => {
       ? Number(text.replace(",", "."))
       : null;
   }
-  function mount(target, features, standard, onChange = () => {}) {
+  function mount(target, sourceFeatures, standard, onChange = () => {}) {
+    const features = sourceFeatures.map((m) => ({ ...m, muc_no: Number(m.muc_no) }));
     const S = IpqcSpc,
       E = S.esc,
       values = new Map(),
@@ -201,9 +202,13 @@ const IpqcGcEntry = (() => {
         render();
       },
       setMany(items) {
+        if (disabled) throw Error("Không có quyền nhập kết quả.");
         for (const item of items) {
-          if (!counts.has(item.muc_no) || item.mau < 1 || item.mau > 100)
+          if (!counts.has(item.muc_no) || !Number.isInteger(item.mau) || item.mau < 1 || item.mau > 100)
             throw Error("Đặc tính/mẫu không hợp lệ.");
+        }
+        // Validate the entire batch before touching any existing measurement.
+        for (const item of items) {
           counts.set(item.muc_no, Math.max(counts.get(item.muc_no), item.mau));
           values.set(key(item.muc_no, item.mau), String(item.value));
         }

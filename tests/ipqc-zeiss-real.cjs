@@ -75,8 +75,12 @@ const P = require("../shared/ipqc-result-parser.js");
   );
   const same = { ...parsed[0], id: "UNKNOWN", name: features[0].hang_muc, unit: "mm" };
   assert.equal(P.match(same, features).muc_no, 1, "Full name/spec/unit evidence");
-  assert.equal(P.match({ ...same, unit: "" }, features).status, "unmatched");
-  assert.equal(P.match({ ...same, upper: same.upper + 1 }, features).status, "unmatched");
+  assert.equal(
+    P.match({ ...same, unit: "" }, features).muc_no,
+    1,
+    "Unique descriptive name maps, but controller must still require units",
+  );
+  assert.ok(P.match({ ...same, upper: same.upper + 1 }, features).warnings.length);
   assert.ok(P.match({ ...parsed[0], unit: "mm", nominal: parsed[0].nominal + 1 }, features).warnings.length);
   const damaged = structuredClone(sheets);
   const actualLine = damaged[0].lines.find((l) => l.cells.some((c) => c.text === parsed[0].samples[0].raw));

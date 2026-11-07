@@ -38,7 +38,7 @@ function backend(options = {}) {
       const b=tables.ipqc_btk.find(r=>r.id===p.id_btk),features=tables.ipqc_btk_muc.filter(r=>r.id_btk===b?.id);
       if(!b||b.trang_thai!=='da_duyet')return {error:{code:'P0001',message:'Tiêu chuẩn chưa phát hành'}};
       const id='saved-'+(tables.ipqc_gc_lan.length+1),kq=p.kq.map(k=>{
-        const m=features.find(m=>m.muc_no===k.muc_no);
+        const m=features.find(m=>Number(m.muc_no)===Number(k.muc_no));
         return {...k,dat:m.kieu==='so'?Number.isFinite(k.gia_tri)&&(m.lsl==null||k.gia_tri>=m.lsl)&&
           (m.usl==null||k.gia_tri<=m.usl):k.dat};
       });
