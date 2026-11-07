@@ -62,7 +62,7 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
       await page.goto("https://mes.test/ipqc-gia-cong.html");
       await page.waitForFunction(() => document.getElementById("gcMachine").options.length === 1);
       await page.locator("#gcMeasureProduct").fill("PART");
-      await page.locator("#gcLot").fill("CMM-APPLY");
+      await page.locator("#gcMeasureProduct").dispatchEvent("change");
       await page.waitForFunction(
         (n) => document.querySelectorAll("#gcMeasureRows [data-result]").length === n,
         N,
@@ -98,7 +98,7 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
     assert.equal(await page.locator("#gcMeasureRows .measure-ng").count(), expectedNG);
     assert.equal(dialogs, 0, "One Apply action, without an extra confirmation dialog");
     assert.equal(await count("filled"), N);
-    assert.equal(await page.evaluate(() => sb.calls.length + sb.uploads.length), 0);
+    assert.equal(await page.evaluate(() => sb.calls.filter(c=>c.name==='ipqc_gc_luu_do').length + sb.uploads.length), 0);
     assert.ok(await page.locator("#gcResultConfirmed").isChecked());
     await page.locator('[data-tab="dashboard"]').click();
     await page.locator('[data-tab="measure"]').click();
@@ -127,7 +127,7 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
     assert.ok(saved.nhan_dien.gia_tri_da_xac_minh.every((t) => t.don_vi_bo_sung_da_xac_nhan === "mm"));
     assert.equal(await page.evaluate(() => JSON.stringify(sb.tables.ipqc_btk_muc)), before);
     await page.locator('[data-tab="dashboard"]').click();
-    await page.waitForFunction(() => document.getElementById("gcDataRows").textContent.includes("CMM-APPLY"));
+    await page.waitForFunction(() => document.getElementById("gcDataRows").textContent.includes("Nhập từ file"));
     assert.equal(await page.locator("#gcDataRows tbody tr").count(), N);
     // Duplicate targets do not poison the whole batch. Fixing only those rows keeps prior values.
     await start();
@@ -190,7 +190,7 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
       };
     });
     await page.locator("#gcMeasureProduct").fill("PART");
-    await page.locator("#gcLot").fill("FAIL-READBACK");
+    await page.locator("#gcMeasureProduct").dispatchEvent("change");
     await page.waitForFunction(() => !!window.testEntry);
     assert.ok(await page.evaluate(() => atomicBatchValid));
     await page.locator("#gcResultMode").selectOption("file");
@@ -203,7 +203,7 @@ const v = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "utf8")),
     assert.match(await page.locator("#gcImportStatus").textContent(), /Chưa điền được đặc tính/);
     assert.equal(await count("filled"), 0);
     assert.ok((await values()).every((x) => x === ""));
-    assert.equal(await page.evaluate(() => sb.calls.length), 0);
+    assert.equal(await page.evaluate(() => sb.calls.filter(c=>c.name==='ipqc_gc_luu_do').length), 0);
     console.log(
       JSON.stringify({
         result:

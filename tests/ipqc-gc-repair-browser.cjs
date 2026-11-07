@@ -46,7 +46,6 @@ const {backend}=require('./ipqc-gc-fixture.cjs');
     assert.equal(await input(1,1).inputValue(),'20.02');
     assert.equal(await page.locator('#gcSaveMeasure').isDisabled(),true);
     for(const [no,value]of [[1,'20'],[2,'38.1'],[3,'15']])await input(no,3).fill(value);
-    await page.locator('#gcLot').fill('LOT-MANUAL');
     await page.locator('#gcSaveMeasure').click();
     await page.waitForFunction(()=>sb.tables.ipqc_gc_lan.length===1);
     assert.equal(await page.evaluate(()=>sb.tables.ipqc_gc_lan[0].dat),false);
@@ -55,7 +54,7 @@ const {backend}=require('./ipqc-gc-fixture.cjs');
    }
    await page.locator('[data-tab=dashboard]').click();
    if(empty)await page.waitForFunction(()=>document.getElementById('gcDataRows').textContent.includes('Chưa có dữ liệu'));
-   else await page.waitForFunction(()=>document.getElementById('gcDataRows').textContent.includes('LOT-MANUAL'));
+   else await page.waitForFunction(()=>document.getElementById('gcDataRows').textContent.includes('PART'));
    assert.deepEqual(errors,[]);await context.close();
   }
   console.log('PASS real Chromium/catalog implementation: machine order uses ma_may; empty standards/dashboard are normal states; released features load');

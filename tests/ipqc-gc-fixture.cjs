@@ -16,8 +16,17 @@ function backend(options = {}) {
     ...options.tables
   };
   const calls=[],orders=[],uploads=[];
+  const vietnamDay=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date());
+  function resolveStandard(model,day){
+    const eligible=tables.ipqc_btk.filter(b=>b.ma_sp===model&&b.cong_doan==='gia_cong'&&b.trang_thai==='da_duyet'&&b.ngay_hieu_luc&&b.ngay_hieu_luc<=day);
+    const dates=new Map();for(const b of eligible){const step=(b.buoc_gia_cong||'').trim();dates.set(step,[dates.get(step)||'',b.ngay_hieu_luc].sort().at(-1));}
+    const latest=eligible.filter(b=>b.ngay_hieu_luc===dates.get((b.buoc_gia_cong||'').trim()));
+    if(latest.length!==1)return {status:latest.length?'ambiguous':'none',message:latest.length?'Tiêu chuẩn chồng lấn. Liên hệ quản lý QC.':'Chưa có tiêu chuẩn.',btk:null,muc:[]};
+    return JSON.parse(JSON.stringify({status:'ok',btk:latest[0],muc:tables.ipqc_btk_muc.filter(m=>String(m.id_btk)===String(latest[0].id))}));
+  }
   const db={tables,calls,orders,uploads,from(name){
     let data=[...(tables[name]||[])],single=false,error=null;
+    if(name==='ipqc_lan_tong_hop')data=data.map(r=>({...r,ngay_kiem:r.ngay_kiem||new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(r.thoi_diem))}));
     const query={select(){return query;},eq(k,v){data=data.filter(r=>String(r[k])===String(v));return query;},
       neq(k,v){data=data.filter(r=>String(r[k])!==String(v));return query;},
       in(k,values){data=data.filter(r=>values.some(v=>String(r[k])===String(v)));return query;},
@@ -32,11 +41,13 @@ function backend(options = {}) {
     return query;
   },async rpc(name,args){
     calls.push({name,args});
+    if(name==='ipqc_gc_tieu_chuan_theo_ngay')return {data:resolveStandard(args.p_ma_sp,args.p_ngay_kiem),error:null};
     if(name==='ipqc_gc_luu_do'){
       const p=args.p_data,prior=tables.ipqc_gc_lan.find(r=>r.request_id===p.request_id);
       if(prior)return {data:prior.id};
-      const b=tables.ipqc_btk.find(r=>r.id===p.id_btk),features=tables.ipqc_btk_muc.filter(r=>r.id_btk===b?.id);
-      if(!b||b.trang_thai!=='da_duyet')return {error:{code:'P0001',message:'Tiêu chuẩn chưa phát hành'}};
+      const resolved=resolveStandard(p.ma_sp,p.ngay_kiem||vietnamDay()),b=resolved.btk,
+       features=tables.ipqc_btk_muc.filter(r=>String(r.id_btk)===String(b?.id));
+      if(!b||String(b.id)!==String(p.id_btk))return {error:{code:'P0001',message:resolved.message||'Tiêu chuẩn đã thay đổi.'}};
       const id='saved-'+(tables.ipqc_gc_lan.length+1),kq=p.kq.map(k=>{
         const m=features.find(m=>Number(m.muc_no)===Number(k.muc_no));
         return {...k,dat:m.kieu==='so'?Number.isFinite(k.gia_tri)&&(m.lsl==null||k.gia_tri>=m.lsl)&&
@@ -44,7 +55,7 @@ function backend(options = {}) {
       });
       const row={id,request_id:p.request_id,id_btk:b.id,ma_sp:b.ma_sp,revision:b.phien_ban,
         buoc_gia_cong:b.buoc_gia_cong,ma_may:p.ma_may,ca:p.ca,ma_lo:p.ma_lo,
-        nguoi_kiem:'Inspector',thoi_diem:new Date().toISOString(),so_mau:Math.max(...kq.map(k=>k.mau)),
+        nguoi_kiem:'Inspector',ngay_kiem:p.ngay_kiem||vietnamDay(),thoi_diem:new Date().toISOString(),cap_nhat_luc:new Date().toISOString(),so_mau:Math.max(...kq.map(k=>k.mau)),
         dat:kq.every(k=>k.dat),tieu_chuan:{btk:{...b},muc:features.map(m=>({...m}))},
         nguon_nhap:p.nguon_nhap||'nhap_tay',tep_ket_qua:p.tep_ket_qua||null,nhan_dien:p.nhan_dien||null,kq};
       tables.ipqc_gc_lan.push(row);tables.ipqc_lan_tong_hop.push({...row,cong_doan:'gia_cong'});

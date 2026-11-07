@@ -51,7 +51,7 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
       await page.goto("https://mes.test/ipqc-gia-cong.html");
       await page.waitForFunction(() => document.getElementById("gcMachine").options.length === 1);
       await page.locator("#gcMeasureProduct").fill("PART");
-      await page.locator("#gcLot").fill("REAL-ZEISS");
+      await page.locator("#gcMeasureProduct").dispatchEvent("change");
       await page.waitForFunction(
         (n) => document.querySelectorAll("#gcMeasureRows [data-result]").length === n,
         validation.features.length,
@@ -91,7 +91,13 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     await read();
     assert.match(
       await page.locator("#gcImportSummary").textContent(),
-      /Đã đọc: 36Đã khớp: 0Chưa khớp: 36Đã điền: 0/,
+      new RegExp(
+        "Đã đọc: " +
+          validation.parsed.length +
+          "Đã khớp: 0Chưa khớp: " +
+          validation.parsed.length +
+          "Đã điền: 0",
+      ),
     );
     assert.equal(
       await page.locator("[data-import-value]").first().inputValue(),
@@ -109,15 +115,20 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     }
     await page.locator("#gcImportSync").click();
     assert.equal((await values())[0], String(validation.oracle[0]));
-    assert.equal(await page.evaluate(() => sb.calls.length), 0);
+    assert.equal(await page.evaluate(() => sb.calls.filter((c) => c.name === "ipqc_gc_luu_do").length), 0);
     assert.equal(ocrRequests.length, 0);
     // Exact-code matches, bulk confirmation and matrix sync use all four pages.
     await start();
     const before = await page.evaluate(() => JSON.stringify([sb.tables.ipqc_btk, sb.tables.ipqc_btk_muc]));
     await read();
-    assert.equal(await page.locator('[data-count="read"]').textContent(), "36");
+    assert.equal(await page.locator('[data-count="read"]').textContent(), String(validation.parsed.length));
     assert.ok((await values()).every((v) => v === ""));
-    assert.equal(await page.evaluate(() => sb.calls.length + sb.uploads.length), 0);
+    assert.equal(
+      await page.evaluate(
+        () => sb.calls.filter((c) => c.name === "ipqc_gc_luu_do").length + sb.uploads.length,
+      ),
+      0,
+    );
     await page.locator("#gcImportDefaultUnit").selectOption("mm");
     await page.locator("#gcImportSameUnit").check();
     await page.locator("#gcImportSync").click();
@@ -135,7 +146,12 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
         (m.lsl !== null && validation.oracle[i] < m.lsl) || (m.usl !== null && validation.oracle[i] > m.usl),
     ).length;
     assert.equal(await page.locator("#gcMeasureRows .measure-ng").count(), expectedNG);
-    assert.equal(await page.evaluate(() => sb.calls.length + sb.uploads.length), 0);
+    assert.equal(
+      await page.evaluate(
+        () => sb.calls.filter((c) => c.name === "ipqc_gc_luu_do").length + sb.uploads.length,
+      ),
+      0,
+    );
     await page.screenshot({ path: ".review/zeiss-browser-filled.png", fullPage: true });
     await page.locator("#gcResultConfirmed").check();
     await page.locator("#gcSaveMeasure").click();
@@ -147,16 +163,16 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
     );
     assert.equal(saved.dat, expectedNG === 0);
     assert.equal(saved.nguon_nhap, "tu_file");
-    assert.equal(saved.nhan_dien.gia_tri_da_xac_minh.length, 36);
+    assert.equal(saved.nhan_dien.gia_tri_da_xac_minh.length, validation.parsed.length);
     assert.equal(
       await page.evaluate(() => JSON.stringify([sb.tables.ipqc_btk, sb.tables.ipqc_btk_muc])),
       before,
     );
     await page.locator('[data-tab="dashboard"]').click();
     await page.waitForFunction(() =>
-      document.getElementById("gcDataRows").textContent.includes("REAL-ZEISS"),
+      document.getElementById("gcDataRows").textContent.includes("Nhập từ file"),
     );
-    assert.equal(await page.locator("#gcDataRows tbody tr").count(), 36);
+    assert.equal(await page.locator("#gcDataRows tbody tr").count(), validation.parsed.length);
     assert.ok((await page.locator("#gcDataRows").textContent()).includes(String(validation.oracle[0])));
     assert.deepEqual(ocrRequests, []);
     assert.deepEqual(errors, []);
@@ -172,8 +188,8 @@ const validation = JSON.parse(fs.readFileSync(".review/zeiss-validation.json", "
       JSON.stringify({
         result:
           "PASS Chrome real multipage ZEISS upload/read, unmatched/manual map, exact mapping, confirmation/sync, overwrite protection, OK/NG, explicit save/source/dashboard, immutable standards, corrupt PDF, no OCR",
-        extracted: 36,
-        matched: 36,
+        extracted: validation.parsed.length,
+        matched: validation.parsed.length,
         unresolved: 0,
         NG: expectedNG,
       }),

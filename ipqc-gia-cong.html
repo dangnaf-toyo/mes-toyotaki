@@ -134,6 +134,15 @@
         gap: 12px;
         margin-bottom: 12px;
       }
+      #gcMeasureInput { border: 0; padding: 0; margin: 0; min-width: 0; }
+      .entry-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .dashboard-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+      @media (min-width: 1500px) { .dashboard-filters { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+      .dashboard-filters input, .dashboard-filters select { width: 100%; }
+      #gcDashboardPanel .metric { padding: 8px 12px; min-width: 105px; }
+      #gcDashboardPanel .metric b { font-size: 18px; }
+      .capability-check { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+      .capability-check input { width: 18px; flex: none; }
       .drawing-grid {
         display: grid;
         grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
@@ -298,15 +307,12 @@
       <datalist id="gcProducts"></datalist>
       <section data-panel="measure">
         <form id="gcMeasureForm" class="panel">
-          <h2>Nhập kết quả IPQC Gia công</h2>
-          <div class="grid">
-            <label>Model <input id="gcMeasureProduct" list="gcProducts" required /></label
-            ><label
-              >Revision có hiệu lực
-              <select id="gcMeasureVersion" required></select
-            ></label>
+          <h2>IPQC Gia công – Nhập kết quả</h2>
+          <div class="grid entry-fields">
+            <label>Ngày kiểm <input id="gcInspectionDate" type="date" required /></label>
+            <label>Model <input id="gcMeasureProduct" list="gcProducts" required /></label>
             <label
-              >Máy Gia công
+              >Máy
               <select id="gcMachine" required></select></label
             ><label
               >Ca
@@ -317,11 +323,11 @@
                 <option>Ca 2</option>
               </select></label
             >
-            <label>Mã lô <input id="gcLot" required /></label>
           </div>
           <p id="gcMeasureInfo"></p>
-          <label>Cách nhập <select id="gcResultMode"><option value="manual">Nhập tay</option>
-            <option value="file">Nhập file CMM</option></select></label>
+          <fieldset id="gcMeasureInput" disabled>
+          <label>Hình thức nhập <select id="gcResultMode"><option value="manual">Thủ công</option>
+            <option value="file">Tự động</option></select></label>
           <section id="gcResultImportPanel" hidden>
             <h3>File CMM</h3>
             <div class="grid"><label>File PDF / Excel / ảnh
@@ -364,12 +370,13 @@
             <label class="checkline"><input id="gcResultAttach" type="checkbox" checked> Lưu kèm file gốc</label>
           </div>
           <button class="primary" id="gcSaveMeasure" type="submit">Lưu kết quả đo</button>
+          </fieldset>
         </form>
       </section>
       <section data-panel="dashboard" hidden>
-        <div class="panel">
-          <h2>Dashboard IPQC Đúc / Gia công</h2>
-          <div class="grid">
+        <div class="panel" id="gcDashboardPanel">
+          <h2>Dashboard IPQC</h2>
+          <div class="grid dashboard-filters">
             <label>Từ ngày <input id="gcFrom" type="date" /></label
             ><label>Đến ngày <input id="gcTo" type="date" /></label>
             <label
@@ -381,8 +388,7 @@
               </select></label
             >
             <label>Model <input id="gcFilterProduct" list="gcProducts" /></label
-            ><label>Revision <input id="gcFilterRevision" /></label
-            ><label>Nguyên công <select id="gcFilterStep"><option value="">Tất cả nguyên công</option></select></label>
+            >
             <label>Máy <input id="gcFilterMachine" list="gcMachines" /></label><datalist id="gcMachines"></datalist
             ><label
               >Ca
@@ -395,36 +401,35 @@
               </select></label
             >
             <label>Người kiểm <input id="gcFilterInspector" placeholder="Tên / mã" /></label
-            ><label>Mã lô <input id="gcFilterLot" /></label>
+            >
             <label
-              >Đặc tính (theo phiên bản)
+              >Đặc tính
               <select id="gcFilterFeature">
                 <option value="">Tất cả</option>
               </select></label
             >
           </div>
           <div class="toolbar">
-            <button id="gcRefresh">Xem / tải lại</button><button id="gcExcel">Xuất Excel</button>
+            <button id="gcRefresh">Xem</button><button id="gcExcel">Xuất Excel</button>
           </div>
           <div id="gcMetrics" class="metrics"></div>
         </div>
         <div class="panel">
-          <h3>Kích thước thực tế so với danh nghĩa và LSL/USL</h3>
+          <h3>Biểu đồ kích thước</h3>
           <div id="gcValueChart"></div>
-          <h3>SPC — UCL/LCL thống kê</h3>
+          <h3>Biểu đồ SPC</h3>
           <div id="gcSpcChart"></div>
-          <label class="no-print"
-            ><input type="checkbox" id="gcCapabilityConfirmed" /> Tôi đã xác minh quá trình ổn định, phân phối và cách
-            lấy mẫu phù hợp để đánh giá Cp/Cpk</label
+          <label class="no-print capability-check" title="Chỉ xác nhận khi quá trình ổn định, phân phối và cách lấy mẫu phù hợp để đánh giá Cp/Cpk."
+            ><input type="checkbox" id="gcCapabilityConfirmed" /> Đủ điều kiện Cp/Cpk</label
           >
-          <p id="gcCapability"></p>
+          <p id="gcCapability" title="Cp/Cpk cần 100 giá trị, 30 nhóm, không có tín hiệu mất kiểm soát và xác nhận điều kiện quá trình/phân phối."></p>
         </div>
         <div class="panel">
-          <h3>Đặc tính thường phát sinh NG</h3>
+          <h3>Đặc tính NG</h3>
           <div id="gcTopNg"></div>
         </div>
         <div class="panel">
-          <h3>Dữ liệu đo chi tiết</h3>
+          <h3>Chi tiết kết quả</h3>
           <div id="gcDataRows" class="scroll"></div>
           <button id="gcMoreRows">Tải thêm</button>
         </div>
@@ -442,7 +447,7 @@
     <script src="shared/ipqc-gc-entry.js?v=20261107-cmm-apply"></script>
     <script src="shared/ipqc-result-parser.js?v=20261107-cmm-apply"></script>
     <script src="shared/ipqc-result-reader.js?v=20261106-zeiss"></script>
-    <script src="shared/ipqc-result-import.js?v=20261107-cmm-apply"></script>
-    <script src="shared/ipqc-gia-cong.js?v=20261106-signed-copy"></script>
+    <script src="shared/ipqc-result-import.js?v=20261107-inspection-date"></script>
+    <script src="shared/ipqc-gia-cong.js?v=20261107-inspection-date"></script>
   </body>
 </html>

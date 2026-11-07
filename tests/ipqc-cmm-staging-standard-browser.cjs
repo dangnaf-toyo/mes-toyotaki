@@ -67,7 +67,7 @@ const actual = Object.fromEntries(verification.parsed.map((c) => [c.id, c.sample
       await page.goto("https://mes.test/ipqc-gia-cong.html");
       await page.waitForFunction(() => document.getElementById("gcMachine").options.length === 1);
       await page.locator("#gcMeasureProduct").fill(model);
-      await page.locator("#gcLot").fill("M2-VERIFY");
+      await page.locator("#gcMeasureProduct").dispatchEvent("change");
       await page.waitForFunction(
         () => document.querySelectorAll("#gcMeasureRows [data-result]").length === 15,
       );
@@ -109,7 +109,7 @@ const actual = Object.fromEntries(verification.parsed.map((c) => [c.id, c.sample
       assert.equal(await page.locator("[data-candidate]").count(), 11 - mapping.length);
       await page.locator("#gcImportFilter").selectOption("");
       await page.screenshot({ path: ".review/m2-" + model + "-matrix.png", fullPage: true });
-      assert.equal(await page.evaluate(() => sb.calls.length + sb.uploads.length), 0);
+      assert.equal(await page.evaluate(() => sb.calls.filter(c=>c.name==='ipqc_gc_luu_do').length + sb.uploads.length), 0);
       assert.equal(
         await page.evaluate(() => JSON.stringify([sb.tables.ipqc_btk, sb.tables.ipqc_btk_muc])),
         before,
