@@ -26,6 +26,8 @@
        — supabase/migration_phase_T145_bang_dieu_khien_bavia.sql.
   Đợt 2 (T146): Nạp KH từ KHSX tuần + số ca theo mã (bavia_kh_du_lieu / bavia_nap_kh), Báo cáo kết ca
   + khoá số liệu (bavia_ket_ca_luu, admin mở lại bavia_mo_lai_ca) — supabase/migration_phase_T146_bavia_nap_kh_ket_ca.sql.
+  T217: ca theo lần bấm Kết ca như Đúc (bavia_ca_dang_mo), chỉ ghi sản lượng vào ca đang mở
+  — supabase/migration_phase_T217_bavia_ca_theo_ket_ca.sql.
 -->
 <style>
   :root{
@@ -320,7 +322,7 @@
   <div class="header-group">
     <span class="header-label">Ca</span>
     <select id="fCa" class="header-select" aria-label="Ca">
-      <option>Ca ngày</option><option>Ca đêm</option><option>Ca 1</option><option>Ca 2</option>
+      <option>Ca ngày</option><option>Ca đêm</option>
     </select>
   </div>
   <div class="header-group">
@@ -481,13 +483,39 @@ function loiDeHieu(e) {
 function setFlash(k, t, detail) { flash = { k, t, detail }; }
 function errFlash(e) { const x = loiDeHieu(e); setFlash('bad', esc(x.t), x.d); }
 
-/* ── Ngày / ca mặc định theo giờ: 06:00–18:00 Ca ngày, còn lại Ca đêm ── */
+/* ── Ca theo giờ, chỉ dùng khi không lấy được ca đang mở từ server ── */
 function goiYNgayCa() {
   const now = new Date(Date.now() + 7 * 3600e3);
   const h = now.getUTCHours();
   if (h >= 6 && h < 18) return { ngay: now.toISOString().slice(0, 10), ca: 'Ca ngày' };
   const d = h < 6 ? new Date(now.getTime() - 86400e3) : now;
   return { ngay: d.toISOString().slice(0, 10), ca: 'Ca đêm' };
+}
+
+/* ── T217: ca đang mở tính theo lần bấm Kết ca. Trang tự đi theo ca này,
+   trừ khi người dùng chủ động chọn ca khác để xem. ── */
+let caMo = null, caTuChon = false;
+const laCaMo = () => !!caMo && $('#fNgay').value === caMo.ngay && $('#fCa').value === caMo.ca;
+async function layCaMo() {
+  try {
+    const { data, error } = await sb.rpc('bavia_ca_dang_mo');
+    if (!error && data && data.ca) { caMo = data; return caMo; }
+  } catch (e) { console.error(e); }
+  if (!caMo) caMo = goiYNgayCa();
+  return caMo;
+}
+function veCaMo() {
+  $('#fNgay').value = caMo.ngay; $('#fCa').value = caMo.ca;
+  caTuChon = false; reasons = {}; ngOpen = testOpen = retOpen = null;
+}
+function bannerCa() {
+  if (!caMo) return '';
+  if (!laCaMo()) return '<div class="flash warn">Đang xem <b>' + esc($('#fCa').value) + ' ' + dmy($('#fNgay').value) + '</b>. Ca đang mở là <b>' +
+    esc(caMo.ca) + ' ' + dmy(caMo.ngay) + '</b>. ' + (laAdmin ? 'Admin vẫn ghi được vào ca này để sửa số liệu.' : 'Ca này không ghi được sản lượng.') +
+    ' <button class="tiny" type="button" data-veca>Về ca đang mở</button></div>';
+  if (caMo.giu_ca_truoc) return '<div class="flash ok">Đã qua giờ hết ca nhưng chưa bấm kết ca: sản lượng vẫn tính vào <b>' +
+    esc(caMo.ca) + ' ' + dmy(caMo.ngay) + '</b> đến khi bấm Kết ca.</div>';
+  return '';
 }
 
 /* ── Tải dữ liệu ─────────────────────────────────────────────────────────── */
@@ -508,6 +536,9 @@ async function taiDanhMuc() {
 }
 
 async function taiLai() {
+  await layCaMo();
+  // Đang mở báo cáo kết ca thì giữ nguyên ca đang xem; đóng báo cáo mới chuyển sang ca sau.
+  if (!caTuChon && !laCaMo() && $('#rpModal').hidden) veCaMo();
   const ngay = $('#fNgay').value, ca = $('#fCa').value;
   const { data, error } = await sb.rpc('bavia_du_lieu', { p_ngay: ngay, p_ca: ca });
   if (error) { errFlash(error); renderAll(); return; }
@@ -706,7 +737,7 @@ function testResult(t, i) {
 
 function renderWs() {
   const l = curLine();
-  const fl = flash ? '<div class="flash ' + flash.k + '">' + flash.t + (flash.detail ? '<details><summary>Chi tiết kỹ thuật</summary>' + esc(flash.detail) + '</details>' : '') + '</div>' : '';
+  const fl = bannerCa() + (flash ? '<div class="flash ' + flash.k + '">' + flash.t + (flash.detail ? '<details><summary>Chi tiết kỹ thuật</summary>' + esc(flash.detail) + '</details>' : '') + '</div>' : '');
   if (!D) { $('#ws').innerHTML = '<div class="card">' + fl + '</div>'; return; }
   if (!l) {
     $('#ws').innerHTML = '<div class="card"><div class="empty-box">Chưa có Line nào trong ' + esc($('#fCa').value) + ' ' + dmy($('#fNgay').value) +
@@ -896,7 +927,8 @@ document.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
   const l = curLine();
   if (t.dataset.line) { selLine = t.dataset.line; lsSet('bvdb_line', selLine); flash = null; ngOpen = testOpen = retOpen = null; renderLines(); renderWs(); const s = $('#scan'); if (s) s.focus({ preventScroll: true }); return; }
-  if (t.dataset.close !== undefined) { t.closest('.modal-bg').hidden = true; return; }
+  if (t.dataset.close !== undefined) { const m = t.closest('.modal-bg'); m.hidden = true; if (m.id === 'rpModal') taiLai(); return; }
+  if (t.dataset.veca !== undefined) { flash = null; veCaMo(); taiLai(); return; }
   if (!l) return;
   if (t.dataset.ng !== undefined) { ngOpen = Number(t.dataset.ng); testOpen = null; flash = null; renderWs(); const q = $('#ngRows .ng-qty'); if (q) q.focus(); return; }
   if (t.dataset.ngadd !== undefined) { $('#ngRows').insertAdjacentHTML('beforeend', ngRowHtml()); ngTong(); $('#ngRows .ng-row:last-child .ng-loai').focus(); return; }
@@ -1103,8 +1135,10 @@ function rpRows() {
 const canLyDo = r => r.kh > 0 && r.pct < KH_DAT;
 function rpChecks(rows) {
   const out = [];
-  rows.filter(r => !opsOf(r.l).length).forEach(r => out.push(['bad', esc(r.l.ten_line) + ' chưa gán người thao tác.']));
-  rows.filter(r => !r.l.nguoi_kiem_tra).forEach(r => out.push(['bad', esc(r.l.ten_line) + ' chưa có người kiểm tra.']));
+  // T217: Line không có việc (chỉ nạp KH, không chạy) không bắt buộc gán người.
+  const coViec = r => r.thung > 0 || r.ng > 0 || (r.l.test || []).some(t => t.id_tram === r.l.id_tram);
+  rows.filter(r => coViec(r) && !opsOf(r.l).length).forEach(r => out.push(['bad', esc(r.l.ten_line) + ' chưa gán người thao tác.']));
+  rows.filter(r => coViec(r) && !r.l.nguoi_kiem_tra).forEach(r => out.push(['bad', esc(r.l.ten_line) + ' chưa có người kiểm tra.']));
   rows.filter(r => canLyDo(r) && (reasons[r.l.ten_line] || '').trim().length < 3).forEach(r =>
     out.push(['bad', esc(r.l.ten_line) + ' đạt ' + Math.round(r.pct * 100) + '% KH ca. Ghi lý do chưa đạt trong bảng.']));
   rows.forEach(r => r.dangTest.forEach(t => out.push(['warn', esc(r.l.ten_line) + ': ' + fmt(t.so_luong) + ' pcs đang test (' + esc(t.muc_dich) + ', ' +
@@ -1205,7 +1239,7 @@ function moBaoCao() {
   const c = $('#rpConfirm');
   if (c) c.onclick = async () => {
     if (rpChecks(rpRows()).some(x => x[0] === 'bad')) return;
-    if (!confirm('Kết ca ' + $('#fCa').value + ' ' + dmy($('#fNgay').value) + '? Sau khi kết, số liệu ca bị khoá.')) return;
+    if (!confirm('Kết ca ' + $('#fCa').value + ' ' + dmy($('#fNgay').value) + '? Sau khi kết, số liệu ca bị khoá và sản lượng tiếp theo tính vào ca sau.')) return;
     c.disabled = true;
     try {
       const ly = {};
@@ -1300,10 +1334,10 @@ function tick() {
 (async function boot() {
   tick(); setInterval(tick, 1000);
   await MesAuth.requireAuth();
-  const g = goiYNgayCa();
-  $('#fNgay').value = g.ngay; $('#fCa').value = g.ca;
+  await layCaMo();
+  veCaMo();
   selLine = lsGet('bvdb_line', null);
-  $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; reasons = {}; ngOpen = testOpen = retOpen = null; taiLai(); };
+  $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; reasons = {}; ngOpen = testOpen = retOpen = null; caTuChon = !laCaMo(); taiLai(); };
   $('#fTruongCa').onchange = () => lsSet('bvdb_truong_ca', $('#fTruongCa').value);
   $('#btnReload').onclick = () => { flash = null; taiLai(); };
   try { await taiDanhMuc(); } catch (e) { console.error(e); }
