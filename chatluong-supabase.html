@@ -126,6 +126,8 @@
   .proc-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:16px;}
 
   /* customer matrix */
+  .mx-link{cursor:pointer;border-radius:6px;transition:box-shadow .15s}
+  .mx-link:hover{box-shadow:0 0 0 2px #0F5FA5}
   .matrix{display:grid; grid-template-columns:150px 1fr 1fr; gap:14px;}
   .matrix .mx-head{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding-bottom:6px; border-bottom:2px solid var(--ink); align-self:end;}
   .mx-name{display:flex; align-items:center; font-family:'Inter',sans-serif; font-size:15px; font-weight:600; padding:14px 4px 0;}
@@ -1088,11 +1090,19 @@ function renderDashboard(data){
         <div class="mx-cell">
           <div class="mx-cell-head" id="mxBadgeInt_${n.replace(/\W/g,'')}">${evalBadge(iSeries[reportIdx], idData.target, reportIdx)}</div>
           <div class="target-note">Mục tiêu: ${fmtPct(idData.target)}</div>
-          <div class="mini-canvas"><canvas id="mx_int_${n.replace(/\W/g,'')}"></canvas></div>
+          <div class="mini-canvas mx-link" data-nhom="${n}" title="Bấm để xem P-Chart NG Bavia hằng ngày từng mã của ${custLabel(n)} — tháng T${reportIdx+1}"><canvas id="mx_int_${n.replace(/\W/g,'')}"></canvas></div>
+          <div class="target-note" style="text-align:right">↗ Bấm biểu đồ để xem P-Chart NG Bavia từng mã</div>
           ${commentBoxHTML(customerCommentKey(n,'internal'), `Comment — Tháng báo cáo`)}
         </div>`;
     });
     matrix.innerHTML = matrixHTML;
+    // Bấm biểu đồ báo phế nội bộ của 1 khách hàng → P-Chart NG Bavia hằng ngày từng mã của khách đó, trong tháng báo cáo
+    matrix.querySelectorAll('.mx-link').forEach(el => el.addEventListener('click', () => {
+      const now = new Date(), m = reportIdx + 1, y = now.getFullYear() - (m > now.getMonth() + 1 ? 1 : 0);
+      const pad = x => String(x).padStart(2, '0'), cuoi = new Date(y, m, 0).getDate();
+      const q = new URLSearchParams({ tab: 'bavia', tu: `${y}-${pad(m)}-01`, den: `${y}-${pad(m)}-${pad(cuoi)}`, nhom: el.dataset.nhom });
+      window.open('bieu-do-chat-luong.html?' + q.toString(), '_blank');
+    }));
 
     const mxAxisOpts = {
       responsive:true, maintainAspectRatio:false, layout:{padding:{right:4}},
