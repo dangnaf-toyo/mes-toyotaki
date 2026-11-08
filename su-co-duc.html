@@ -374,9 +374,13 @@ function setUrl(){
 }
 
 // ── Hiển thị ──────────────────────────────────────────────────────────────────
-function statBlock(title, dim, rows, keyFn, labelFn, cur){
+// Đã chọn giá trị ở chiều này → chỉ hiện đúng giá trị đó (sự cố nhiều mã SP/khuôn
+// không kéo theo mã khác); nhóm loại "g:X" → hiện các mã trong nhóm. Chưa chọn →
+// bỏ lọc chiều này để thấy mọi giá trị. Bấm lại dòng đang chọn để bỏ lọc.
+function statBlock(title, dim, keyFn, labelFn, cur){
+  const rows = cur ? filtered() : filtered(dim), chiMot = cur && !cur.startsWith('g:');
   const g = new Map();
-  rows.forEach(r => [].concat(keyFn(r)).forEach(k => { if (!k) return; const x = g.get(k) || { n: 0, p: 0 }; x.n++; x.p += r.phut; g.set(k, x); }));
+  rows.forEach(r => [].concat(keyFn(r)).forEach(k => { if (!k || (chiMot && k !== cur)) return; const x = g.get(k) || { n: 0, p: 0 }; x.n++; x.p += r.phut; g.set(k, x); }));
   const list = [...g.entries()].sort((a, b) => b[1].p - a[1].p || b[1].n - a[1].n).slice(0, 10);
   const maxP = Math.max(1, ...list.map(x => x[1].p));
   return '<div class="card stat"><div class="card-title">' + title + ' <span style="text-transform:none;font-weight:500">(theo phút dừng)</span></div>' +
@@ -403,10 +407,10 @@ function render(){
       fmtNum(Math.round(tCl)) + '<span style="font-size:12px;color:var(--text-muted)"> p · ' + Math.round(tCl / Math.max(1, tXl + tCl) * 100) + '% CL</span></div></div>' : '') +
     '<div class="kpi"><div class="l">Đang mở</div><div class="v' + (dangMo ? ' alarm' : '') + '">' + fmtNum(dangMo) + '</div></div>';
   $('stats').innerHTML =
-    statBlock('Theo loại vấn đề', 'loai', filtered('loai'), r => r.ma, m => m + ' — ' + (TEN_LOAI[m] || 'Không rõ'), $('fLoai').value) +
-    statBlock('Theo máy', 'may', filtered('may'), r => r.ma_may, null, $('fMay').value) +
-    statBlock('Theo mã SP', 'sp', filtered('sp'), r => r.ma_sps, null, $('fSp').value) +
-    statBlock('Theo khuôn', 'khuon', filtered('khuon'), r => r.so_khuons, null, $('fKhuon').value);
+    statBlock('Theo loại vấn đề', 'loai', r => r.ma, m => m + ' — ' + (TEN_LOAI[m] || 'Không rõ'), $('fLoai').value) +
+    statBlock('Theo máy', 'may', r => r.ma_may, null, $('fMay').value) +
+    statBlock('Theo mã SP', 'sp', r => r.ma_sps, null, $('fSp').value) +
+    statBlock('Theo khuôn', 'khuon', r => r.so_khuons, null, $('fKhuon').value);
 
   const k = sortKey;
   rows.sort((a, b) => {
