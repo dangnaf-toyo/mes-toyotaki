@@ -128,9 +128,9 @@
   /* customer matrix */
   .mx-link{cursor:pointer;border-radius:6px;transition:box-shadow .15s}
   .mx-link:hover{box-shadow:0 0 0 2px #0F5FA5}
-  .matrix{display:grid; grid-template-columns:150px 1fr 1fr; gap:14px;}
+  .matrix{display:grid; grid-template-columns:180px 1fr 1fr; gap:14px;}
   .matrix .mx-head{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding-bottom:6px; border-bottom:2px solid var(--ink); align-self:end;}
-  .mx-name{display:flex; align-items:center; font-family:'Inter',sans-serif; font-size:15px; font-weight:600; padding:14px 4px 0;}
+  .mx-name{display:flex; align-items:center; font-family:'Inter',sans-serif; font-size:14px; font-weight:600; padding:14px 4px 0; overflow-wrap:anywhere;}
   .mx-cell{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:2px;}
   .mx-cell .mx-cell-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
   .mx-cell .target-note{font-size:11px; color:var(--muted); margin-bottom:6px;}
@@ -465,7 +465,13 @@ function evalPointsBadge(v, reportIdx){
   const ok = v>=0;
   return `<span class="badge ${ok?'ok':'no'}">T${reportIdx+1}: ${ok?'Đạt (dương)':'Không đạt (âm)'} · ${v} điểm</span>`;
 }
-function custLabel(k){ return k === 'KHAC' ? 'KHÁC' : k; }
+// Tên hiển thị khách hàng = tên đầy đủ trong Danh mục sản phẩm, đọc từ bảng cl_nhom_khach_hang (T225).
+// Khoá ngắn (FCC, Hitachi (ASTEMO)…) vẫn là khoá dữ liệu / comment; DB tự chuẩn hoá tên khi nạp Sheet/Excel.
+let NHOM_KH_DS = [
+  {ma_nhom:'Hitachi (ASTEMO)', ten_hien_thi:'ASTEMO PHU THO CO., LTD.'}, {ma_nhom:'FCC', ten_hien_thi:'FCC (VIETNAM) CO.,LTD'},
+  {ma_nhom:'FOMECO', ten_hien_thi:'FOMECO'}, {ma_nhom:'EXEDY', ten_hien_thi:'EXEDY Vietnam Co.,Ltd'}, {ma_nhom:'KHAC', ten_hien_thi:'Khách hàng khác'}
+];
+function custLabel(k){ const n = NHOM_KH_DS.find(x => x.ma_nhom === k); return n ? n.ten_hien_thi : (k === 'KHAC' ? 'Khách hàng khác' : k); }
 function procLabel(k){ return ({'Duc (tat ca KH)':'Đúc (tất cả KH)','Gia cong (CNC)':'Gia công (CNC)','Son':'Sơn'})[k] || k; }
 function processCommentKey(k){ return ({'Duc (tat ca KH)':'process_Duc','Bavia':'process_Bavia','Gia cong (CNC)':'process_GiaCong','Cắt viền (CNC)':'process_CatVien','Son':'process_Son'})[k]; }
 function customerCommentKey(k, type){ return `customer_${type}_${k==='KHAC' ? 'KHAC' : k.replace(/\s*\(.*\)/,'').trim()}`; }
@@ -644,7 +650,7 @@ function buildDataModel(raw){
   const internalTotal = {prod:tongHopProd, ng:tongHopNg, target:totalNoiBo};
   const returnTotal = {ship:tongHopShip, ret:tongHopRet, target:totalTraVe};
 
-  const CUSTOMER_KEYS = ['Hitachi (ASTEMO)','FCC','FOMECO','EXEDY','KHAC'];
+  const CUSTOMER_KEYS = NHOM_KH_DS.map(x => x.ma_nhom);
   const internalByCustomer = {}, returnByCustomer = {}, returnNotTracked = [];
   CUSTOMER_KEYS.forEach(k=>{
     const t = targetsByName[k] || {};
@@ -927,6 +933,82 @@ function targetLine(value, label){
    comment text was re-applied. Structure is now built ONCE; every later refresh only
    updates chart data and comment values in place, leaving the DOM nodes (and their
    user-resized dimensions) untouched. */
+// Ma trận "Theo khách hàng": dựng lại khi danh sách nhóm KH (cl_nhom_khach_hang) hoặc
+// nhóm không theo dõi trả về thay đổi — lần dựng đầu là dữ liệu mẫu.
+let builtCustSig = '';
+function custSig(data, custNames){ return JSON.stringify([custNames, data.returnNotTracked, custNames.map(custLabel)]); }
+function buildCustMatrix(data, custNames, reportIdx){
+  Object.keys(chartsByKey).filter(k => k.startsWith('mx_')).forEach(k => {
+    const c = chartsByKey[k]; c.destroy(); allCharts = allCharts.filter(x => x !== c); delete chartsByKey[k];
+  });
+  builtCustSig = custSig(data, custNames);
+  // ---- build customer matrix (grid HTML + charts) ----
+  const matrix = document.getElementById('custMatrix');
+  let matrixHTML = `<div class="mx-head">Khách hàng</div><div class="mx-head">Báo phế khách hàng trả về</div><div class="mx-head">Báo phế nội bộ (Đúc)</div>`;
+  custNames.forEach((n)=>{
+    const rd = data.returnByCustomer[n]; const idData = data.internalByCustomer[n];
+    const skipReturn = data.returnNotTracked.includes(n);
+    matrixHTML += `<div class="mx-name">${custLabel(n)}</div>`;
+    if (skipReturn){
+      matrixHTML += `<div class="mx-cell"><div class="mx-empty">Không quản lý chỉ tiêu này cho khách hàng ${custLabel(n)}</div></div>`;
+    } else {
+      const rSeries = retSeriesRate(rd);
+      matrixHTML += `
+        <div class="mx-cell">
+          <div class="mx-cell-head" id="mxBadgeRet_${n.replace(/\W/g,'')}">${evalBadge(rSeries[reportIdx], rd.target, reportIdx)}</div>
+          <div class="target-note">Mục tiêu: ${fmtPct(rd.target)}</div>
+          <div class="mini-canvas"><canvas id="mx_ret_${n.replace(/\W/g,'')}"></canvas></div>
+          ${commentBoxHTML(customerCommentKey(n,'return'), `Comment — Tháng báo cáo`)}
+        </div>`;
+    }
+    const iSeries = seriesRate(idData);
+    matrixHTML += `
+      <div class="mx-cell">
+        <div class="mx-cell-head" id="mxBadgeInt_${n.replace(/\W/g,'')}">${evalBadge(iSeries[reportIdx], idData.target, reportIdx)}</div>
+        <div class="target-note">Mục tiêu: ${fmtPct(idData.target)}</div>
+        <div class="mini-canvas mx-link" data-nhom="${n}" title="Bấm để xem P-Chart NG Bavia hằng ngày từng mã của ${custLabel(n)} trong tháng báo cáo"><canvas id="mx_int_${n.replace(/\W/g,'')}"></canvas></div>
+        <div class="target-note" style="text-align:right">↗ Bấm biểu đồ để xem P-Chart NG Bavia từng mã</div>
+        ${commentBoxHTML(customerCommentKey(n,'internal'), `Comment — Tháng báo cáo`)}
+      </div>`;
+  });
+  matrix.innerHTML = matrixHTML;
+  // Bấm biểu đồ báo phế nội bộ của 1 khách hàng → P-Chart NG Bavia hằng ngày từng mã của khách đó, trong tháng báo cáo
+  matrix.querySelectorAll('.mx-link').forEach(el => el.addEventListener('click', () => {
+    const now = new Date(), m = currentReportIdx + 1, y = now.getFullYear() - (m > now.getMonth() + 1 ? 1 : 0);
+    const pad = x => String(x).padStart(2, '0'), cuoi = new Date(y, m, 0).getDate();
+    const q = new URLSearchParams({ tab: 'bavia', tu: `${y}-${pad(m)}-01`, den: `${y}-${pad(m)}-${pad(cuoi)}`, nhom: el.dataset.nhom });
+    window.open('bieu-do-chat-luong.html?' + q.toString(), '_blank');
+  }));
+
+  const mxAxisOpts = {
+    responsive:true, maintainAspectRatio:false, layout:{padding:{right:4}},
+    plugins:{legend:{display:false}},
+    scales:{ x:{ticks:{font:{size:10}}, grid:{color:palette.line}}, y:{ticks:{font:{size:10}, callback:v=>v+'%'}, grid:{color:palette.line}} }
+  };
+  custNames.forEach((n)=>{
+    const rd = data.returnByCustomer[n]; const idData = data.internalByCustomer[n];
+    if (!data.returnNotTracked.includes(n)){
+      track('mx_ret_'+n, new Chart(document.getElementById('mx_ret_'+n.replace(/\W/g,'')), {
+        type:'line',
+        data:{labels:monthsFull, datasets:[
+          {data:retSeriesRate(rd), borderColor:palette.bad, backgroundColor:palette.bad, tension:.3, pointRadius:3, borderWidth:2.5, spanGaps:false},
+          {data:targetArr(rd.target), borderColor:palette.muted, borderDash:[4,3], borderWidth:1.5, pointRadius:0, spanGaps:true}
+        ]},
+        options:mxAxisOpts
+      }));
+    }
+    track('mx_int_'+n, new Chart(document.getElementById('mx_int_'+n.replace(/\W/g,'')), {
+      type:'line',
+      data:{labels:monthsFull, datasets:[
+        {data:seriesRate(idData), borderColor:palette.orange, backgroundColor:palette.orange, tension:.3, pointRadius:3, borderWidth:2.5, spanGaps:false},
+        {data:targetArr(idData.target), borderColor:palette.muted, borderDash:[4,3], borderWidth:1.5, pointRadius:0, spanGaps:true}
+      ]},
+      options:mxAxisOpts
+    }));
+  });
+
+}
+
 function renderDashboard(data){
   const reportIdx = (() => {
     for (let i=11;i>=0;i--){ if (data.internalTotal.prod[i]!=null) return i; }
@@ -1070,70 +1152,7 @@ function renderDashboard(data){
       }
     }));
 
-    // ---- build customer matrix (grid HTML + charts) ----
-    const matrix = document.getElementById('custMatrix');
-    let matrixHTML = `<div class="mx-head">Khách hàng</div><div class="mx-head">Báo phế khách hàng trả về</div><div class="mx-head">Báo phế nội bộ (Đúc)</div>`;
-    custNames.forEach((n)=>{
-      const rd = data.returnByCustomer[n]; const idData = data.internalByCustomer[n];
-      const skipReturn = data.returnNotTracked.includes(n);
-      matrixHTML += `<div class="mx-name">${custLabel(n)}</div>`;
-      if (skipReturn){
-        matrixHTML += `<div class="mx-cell"><div class="mx-empty">Không quản lý chỉ tiêu này cho khách hàng ${custLabel(n)}</div></div>`;
-      } else {
-        const rSeries = retSeriesRate(rd);
-        matrixHTML += `
-          <div class="mx-cell">
-            <div class="mx-cell-head" id="mxBadgeRet_${n.replace(/\W/g,'')}">${evalBadge(rSeries[reportIdx], rd.target, reportIdx)}</div>
-            <div class="target-note">Mục tiêu: ${fmtPct(rd.target)}</div>
-            <div class="mini-canvas"><canvas id="mx_ret_${n.replace(/\W/g,'')}"></canvas></div>
-            ${commentBoxHTML(customerCommentKey(n,'return'), `Comment — Tháng báo cáo`)}
-          </div>`;
-      }
-      const iSeries = seriesRate(idData);
-      matrixHTML += `
-        <div class="mx-cell">
-          <div class="mx-cell-head" id="mxBadgeInt_${n.replace(/\W/g,'')}">${evalBadge(iSeries[reportIdx], idData.target, reportIdx)}</div>
-          <div class="target-note">Mục tiêu: ${fmtPct(idData.target)}</div>
-          <div class="mini-canvas mx-link" data-nhom="${n}" title="Bấm để xem P-Chart NG Bavia hằng ngày từng mã của ${custLabel(n)} trong tháng báo cáo"><canvas id="mx_int_${n.replace(/\W/g,'')}"></canvas></div>
-          <div class="target-note" style="text-align:right">↗ Bấm biểu đồ để xem P-Chart NG Bavia từng mã</div>
-          ${commentBoxHTML(customerCommentKey(n,'internal'), `Comment — Tháng báo cáo`)}
-        </div>`;
-    });
-    matrix.innerHTML = matrixHTML;
-    // Bấm biểu đồ báo phế nội bộ của 1 khách hàng → P-Chart NG Bavia hằng ngày từng mã của khách đó, trong tháng báo cáo
-    matrix.querySelectorAll('.mx-link').forEach(el => el.addEventListener('click', () => {
-      const now = new Date(), m = currentReportIdx + 1, y = now.getFullYear() - (m > now.getMonth() + 1 ? 1 : 0);
-      const pad = x => String(x).padStart(2, '0'), cuoi = new Date(y, m, 0).getDate();
-      const q = new URLSearchParams({ tab: 'bavia', tu: `${y}-${pad(m)}-01`, den: `${y}-${pad(m)}-${pad(cuoi)}`, nhom: el.dataset.nhom });
-      window.open('bieu-do-chat-luong.html?' + q.toString(), '_blank');
-    }));
-
-    const mxAxisOpts = {
-      responsive:true, maintainAspectRatio:false, layout:{padding:{right:4}},
-      plugins:{legend:{display:false}},
-      scales:{ x:{ticks:{font:{size:10}}, grid:{color:palette.line}}, y:{ticks:{font:{size:10}, callback:v=>v+'%'}, grid:{color:palette.line}} }
-    };
-    custNames.forEach((n)=>{
-      const rd = data.returnByCustomer[n]; const idData = data.internalByCustomer[n];
-      if (!data.returnNotTracked.includes(n)){
-        track('mx_ret_'+n, new Chart(document.getElementById('mx_ret_'+n.replace(/\W/g,'')), {
-          type:'line',
-          data:{labels:monthsFull, datasets:[
-            {data:retSeriesRate(rd), borderColor:palette.bad, backgroundColor:palette.bad, tension:.3, pointRadius:3, borderWidth:2.5, spanGaps:false},
-            {data:targetArr(rd.target), borderColor:palette.muted, borderDash:[4,3], borderWidth:1.5, pointRadius:0, spanGaps:true}
-          ]},
-          options:mxAxisOpts
-        }));
-      }
-      track('mx_int_'+n, new Chart(document.getElementById('mx_int_'+n.replace(/\W/g,'')), {
-        type:'line',
-        data:{labels:monthsFull, datasets:[
-          {data:seriesRate(idData), borderColor:palette.orange, backgroundColor:palette.orange, tension:.3, pointRadius:3, borderWidth:2.5, spanGaps:false},
-          {data:targetArr(idData.target), borderColor:palette.muted, borderDash:[4,3], borderWidth:1.5, pointRadius:0, spanGaps:true}
-        ]},
-        options:mxAxisOpts
-      }));
-    });
+    buildCustMatrix(data, custNames, reportIdx);
 
     wireAllCommentBoxes(document.getElementById('overview'), data.comments);
     wireAllCommentBoxes(document.getElementById('process'), data.comments);
@@ -1226,6 +1245,10 @@ function renderDashboard(data){
     chartsByKey.qcRepaint.data.datasets[0].data = [data.qcRepaint.sonLan1, data.qcRepaint.sonLai];
     chartsByKey.qcRepaint.update();
 
+    if (custSig(data, custNames) !== builtCustSig){
+      buildCustMatrix(data, custNames, reportIdx);
+      wireAllCommentBoxes(document.getElementById('customer'), data.comments);
+    }
     custNames.forEach(n=>{
       const rd = data.returnByCustomer[n]; const idData = data.internalByCustomer[n]; const id = n.replace(/\W/g,'');
       if (!data.returnNotTracked.includes(n) && chartsByKey['mx_ret_'+n]){
@@ -1332,6 +1355,10 @@ async function loadData(){
     const extraSettled = await Promise.allSettled(EXTRA_KEYS.map(k => fetchSupabaseTable(EXTRA_TABLES[k])));
     const extra = {};
     EXTRA_KEYS.forEach((k,i) => { extra[k] = extraSettled[i].status === 'fulfilled' ? remapKeys(extraSettled[i].value, KEY_MAPS[k]) : []; });
+    try {
+      const nhom = await fetchSupabaseTable('cl_nhom_khach_hang', 'ma_nhom,ten_hien_thi,thu_tu');
+      if (nhom && nhom.length) NHOM_KH_DS = nhom.sort((a, b) => a.thu_tu - b.thu_tu);
+    } catch (e) { console.warn('Không đọc được cl_nhom_khach_hang — dùng tên mặc định', e); }
     const data = buildDataModel(Object.assign({}, core, extra));
     renderDashboard(data);
     const missingExtra = extraSettled.filter(r => r.status !== 'fulfilled').length;
