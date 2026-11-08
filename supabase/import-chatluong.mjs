@@ -8,6 +8,15 @@
 //   node supabase/import-chatluong.mjs
 //
 // Không commit service_role key vào git — chỉ truyền qua biến môi trường lúc chạy.
+//
+// TÊN KHÁCH HÀNG (T225) — đọc trước khi nạp số liệu tháng mới:
+//   Cột KhachHang (sheet theoKhachHang) và Ten (sheet targets, Loai=KhachHang) được DB tự chuẩn hoá
+//   về khoá nhóm trong bảng cl_nhom_khach_hang (Hitachi (ASTEMO) / FCC / FOMECO / EXEDY / KHAC).
+//   Ghi tên ngắn, tên đầy đủ trong Danh mục sản phẩm, hay bí danh đã khai đều được.
+//   Tên LẠ → DB báo lỗi "Tên khách hàng ... không có trong bảng nhóm khách hàng" và KHÔNG nạp:
+//   thêm tên đó vào cl_nhom_khach_hang.bi_danh (hoặc thêm nhóm mới) rồi chạy lại.
+//   Dashboard + P-Chart NG Bavia hiển thị cl_nhom_khach_hang.ten_hien_thi (= tên trong Danh mục sản phẩm).
+//   Xem supabase/migration_phase_T225_cl_nhom_khach_hang.sql.
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

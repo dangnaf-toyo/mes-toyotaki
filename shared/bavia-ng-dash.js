@@ -47,16 +47,28 @@
   // Nhóm khách hàng của Dashboard chất lượng (tab Theo khách hàng) → TÊN ĐẦY ĐỦ đúng như
   // master_products.ten_khach_hang (Danh mục sản phẩm). "KHAC" = mọi khách không thuộc 4 nhóm chính.
   // Đổi tên khách trong danh mục thì sửa ở đây.
-  const NHOM_KH = {
+  // Mặc định khi chưa đọc được bảng cl_nhom_khach_hang (T225 — nguồn chung với Dashboard KPI chất lượng);
+  // mount() nạp bảng rồi ghi đè: tên đầy đủ (ten_day_du) + bí danh (bi_danh).
+  let NHOM_KH = {
     'Hitachi (ASTEMO)': ['ASTEMO PHU THO CO., LTD.'],
     FCC: ['FCC (VIETNAM) CO.,LTD'],
     FOMECO: ['FOMECO'],
     EXEDY: ['EXEDY Vietnam Co.,Ltd'],
   };
+  let TEN_HIEN_THI = {};
   const chuan = s => String(s || '').trim().toLowerCase();
-  const TEN_CHINH = new Set([].concat(...Object.values(NHOM_KH)).map(chuan));
-  const trongNhom = (nhom, kh) => nhom === 'KHAC' ? !!chuan(kh) && !TEN_CHINH.has(chuan(kh))
+  const tenChinh = () => new Set([].concat(...Object.values(NHOM_KH)).map(chuan));
+  const trongNhom = (nhom, kh) => nhom === 'KHAC' ? !!chuan(kh) && !tenChinh().has(chuan(kh))
     : !!NHOM_KH[nhom] && NHOM_KH[nhom].some(t => chuan(t) === chuan(kh));
+  async function napNhomKh() {
+    try {
+      const { data, error } = await sb.from('cl_nhom_khach_hang').select('ma_nhom,ten_hien_thi,ten_day_du,bi_danh');
+      if (error || !data || !data.length) return;
+      const m = {}, t = {};
+      data.forEach(r => { t[r.ma_nhom] = r.ten_hien_thi; if (r.ma_nhom !== 'KHAC') m[r.ma_nhom] = [].concat(r.ten_day_du || [], r.bi_danh || []); });
+      NHOM_KH = m; TEN_HIEN_THI = t;
+    } catch (e) { /* giữ mặc định */ }
+  }
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
   const META = {
@@ -110,6 +122,7 @@
   async function mount(el, opts) {
     css();
     opts = opts || {};
+    await napNhomKh();
     const today = ymd(new Date());
     const st = { start: addDays(today, -15), end: today, range: 16, kh: '', nhom: NHOM_KH[opts.nhom] || opts.nhom === 'KHAC' ? opts.nhom : '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null };
     el.innerHTML =
@@ -221,7 +234,7 @@
     function hopKh(r) { const k = khOf(r); return (!st.nhom || trongNhom(st.nhom, k)) && (!st.kh || k === st.kh); }
     function veNhom() {
       $('nhom').innerHTML = st.nhom ? '<button type="button" class="btn sm on" data-act="bonhom" title="Bỏ lọc nhóm khách hàng">Nhóm KH: ' +
-        esc(st.nhom === 'KHAC' ? 'Khách hàng khác' : NHOM_KH[st.nhom].join(', ')) + ' ✕</button>' : '';
+        esc(TEN_HIEN_THI[st.nhom] || (st.nhom === 'KHAC' ? 'Khách hàng khác' : NHOM_KH[st.nhom][0])) + ' ✕</button>' : '';
     }
     function fillKh() {
       const sel = el.querySelector('[data-k="kh"]');
