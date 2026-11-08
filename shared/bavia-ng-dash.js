@@ -44,10 +44,19 @@
   ];
   const NGUON = { excel: 'Excel QC', mes: 'MES' };
   const isOther = l => /^(loại |lỗi |nhóm )?(khác|ngoài ra|other|others)$/i.test(String(l).trim());
-  // Nhóm khách hàng của Dashboard chất lượng (tab Theo khách hàng) → khớp ten_khach_hang.
-  // "KHAC" = mọi khách không thuộc 4 nhóm chính.
-  const NHOM_KH = { 'Hitachi (ASTEMO)': /astemo|hitachi/i, FCC: /fcc/i, FOMECO: /fomeco/i, EXEDY: /exedy/i };
-  const trongNhom = (nhom, kh) => nhom === 'KHAC' ? !!kh && !Object.values(NHOM_KH).some(re => re.test(kh)) : !!(NHOM_KH[nhom] && NHOM_KH[nhom].test(kh || ''));
+  // Nhóm khách hàng của Dashboard chất lượng (tab Theo khách hàng) → TÊN ĐẦY ĐỦ đúng như
+  // master_products.ten_khach_hang (Danh mục sản phẩm). "KHAC" = mọi khách không thuộc 4 nhóm chính.
+  // Đổi tên khách trong danh mục thì sửa ở đây.
+  const NHOM_KH = {
+    'Hitachi (ASTEMO)': ['ASTEMO PHU THO CO., LTD.'],
+    FCC: ['FCC (VIETNAM) CO.,LTD'],
+    FOMECO: ['FOMECO'],
+    EXEDY: ['EXEDY Vietnam Co.,Ltd'],
+  };
+  const chuan = s => String(s || '').trim().toLowerCase();
+  const TEN_CHINH = new Set([].concat(...Object.values(NHOM_KH)).map(chuan));
+  const trongNhom = (nhom, kh) => nhom === 'KHAC' ? !!chuan(kh) && !TEN_CHINH.has(chuan(kh))
+    : !!NHOM_KH[nhom] && NHOM_KH[nhom].some(t => chuan(t) === chuan(kh));
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
   const META = {
@@ -212,7 +221,7 @@
     function hopKh(r) { const k = khOf(r); return (!st.nhom || trongNhom(st.nhom, k)) && (!st.kh || k === st.kh); }
     function veNhom() {
       $('nhom').innerHTML = st.nhom ? '<button type="button" class="btn sm on" data-act="bonhom" title="Bỏ lọc nhóm khách hàng">Nhóm KH: ' +
-        esc(st.nhom === 'KHAC' ? 'Khách hàng khác' : st.nhom) + ' ✕</button>' : '';
+        esc(st.nhom === 'KHAC' ? 'Khách hàng khác' : NHOM_KH[st.nhom].join(', ')) + ' ✕</button>' : '';
     }
     function fillKh() {
       const sel = el.querySelector('[data-k="kh"]');
