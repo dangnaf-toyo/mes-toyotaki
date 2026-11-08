@@ -428,6 +428,9 @@ const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 /* ========================================================================= */
 
 const REPORT_IDX_FALLBACK = 6;
+// Tháng báo cáo của lần render gần nhất. Ma trận khách hàng chỉ dựng 1 lần (lúc đó còn là dữ liệu mẫu T6),
+// nên nút bấm sang P-Chart Bavia phải đọc biến này chứ không giữ reportIdx của lần dựng đầu.
+let currentReportIdx = REPORT_IDX_FALLBACK;
 const monthsFull = Array.from({length:12},(_,i)=>'T'+(i+1));
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.color = '#5c5044';
@@ -929,6 +932,7 @@ function renderDashboard(data){
     for (let i=11;i>=0;i--){ if (data.internalTotal.prod[i]!=null) return i; }
     return REPORT_IDX_FALLBACK;
   })();
+  currentReportIdx = reportIdx;
 
 
   const internalT = rateOrNull(data.internalTotal.ng[reportIdx], data.internalTotal.prod[reportIdx]);
@@ -1090,7 +1094,7 @@ function renderDashboard(data){
         <div class="mx-cell">
           <div class="mx-cell-head" id="mxBadgeInt_${n.replace(/\W/g,'')}">${evalBadge(iSeries[reportIdx], idData.target, reportIdx)}</div>
           <div class="target-note">Mục tiêu: ${fmtPct(idData.target)}</div>
-          <div class="mini-canvas mx-link" data-nhom="${n}" title="Bấm để xem P-Chart NG Bavia hằng ngày từng mã của ${custLabel(n)} — tháng T${reportIdx+1}"><canvas id="mx_int_${n.replace(/\W/g,'')}"></canvas></div>
+          <div class="mini-canvas mx-link" data-nhom="${n}" title="Bấm để xem P-Chart NG Bavia hằng ngày từng mã của ${custLabel(n)} trong tháng báo cáo"><canvas id="mx_int_${n.replace(/\W/g,'')}"></canvas></div>
           <div class="target-note" style="text-align:right">↗ Bấm biểu đồ để xem P-Chart NG Bavia từng mã</div>
           ${commentBoxHTML(customerCommentKey(n,'internal'), `Comment — Tháng báo cáo`)}
         </div>`;
@@ -1098,7 +1102,7 @@ function renderDashboard(data){
     matrix.innerHTML = matrixHTML;
     // Bấm biểu đồ báo phế nội bộ của 1 khách hàng → P-Chart NG Bavia hằng ngày từng mã của khách đó, trong tháng báo cáo
     matrix.querySelectorAll('.mx-link').forEach(el => el.addEventListener('click', () => {
-      const now = new Date(), m = reportIdx + 1, y = now.getFullYear() - (m > now.getMonth() + 1 ? 1 : 0);
+      const now = new Date(), m = currentReportIdx + 1, y = now.getFullYear() - (m > now.getMonth() + 1 ? 1 : 0);
       const pad = x => String(x).padStart(2, '0'), cuoi = new Date(y, m, 0).getDate();
       const q = new URLSearchParams({ tab: 'bavia', tu: `${y}-${pad(m)}-01`, den: `${y}-${pad(m)}-${pad(cuoi)}`, nhom: el.dataset.nhom });
       window.open('bieu-do-chat-luong.html?' + q.toString(), '_blank');
