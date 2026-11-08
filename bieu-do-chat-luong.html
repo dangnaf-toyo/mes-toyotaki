@@ -13,6 +13,7 @@
   - ?tab=kiemsoat : Biểu đồ kiểm soát kích thước IPQC (I-MR / X̄-R) — IpqcBtkQc.mountChart (T133)
   - ?tab=pchart   : P-Chart NG OQC — OqcNgDash.mount (T135)
   - ?tab=bavia    : P-Chart NG Bavia — BaviaNgDash.mount (T159, Excel quá khứ + NG MES)
+                    &tu=YYYY-MM-DD&den=YYYY-MM-DD&nhom=FCC|EXEDY|FOMECO|Hitachi (ASTEMO)|KHAC (từ Dashboard chất lượng)
   qc-manager.html?tab=bieudo|ngoqc tự chuyển sang đây.
 -->
 <style>
@@ -57,7 +58,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 <script src="shared/ipqc-spc.js?v=T213"></script>
 <script src="shared/ipqc-btk-qc.js?v=20261106-signed-copy"></script>
 <script src="shared/oqc-ng-dash.js?v=T157"></script>
-<script src="shared/bavia-ng-dash.js?v=T159"></script>
+<script src="shared/bavia-ng-dash.js?v=T224"></script>
 <script>
 const TABS = ['kiemsoat', 'pchart', 'bavia'];
 const ctl = {};
@@ -77,7 +78,11 @@ function chonTab(tab) {
     if (!ctl.pchart) ctl.pchart = OqcNgDash.mount(document.getElementById('pchart-root'));
     else ctl.pchart.then(c => c && c.taiLai && c.taiLai());
   } else if (tab === 'bavia') {
-    if (!ctl.bavia) ctl.bavia = BaviaNgDash.mount(document.getElementById('bavia-root'));
+    if (!ctl.bavia) {
+      // ?tu=&den=&nhom= — mở từ Dashboard chất lượng › Theo khách hàng (tháng báo cáo + nhóm KH)
+      const q = new URLSearchParams(location.search);
+      ctl.bavia = BaviaNgDash.mount(document.getElementById('bavia-root'), { tu: q.get('tu'), den: q.get('den'), nhom: q.get('nhom') });
+    }
     else ctl.bavia.then(c => c && c.taiLai && c.taiLai());
   }
 }

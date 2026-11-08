@@ -44,6 +44,10 @@
   ];
   const NGUON = { excel: 'Excel QC', mes: 'MES' };
   const isOther = l => /^(loại |lỗi |nhóm )?(khác|ngoài ra|other|others)$/i.test(String(l).trim());
+  // Nhóm khách hàng của Dashboard chất lượng (tab Theo khách hàng) → khớp ten_khach_hang.
+  // "KHAC" = mọi khách không thuộc 4 nhóm chính.
+  const NHOM_KH = { 'Hitachi (ASTEMO)': /astemo|hitachi/i, FCC: /fcc/i, FOMECO: /fomeco/i, EXEDY: /exedy/i };
+  const trongNhom = (nhom, kh) => nhom === 'KHAC' ? !!kh && !Object.values(NHOM_KH).some(re => re.test(kh)) : !!(NHOM_KH[nhom] && NHOM_KH[nhom].test(kh || ''));
   const parsePct = v => { const t = String(v == null ? '' : v).trim().replace(',', '.'); if (t === '') return null; const n = Number(t); return isFinite(n) ? n / 100 : NaN; };
 
   const META = {
@@ -93,10 +97,12 @@
     document.head.appendChild(st);
   }
 
-  async function mount(el) {
+  // opts (tuỳ chọn, từ Dashboard chất lượng): { tu, den, nhom } — mở sẵn khoảng ngày + nhóm khách hàng
+  async function mount(el, opts) {
     css();
+    opts = opts || {};
     const today = ymd(new Date());
-    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null };
+    const st = { start: addDays(today, -15), end: today, range: 16, kh: '', nhom: NHOM_KH[opts.nhom] || opts.nhom === 'KHAC' ? opts.nhom : '', pareto: '7', cfgOpen: false, rows: [], prods: {}, cfg: {}, canEdit: false, msg: null, sel: null };
     el.innerHTML =
       '<div class="ond">' +
       '<div class="bar">' +
@@ -106,6 +112,7 @@
       PRESETS.map(p => '<button type="button" class="btn sm' + (p.k === 'd16' ? ' on' : '') + '" data-act="preset" data-p="' + p.k + '">' + p.l + '</button>').join('') +
       '</span>' +
       '<label>Khách hàng <select data-k="kh"><option value="">Tất cả</option></select></label>' +
+      '<span data-o="nhom"></span>' +
       '<span style="flex:1"></span><span data-o="msg"></span>' +
       '<button type="button" class="btn" data-act="cfg">🔒 CL &amp; mục tiêu</button>' +
       '</div>' +
@@ -202,9 +209,15 @@
     }
     function setMsg(t, cls) { const m = $('msg'); m.className = t ? 'msg ' + cls : ''; m.textContent = t || ''; }
     function khOf(r) { const p = st.prods[r.p]; return (p && p.ten_khach_hang) || r.kh || ''; }
+    function hopKh(r) { const k = khOf(r); return (!st.nhom || trongNhom(st.nhom, k)) && (!st.kh || k === st.kh); }
+    function veNhom() {
+      $('nhom').innerHTML = st.nhom ? '<button type="button" class="btn sm on" data-act="bonhom" title="Bỏ lọc nhóm khách hàng">Nhóm KH: ' +
+        esc(st.nhom === 'KHAC' ? 'Khách hàng khác' : st.nhom) + ' ✕</button>' : '';
+    }
     function fillKh() {
       const sel = el.querySelector('[data-k="kh"]');
-      const list = [...new Set(st.rows.map(khOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+      veNhom();
+      const list = [...new Set(st.rows.map(khOf).filter(k => k && (!st.nhom || trongNhom(st.nhom, k))))].sort((a, b) => a.localeCompare(b, 'vi'));
       if (st.kh && !list.includes(st.kh)) st.kh = ''; // khách hàng không có trong khoảng mới → về "Tất cả"
       sel.innerHTML = '<option value="">Tất cả</option>' + list.map(k => '<option' + (k === st.kh ? ' selected' : '') + '>' + esc(k) + '</option>').join('');
     }
@@ -213,7 +226,7 @@
     function compute() {
       const end = st.end, N = st.range, start = st.start;
       const cut = addDays(end, -6), pStart = addDays(end, -13), avgFrom = addDays(end, -27);
-      const all = st.rows.filter(r => !st.kh || khOf(r) === st.kh);
+      const all = st.rows.filter(hopKh);
       const inD = all.filter(r => r.d >= start && r.d <= end);
       const days = []; for (let i = 0; i < N; i++) days.push(addDays(start, i));
       const gTarget = st.cfg['*'] && st.cfg['*'].muc_tieu != null ? Number(st.cfg['*'].muc_tieu) : 0.02;
@@ -537,6 +550,7 @@
       const a = b.dataset.act;
       if (a === 'cfg') { st.cfgOpen = !st.cfgOpen; b.classList.toggle('on', st.cfgOpen); render(); }
       else if (a === 'close') { st.sel = null; render(); }
+      else if (a === 'bonhom') { st.nhom = ''; st.kh = ''; fillKh(); render(); }
       else if (a === 'xls') xuatExcel();
       else if (a === 'preset') {
         const p = PRESETS.find(x => x.k === b.dataset.p);
@@ -547,6 +561,18 @@
       else if (a === 'cl' || a === 'mt') luu(a === 'cl' ? 'cl' : 'muc_tieu', b.dataset.ma);
     });
 
+    // Mở từ Dashboard chất lượng: dùng đúng khoảng ngày được truyền (cả tháng báo cáo)
+    const reD = /^\d{4}-\d{2}-\d{2}$/;
+    if (reD.test(opts.tu || '') && reD.test(opts.den || '') && opts.tu <= opts.den && soNgay(opts.tu, opts.den) <= MAX_NGAY) {
+      st.start = opts.tu; st.end = opts.den > today ? today : opts.den; st.range = soNgay(st.start, st.end); st.pareto = 'all';
+      el.querySelector('[data-k="start"]').value = st.start; el.querySelector('[data-k="end"]').value = st.end;
+      el.querySelectorAll('[data-act="preset"]').forEach(btn => {
+        const p = PRESETS.find(x => x.k === btn.dataset.p), [a, b] = p.f(st.end, today);
+        btn.classList.toggle('on', a === st.start && b === st.end);
+      });
+      await taiLai();
+      return { taiLai };
+    }
     // Mở lần đầu: lùi về ngày gần nhất có dữ liệu để khoảng mặc định không trống
     const cuoi = await ngayCuoi();
     if (cuoi < today) {
