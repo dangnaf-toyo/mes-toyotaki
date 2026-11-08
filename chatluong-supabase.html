@@ -317,30 +317,6 @@
 
     <div class="proc-grid" id="procChartGrid"></div>
 
-    <h3 style="font-family:'Inter',sans-serif; font-size:17px; margin:26px 0 12px;">Dữ liệu từ QC GHẾ — Tháng 7/2026</h3>
-
-    <div class="grid-2">
-      <div class="panel">
-        <div class="panel-head"><h3>Tỷ lệ NG hàng ngày (tất cả mã)</h3><span id="badgeDaily"></span></div>
-        <p class="desc">Theo dõi theo từng ngày kiểm tra · Tổng NG (bar) + Tỷ lệ % (line)</p>
-        <canvas id="chartDailyNG" height="140"></canvas>
-        <div class="comment-box">
-          <label>Comment — Tháng 7</label>
-          <textarea data-key="comment:process:dailyNG:6" spellcheck="false" placeholder="Ghi chú của anh cho tháng báo cáo..."></textarea>
-          <div class="comment-save-row"><button type="button" class="save-btn">💾 Lưu dữ liệu</button><span class="save-status"></span></div>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><h3>So sánh tỷ lệ NG: Sơn lần 1 vs Sơn lại</h3><span id="badgeRepaint"></span></div>
-        <p class="desc">Tỷ lệ NG sơn lần 1 (xanh) vs sơn lại (cam) · theo từng mã hàng</p>
-        <canvas id="chartRepaintCmp" height="140"></canvas>
-        <div class="comment-box">
-          <label>Comment — Tháng 7</label>
-          <textarea data-key="comment:process:repaint:6" spellcheck="false" placeholder="Ghi chú của anh cho tháng báo cáo..."></textarea>
-          <div class="comment-save-row"><button type="button" class="save-btn">💾 Lưu dữ liệu</button><span class="save-status"></span></div>
-        </div>
-      </div>
-    </div>
 
   </section>
 
@@ -504,12 +480,6 @@ const DEMO_DATA = (function(){
     'Son':             {prod:pad12([4738,732,13486,9016,3254,3690]), ng:pad12([0,0,0,0,0,0]), target:0.80},
   };
   const returnNotTracked = ['FOMECO','EXEDY'];
-  const qcDaily = {
-    dates: ["16/06","10/06","12/06","15/06","18/06","19/06","21/06","22/06","26/06","28/06","29/06","01/07","02/07","03/07"],
-    counts: [0,26,88,25,150,244,205,14,67,110,66,45,62,105],
-    pcts: [0.0,23.64,25.43,6.49,51.02,56.09,61.93,12.73,24.72,20.91,54.1,61.64,31.0,39.03]
-  };
-  const qcRepaint = {sonLan1:36.99, sonLai:51.92};
   const batThuong = {
     khTotal: pad12([7,4,11,8,13,2]), khClosed: pad12([4,1,0,0,0,0]),
     nbTotal: pad12([2,1,18,13,13,0]), nbClosed: pad12([0,0,0,0,0,0])
@@ -538,7 +508,7 @@ const DEMO_DATA = (function(){
   };
   return {
     internalTotal, returnTotal, bonusPoints, internalByCustomer, returnByCustomer,
-    processes, returnNotTracked, qcDaily, qcRepaint, comments,
+    processes, returnNotTracked, comments,
     batThuong, batThuongKHCongDoan, batThuongNBCongDoan, batThuongChuaTraLoi, ngLan1
   };
 })();
@@ -686,19 +656,6 @@ function buildDataModel(raw){
     };
   });
 
-  const qcDaily = { dates:[], counts:[], pcts:[] };
-  (raw.qcDaily||[]).forEach(r=>{
-    qcDaily.dates.push(r['Ngay']||'');
-    qcDaily.counts.push(toNum(r['SoLuongNG']) ?? 0);
-    qcDaily.pcts.push(toNum(r['TyLeNG']) ?? 0);
-  });
-  let qcRepaint = {sonLan1:null, sonLai:null};
-  (raw.qcRepaint||[]).forEach(r=>{
-    const loai = (r['Loai']||'').toLowerCase();
-    const v = toNum(r['TyLeNG']);
-    if (loai.includes('lan 1') || loai.includes('lần 1')) qcRepaint.sonLan1 = v;
-    else if (loai.includes('lai') || loai.includes('lại')) qcRepaint.sonLai = v;
-  });
 
   // Comment nay lưu theo (key, thang) — mỗi key gom thành { [thang]: noiDung }.
   const comments = {};
@@ -738,7 +695,7 @@ function buildDataModel(raw){
 
   return {
     internalTotal, returnTotal, bonusPoints, internalByCustomer, returnByCustomer,
-    processes, returnNotTracked, qcDaily, qcRepaint, comments,
+    processes, returnNotTracked, comments,
     batThuong, batThuongKHCongDoan, batThuongNBCongDoan, batThuongChuaTraLoi, ngLan1
   };
 }
@@ -1124,34 +1081,6 @@ function renderDashboard(data){
       }));
     });
 
-    track('qcDaily', new Chart(document.getElementById('chartDailyNG'), {
-      type: 'bar',
-      data: {
-        labels: data.qcDaily.dates,
-        datasets: [
-          {label: 'Tổng SL NG', data: data.qcDaily.counts, backgroundColor: palette.bad, yAxisID: 'y', borderRadius: 4},
-          {label: 'Tỷ lệ % NG', data: data.qcDaily.pcts, borderColor: palette.orange, backgroundColor: palette.orange, type: 'line', yAxisID: 'y1', tension: .3, pointRadius: 3, borderWidth: 2.5}
-        ]
-      },
-      options: {
-        plugins: {legend: {position: 'bottom', labels: {boxWidth: 12}}},
-        scales: {
-          y: {position: 'left', title: {display: true, text: 'Số lượng NG'}, ticks: {font: {size: 10}}},
-          y1: {position: 'right', title: {display: true, text: 'Tỷ lệ %'}, ticks: {font: {size: 10}, callback: v => v+'%'}, grid: {drawOnChartArea: false}}
-        }
-      }
-    }));
-    track('qcRepaint', new Chart(document.getElementById('chartRepaintCmp'), {
-      type: 'bar',
-      data: {
-        labels: ['Sơn lần 1','Sơn lại'],
-        datasets: [{label: 'Tỷ lệ NG (%)', data: [data.qcRepaint.sonLan1, data.qcRepaint.sonLai], backgroundColor: [palette.good, palette.orange], borderRadius: 4}]
-      },
-      options: {
-        plugins: {legend: {display: false}},
-        scales: { x: {stacked: false}, y: {ticks: {callback: v => v.toFixed ? v.toFixed(1)+'%' : v+'%'}, max: 100} }
-      }
-    }));
 
     buildCustMatrix(data, custNames, reportIdx);
 
@@ -1236,15 +1165,6 @@ function renderDashboard(data){
       const badgeEl = document.getElementById('procBadge_'+id);
       if (badgeEl) badgeEl.innerHTML = evalBadge(rs[reportIdx], d.target, reportIdx);
     });
-    const dailyAvgNG = data.qcDaily.pcts.length ? (data.qcDaily.pcts.reduce((a,b)=>a+b,0) / data.qcDaily.pcts.length).toFixed(2) : '–';
-    document.getElementById('badgeDaily').innerHTML = `<span class="badge">${dailyAvgNG}% TB</span>`;
-    document.getElementById('badgeRepaint').innerHTML = `<span class="badge">Sơn lại: ${data.qcRepaint.sonLai ?? '–'}% | Lần 1: ${data.qcRepaint.sonLan1 ?? '–'}%</span>`;
-    chartsByKey.qcDaily.data.labels = data.qcDaily.dates;
-    chartsByKey.qcDaily.data.datasets[0].data = data.qcDaily.counts;
-    chartsByKey.qcDaily.data.datasets[1].data = data.qcDaily.pcts;
-    chartsByKey.qcDaily.update();
-    chartsByKey.qcRepaint.data.datasets[0].data = [data.qcRepaint.sonLan1, data.qcRepaint.sonLai];
-    chartsByKey.qcRepaint.update();
 
     if (custSig(data, custNames) !== builtCustSig){
       buildCustMatrix(data, custNames, reportIdx);
@@ -1310,7 +1230,7 @@ function nowStr(){
 }
 const CORE_TABLES = {
   tongHop:'cl_tong_hop', theoKhachHang:'cl_theo_khach_hang', theoCongDoan:'cl_theo_cong_doan',
-  qcDaily:'cl_qc_daily', qcRepaint:'cl_qc_repaint', targets:'cl_targets', comments:'cl_comments', config:'cl_config'
+  targets:'cl_targets', comments:'cl_comments', config:'cl_config'
 };
 const EXTRA_TABLES = {
   batThuongThang:'cl_bat_thuong_thang', batThuongKH:'cl_bat_thuong_kh', batThuongNB:'cl_bat_thuong_nb',
@@ -1336,8 +1256,6 @@ async function loadData(){
       tongHop: {thang:'Thang', san_luong_noi_bo_tong:'SanLuongNoiBoTong', bao_phe_noi_bo_tong:'BaoPheNoiBoTong', giao_hang_tong:'GiaoHangTong', tra_ve_tong:'TraVeTong', diem_thuong_phat:'DiemThuongPhat'},
       theoKhachHang: {thang:'Thang', khach_hang:'KhachHang', san_luong:'SanLuong', bao_phe:'BaoPhe', giao_hang:'GiaoHang', tra_ve:'TraVe'},
       theoCongDoan: {thang:'Thang', cong_doan:'CongDoan', san_luong:'SanLuong', bao_phe:'BaoPhe'},
-      qcDaily: {ngay:'Ngay', so_luong_ng:'SoLuongNG', ty_le_ng:'TyLeNG'},
-      qcRepaint: {loai:'Loai', ty_le_ng:'TyLeNG'},
       targets: {loai:'Loai', ten:'Ten', muc_tieu_noi_bo:'MucTieuNoiBo', muc_tieu_tra_ve:'MucTieuTraVe', theo_doi_tra_ve:'TheoDoiTraVe'},
       comments: {key:'Key', thang:'Thang', noi_dung:'NoiDung'},
       config: {key:'Key', value:'Value'},
