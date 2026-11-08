@@ -229,8 +229,9 @@
 
       <div class="panel">
         <div class="panel-head"><h3>Chi phí báo phế theo mã sản phẩm</h3></div>
-        <p class="desc">Top 10 mã có chi phí báo phế lớn nhất (tổng các công đoạn) · tháng đang xem ở dropdown "Xem/ghi comment" phía trên</p>
+        <p class="desc">Top 10 mã có chi phí báo phế lớn nhất (tổng các công đoạn) · mã MES (mã cũ trong file Excel tự đổi qua bảng ánh xạ) · tháng đang xem ở dropdown "Xem/ghi comment" phía trên</p>
         <canvas id="chartBaoPheMa" height="180"></canvas>
+        <p class="desc" id="baopheChuaGan" style="display:none;color:var(--bad);margin-top:8px"></p>
       </div>
     </div>
 
@@ -1414,7 +1415,8 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 
 /* ---------- Tab "Chi phí phế phẩm" ---------- */
 const BAOPHE_THANG_TABLE = 'cl_bao_phe_thang';
-const BAOPHE_CHITIET_TABLE = 'cl_bao_phe_chi_tiet';
+// T226: đọc qua view đổi mã cũ trong Excel → mã MES (bảng cl_bao_phe_ma_anh_xa); ma_hien_thi = mã MES hoặc mã cũ nếu chưa gán
+const BAOPHE_CHITIET_TABLE = 'cl_bao_phe_chi_tiet_mes';
 let baopheThangRows = [];
 let baopheSelectedMonth = null;
 let baopheStructureBuilt = false;
@@ -1428,7 +1430,7 @@ function fmtVND(v){
 }
 
 async function fetchBaoPheChiTietForMonth(thang){
-  const url = `${SUPABASE_URL}/rest/v1/${BAOPHE_CHITIET_TABLE}?thang=eq.${encodeURIComponent(thang)}&select=ma_san_pham,cong_doan,thanh_tien`;
+  const url = `${SUPABASE_URL}/rest/v1/${BAOPHE_CHITIET_TABLE}?thang=eq.${encodeURIComponent(thang)}&select=ma_san_pham:ma_hien_thi,ma_cu,ma_sp,ten_sp,cong_doan,thanh_tien`;
   const res = await fetch(url, { headers: await sbHeaders() });
   if (!res.ok) throw new Error('HTTP ' + res.status + ' fetching ' + BAOPHE_CHITIET_TABLE);
   return res.json();
@@ -1538,6 +1540,12 @@ async function renderBaopheMonthDetail(thang){
   const byMa = {};
   detail.forEach(r => { byMa[r.ma_san_pham] = (byMa[r.ma_san_pham] || 0) + (r.thanh_tien || 0); });
   const maSorted = Object.entries(byMa).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const tenSp = {}; detail.forEach(r => { if (r.ten_sp) tenSp[r.ma_san_pham] = r.ten_sp; });
+  // Mã trong Excel chưa đổi được sang mã MES (có chi phí) → nhắc thêm vào bảng ánh xạ cl_bao_phe_ma_anh_xa
+  const chuaGan = {}; detail.forEach(r => { if (!r.ma_sp && r.thanh_tien > 0) chuaGan[r.ma_cu] = (chuaGan[r.ma_cu] || 0) + r.thanh_tien; });
+  const elCg = document.getElementById('baopheChuaGan'), dsCg = Object.keys(chuaGan);
+  elCg.style.display = dsCg.length ? '' : 'none';
+  elCg.textContent = dsCg.length ? `⚠ ${dsCg.length} mã trong file Excel chưa có mã MES (đang hiện mã cũ): ${dsCg.join(', ')}` : '';
 
   if (chartsByKey.baophe_ma) chartsByKey.baophe_ma.destroy();
   track('baophe_ma', new Chart(document.getElementById('chartBaoPheMa'), {
@@ -1548,7 +1556,7 @@ async function renderBaopheMonthDetail(thang){
     },
     options: {
       indexAxis: 'y',
-      plugins: {legend: {display: false}},
+      plugins: {legend: {display: false}, tooltip: {callbacks: {title: it => it.length ? it[0].label + (tenSp[it[0].label] ? ' — ' + tenSp[it[0].label] : '') : ''}}},
       scales: {x: {ticks: {callback: v => (v / 1e6).toLocaleString('vi-VN') + 'tr'}}}
     }
   }));
@@ -1586,7 +1594,7 @@ async function renderBaopheMonthDetail(thang){
       const v = (byMaCongDoan[ma] || {})[cd];
       return v ? `<td>${fmtVND(v)}</td>` : `<td class="cell-blank">–</td>`;
     });
-    return `<tr><td style="text-align:left;font-weight:600;white-space:nowrap;">${ma}</td>${cells.join('')}<td style="font-weight:700;">${fmtVND(total)}</td></tr>`;
+    return `<tr><td style="text-align:left;font-weight:600;white-space:nowrap;" title="${tenSp[ma] || ''}">${ma}</td>${cells.join('')}<td style="font-weight:700;">${fmtVND(total)}</td></tr>`;
   }).join('') : `<tr><td colspan="${CONG_DOAN_ORDER.length + 2}" class="cell-blank">Không có dữ liệu chi phí báo phế trong tháng này.</td></tr>`;
 }
 
