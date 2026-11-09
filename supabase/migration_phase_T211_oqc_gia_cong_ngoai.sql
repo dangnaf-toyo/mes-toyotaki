@@ -1,3 +1,4 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- Đã áp dụng STAGING 04/11/2026. Giữ nguyên dữ liệu lịch sử.
 begin;
 alter table public.oqc_daily_inspection add column if not exists cong_doan_gia_cong_ngoai text check(cong_doan_gia_cong_ngoai in ('ma','in','anode'));

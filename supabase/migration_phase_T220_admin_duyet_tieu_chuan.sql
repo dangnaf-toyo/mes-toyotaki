@@ -1,3 +1,4 @@
+-- KHÔNG chạy trên PROD: ở prod Admin không được làm thay Trưởng phòng QC / Giám đốc SX (quy trình 2 người T163).
 -- T220: STAGING only. Admin can perform every existing standards approval step.
 -- Preserve current approval/locking/effective dates/identity for every other role.
 begin;

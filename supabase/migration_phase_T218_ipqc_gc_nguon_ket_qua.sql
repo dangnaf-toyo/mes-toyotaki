@@ -1,3 +1,4 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- T218: nguồn nhập và file kết quả đo private; đã áp dụng STAGING 05/11/2026.
 -- Chỉ bổ sung dữ liệu kết quả; không sửa bảng/dữ liệu tiêu chuẩn, không đổi writer Đúc.
 begin;

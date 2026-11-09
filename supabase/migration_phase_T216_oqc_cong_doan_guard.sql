@@ -1,3 +1,4 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- T216: sửa ghi công đoạn/nhân lực; đã áp dụng STAGING 04/11/2026.
 -- Không đổi schema, không backfill hoặc thay dữ liệu lịch sử.
 begin;

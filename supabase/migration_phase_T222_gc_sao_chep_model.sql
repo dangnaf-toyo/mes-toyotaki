@@ -1,4 +1,5 @@
--- T222: STAGING only. Copy standards into an independent, unconfirmed machining draft.
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
+-- T222: Copy standards into an independent, unconfirmed machining draft.
 begin;
 alter table public.ipqc_btk add column nguon_sao_chep jsonb;
 alter table public.ipqc_btk drop constraint ipqc_btk_trang_thai_check;
