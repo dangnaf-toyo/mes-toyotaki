@@ -1,4 +1,5 @@
--- STAGING only. Independent attachments; no changes to NCP business fields or approval RPCs.
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
+-- Independent attachments; no changes to NCP business fields or approval RPCs.
 begin;
 
 create table public.ncp_hinh_anh (

@@ -1,5 +1,6 @@
--- T213: STAGING IPQC Gia công, tái sử dụng tiêu chuẩn và duyệt T183/T185.
--- Đã áp dụng STAGING 04/11/2026; chưa chạy PRODUCTION.
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
+-- T213: IPQC Gia công, tái sử dụng tiêu chuẩn và duyệt T183/T185.
+-- Đã áp dụng STAGING 04/11/2026.
 begin;
 alter table public.ipqc_btk add column if not exists ma_ban_ve text;
 alter table public.ipqc_btk add column if not exists buoc_gia_cong text;

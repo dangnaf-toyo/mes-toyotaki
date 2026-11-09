@@ -1,3 +1,4 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- T215: danh tính người soạn/duyệt lấy từ phiên server; đã áp dụng STAGING 04/11/2026.
 begin;
 CREATE OR REPLACE FUNCTION public.ipqc_btk_luu(p_ma_sp text, p_data jsonb, p_nguoi text, p_cong_doan text DEFAULT 'duc'::text)

@@ -1,3 +1,4 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- T217: cỡ mẫu thực tế; đã áp dụng STAGING 05/11/2026. Không sửa dữ liệu tiêu chuẩn.
 begin;
 alter table public.ipqc_gc_lan add column co_mau_thuc_te jsonb;

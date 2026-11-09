@@ -97,13 +97,32 @@ const IpqcGiaCong = (() => {
     if (tab === "dashboard") loadDashboard().catch(fail);
   }
   document.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => changeTab(b.dataset.tab)));
+  const stepOf = (b) => String(b?.buoc_gia_cong || "").trim();
+  function measureStep() {
+    const v = $("gcMeasureStep").value;
+    return $("gcMeasureStepWrap").hidden || !v ? null : v.slice(2);
+  }
+  function renderSteps(list, chosen) {
+    $("gcMeasureStepWrap").hidden = list.length < 2;
+    $("gcMeasureStep").innerHTML =
+      '<option value="">— Chọn bước —</option>' +
+      list.map((s) => '<option value="s:' + E(s) + '">' + E(s || "Không ghi bước") + "</option>").join("");
+    $("gcMeasureStep").value = chosen === null ? "" : "s:" + chosen;
+  }
   async function loadMeasureStandard(forceReset = false) {
     const serial = ++measureSerial,
       model = $("gcMeasureProduct").value.trim(),
-      day = $("gcInspectionDate").value;
+      day = $("gcInspectionDate").value,
+      step = measureStep();
     // Native blur can repeat a Model change after its data already loaded. Do not
     // disable the destination input while focus is moving into the measurement grid.
-    if (!forceReset && measureEntry && measureStandard?.ma_sp === model && measureDay === day) {
+    if (
+      !forceReset &&
+      measureEntry &&
+      measureStandard?.ma_sp === model &&
+      measureDay === day &&
+      (step === null || stepOf(measureStandard) === step)
+    ) {
       measureLoading = false;
       $("gcMeasureInput").disabled = false;
       return;
@@ -113,7 +132,7 @@ const IpqcGiaCong = (() => {
     try {
       const resolved =
         model && day
-          ? await rpc("ipqc_gc_tieu_chuan_theo_ngay", { p_ma_sp: model, p_ngay_kiem: day })
+          ? await rpc("ipqc_gc_tieu_chuan_theo_ngay", { p_ma_sp: model, p_ngay_kiem: day, p_buoc: step })
           : { status: "none", message: model ? "Chọn ngày kiểm." : "Chọn Model." };
       if (serial !== measureSerial) return;
       const selected = resolved.status === "ok" ? resolved.btk : null;
@@ -128,8 +147,10 @@ const IpqcGiaCong = (() => {
       ) {
         $("gcMeasureProduct").value = measureStandard.ma_sp;
         $("gcInspectionDate").value = measureDay;
+        $("gcMeasureStep").value = "s:" + stepOf(measureStandard);
         return;
       }
+      renderSteps(resolved.buoc || [], selected ? stepOf(selected) : null);
       measureStandard = null;
       measureImport?.reset();
       $("gcResultConfirmation").hidden = true;
@@ -141,16 +162,16 @@ const IpqcGiaCong = (() => {
       measureDay = day;
       if (!selected) {
         $("gcMeasureInfo").textContent =
-          resolved.status === "ambiguous"
-            ? "Tiêu chuẩn chồng lấn."
+          resolved.status === "chon_buoc"
+            ? "Chọn bước gia công."
             : model && day
               ? "Chưa có tiêu chuẩn."
               : model
                 ? "Chọn ngày kiểm."
                 : "Chọn Model.";
         $("gcMeasureInfo").title =
-          resolved.status === "ambiguous"
-            ? "Nhiều phiên bản hoặc nguyên công cùng hiệu lực. Liên hệ quản lý QC."
+          resolved.status === "chon_buoc"
+            ? "Model này có nhiều bước gia công đang có hiệu lực."
             : "";
         $("gcMeasureRows").replaceChildren();
         return;
@@ -198,7 +219,11 @@ const IpqcGiaCong = (() => {
       !["admin", "qc_manager", "ipqc"].includes(rights.role);
   }
   $("gcAddSample").onclick = () => measureEntry?.addSample();
-  $("gcMeasureProduct").onchange = $("gcInspectionDate").onchange = () => loadMeasureStandard().catch(fail);
+  $("gcMeasureProduct").onchange = () => {
+    $("gcMeasureStep").value = "";
+    loadMeasureStandard().catch(fail);
+  };
+  $("gcInspectionDate").onchange = $("gcMeasureStep").onchange = () => loadMeasureStandard().catch(fail);
   $("gcMeasureForm").onsubmit = async (event) => {
     event.preventDefault();
     if (
@@ -540,7 +565,6 @@ const IpqcGiaCong = (() => {
     XLSX.writeFile(workbook, "IPQC-theo-bo-loc.xlsx");
   };
   async function boot() {
-    if (IS_PROD) throw Error("Chức năng này đang triển khai trên staging.");
     MesNav.setTitle("IPQC Gia công");
     rights = await IpqcBtkQc.quyen();
     [products, machines] = await Promise.all([

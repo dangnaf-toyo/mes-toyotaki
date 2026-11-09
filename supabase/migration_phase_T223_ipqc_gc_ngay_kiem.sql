@@ -1,6 +1,7 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- T223: inspection date, automatic effective standards and optional report lot/step.
--- Apply only to STAGING jcjbleugnclzsghfpmvk. Existing measurements/standards stay unchanged.
--- Applied to that staging project on 2026-11-07. Not applied to Production.
+-- Existing measurements/standards stay unchanged.
+-- Applied to staging 2026-11-07.
 begin;
 alter table public.ipqc_gc_lan add column ngay_kiem date;
 alter table public.ipqc_gc_lan add column cap_nhat_luc timestamptz;

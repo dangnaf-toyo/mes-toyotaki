@@ -1,4 +1,5 @@
--- T221: STAGING only. Versioned signed deviations; historical values/bounds remain untouched.
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
+-- T221: Versioned signed deviations; historical values/bounds remain untouched.
 begin;
 alter table public.ipqc_btk_muc add column dung_sai_co_dau boolean not null default false;
 CREATE OR REPLACE FUNCTION public.ipqc_btk_luu(p_ma_sp text, p_data jsonb, p_nguoi text, p_cong_doan text DEFAULT 'duc'::text)

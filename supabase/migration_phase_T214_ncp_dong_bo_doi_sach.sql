@@ -1,3 +1,4 @@
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
 -- T214: tích hợp đối sách cũ/mới; đã áp dụng STAGING 04/11/2026.
 begin;
 alter table public.ncp_doi_sach add column da_luu_tru boolean not null default false;

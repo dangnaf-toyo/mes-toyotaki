@@ -1,4 +1,5 @@
--- T219: STAGING only. Reuse the existing standards registry and IDs; no data migration.
+-- ĐÃ ÁP DỤNG PROD 09/11/2026 (gộp theo mảng, bỏ phiên bản hàm trung gian; bản cuối các hàm đã sửa xem T230).
+-- T219: Reuse the existing standards registry and IDs; no data migration.
 -- The common manager must also be able to revise legacy machining standards without a step/drawing code.
 begin;
 create or replace function public.ipqc_gc_luu_tieu_chuan(p_data jsonb)
