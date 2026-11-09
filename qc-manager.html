@@ -181,6 +181,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 .ncp-step-choice button:hover{background:var(--bg-sunken)}
 .hidden{display:none!important}
 </style>
+<link rel="stylesheet" href="shared/ncp-defect-images.css?v=T228">
 </head>
 <body>
 <div class="app">
@@ -368,6 +369,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
           <label>Mô tả lỗi</label>
           <textarea id="ncp-mo-ta-loi"></textarea>
         </div>
+        <section id="ncp-new-images" aria-label="Hình ảnh lỗi"></section>
         <div class="field-row">
           <label>Số lượng nghi vấn cần cách ly</label>
           <input type="number" id="ncp-so-luong" min="1" step="1">
@@ -1205,14 +1207,14 @@ async function submitNcpNewCase(){
   if (!p.nguoiDamNhiem) return alert('Nhập người đảm nhiệm xử lý');
   if (!p.nguoiDamNhiemDoiSach) return alert('Nhập người đảm nhiệm trả lời Nguyên nhân & Đối sách');
 
-  const { data, error } = await sb.rpc('duc_ncp_open_case', {
+  let data;
+  try { data = await ncpNewImages.create('ng', {
     p_han_tra_loi_doi_sach: document.getElementById('ncp-han-tra-loi').value,
     p_id_checkpoint_goc: p.idCheckpoint, p_ma_may: p.maMay, p_ma_sp: p.maSp, p_ten_sp: p.tenSp, p_so_khuon: p.soKhuon,
     p_mo_ta_loi: p.moTaLoi, p_so_luong_nghi_van: p.soLuong, p_so_luong_ng_du_kien: p.soLuongNgDuKien,
     p_vi_tri_cach_ly: p.viTri, p_nguoi_dam_nhiem: p.nguoiDamNhiem, p_nguoi_dam_nhiem_doi_sach: p.nguoiDamNhiemDoiSach,
     p_user: state.currentUserEmail,
-  });
-  if (error) return alert('Lỗi: ' + error.message);
+  }); } catch(e) { return alert('Chưa lưu được phiếu: '+e.message+' — hãy thử lại trên form này.'); }
   if (data && data.ok === false) return alert('Lỗi: ' + data.error);
   closeNcpModal('ncp-modal-new');
   loadNcpList();
@@ -1585,7 +1587,9 @@ loadQcFilters();
 setInterval(loadBoard, 15000);
 </script>
 <script>Qc02Data.attachEmployees(["ncp-nguoi-dam-nhiem","ncp-nguoi-dam-nhiem-doi-sach"]);</script>
-<script src="shared/mes-ncp-source.js?v=T184"></script>
+<script src="shared/ncp-defect-images.js?v=T228"></script>
+<script>const ncpNewImages=NcpDefectImages.mount(document.getElementById('ncp-new-images'));</script>
+<script src="shared/mes-ncp-source.js?v=T228"></script>
 <script>/* ?tab=… mở thẳng tab; T136: bieudo / ngoqc đã chuyển sang bieu-do-chat-luong.html */(function(){var t=new URLSearchParams(location.search).get('tab');var moi={bieudo:'kiemsoat',ngoqc:'pchart'};if(moi[t]){location.replace('bieu-do-chat-luong.html?tab='+moi[t]);return;}if(t&&document.getElementById('tab-'+t))setTimeout(function(){switchTab(t);},0);})();</script>
 <script src="shared/ncp-doi-sach-board.js?v=T214"></script>
 </body>
