@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>IPQC Gia công — TOYOTAKI MES</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-page: #f3f5f7;
+        --bg-panel: #fff;
+        --bg-header: #132537;
+        --text: #172b40;
+        --text-muted: #64748b;
+        --border: #d7dfe7;
+        --accent: #0f5fa5;
+        --run-fg: #166534;
+        --warn-fg: #92400e;
+        --alarm-fg: #b91c1c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        font:
+          13px Inter,
+          Arial,
+          sans-serif;
+        color: var(--text);
+        background: var(--bg-page);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 12px 20px;
+        background: var(--bg-header);
+        color: #fff;
+      }
+      .brand {
+        font-weight: 800;
+        font-size: 18px;
+      }
+      .brand small {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .header-clock {
+        margin-left: auto;
+      }
+      main {
+        padding: 16px;
+        width: 100%;
+      }
+      .panel {
+        padding: 16px;
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #fff;
+      }
+      h2,
+      h3 {
+        margin: 0 0 12px;
+      }
+      h2 {
+        font-size: 18px;
+      }
+      h3 {
+        font-size: 15px;
+      }
+      .toolbar,
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: end;
+        margin-bottom: 12px;
+      }
+      button,
+      .btn {
+        min-height: 34px;
+        padding: 7px 12px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--accent);
+        font: 600 13px Inter;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .primary,
+      .tabs button.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-weight: 600;
+      }
+      input,
+      select,
+      textarea {
+        font: 13px Inter;
+        padding: 8px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        min-height: 34px;
+        max-width: 100%;
+      }
+      textarea {
+        min-height: 64px;
+      }
+      input[type="checkbox"] {
+        min-height: 18px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      #gcMeasureInput { border: 0; padding: 0; margin: 0; min-width: 0; }
+      .entry-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .dashboard-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+      @media (min-width: 1500px) { .dashboard-filters { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+      .dashboard-filters input, .dashboard-filters select { width: 100%; }
+      #gcDashboardPanel .metric { padding: 8px 12px; min-width: 105px; }
+      #gcDashboardPanel .metric b { font-size: 18px; }
+      .capability-check { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+      .capability-check input { width: 18px; flex: none; }
+      .drawing-grid {
+        display: grid;
+        grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
+        gap: 16px;
+      }
+      .drawing {
+        width: 100%;
+        height: 65vh;
+        border: 1px solid var(--border);
+        object-fit: contain;
+      }
+      .scroll {
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+      }
+      th {
+        background: #f1f5f9;
+      }
+      td input,
+      td select {
+        min-width: 95px;
+      }
+      td input[type="checkbox"] {
+        min-width: 18px;
+      }
+      .muted {
+        color: var(--text-muted);
+      }
+      .notice {
+        white-space: pre-wrap;
+        min-height: 20px;
+      }
+      .bad {
+        color: var(--alarm-fg);
+      }
+      .good {
+        color: var(--run-fg);
+      }
+      .warn { color: var(--warn-fg); }
+      #gcResultImportPanel .drawing-grid { grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2fr); }
+      .cmm-summary, .cmm-units { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 10px 0; }
+      .cmm-summary span { white-space: nowrap; }
+      .cmm-summary b { font-variant-numeric: tabular-nums; }
+      #gcImportCandidates { max-height: 65vh; }
+      #gcImportCandidates table { min-width: 850px; }
+      #gcImportCandidates th { position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+      #gcImportCandidates td { vertical-align: middle; padding: 6px; }
+      #gcImportCandidates td:nth-child(4) { min-width: 200px; max-width: 260px; }
+      #gcImportCandidates td:nth-child(4) select { width: 100%; }
+      #gcImportCandidates small { display: block; color: var(--text-muted); margin-top: 3px; }
+      .cmm-value { flex-direction: row; align-items: center; font-weight: 500; margin: 3px 0; }
+      .cmm-value input { width: 115px; min-height: 32px; padding: 6px; }
+      .cmm-state summary { cursor: pointer; white-space: nowrap; font-weight: 600; }
+      .cmm-state p { max-width: 260px; margin: 6px 0; line-height: 1.4; }
+      .cmm-pick, #gcMeasureForm .checkline { flex-direction: row; align-items: center; gap: 8px; }
+      .cmm-pick { min-width: 32px; min-height: 36px; justify-content: center; cursor: pointer; }
+      .cmm-pick input, #gcMeasureForm .checkline input { width: 18px; height: 18px; min-height: 18px; padding: 0; flex: none; }
+      .metrics {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .metric {
+        padding: 12px;
+        background: #f1f5f9;
+        border-radius: 8px;
+        min-width: 130px;
+      }
+      .metric b {
+        display: block;
+        font-size: 20px;
+      }
+      .hidden,
+      [hidden] {
+        display: none !important;
+      }
+      .source {
+        font-size: 11px;
+        min-width: 170px;
+        max-width: 240px;
+      }
+      .number {
+        font-family: "JetBrains Mono", monospace;
+      }
+      svg {
+        max-width: 100%;
+        height: auto;
+      }
+      @media (max-width: 800px) {
+        main {
+          padding: 8px;
+        }
+        .drawing-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        #gcResultImportPanel .drawing-grid { grid-template-columns: minmax(0, 1fr); }
+        .drawing {
+          height: 45vh;
+        }
+        .panel {
+          padding: 10px;
+        }
+        .grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      @media print {
+        header,
+        .tabs,
+        button,
+        .no-print,
+        input[type="file"] {
+          display: none !important;
+        }
+        .panel {
+          border: 0;
+          padding: 0;
+          break-inside: avoid;
+        }
+        main {
+          padding: 0;
+        }
+        .scroll {
+          overflow: visible;
+        }
+        body {
+          background: #fff;
+        }
+        table {
+          font-size: 11px;
+        }
+      }
+    .measure-table{min-width:1100px}.measure-table input,.measure-table select{min-width:100px;width:110px}
+      .measure-table small{display:block;color:var(--text-muted)}.measure-table th{white-space:nowrap}
+      .measure-table .measure-ng{border:2px solid #dc2626;background:#fef2f2;color:#991b1b}
+      .measure-table .measure-ok{border-color:#16a34a}.measure-table td:last-child{min-width:140px;font-weight:700}
+      </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">TOYOTAKI – IPQC Gia công</div>
+      <span class="header-clock" id="clock"></span>
+    </header>
+    <main>
+      <nav class="tabs">
+        <button data-tab="measure" class="active">Nhập kết quả</button>
+        <button data-tab="dashboard">Dashboard IPQC</button>
+      </nav>
+      <p id="gcMessage" class="notice" role="status"></p>
+      <details id="gcErrorDetails" hidden><summary>Chi tiết kỹ thuật</summary><pre></pre></details>
+      <datalist id="gcProducts"></datalist>
+      <section data-panel="measure">
+        <form id="gcMeasureForm" class="panel">
+          <h2>IPQC Gia công – Nhập kết quả</h2>
+          <div class="grid entry-fields">
+            <label>Ngày kiểm <input id="gcInspectionDate" type="date" required /></label>
+            <label>Model <input id="gcMeasureProduct" list="gcProducts" required /></label>
+            <label
+              >Máy
+              <select id="gcMachine" required></select></label
+            ><label
+              >Ca
+              <select id="gcShift">
+                <option>Ca ngày</option>
+                <option>Ca đêm</option>
+                <option>Ca 1</option>
+                <option>Ca 2</option>
+              </select></label
+            >
+          </div>
+          <p id="gcMeasureInfo"></p>
+          <fieldset id="gcMeasureInput" disabled>
+          <label>Hình thức nhập <select id="gcResultMode"><option value="manual">Thủ công</option>
+            <option value="file">Tự động</option></select></label>
+          <section id="gcResultImportPanel" hidden>
+            <h3>File CMM</h3>
+            <div class="grid"><label>File PDF / Excel / ảnh
+              <input id="gcResultFile" type="file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"></label>
+              <label>Trang <select id="gcResultSheet"></select></label>
+              <label>Mẫu CMM <select id="gcImportPreset"><option value="">Tự động</option></select></label></div>
+            <details><summary>Cấu hình mẫu CMM</summary>
+              <div class="grid"><label>Bố cục <select id="gcImport_layout"><option value="auto">Tự động</option>
+                <option value="rows">Một đặc tính / dòng</option><option value="columns">Đặc tính theo cột (bảng ngang)</option>
+                <option value="text">Dòng mã/tên = giá trị</option></select></label>
+                <label>Dòng tiêu đề <input id="gcImport_headerRow" inputmode="numeric" placeholder="Tự động"></label>
+                <label>Cột mã <input id="gcImport_idColumn" placeholder="A"></label>
+                <label>Cột tên <input id="gcImport_nameColumn" placeholder="B"></label>
+                <label>Cột danh nghĩa <input id="gcImport_nominalColumn" placeholder="C"></label>
+                <label>Cột đơn vị <input id="gcImport_unitColumn" placeholder="D"></label>
+                <label>Cột/mẫu hoặc dòng/mẫu <input id="gcImport_sampleColumns" placeholder="I:1,J:2 hoặc 10:1,11:2"></label>
+                <label>Tên mẫu đọc <input id="gcImportProfileName" placeholder="Máy CMM / Biểu QC"></label></div>
+              <div class="toolbar"><button id="gcImportParse" type="button">Đọc lại</button>
+                <button id="gcImportSavePreset" type="button">Lưu mẫu CMM</button></div>
+            </details>
+            <p id="gcImportStatus" role="status">Chọn file CMM.</p>
+            <div class="drawing-grid"><div><h4>File gốc</h4><div id="gcResultOriginal"></div>
+                <details><summary>Nội dung gốc</summary><pre id="gcImportRaw"></pre></details></div>
+              <div><h4>Đối chiếu CMM</h4>
+                <div class="cmm-summary" id="gcImportSummary" aria-live="polite"></div>
+                <label>Lọc <select id="gcImportFilter"><option value="">Tất cả</option><option value="matched">Đã khớp</option>
+                  <option value="unmatched">Chưa khớp</option></select></label>
+                <div class="scroll" id="gcImportCandidates"></div><button id="gcImportMore" type="button" hidden>Tải thêm</button>
+                <div class="cmm-units"><label>Đơn vị bổ sung
+                  <select id="gcImportDefaultUnit" title="Chỉ bổ sung đơn vị còn thiếu ở file hoặc MES cho lần nhập này."><option value="">Chọn đơn vị</option><option>mm</option><option>cm</option><option>um</option><option>in</option><option>deg</option><option>rad</option></select></label>
+                  <label class="checkline" title="Tôi đã đối chiếu đơn vị còn thiếu với bản gốc. Không thay đổi tiêu chuẩn MES."><input id="gcImportSameUnit" type="checkbox"> Đã đối chiếu đơn vị</label></div>
+                <div class="toolbar"><button id="gcImportSync" class="primary" type="button" disabled>Áp dụng kết quả</button></div>
+              </div></div>
+          </section>
+          <div class="toolbar"><button id="gcAddSample" type="button" disabled>+ Thêm mẫu</button></div>
+          <p id="gcMeasureSummary" role="status">Chọn Model và Revision để tải bảng kiểm tra.</p>
+          <div id="gcMeasureRows" class="scroll"></div>
+          <div id="gcResultConfirmation" hidden>
+            <label class="checkline"><input id="gcResultConfirmed" type="checkbox"> Đã kiểm tra kết quả</label>
+            <label class="checkline"><input id="gcResultAttach" type="checkbox" checked> Lưu kèm file gốc</label>
+          </div>
+          <button class="primary" id="gcSaveMeasure" type="submit">Lưu kết quả đo</button>
+          </fieldset>
+        </form>
+      </section>
+      <section data-panel="dashboard" hidden>
+        <div class="panel" id="gcDashboardPanel">
+          <h2>Dashboard IPQC</h2>
+          <div class="grid dashboard-filters">
+            <label>Từ ngày <input id="gcFrom" type="date" /></label
+            ><label>Đến ngày <input id="gcTo" type="date" /></label>
+            <label
+              >Công đoạn
+              <select id="gcDashboardProcess">
+                <option value="gia_cong">IPQC Gia công</option>
+                <option value="duc">IPQC Đúc</option>
+                <option value="">Tất cả</option>
+              </select></label
+            >
+            <label>Model <input id="gcFilterProduct" list="gcProducts" /></label
+            >
+            <label>Máy <input id="gcFilterMachine" list="gcMachines" /></label><datalist id="gcMachines"></datalist
+            ><label
+              >Ca
+              <select id="gcFilterShift">
+                <option value="">Tất cả</option>
+                <option>Ca ngày</option>
+                <option>Ca đêm</option>
+                <option>Ca 1</option>
+                <option>Ca 2</option>
+              </select></label
+            >
+            <label>Người kiểm <input id="gcFilterInspector" placeholder="Tên / mã" /></label
+            >
+            <label
+              >Đặc tính
+              <select id="gcFilterFeature">
+                <option value="">Tất cả</option>
+              </select></label
+            >
+          </div>
+          <div class="toolbar">
+            <button id="gcRefresh">Xem</button><button id="gcExcel">Xuất Excel</button>
+          </div>
+          <div id="gcMetrics" class="metrics"></div>
+        </div>
+        <div class="panel">
+          <h3>Biểu đồ kích thước</h3>
+          <div id="gcValueChart"></div>
+          <h3>Biểu đồ SPC</h3>
+          <div id="gcSpcChart"></div>
+          <label class="no-print capability-check" title="Chỉ xác nhận khi quá trình ổn định, phân phối và cách lấy mẫu phù hợp để đánh giá Cp/Cpk."
+            ><input type="checkbox" id="gcCapabilityConfirmed" /> Đủ điều kiện Cp/Cpk</label
+          >
+          <p id="gcCapability" title="Cp/Cpk cần 100 giá trị, 30 nhóm, không có tín hiệu mất kiểm soát và xác nhận điều kiện quá trình/phân phối."></p>
+        </div>
+        <div class="panel">
+          <h3>Đặc tính NG</h3>
+          <div id="gcTopNg"></div>
+        </div>
+        <div class="panel">
+          <h3>Chi tiết kết quả</h3>
+          <div id="gcDataRows" class="scroll"></div>
+          <button id="gcMoreRows">Tải thêm</button>
+        </div>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script src="shared/supabase-client.js"></script>
+    <script src="shared/navbar.js?v=20261105-standards"></script>
+    <script src="shared/qc02-data.js?v=T183"></script>
+    <script src="shared/ipqc-gc-standard.js?v=20261106-signed-copy"></script>
+<script src="shared/ipqc-spc.js?v=T213"></script>
+    <script src="shared/ipqc-btk-qc.js?v=20261106-signed-copy"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="shared/ipqc-gc-math.js?v=T213"></script>
+    <script src="shared/ipqc-gc-entry.js?v=20261107-cmm-apply"></script>
+    <script src="shared/ipqc-result-parser.js?v=20261107-cmm-apply"></script>
+    <script src="shared/ipqc-result-reader.js?v=20261106-zeiss"></script>
+    <script src="shared/ipqc-result-import.js?v=20261107-inspection-date"></script>
+    <script src="shared/ipqc-gia-cong.js?v=20261107-inspection-date"></script>
+  </body>
+</html>

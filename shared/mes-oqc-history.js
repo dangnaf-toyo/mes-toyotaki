@@ -272,7 +272,7 @@ const MesOqcHistory = (() => {
               .map((d) => MesQcFields.defectName(d) + ": " + d.qty)
               .join("; "),
           ) +
-          '</td><td>' + E(r.context?.inspection_scope ? (MesOqcScope.labels[r.context.inspection_scope] || r.context.inspection_scope) : '—') +
+          '</td><td>' + E(OqcScope.recordLabel(r)) +
           '</td><td>' + (Number(r.total_qty)>0 ? (Number(r.ng_qty||0)/Number(r.total_qty)*100).toFixed(2)+'%' : '—') +
           '</td><td>' + OqcReportAccess.actions(r) + '</td></tr>',
       )
@@ -280,8 +280,10 @@ const MesOqcHistory = (() => {
     const groups = new Map(),
       faults = new Map();
     for (const r of dataRows) {
-      const scope=r.context?.inspection_scope||'',groupKey=JSON.stringify([r.product_code,scope]);
-      const g = groups.get(groupKey) || { code: r.product_code, scope, count: 0, total: 0, ok: 0, ng: 0 };
+      const scope=r.context?.inspection_scope||'';
+      const outsideProcess=OqcScope.process(scope,r.cong_doan_gia_cong_ngoai);
+      const groupKey=JSON.stringify([r.product_code,scope,outsideProcess]);
+      const g = groups.get(groupKey) || { code: r.product_code, scope, outsideProcess, count: 0, total: 0, ok: 0, ng: 0 };
       g.count++;
       g.total += Number(r.total_qty || 0);
       g.ok += Number(r.ok_qty || 0);
@@ -298,7 +300,8 @@ const MesOqcHistory = (() => {
     Qc02View.table(
       target,
       ["Model", "Lần kiểm", "Tổng kiểm", "OK", "NG", "Phạm vi kiểm", "% lỗi"],
-      [...groups.values()].map((g) => [g.code, g.count, g.total, g.ok, g.ng, g.scope?(MesOqcScope.labels[g.scope]||g.scope):'—',g.total>0?(g.ng/g.total*100).toFixed(2)+'%':'—']),
+      [...groups.values()].map((g) => [g.code, g.count, g.total, g.ok, g.ng,
+        OqcScope.label(g.scope,g.outsideProcess),g.total>0?(g.ng/g.total*100).toFixed(2)+'%':'—']),
     );
     [...target.querySelectorAll("tr")]
       .filter((tr) => tr.querySelector("td"))

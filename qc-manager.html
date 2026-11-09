@@ -181,6 +181,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 .ncp-step-choice button:hover{background:var(--bg-sunken)}
 .hidden{display:none!important}
 </style>
+<link rel="stylesheet" href="shared/ncp-defect-images.css?v=T228">
 </head>
 <body>
 <div class="app">
@@ -368,6 +369,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
           <label>Mô tả lỗi</label>
           <textarea id="ncp-mo-ta-loi"></textarea>
         </div>
+        <section id="ncp-new-images" aria-label="Hình ảnh lỗi"></section>
         <div class="field-row">
           <label>Số lượng nghi vấn cần cách ly</label>
           <input type="number" id="ncp-so-luong" min="1" step="1">
@@ -386,7 +388,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
         </div>
         <div class="field-row">
           <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
-          <input type="text" autocomplete="off" id="ncp-nguoi-dam-nhiem-doi-sach"></div><div class="field-row"><label for="ncp-han-tra-loi">Hạn trả lời đối sách *</label><input id="ncp-han-tra-loi" type="date" lang="vi" required>
+          <input type="text" autocomplete="off" id="ncp-nguoi-dam-nhiem-doi-sach"></div><div class="field-row"><label for="ncp-han-tra-loi">Hạn trả lời đối sách</label><input id="ncp-han-tra-loi" type="date" lang="vi">
         </div>
       </div>
       <div class="modal-foot">
@@ -505,13 +507,15 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js?v=T169"></script>
 <script src="shared/ipqc-text.js"></script>
-<script src="shared/navbar.js"></script>
+<script src="shared/navbar.js?v=20261105-standards"></script>
 <script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script src="shared/qc02-data.js?v=T183"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="shared/ipqc-spc.js"></script>
-<script src="shared/ipqc-btk-qc.js?v=T211"></script>
+<script src="shared/ipqc-gc-standard.js?v=20261106-signed-copy"></script>
+<script src="shared/ipqc-spc.js?v=T213"></script>
+<script src="shared/ipqc-drawing-viewer.js?v=20261105-attachments"></script>
+<script src="shared/ipqc-btk-qc.js?v=20261106-signed-copy"></script>
 <script src="shared/mes-ng-status.js?v=T141"></script>
 <script>
 const state = { machines: [], products: [], productMap: {}, moldsByProduct: {}, dynamicFiltersLoaded: false, suCoPhutDungMap: {}, suCoLog: [], ncpList: [], ncpAvailableNg: [], ncpLoaded: false, ncpCurrentCase: null, pdfBlob: null, currentUserEmail: '' };
@@ -963,7 +967,7 @@ function onSoKhuonSelectChange(prefix){
 function populateDynamicFilterOptions(list){
   const dates = Array.from(new Set(list.map(x => x.thoi_diem_kiem_thuc_te ? toVnDateStr(x.thoi_diem_kiem_thuc_te) : null).filter(Boolean))).sort().reverse();
   const dateSel = document.getElementById('fl-ngay');
-  dates.forEach(dt => { const opt = document.createElement('option'); opt.value = dt; opt.textContent = new Date(dt + 'T00:00:00').toLocaleDateString('vi-VN'); dateSel.appendChild(opt); });
+  dates.forEach(dt => { const opt = document.createElement('option'); opt.value = dt; opt.textContent = new Date(dt + 'T00:00:00').toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour12:false}); dateSel.appendChild(opt); });
   const inspectors = Array.from(new Set(list.map(x => x.nguoi_kiem).filter(Boolean)));
   fillSelect('fl-nguoi-kiem', inspectors);
 }
@@ -1082,7 +1086,7 @@ function renderNcpList(){
       <td>${escapeHtml(NCP_TRANG_THAI_LABEL[c.trang_thai] || c.trang_thai)}</td>
       ${ncpDeadlineCells(c)}<td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
-      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
         <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
         <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
@@ -1103,7 +1107,7 @@ function renderNcpList(){
       <td class="ncp-qty" style="color:${c.so_luong_phe_da_duyet > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${c.so_luong_phe_da_duyet}</td>
       ${ncpDeadlineCells(c)}<td><span class="ncp-rc-badge ${c.rc_trang_thai_duyet}">${NCP_RC_BADGE_LABEL[c.rc_trang_thai_duyet] || c.rc_trang_thai_duyet}</span></td>
       <td>${escapeHtml(c.nguoi_dam_nhiem || c.nguoi_mo_case)}</td>
-      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : '—'}</td>
+      <td class="mono">${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : '—'}</td>
       <td class="ncp-btn-row">
         <button class="btn btn-outline" onclick="printNcpTag('${c.id_ncp}')">🖨 In thẻ</button>
         <a class="btn btn-outline" style="text-decoration:none;display:inline-flex;align-items:center" href="ncp-detail.html?id=${encodeURIComponent(c.id_ncp)}" target="_blank">📝 Đối sách</a>
@@ -1140,7 +1144,7 @@ async function openNcpNewModal(){
   else {
     state.ncpAvailableNg = data.map(x => ({ id_checkpoint: x.id_checkpoint, ma_may: x.ma_may, ma_sp: x.ma_sp, so_khuon: x.so_khuon, thoi_diem_kiem_thuc_te: x.thoi_diem_kiem_thuc_te, mo_ta_de_xuat: x.mo_ta_de_xuat }));
     sel.innerHTML = '<option value="">-- Chọn --</option>' + state.ncpAvailableNg.map(x =>
-      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { hour12: false })}</option>`).join('');
+      `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false })}</option>`).join('');
     onNcpNgSelected();
   }
   document.getElementById('ncp-modal-new').classList.add('show');
@@ -1203,14 +1207,14 @@ async function submitNcpNewCase(){
   if (!p.nguoiDamNhiem) return alert('Nhập người đảm nhiệm xử lý');
   if (!p.nguoiDamNhiemDoiSach) return alert('Nhập người đảm nhiệm trả lời Nguyên nhân & Đối sách');
 
-  const { data, error } = await sb.rpc('duc_ncp_open_case', {
+  let data;
+  try { data = await ncpNewImages.create('ng', {
     p_han_tra_loi_doi_sach: document.getElementById('ncp-han-tra-loi').value,
     p_id_checkpoint_goc: p.idCheckpoint, p_ma_may: p.maMay, p_ma_sp: p.maSp, p_ten_sp: p.tenSp, p_so_khuon: p.soKhuon,
     p_mo_ta_loi: p.moTaLoi, p_so_luong_nghi_van: p.soLuong, p_so_luong_ng_du_kien: p.soLuongNgDuKien,
     p_vi_tri_cach_ly: p.viTri, p_nguoi_dam_nhiem: p.nguoiDamNhiem, p_nguoi_dam_nhiem_doi_sach: p.nguoiDamNhiemDoiSach,
     p_user: state.currentUserEmail,
-  });
-  if (error) return alert('Lỗi: ' + error.message);
+  }); } catch(e) { return alert('Chưa lưu được phiếu: '+e.message+' — hãy thử lại trên form này.'); }
   if (data && data.ok === false) return alert('Lỗi: ' + data.error);
   closeNcpModal('ncp-modal-new');
   loadNcpList();
@@ -1347,7 +1351,7 @@ function printNcpTag(idNcp){
           <tr><td class="k">Mã SP</td><td><b>${escapeHtml(c.ma_sp)}</b></td></tr>
           <tr><td class="k">Số lượng</td><td><b>${c.so_luong_nghi_van}</b></td></tr>
           <tr><td class="k">Vị trí cách ly</td><td>${escapeHtml(c.vi_tri_cach_ly)}</td></tr>
-          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { hour12: false }) : ''}</td></tr>
+          <tr><td class="k">Ngày mở</td><td>${c.ngay_tao ? new Date(c.ngay_tao).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : ''}</td></tr>
           <tr><td class="k">Người mở</td><td>${escapeHtml(c.nguoi_mo_case)}</td></tr>
         </table>
         <div class="desc">${escapeHtml(c.mo_ta_loi)}</div>
@@ -1397,8 +1401,8 @@ async function moTabTieuChuan(){
   const ma = qs.get('ma');
   if (ma && !state.tcMoMa) {
     state.tcMoMa = true;
-    if (tcNhap[ma]) { editTieuChuan(ma); document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' }); }
-    else btkCtl.mo(ma);
+    if (tcNhap[ma] && qs.get('type')!=='btk' && !qs.has('version')) { editTieuChuan(ma); document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' }); }
+    else await btkCtl.mo(ma,null,qs.get('version'));
   }
 }
 
@@ -1406,7 +1410,7 @@ async function loadChoDuyet(){
   const el = document.getElementById('tc-cho-list');
   const cot = 'id,ma_sp,cong_doan,trang_thai,noi_dung_sua_doi,nguoi_lap,nguoi_lap_uid,gui_luc,ly_do_tra_lai';
   const [b, c] = await Promise.all([
-    sb.from('ipqc_btk').select(cot + ',phien_ban').neq('trang_thai', 'da_duyet'),
+    sb.from('ipqc_btk').select(cot + ',phien_ban,buoc_gia_cong').neq('trang_thai', 'da_duyet'),
     sb.from('duc_ipqc_tieuchuan_de_xuat').select(cot).neq('trang_thai', 'da_duyet'),
   ]);
   const ds = (b.data || []).map(x => ({ ...x, loai: 'btk' })).concat((c.data || []).map(x => ({ ...x, loai: 'checklist' })))
@@ -1416,19 +1420,19 @@ async function loadChoDuyet(){
   document.getElementById('tc-cho-count').textContent = ds.length;
   if (!ds.length) { el.innerHTML = '<div class="empty-note">Không có tiêu chuẩn nào đang chờ duyệt.</div>'; return; }
   el.innerHTML = '<table style="min-width:740px"><thead><tr><th>Công đoạn</th><th>Loại</th><th>Mã SP</th><th>Nội dung sửa đổi</th><th>Người soạn</th><th>Gửi lúc</th><th>Trạng thái</th></tr></thead><tbody>' +
-    ds.map(x => `<tr class="tc-cho-row" onclick="moChoDuyet('${x.loai}','${escapeHtml(x.ma_sp)}','${escapeHtml(x.cong_doan)}')">
+    ds.map(x => `<tr class="tc-cho-row" onclick="moChoDuyet('${x.loai}','${escapeHtml(x.ma_sp)}','${escapeHtml(x.cong_doan)}',${Number(x.id)})">
       <td style="font-weight:700">${TC_CD[x.cong_doan] || ''}</td>
-      <td>${x.loai === 'btk' ? 'Bảng tuần kiểm ' + escapeHtml(x.phien_ban) : 'Checklist + PDF'}</td>
+      <td>${x.loai === 'btk' ? 'Bảng tuần kiểm ' + escapeHtml(x.phien_ban) + (x.buoc_gia_cong?' · '+escapeHtml(x.buoc_gia_cong):'') : 'Checklist + PDF'}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtml(x.ma_sp)}</td>
       <td>${escapeHtml(x.noi_dung_sua_doi || '')}${x.trang_thai === 'tra_lai' && x.ly_do_tra_lai ? '<div style="color:var(--alarm-fg);font-size:11px">Lý do trả lại: ' + escapeHtml(x.ly_do_tra_lai) + '</div>' : ''}</td>
       <td>${escapeHtml(x.nguoi_lap || '')}</td>
-      <td style="white-space:nowrap">${x.gui_luc ? new Date(x.gui_luc).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</td>
+      <td style="white-space:nowrap">${x.gui_luc ? new Date(x.gui_luc).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</td>
       <td style="white-space:nowrap">${tcPill(x.trang_thai)}${choToi(x) ? ' <span class="pill ok">Tới lượt bạn</span>' : ''}</td></tr>`).join('') + '</tbody></table>';
 }
 
-async function moChoDuyet(loai, ma, cd){
+async function moChoDuyet(loai, ma, cd, version){
   await chonCongDoanTc(cd);
-  if (loai === 'btk') return btkCtl.mo(ma);
+  if (loai === 'btk') return btkCtl.mo(ma,null,version);
   editTieuChuan(ma);
   document.getElementById('tc-form-panel').scrollIntoView({ block: 'start' });
 }
@@ -1583,7 +1587,10 @@ loadQcFilters();
 setInterval(loadBoard, 15000);
 </script>
 <script>Qc02Data.attachEmployees(["ncp-nguoi-dam-nhiem","ncp-nguoi-dam-nhiem-doi-sach"]);</script>
-<script src="shared/mes-ncp-source.js?v=T184"></script>
+<script src="shared/ncp-defect-images.js?v=T228"></script>
+<script>const ncpNewImages=NcpDefectImages.mount(document.getElementById('ncp-new-images'));</script>
+<script src="shared/mes-ncp-source.js?v=T228"></script>
 <script>/* ?tab=… mở thẳng tab; T136: bieudo / ngoqc đã chuyển sang bieu-do-chat-luong.html */(function(){var t=new URLSearchParams(location.search).get('tab');var moi={bieudo:'kiemsoat',ngoqc:'pchart'};if(moi[t]){location.replace('bieu-do-chat-luong.html?tab='+moi[t]);return;}if(t&&document.getElementById('tab-'+t))setTimeout(function(){switchTab(t);},0);})();</script>
+<script src="shared/ncp-doi-sach-board.js?v=T214"></script>
 </body>
 </html>

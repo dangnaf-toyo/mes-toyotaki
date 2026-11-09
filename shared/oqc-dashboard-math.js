@@ -5,17 +5,46 @@
  function planning(config){const hours=Number(config?.planning_hours),target=Number(config?.target_efficiency);return positive(hours)&&hours<=24&&positive(target)&&target<=1?{hours,target}:null;}
  function capa(steps,config){if(!Array.isArray(steps)||!steps.length)return {error:'Chưa có CAPA'};let seconds=0;for(const s of steps){if(!String(s.name||'').trim()||s.seconds===''||s.seconds==null||!Number.isFinite(Number(s.seconds))||Number(s.seconds)<0)return {error:'Tên công đoạn và giây/PCS không âm là bắt buộc'};seconds+=Number(s.seconds);}if(!positive(seconds))return {error:'Tổng thời gian phải lớn hơn 0'};const p=planning(config);return {seconds,hourly:3600/seconds,daily:p?Math.floor(3600/seconds*p.hours*p.target+1e-9):null,configError:p?null:"Chưa đủ dữ liệu"};}
  function staffing(plans){if(!plans.length)return {fte:null,people:null,missing:0,error:'Ngoài kế hoạch'};let fte=0,missing=0;const days=new Map();for(const p of plans){if(!positive(p.seconds_per_piece)){missing++;continue;}const config=planning(p);if(!config){missing++;continue;}const v=Number(p.quantity)*Number(p.seconds_per_piece)/(config.hours*3600*config.target);fte+=v;days.set(p.date,(days.get(p.date)||0)+v);}if(missing)return {fte:null,people:null,missing,error:'Chưa tính đủ: '+missing+' dòng kế hoạch thiếu CAPA hoặc cấu hình giờ/hiệu suất'};return {fte,people:Math.ceil(Math.max(0,fte-1e-10)),days:[...days].map(([date,value])=>({date,fte:value,people:Math.ceil(Math.max(0,value-1e-10))})),missing:0};}
- function summary(records,plans){let checked=0,ok=0,ng=0,hours=0,earned=0,missingHours=0,missingCapa=0;const people=new Set();for(const r of records){ok+=Number(r.ok_qty||0);ng+=Number(r.ng_qty||0);const qty=Number(r.ok_qty||0)+Number(r.ng_qty||0);checked+=qty;const work=r.work;
+ function reportHours(r){
+  const rows=r.work?.labor||[], named=rows.reduce((n,l)=>n+(positive(l.hours)?Number(l.hours):0),0);
+  if(rows.some(l=>!positive(l.hours)))return null;
+  if(r.so_nguoi_kiem==null)return rows.length?named:null;
+  const remaining=Number(r.so_nguoi_kiem)-rows.length;
+  if(remaining<0)return null;
+  if(remaining && !positive(r.gio_kiem_thuc_te))return null;
+  return named+remaining*Number(r.gio_kiem_thuc_te||0)||null;
+ }
+ function summary(records,plans){let checked=0,ok=0,ng=0,hours=0,earned=0,missingHours=0,missingCapa=0,personTurns=0;const people=new Set();for(const r of records){ok+=Number(r.ok_qty||0);ng+=Number(r.ng_qty||0);const qty=Number(r.ok_qty||0)+Number(r.ng_qty||0);checked+=qty;const work=r.work;
    if(r.inspector_code)people.add(String(r.inspector_code).toLocaleLowerCase());
-   const labor=work?.labor||[];if(!labor.length)missingHours++;else for(const l of labor){if(positive(l.hours)){hours+=Number(l.hours);people.add(String(l.employee_code).toLocaleLowerCase());}else missingHours++;}
+   const labor=work?.labor||[];personTurns+=Number(r.so_nguoi_kiem??Math.max(1,labor.length));const actual=reportHours(r);if(actual==null)missingHours++;else hours+=actual;for(const l of labor)if(l.employee_code)people.add(String(l.employee_code).toLocaleLowerCase());
    const sec=work?.seconds_per_piece??r.context?.seconds_per_piece;
    if(r.context?.inspection_scope!=='FULL_POST_MACHINING'||!positive(sec))missingCapa++;else earned+=qty*Number(sec)/3600;
   }
   const planned=plans.reduce((n,p)=>n+Number(p.quantity||0),0),comparable=records.every(r=>r.context?.inspection_scope==='FULL_POST_MACHINING');
-  const targets=records.map(r=>r.work?.target_efficiency),distinct=[...new Set(targets.filter(positive).map(Number))];const target=records.length?(targets.every(positive)?distinct.length===1?distinct[0]:!missingHours&&hours>0?records.reduce((n,r)=>n+(r.work.labor||[]).reduce((h,l)=>h+Number(l.hours),0)*Number(r.work.target_efficiency),0)/hours:null:null):null;
-  return {target,checked,ok,ng,ngRate:checked?ng/checked*100:null,planned,completion:planned>0&&comparable?checked/planned*100:null,hours:missingHours?null:hours,knownHours:hours,people:people.size,standardHours:missingCapa?null:earned,efficiency:missingHours||missingCapa||hours<=0?null:earned/hours*100,missingHours,missingCapa,staff:staffing(plans),comparable};
+  const targets=records.map(r=>r.work?.target_efficiency),distinct=[...new Set(targets.filter(positive).map(Number))];const target=records.length?(targets.every(positive)?distinct.length===1?distinct[0]:!missingHours&&hours>0?records.reduce((n,r)=>n+reportHours(r)*Number(r.work.target_efficiency),0)/hours:null:null):null;
+  return {personTurns,productivity:!missingHours&&hours>0?checked/hours:null,target,checked,ok,ng,ngRate:checked?ng/checked*100:null,planned,completion:planned>0&&comparable?checked/planned*100:null,hours:missingHours?null:hours,knownHours:hours,people:people.size,standardHours:missingCapa?null:earned,efficiency:missingHours||missingCapa||hours<=0?null:earned/hours*100,missingHours,missingCapa,staff:staffing(plans),comparable};
  }
  function group(records,plans){const codes=new Set([...records.map(r=>r.product_code),...plans.map(p=>p.product_code)]);return [...codes].sort().map(code=>({code,...summary(records.filter(r=>r.product_code===code),plans.filter(p=>p.product_code===code))}));}
- function groupByScope(records,plans){const groups=new Map();for(const r of records){const scope=r.context?.inspection_scope||'',key=JSON.stringify([r.product_code,scope]);if(!groups.has(key))groups.set(key,{code:r.product_code,scope,records:[],plans:[]});groups.get(key).records.push(r);}for(const p of plans){const key=JSON.stringify([p.product_code,'FULL_POST_MACHINING']);if(!groups.has(key))groups.set(key,{code:p.product_code,scope:'FULL_POST_MACHINING',records:[],plans:[]});groups.get(key).plans.push(p);}return [...groups.values()].map(g=>{const total=g.records.reduce((n,r)=>n+Number(r.total_qty||0),0);return {code:g.code,scope:g.scope,...summary(g.records,g.plans),reportTotal:total,defectRate:total>0?g.records.reduce((n,r)=>n+Number(r.ng_qty||0),0)/total*100:null};}).sort((a,b)=>a.code.localeCompare(b.code)||a.scope.localeCompare(b.scope));}
- const api={planning,positive,capa,staffing,summary,group,groupByScope};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.OqcDashboardMath=api;
+ function groupByScope(records, plans) {
+  const groups = new Map();
+  for (const r of records) {
+   const scope = r.context?.inspection_scope || '';
+   const outsideProcess = scope === 'POST_OUTSOURCED_MACHINING' ? r.cong_doan_gia_cong_ngoai || '' : '';
+   const key = JSON.stringify([r.product_code, scope, outsideProcess]);
+   if (!groups.has(key)) groups.set(key, {code:r.product_code,scope,outsideProcess,records:[],plans:[]});
+   groups.get(key).records.push(r);
+  }
+  for (const p of plans) {
+   const key = JSON.stringify([p.product_code, 'FULL_POST_MACHINING', '']);
+   if (!groups.has(key)) groups.set(key, {code:p.product_code,scope:'FULL_POST_MACHINING',outsideProcess:'',records:[],plans:[]});
+   groups.get(key).plans.push(p);
+  }
+  return [...groups.values()].map(g => {
+   const total = g.records.reduce((n,r) => n + Number(r.total_qty || 0), 0);
+   return {code:g.code,scope:g.scope,outsideProcess:g.outsideProcess,...summary(g.records,g.plans),
+    reportTotal:total,defectRate:total > 0 ? g.records.reduce((n,r) => n + Number(r.ng_qty || 0), 0) / total * 100 : null};
+  }).sort((a,b) => a.code.localeCompare(b.code) || a.scope.localeCompare(b.scope) ||
+   a.outsideProcess.localeCompare(b.outsideProcess));
+ }
+ const api={reportHours,planning,positive,capa,staffing,summary,group,groupByScope};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.OqcDashboardMath=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

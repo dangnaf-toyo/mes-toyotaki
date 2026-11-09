@@ -67,13 +67,9 @@ const OqcDashboard = (() => {
   scopeLabel.htmlFor = "oqcDashboardScope";
   const scopeSelect = node("select");
   scopeSelect.id = "oqcDashboardScope";
-  for (const [value, label] of [
-    ...MesOqcScope.current.map((value) => [value, MesOqcScope.labels[value]]),
-    ["ALL", "Tất cả kết quả"],
-    ["UNKNOWN", "Chưa xác định (dữ liệu cũ)"],
-    ["LEGACY", "Phạm vi cũ khác"],
-  ])
+  for (const [value, label] of OqcScope.filters)
     scopeSelect.add(new Option(label, value));
+  scopeSelect.value = "FULL_POST_MACHINING";
   scopeField.append(scopeLabel, scopeSelect);
   // T140: bộ lọc Thống kê OQC dồn 1 hàng (tự xuống dòng khi hẹp); Phạm vi đứng trước nút Xem/Xuất Excel.
   const filterBar = $("period").closest(".grid"),
@@ -94,6 +90,22 @@ const OqcDashboard = (() => {
     filterButtons.className = "oqc-filter-actions";
     filterBar.insertBefore(scopeField, filterButtons);
   } else filterBar.append(scopeField);
+  const outsourced = node("div");
+  outsourced.className="field";
+  outsourced.innerHTML='<label for="oqcOutsourceProcess">Công đoạn gia công ngoài</label><select id="oqcOutsourceProcess"><option value="">Chọn công đoạn</option><option value="ma">Mạ</option><option value="in">In</option><option value="anode">Anode</option></select>';
+  const inputScopeField = $("inspectionScope").closest(".field");
+  inputScopeField.classList.add('oqc-input-scope');
+  // Keep it inside the scope field when the compact workspace moves that field.
+  inputScopeField.append(outsourced);
+  const syncOutside=()=>{
+    outsourced.hidden=$("inspectionScope").value!=="POST_OUTSOURCED_MACHINING";
+    outsourced.style.display=outsourced.hidden?'none':'';
+    const original = editing && dataRows.find(r=>r.id===editing);
+    const legacy = original?.context?.inspection_scope === OqcScope.outsourced &&
+      !original.cong_doan_gia_cong_ngoai;
+    $("oqcOutsourceProcess").required = !outsourced.hidden && !legacy;
+  };
+  $("inspectionScope").addEventListener("change",syncOutside);syncOutside();
   const clearModels = $("clearModels");
   clearModels.className = "oqc-clear-models";
   clearModels.textContent = "×";
@@ -116,8 +128,12 @@ const OqcDashboard = (() => {
   const hourField = node("div");
   hourField.className = "field";
   hourField.innerHTML =
-    '<label for="oqcInspectionHours">Số giờ kiểm tra</label><input id="oqcInspectionHours" type="text" inputmode="decimal" placeholder="Ví dụ: 1,5" autocomplete="off"><small>Giờ của người kiểm đang chọn dành riêng cho báo cáo/model này.</small>';
-  $("inspectorCode").closest(".field").after(hourField);
+    '<label for="oqcInspectionHours">Số giờ kiểm tra</label><input id="oqcInspectionHours" type="text" inputmode="decimal" placeholder="Ví dụ: 1,5" autocomplete="off"><small>Thời gian thực tế/người dành cho báo cáo này; người chưa ghi giờ riêng dùng thời gian này.</small>';
+  const countField = node("div");
+  countField.className = "field";
+  countField.innerHTML = '<label for="oqcInspectorCount">Số người kiểm tra</label><input id="oqcInspectorCount" type="number" min="1" step="1" value="1" required>';
+  $("inspectorCode").closest(".field").querySelector("label").textContent = "Người kiểm tra chính";
+  $("inspectorCode").closest(".field").after(countField, hourField);
   const guidance = node("p");
   guidance.id = "oqcDefectGuide";
   guidance.textContent = "Mỗi sản phẩm NG chỉ ghi một loại lỗi chính, tránh đếm trùng.";
@@ -354,15 +370,7 @@ const OqcDashboard = (() => {
             work = match(w, r) ? w : null;
           return { ...r, context, work, images: [...new Set([...(r.images || []), ...(work?.images || [])])] };
         });
-      const records = annotated.filter((r) =>
-        scope === "ALL"
-          ? true
-          : scope === "UNKNOWN"
-            ? !r.context?.inspection_scope
-            : scope === "LEGACY"
-              ? !!r.context?.inspection_scope && !MesOqcScope.current.includes(r.context.inspection_scope)
-              : r.context?.inspection_scope === scope,
-      );
+      const records = annotated.filter(r => OqcScope.matches(r, scope));
       const filters = MesOqcHistory.filters(),
         products = MesOqcHistory.products(),
         plans = [];
@@ -412,7 +420,7 @@ const OqcDashboard = (() => {
       dataRows = records;
       snapshot = { records, plans, from, to, outside: raw.length - records.length, scope };
       renderStats();
-      if (modelDialog.open && modelCode) renderModel(modelCode, modelScope);
+      if (modelDialog.open && modelCode) renderModel(modelCode, modelScope, modelProcess);
     } catch (e) {
       if (ticket === loadToken) {
         message(e, true, "Không tải được dashboard đầy đủ");
@@ -456,7 +464,9 @@ const OqcDashboard = (() => {
       ["NG", fmt(s.ng)],
       ["Tỷ lệ NG", value(s.ngRate, "Chưa có sản lượng đã kiểm", "%")],
       ["Giờ công", value(s.hours, "Thiếu giờ công thực tế; đã ghi " + fmt(s.knownHours) + " giờ")],
-      ["Số người kiểm", s.people],
+      ["Lượt nhân lực", s.personTurns],
+      ["NV QC đã định danh (không trùng)", s.people],
+      ["PCS/người/giờ", value(s.productivity, "Thiếu giờ công thực tế")],
       ["Hiệu suất", efficiency(s)],
     ];
     for (const [label, val] of values) {
@@ -469,8 +479,8 @@ const OqcDashboard = (() => {
       target.append(c);
     }
   }
-  let modelScope;
-  const scopeText = scope => scope ? (MesOqcScope.labels[scope] || scope) : '—';
+  let modelScope, modelProcess;
+  const scopeText = (scope, process) => OqcScope.label(scope, process);
   const defectPercent = (ng,total) => Number(total)>0 ? (Number(ng||0)/Number(total)*100).toFixed(2)+'%' : '—';
   function renderDashboard() {
     const s = M.summary(snapshot.records, snapshot.plans);
@@ -483,7 +493,8 @@ const OqcDashboard = (() => {
       b.onclick = () => {
         modelCode = g.code;
         modelScope = g.scope;
-        renderModel(g.code, g.scope);
+        modelProcess = g.outsideProcess;
+        renderModel(g.code, g.scope, g.outsideProcess);
         modelDialog.showModal();
       };
       return [
@@ -494,19 +505,21 @@ const OqcDashboard = (() => {
         fmt(g.ok),
         fmt(g.ng),
         value(g.hours, "Thiếu giờ công thực tế"),
+        g.personTurns,
         g.people,
+        value(g.productivity, "Thiếu giờ công thực tế"),
         efficiency(g),
-        scopeText(g.scope),
+        scopeText(g.scope, g.outsideProcess),
         defectPercent(g.ng,g.reportTotal),
       ];
     });
     table(
       $("modelSummary"),
-      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Số người kiểm", "Hiệu suất", "Phạm vi kiểm", "% lỗi"],
+      ["Mã/tên sản phẩm", "Kế hoạch", "Đã kiểm", "% hoàn thành", "OK", "NG", "Giờ công", "Lượt nhân lực", "QC định danh", "PCS/người/giờ", "Hiệu suất", "Phạm vi kiểm", "% lỗi"],
       rows,
     );
     $("modelSummary").title =
-      "Kế hoạch từ KH tuần OQC đã liên kết sau gia công; không gán sang Sơn/Gia Công ngoài. Giờ công cộng theo từng người/báo cáo; hiệu suất = giờ công chuẩn / giờ công thực tế × 100%.";
+      "Kế hoạch từ KH tuần OQC đã liên kết sau gia công; không gán sang sơn/gia công ngoài. Giờ công cộng theo từng người/báo cáo; hiệu suất = giờ công chuẩn / giờ công thực tế × 100%.";
     demand.replaceChildren();
     demand.hidden = true;
     OqcDefectCharts.render($("oqcDefectSummary"), snapshot.records, $("oqcTrendUnit").value, MesQcFields.defectName, {
@@ -514,12 +527,14 @@ const OqcDashboard = (() => {
       scopeLabel: scopeText,
     });
   }
-  function renderModel(code, scope) {
+  function renderModel(code, scope, process) {
     if (!snapshot) return;
-    const records = snapshot.records.filter((r) => r.product_code === code && (scope===undefined || (r.context?.inspection_scope||'')===scope)),
+    const records = snapshot.records.filter((r) => r.product_code === code &&
+      (scope===undefined || (r.context?.inspection_scope||'')===scope) &&
+      (process===undefined || OqcScope.process(scope,r.cong_doan_gia_cong_ngoai)===process)),
       plans = snapshot.plans.filter((p) => p.product_code === code && (scope===undefined || scope==='FULL_POST_MACHINING'));
     $("oqcModelTitle").textContent =
-      code + " · " + scopeText(scope) + " · " + MesQcFields.date(snapshot.from) + " – " + MesQcFields.date(snapshot.to);
+      code + " · " + scopeText(scope, process) + " · " + MesQcFields.date(snapshot.from) + " – " + MesQcFields.date(snapshot.to);
     cards($("oqcModelMetrics"), M.summary(records, plans));
     OqcDefectCharts.render($("oqcModelDefects"), records, $("oqcTrendUnit").value, MesQcFields.defectName, {
       pcs: true,
@@ -538,9 +553,9 @@ const OqcDashboard = (() => {
           Number(r.ok_qty) + Number(r.ng_qty),
           r.ok_qty,
           r.ng_qty,
-          r.work?.labor?.length ? fmt(r.work.labor.reduce((n, l) => n + Number(l.hours), 0)) : "Chưa ghi nhận",
+          M.reportHours(r) == null ? "Chưa ghi nhận" : fmt(M.reportHours(r)),
           b,
-          scopeText(r.context?.inspection_scope),
+          OqcScope.recordLabel(r),
           defectPercent(r.ng_qty,r.total_qty),
         ];
       }),
@@ -742,14 +757,18 @@ const OqcDashboard = (() => {
   function laborTotal() {
     try {
       const all = reportLabor();
-      $("oqcLaborTotal").textContent = all.length
-        ? "Giờ công đã nhập: " + fmt(all.reduce((n, l) => n + (l.hours || 0), 0)) + " giờ-người."
-        : "Chưa có giờ kiểm tra — chưa đủ dữ liệu tính hiệu suất.";
+      const hours = M.reportHours({ work: { labor: all },
+        so_nguoi_kiem: Number($("oqcInspectorCount").value),
+        gio_kiem_thuc_te: parseHours($("oqcInspectionHours").value) });
+      $("oqcLaborTotal").textContent = hours == null
+        ? "Chưa có giờ kiểm tra — chưa đủ dữ liệu tính hiệu suất."
+        : "Giờ công đã nhập: " + fmt(hours) + " giờ-người.";
     } catch (e) {
       $("oqcLaborTotal").textContent = e.message;
     }
   }
   $("oqcInspectionHours").oninput = laborTotal;
+  $("oqcInspectorCount").oninput = laborTotal;
   $("inspectorCode").addEventListener("change", laborTotal);
   function renderPhotos() {
     const box = $("oqcReportPhotoList");
@@ -807,11 +826,13 @@ const OqcDashboard = (() => {
     files = [];
     request = null;
     $("oqcInspectionHours").value = "";
+    $("oqcInspectorCount").value = "1";
     $("oqcFormMessage").textContent = "";
     $("ng").value = "0";
     $("date").value = today();
     $("inspectionScope").value = "FULL_POST_MACHINING";
     $("oqcReportPhotos").value = "";
+    $("oqcOutsourceProcess").value = "";syncOutside();
     renderLabor();
     renderPhotos();
     calcWork();
@@ -830,7 +851,8 @@ const OqcDashboard = (() => {
     const primary = (r.work?.labor || []).find(
       (l) => String(l.employee_code).toLowerCase() === String(r.inspector_code).toLowerCase(),
     );
-    $("oqcInspectionHours").value = primary?.hours ?? "";
+    $("oqcInspectorCount").value = r.so_nguoi_kiem ?? Math.max(1, r.work?.labor?.length || 0);
+    $("oqcInspectionHours").value = r.gio_kiem_thuc_te ?? primary?.hours ?? "";
     labor = (r.work?.labor || [])
       .filter((l) => String(l.employee_code).toLowerCase() !== String(r.inspector_code).toLowerCase())
       .map((l) => ({ ...l }));
@@ -839,6 +861,7 @@ const OqcDashboard = (() => {
     request = null;
     $("oqcReportPhotos").value = "";
     MesOqcScope.selectValue(r.context?.inspection_scope);
+    $("oqcOutsourceProcess").value=r.cong_doan_gia_cong_ngoai||"";syncOutside();
     $("inspectionScope").disabled =
       !info?.can_actual || !r.context || !MesOqcScope.current.includes(r.context.inspection_scope);
     $("ng").value = r.ng_qty;
@@ -891,7 +914,13 @@ const OqcDashboard = (() => {
       const defects = defectsPayload();
       if (defects.some((d) => !Number.isInteger(Number(d.qty)) || Number(d.qty) < 0 || Number(d.qty) > ng))
         throw Error("Số lượng từng lỗi phải nguyên, không âm và không vượt NG.");
+      const count = Number($("oqcInspectorCount").value);
+      if (!Number.isInteger(count) || count < 1) throw Error("Số người kiểm tra phải là số nguyên dương.");
+      const outside=$("inspectionScope").value==="POST_OUTSOURCED_MACHINING"?$("oqcOutsourceProcess").value||null:null;
+      const oldRow=editing&&dataRows.find(r=>r.id===editing);
+      if($("inspectionScope").value==="POST_OUTSOURCED_MACHINING"&&!outside&&!(oldRow?.context?.inspection_scope==="POST_OUTSOURCED_MACHINING"&&!oldRow.cong_doan_gia_cong_ngoai))throw Error("Chọn công đoạn gia công ngoài: Mạ, In hoặc Anode.");
       const allLabor = reportLabor();
+      if (allLabor.length > count) throw Error("Số người kiểm tra không được ít hơn số người đã ghi giờ riêng.");
       const codes = new Set();
       for (const l of allLabor) {
         if (
@@ -930,8 +959,10 @@ const OqcDashboard = (() => {
           task_no: $("inspectionTask").value.trim() || null,
           ...MesOqcHistory.customerPayload($("code").value, original),
           scope: $("inspectionScope").value || null,
-          // T153: lần sơn chỉ gửi cho phạm vi "Kiểm tra sau Sơn"
+          // T153: lần sơn chỉ gửi cho phạm vi "Kiểm tra sau sơn"
           ...($("inspectionScope").value === "POST_PAINTING" && $("oqcLanSon") ? { lan_son: $("oqcLanSon").value } : {}),
+          cong_doan_gia_cong_ngoai: outside,
+          so_nguoi_kiem: count,
           inspection_hours: parseHours($("oqcInspectionHours").value),
           labor: allLabor.map((l) => ({ employee_code: l.employee_code, hours: Number(l.hours) })),
           images,
