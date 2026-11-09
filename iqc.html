@@ -1143,6 +1143,8 @@
         const formatDisplayDate = MesQcFields.display;
 
         const normalizeLot = (row = {}) => ({
+          itemKind: row.doi_tuong || "san_pham", materialCode: row.ma_nvl || "", materialGroup: row.nhom_vat_lieu || "", grade: row.mac_vat_lieu || "",
+          method: row.phuong_thuc || "ngoai_quan", inspectionDate: row.ngay_kiem || "", shift: row.ca_kiem || "", chemical: row.hoa_hoc_json || null, updatedAt: row.updated_at,
           id: row.id,
           receivedDate: formatDisplayDate(row.received_at),
           sampledDate: formatDisplayDate(row.sampled_at),
@@ -1227,6 +1229,7 @@
 
           return {
             received_at: receivedAt,
+            ...(data.itemKind ? {doi_tuong:data.itemKind,ma_nvl:data.materialCode||null,nhom_vat_lieu:data.materialGroup||null,mac_vat_lieu:data.grade||null} : {}),
             ...(data.sampledDate !== undefined || data.sampled_at !== undefined
               ? { sampled_at: toIso(data.sampledDate ?? data.sampled_at) }
               : {}),
@@ -1269,7 +1272,7 @@
           try {
             const { data, error } = await sbTaiHet(() => sb.from("iqc_lots").select("*").order("created_at", { ascending: false }).order("id"));
             if (error) throw error;
-            return safeRows(data).map(normalizeLot);
+            return safeRows(data).filter(row=>!row.da_luu_tru).map(normalizeLot);
           } catch (err) {
             console.warn("iqc_lots not ready:", err.message || err);
             throw err;
@@ -1426,7 +1429,7 @@
           },
 
           async searchLotHistory(key, from, to) {
-            const term = String(key || "").trim();
+            const term = String(key || "").trim().replace(/^\[NVL\]\s*/, "");
             try {
               let query = sb.from("iqc_lots").select("*");
               if (term) {
@@ -1440,7 +1443,7 @@
                 );
               const { data, error } = await query.order("created_at", { ascending: false });
               if (error) throw error;
-              return safeRows(data).map(normalizeLot);
+              return safeRows(data).filter(row=>!row.da_luu_tru).map(normalizeLot);
             } catch (err) {
               console.warn("searchLotHistory failed:", err.message || err);
               throw err;
@@ -1522,7 +1525,7 @@
 
               const productMap = new Map();
               normLots.forEach((lot) => {
-                const key = `${lot.productCode}|${lot.productName}`;
+                const key = `${lot.itemKind}|${lot.productCode}|${lot.productName}`;
                 if (!productMap.has(key)) {
                   productMap.set(key, {
                     productCode: lot.productCode,
@@ -1674,7 +1677,7 @@
             l.status !== "Đã kiểm tra"
               ? `<button class="button btn-success btn-small" onclick="openComplete('${esc(l.id)}')">Hoàn thành kiểm tra</button>`
               : "";
-          tb.innerHTML += `<tr><td>${esc(l.receivedDate)}</td><td>${esc(l.sampledDate)}</td><td>${esc(l.pickupDate)}</td><td>${esc(l.supplier)}</td><td>${esc(l.scope || "—")}</td><td>${esc(l.inspectorName || l.inspector)}</td><td>${esc(l.productCode)}</td><td>${esc(l.productName)}</td><td><button type="button" class="button btn-secondary btn-small" onclick="openDetail('${esc(l.id)}')">${esc(l.lotNo)}</button></td><td>${l.lotQty}</td><td>${esc(l.inspectionType)}</td><td>${l.sampleQty}</td><td>${esc(l.aql || "—")}</td><td>${esc(l.location)}</td><td>${st}</td><td class="timer ${l.completedMs ? "done" : ""}" data-start="${l.startMs || ""}" data-end="${l.completedMs || ""}" data-min="${l.inspectionMinutes || 0}" data-status="${esc(l.status || "")}">${timerText(l)}</td><td>${res}</td><td class="ok">${l.inspectionType === "Kiểm tra 100%" ? l.okQty : "—"}</td><td class="ng">${l.inspectionType === "Kiểm tra 100%" ? l.ngQty : "—"}</td><td>${l.inspectionType === "Kiểm tra 100%" ? Number(l.okPercent).toFixed(2) + "%" : "—"}</td><td>${l.inspectionType === "Kiểm tra 100%" ? Number(l.ngPercent).toFixed(2) + "%" : "—"}</td><td class="note-cell">${esc(l.note || "")}</td><td><button class="button btn-secondary btn-small" onclick="editLot('${esc(l.id)}')">Sửa</button> <button class="button btn-danger btn-small" onclick="deleteLotUI('${esc(l.id)}','${esc(l.lotNo)}')">Xóa</button> ${action}</td></tr>`;
+          tb.innerHTML += `<tr><td>${esc(l.receivedDate)}</td><td>${esc(l.sampledDate)}</td><td>${esc(l.pickupDate)}</td><td>${esc(l.supplier)}</td><td>${esc(l.scope || "—")}</td><td>${esc(l.inspectorName || l.inspector)}</td><td>${esc(l.productCode)}</td><td>${esc(l.productName)}</td><td><button type="button" class="button btn-secondary btn-small" onclick="openDetail('${esc(l.id)}')">${esc(l.lotNo)}</button></td><td>${l.method === "hoa_hoc" ? "—" : l.lotQty}</td><td>${esc(l.inspectionType)}</td><td>${l.method === "hoa_hoc" ? "—" : l.sampleQty}</td><td>${esc(l.aql || "—")}</td><td>${esc(l.location)}</td><td>${st}</td><td class="timer ${l.completedMs ? "done" : ""}" data-start="${l.startMs || ""}" data-end="${l.completedMs || ""}" data-min="${l.inspectionMinutes || 0}" data-status="${esc(l.status || "")}">${timerText(l)}</td><td>${res}</td><td class="ok">${l.inspectionType === "Kiểm tra 100%" ? l.okQty : "—"}</td><td class="ng">${l.inspectionType === "Kiểm tra 100%" ? l.ngQty : "—"}</td><td>${l.inspectionType === "Kiểm tra 100%" ? Number(l.okPercent).toFixed(2) + "%" : "—"}</td><td>${l.inspectionType === "Kiểm tra 100%" ? Number(l.ngPercent).toFixed(2) + "%" : "—"}</td><td class="note-cell">${esc(l.note || "")}</td><td><button class="button btn-secondary btn-small" onclick="editLot('${esc(l.id)}')">Sửa</button> <button class="button btn-danger btn-small" onclick="deleteLotUI('${esc(l.id)}','${esc(l.lotNo)}')">Xóa</button> ${action}</td></tr>`;
         });
         renderDefects(d.defects);
         populateDefectLots();
@@ -1942,6 +1945,7 @@
       });
       function populateDefectLots(selected) {
         $("defectLot").innerHTML = dashboard.lots
+          .filter((l) => l.method !== "hoa_hoc")
           .map(
             (l) =>
               `<option value="${esc(l.id)}">${esc(l.lotNo)} — ${esc(l.productCode)} — ${esc(l.productName)}</option>`,
@@ -2352,7 +2356,7 @@
               : l.result === "NG"
                 ? '<span class="badge badge-ng">NG</span>'
                 : '<span class="badge badge-wait">Chưa có</span>';
-          tb.innerHTML += `<tr class="clickable" onclick="openDetail('${esc(l.id)}')"><td>${esc(l.receivedDate)}</td><td>${esc(l.sampledDate)}</td><td>${esc(l.pickupDate)}</td><td>${esc(l.completionDate)}</td><td>${esc(l.scope || "—")}</td><td><b>${esc(l.productCode)}</b></td><td>${esc(l.productName)}</td><td><b>${esc(l.lotNo)}</b></td><td>${l.lotQty}</td><td>${esc(l.inspectionType)}</td><td>${l.sampleQty}</td><td>${r}</td><td>${l.inspectionMinutes ? l.inspectionMinutes + " phút" : "—"}</td></tr>`;
+          tb.innerHTML += `<tr class="clickable" onclick="openDetail('${esc(l.id)}')"><td>${esc(l.receivedDate)}</td><td>${esc(l.sampledDate)}</td><td>${esc(l.pickupDate)}</td><td>${esc(l.completionDate)}</td><td>${esc(l.scope || "—")}</td><td><b>${esc(l.productCode)}</b></td><td>${esc(l.productName)}</td><td><b>${esc(l.lotNo)}</b></td><td>${l.method === "hoa_hoc" ? "—" : l.lotQty}</td><td>${esc(l.inspectionType)}</td><td>${l.method === "hoa_hoc" ? "—" : l.sampleQty}</td><td>${r}</td><td>${l.inspectionMinutes ? l.inspectionMinutes + " phút" : "—"}</td></tr>`;
         });
       }
       async function openDetail(id) {
@@ -2520,10 +2524,17 @@
         ); // IQC lấy toàn bộ danh mục nhân sự / tài khoản chung.
 
       Qc02Data.attachEmployees(["inspector", "completeInspector"]);
-      Qc02Data.products("productCode", "productName").catch((e) => console.error(e));
+      Qc02Data.products("productCode", "productName").then(() => window.dispatchEvent(new Event("iqc-product-master-loaded"))).catch((e) => console.error(e));
     </script>
-    <script src="shared/mes-iqc-workspace.js?v=20261028-scope-rate"></script>
+    <script src="shared/iqc-material-catalog.js?v=T232"></script>
+    <script src="shared/iqc-chemistry.js?v=T232"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="shared/ipqc-result-parser.js?v=T232"></script>
+    <script src="shared/ipqc-result-reader.js?v=T232"></script>
+    <link rel="stylesheet" href="shared/iqc-chemistry.css?v=T232">
+    <script src="shared/mes-iqc-workspace.js?v=T232"></script>
     <link rel="stylesheet" href="shared/mes-iqc-report.css?v=20261028">
     <script src="shared/mes-iqc-report.js?v=20261028-quantity-label"></script>
+    <script src="shared/iqc-chemical-entry.js?v=T232"></script>
   </body>
 </html>
