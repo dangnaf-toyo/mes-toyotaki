@@ -175,6 +175,7 @@ details.panel>summary{cursor:pointer;font-weight:700;font-size:13px;min-height:3
 
 .qc02-record-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.qc02-record-group{min-width:0;background:var(--bg-sunken);padding:14px;border-radius:8px}.qc02-record-group table{width:100%;border-collapse:collapse;table-layout:fixed}.qc02-record-group th,.qc02-record-group td{padding:8px;border-bottom:1px solid var(--border);overflow-wrap:anywhere;white-space:pre-wrap;text-align:left}.qc02-record-group th:first-child,.qc02-record-group td:first-child{width:38%}@media(max-width:760px){.qc02-record-grid{grid-template-columns:1fr}}
 </style>
+<link rel="stylesheet" href="shared/ncp-defect-images.css?v=T228">
 </head>
 <body>
 <div class="overlay" id="overlay">Đang xử lý...</div>
@@ -222,7 +223,8 @@ details.panel>summary{cursor:pointer;font-weight:700;font-size:13px;min-height:3
       <div class="info-item"><span class="k">Người đảm nhiệm xử lý</span><span class="v" id="i-nguoi-dam-nhiem">—</span></div>
     </div>
     <div class="info-item" hidden><span class="k">Mô tả lỗi</span><span class="v" id="i-mo-ta">—</span></div>
-    <div class="field-row"><label>Ảnh lỗi</label><div class="img-gallery" id="ipqc-evidence"></div></div>
+    <section id="ncp-case-images" aria-label="Hình ảnh lỗi"></section>
+      <div class="field-row" id="ncp-checkpoint-evidence"><label>Ảnh bằng chứng IPQC</label><div class="img-gallery" id="ipqc-evidence"></div></div>
     <div class="field-row">
       <label>Người đảm nhiệm trả lời Nguyên nhân & Đối sách</label>
       <input type="text" autocomplete="off" id="f-nguoi-dam-nhiem"></div><div class="field-row"><label for="f-han-tra-loi">Hạn trả lời đối sách</label><input type="date" lang="vi" id="f-han-tra-loi">
@@ -323,6 +325,7 @@ details.panel>summary{cursor:pointer;font-weight:700;font-size:13px;min-height:3
 <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
 <script src="shared/qc02-data.js?v=T183"></script>
 <script src="shared/qc02-ncp.js"></script>
+<script src="shared/ncp-defect-images.js?v=T228"></script>
 <script>
 const state = {
   id: null, case: null, locked: false, currentUserEmail: '',
@@ -330,6 +333,7 @@ const state = {
   doiSach: { ps_tam_thoi: [], ps_lau_dai: [], lx_tam_thoi: [], lx_lau_dai: [] },
   cachLy: [], pendingTask: null, taskRequest: 0, holdingTask: false,
 };
+const ncpCaseImages=NcpDefectImages.mount(document.getElementById('ncp-case-images'),{persisted:true,onUrls:urls=>{state.ipqcEvidence=[...urls,...jsonArr(state.checkpoint?.anh_bang_chung_url)];}});
 const DS_KEYS = ['ps_tam_thoi', 'ps_lau_dai', 'lx_tam_thoi', 'lx_lau_dai'];
 
 function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -425,7 +429,7 @@ async function load(){
   if (!data) { showPageMessage('🔍', 'Không tìm thấy phiếu ' + state.id, 'Phiếu có thể đã bị xoá hoặc số phiếu trên đường dẫn không đúng.'); return; }
 
   state.case = data;
-  state.ipqcEvidence = jsonArr(data.source_images);state.checkpoint = null;
+  state.ipqcEvidence = [];state.checkpoint = null;
   if(data.id_checkpoint_goc){const {data:cp}=await sb.from('duc_ipqc_checkpoint').select('*').eq('id_checkpoint',data.id_checkpoint_goc).maybeSingle();state.checkpoint = cp;state.ipqcEvidence=[...state.ipqcEvidence,...jsonArr(cp&&cp.anh_bang_chung_url)]}
   state.currentUserEmail = (await MesAuth.getCurrentUserIdentity()) || '';
   state.images.phat_sinh = jsonArr(data.hinh_anh_phat_sinh_json).slice();
@@ -442,6 +446,7 @@ async function load(){
   });
   await loadCachLy();
   renderAll();
+  await ncpCaseImages.load(state.id);
 }
 
 async function loadCachLy(){
@@ -483,7 +488,8 @@ function renderAll(){
   document.getElementById('i-ma-sp').textContent = c.ma_sp;
   document.getElementById('i-so-luong').textContent = c.so_luong_nghi_van;
   document.getElementById('i-mo-ta').textContent = MesQcFields.cleanText(c.mo_ta_loi);
-  document.getElementById('ipqc-evidence').innerHTML=(state.ipqcEvidence||[]).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" data-qc-photo></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
+  document.getElementById('ncp-checkpoint-evidence').hidden=!jsonArr(state.checkpoint?.anh_bang_chung_url).length;
+  document.getElementById('ipqc-evidence').innerHTML=jsonArr(state.checkpoint?.anh_bang_chung_url).map(u=>'<div class="img-thumb"><img src="'+escapeHtml(u)+'" data-qc-photo></div>').join('')||'<span class="sub">Chưa có ảnh</span>';
   document.getElementById('i-nguoi-dam-nhiem').textContent = c.nguoi_dam_nhiem || '—';
   document.getElementById('f-nguoi-dam-nhiem').value = c.nguoi_dam_nhiem_doi_sach || '';
  document.getElementById('f-han-tra-loi').value=c.han_tra_loi_doi_sach||'';
