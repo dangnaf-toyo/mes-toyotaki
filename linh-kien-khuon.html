@@ -265,8 +265,8 @@ tr.off td{color:var(--text-dim)}
     <div class="dlg-head"><span id="lk-title">Thêm linh kiện</span><button type="button" data-close>✕</button></div>
     <div class="dlg-body">
       <div class="row2">
-        <div class="fg"><label>Mã linh kiện *</label><input id="lk-ma" placeholder="VD: INS-9002-01"></div>
-        <div class="fg"><label>Tên linh kiện *</label><input id="lk-ten" placeholder="VD: Insert lòng 1"></div>
+        <div class="fg"><label>Mã linh kiện *</label><input id="lk-ma" placeholder="VD: INS-TTI-MOT-02-01"></div>
+        <div class="fg"><label>Tên linh kiện *</label><input id="lk-ten" placeholder="VD: Insert lòng 1 – TTI-MOT-02"></div>
       </div>
       <div class="row2">
         <div class="fg"><label>Loại *</label><select id="lk-loai"></select></div>
@@ -279,7 +279,7 @@ tr.off td{color:var(--text-dim)}
       <div class="sub" id="lk-quy-tac" style="font-size:11.5px;color:var(--text-muted);margin-top:-4px"></div>
       <div class="row2">
         <div class="fg"><label>Quy cách</label><input id="lk-quy-cach" placeholder="VD: Ø6×150"></div>
-        <div class="fg"><label>Vật liệu / xử lý</label><input id="lk-vat-lieu" placeholder="VD: SKD61, thấm nitơ"></div>
+        <div class="fg"><label>Vật liệu / xử lý</label><input id="lk-vat-lieu" placeholder="SKD61/48-52HRC"></div>
       </div>
       <div class="row2">
         <div class="fg"><label>Số bản vẽ / mã catalog</label><input id="lk-ban-ve"></div>
@@ -288,7 +288,7 @@ tr.off td{color:var(--text-dim)}
       <div class="row3">
         <div class="fg"><label>Lead time (ngày)</label><input type="number" id="lk-lead" min="0" step="1"></div>
         <div class="fg"><label>Tuổi thọ dự kiến (shot)</label><input type="number" id="lk-tuoi-tho" min="1" step="1000"></div>
-        <div class="fg"><label>Đơn vị</label><input id="lk-dv" value="cái"></div>
+        <div class="fg"><label>Đơn vị</label><input id="lk-dv" value="pcs"></div>
       </div>
       <div class="row2">
         <div class="fg"><label>Vị trí lưu kho</label><input id="lk-vi-tri" placeholder="VD: Tủ A - ngăn 3"></div>
@@ -425,7 +425,7 @@ const qs = new URLSearchParams(location.search);
 let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'ton';
 let curKhuon = qs.get('khuon') || '';
 let myRole = null, myName = '';
-let dm = [], gan = [], molds = {}, lastThay = {};
+let dm = [], gan = [], molds = {}, lastThay = {}, maSpSet = new Set();
 let tFilter = 'all';
 let lkEditing = null, ganEditing = null, gdLs = [];
 
@@ -473,6 +473,8 @@ async function loadRole(){
   return true;
 }
 async function loadAll(){
+  const sp = await sb.from('master_products').select('ma_sp');
+  if (!sp.error) maSpSet = new Set((sp.data || []).map(x => x.ma_sp));
   const [d, g, m, l] = await Promise.all([
     sb.from('khuon_lk_danh_muc').select('*').order('ma_lk'),
     sb.from('khuon_lk_gan').select('*'),
@@ -490,7 +492,7 @@ async function loadAll(){
   (l.data || []).forEach(x => { const k = x.ma_khuon + '|' + x.id_lk; if (!lastThay[k]) lastThay[k] = x; });
   document.getElementById('dlKhuon').innerHTML = Object.keys(molds).sort(naturalCmp).map(k =>
     '<option value="' + escapeHtml(k) + '">' + escapeHtml(molds[k].ma_sp + ' · ' + (TT_LABEL[molds[k].tinh_trang] || '')) + '</option>').join('');
-  document.getElementById('dlSp').innerHTML = [...new Set(Object.values(molds).map(m => m.ma_sp).filter(Boolean))].sort(naturalCmp)
+  document.getElementById('dlSp').innerHTML = [...new Set([...maSpSet, ...Object.values(molds).map(m => m.ma_sp).filter(Boolean)])].sort(naturalCmp)
     .map(sp => '<option value="' + escapeHtml(sp) + '">').join('');
   document.getElementById('dlLk').innerHTML = dm.filter(x => x.dang_dung).map(x =>
     '<option value="' + escapeHtml(x.ma_lk) + '">' + escapeHtml(x.ten_lk + (x.quy_cach ? ' · ' + x.quy_cach : '')) + '</option>').join('');
@@ -635,6 +637,26 @@ function maHopLe(ma, loai, phamVi){
   if (phamVi === 'rieng' && (!/-\d{2}$/.test(ma) || ma.split('-').length < 5)) return 'Linh kiện riêng khuôn kết thúc bằng STT 2 số (VD ' + pre + '-TTI-MOT-02-01)';
   return '';
 }
+const VAT_LIEU_CHUAN = 'SKD61/48-52HRC', DON_VI_CHUAN = 'pcs';
+const MIEN_VAT_LIEU = ['dau_noi_nuoc', 'lo_xo', 'vat_tu_tieu_hao'];
+// Trả danh sách điểm sai quy tắc. Mã cũ giữ nguyên khi sửa thì không bắt lại phần mã / tên.
+function canhBaoLk(d, giuMaCu){
+  const ds = [], pre = LOAI_MA[d.loai];
+  if (!giuMaCu) {
+    const loi = maHopLe(d.ma_lk, d.loai, d.pham_vi);
+    if (loi) ds.push(loi);
+    if (d.pham_vi === 'rieng') {
+      const sp = !loi ? d.ma_lk.slice(d.ma_lk.indexOf('-') + 1, -3) : '';
+      if (sp && maSpSet.size && !maSpSet.has(sp)) ds.push('Mã SP "' + sp + '" không có trong Danh mục sản phẩm');
+      if (sp && !d.ten_lk.includes('– ' + sp)) ds.push('Tên linh kiện riêng phải có "– ' + sp + '" ở cuối');
+      const q = chuanQuyCach(d.quy_cach), chung = q && dm.find(x => x.pham_vi === 'chung' && x.dang_dung && x.ma_lk === pre + '-' + q);
+      if (chung) ds.push('Đã có mã dùng chung ' + chung.ma_lk + ' cùng quy cách — dùng mã đó, không tạo mã riêng');
+    }
+  }
+  if (d.don_vi !== DON_VI_CHUAN) ds.push('Đơn vị phải là ' + DON_VI_CHUAN);
+  if (!MIEN_VAT_LIEU.includes(d.loai) && d.vat_lieu !== VAT_LIEU_CHUAN) ds.push('Vật liệu phải là ' + VAT_LIEU_CHUAN);
+  return ds;
+}
 function goiYMa(){
   const loai = document.getElementById('lk-loai').value, pv = document.getElementById('lk-pham-vi').value;
   const sp = khongDau(document.getElementById('lk-sp').value).toUpperCase().replace(/[^A-Z0-9\-]/g, '');
@@ -661,8 +683,10 @@ function goiYMa(){
 }
 function capNhatQuyTac(){
   const loai = document.getElementById('lk-loai').value, pv = document.getElementById('lk-pham-vi').value;
-  const ma = document.getElementById('lk-ma').value.trim(), pre = LOAI_MA[loai];
-  const loi = ma ? maHopLe(ma, loai, pv) : '';
+  const v = k => document.getElementById(k).value.trim();
+  const ma = v('lk-ma').toUpperCase(), pre = LOAI_MA[loai];
+  const loi = ma ? canhBaoLk({ ma_lk: ma, ten_lk: v('lk-ten'), loai, pham_vi: pv, quy_cach: v('lk-quy-cach'), vat_lieu: v('lk-vat-lieu'), don_vi: v('lk-dv') },
+    !!(lkEditing && lkEditing.ma_lk === ma)).join(' · ') : '';
   const el = document.getElementById('lk-quy-tac');
   el.style.color = loi ? 'var(--warn-fg)' : 'var(--text-muted)';
   el.textContent = loi ? '⚠ ' + loi : 'Quy tắc: ' + (pv === 'rieng' ? pre + '-<Mã SP>-<STT 2 số>, VD ' + pre + '-TTI-MOT-02-01' : pre + '-<Quy cách>, VD ' + pre + '-D06-L150 (Ø6×150)') +
@@ -676,7 +700,7 @@ function openLk(id){
   const set = (k, v) => { document.getElementById(k).value = v ?? ''; };
   set('lk-ma', x && x.ma_lk); set('lk-ten', x && x.ten_lk); set('lk-loai', x ? x.loai : 'insert'); set('lk-pham-vi', x ? x.pham_vi : 'rieng');
   set('lk-quy-cach', x && x.quy_cach); set('lk-vat-lieu', x && x.vat_lieu); set('lk-ban-ve', x && x.ban_ve); set('lk-ncc', x && x.nha_cung_cap);
-  set('lk-lead', x && x.lead_time_ngay); set('lk-tuoi-tho', x && x.tuoi_tho_shot); set('lk-dv', x ? x.don_vi : 'cái');
+  set('lk-lead', x && x.lead_time_ngay); set('lk-tuoi-tho', x && x.tuoi_tho_shot); set('lk-dv', x ? x.don_vi : DON_VI_CHUAN);
   set('lk-vi-tri', x && x.vi_tri_kho); set('lk-min', x ? x.ton_toi_thieu : 0); set('lk-max', x && x.ton_toi_da); set('lk-ghi-chu', x && x.ghi_chu);
   document.getElementById('lk-sua').checked = !!(x && x.sua_duoc);
   document.getElementById('lk-dung').checked = !x || x.dang_dung;
@@ -695,9 +719,8 @@ async function saveLk(btn){
   if (!data.ma_lk || !data.ten_lk) return showMsg('Nhập mã và tên linh kiện', 'err');
   if (data.ton_toi_da !== '' && Number(data.ton_toi_da) < Number(data.ton_toi_thieu || 0)) return showMsg('Tồn tối đa phải ≥ tồn tối thiểu', 'err');
   data.ma_lk = data.ma_lk.toUpperCase();
-  const loiMa = maHopLe(data.ma_lk, data.loai, data.pham_vi);
-  if (loiMa && !(lkEditing && lkEditing.ma_lk === data.ma_lk) &&
-    !confirm('Mã "' + data.ma_lk + '" chưa đúng quy tắc đặt mã:\n' + loiMa + '\n\nVẫn lưu?')) return;
+  const saiQuyTac = canhBaoLk(data, !!(lkEditing && lkEditing.ma_lk === data.ma_lk));
+  if (saiQuyTac.length && !confirm('Linh kiện "' + data.ma_lk + '" chưa đúng quy tắc:\n- ' + saiQuyTac.join('\n- ') + '\n\nVẫn lưu?')) return;
   btn.disabled = true;
   try {
     await rpcWrite('khuon_lk_luu', { p_data: data });
@@ -769,12 +792,14 @@ async function nhapExcel(file){
       ma_lk: str(r[0]), ten_lk: str(r[1]), loai: parseLoai(r[2]), pham_vi: /chung/i.test(str(r[3])) ? 'chung' : 'rieng',
       quy_cach: str(r[4]), vat_lieu: str(r[5]), ban_ve: str(r[6]), nha_cung_cap: str(r[7]),
       lead_time_ngay: str(r[8]).replace(/[^\d]/g, ''), tuoi_tho_shot: str(r[9]).replace(/[^\d]/g, ''),
-      sua_duoc: parseBool(r[10]), don_vi: str(r[11]) || 'cái', vi_tri_kho: str(r[12]),
+      sua_duoc: parseBool(r[10]), don_vi: str(r[11]) || DON_VI_CHUAN, vi_tri_kho: str(r[12]),
       ton_toi_thieu: str(r[13]).replace(/[^\d.]/g, ''), ton_dau_ky: str(r[cDk]).replace(/[^\d.]/g, ''), dang_dung: true,
       ...(iMax >= 0 ? { ton_toi_da: str(r[iMax]).replace(/[^\d.]/g, '') } : {}) }));
     const pGan = (s2 || []).slice(1).filter(r => r.some(c => str(c))).map(r => ({
       ma_khuon: str(r[0]), ma_lk: str(r[1]), so_luong_lap: str(r[2]).replace(/[^\d.]/g, ''), vi_tri_lap: str(r[3]),
       du_phong_toi_thieu: str(r[4]).replace(/[^\d.]/g, ''), ghi_chu: str(r[5]) }));
+    const saiFile = pDm.flatMap(d => canhBaoLk({ ...d, ma_lk: d.ma_lk.toUpperCase() }, dm.some(x => x.ma_lk === d.ma_lk.toUpperCase())).map(l => d.ma_lk + ': ' + l));
+    if (saiFile.length && !confirm(saiFile.length + ' điểm chưa đúng quy tắc:\n- ' + saiFile.slice(0, 12).join('\n- ') + (saiFile.length > 12 ? '\n...' : '') + '\n\nVẫn nhập?')) return;
     if (!confirm('Nhập ' + pDm.length + ' dòng danh mục và ' + pGan.length + ' dòng gán khuôn?\nMã LK đã có sẽ được cập nhật theo file.')) return;
     out.innerHTML = '<div class="note ro">Đang nhập...</div>';
     const r = await rpcWrite('khuon_lk_nhap_excel', { p_danh_muc: pDm, p_gan: pGan });
@@ -984,7 +1009,8 @@ function bindAll(){
   document.getElementById('hXuat').onclick = xuatLichSu;
   document.getElementById('lk-save').onclick = e => saveLk(e.currentTarget);
   document.getElementById('lk-goi-y').onclick = goiYMa;
-  ['lk-loai', 'lk-pham-vi', 'lk-ma'].forEach(id => document.getElementById(id).addEventListener(id === 'lk-ma' ? 'input' : 'change', capNhatQuyTac));
+  ['lk-loai', 'lk-pham-vi'].forEach(id => document.getElementById(id).addEventListener('change', capNhatQuyTac));
+  ['lk-ma', 'lk-ten', 'lk-quy-cach', 'lk-vat-lieu', 'lk-dv'].forEach(id => document.getElementById(id).addEventListener('input', capNhatQuyTac));
   document.getElementById('lk-del').onclick = delLk;
   document.getElementById('gan-save').onclick = e => saveGan(e.currentTarget);
   document.getElementById('copy-save').onclick = e => saveCopy(e.currentTarget);
