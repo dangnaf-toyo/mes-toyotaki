@@ -63,7 +63,7 @@ const IpqcResultReader = (() => {
       return values;
     });
   }
-  async function read(file, { progress = () => {}, features = [], signal } = {}) {
+  async function read(file, { progress = () => {}, features = [], signal, parseSheets = IpqcResultParser.parse, imageScale = 1 } = {}) {
     if (file.size > 20 * 1024 * 1024) throw Error("File kết quả đo tối đa 20 MB.");
     const extension = file.name.split(".").at(-1).toLowerCase();
     const sheets = [],
@@ -176,7 +176,7 @@ const IpqcResultReader = (() => {
             content = await page.getTextContent();
           const lines = IpqcResultParser.pdfLines(content.items);
           const sheet = { name: "Trang " + n, rows: grid(lines), lines, method: "pdf-text" };
-          const candidates = IpqcResultParser.parse([sheet]);
+          const candidates = parseSheets([sheet]);
           // Extraction does not depend on whether MES has matching characteristic codes.
           // OCR is a fallback for unreadable text, never a retry for unmatched standards.
           const extracted = candidates.some((c) =>
@@ -196,7 +196,7 @@ const IpqcResultReader = (() => {
             canvas.height = Math.ceil(viewport.height);
             await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
             const scanned = await recognize(canvas, n);
-            if (IpqcResultParser.parse([scanned]).some((c) => c.samples.some((s) => s.value !== null)))
+            if (parseSheets([scanned]).some((c) => c.samples.some((s) => s.value !== null)))
               selected = scanned;
             canvas.width = canvas.height = 0;
           }
@@ -206,7 +206,7 @@ const IpqcResultReader = (() => {
       } else if (["jpg", "jpeg", "png"].includes(extension)) {
         const bitmap = await createImageBitmap(file),
           canvas = document.createElement("canvas");
-        const scale = Math.min(1, 4500 / Math.max(bitmap.width, bitmap.height));
+        const scale = Math.min(Math.max(1,Math.min(3,imageScale)), 4500 / Math.max(bitmap.width, bitmap.height));
         canvas.width = Math.ceil(bitmap.width * scale);
         canvas.height = Math.ceil(bitmap.height * scale);
         canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
@@ -214,7 +214,7 @@ const IpqcResultReader = (() => {
         sheets.push(await recognize(canvas, 1));
         canvas.width = canvas.height = 0;
       } else throw Error("Chọn PDF kết quả đo, XLSX/XLS hoặc ảnh JPG/JPEG/PNG.");
-      if (!sheets.some((s) => IpqcResultParser.parse([s]).length))
+      if (!sheets.some((s) => parseSheets([s]).length))
         warnings.push(
           "Chưa nhận diện được bảng giá trị đo. Chọn mẫu đọc/cột tương ứng hoặc nhập tay; chưa có dữ liệu được đồng bộ.",
         );

@@ -1,0 +1,85 @@
+-- STAGING jcjbleugnclzsghfpmvk only. Never persists classification, limits, samples or storage metadata.
+begin;
+set local time zone 'Asia/Ho_Chi_Minh';
+do $$
+declare u uuid;account text;a text;z text;other_material text;s bigint;sz bigint;future bigint;r jsonb;d jsonb;v bigint;v2 bigint;before_lot jsonb;legacy bigint;
+ failed boolean;request uuid:=gen_random_uuid();path text;count_before integer;tc jsonb;
+begin
+ select user_id,username into u,account from user_roles where role='admin' limit 1;
+ if u is null then raise exception 'Needs staging admin';end if;
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ select ma_nvl into a from nvl_materials order by ma_nvl limit 1;
+ select ma_nvl into z from nvl_materials where ma_nvl<>a order by ma_nvl limit 1;
+ select ma_nvl into other_material from nvl_materials where ma_nvl not in(a,z) order by ma_nvl limit 1;
+ select id,to_jsonb(l) into legacy,before_lot from iqc_lots l order by id limit 1;
+ perform iqc_nvl_luu_phan_loai(a,'nhom','QA-AL-ROLLBACK');perform iqc_nvl_luu_phan_loai(z,'kem','QA-ZN-ROLLBACK');
+ if jsonb_array_length(iqc_nvl_danh_muc()->'nvl')<>(select count(*) from nvl_materials) then raise exception 'Catalog lost or duplicated NVL codes';end if;
+ failed:=false;begin insert into iqc_lots(doi_tuong,ma_nvl,product_code,supplier,pham_vi)values('nvl',other_material,other_material,'BRV','Linh kiện đầu vào');exception when others then failed:=true;end;
+ if not failed then raise exception 'Unclassified material can silently become visual';end if;
+ perform iqc_nvl_luu_phan_loai(other_material,'khac',null);
+ insert into iqc_lots(doi_tuong,ma_nvl,product_code,supplier,pham_vi)values('nvl',other_material,other_material,'BRV','Linh kiện đầu vào');
+ if not exists(select 1 from iqc_lots where ma_nvl=other_material and phuong_thuc='ngoai_quan') then raise exception 'Other material visual flow blocked';end if;
+ d:=jsonb_build_object('request_id',request,'ma_nvl',a,'ngay_kiem',current_date,'ca_kiem','Ca ngày','lot_no','QA-CHEM-ROLLBACK','inspector',account,'results','{}'::jsonb,'xac_nhan',true);
+ r:=iqc_luu_hoa_hoc(null,d);v:=(r->>'id')::bigint;
+ if r->>'result' is distinct from '' then raise exception 'Missing standard became OK';end if;
+ s:=iqc_tc_luu_hoa_hoc(null,jsonb_build_object('ma_nvl',a,'phien_ban','ROLLBACK-A','ngay_hieu_luc',current_date,'noi_dung_sua_doi','Rollback only',
+  'nguyen_to','[{"element":"Si","min":"9.6","max":"12","unit":"%","required":true},{"element":"Fe","max":"1.3","unit":"%","required":true}]'::jsonb),true);
+ if iqc_tc_hoa_hoc(a,current_date)->'tieu_chuan' <> 'null'::jsonb then raise exception 'Unapproved standard was applied';end if;
+ r:=ipqc_tc_duyet('btk',s,'kiem_tra',null,'FORGED');if not (r->>'ok')::boolean then raise exception '%',r;end if;
+ r:=ipqc_tc_duyet('btk',s,'phe_duyet',null,'FORGED');if not (r->>'ok')::boolean then raise exception '%',r;end if;
+ if (select nguoi_phe_duyet from ipqc_btk where id=s)='FORGED' then raise exception 'Actor accepted from client';end if;
+ tc:=iqc_tc_hoa_hoc(a,current_date);if (tc->'tieu_chuan'->>'id')::bigint<>s then raise exception 'Wrong material standard';end if;
+ d:=d||jsonb_build_object('request_id',gen_random_uuid(),'id_tieu_chuan',s,'results','{"Si":"10,5","Fe":"0.4"}'::jsonb);
+ r:=iqc_luu_hoa_hoc(null,d);v:=(r->>'id')::bigint;
+ if r->>'result'<>'OK' then raise exception 'Valid chemistry not OK';end if;
+ r:=iqc_luu_hoa_hoc(null,d);if (r->>'id')::bigint<>v then raise exception 'Retry duplicated report';end if;
+ failed:=false;begin perform iqc_luu_hoa_hoc(null,d||'{"results":{"Si":"13","Fe":"0.4"}}');exception when others then failed:=true;end;
+ if not failed then raise exception 'Changed retry silently accepted';end if;
+ r:=iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid(),'results','{"Si":"10"}'::jsonb));
+ if r->>'result' is distinct from '' then raise exception 'Missing required element became OK';end if;
+ r:=iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid(),'results','{"Si":"13"}'::jsonb,'result','OK'));
+ if r->>'result'<>'NG' then raise exception 'Failed element was not NG';end if;
+ r:=iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid(),'xac_nhan',false));if r->>'result' is distinct from '' then raise exception 'Unconfirmed results completed report';end if;
+ if exists(select 1 from iqc_lots where phuong_thuc='hoa_hoc' and (lot_qty<>0 or ok_qty<>0 or ng_qty<>0 or sample_qty<>0)) then raise exception 'Elements counted as PCS';end if;
+ if exists(select 1 from iqc_defects where lot_id=v) then raise exception 'Chemical failures became visual defects';end if;
+ sz:=iqc_tc_luu_hoa_hoc(null,jsonb_build_object('ma_nvl',z,'phien_ban','ROLLBACK-Z','ngay_hieu_luc',current_date,'noi_dung_sua_doi','Rollback only',
+  'nguyen_to','[{"element":"Al","min":"3.5","max":"4.3","unit":"%","required":true},{"element":"Mg","min":"0.03","max":"0.06","unit":"%","required":true}]'::jsonb),true);
+ perform ipqc_tc_duyet('btk',sz,'kiem_tra',null,'');perform ipqc_tc_duyet('btk',sz,'phe_duyet',null,'');
+ r:=iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid(),'ma_nvl',z,'id_tieu_chuan',sz,'results','{"Al":"4","Mg":"0.04"}'::jsonb));if r->>'result'<>'OK' then raise exception 'Zinc used aluminum limits';end if;
+ failed:=false;begin perform iqc_tc_luu_hoa_hoc(s,jsonb_build_object('ma_nvl',a,'phien_ban','ROLLBACK-A','ngay_hieu_luc',current_date,'noi_dung_sua_doi','Forbidden','nguyen_to','[{"element":"Si","min":0,"max":100,"unit":"%"}]'::jsonb),false);exception when others then failed:=true;end;
+ if not failed then raise exception 'Published limits changed';end if;
+ future:=iqc_tc_luu_hoa_hoc(null,jsonb_build_object('ma_nvl',a,'phien_ban','ROLLBACK-FUTURE','ngay_hieu_luc',current_date+1,'noi_dung_sua_doi','Rollback future','nguyen_to','[{"element":"Si","min":1,"max":2,"unit":"%"}]'::jsonb),true);
+ perform ipqc_tc_duyet('btk',future,'kiem_tra',null,'');perform ipqc_tc_duyet('btk',future,'phe_duyet',null,'');
+ if (iqc_tc_hoa_hoc(a,current_date)->'tieu_chuan'->>'id')::bigint<>s or (iqc_tc_hoa_hoc(a,current_date+1)->'tieu_chuan'->>'id')::bigint<>future then raise exception 'Historical/future effective dates incorrect';end if;
+ if (select hoa_hoc_json->'tieu_chuan'->>'id' from iqc_lots where id=v)::bigint<>s then raise exception 'Report snapshot changed after new revision';end if;
+ path:=u||'/'||gen_random_uuid()||'/'||gen_random_uuid()||'.pdf';
+ insert into storage.objects(bucket_id,name,owner_id,metadata) values('iqc-phan-tich',path,u::text,'{"mimetype":"application/pdf","size":1000}');
+ r:=iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid(),'file',jsonb_build_object('bucket','iqc-phan-tich','path',path,'name','analysis.pdf')));
+ if not exists(select 1 from iqc_lots where id=(r->>'id')::bigint and hoa_hoc_json->'file'->>'path'=path) then raise exception 'File link lost';end if;
+ update storage.objects set metadata='{"mimetype":"text/html","size":1000}' where bucket_id='iqc-phan-tich' and name=path;
+ failed:=false;begin perform iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid(),'file',jsonb_build_object('bucket','iqc-phan-tich','path',path,'name','bad.pdf')));exception when others then failed:=true;end;
+ if not failed then raise exception 'Unsupported file type accepted';end if;
+ if legacy is not null and (select to_jsonb(l) from iqc_lots l where id=legacy) is distinct from before_lot then raise exception 'Legacy report modified';end if;
+ perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+ failed:=false;begin perform iqc_nvl_luu_phan_loai(a,'khac',null);exception when others then failed:=true;end;if not failed then raise exception 'Unauthorized classification';end if;
+ failed:=false;begin perform iqc_luu_hoa_hoc(null,d||jsonb_build_object('request_id',gen_random_uuid()));exception when others then failed:=true;end;if not failed then raise exception 'Unauthorized report';end if;
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ perform iqc_luu_tru_hoa_hoc(v);if not exists(select 1 from iqc_lots where id=v and da_luu_tru) or not exists(select 1 from iqc_lich_su where loai='luu_tru_bao_cao' and khoa=v::text) then raise exception 'Archive audit missing';end if;
+ if has_function_privilege('anon','iqc_luu_hoa_hoc(bigint,jsonb)','EXECUTE') or has_table_privilege('authenticated','iqc_nvl_phan_loai','INSERT') or has_table_privilege('authenticated','iqc_lich_su','INSERT') then raise exception 'Direct/anonymous bypass';end if;
+ perform set_config('iqc.test.uid',u::text,true);perform set_config('iqc.test.id',v::text,true);perform set_config('iqc.test.nvl',a,true);
+ set constraints all immediate;
+end $$;
+set local role authenticated;
+do $$
+declare n integer;failed boolean;
+begin
+ perform set_config('request.jwt.claim.sub',current_setting('iqc.test.uid'),true);
+ update iqc_lots set result='OK' where id=current_setting('iqc.test.id')::bigint;get diagnostics n=row_count;if n<>0 then raise exception 'Direct edit bypassed chemistry evaluation';end if;
+ failed:=false;begin insert into iqc_lots(doi_tuong,ma_nvl,phuong_thuc,product_code,pham_vi)values('nvl',current_setting('iqc.test.nvl'),'hoa_hoc',current_setting('iqc.test.nvl'),'Nguyên vật liệu');exception when insufficient_privilege then failed:=true;end;
+ if not failed then raise exception 'Direct chemical insert allowed';end if;
+ failed:=false;begin insert into iqc_defects(lot_id,defect_qty)values(current_setting('iqc.test.id')::bigint,1);exception when insufficient_privilege then failed:=true;end;
+ if not failed then raise exception 'Chemical elements can become PCS defects';end if;
+end $$;
+reset role;
+select 'PASS IQC live staging RPC/RLS: BOM identity, approved grade-specific limits, missing/NG/OK/confirmation, exact server evaluation, historical revisions, file link/type, audit, idempotence, zero PCS, original LOT and unauthorized writes (ROLLBACK)' result;
+rollback;

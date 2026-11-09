@@ -25,7 +25,7 @@ const IqcWorkspace = (() => {
     const fields = [
       ["From", "Từ ngày", "date"],
       ["To", "Đến ngày", "date"],
-      ["Product", "Mã / tên SP", "search"],
+      ["Product", "Mã / tên SP hoặc NVL", "search"],
     ];
     for (const [key, title, type] of fields) {
       const label = node("label", title),
@@ -36,10 +36,14 @@ const IqcWorkspace = (() => {
       label.append(input);
       bar.append(label);
     }
+    for (const [key,title,values] of [["Method","Loại kiểm",[["ngoai_quan","Ngoại quan"],["hoa_hoc","Thành phần hóa học"]]],["MaterialGroup","Nhóm vật liệu",[["nhom","Nhôm"],["kem","Kẽm"],["khac","NVL khác"]]],["ChemicalResult","Kết quả",[["OK","OK"],["NG","NG"],["pending","Chưa kết luận"]]]]) {
+      if (full && key === "ChemicalResult") continue;
+      const label=node("label",title),select=node("select");select.id=prefix+key;select.append(new Option("Tất cả",""));for(const [v,t]of values)select.append(new Option(t,v));label.append(select);bar.append(label);
+    }
     if (full)
       for (const [key, title, values] of [
         ["Supplier", "Nhà cung cấp", suppliers],
-        ["Scope", "Phạm vi", scopes],
+        ["Scope", "Phạm vi", [...scopes,"Nguyên vật liệu"]],
         ["Inspector", "Người kiểm", []],
         ["Result", "Kết quả", ["OK", "NG", "Chưa có"]],
       ]) {
@@ -72,7 +76,7 @@ const IqcWorkspace = (() => {
   const historyScope = node("select");
   historyScope.id = "iqcHistoryScope";
   historyScope.append(new Option("Tất cả phạm vi", ""));
-  for (const scope of scopes) historyScope.append(new Option(scope, scope));
+  for (const scope of [...scopes,"Nguyên vật liệu"]) historyScope.append(new Option(scope, scope));
   const historyLabel = node("label", "Phạm vi kiểm");
   historyLabel.append(historyScope);
   $("historyProductCode").before(historyLabel);
@@ -139,7 +143,7 @@ const IqcWorkspace = (() => {
   dash.append(charts);
   const note = node(
     "div",
-    "Tỷ lệ OK / NG tính trên LOT đã có kết quả. Ngày thống kê là ngày nhận hàng (GMT+7). LOT cũ chưa có phạm vi được thống kê riêng. Tự làm mới mỗi 15 giây.",
+    "Tỷ lệ OK / NG tính trên LOT đã có kết quả. Kiểm hóa học dùng ngày kiểm; ngoại quan dùng ngày nhận hàng (GMT+7). LOT cũ chưa có phạm vi được thống kê riêng. Tự làm mới mỗi 15 giây.",
   );
   note.className = "help";
   dash.append(note);
@@ -151,7 +155,7 @@ const IqcWorkspace = (() => {
   function csv(rows) {
     const data = [
       [
-        "Ngày nhận",
+        "Ngày kiểm / nhận",
         "Mã sản phẩm",
         "Tên sản phẩm",
         "LOT",
@@ -161,10 +165,10 @@ const IqcWorkspace = (() => {
         "Người kiểm",
         "Trạng thái",
         "Kết quả",
-        "SL LOT",
+        "SL LOT", "Loại kiểm", "Nhóm vật liệu", "Mác vật liệu", "Nguyên tố không đạt",
       ],
       ...rows.map((l) => [
-        l.receivedDate,
+        l.method === "hoa_hoc" ? l.inspectionDate : l.receivedDate,
         l.productCode,
         l.productName,
         l.lotNo,
@@ -174,7 +178,8 @@ const IqcWorkspace = (() => {
         l.inspectorName || l.inspector,
         l.status,
         l.result,
-        l.lotQty,
+        l.method==="hoa_hoc"?"":l.lotQty, l.method||"ngoai_quan", l.materialGroup||"", l.grade||"",
+        (l.chemical?.nguyen_to||[]).filter(r=>r.result==="NG").map(r=>r.element+": "+r.value+" "+r.unit).join("; "),
       ]),
     ];
     return (
@@ -225,16 +230,20 @@ const IqcWorkspace = (() => {
     $("tabStats").classList.toggle("active", p === "stats");
     if (p === "stats") loadDashboard();
   };
-  const day = (l) => l.receivedInput?.slice(0, 10) || "";
+  const day = (l) => l.inspectionDate || l.receivedInput?.slice(0, 10) || "";
   function filtered(rows, prefix, full) {
     const from = val(prefix + "From"),
       to = val(prefix + "To"),
       product = val(prefix + "Product")
         .trim()
+        .replace(/^\[NVL\]\s*/, "")
         .toLocaleLowerCase("vi");
     if (from && to && from > to) return [];
     return rows.filter(
       (l) =>
+        (!val(prefix+"Method") || (l.method||"ngoai_quan")===val(prefix+"Method")) &&
+        (!val(prefix+"MaterialGroup") || l.materialGroup===val(prefix+"MaterialGroup")) &&
+        (full || !val(prefix+"ChemicalResult") || (val(prefix+"ChemicalResult")==="pending"?!l.result:l.result===val(prefix+"ChemicalResult"))) &&
         (!from || day(l) >= from) &&
         (!to || day(l) <= to) &&
         (!product ||
@@ -313,6 +322,8 @@ const IqcWorkspace = (() => {
       " / " +
       s.total +
       " LOT";
+    let chemicalRates=$("iqcChemicalRates");if(!chemicalRates){chemicalRates=node("p");chemicalRates.id="iqcChemicalRates";$("iqcRates").after(chemicalRates);}
+    const chemical=rows.filter(l=>l.method==="hoa_hoc");chemicalRates.textContent="Thành phần hóa học: "+chemical.length+" lô · "+chemical.filter(l=>l.result==="OK").length+" OK · "+chemical.filter(l=>l.result==="NG").length+" NG · "+chemical.filter(l=>!l.result).length+" chưa kết luận. Không quy đổi nguyên tố NG thành PCS NG.";
     chart($("iqcChartDate"), rows, (l) => day(l).slice(0, val("iqcInterval") === "month" ? 7 : 10));
     chart($("iqcChartSupplier"), rows, (l) => l.supplier);
     chart($("iqcChartScope"), rows, (l) => l.scope);
@@ -337,10 +348,14 @@ const IqcWorkspace = (() => {
   async function prepare(data, previous) {
     if (!suppliers.includes(data.supplier)) throw Error("Chọn nhà cung cấp trong 5 lựa chọn.");
     if (!scopes.includes(data.scope)) throw Error("Phạm vi là bắt buộc.");
-    const products = await Qc02Data.readAll("master_products"),
-      product = products.find((r) => r.ma_sp === data.productCode);
-    if (!product && previous?.productCode !== data.productCode) throw Error("Chọn mã sản phẩm từ danh mục chung.");
-    return { ...data, productName: product?.ten_sp ?? data.productName, ...(await identity(data.inspector, previous)) };
+    await IqcMaterialCatalog.load();
+    const product=IqcMaterialCatalog.resolve(data.productCode, data.itemKind);
+    if(!product && previous?.productCode!==data.productCode)throw Error("Chọn mã sản phẩm hoặc định danh NVL từ danh mục chung.");
+    if(product?.kind==='nvl'&&['nhom','kem'].includes(product.group))throw Error("NVL Nhôm/Kẽm phải kiểm tra thành phần hóa học.");
+    if(product?.kind==='nvl'&&!product.group)throw Error("Phân loại NVL tại Quản lý tiêu chuẩn trước khi lưu kiểm tra.");
+    return {...data,productCode:product?.code||data.productCode,productName:product?.name??data.productName,
+      itemKind:product?.kind||previous?.itemKind||'san_pham',materialCode:product?.kind==='nvl'?product.code:null,
+      materialGroup:product?.group||null,grade:product?.grade||null,...(await identity(data.inspector,previous))};
   }
   const add = IqcApi.addLot.bind(IqcApi),
     update = IqcApi.updateLot.bind(IqcApi),
@@ -377,11 +392,9 @@ const IqcWorkspace = (() => {
     }
   }
   async function refreshProducts() {
-    const rows = await Qc02Data.readAll("master_products"),
-      list = $("qc02-products");
-    if (list) list.replaceChildren(...rows.map((r) => new Option(r.ten_sp || r.ma_sp, r.ma_sp)));
-    const selected = rows.find((r) => r.ma_sp === val("productCode"));
-    if (selected) $("productName").value = selected.ten_sp || "";
+    await IqcMaterialCatalog.load(true);
+    const list=$("qc02-products");if(list)IqcMaterialCatalog.options(list);
+    const selected=IqcMaterialCatalog.resolve(val("productCode"));if(selected)$("productName").value=selected.name;
   }
   $("productCode").addEventListener("change", () =>
     refreshProducts().catch((e) => console.error("Không tải được danh mục sản phẩm", e)),
