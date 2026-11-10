@@ -109,6 +109,13 @@ button{cursor:pointer}
 .detail-issue .timer{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.6rem;margin-top:.4rem}
 .detail-issue .giao-qc-da{margin-top:.3rem;font-size:.95rem;font-weight:700;color:#2563EB}
 .action-btn.giao-qc{color:#2563EB;border-color:#93C5FD}
+/* T232: sự cố đang chờ bước nào mới đóng được */
+.detail-issue .dk-dong{margin-top:.35rem;font-size:.9rem;font-weight:700;padding:.3rem .5rem;border-radius:6px;border:1px solid}
+.detail-issue .dk-dong.ok{color:#047857;border-color:#6EE7B7;background:#ECFDF5}
+.detail-issue .dk-dong.cho{color:#92400E;border-color:#F59E0B;background:#FFFBEB}
+.detail-issue .dk-dong.cho.tre{color:#FFF;border-color:#B91C1C;background:#DC2626}
+.detail-issue .dk-dong.can{color:#B91C1C;border-color:#FCA5A5;background:#FFF}
+.detail-issue .dk-dong small{display:block;font-weight:500;margin-top:.15rem}
 
 .action-grid{padding:0 .75rem;display:flex;flex-direction:column;gap:.7rem}
 .action-btn{display:flex;align-items:center;gap:.75rem;background:var(--bg-panel);border:1px solid var(--border);border-radius:.7rem;padding:1.1rem;box-shadow:var(--shadow-sm);font-size:1.15rem;font-weight:700;color:var(--text);width:100%;text-align:left}
@@ -929,6 +936,9 @@ async function loadShiftState(){
     // T180: lần "Hoàn thành mẫu & giao QC" gần nhất của từng sự cố đang mở.
     state.giaoQc = await taiGiaoQcM(state.rows.map(r => r.open_id_su_co)
       .concat(...state.rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
+    // T232: sự cố còn thiếu bước gì mới đóng được (cùng quy tắc server).
+    state.dieuKien = await taiDieuKienM(state.rows.map(r => r.open_id_su_co)
+      .concat(...state.rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
 
     hideOverlay();
     updateCtxSummaryLine();
@@ -980,6 +990,37 @@ async function taiGiaoQcM(ids){
   (data || []).forEach(g => { const o = m[g.id_su_co] || (m[g.id_su_co] = { lan: 0 }); o.lan++; o.thoi_diem = g.thoi_diem; o.nguoi = g.nguoi; });
   return m;
 }
+// T232: điều kiện đóng từng sự cố (duc_su_co_dieu_kien_dong). Lỗi / chưa đăng nhập → {} = như cũ.
+async function taiDieuKienM(ids){
+  ids = Array.from(new Set(ids.filter(Boolean)));
+  if (!ids.length) return {};
+  try {
+    const session = await MesAuth.getSession();
+    if (!session) return {};
+    const { data, error } = await sb.rpc('duc_su_co_dieu_kien_dong', { p_ids: ids });
+    if (error) { console.warn('duc_su_co_dieu_kien_dong:', error.message); return {}; }
+    return data || {};
+  } catch (e) { console.warn('duc_su_co_dieu_kien_dong:', e); return {}; }
+}
+const DK_NHAN_M = {
+  can_thiep: '🔧 Chờ can thiệp khuôn (khai trên Dashboard Đúc)',
+  giao_qc: '📦 Cần giao QC',
+  giao_lai: '❌ IPQC NG — xử lý tiếp rồi giao QC lại',
+  xu_ly_lai: '❌ IPQC NG — xử lý tiếp, nhờ IPQC kiểm lại',
+};
+function dieuKienHTMLM(s){
+  const dk = (state.dieuKien || {})[s.open_id_su_co];
+  if (!dk || !dk.buoc) return '';
+  if (dk.buoc === 'duoc_dong') {
+    return dk.thong_bao ? `<div class="dk-dong ok">✓ IPQC ${dk.ket_qua_ipqc === 'OK' ? 'OK' : 'Cảnh báo'} — bấm Xử lý xong</div>` : '';
+  }
+  if (dk.buoc === 'cho_ipqc') {
+    const phut = dk.cho_tu ? Math.round((nowServer() - new Date(dk.cho_tu)) / 60000) : 0;
+    return `<div class="dk-dong cho${phut >= 60 ? ' tre' : ''}">⏳ Chờ IPQC kiểm · ${phut >= 60 ? Math.floor(phut / 60) + 'h' + pad(phut % 60) : phut + "'"}</div>`;
+  }
+  return `<div class="dk-dong can">${escapeHtml(DK_NHAN_M[dk.buoc] || dk.buoc)}<small>${escapeHtml(dk.thong_bao || '')}</small></div>`;
+}
+
 async function giaoQcM(idSuCo){
   const row = state.rows.find(r => r.id_dong === state.currentIdDong);
   const s = suCoMoCuaDongM(row).find(x => (x.open_id_su_co || null) === (idSuCo || null));
@@ -1095,7 +1136,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
       return `<div${i ? ' style="border-top:1px solid #FCA5A5;margin-top:.6rem;padding-top:.6rem"' : ''}>
       <div class="code">${escapeHtml(s.open_loai_su_co||'—')}${SuCoAnh.badge((state.anhSuCoCount || {})[s.open_id_su_co], ` onclick="openResolveScreen(${arg})"`)}</div>
       <div class="desc">${escapeHtml(IpqcText.gon(s.open_van_de) || '(chưa nhập mô tả)')}</div>
-      <div class="timer">${elapsed}' đang dừng</div>${giaoQcInfoM(s)}</div>`;
+      <div class="timer">${elapsed}' đang dừng</div>${giaoQcInfoM(s)}${dieuKienHTMLM(s)}</div>`;
     }).join('');
   } else {
     issueBox.classList.add('hidden');
@@ -1255,7 +1296,21 @@ async function submitIncidentMobile(){
 async function openResolveScreen(idSuCoChon){
   if (!(await ensureAuth())) return;
   state.currentIdSuCo = idSuCoChon || null;
-  if (!suCoDangChonM()) return showToast('Không tìm thấy sự cố đang mở — tải lại', true);
+  const sChon = suCoDangChonM();
+  if (!sChon) return showToast('Không tìm thấy sự cố đang mở — tải lại', true);
+  // T232: chưa đủ điều kiện đóng → báo bước còn thiếu, không mở form rồi mới bị từ chối.
+  const dk = (state.dieuKien || {})[sChon.open_id_su_co];
+  if (dk && dk.buoc && dk.buoc !== 'duoc_dong') {
+    if (dk.duoc_vuot) {
+      if (!confirm('⚠ Sự cố chưa đủ điều kiện đóng:\n\n' + (dk.thong_bao || '') +
+        '\n\nBạn có quyền đóng vượt (hệ thống ghi chú kèm tên bạn). Vẫn đóng?')) return;
+    } else {
+      alert('⛔ Chưa đóng được sự cố ' + (sChon.open_id_su_co || '') + '\n\n' + (dk.thong_bao || '') +
+        (dk.buoc === 'can_thiep' ? '\n\n(Khai can thiệp khuôn trên Dashboard Đúc ở máy tính.)' : ''));
+      if (dk.buoc === 'giao_qc' || dk.buoc === 'giao_lai') return giaoQcM(idSuCoChon || null);
+      return;
+    }
+  }
   const nowStr = toLocalInputValue(nowServer());
   document.getElementById('rs-gio').value = nowStr;
   document.getElementById('rs-gio').max = nowStr;

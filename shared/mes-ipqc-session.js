@@ -138,9 +138,10 @@ const MesIpqcSession = (() => {
   }
   function controls(enabled) {
     for (const input of document.querySelectorAll(
-      "#ck-checklist button,#ck-btk input,#ck-btk select,#ck-btk textarea,#ck-btk [data-ok],#ck-btk [data-ng],#ck-photo-btn,#ck-photo-input,#ck-ghi-chu,.btn-result,#ipqcWarningButton",
+      "#ck-checklist button,#ck-btk input,#ck-btk select,#ck-btk textarea,#ck-btk button,#ck-photo-btn,#ck-photo-input,#ck-ghi-chu,.btn-result,#ipqcWarningButton,#ipqc-casting-finish",
     ))
       input.disabled = !enabled;
+    state.btk?.setEnabled?.(enabled);
     if (enabled && state.btk && typeof khoaMucKichThuoc === "function") khoaMucKichThuoc();
   }
   function tick() {
@@ -183,6 +184,7 @@ const MesIpqcSession = (() => {
       answers: state.checklistAnswers,
       note: document.getElementById("ck-ghi-chu").value,
       photos: state.photos,
+      measurements: state.btk?.draft?.(),
     };
     try {
       await storage("readwrite", (s) => s.put(draft, savedKey));
@@ -255,6 +257,7 @@ const MesIpqcSession = (() => {
             document.getElementById("cl-bad-" + i)?.classList.toggle("sel-bad", answer.dat === false);
           });
           renderPhotoGrid();
+          state.btk?.restore?.(draft.measurements);
         }
         ready = true;
         controls(true);
@@ -335,6 +338,7 @@ const MesIpqcSession = (() => {
     schedule();
   };
   document.getElementById("ck-ghi-chu").addEventListener("input", schedule);
+  document.getElementById("ck-btk").addEventListener("ipqc-measurements-change", schedule);
   const oldSubmit = submitCheck;
   submitCheck = async (result) => {
     if (busy) return;
