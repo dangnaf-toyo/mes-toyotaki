@@ -97,6 +97,17 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .hist-table th,.hist-table td{border-bottom:1px solid var(--border);padding:5px 6px;text-align:left}
 .hist-table th{color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase}
 
+.modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.open{display:flex}
+.modal{background:#FFF;border-radius:10px;width:100%;max-width:440px;box-shadow:var(--shadow-lg);overflow:hidden}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{background:transparent;border:none;font-size:18px;color:var(--text-muted);cursor:pointer}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.modal .field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.modal .field input{width:100%;padding:7px 9px;border:1px solid var(--border-strong);border-radius:5px;font-family:inherit;font-size:12.5px;outline:none}
+.modal-foot{padding:12px 18px;background:var(--bg-sunken);border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
 .toast{position:fixed;bottom:20px;right:20px;background:#0F172A;color:#F1F5F9;padding:10px 16px;border-radius:6px;font-size:12px;box-shadow:var(--shadow-lg);display:none;z-index:200;align-items:center;gap:10px;max-width:400px}
 .toast.show{display:flex}
 .toast.error{background:#B91C1C}
@@ -111,6 +122,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
       <div class="title" id="hdrTitle">Chi tiết tài liệu</div>
       <div class="sub" id="hdrSub">—</div>
     </div>
+    <button class="btn btn-ghost" id="btn-rename" style="display:none" onclick="openRenameModal()" title="Sửa tên tài liệu">✎ Sửa tên</button>
     <button class="btn btn-ghost" onclick="window.location.href='tai-lieu-danh-muc.html'">← Quay lại danh mục</button>
     <button class="btn btn-outline" id="btn-download-source" style="display:none">⬇ Tải bản gốc CAD</button>
     <div class="header-clock">
@@ -158,6 +170,31 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
       <div class="viewer-wrap" id="viewerWrap">
         <div class="viewer-empty">Chọn 1 phiên bản bên trái để xem.</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: sửa tên tài liệu -->
+<div class="modal-mask" id="modal-rename">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Sửa tên tài liệu</div>
+      <button class="modal-close" onclick="closeRenameModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Tên hiện tại</label>
+        <input type="text" id="rn-cu" disabled>
+      </div>
+      <div class="field">
+        <label>Tên mới <span style="color:#DC2626">*</span></label>
+        <input type="text" id="rn-ten">
+      </div>
+      <div class="msg-inline" id="rn-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeRenameModal()">Huỷ</button>
+      <button class="btn btn-primary" id="rn-submit" onclick="submitRename()">Lưu</button>
     </div>
   </div>
 </div>
@@ -240,6 +277,43 @@ async function loadPermissions(){
   state.canDownloadSource = !!d;
   document.getElementById('uploadForm').style.display = state.canWrite ? 'block' : 'none';
   document.getElementById('btn-download-source').style.display = state.canDownloadSource ? 'inline-flex' : 'none';
+  document.getElementById('btn-rename').style.display = state.canWrite ? 'inline-flex' : 'none';
+}
+
+// ── Sửa tên tài liệu ─────────────────────────────────────────────────────
+function openRenameModal(){
+  const tenCu = state.doc.ten_tai_lieu;
+  document.getElementById('rn-cu').value = tenCu;
+  const inp = document.getElementById('rn-ten');
+  inp.value = tenCu;
+  document.getElementById('rn-msg').style.display = 'none';
+  document.getElementById('rn-submit').disabled = false;
+  document.getElementById('modal-rename').classList.add('open');
+  inp.focus(); inp.select();
+}
+function closeRenameModal(){ document.getElementById('modal-rename').classList.remove('open'); }
+document.getElementById('rn-ten').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitRename(); });
+async function submitRename(){
+  const ten = document.getElementById('rn-ten').value.trim();
+  const msg = document.getElementById('rn-msg');
+  if (!ten){ msg.style.display = 'block'; msg.textContent = 'Cần nhập tên tài liệu.'; return; }
+  if (ten === state.doc.ten_tai_lieu){ closeRenameModal(); return; }
+  const btn = document.getElementById('rn-submit');
+  btn.disabled = true;
+  try {
+    // .select() để phát hiện RLS chặn (update 0 dòng không báo lỗi)
+    const { data, error } = await sb.from('documents').update({ ten_tai_lieu: ten })
+      .eq('id', state.doc.id).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Bạn không có quyền sửa tài liệu này.');
+    state.doc.ten_tai_lieu = ten;
+    document.getElementById('hdrTitle').textContent = ten;
+    toast('Đã đổi tên: ' + ten);
+    closeRenameModal();
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+    btn.disabled = false;
+  }
 }
 
 async function loadVersions(){
