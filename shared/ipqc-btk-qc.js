@@ -916,7 +916,7 @@
   // ═══════════════════════════ BIỂU ĐỒ KIỂM SOÁT ═══════════════════════════
   async function mountChart(el) {
     css();
-    const st = { dsMa: [], cache: {}, cd: 'duc', ma: null, no: null, may: '', khuon: '', ngay: 30 };
+    const st = { dsMa: [], cache: {}, cd: 'duc', ma: null, no: null, may: '', khuon: '', ngay: 30, cvt: null };
     const dsCd = () => st.dsMa.filter(x => x.cong_doan === st.cd);
     const khoa = (ma, cd, ngay) => cd + '|' + ma + '|' + ngay;
     el.innerHTML = '<div class="bq" style="flex-direction:column;align-items:stretch">' +
@@ -953,7 +953,14 @@
       taiCanhBao();
     }
 
-    function diemVaViPham(data, m, loc) {
+    function diemVaViPham(data, m, loc, cd = st.cd, cvt = st.cvt) {
+      if (cd === 'duc') {
+        // Positions are independent series; never treat their count as sample size or PCS.
+        data = { ...data, gioi_han: cvt ? [] : data.gioi_han,
+          btk: { ...data.btk, so_mau: cvt ? 1 : data.btk?.so_mau },
+          lan: (data.lan || []).filter(l => l.id_btk === data.btk?.id).map(l => ({ ...l,
+            kq: (l.kq || []).filter(k => cvt ? k.ma_cvt === cvt : k.ma_cvt == null) })) };
+      }
       const soMau = (data.btk && data.btk.so_mau) || 1;
       const pts = S().chuoi(data, m.muc_no, loc);
       const lim = S().gioiHan(data, m.muc_no, soMau, S().chuoi(data, m.muc_no));
@@ -969,6 +976,8 @@
       if (!st.no || !mucSo.some(m => m.muc_no === st.no)) st.no = mucSo.length ? mucSo[0].muc_no : null;
       const mays = [...new Set((data.lan || []).map(l => l.ma_may).filter(Boolean))].sort();
       const khuons = [...new Set((data.lan || []).map(l => l.so_khuon).filter(Boolean))].sort();
+      const cvts = st.cd === 'duc' ? [...new Set((data.lan || []).flatMap(l => (l.kq || []).filter(k => k.muc_no === st.no && k.ma_cvt != null).map(k => k.ma_cvt)))].sort() : [];
+      if (st.cvt === null || (st.cvt && !cvts.includes(st.cvt))) st.cvt = cvts[0] || '';
       locEl.innerHTML =
         '<label class="f">Công đoạn<select data-l="cd">' + Object.keys(CD).map(c => '<option value="' + c + '"' + (c === st.cd ? ' selected' : '') + '>' + CD[c] + ' (' + st.dsMa.filter(x => x.cong_doan === c).length + ' mã)</option>').join('') + '</select></label>' +
         '<label class="f">Mã SP<select data-l="ma">' + dsCd().map(x => '<option' + (x.ma_sp === st.ma ? ' selected' : '') + '>' + esc(x.ma_sp) + '</option>').join('') + '</select></label>' +
@@ -976,10 +985,15 @@
         '<label class="f">Máy<select data-l="may"><option value="">Tất cả</option>' + mays.map(x => '<option' + (x === st.may ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khuôn<select data-l="khuon"><option value="">Tất cả</option>' + khuons.map(x => '<option' + (x === st.khuon ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khoảng thời gian<select data-l="ngay">' + [[7, '7 ngày'], [30, '30 ngày'], [90, '90 ngày'], [0, 'Tất cả']].map(([v, t]) => '<option value="' + v + '"' + (v === st.ngay ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
-        '<div style="margin-left:auto;font-size:12px;color:#64748B">Bảng tuần kiểm ' + esc(data.btk ? data.btk.phien_ban : '') + ' · ' + ((data.btk && data.btk.so_mau) || 1) + ' mẫu/lần · ' + (data.lan || []).length + ' lần đo</div>';
+        '<div style="margin-left:auto;font-size:12px;color:#64748B">Bảng tuần kiểm ' + esc(data.btk ? data.btk.phien_ban : '') + ' · ' + (st.cd === 'duc' ? 'CVT nhập theo thực tế' : ((data.btk && data.btk.so_mau) || 1) + ' mẫu/lần') + ' · ' + (data.lan || []).length + ' lần đo</div>';
       const loc = l => (!st.may || l.ma_may === st.may) && (!st.khuon || l.so_khuon === st.khuon);
+      if (st.cd === 'duc' && cvts.length) {
+        locEl.insertAdjacentHTML('beforeend', '<label class="f">CVT (biểu đồ)<select data-l="cvt"><option value="">Kết quả cũ chưa có mã CVT</option>' +
+          cvts.map(code => '<option value="' + esc(code) + '"' + (st.cvt === code ? ' selected' : '') + '>' + esc(code) + '</option>').join('') + '</select></label>');
+        locEl.insertAdjacentHTML('beforeend', '<div class="hint">Biểu đồ theo một mã CVT và phiên bản tiêu chuẩn hiện tại. Lịch sử bên dưới giữ đầy đủ các phiên bản và CVT.</div>');
+      }
       const m = mucSo.find(x => x.muc_no === st.no);
-      if (!m) { trai.innerHTML = '<div class="card hint">Bảng tuần kiểm của mã này chưa có hạng mục đo số.</div>'; veTongQuan(data, loc); return; }
+      if (!m) { trai.innerHTML = '<div class="card hint">Bảng tuần kiểm của mã này chưa có hạng mục đo số.</div><div class="card" data-tq></div>'; veTongQuan(data, loc); return; }
       const d = S().soLe(m);
       const { pts, lim, sp, vp, soMau } = diemVaViPham(data, m, loc);
       const vpIdx = new Set(vp.map(v => v.i));
@@ -1011,6 +1025,17 @@
     function veTongQuan(data, loc) {
       const tq = el.querySelector('[data-tq]'); if (!tq) return;
       const lan = (data.lan || []).filter(loc);
+      if (st.cd === 'duc') {
+        const rows = (data.muc || []).map(m => {
+          const results = lan.filter(l => l.id_btk === data.btk?.id).flatMap(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && typeof k.dat === 'boolean'));
+          const ng = results.filter(k => k.dat === false).length;
+          return '<tr><td>' + m.muc_no + '</td><td>' + esc(m.hang_muc) + '</td><td>' + results.length + '</td><td>' + (results.length - ng) + '</td><td>' + ng + '</td><td>' +
+            (results.length ? (100 * ng / results.length).toFixed(1) + '%' : 'Chưa kiểm') + '</td></tr>';
+        }).join('');
+        tq.innerHTML = '<b>Tổng quan các hạng mục — phiên bản hiện tại</b><div class="tbl"><table><tr><th>No</th><th>Hạng mục</th><th>Kết quả đo</th><th>OK</th><th>NG</th><th>Tỷ lệ NG</th></tr>' + rows + '</table></div>' +
+          IpqcCastingHistory.html(lan);
+        return;
+      }
       const rows = (data.muc || []).map(m => {
         if (m.kieu !== 'so') {
           const kq = []; lan.forEach(l => (l.kq || []).filter(k => k.muc_no === m.muc_no).forEach(k => kq.push(k)));
@@ -1030,6 +1055,10 @@
     }
 
     async function veGioiHan(m, lim, d) {
+      if (st.cd === 'duc' && st.cvt) {
+        el.querySelector('[data-gh]').innerHTML = '<b>Giới hạn theo CVT ' + esc(st.cvt) + '</b><p>Giới hạn tạm tính riêng cho vị trí đo này. Giới hạn đã khóa của dữ liệu mẫu cũ được giữ riêng.</p>';
+        return;
+      }
       const box = el.querySelector('[data-gh]');
       const { data: ls } = await sb.from('ipqc_gioi_han').select('*').eq('ma_sp', st.ma).eq('cong_doan', st.cd).eq('muc_no', m.muc_no).order('tao_luc', { ascending: false }).limit(10);
       const CACH = { tu_dong: 'Tự khoá 30 lần đầu', tinh_lai: 'Tính lại', tay: 'Nhập tay' };
@@ -1069,19 +1098,26 @@
         let data;
         try { data = await layDuLieu(x.ma_sp, 0, x.cong_doan); } catch (e) { continue; }
         const tenMa = x.ma_sp + (x.cong_doan === 'gia_cong' ? ' (Gia công)' : '');
+        if (x.cong_doan === 'duc') (data.lan || []).filter(l => new Date(l.thoi_diem) >= moc).forEach(l =>
+          (l.kq || []).filter(k => k.dat === false).forEach(k => ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan,
+            no: k.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + k.muc_no + ' · CVT ' + (k.ma_cvt ?? 'chưa ghi nhận') + ' NG',
+            moTa: (l.ma_may || '') + ' · ' + (l.nguoi || '') + ' · Phiên bản ' + (l.tieu_chuan?.phien_ban || '') })));
         (data.muc || []).forEach(m => {
           if (m.kieu !== 'so') {
-            (data.lan || []).filter(l => new Date(l.thoi_diem) >= moc).forEach(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && !k.dat)
+            (data.lan || []).filter(l => x.cong_doan !== 'duc' && new Date(l.thoi_diem) >= moc).forEach(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && !k.dat)
               .forEach(() => ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' NG', moTa: (l.ma_may || '') + (l.so_khuon ? ' · ' + l.so_khuon : '') })));
             return;
           }
-          const r = diemVaViPham(data, m), d = S().soLe(m);
+          const codes = x.cong_doan === 'duc' ? ['', ...new Set((data.lan || []).flatMap(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && k.ma_cvt != null).map(k => k.ma_cvt)))] : [''];
+          for (const code of codes) {
+          const r = diemVaViPham(data, m, null, x.cong_doan, code), d = S().soLe(m);
           r.pts.forEach((p, i) => {
             if (new Date(p.t) < moc) return;
             const ngoai = p.vals.filter(v => S().datGiaTri(v, r.sp) === false);
-            if (ngoai.length) ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: p.t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' = ' + ngoai.map(v => S().fmt(v, d)).join(' / ') + ' ngoài tiêu chuẩn', moTa: (p.may || '') + (p.khuon ? ' · ' + p.khuon : '') + ' · ' + (p.nguoi || '') });
+            if (ngoai.length && x.cong_doan !== 'duc') ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: p.t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' = ' + ngoai.map(v => S().fmt(v, d)).join(' / ') + ' ngoài tiêu chuẩn', moTa: (p.may || '') + (p.khuon ? ' · ' + p.khuon : '') + ' · ' + (p.nguoi || '') });
           });
           r.vp.filter(v => new Date(r.pts[v.i].t) >= moc).forEach(v => ds.push({ ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: r.pts[v.i].t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' — ' + v.msg, moTa: 'Quy tắc ' + v.quy_tac + (r.lim && r.lim.tam ? ' (giới hạn tạm)' : '') + ' · ' + (r.pts[v.i].may || '') }));
+          }
         });
       }
       ds.sort((a, b) => new Date(b.t) - new Date(a.t));
@@ -1097,12 +1133,14 @@
     el.addEventListener('change', async e => {
       const t = e.target.closest('[data-l]'); if (!t) return;
       const k = t.dataset.l;
+      if (['cd','ma','no'].includes(k)) st.cvt = null;
       if (k === 'cd') { st.cd = t.value; st.ma = (dsCd()[0] || {}).ma_sp || null; st.no = null; st.may = ''; st.khuon = ''; }
       if (k === 'ma') { st.ma = t.value; st.no = null; st.may = ''; st.khuon = ''; }
       if (k === 'no') st.no = +t.value;
       if (k === 'may') st.may = t.value;
       if (k === 'khuon') st.khuon = t.value;
       if (k === 'ngay') st.ngay = +t.value;
+      if (k === 'cvt') st.cvt = t.value;
       await ve();
     });
     el.addEventListener('click', async e => {

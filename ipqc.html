@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#1E293B">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%231E293B'%2F%3E%3Ctext%20x%3D'50'%20y%3D'62'%20font-size%3D'52'%20text-anchor%3D'middle'%3E%F0%9F%94%8D%3C%2Ftext%3E%3C%2Fsvg%3E">
 <title>IPQC — Kiểm tra chất lượng</title>
+<link rel="stylesheet" href="shared/ipqc-casting.css?v=T234">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -281,6 +282,7 @@ button{cursor:pointer;font-family:inherit}
   </div>
 
   <div class="result-grid">
+    <button class="btn-result ok" id="ipqc-casting-finish" onclick="finishCastingCheck()">Kết thúc kiểm tra</button>
     <div class="result-row">
       <button class="btn-result ok" onclick="submitCheck('OK')">✅ OK<br><span style="font-weight:500;font-size:.75rem">Cho phép SX</span></button>
       <button class="btn-result ng" onclick="submitCheck('NG')">❌ NG<br><span style="font-weight:500;font-size:.75rem">Dừng máy</span></button>
@@ -298,7 +300,8 @@ button{cursor:pointer;font-family:inherit}
 <script src="shared/su-co-lich-su.js?v=T180"></script>
 <script src="shared/ipqc-bao-mau.js?v=T182"></script>
 <script src="shared/ipqc-spc.js?v=T213"></script>
-<script src="shared/ipqc-btk-do.js?v=T187"></script>
+<script src="shared/ipqc-casting-history.js?v=T234"></script>
+<script src="shared/ipqc-btk-do.js?v=T234"></script>
 <script>
 const IPQC_CHECK_INTERVAL_MIN = 120;   // CONFIG.IPQC_CHECK_INTERVAL_MIN (Config.js) — giữ khớp
 const IPQC_MAX_PHOTOS = 10;
@@ -828,16 +831,18 @@ async function openCheck(idCheckpoint, maSpChon){
   // The original checklist remains independent of the reference document.
   state.checklistAnswers = [...IPQC_DEFAULT_CHECKLIST.map(muc => ({ muc, dat: null })),{code:'machine_condition',group:'Điều kiện máy',muc:'Điều kiện máy',dat:null}];
   renderChecklist();
+  if (typeof MesIpqcSession !== 'undefined') MesIpqcSession.syncControls();
   // T133: mã có bảng tuần kiểm → nhập kết quả đo, mục "Kích thước" tự đánh giá.
   state.btk = null;
-  IpqcBtkDo.mount(document.getElementById('ck-btk'), cp, {
+  state.btkError = null;
+  await IpqcBtkDo.mount(document.getElementById('ck-btk'), cp, {
     onChange: s => { if (state.current?.id_checkpoint === cp.id_checkpoint) apDungBtk(s); },
   }).then(ctl => {
     if (state.current?.id_checkpoint !== cp.id_checkpoint) return;
     state.btk = ctl;
     if (ctl) khoaMucKichThuoc();
     if (typeof MesIpqcSession !== 'undefined') MesIpqcSession.syncControls();
-  }).catch(e => showToast('Không tải được bảng tuần kiểm: ' + e.message, true));
+  }).catch(e => { state.btkError = e.message; showToast('Không tải được bảng tuần kiểm: ' + e.message, true); });
   const request = state.referenceRequest = (state.referenceRequest || 0) + 1;
   const pdfBtn = document.getElementById('ck-pdf-btn');
   pdfBtn.classList.remove('hidden'); pdfBtn.disabled = true; pdfBtn.onclick = null;
@@ -1146,10 +1151,20 @@ async function uploadEvidencePhotos(maMay, maSp, ketQua){
   return urls;
 }
 
+function finishCastingCheck(){
+  const d = state.btk?.trangThai();
+  if (d && !d.du) return showToast(d.errors[0] + '. Bỏ chọn hạng mục chưa thực hiện để kết thúc.', true);
+  const ng = d?.dat === false || state.checklistAnswers.some(a => a.dat === false);
+  if (ng && !confirm('Có kết quả NG. Kết thúc và giữ quy trình xử lý NG hiện tại?')) return;
+  return submitCheck(ng ? 'NG' : 'OK');
+}
+
 async function submitCheck(ketQua){
   if (!state.current) return;
   const submittedCheckpoint = { ...state.current };
-  if (state.btk && !state.btk.trangThai().du) return showToast('Nhập đủ kết quả đo các hạng mục bảng tuần kiểm (kích thước).', true);   // T133
+  if (state.btkError) return showToast('Chưa tải được tiêu chuẩn. Mở lại phiếu trước khi lưu.', true);
+  if (state.btk && !state.btk.trangThai().du) return showToast(state.btk.trangThai().errors[0] + '. Bỏ chọn hạng mục chưa thực hiện để kết thúc.', true);
+  if (state.btk) apDungBtk(state.btk.trangThai());
   if(!state.checklistAnswers.length||state.checklistAnswers.some(a=>typeof a.dat!=='boolean'))return showToast('Xác nhận đầy đủ tất cả hạng mục bắt buộc trước khi lưu.',true);
   if(!state.checklistAnswers.some(a=>a.code==='machine_condition'&&typeof a.dat==='boolean'))return showToast('Chọn Đạt hoặc Không đạt cho Điều kiện máy.',true);
   const vdLoi = kiemTraVdTruoc(ketQua);   // T127
@@ -1183,12 +1198,13 @@ async function submitCheck(ketQua){
   try {
     await MesIpqcSession.prepare();
     await luuVdTruoc(submittedCheckpoint.id_checkpoint);   // T127
-    if (state.btk) await state.btk.luu(submittedCheckpoint.id_checkpoint, nguoiKiem);   // T133
+    const measurement = state.btk?.duLieu();
     const anhUrls = await uploadEvidencePhotos(state.current.ma_may, state.current.ma_sp, ketQua);
 
     showOverlay('Đang lưu kết quả...');
     const thoiGianKiemGiay = state.checkStartedAt ? Math.round((Date.now() - state.checkStartedAt) / 1000) : null;
-    const { data, error } = await sb.rpc('duc_submit_ipqc_session', {
+    const { data, error } = await sb.rpc(measurement ? 'duc_submit_ipqc_cvt' : 'duc_submit_ipqc_session', {
+      ...(measurement ? { p_do: measurement } : {}),
       p_id_checkpoint: submittedCheckpoint.id_checkpoint,
       p_checklist: ckList,
       p_ket_qua: ketQua,
@@ -1218,6 +1234,6 @@ async function submitCheck(ketQua){
 }
 </script>
 <script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
-<script src="shared/mes-ng-status.js?v=T141"></script><script src="shared/mes-ipqc-session.js?v=T141"></script>
+<script src="shared/mes-ng-status.js?v=T141"></script><script src="shared/mes-ipqc-session.js?v=T234"></script>
 </body>
 </html>
