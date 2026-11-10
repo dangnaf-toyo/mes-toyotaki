@@ -2196,7 +2196,7 @@ async function loadKanbanProgress(){
 }
 
 // T178: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
-const SU_CO_MO_TOI_DA = 3;
+const SU_CO_MO_TOI_DA = 1;   // T241: mỗi máy chỉ 1 sự cố mở (T178 từng cho 3)
 function suCoMoCuaDong(row){
   if (!row || !row.open_gio_phat_sinh) return [];
   return [row].concat((row.su_co_phu || []).map(x => Object.assign({}, row, {
@@ -2558,7 +2558,7 @@ function makeRowHTML(row, stateClass, isActive){
 
   let issueHTML;
   if (row.open_gio_phat_sinh) {
-    // T178: tối đa 3 sự cố mở / máy — sự cố chính + sự cố phụ (duc_su_co_mo_them), sửa / xong từng cái.
+    // T241: mỗi máy chỉ 1 sự cố mở. Vẫn vẽ cả sự cố phụ còn sót (duc_su_co_mo_them, T178) để sửa / đóng được.
     const list = suCoMoCuaDong(row);
     issueHTML = list.map(s => {
       const startTime = new Date(s.open_gio_phat_sinh);
@@ -3489,13 +3489,13 @@ async function submitAddIncident(){
 // =============================================================================
 async function openBulkIncidentModal(){
   if (!(await ensureAuth())) return;
-  // T179: máy đang có sự cố vẫn chọn được nếu còn chỗ (tối đa SU_CO_MO_TOI_DA sự cố mở / máy)
+  // T241: máy đang có sự cố mở không chọn được (mỗi máy chỉ 1 sự cố mở)
   const eligible = state.rows.filter(r => r.ma_sp && suCoMoCuaDong(r).length < SU_CO_MO_TOI_DA)
     .sort((a,b) => naturalCompare(a.ma_may, b.ma_may));
 
   const list = document.getElementById('bi-machine-list');
   if (eligible.length === 0) {
-    list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-style:italic;font-size:12px">Không có máy nào để chọn (máy đã đủ ' + SU_CO_MO_TOI_DA + ' sự cố mở sẽ không hiện ở đây).</div>';
+    list.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-style:italic;font-size:12px">Không có máy nào để chọn (máy đang có sự cố mở sẽ không hiện ở đây — đóng sự cố đó trước).</div>';
   } else {
     // Máy đang có sự cố: hiện kèm số sự cố, mặc định KHÔNG tick (tick tay nếu sự cố mới cũng ảnh hưởng máy đó).
     list.innerHTML = eligible.map(r => {

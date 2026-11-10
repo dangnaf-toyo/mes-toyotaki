@@ -958,7 +958,7 @@ function formatDateDisplayMobile(d){ return pad(d.getDate())+'/'+pad(d.getMonth(
 // MACHINE LIST
 // =============================================================================
 // T178: các sự cố đang mở của 1 dòng, dạng "dòng ảo" có cột open_* — sự cố chính trước, rồi sự cố phụ.
-const SU_CO_MO_TOI_DA = 3;
+const SU_CO_MO_TOI_DA = 1;   // T241: mỗi máy chỉ 1 sự cố mở (T178 từng cho 3)
 function suCoMoCuaDongM(row){
   if (!row || !row.open_gio_phat_sinh) return [];
   return [row].concat((row.su_co_phu || []).map(x => Object.assign({}, row, {
@@ -1126,7 +1126,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
       <div class="detail-stat"><div class="num">${pct}%</div><div class="lbl">Hoàn thành</div></div>
     </div>`;
 
-  // T178: tối đa 3 sự cố mở / máy — mỗi sự cố 1 khối, bấm "Xử lý xong" từng cái.
+  // T241: mỗi máy chỉ 1 sự cố mở. Vẫn vẽ cả sự cố phụ còn sót (T178) để đóng được.
   const suCoList = suCoMoCuaDongM(row);
   if (suCoList.length) {
     issueBox.classList.remove('hidden');
