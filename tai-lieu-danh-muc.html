@@ -79,6 +79,8 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .doc-row:hover{background:var(--bg-sunken)}
 .doc-row .name{flex:1;font-size:12.5px}
 .doc-row .arrow{color:var(--text-dim);font-size:11px}
+.doc-row .rename-btn{font-size:11px;color:var(--text-muted);background:none;border:1px dashed var(--border-strong);border-radius:4px;padding:1px 7px;cursor:pointer;flex-shrink:0;font-family:inherit}
+.doc-row .rename-btn:hover{color:var(--text);background:var(--bg-panel)}
 .cat-empty{padding:8px;color:var(--text-dim);font-size:11.5px;font-style:italic}
 /* Màn hình rộng: khung trang cao đúng 1 màn hình, 2 cột cuộn riêng — chọn mã ở
    cuối danh sách vẫn thấy ngay tài liệu bên phải (trước đây cả trang cuộn). */
@@ -192,6 +194,31 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
     <div class="modal-foot">
       <button class="btn-outline" onclick="closeNewDocModal()">Huỷ</button>
       <button class="btn btn-primary" id="nd-submit" onclick="submitNewDoc()">Tạo &amp; tiếp tục</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: sửa tên tài liệu -->
+<div class="modal-mask" id="modal-rename">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Sửa tên tài liệu</div>
+      <button class="modal-close" onclick="closeRenameModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Tên hiện tại</label>
+        <input type="text" id="rn-cu" disabled>
+      </div>
+      <div class="field">
+        <label>Tên mới <span style="color:#DC2626">*</span></label>
+        <input type="text" id="rn-ten">
+      </div>
+      <div class="msg-inline" id="rn-msg" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeRenameModal()">Huỷ</button>
+      <button class="btn btn-primary" id="rn-submit" onclick="submitRename()">Lưu</button>
     </div>
   </div>
 </div>
@@ -357,6 +384,7 @@ async function loadDetail(maSp){
         ${list.length ? list.map(d => `
           <div class="doc-row" data-doc-id="${d.id}">
             <span class="name">${escapeHtml(d.ten_tai_lieu)}</span>
+            ${writable ? `<button type="button" class="rename-btn" data-rename-id="${d.id}" data-rename-ten="${escapeHtml(d.ten_tai_lieu)}" title="Sửa tên tài liệu">✎ Sửa tên</button>` : ''}
             <span class="arrow">→</span>
           </div>
         `).join('') : '<div class="cat-empty">Chưa có tài liệu nào.</div>'}
@@ -365,7 +393,13 @@ async function loadDetail(maSp){
   }).join('');
 
   body.querySelectorAll('.doc-row').forEach(row => {
-    row.addEventListener('click', () => { window.location.href = 'tai-lieu-chi-tiet.html?id=' + encodeURIComponent(row.dataset.docId); });
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.rename-btn')) return;
+      window.location.href = 'tai-lieu-chi-tiet.html?id=' + encodeURIComponent(row.dataset.docId);
+    });
+  });
+  body.querySelectorAll('.rename-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openRenameModal(btn.dataset.renameId, btn.dataset.renameTen); });
   });
   body.querySelectorAll('[data-new-doc-cat]').forEach(btn => {
     btn.addEventListener('click', () => openNewDocModal(btn.dataset.newDocCat, btn.dataset.newDocCatName, btn.dataset.newDocMaSp));
@@ -397,6 +431,42 @@ async function submitNewDoc(){
     }).select('id').single();
     if (error) throw error;
     window.location.href = 'tai-lieu-chi-tiet.html?id=' + encodeURIComponent(data.id);
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+// ── Modal: sửa tên tài liệu ───────────────────────────────────────────────
+let renameCtx = null;
+function openRenameModal(docId, tenCu){
+  renameCtx = { docId, tenCu };
+  document.getElementById('rn-cu').value = tenCu;
+  const inp = document.getElementById('rn-ten');
+  inp.value = tenCu;
+  document.getElementById('rn-msg').style.display = 'none';
+  document.getElementById('rn-submit').disabled = false;
+  document.getElementById('modal-rename').classList.add('open');
+  inp.focus(); inp.select();
+}
+function closeRenameModal(){ document.getElementById('modal-rename').classList.remove('open'); }
+document.getElementById('rn-ten').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitRename(); });
+async function submitRename(){
+  const ten = document.getElementById('rn-ten').value.trim();
+  const msg = document.getElementById('rn-msg');
+  if (!ten){ msg.style.display = 'block'; msg.textContent = 'Cần nhập tên tài liệu.'; return; }
+  if (ten === renameCtx.tenCu){ closeRenameModal(); return; }
+  const btn = document.getElementById('rn-submit');
+  btn.disabled = true;
+  try {
+    // .select() để phát hiện trường hợp RLS chặn (update 0 dòng không báo lỗi)
+    const { data, error } = await sb.from('documents').update({ ten_tai_lieu: ten })
+      .eq('id', renameCtx.docId).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Bạn không có quyền sửa tài liệu này.');
+    toast('Đã đổi tên: ' + ten);
+    closeRenameModal();
+    loadDetail(state.selectedMaSp);
   } catch (e) {
     msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + e.message;
     btn.disabled = false;
