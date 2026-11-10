@@ -14,6 +14,7 @@
   - ?tab=pchart   : P-Chart NG OQC — OqcNgDash.mount (T135)
   - ?tab=bavia    : P-Chart NG Bavia — BaviaNgDash.mount (T159, Excel quá khứ + NG MES)
                     &tu=YYYY-MM-DD&den=YYYY-MM-DD&nhom=FCC|EXEDY|FOMECO|Hitachi (ASTEMO)|KHAC (từ Dashboard chất lượng)
+  - ?tab=baviatem : NG Bavia theo từng tem Đúc + shot khuôn từ bảo dưỡng — BaviaNgTem.mount (T235)
   qc-manager.html?tab=bieudo|ngoqc tự chuyển sang đây.
 -->
 <style>
@@ -42,12 +43,14 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
       <button type="button" class="tab-btn" role="tab" data-tab="kiemsoat">Biểu đồ kiểm soát</button>
       <button type="button" class="tab-btn" role="tab" data-tab="pchart">P-Chart NG OQC</button>
       <button type="button" class="tab-btn" role="tab" data-tab="bavia">P-Chart NG Bavia</button>
+      <button type="button" class="tab-btn" role="tab" data-tab="baviatem">NG Bavia theo tem Đúc</button>
     </div>
   </header>
   <div id="login-msg" class="login" style="display:none">Cần đăng nhập để xem biểu đồ. <a id="login-link" href="shared/login.html">Đăng nhập</a></div>
   <div class="tabpanel" id="tab-kiemsoat"><div id="kiemsoat-root"></div></div>
   <div class="tabpanel" id="tab-pchart"><div id="pchart-root"></div></div>
   <div class="tabpanel" id="tab-bavia"><div id="bavia-root"></div></div>
+  <div class="tabpanel" id="tab-baviatem"><div id="baviatem-root"></div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -60,8 +63,9 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 <script src="shared/ipqc-btk-qc.js?v=T234"></script>
 <script src="shared/oqc-ng-dash.js?v=T157"></script>
 <script src="shared/bavia-ng-dash.js?v=T225"></script>
+<script src="shared/bavia-ng-tem.js?v=T235"></script>
 <script>
-const TABS = ['kiemsoat', 'pchart', 'bavia'];
+const TABS = ['kiemsoat', 'pchart', 'bavia', 'baviatem'];
 const ctl = {};
 function chonTab(tab) {
   if (!TABS.includes(tab)) tab = TABS[0];
@@ -85,6 +89,9 @@ function chonTab(tab) {
       ctl.bavia = BaviaNgDash.mount(document.getElementById('bavia-root'), { tu: q.get('tu'), den: q.get('den'), nhom: q.get('nhom') });
     }
     else ctl.bavia.then(c => c && c.taiLai && c.taiLai());
+  } else if (tab === 'baviatem') {
+    if (!ctl.baviatem) ctl.baviatem = BaviaNgTem.mount(document.getElementById('baviatem-root'));
+    else ctl.baviatem.then(c => c && c.taiLai && c.taiLai());
   }
 }
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => chonTab(b.dataset.tab)));
