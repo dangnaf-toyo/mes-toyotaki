@@ -1,4 +1,5 @@
--- IQC NVL / chemical analysis. Apply to STAGING only for this change; no production execution.
+-- IQC NVL / chemical analysis. Đã chạy staging 09/11 + PROD 10/11/2026 (sau review, không đổi nội dung).
+-- Lưu ý: trùng số T232 với migration_phase_T232_dieu_kien_dong_su_co.sql (2 việc khác nhau).
 begin;
 
 -- Classification references the existing BOM/inventory master; it is not a second material catalog.
