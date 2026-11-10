@@ -860,7 +860,8 @@
         <nav class="tabs">
           <button class="tab" data-tab="materials">Danh mục NVL</button
           ><button class="tab active" data-tab="register">Lập BOM</button
-          ><button class="tab" data-tab="lookup">Tổng hợp BOM</button>
+          ><button class="tab" data-tab="lookup">Tổng hợp BOM</button
+          ><button class="tab" data-tab="kimloai">Kim loại</button>
         </nav>
         <div class="header-clock" aria-hidden="true">
           <span class="date" id="clock-date">—</span><span class="time" id="clock-time">--:--</span>
@@ -1001,6 +1002,81 @@
               <tbody id="sumBody"></tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <!-- ── Kim loại: tiêu hao chuẩn vs thực + nhu cầu theo KHSX (T239) ─── -->
+      <section class="panel" id="kimloai">
+        <div class="card">
+          <div class="head">
+            <div>
+              <h2>Tiêu hao kim loại — chuẩn theo BOM so với thực xuất kho</h2>
+              <p class="sub">Chuẩn = sản lượng máy đúc × định mức của phiên bản BOM có hiệu lực vào ngày sản xuất. Thực = kho NVL ghi xuất cho sản xuất.</p>
+            </div>
+          </div>
+          <div class="toolbar">
+            <label class="sub">Từ <input type="date" id="thTu" /></label>
+            <label class="sub">đến <input type="date" id="thDen" /></label>
+            <button class="btn secondary" type="button" data-th="thang">Tháng này</button>
+            <button class="btn secondary" type="button" data-th="truoc">Tháng trước</button>
+            <button class="btn primary" type="button" id="thXem">Xem</button>
+          </div>
+          <div id="thWarn" style="margin: 0 14px"></div>
+          <div class="kpis" id="thKpis"></div>
+          <div id="thChart" style="margin: 14px"></div>
+          <div class="table-wrap" style="margin: 0 14px 14px">
+            <table>
+              <thead>
+                <tr><th>Mác</th><th class="num">Sản lượng (pcs)</th><th class="num">Có BOM</th><th class="num">Chuẩn (kg)</th><th class="num">Hồi liệu (kg)</th><th class="num">Thực xuất (kg)</th><th class="num">Chênh (kg)</th><th class="num">Chênh %</th></tr>
+              </thead>
+              <tbody id="thMac"></tbody>
+            </table>
+          </div>
+          <details style="margin: 0 14px 14px">
+            <summary><b>Chi tiết theo mã sản phẩm</b></summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Mã SP</th><th>Tên</th><th>Mác</th><th>Máy</th><th class="num">Sản lượng</th><th>BOM</th><th class="num">Định mức kg/pcs</th><th class="num">Chuẩn (kg)</th></tr>
+                </thead>
+                <tbody id="thSp"></tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+
+        <div class="card" style="margin-top: 16px">
+          <div class="head">
+            <div>
+              <h2>Nhu cầu kim loại theo kế hoạch sản xuất Đúc</h2>
+              <p class="sub">KHSX tuần (máy đúc) × định mức BOM hiệu lực, so với tồn kho NVL theo mác.</p>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button class="btn secondary" type="button" id="ncTruoc">← Tuần trước</button>
+            <b id="ncTuanLbl">—</b>
+            <button class="btn secondary" type="button" id="ncSau">Tuần sau →</button>
+          </div>
+          <div id="ncWarn" style="margin: 0 14px"></div>
+          <div class="table-wrap" style="margin: 14px">
+            <table>
+              <thead>
+                <tr><th>Mác</th><th class="num">Tồn kho NVL (kg)</th><th class="num" id="ncH1">Nhu cầu tuần (kg)</th><th class="num" id="ncH2">Còn lại tuần (kg)</th><th class="num" id="ncH3">Tuần sau (kg)</th><th>Đủ dùng</th><th class="num">SL kế hoạch chưa có BOM</th></tr>
+              </thead>
+              <tbody id="ncMac"></tbody>
+            </table>
+          </div>
+          <details style="margin: 0 14px 14px">
+            <summary><b>Chi tiết theo mã sản phẩm</b></summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Mã SP</th><th>Mác</th><th>BOM</th><th class="num">Định mức kg/pcs</th><th class="num">KH tuần (pcs)</th><th class="num">Kim loại (kg)</th><th class="num">KH tuần sau (pcs)</th><th class="num">Kim loại (kg)</th></tr>
+                </thead>
+                <tbody id="ncSp"></tbody>
+              </table>
+            </div>
+          </details>
         </div>
       </section>
     </main>
@@ -1805,12 +1881,158 @@
         }
       };
 
+      // ── Kim loại (T239) ───────────────────────────────────────────────
+      const isoD = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      const kg = (v) => (v === null || v === undefined ? "—" : Math.round(Number(v)).toLocaleString("vi-VN"));
+      const chuaBom = '<span class="badge tt-chua">Chưa có BOM</span>';
+      let klDaTai = false,
+        ncTuan = null;
+      function thPreset(k) {
+        const n = new Date();
+        const a = k === "truoc" ? new Date(n.getFullYear(), n.getMonth() - 1, 1) : new Date(n.getFullYear(), n.getMonth(), 1);
+        const b = k === "truoc" ? new Date(n.getFullYear(), n.getMonth(), 0) : n;
+        $("thTu").value = isoD(a);
+        $("thDen").value = isoD(b);
+      }
+      function canhBaoKho(cuoi, tu) {
+        if (!cuoi) return '<div class="warn">Kho NVL chưa có giao dịch nào — chưa so được với thực tế.</div>';
+        const cu = (Date.now() - new Date(cuoi).getTime()) / 864e5;
+        if (cu > 7)
+          return (
+            '<div class="warn">Kho NVL ghi giao dịch lần cuối ngày <b>' + fmtDate(cuoi) + "</b>" +
+            (tu && cuoi < tu ? " (trước khoảng đang xem)" : "") +
+            " — số thực xuất / tồn kho chưa phản ánh thực tế. Cần Kho NVL ghi nhập/xuất hằng ngày tại trang Kho NVL.</div>"
+          );
+        return "";
+      }
+      function veChart(rows) {
+        const box = $("thChart");
+        if (!rows.some((r) => +r.chuan_kg > 0 || +r.thuc_kg > 0)) return (box.innerHTML = "");
+        const W = 1000, H = 180, P = 36,
+          max = Math.max(1, ...rows.map((r) => Math.max(+r.chuan_kg || 0, +r.thuc_kg || 0))),
+          bw = (W - P) / rows.length,
+          y = (v) => H - 20 - ((H - 30) * v) / max;
+        const bars = rows
+          .map((r, i) => '<rect x="' + (P + i * bw + bw * 0.15) + '" y="' + y(+r.chuan_kg || 0) + '" width="' + bw * 0.7 + '" height="' + (H - 20 - y(+r.chuan_kg || 0)) + '" fill="#93c5fd"><title>' + fmtDate(r.ngay) + " · chuẩn " + kg(r.chuan_kg) + " kg</title></rect>")
+          .join("");
+        const pts = rows.map((r, i) => P + i * bw + bw / 2 + "," + y(+r.thuc_kg || 0)).join(" ");
+        const lbl = rows
+          .map((r, i) => (i % Math.ceil(rows.length / 10) === 0 ? '<text x="' + (P + i * bw + bw / 2) + '" y="' + (H - 4) + '" font-size="11" text-anchor="middle" fill="#64748b">' + r.ngay.slice(8, 10) + "/" + r.ngay.slice(5, 7) + "</text>" : ""))
+          .join("");
+        box.innerHTML =
+          '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto" role="img" aria-label="Kim loại chuẩn và thực xuất theo ngày">' +
+          '<text x="0" y="12" font-size="11" fill="#64748b">' + kg(max) + ' kg</text><line x1="' + P + '" y1="' + (H - 20) + '" x2="' + W + '" y2="' + (H - 20) + '" stroke="#cbd5e1"/>' +
+          bars + '<polyline points="' + pts + '" fill="none" stroke="#b42318" stroke-width="2"/>' + lbl + "</svg>" +
+          '<div class="sub" style="font-size:12px"><span style="display:inline-block;width:10px;height:10px;background:#93c5fd"></span> Chuẩn theo BOM &nbsp; <span style="display:inline-block;width:14px;height:2px;background:#b42318;vertical-align:middle"></span> Thực xuất kho</div>';
+      }
+      async function taiTieuHao() {
+        const tu = $("thTu").value, den = $("thDen").value;
+        $("thMac").innerHTML = '<tr><td colspan="8" class="empty">Đang tính…</td></tr>';
+        const r = await sb.rpc("bom_kim_loai_tieu_hao", { p_tu: tu, p_den: den });
+        if (r.error) return ($("thMac").innerHTML = '<tr><td colspan="8" class="empty">' + errHtml("Không tải được.", r.error) + "</td></tr>");
+        const d = r.data, t = d.tong;
+        const pct = t.sl ? Math.round((t.sl_co_bom / t.sl) * 100) : 0;
+        let warn = canhBaoKho(d.kho_gd_cuoi, tu);
+        if (t.sl && pct < 100)
+          warn += '<div class="warn">' + (t.so_ma - t.so_ma_co_bom) + "/" + t.so_ma + " mã (" + (100 - pct) + "% sản lượng) chưa có BOM hiệu lực → chưa tính được kim loại chuẩn cho phần này. Lập và duyệt BOM ở tab Lập BOM.</div>";
+        $("thWarn").innerHTML = warn;
+        const chenh = d.thuc_kg - t.chuan_kg;
+        $("thKpis").innerHTML =
+          "<div><b>" + kg(t.sl) + "</b>pcs đúc (" + t.so_ma + " mã)</div><div><b>" + pct + "%</b>sản lượng có BOM</div><div><b>" + kg(t.chuan_kg) + "</b>kg chuẩn</div><div><b>" + kg(t.hoi_lieu_kg) +
+          "</b>kg hồi liệu</div><div><b>" + kg(d.thuc_kg) + "</b>kg thực xuất</div>" +
+          (t.chuan_kg && d.thuc_kg ? "<div><b style=\"color:" + (chenh > 0 ? "var(--red)" : "var(--green)") + '">' + (chenh > 0 ? "+" : "") + kg(chenh) + "</b>kg chênh</div>" : "");
+        veChart(d.theo_ngay || []);
+        $("thMac").innerHTML =
+          (d.theo_mac || [])
+            .map((m) => {
+              const ch = m.chuan_kg != null && m.thuc_kg != null ? m.thuc_kg - m.chuan_kg : null,
+                cp = ch != null && m.chuan_kg ? (ch / m.chuan_kg) * 100 : null;
+              return (
+                "<tr><td><b>" + esc(m.mac || "Chưa rõ mác") + '</b></td><td class="num">' + kg(m.sl) + '</td><td class="num">' + (m.sl ? Math.round((m.sl_co_bom / m.sl) * 100) + "%" : "—") +
+                '</td><td class="num">' + kg(m.chuan_kg) + '</td><td class="num">' + kg(m.hoi_lieu_kg) + '</td><td class="num">' + kg(m.thuc_kg) + '</td><td class="num">' +
+                (ch == null ? "—" : (ch > 0 ? "+" : "") + kg(ch)) + '</td><td class="num"' + (cp != null && Math.abs(cp) > 5 ? ' style="color:var(--red);font-weight:700"' : "") + ">" +
+                (cp == null ? "—" : (cp > 0 ? "+" : "") + cp.toFixed(1) + "%") + "</td></tr>"
+              );
+            })
+            .join("") || '<tr><td colspan="8" class="empty">Không có sản lượng máy đúc trong khoảng này.</td></tr>';
+        $("thSp").innerHTML = (d.theo_sp || [])
+          .map(
+            (s) =>
+              "<tr><td class=\"mono\">" + esc(s.ma_sp) + "</td><td>" + esc(s.ten_sp || "") + "</td><td>" + esc(s.mac || "—") + '</td><td class="sub">' + esc(s.may || "") + '</td><td class="num">' + kg(s.sl) +
+              "</td><td>" + (s.phien_ban ? badge("da_duyet", s.phien_ban) + (s.sl_co_bom < s.sl ? ' <span class="sub">(' + Math.round((s.sl_co_bom / s.sl) * 100) + "%)</span>" : "") : chuaBom) +
+              '</td><td class="num">' + fmt(s.dm, 4) + '</td><td class="num"><b>' + kg(s.chuan_kg) + "</b></td></tr>",
+          )
+          .join("");
+      }
+      async function taiNhuCau() {
+        $("ncMac").innerHTML = '<tr><td colspan="7" class="empty">Đang tính…</td></tr>';
+        const r = await sb.rpc("bom_kim_loai_nhu_cau", { p_tuan: ncTuan });
+        if (r.error) return ($("ncMac").innerHTML = '<tr><td colspan="7" class="empty">' + errHtml("Không tải được.", r.error) + "</td></tr>");
+        const d = r.data;
+        ncTuan = d.tuan;
+        const laTuanNay = d.hom_nay >= d.tuan && d.hom_nay < d.tuan_sau;
+        $("ncTuanLbl").textContent = "Tuần " + fmtDate(d.tuan) + (laTuanNay ? " (tuần này)" : "");
+        $("ncH1").textContent = "Nhu cầu tuần " + fmtDate(d.tuan).slice(0, 5) + " (kg)";
+        $("ncH2").style.display = laTuanNay ? "" : "none";
+        $("ncH3").textContent = "Tuần " + fmtDate(d.tuan_sau).slice(0, 5) + " (kg)";
+        const thieu = (d.theo_mac || []).reduce((a, m) => a + (+m.sl_thieu_bom || 0), 0);
+        $("ncWarn").innerHTML =
+          canhBaoKho(d.kho_gd_cuoi) +
+          (thieu ? '<div class="warn">' + kg(thieu) + " pcs trong kế hoạch là mã chưa có BOM hiệu lực — nhu cầu kim loại đang thiếu phần này.</div>" : "") +
+          ((d.theo_sp || []).length ? "" : '<div class="warn">Chưa có KHSX tuần Đúc cho tuần này / tuần sau.</div>');
+        const soNgayConLai = laTuanNay ? 7 - Math.floor((new Date(d.hom_nay) - new Date(d.tuan)) / 864e5) : 7;
+        $("ncMac").innerHTML =
+          (d.theo_mac || [])
+            .map((m) => {
+              const can = laTuanNay ? (+m.kg_con_lai || 0) + (+m.kg_tuan_sau || 0) : (+m.kg_tuan || 0) + (+m.kg_tuan_sau || 0),
+                ngay = laTuanNay ? soNgayConLai + 7 : 14,
+                rate = can / ngay,
+                du = rate > 0 && m.ton_kg != null ? m.ton_kg / rate : null;
+              let duTxt = "—";
+              if (du != null) duTxt = du >= ngay ? '<span class="badge tt-da_duyet">Đủ cả 2 tuần</span>' : '<span class="badge tt-chua">~' + Math.floor(du) + " ngày</span>";
+              return (
+                "<tr><td><b>" + esc(m.mac || "Chưa rõ mác") + '</b></td><td class="num">' + kg(m.ton_kg) + '</td><td class="num">' + kg(m.kg_tuan) + '</td><td class="num"' + (laTuanNay ? "" : ' style="display:none"') + ">" +
+                kg(m.kg_con_lai) + '</td><td class="num">' + kg(m.kg_tuan_sau) + "</td><td>" + duTxt + '</td><td class="num">' + (+m.sl_thieu_bom ? kg(m.sl_thieu_bom) : "—") + "</td></tr>"
+              );
+            })
+            .join("") || '<tr><td colspan="7" class="empty">Không có kế hoạch.</td></tr>';
+        $("ncSp").innerHTML = (d.theo_sp || [])
+          .map(
+            (s) =>
+              '<tr><td class="mono">' + esc(s.ma_sp) + "</td><td>" + esc(s.mac || "—") + "</td><td>" + (s.phien_ban ? badge("da_duyet", s.phien_ban) : chuaBom) + '</td><td class="num">' + fmt(s.dm, 4) +
+              '</td><td class="num">' + kg(s.sl_tuan) + '</td><td class="num">' + kg(s.kg_tuan) + '</td><td class="num">' + kg(s.sl_tuan_sau) + '</td><td class="num">' + kg(s.kg_tuan_sau) + "</td></tr>",
+          )
+          .join("");
+      }
+      document.querySelectorAll("[data-th]").forEach((b) => (b.onclick = () => (thPreset(b.dataset.th), taiTieuHao())));
+      $("thXem").onclick = taiTieuHao;
+      $("ncTruoc").onclick = () => {
+        const d = new Date(ncTuan);
+        d.setDate(d.getDate() - 7);
+        ncTuan = isoD(d);
+        taiNhuCau();
+      };
+      $("ncSau").onclick = () => {
+        const d = new Date(ncTuan);
+        d.setDate(d.getDate() + 7);
+        ncTuan = isoD(d);
+        taiNhuCau();
+      };
+      function moKimLoai() {
+        if (klDaTai) return;
+        klDaTai = true;
+        thPreset("thang");
+        taiTieuHao();
+        taiNhuCau();
+      }
+
       // ── Tab + đồng hồ ─────────────────────────────────────────────────
       document.querySelectorAll(".tab").forEach(
         (x) =>
           (x.onclick = () => {
             document.querySelectorAll(".tab").forEach((y) => y.classList.toggle("active", y === x));
             document.querySelectorAll(".panel").forEach((y) => y.classList.toggle("active", y.id === x.dataset.tab));
+            if (x.dataset.tab === "kimloai" && perm.xem) moKimLoai();
           }),
       );
       $("productSearch").oninput = renderProducts;
