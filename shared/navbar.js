@@ -74,6 +74,7 @@
     ] },
     { label: 'QMS · Tài liệu', items: [
       { label: 'Tài liệu kỹ thuật', href: 'tai-lieu-danh-muc.html' },
+      { label: 'BOM sản phẩm', href: 'bom.html' },
       { label: 'Tài liệu hệ thống (QM/QP/WI/Biểu mẫu)', href: 'tai-lieu-he-thong.html' },
       { label: 'Phiếu thay đổi tài liệu', href: 'danh-sach-phieu-thay-doi.html' },
       { label: 'Tài liệu bên ngoài', href: 'tai-lieu-ben-ngoai.html' },
@@ -140,7 +141,7 @@
     'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },
     'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
     'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
-    'bom.html': { icon: '🧾', title: 'BOM Sản Phẩm', desc: 'Nhôm, linh kiện và luồng công đoạn theo từng phiên bản BOM', noTitleBar: true },
+    'bom.html': { icon: '🧾', title: 'BOM Sản Phẩm', desc: 'Định mức kim loại theo shot, vật tư theo công đoạn, duyệt phiên bản', noTitleBar: true },
     'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
     'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
     // T161: Quản lý công việc

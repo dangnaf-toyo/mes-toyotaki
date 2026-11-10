@@ -355,8 +355,11 @@
     </section>
 
     <!-- BOM dùng nguyên giao diện đăng ký/tra cứu hiện có, hiển thị trong Danh mục. -->
+    <section id="tab-nvl" class="tab-pane" style="display:none">
+      <iframe class="bom-frame" title="Danh mục nguyên vật liệu" data-src="bom.html?embed=1&tab=materials"></iframe>
+    </section>
     <section id="tab-bom" class="tab-pane" style="display:none">
-      <iframe class="bom-frame" title="Quản lý BOM" src="bom.html?embed=1"></iframe>
+      <iframe class="bom-frame" title="Quản lý BOM" data-src="bom.html?embed=1&tab=register"></iframe>
     </section>
 
     <!-- ── Tab Phân quyền tài liệu kỹ thuật (T62) ─────────────────────────── -->
@@ -417,7 +420,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
     btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).style.display = 'block';
+    const pane = document.getElementById('tab-' + btn.dataset.tab);
+    pane.style.display = 'block';
+    // T238: tab NVL / BOM nạp iframe khi mở lần đầu (tránh tải 2 trang BOM ngay khi vào Danh mục)
+    pane.querySelectorAll('iframe[data-src]').forEach(f => { if (!f.src) f.src = f.dataset.src; });
   });
 });
 { const t = new URLSearchParams(location.search).get('tab');   // ?tab=khuon (link từ quan-ly-khuon.html)
