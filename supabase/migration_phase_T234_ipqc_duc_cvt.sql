@@ -1,4 +1,4 @@
--- STAGING jcjbleugnclzsghfpmvk. Additive: no existing measurement or standard is rewritten.
+-- Đã chạy STAGING jcjbleugnclzsghfpmvk 10/11 + PROD 10/11/2026 (sau review, nguyên trạng). Additive: no existing measurement or standard is rewritten.
 begin;
 alter table public.ipqc_do_kq add column if not exists ma_cvt text;
 alter table public.ipqc_do_kq add constraint ipqc_do_kq_ma_cvt_check
