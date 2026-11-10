@@ -130,6 +130,10 @@
       '📦 Hoàn thành mẫu & giao QC' + (k.du_lieu && k.du_lieu.lan > 1 ? ' (lần ' + k.du_lieu.lan + ')' : ''), k.nguoi, ''));
     nk.filter(k => k.su_kien === 'cap_nhat').forEach(k => add(k.thoi_diem, 'lam', '✏️ Cập nhật nội dung sự cố', k.nguoi, diffHtml(k.thay_doi)));
     nk.filter(k => k.su_kien === 'sua_sau_dong').forEach(k => add(k.thoi_diem, 'lam', '✏️ Sửa sự cố sau khi đã đóng', k.nguoi, diffHtml(k.thay_doi)));
+    // T232: lần bấm "Xong" bị hệ thống từ chối (chưa đủ điều kiện đóng).
+    const LY_DO_TC = { can_thiep: 'chưa khai / chưa duyệt can thiệp khuôn', giao_qc: 'chưa giao QC', ipqc: 'IPQC chưa kiểm đạt', khac: 'khác' };
+    nk.filter(k => k.su_kien === 'tu_choi_dong').forEach(k => add(k.thoi_diem, 'do',
+      '⛔ Bấm Xong bị từ chối — ' + esc(LY_DO_TC[(k.du_lieu || {}).ly_do] || 'khác'), k.nguoi, ''));
     nk.filter(k => k.su_kien === 'xoa').forEach(k => add(k.thoi_diem, 'do', '🗑 Xoá 1 phần sự cố (ca ' + esc(k.ca || '') + ')', k.nguoi, ''));
 
     const x = d.to_khuon;
