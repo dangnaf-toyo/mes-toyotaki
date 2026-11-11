@@ -1,7 +1,7 @@
 -- T242: IPQC — hàng đợi hiện trạng thái "Chờ kiểm / Đang kiểm: ai, từ mấy giờ";
 --       người khác bấm Bắt đầu khi đã có người kiểm → cảnh báo, hỏi "kiểm thay?",
 --       đồng ý thì chuyển phiên sang người mới và ghi log để điều tra sau.
--- Trạng thái: ĐÃ chạy staging jcjbleugnclzsghfpmvk 11/11/2026 (test 2 tài khoản giả lập đạt); CHƯA chạy prod fgghikpzcxjqzahfiiil.
+-- Trạng thái: ĐÃ chạy staging jcjbleugnclzsghfpmvk 11/11/2026 (test 2 tài khoản giả lập đạt); ĐÃ chạy prod fgghikpzcxjqzahfiiil 11/11/2026.
 -- Phụ thuộc: T118 (duc_ipqc_inspection_session, duc_ipqc_session).
 -- Hoàn tác: supabase/rollback_T242_ipqc_dang_kiem_kiem_thay.sql
 begin;
