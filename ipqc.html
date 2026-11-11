@@ -111,6 +111,9 @@ button{cursor:pointer;font-family:inherit}
 .qcard-time{font-size:1.1rem;font-weight:700;font-family:'JetBrains Mono',monospace;display:flex;flex-direction:column;align-items:flex-end;gap:.1rem}
 .qcard-time .qt-over{font-size:.75rem;letter-spacing:.03em}
 .qcard-time .qt-dur{white-space:nowrap}
+.qcard-tt{display:inline-block;font-size:.72rem;font-weight:700;padding:.12rem .5rem;border-radius:1rem;margin-bottom:.25rem;white-space:nowrap}
+.qcard-tt.cho-kiem{background:var(--bg-sunken);color:var(--text-muted)}
+.qcard-tt.dang-kiem{background:#DBEAFE;color:#1D4ED8}
 .toast:not(.show){visibility:hidden;transition:transform .25s,visibility 0s linear .25s}
 .qcard-time.warn{color:var(--warn-fg)}
 .qcard-time.alarm{color:var(--alarm-fg)}
@@ -579,6 +582,14 @@ async function loadQueue(){
     deduped.push(...(uuTienCao.length ? uuTienCao : items));
   });
 
+  // T242: phiếu đang có người kiểm (đã bấm Bắt đầu) → gắn tên + giờ để hàng đợi hiện "Đang kiểm".
+  try {
+    const { data: phien, error: pErr } = await sb.rpc('duc_ipqc_phien_dang_kiem');
+    if (pErr) console.warn('duc_ipqc_phien_dang_kiem:', pErr.message);
+    const pMap = {}; (phien || []).forEach(p => { pMap[p.checkpoint_id] = p; });
+    deduped.forEach(cp => { cp.phien = pMap[cp.id_checkpoint] || null; });
+  } catch (e) { console.warn('duc_ipqc_phien_dang_kiem:', e.message); }
+
   const queue = deduped
     .sort((a, b) => {
       const pa = priorityOf(a), pb = priorityOf(b);
@@ -682,6 +693,9 @@ function queueCardHtml(cp){
           : ' · <span style="color:#B45309">⏳ SX chưa giao mẫu</span>') : ''}</div>
       </div>
       <div style="text-align:right">
+        ${cp.phien
+          ? `<div class="qcard-tt dang-kiem" title="Bắt đầu lúc ${escapeHtml(fmtDateTime24(cp.phien.started_at))}">🔍 Đang kiểm: ${cp.phien.la_toi ? 'bạn' : escapeHtml(cp.phien.ten_nguoi || '')} · từ ${new Date(cp.phien.started_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })}</div>`
+          : '<div class="qcard-tt cho-kiem">Chờ kiểm</div>'}
         <div class="qcard-time ${lvl === 'ok' ? '' : lvl}" title="Đã chờ ${cp.phut_da_troi} phút">${timeLabel}</div>
       </div>
       <div class="qcard-arrow">›</div>
@@ -1234,6 +1248,6 @@ async function submitCheck(ketQua){
 }
 </script>
 <script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
-<script src="shared/mes-ng-status.js?v=T141"></script><script src="shared/mes-ipqc-session.js?v=T234"></script>
+<script src="shared/mes-ng-status.js?v=T141"></script><script src="shared/mes-ipqc-session.js?v=T242"></script>
 </body>
 </html>

@@ -9,7 +9,9 @@ const MesIpqcSession = (() => {
     storePromise = null,
     persistTimer,
     loadToken = 0,
-    ready = false;
+    ready = false,
+    other = null; // T242: phiên đang thuộc người khác {ten, started_at} → hỏi "kiểm thay?"
+  const gioCua = (iso) => new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const panel = document.createElement("section");
   panel.className = "session-panel";
   panel.style.cssText = "padding:12px;border:1px solid #94a3b8;border-radius:8px;margin:12px 0";
@@ -202,6 +204,7 @@ const MesIpqcSession = (() => {
     current = null;
     ending = null;
     ready = false;
+    other = null;
     state.checkStartedAt = null;
     controls(false);
     start.hidden = false;
@@ -232,6 +235,7 @@ const MesIpqcSession = (() => {
       if (token !== loadToken || state.current?.id_checkpoint !== cp.id_checkpoint) return;
       if (r.error) throw r.error;
       current = verified(r.data, cp) || null;
+      other = !current && r.data.nguoi_khac && r.data.nguoi_khac.ten ? r.data.nguoi_khac : null;
       offset = Date.parse(r.data.server_now) - Date.now();
       state.checkStartedAt = current ? Date.parse(current.started_at) : null;
       start.hidden = !!current;
@@ -270,9 +274,11 @@ const MesIpqcSession = (() => {
         message(
           current
             ? "Phiên kiểm đã hoàn tất trên máy chủ."
-            : ready
-              ? "Máy chủ đã sẵn sàng. Bấm Bắt đầu kiểm tra khi thực sự bắt đầu."
-              : "Lần kiểm này không còn ở trạng thái chờ kiểm. Hãy tải lại danh sách.",
+            : ready && other
+              ? "⚠ " + other.ten + " đang kiểm máy này từ " + gioCua(other.started_at) + ". Bấm Bắt đầu kiểm tra nếu muốn kiểm thay (sẽ hỏi lại và ghi log)."
+              : ready
+                ? "Máy chủ đã sẵn sàng. Bấm Bắt đầu kiểm tra khi thực sự bắt đầu."
+                : "Lần kiểm này không còn ở trạng thái chờ kiểm. Hãy tải lại danh sách.",
         );
       }
       tick();
@@ -284,25 +290,37 @@ const MesIpqcSession = (() => {
   }
   start.onclick = async () => {
     if (!state.current || busy || !ready || current) return;
+    // T242: đã có người kiểm → cảnh báo, hỏi kiểm thay; đồng ý mới gọi p_kiem_thay.
+    const kiemThay = !!other;
+    if (
+      kiemThay &&
+      !confirm(
+        "ĐANG CÓ NGƯỜI KIỂM máy này:\n" + other.ten + " — bắt đầu lúc " + gioCua(other.started_at) +
+          ".\n\nBạn có muốn KIỂM THAY không?\nPhiên của " + other.ten + " sẽ chuyển sang bạn, thời gian kiểm tính lại từ bây giờ và việc kiểm thay được ghi log.",
+      )
+    )
+      return;
     busy = true;
     start.disabled = true;
     retry.disabled = true;
     const cp = state.current,
       token = loadToken;
-    message("Đang lưu thời điểm bắt đầu lên máy chủ...");
+    message(kiemThay ? "Đang chuyển phiên kiểm sang bạn..." : "Đang lưu thời điểm bắt đầu lên máy chủ...");
     try {
-      const r = await sb.rpc("duc_ipqc_session", { p_checkpoint: cp.id_checkpoint, p_start: true });
+      const r = await sb.rpc("duc_ipqc_session", { p_checkpoint: cp.id_checkpoint, p_start: true, p_kiem_thay: kiemThay });
       if (token !== loadToken || state.current?.id_checkpoint !== cp.id_checkpoint) return;
       if (r.error) throw r.error;
       const saved = verified(r.data, cp, true);
       if (saved.completed_at)
         throw { code: "INVALID_SESSION", message: "Phiên này đã hoàn tất. Hãy tải lại danh sách." };
       current = saved;
+      const tenCu = other && other.ten;
+      other = null;
       offset = Date.parse(r.data.server_now) - Date.now();
       state.checkStartedAt = Date.parse(current.started_at);
       start.hidden = true;
       controls(true);
-      message("Đã lưu thời điểm bắt đầu trên máy chủ. Bộ đếm đang chạy.");
+      message(kiemThay && tenCu ? "Đã kiểm thay " + tenCu + " (đã ghi log). Bộ đếm đang chạy." : "Đã lưu thời điểm bắt đầu trên máy chủ. Bộ đếm đang chạy.");
       await persist();
       tick();
     } catch (e) {
