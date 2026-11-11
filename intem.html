@@ -1800,6 +1800,16 @@ async function inTem(){
   if(!nguoi)return err("Chọn Người thao tác");
   if(!loai) loai="hangloat";
 
+  // T243 (R15): máy đang chạy mã khác trên bảng điều khiển → tem này sẽ KHÔNG cộng sản lượng ca. Hỏi lại trước khi in.
+  try {
+    const { data: dong } = await sb.from('duc_ca_hien_tai').select('ma_sp,ngay,ca').eq('ma_may', may);
+    if (Array.isArray(dong) && dong.length && !dong.some(r => r.ma_sp === ma)) {
+      const dangChay = [...new Set(dong.map(r => r.ma_sp).filter(Boolean))].join(', ');
+      if (!confirm("⚠ Máy " + may + " đang chạy mã " + dangChay + " trên Bảng điều khiển Đúc, không phải " + ma + ".\n\n" +
+        "Tem in ra sẽ KHÔNG được cộng vào sản lượng ca của máy. Nếu máy đã đổi mã, hãy khai 'Đổi sản phẩm' trên bảng điều khiển trước.\n\nVẫn in tem " + ma + " cho máy " + may + "?")) return;
+    }
+  } catch (e) { console.warn('kiểm tra mã máy đang chạy lỗi:', e); }
+
   setBtn(true);
   showMsg("⏳ Đang sinh Tag No và ghi dữ liệu...","wait");
 
