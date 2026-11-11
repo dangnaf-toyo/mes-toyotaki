@@ -15,7 +15,7 @@
 --   R15 duc_tem_mo_coi_ca: tem in trong ca có máy nhưng mã SP không thuộc dòng đang chạy
 --       (sản lượng ca không cộng) → hiện ở hộp kết ca; intem.html cảnh báo trước khi in.
 --   R16 F1 tự đóng (IPQC OK) ghi tách theo ca như duc_resolve_incident (duc_su_co_ghi_log_theo_ca).
--- An toàn chạy lại. Trạng thái: ĐÃ chạy STAGING 11/11/2026, test SQL rollback 9 mục đạt (R8–R16); CHƯA chạy PROD.
+-- An toàn chạy lại. Trạng thái: ĐÃ chạy STAGING + PROD 11/11/2026 (test SQL rollback 9 mục đạt trên staging).
 -- ============================================================================
 
 -- ── R9: mã bản ghi kế tiếp ───────────────────────────────────────────────────
@@ -339,7 +339,7 @@ begin
     if not found then continue; end if;
     v_new_id_dong := duc_make_id_dong((v_next->>'ngay')::date, v_next->>'ca', v_old.ma_may, v_old.ma_sp);
     v_nd := '[Chuyển tiếp từ ' || p_ca || ' ' || to_char(p_ngay, 'DD/MM/YYYY') || ']';
-    v_ghep := false;
+    v_ghep := false; v_kh_ca_moi := null; v_dich := null;   -- reset mỗi máy, tránh rò kh_ca/dòng đích của máy trước
 
     select * into v_dich from duc_ca_hien_tai where id_dong = v_new_id_dong for update;
     if found then
