@@ -690,6 +690,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     </div>
     <div class="modal-body">
       <div id="es-plan-warning" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;border-radius:6px;padding:10px 12px;font-size:12px"></div>
+      <div id="es-tem-warning" style="display:none;background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;border-radius:6px;padding:10px 12px;font-size:12px"></div>
       <div id="es-warning"style="display:none;background:#FEF3C7;border:1px solid #F59E0B;color:#B45309;border-radius:6px;padding:10px 12px;font-size:12px"></div>
 
       <div id="es-review-section" style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:#FFFBEB">
@@ -4632,6 +4633,22 @@ async function endShift(){
         '<input type="checkbox" id="es-plan-ack" onchange="capNhatNutKetCa_()" style="cursor:pointer">' +
         '<span>Trưởng ca đã kiểm tra lại danh sách máy chạy ca này</span></label>';
   } else { planWarn.style.display = 'none'; planWarn.innerHTML = ''; }
+
+  // T243 (R15): tem in trong ca có máy nhưng mã SP khác dòng đang chạy → sản lượng ca KHÔNG cộng.
+  const temWarn = document.getElementById('es-tem-warning');
+  temWarn.style.display = 'none'; temWarn.innerHTML = '';
+  try {
+    const { data: moCoi } = await sb.rpc('duc_tem_mo_coi_ca', { p_ngay: state.ngay, p_ca: state.ca, p_phuong_an_ca: state.phuongAnCa });
+    if (Array.isArray(moCoi) && moCoi.length) {
+      const tong = moCoi.reduce((a, t) => a + (Number(t.so_luong) || 0), 0);
+      temWarn.style.display = 'block';
+      temWarn.innerHTML = '⚠ <b>' + moCoi.length + ' tem (' + fmtNum(tong) + ' pcs) in trong ca với mã KHÁC mã máy đang chạy</b> — không được cộng vào sản lượng ca. ' +
+        'Kiểm tra lại: in nhầm máy / nhầm mã, hoặc máy đổi mã mà chưa khai trên bảng điều khiển.<br>' +
+        moCoi.slice(0, 8).map(t => '• ' + escapeHtml(t.tag_no) + ' · ' + escapeHtml(t.ma_may) + ' · <b>' + escapeHtml(t.ma_sp) + '</b> ' + fmtNum(t.so_luong) + ' pcs · ' + escapeHtml(t.luc) +
+          ' (máy đang chạy ' + escapeHtml(t.dang_chay || '—') + ')').join('<br>') +
+        (moCoi.length > 8 ? '<br>… và ' + (moCoi.length - 8) + ' tem nữa' : '');
+    }
+  } catch (e) { console.error('duc_tem_mo_coi_ca lỗi:', e); }
 
   const list = document.getElementById('es-machine-list');
   list.innerHTML = '';
