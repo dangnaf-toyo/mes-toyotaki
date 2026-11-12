@@ -120,7 +120,7 @@
   </div>
   <div class="ft">
     <span class="hint">Bộ đếm shot tự reset khi check sheet bảo dưỡng hoàn thành ĐẠT.</span>
-    <button type="button" class="kb dg" data-act="cfg-del">🗑 Xoá khuôn</button>
+    <button type="button" class="kb dg" data-act="cfg-del">Xoá khuôn</button>
     <button type="button" class="kb ol" data-close>Huỷ</button>
     <button type="button" class="kb" data-act="cfg-save">Lưu</button>
   </div>
@@ -292,9 +292,9 @@
           '<td><span class="st ' + cls + '">' + escapeHtml(m.trang_thai_khuon) + '</span>' + issTag + '</td>' +
           '<td class="act">' +
             (admin && nhieuKhuon ? '<button type="button" class="kb ol sm" data-ut="' + mk + '" title="Thứ tự ưu tiên các khuôn của mã ' + escapeHtml(m.ma_sp) + '">⇅ Ưu tiên</button> ' : '') +
-            (admin ? '<button type="button" class="kb ol sm" data-tt="' + mk + '">🏷 Tình trạng</button> ' : '') +
+            (admin ? '<button type="button" class="kb ol sm" data-tt="' + mk + '">Tình trạng</button> ' : '') +
             '<a class="kb ol sm" href="van-de-khuon.html?khuon=' + encodeURIComponent(m.ma_khuon) + '&tab=lich-su" title="Lịch sử sự cố + IPQC NG của khuôn">🔎 Vấn đề</a> ' +
-            (admin ? '<button type="button" class="kb ol sm" data-cfg="' + mk + '">✏ Sửa</button> ' : '') +
+            (admin ? '<button type="button" class="kb ol sm" data-cfg="' + mk + '">Sửa</button> ' : '') +
             '<a class="kb ol sm" href="linh-kien-khuon.html?tab=khuon&khuon=' + encodeURIComponent(m.ma_khuon) + '" title="Linh kiện dự phòng của khuôn">🔩 Linh kiện</a> ' +
             '<a class="kb ol sm" href="quan-ly-khuon.html?tab=mau&khuon=' + encodeURIComponent(m.ma_khuon) + '" data-gomau="' + mk + '">📋 Hạng mục</a></td></tr>';
       }).join('');

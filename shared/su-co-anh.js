@@ -109,7 +109,7 @@
     const err = msg => (opts.onError ? opts.onError(msg) : alert(msg));
     container.innerHTML =
       '<div class="sca"><div class="sca-h"><span>📷 ' + esc(opts.title || LABEL[p.kind]) + ' <span class="cnt"></span></span><span class="sp"></span>' +
-      '<button type="button" class="sca-b" data-pick="cam">📷 Chụp</button><button type="button" class="sca-b" data-pick="album">🖼 Chọn ảnh</button></div>' +
+      '<button type="button" class="sca-b" data-pick="cam">Chụp</button><button type="button" class="sca-b" data-pick="album">Chọn ảnh</button></div>' +
       '<input type="file" accept="image/*" capture="environment" hidden data-in="cam">' +
       '<input type="file" accept="image/*" multiple hidden data-in="album">' +
       '<div class="sca-g"></div><div class="sca-busy" hidden>⏳ Đang tải ảnh lên...</div>' +

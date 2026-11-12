@@ -117,7 +117,7 @@ const IqcChemicalStandard = (() => {
           (r.required ? " checked" : "") +
           '></td><td><button type="button" data-remove="' +
           i +
-          '">Xóa</button></td></tr>',
+          '">Xoá</button></td></tr>',
       )
       .join("");
     el("iqcTcRows")

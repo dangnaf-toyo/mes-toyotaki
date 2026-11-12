@@ -126,7 +126,7 @@
       LANS.map(x => '<option value="' + x.k + '">' + x.l + '</option>').join('') + '</select></label>' +
       '<label>Khách hàng <select data-k="kh"><option value="">Tất cả</option></select></label>' +
       '<span style="flex:1"></span><span data-o="msg"></span>' +
-      '<button type="button" class="btn" data-act="cfg">🔒 CL &amp; mục tiêu</button>' +
+      '<button type="button" class="btn" data-act="cfg">CL &amp; mục tiêu</button>' +
       '</div>' +
       '<div data-o="cfg" style="display:none"></div>' +
       '<div class="row" data-o="kpi"></div>' +

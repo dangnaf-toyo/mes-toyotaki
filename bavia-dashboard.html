@@ -475,6 +475,7 @@ function parseTagNo(raw) {
 // Thông báo lỗi dễ hiểu cho công nhân, chi tiết kỹ thuật để trong <details>.
 function loiDeHieu(e) {
   const m = String((e && e.message) || e || '');
+  if (MesLoi.daDich(m)) return { t: m, d: MesLoi.chiTiet(e) === m ? '' : MesLoi.chiTiet(e) };   // T242: đã dịch từ shared/supabase-client.js
   if (/Failed to fetch|NetworkError|network/i.test(m)) return { t: 'Mất kết nối mạng. Kiểm tra wifi rồi thử lại.', d: m };
   if (/permission denied|42501|JWT|not authorized/i.test(m)) return { t: 'Phiên đăng nhập hết hạn hoặc thiếu quyền. Đăng nhập lại.', d: m };
   if (/Tem Đúc đang dùng còn thiếu/.test(m)) return { t: m.replace(/^.*?(Tem Đúc)/, '$1'), d: '' };
@@ -749,7 +750,7 @@ function renderWs() {
     '<div class="card"><div class="ws-head">' +
       '<div class="ws-id"><div class="l1"><b>' + esc(l.ten_line) + '</b>' + dangChip + (khoa ? '<span class="chip mute">Ca đã kết</span>' : '') + '</div>' +
         '<div class="l2"><span class="mono">' + esc(l.ma_sp) + '</span> · ' + esc(l.ten_sp || '') + (info.ten_khach_hang ? ' · ' + esc(info.ten_khach_hang) : '') +
-        (!khoa ? ' <button class="link-btn" type="button" id="btnEditLine">Sửa Line</button>' : '') + '</div>' +
+        (!khoa ? ' <button class="link-btn" type="button" id="btnEditLine">Sửa line</button>' : '') + '</div>' +
         (route ? '<div class="route">' + route + '</div>' : '<div class="flash bad">' + esc(info.error || '') + '</div>') + '</div>' +
       '<div class="ops"><span class="lab">Người thao tác</span><div class="list">' +
         (ops.map(p => '<span class="person"><span class="av">' + esc(initials(p)) + '</span>' + esc(p) + '</span>').join('') || '<span class="chip warn">Chưa gán người</span>') + '</div></div>' +

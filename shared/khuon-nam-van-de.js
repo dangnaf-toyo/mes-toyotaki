@@ -121,7 +121,7 @@
         '<div class="knvd-f"><label><input type="checkbox" class="knvd-cb"> Tôi đã nắm các vấn đề trên và biện pháp xử lý, sẽ lưu ý khi sản xuất.</label>' +
           '<div class="knvd-err" hidden></div>' +
           '<div class="act"><button type="button" class="huy">Huỷ — chưa lên khuôn</button>' +
-          '<button type="button" class="ok" disabled>✅ Đã nắm thông tin — lên khuôn</button></div></div>' +
+          '<button type="button" class="ok" disabled>✓ Đã nắm thông tin — lên khuôn</button></div></div>' +
       '</div>';
       document.body.appendChild(mask);
       const cb = mask.querySelector('.knvd-cb'), ok = mask.querySelector('.ok'), err = mask.querySelector('.knvd-err');
