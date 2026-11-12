@@ -18,6 +18,9 @@
   (5) Bảng công việc — việc công khai đang mở theo nhóm ưu tiên (T168, RPC wallboard_cong_viec, 60 giây).
   Số liệu: RPC tong_quan_hom_nay + shared/tong-quan.js (chung với index.html), tải lại
   mỗi 60 giây, tải lại cả trang mỗi 6 giờ cho TV chạy lâu không bị đầy bộ nhớ.
+  (6) Xưởng sau Đúc — Bavia / Gia công / Sơn ngay lúc này, (7) NVL & Kho thành phẩm: T245, hiện khi có
+  số liệu; hiện tại chỉ có ở chế độ DEMO (?demo=1, shared/tong-quan-demo.js sinh số bám theo Đúc thật)
+  để hình dung wallboard khi MES phủ toàn bộ công đoạn. Không có ?demo thì công đoạn chưa lên MES hiện xám.
   Script viết kiểu cũ (không ?. ??) cho trình duyệt TV đời cũ.
 -->
 <style>
@@ -29,7 +32,7 @@
   .scr.off{opacity:0;pointer-events:none}
   .hd{display:flex;align-items:center;gap:28px}
   .hd .co{font-size:18px;letter-spacing:.14em;color:#8EA0BC;font-weight:700}
-  .hd .ti{font-size:40px;font-weight:800;line-height:1.1}
+  .hd .ti{font-size:40px;font-weight:800;line-height:1.1;white-space:nowrap}
   .pill{background:#1E3A5F;color:#BFDBFE;font-size:24px;font-weight:700;padding:8px 18px;border-radius:10px}
   .dots{display:flex;gap:10px}.dots span{width:44px;height:8px;border-radius:4px;background:#33415C}.dots span.on{background:#E6EDF7}
   .clk{text-align:right;line-height:1}.clk .d{font-size:20px;color:#8EA0BC;font-weight:600}.clk .t{font-size:64px;font-weight:800;letter-spacing:-.02em}
@@ -70,6 +73,14 @@
   #fs:hover,#fs:focus-visible{background:#1E3A5F;outline:2px solid #60A5FA;outline-offset:2px}
   #fs.an{opacity:0;pointer-events:none}
   body.idle{cursor:none}
+  .demo{background:#4C1D95;color:#DDD6FE;font-size:22px;font-weight:800;letter-spacing:.12em;padding:8px 16px;border-radius:8px;white-space:nowrap}
+  .stg .nm{font-size:24px;font-weight:800;white-space:nowrap}
+  .stg .bg{font-size:34px;font-weight:800;line-height:1}
+  .stg .sm{font-size:16px;color:#8EA0BC;line-height:1.25}
+  .lc{display:flex;flex-direction:column;gap:2px;padding:6px 10px;border-radius:10px;background:#13233A;border-left:8px solid #22C55E;min-height:0;overflow:hidden}
+  .lc.warn{background:#2A2210;border-left-color:#F59E0B}.lc.alarm{background:#2B1216;border-left-color:#EF4444}.lc.idle{background:#151C2B;border-left-color:#5B6B86;color:#6B7C99}
+  .lc .n{font-size:21px;font-weight:800;white-space:nowrap}.lc .p{font-size:20px;font-weight:800}.lc .sp{font-size:15px;color:#B6C3D8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lc .bar{height:6px}.lc .st{font-size:14px;font-weight:800;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kv{display:flex;justify-content:space-between;align-items:baseline;font-size:22px}.kv b{font-size:30px;font-weight:800}
   #adm{position:fixed;left:12px;right:12px;bottom:12px;background:#F8FAFC;color:#0F172A;border-radius:10px;padding:12px 16px;font-size:14px;display:none;z-index:9;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   #adm input{width:100%;font:inherit;padding:6px 8px;margin-top:6px;box-sizing:border-box}
   #adm button{font:inherit;font-weight:600;padding:6px 12px;margin-top:8px;margin-right:6px;min-height:36px;cursor:pointer}
@@ -83,6 +94,8 @@
   <section class="scr off" id="s3"></section>
   <section class="scr off" id="s4"></section>
   <section class="scr off" id="s5"></section>
+  <section class="scr off" id="s6"></section>
+  <section class="scr off" id="s7"></section>
 </div>
 <button type="button" id="fs" style="display:none" aria-label="Phóng to toàn màn hình"></button>
 <div id="adm"></div>
@@ -90,12 +103,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/tong-quan.js?v=T180"></script>
+<script src="shared/tong-quan-demo.js?v=T245"></script>
 <script>
 (function () {
-  var KHOA = new URLSearchParams(location.search).get('k');
+  var QS = new URLSearchParams(location.search), KHOA = QS.get('k'), DEMO = QS.get('demo') === '1';
   var P = TongQuan.pct, N = TongQuan.fmtN;
   var M = null, PC = null, CVD = null, cur = 0;
-  var SCR = ['s1', 's2', 's3', 's4', 's5'];
+  var SCR = ['s1', 's2', 's3', 's4', 's5', 's6', 's7'];
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function cls(p) { return p == null ? 'mu' : p >= 0.95 ? 'g' : p >= 0.85 ? 'a' : 'r'; }
@@ -141,7 +155,7 @@
   function header(title, idx) {
     var c = M.ca, wd = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(M.ngay + 'T00:00:00').getDay()];
     return '<header class="hd"><div style="display:flex;flex-direction:column"><span class="co">TOYOTAKI · NHÀ MÁY ĐÚC</span><span class="ti">' + title + '</span></div>' +
-      (c ? '<span class="pill">' + esc(c.nhan) + '</span>' : '') +
+      (c ? '<span class="pill">' + esc(c.nhan) + '</span>' : '') + (DEMO ? '<span class="demo" title="Số công đoạn chưa lên MES là mô phỏng">DEMO</span>' : '') +
       '<div style="margin-left:auto;display:flex;align-items:center;gap:26px"><div class="dots">' + coMan().map(function (i) { return '<span class="' + (idx === i ? 'on' : '') + '"></span>'; }).join('') + '</div>' +
       '<div class="clk"><div class="d">' + wd + ' ' + TongQuan.ddmm(M.ngay) + '</div><div class="t mono clock">' + TongQuan.hm(new Date()) + '</div></div></div></header>';
   }
@@ -193,40 +207,128 @@
       '</div></div></div>' + footer('Tự cập nhật mỗi 60 giây · màn tiếp theo sau 20 giây');
   }
 
+  // ---------- Màn 2: Dòng chảy toàn nhà máy (T245: đủ công đoạn; chưa có số liệu → xám) ----------
   function render2() {
-    var du = M.duc, h = du.homNay;
+    var du = M.duc, h = du.homNay, X = M.demo;
     var frac = du.khNgay > 0 ? Math.min(1, du.khDenGio / du.khNgay) : 0;
     var pD = du.pNgay;
-    var arrow = '<div style="display:flex;align-items:center;width:44px;justify-content:center"><svg width="40" height="20" viewBox="0 0 44 20" fill="none" stroke="#5B6B86" stroke-width="3"><path d="M0 10h38M30 2l8 8-8 8"></path></svg></div>';
+    var arrow = '<div style="display:flex;align-items:center;width:30px;justify-content:center"><svg width="26" height="18" viewBox="0 0 44 20" fill="none" stroke="#5B6B86" stroke-width="3"><path d="M0 10h38M30 2l8 8-8 8"></path></svg></div>';
+    var mau = function (p) { return p == null ? '#33415C' : p >= 0.95 ? '#22C55E' : p >= 0.85 ? '#F59E0B' : '#EF4444'; };
+    var mauNg = function (p, mt) { return p == null ? '#33415C' : p > mt ? '#EF4444' : '#22C55E'; };
+    // Ô công đoạn: tên, số lớn, dòng nhỏ, thanh tiến độ (tt/kh + vạch = phải đạt đến giờ)
+    function stg(ten, bd, so, nho, tt, kh, fr) {
+      return '<div class="stg" style="border-top-color:' + bd + '"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="nm">' + ten + '</span>' +
+        (kh ? '<span class="mono ' + cls(tt / Math.max(1, kh * fr)) + '" style="font-size:22px;font-weight:800">' + Math.round(tt / kh * 100) + '%</span>' : '') + '</div>' +
+        '<span class="mono bg">' + so + '</span><span class="sm">' + nho + '</span>' +
+        (kh ? '<div class="trk" style="height:12px"><i style="width:' + Math.min(100, tt / kh * 100).toFixed(1) + '%"></i><b style="left:' + (fr * 100).toFixed(1) + '%"></b></div>' : '') + '</div>';
+    }
+    function off(ten) { return '<div class="stg off"><span class="nm">' + ten + '</span><span style="font-size:18px">Chưa lên MES</span></div>'; }
     var st = [];
-    st.push('<div class="stg" style="border-top-color:' + (pD == null ? '#33415C' : pD >= 0.95 ? '#22C55E' : pD >= 0.85 ? '#F59E0B' : '#EF4444') + '"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:28px;font-weight:800">Đúc</span><span class="mono ' + cls(pD) + '" style="font-size:26px;font-weight:800">' + (pD == null ? '—' : Math.round(pD * 100) + '%') + '</span></div>' +
-      '<span class="mono" style="font-size:40px;font-weight:800;line-height:1">' + N(h.tt) + '</span><span class="mono mu" style="font-size:18px">KH ngày ' + N(du.khNgay) + '</span>' +
-      '<div class="trk"><i style="width:' + (du.khNgay ? Math.min(100, h.tt / du.khNgay * 100) : 0).toFixed(1) + '%"></i><b style="left:' + (frac * 100).toFixed(1) + '%"></b></div></div>');
-    M.chuaTrienKhai.forEach(function (n) { st.push('<div class="stg off"><span style="font-size:28px;font-weight:800">' + n + '</span><span style="font-size:20px">Chưa triển khai MES</span></div>'); });
-    st.push('<div class="stg" style="border-top-color:' + (M.oqc.pct == null ? '#33415C' : M.oqc.pct > M.oqc.mt ? '#EF4444' : '#22C55E') + '"><span style="font-size:28px;font-weight:800">OQC</span><span class="mono" style="font-size:40px;font-weight:800;line-height:1">' + N(M.oqc.n) + '</span><span class="mu" style="font-size:18px">đã kiểm · NG <b class="mono ' + (M.oqc.pct != null && M.oqc.pct > M.oqc.mt ? 'r' : 'g') + '">' + P(M.oqc.pct, 1) + '</b></span></div>');
-    st.push('<div class="stg" style="border-top-color:#60A5FA"><span style="font-size:28px;font-weight:800">Nhập kho</span><span class="mono" style="font-size:40px;font-weight:800;line-height:1">' + N(M.nhapKho) + '</span><span class="mu" style="font-size:18px">pcs từ 06:00</span></div>');
+    if (X) st.push(stg('NVL · Lò', '#60A5FA', N(X.nvl.capLoKg) + ' kg', 'nhôm lỏng cấp lò · IQC chờ ' + X.nvl.iqc.choKiem + ' lô', 0, 0, 0));
+    else st.push(off('NVL · IQC'));
+    st.push(stg('Đúc', mau(pD), N(h.tt), 'KH ngày ' + N(du.khNgay), h.tt, du.khNgay, frac));
+    if (X) {
+      st.push(stg('Bavia', mau(X.bavia.tt / Math.max(1, X.bavia.kh * X.frac)), N(X.bavia.tt), 'KH ' + N(X.bavia.kh) + ' · NG ' + P(X.bavia.ngPct, 1), X.bavia.tt, X.bavia.kh, X.frac));
+      st.push(stg('Gia công', mau(X.gc.tt / Math.max(1, X.gc.kh * X.frac)), N(X.gc.tt), 'KH ' + N(X.gc.kh) + ' · NG ' + P(X.gc.ngPct, 1), X.gc.tt, X.gc.kh, X.frac));
+      st.push(stg('Sơn', mau(X.son.tt / Math.max(1, X.son.kh * X.frac)), N(X.son.tt), 'KH ' + N(X.son.kh) + ' · NG ' + P(X.son.ngPct, 1), X.son.tt, X.son.kh, X.frac));
+      st.push(stg('OQC', mauNg(X.oqc.pct, X.oqc.mt), N(X.oqc.n), 'đã kiểm · NG ' + P(X.oqc.pct, 1) + ' · chờ ' + N(X.oqc.choKiem), 0, 0, 0));
+      st.push(stg('Kho TP', '#60A5FA', N(X.kho.nhap), 'nhập · ' + X.kho.pallet + ' pallet · tồn ' + N(X.kho.ton), 0, 0, 0));
+      st.push(stg('Xuất hàng', '#60A5FA', N(X.kho.xuat), X.kho.xeHomNay + ' chuyến · ' + X.kho.khach.length + ' khách', 0, 0, 0));
+    } else {
+      M.chuaTrienKhai.forEach(function (n) { st.push(off(n)); });
+      st.push(stg('OQC', mauNg(M.oqc.pct, M.oqc.mt), N(M.oqc.n), 'đã kiểm · NG ' + P(M.oqc.pct, 1), 0, 0, 0));
+      st.push(stg('Nhập kho', '#60A5FA', N(M.nhapKho), 'pcs từ 06:00', 0, 0, 0));
+    }
 
-    var ql = [['Đúc', du.ngPct, du.ngMt], ['OQC', M.oqc.pct, M.oqc.mt]];
+    var ql = [['Đúc', du.ngPct, du.ngMt]];
+    if (X) ql.push(['Bavia', X.bavia.ngPct, X.bavia.ngMt], ['Gia công', X.gc.ngPct, X.gc.ngMt], ['Sơn', X.son.ngPct, X.son.ngMt], ['OQC', X.oqc.pct, X.oqc.mt]);
+    else ql.push(['OQC', M.oqc.pct, M.oqc.mt]);
     var qmx = Math.max(0.04, Math.max.apply(null, ql.map(function (r) { return Math.max(r[1] || 0, r[2]); }))) * 1.15;
-    var dl = M.dung.list.slice(0, 6), dmx = dl.length ? dl[0].phut || 1 : 1;
-    var acts = M.actions.slice(0, 5);
+    var dl = M.dung.list.slice(0, X ? 4 : 6), dmx = dl.length ? dl[0].phut || 1 : 1;
+    var acts = M.actions.slice(0, X ? 4 : 5);
+    var wip = X ? X.wip : [];
+    var dem = [['Máy dừng', M.dung.dangDung.length + (X ? X.gc.dem.alarm : 0)], ['IPQC chưa xử lý', M.ipqc.length + (X ? X.gc.ipqcTre : 0)], ['NCP mở', M.ncp.length]];
     $('s2').innerHTML = header('Dòng chảy &amp; chất lượng hôm nay', 1) +
-      '<section class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:16px"><div style="display:flex;align-items:baseline;gap:18px"><h2>Dòng chảy công đoạn</h2><span class="sub">thực tế hôm nay / kế hoạch ngày · vạch trắng = phải đạt đến giờ này</span></div>' +
+      '<section class="panel" style="padding:18px 22px;display:flex;flex-direction:column;gap:12px"><div style="display:flex;align-items:baseline;gap:18px"><h2>Dòng chảy công đoạn</h2><span class="sub">thực tế hôm nay / kế hoạch ngày · vạch trắng = phải đạt đến giờ này</span></div>' +
       '<div style="display:flex;align-items:stretch">' + st.join(arrow) + '</div></section>' +
       '<div class="row3">' +
-      '<div class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:18px"><h2>NG% hôm nay so mục tiêu</h2>' +
-      ql.map(function (r) { return '<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:26px;font-weight:700">' + r[0] + '</span><span class="mono ' + (r[1] == null ? 'mu' : r[1] > r[2] ? 'r' : 'g') + '" style="font-size:28px;font-weight:800">' + P(r[1], 1) + ' / ' + P(r[2], 1) + '</span></div>' +
-        '<div class="trk" style="height:20px">' + (r[1] != null ? '<i style="width:' + (r[1] / qmx * 100).toFixed(1) + '%;background:' + (r[1] > r[2] ? '#EF4444' : '#60A5FA') + '"></i>' : '') + '<b style="left:' + (r[2] / qmx * 100).toFixed(1) + '%"></b></div></div>'; }).join('') +
-      '<div class="mu" style="font-size:20px">Bavia · Gia công · Sơn: chưa triển khai MES</div>' +
+      '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:12px"><h2>NG% hôm nay so mục tiêu</h2>' +
+      ql.map(function (r) { return '<div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:24px;font-weight:700">' + r[0] + '</span><span class="mono ' + (r[1] == null ? 'mu' : r[1] > r[2] ? 'r' : 'g') + '" style="font-size:26px;font-weight:800">' + P(r[1], 1) + ' / ' + P(r[2], 1) + '</span></div>' +
+        '<div class="trk" style="height:16px">' + (r[1] != null ? '<i style="width:' + (r[1] / qmx * 100).toFixed(1) + '%;background:' + (r[1] > r[2] ? '#EF4444' : '#60A5FA') + '"></i>' : '') + '<b style="left:' + (r[2] / qmx * 100).toFixed(1) + '%"></b></div></div>'; }).join('') +
+      (X ? '' : '<div class="mu" style="font-size:20px">Bavia · Gia công · Sơn: chưa lên MES</div>') +
       '<div style="margin-top:auto;font-size:22px;font-weight:700" class="' + (M.oqc.ucl.length ? 'r' : 'g') + '">P-Chart OQC: ' + (M.oqc.ucl.length ? M.oqc.ucl.length + ' mã vượt UCL' : 'không mã nào vượt UCL') + '</div></div>' +
-      '<div class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:14px"><h2>Dừng máy theo nguyên nhân</h2>' +
-      (dl.length ? dl.map(function (x, i) { return '<div style="display:grid;grid-template-columns:220px minmax(0,1fr) 110px;align-items:center;gap:14px"><span style="font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.loai) + '</span><span style="height:26px;border-radius:5px;background:#1A2540"><span style="display:block;height:100%;border-radius:5px;width:' + (x.phut / dmx * 100).toFixed(0) + '%;background:' + (i === 0 ? '#EF4444' : '#3B5784') + '"></span></span><span class="mono" style="font-size:26px;font-weight:800;text-align:right">' + N(x.phut) + '′</span></div>'; }).join('') : '<div class="sub">Chưa có sự cố hôm nay.</div>') +
-      '<div class="mu" style="margin-top:auto;font-size:20px">Tổng ' + N(M.dung.phut) + ' phút · ' + M.dung.n + ' sự cố</div></div>' +
-      '<div class="panel" style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;border-color:#713F12"><h2 class="a">Việc đang mở</h2>' +
+      '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:12px"><h2>Dừng máy theo nguyên nhân</h2>' +
+      (dl.length ? dl.map(function (x, i) { return '<div style="display:grid;grid-template-columns:220px minmax(0,1fr) 110px;align-items:center;gap:14px"><span style="font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.loai) + '</span><span style="height:24px;border-radius:5px;background:#1A2540"><span style="display:block;height:100%;border-radius:5px;width:' + (x.phut / dmx * 100).toFixed(0) + '%;background:' + (i === 0 ? '#EF4444' : '#3B5784') + '"></span></span><span class="mono" style="font-size:26px;font-weight:800;text-align:right">' + N(x.phut) + '′</span></div>'; }).join('') : '<div class="sub">Chưa có sự cố hôm nay.</div>') +
+      '<div class="mu" style="font-size:20px">Tổng ' + N(M.dung.phut) + ' phút · ' + M.dung.n + ' sự cố Đúc' + (X ? ' · Gia công ' + X.gc.dem.alarm + ' máy dừng' : '') + '</div>' +
+      (wip.length ? '<h2 style="margin-top:auto">Tồn giữa công đoạn</h2>' + wip.map(function (w) { var qua = w.sl > w.mt; return '<div class="kv"><span>' + w.tu + ' → ' + w.den + '</span><b class="mono ' + (qua ? 'a' : 'w') + '">' + N(w.sl) + '<span class="mu" style="font-size:16px;font-weight:600"> / ' + N(w.mt) + '</span></b></div>'; }).join('') : '') + '</div>' +
+      '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:12px;border-color:#713F12"><h2 class="a">Việc đang mở</h2>' +
       '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">' +
-      [['Máy dừng', M.dung.dangDung.length], ['IPQC chưa xử lý', M.ipqc.length], ['NCP mở', M.ncp.length]].map(function (c) { return '<div style="background:#1A2540;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column"><span class="mono ' + (c[1] ? 'a' : 'g') + '" style="font-size:48px;font-weight:800;line-height:1">' + c[1] + '</span><span style="font-size:18px;color:#B6C3D8">' + c[0] + '</span></div>'; }).join('') + '</div>' +
-      acts.map(function (x) { return '<div style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:10px;background:#1A1A22"><span style="width:14px;height:14px;border-radius:99px;flex:none;background:' + (x.muc <= 1 ? '#EF4444' : '#F59E0B') + '"></span><span style="flex:1;min-width:0;font-size:21px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.t) + '</span><span class="mono ' + (x.muc <= 1 ? 'r' : 'a') + '" style="font-size:24px;font-weight:800">' + esc(x.tuoi) + '</span></div>'; }).join('') +
+      dem.map(function (c) { return '<div style="background:#1A2540;border-radius:10px;padding:10px 14px;display:flex;flex-direction:column"><span class="mono ' + (c[1] ? 'a' : 'g') + '" style="font-size:44px;font-weight:800;line-height:1">' + c[1] + '</span><span style="font-size:18px;color:#B6C3D8">' + c[0] + '</span></div>'; }).join('') + '</div>' +
+      acts.map(function (x) { return '<div style="display:flex;align-items:center;gap:14px;padding:9px 12px;border-radius:10px;background:#1A1A22"><span style="width:14px;height:14px;border-radius:99px;flex:none;background:' + (x.muc <= 1 ? '#EF4444' : '#F59E0B') + '"></span><span style="flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.t) + '</span><span class="mono ' + (x.muc <= 1 ? 'r' : 'a') + '" style="font-size:22px;font-weight:800">' + esc(x.tuoi) + '</span></div>'; }).join('') +
       '</div></div>' + footer('Tự cập nhật mỗi 60 giây · màn tiếp theo sau 20 giây');
+  }
+
+  // ---------- Màn 6 (T245): Xưởng sau Đúc — Bavia / Gia công / Sơn ngay lúc này ----------
+  function render6() {
+    var X = M.demo; if (!X) { $('s6').innerHTML = ''; return; }
+    var B = X.bavia, G = X.gc, S = X.son;
+    function the(m, ten, gon) {
+      return '<div class="lc ' + m.st + '"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="n">' + esc(ten) + '</span><span class="p mono ' + (m.pct == null ? 'mu' : cls(m.pct)) + '">' + (m.pct == null ? '—' : Math.round(m.pct * 100) + '%') + '</span></div>' +
+        '<span class="sp mono">' + esc(m.sp || '') + (m.kh ? ' · ' + N(m.tt) + (gon ? '' : ' / ' + N(m.kh)) : '') + '</span>' +
+        '<span class="bar"><i style="width:' + Math.min(100, (m.pct || 0) * 100).toFixed(0) + '%"></i></span>' +
+        '<span class="st ' + (m.st === 'alarm' ? 'r' : m.st === 'warn' ? 'a' : m.st === 'idle' ? 'mu' : 'g') + '">' + esc(m.nhan) + '</span></div>';
+    }
+    var kp = [
+      ['Bavia hôm nay', N(B.tt), 'w', Math.round(B.tt / B.kh * 100) + '% KH (' + N(B.kh) + ') · NG ' + P(B.ngPct, 1), bd(B.tt / Math.max(1, B.kh * X.frac))],
+      ['Gia công hôm nay', N(G.tt), 'w', Math.round(G.tt / G.kh * 100) + '% KH (' + N(G.kh) + ') · NG ' + P(G.ngPct, 1), bd(G.tt / Math.max(1, G.kh * X.frac))],
+      ['Sơn hôm nay', N(S.tt), 'w', Math.round(S.tt / S.kh * 100) + '% KH (' + N(S.kh) + ') · NG ' + P(S.ngPct, 1), S.ngPct > S.ngMt ? 'bg-r' : bd(S.tt / Math.max(1, S.kh * X.frac))],
+      ['Máy dừng sau Đúc', String(G.dem.alarm), G.dem.alarm ? 'r' : 'g', G.dem.alarm ? 'Gia công cần hỗ trợ' : 'không máy nào dừng', G.dem.alarm ? 'bg-r' : 'bg-g'],
+    ];
+    $('s6').innerHTML = header('Xưởng sau Đúc ngay lúc này', 5) +
+      '<div class="k4">' + kp.map(function (k) { return '<div class="panel kp ' + k[4] + '"><span class="l">' + k[0] + '</span><span class="v mono ' + k[2] + '">' + esc(k[1]) + '</span><span class="s mono">' + esc(k[3]) + '</span></div>'; }).join('') + '</div>' +
+      '<div style="flex:1;min-height:0;display:grid;grid-template-columns:560px minmax(0,1fr) 440px;gap:18px">' +
+      '<div class="panel" style="padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-height:0"><div style="display:flex;align-items:baseline;gap:12px"><h2>Bavia</h2><span class="sub">' + B.nguoi + ' người · 13 line</span>' +
+      '<span style="margin-left:auto;font-size:18px;font-weight:700"><span class="g">Chạy ' + B.lines.filter(function (l) { return l.st === 'run'; }).length + '</span> · <span class="a">Chờ hàng ' + B.lines.filter(function (l) { return l.st === 'warn'; }).length + '</span></span></div>' +
+      '<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:8px">' + B.lines.slice(0, 12).map(function (l) { return the(l, l.ten.replace('LINE ', 'L'), true); }).join('') + '</div>' +
+      '<div style="display:flex;gap:14px;font-size:18px"><span class="' + (B.phunBi[0].st === 'run' ? 'g' : 'a') + '">● Phun bi 1 · ' + B.phunBi[0].me + ' mẻ</span><span class="' + (B.phunBi[1].st === 'run' ? 'g' : 'a') + '">● Phun bi 2 · ' + B.phunBi[1].me + ' mẻ</span><span class="mu">Máy mài ' + B.mai.dang + '/' + B.mai.tong + '</span><span class="mu" style="margin-left:auto">Đánh bóng kẽm ' + N(B.kem.tt) + '/' + N(B.kem.kh) + '</span></div></div>' +
+      '<div class="panel" style="padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-height:0"><div style="display:flex;align-items:baseline;gap:12px"><h2>Gia công CNC</h2><span class="sub">' + G.nguoi + ' người + ' + G.vatMep + ' vát mép · 30 máy</span>' +
+      '<span style="margin-left:auto;font-size:18px;font-weight:700"><span class="g">Chạy ' + G.dem.run + '</span> · <span class="a">Đổi jig ' + G.dem.warn + '</span> · <span class="r">Sự cố ' + G.dem.alarm + '</span> · <span class="mu">Nghỉ ' + G.dem.idle + '</span></span></div>' +
+      '<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:8px">' + G.may.map(function (m) { return the(m, m.may); }).join('') + '</div></div>' +
+      '<div class="panel" style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-height:0;border-color:' + (S.ngPct > S.ngMt ? '#7F1D1D' : '#22304A') + '"><div style="display:flex;align-items:baseline;gap:12px"><h2>Sơn</h2><span class="sub">' + S.nguoi + ' người · 1 dây chuyền</span></div>' +
+      '<div style="font-size:20px;font-weight:700" class="mono">' + esc(S.sp) + ' <span class="mu" style="font-weight:600">· ' + S.loai + '</span></div>' +
+      [['Tiền xử lý hoá chất', N(S.tienXuLy.tt) + ' / ' + N(S.tienXuLy.kh)], ['Sấy khô', S.say.nhiet + '°C · đang chạy'], ['Tồn chờ sơn', N(S.choSon) + ' pcs'], ['Masking', N(S.masking.tt) + ' xong · chờ ' + N(S.masking.cho)], ['Lượt treo hôm nay', String(S.luotTreo)], ['Sơn tiêu hao', N(S.kgSon) + ' kg · bay ' + Math.round(S.haoSon * 100) + '%']]
+        .map(function (r) { return '<div class="kv"><span class="mu" style="font-size:19px">' + r[0] + '</span><b class="mono" style="font-size:24px">' + r[1] + '</b></div>'; }).join('') +
+      '<div style="margin-top:auto;padding:12px 14px;border-radius:10px;background:' + (S.ngPct > S.ngMt ? '#2B1216' : '#13233A') + '"><div class="kv"><span style="font-size:22px;font-weight:700">NG Sơn hôm nay</span><b class="mono ' + (S.ngPct > S.ngMt ? 'r' : 'g') + '" style="font-size:40px">' + P(S.ngPct, 1) + '</b></div><div class="mu" style="font-size:18px">' + N(S.ng) + ' / ' + N(S.tt) + ' pcs · mục tiêu ' + P(S.ngMt, 0) + '</div></div></div>' +
+      '</div>' + footer('Bavia / Gia công / Sơn: số mô phỏng theo sản lượng Đúc hôm qua và quy trình công đoạn từng mã · tự cập nhật mỗi 60 giây');
+  }
+
+  // ---------- Màn 7 (T245): NVL & Kho thành phẩm ----------
+  function render7() {
+    var X = M.demo; if (!X) { $('s7').innerHTML = ''; return; }
+    var V = X.nvl, K = X.kho, tMax = Math.max.apply(null, V.ton.map(function (t) { return t.kg; })) || 1, kMax = K.khach[0][1] || 1;
+    var kp = [
+      ['Nhôm lỏng cấp lò', N(V.capLoKg) + ' kg', 'w', 'từ 06:00 · kẽm ' + N(V.kemKg) + ' kg · phế ' + N(V.phe) + ' kg', 'bg-n'],
+      ['IQC NVL', String(V.iqc.choKiem), V.iqc.choKiem ? 'a' : 'g', V.iqc.choKiem ? 'lô chờ kiểm · hôm nay ' + V.iqc.homNay + ' lô OK' : 'không lô chờ · hôm nay ' + V.iqc.homNay + ' lô OK', V.iqc.choKiem ? 'bg-a' : 'bg-g'],
+      ['Nhập kho TP', N(K.nhap), 'w', K.pallet + ' pallet từ 06:00', 'bg-n'],
+      ['Xuất hàng', N(K.xuat), 'w', K.xeHomNay + ' chuyến · tồn kho ' + String(K.tonNgay).replace('.', ',') + ' ngày SX', 'bg-n'],
+    ];
+    $('s7').innerHTML = header('Nguyên vật liệu &amp; Kho thành phẩm', 6) +
+      '<div class="k4">' + kp.map(function (k) { return '<div class="panel kp ' + k[4] + '"><span class="l">' + k[0] + '</span><span class="v mono ' + k[2] + '" style="font-size:64px">' + esc(k[1]) + '</span><span class="s mono">' + esc(k[3]) + '</span></div>'; }).join('') + '</div>' +
+      '<div class="row3">' +
+      '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:baseline;gap:12px"><h2>Tồn NVL</h2><span class="sub">kg · số ngày còn chạy</span></div>' +
+      V.ton.map(function (t) { return '<div style="display:flex;flex-direction:column;gap:4px"><div class="kv"><span style="font-size:21px;font-weight:700">' + t.ma + ' <span class="mu" style="font-size:16px;font-weight:600">' + esc(t.ten) + '</span></span><b class="mono ' + (t.ngay <= 3 ? 'r' : t.ngay <= 7 ? 'a' : 'w') + '" style="font-size:26px">' + N(t.kg) + '<span style="font-size:16px"> · ' + t.ngay + ' ngày</span></b></div>' +
+        '<span class="bar" style="height:10px"><i style="width:' + (t.kg / tMax * 100).toFixed(0) + '%;background:' + (t.ngay <= 3 ? '#EF4444' : t.ngay <= 7 ? '#F59E0B' : '#60A5FA') + '"></i></span></div>'; }).join('') +
+      '<h2 style="margin-top:auto">Lò nung tập trung</h2>' + V.lo.map(function (l) { return '<div class="kv"><span style="font-size:20px">' + l.ten + '</span><b class="mono g" style="font-size:24px">' + l.nhiet + '°C · ' + N(l.kgh) + ' kg/h</b></div>'; }).join('') + '</div>' +
+      '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:baseline;gap:12px"><h2>Xuất hàng theo khách</h2><span class="sub">pcs hôm nay</span></div>' +
+      K.khach.map(function (c, i) { return '<div style="display:grid;grid-template-columns:200px minmax(0,1fr) 110px;align-items:center;gap:14px"><span style="font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c[0]) + '</span><span style="height:24px;border-radius:5px;background:#1A2540"><span style="display:block;height:100%;border-radius:5px;width:' + (c[1] / kMax * 100).toFixed(0) + '%;background:' + (i === 0 ? '#60A5FA' : '#3B5784') + '"></span></span><span class="mono" style="font-size:24px;font-weight:800;text-align:right">' + N(c[1]) + '</span></div>'; }).join('') +
+      '<h2 style="margin-top:auto">Gia công ngoài</h2>' + K.ngoai.map(function (g) { return '<div class="kv"><span style="font-size:20px">' + g.ten + '</span><b class="mono" style="font-size:24px">' + N(g.sl) + '<span class="mu" style="font-size:16px"> pcs · về sau ' + g.ngay + ' ngày</span></b></div>'; }).join('') + '</div>' +
+      '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:baseline;gap:12px"><h2>IQC &amp; OQC</h2><span class="sub">' + X.oqc.nguoi + ' người kiểm OQC</span></div>' +
+      '<div class="kv"><span>Lô NVL kiểm hôm nay</span><b class="mono">' + V.iqc.lo.length + '</b></div>' +
+      V.iqc.lo.map(function (l) { return '<div style="display:flex;gap:12px;font-size:19px;padding:8px 12px;border-radius:8px;background:#13233A"><span class="mono" style="font-weight:700">' + l.ma + '</span><span class="mu">' + N(l.sl) + ' kg · ' + l.luc + '</span><span class="g" style="margin-left:auto;font-weight:800">' + l.kq + '</span></div>'; }).join('') +
+      '<div class="kv" style="margin-top:8px"><span>OQC sau Gia công</span><b class="mono">' + N(X.oqc.sauGC) + '</b></div><div class="kv"><span>OQC sau Sơn</span><b class="mono">' + N(X.oqc.sauSon) + '</b></div>' +
+      '<div class="kv"><span>Chờ kiểm</span><b class="mono a">' + N(X.oqc.choKiem) + '</b></div>' +
+      '<div style="margin-top:auto;padding:12px 14px;border-radius:10px;background:' + (X.oqc.pct > X.oqc.mt ? '#2B1216' : '#13233A') + '"><div class="kv"><span style="font-size:22px;font-weight:700">NG OQC hôm nay' + (X.oqc.that ? '' : ' (mô phỏng)') + '</span><b class="mono ' + (X.oqc.pct > X.oqc.mt ? 'r' : 'g') + '" style="font-size:40px">' + P(X.oqc.pct, 1) + '</b></div><div class="mu" style="font-size:18px">' + N(X.oqc.ng) + ' / ' + N(X.oqc.n) + ' pcs · mục tiêu ' + P(X.oqc.mt, 1) + '</div></div></div>' +
+      '</div>' + footer('NVL: tồn theo kho hiện tại, tiêu hao = sản lượng Đúc × trọng lượng SP × 1,03 · Kho TP / xuất hàng: mô phỏng');
   }
 
   // ---------- T167: P-Chart từ đầu tháng (OQC sau gia công, Bavia) ----------
@@ -378,14 +480,15 @@
   }
 
   // Các màn đang có số liệu (màn P-Chart / công việc chỉ xoay tới khi đã tải được)
-  function coMan() { var a = [0, 1]; if (M && PC && PC.oqc) a.push(2); if (M && PC && PC.bavia) a.push(3); if (M && CVD) a.push(4); return a; }
+  function coMan() { var a = [0, 1]; if (M && PC && PC.oqc) a.push(2); if (M && PC && PC.bavia) a.push(3); if (M && CVD) a.push(4); if (M && M.demo) a.push(5, 6); return a; }
   function show(i) { cur = i; SCR.forEach(function (s, k) { $(s).className = 'scr' + (k === i ? '' : ' off'); }); }
   function tai() {
     return TongQuan.load(KHOA).then(function (D) {
       var lan1 = !M;
       M = TongQuan.compute(D, Date.now());
+      if (DEMO && typeof TongQuanDemo !== 'undefined') TongQuanDemo.apply(M, D);
       $('msg').style.display = 'none';
-      render1(); render2(); renderP(); renderCV(); show(cur);
+      render1(); render2(); renderP(); renderCV(); render6(); render7(); show(cur);
       if (lan1) taiP();
       taiCV();
     }).catch(function (e) {
