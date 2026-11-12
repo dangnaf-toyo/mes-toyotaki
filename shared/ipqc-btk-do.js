@@ -207,7 +207,7 @@
                             i +
                             '" aria-label="Xóa CVT dòng ' +
                             (i + 1) +
-                            '">Xóa</button></div>',
+                            '">Xoá</button></div>',
                         )
                         .join("") +
                       '<button type="button" data-add="' +

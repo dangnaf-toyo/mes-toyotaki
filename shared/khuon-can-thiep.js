@@ -98,7 +98,7 @@
   }
   function jsonbLen(a){ return Array.isArray(a) ? a.length : 0; }
 
-  const SU_KIEN = { khai: 'Khai hạng mục', duyet: '✅ Duyệt', tu_choi: '❌ Từ chối', an_toan: '🦺 Cam kết an toàn', qlbp_xac_nhan: '🌙 QLBP xác nhận duyệt ca đêm', khong_tac_dong: 'Không tác động khuôn' };
+  const SU_KIEN = { khai: 'Khai hạng mục', duyet: '✓ Duyệt', tu_choi: '✕ Từ chối', an_toan: '🦺 Cam kết an toàn', qlbp_xac_nhan: '🌙 QLBP xác nhận duyệt ca đêm', khong_tac_dong: 'Không tác động khuôn' };
   function nkText(k){
     const d = k.du_lieu || {};
     let t = SU_KIEN[k.su_kien] || k.su_kien;
@@ -141,7 +141,7 @@
       const ct = st && st.ct;
       box.innerHTML = c == null ? '<span style="color:#64748B">Chưa chọn hạng mục</span>' : capChip(c) + ' → ' + esc(CAP[c].duyet) +
         (ct && ct.cap_max === c && c > 0 && ct.trang_thai !== 'da_duyet' ? ' <span style="color:#64748B;font-weight:600">(giữ cấp cao nhất đã khai — không hạ cấp)</span>' : '');
-      if (btn) { btn.disabled = c == null; btn.textContent = c === 0 ? '💾 Lưu (cấp 0 — làm ngay)' : '📤 Gửi duyệt'; }
+      if (btn) { btn.disabled = c == null; btn.textContent = c === 0 ? 'Lưu (cấp 0 — làm ngay)' : 'Gửi duyệt'; }
     }
 
     function render(){
@@ -157,7 +157,7 @@
         if (!st.quyen_duyet && st.ct.de_nghi_uid && !st.tu_duyet_duoc && st.duoc_khai)
           h += '<div class="kct-note">Người khai không tự duyệt việc của mình ngoài khung 22:00–08:00 — chuông đã gửi người duyệt.</div>';
         if (st.quyen_duyet) h += '<div class="kct-row"><span>Bạn duyệt với vai trò <b>' + esc(st.quyen_duyet) + '</b>:</span><span class="sp"></span>' +
-          '<button type="button" class="kct-b g" data-a="duyet">✅ Duyệt</button><button type="button" class="kct-b r" data-a="tuchoi">❌ Từ chối</button></div>';
+          '<button type="button" class="kct-b g" data-a="duyet">✓ Duyệt</button><button type="button" class="kct-b r" data-a="tuchoi">✕ Từ chối</button></div>';
       }
       if (ct && ct.trang_thai === 'tu_choi') h += '<div class="kct-warn">❌ ' + esc(ct.nguoi_duyet) + ' từ chối lúc ' + ts(ct.duyet_luc) + ': ' + esc(ct.ly_do_tu_choi) + ' — chọn lại hạng mục rồi gửi duyệt lại.</div>';
       if (ct && ct.trang_thai === 'da_duyet' && ct.cap > 0) {
@@ -178,15 +178,15 @@
           '<div class="kct-row"><input type="text" id="kct-mt" maxlength="300" placeholder="Mô tả thêm (vị trí, tình trạng…)" value="' + esc(ct ? ct.mo_ta : '') + '"></div>' +
           '<div class="kct-row"><span>Cấp tính được:</span><span class="kct-tinh"></span><span class="sp"></span>' +
             (o.choPhepKhongTacDong && st.duoc_khong_tac_dong && n.loai !== 'A2' && !ct ? '<button type="button" class="kct-b o" data-a="ktd" title="Chỉ chỉnh thông số / máy, không đụng vào khuôn">Không tác động vào khuôn</button>' : '') +
-            '<button type="button" class="kct-b" data-a="gui">📤 Gửi duyệt</button></div></div>';
+            '<button type="button" class="kct-b" data-a="gui">Gửi duyệt</button></div></div>';
         if (!moSan) h += '<div class="kct-row"><span class="kct-note" style="margin:0">Hạng mục: ' + esc((ct.hang_muc || []).map(x => x.noi_dung).join('; ')) + '</span><span class="sp"></span>' +
-          '<button type="button" class="kct-b o" data-a="sua">✎ Đổi hạng mục</button></div>';
+          '<button type="button" class="kct-b o" data-a="sua">Đổi hạng mục</button></div>';
       } else if (ct && jsonbLen(ct.hang_muc)) {
         h += '<div class="kct-note">Hạng mục: ' + esc(ct.hang_muc.map(x => x.noi_dung).join('; ')) + (ct.mo_ta ? ' — ' + esc(ct.mo_ta) : '') + '</div>';
       } else if (!ct && !st.duoc_khai) h += '<div class="kct-note">🔒 Tổ khuôn / QLBP Đúc / trưởng ca (sự cố) mới khai được.</div>';
 
       const nk = st.nhat_ky || [];
-      if (nk.length) h += '<div style="margin-top:6px"><button type="button" class="kct-lnk" data-a="nk">📜 Lịch sử phiếu (' + nk.length + ')</button><div class="kct-nk">' +
+      if (nk.length) h += '<div style="margin-top:6px"><button type="button" class="kct-lnk" data-a="nk">Lịch sử phiếu (' + nk.length + ')</button><div class="kct-nk">' +
         nk.map(k => '<div>' + ts(k.thoi_diem) + ' · <b>' + esc(k.nguoi) + '</b> — ' + esc(nkText(k)) + '</div>').join('') + '</div></div>';
       h += '</div>';
       el.innerHTML = h;
@@ -260,9 +260,9 @@
         const cho = r.trang_thai === 'cho_duyet';
         const nguon = r.nguon === 'xlbt' ? 'Sự cố ' + esc(r.loai_nguon || '') + ' ' + esc(r.nguon_id) : 'Check sheet · ' + esc(r.loai_nguon || 'KH bảo dưỡng');
         const a = cho
-          ? (r.quyen_duyet ? '<button type="button" class="kct-b g" data-a="duyet" data-id="' + r.id + '">✅ Duyệt</button><button type="button" class="kct-b r" data-a="tuchoi" data-id="' + r.id + '">❌ Từ chối</button>'
+          ? (r.quyen_duyet ? '<button type="button" class="kct-b g" data-a="duyet" data-id="' + r.id + '">✓ Duyệt</button><button type="button" class="kct-b r" data-a="tuchoi" data-id="' + r.id + '">✕ Từ chối</button>'
                            : '<span class="kct-note" style="margin:0">Chờ ' + esc(CAP[r.cap].duyet) + '</span>')
-          : (r.quyen_xac_nhan ? '<button type="button" class="kct-b" data-a="xn" data-id="' + r.id + '">🌙 Đã nắm — xác nhận</button>'
+          : (r.quyen_xac_nhan ? '<button type="button" class="kct-b" data-a="xn" data-id="' + r.id + '">Đã nắm — xác nhận</button>'
                               : '<span class="kct-note" style="margin:0">Chờ QLBP Đúc xác nhận</span>');
         return '<div class="kct-qi"><div><div class="m">' + esc(r.ma_khuon || '—') + '</div>' + capChip(r.cap) + '</div>' +
           '<div class="d"><b>' + esc((r.hang_muc || []).map(x => x.noi_dung).join('; ')) + '</b>' + (r.khong_chac ? ' <i>(không chắc → nâng cấp)</i>' : '') +

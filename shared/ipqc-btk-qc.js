@@ -524,7 +524,7 @@
         '<p class="hint">Chỉ sao chép hạng mục từ phiên bản đã lưu. Không sao chép kết quả đo, phê duyệt hoặc bản vẽ nguồn. Đính kèm bản vẽ phù hợp Model đích trước khi gửi duyệt.</p>'+
         '<label><input type="checkbox" data-copy-confirm required> Tôi đã kiểm tra Model và phiên bản nguồn/đích.</label>'+
         '<p data-copy-message class="hint"></p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">'+
-        '<button class="btn" type="button" data-copy-cancel>Hủy</button><button class="btn p" type="submit" data-copy-submit disabled>Sao chép</button></div></form>';
+        '<button class="btn" type="button" data-copy-cancel>Huỷ</button><button class="btn p" type="submit" data-copy-submit disabled>Sao chép</button></div></form>';
       document.body.append(dialog);dialog.showModal();
       const get=key=>dialog.querySelector('[data-copy-'+key+']');
       let serial=0,busy=false,blocked=true;

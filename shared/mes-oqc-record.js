@@ -26,7 +26,7 @@ const MesOqcRecord = (() => {
     byId("otherDefects").innerHTML = otherRows
       .map(
         (r) =>
-          `<tr data-other-id="${r.key}"><td>${safe(r.group || "NG khác")}</td><td><input data-other="label" value="${safe(r.label)}" placeholder="Tên lỗi"></td><td><input data-other="detail" value="${safe(r.detail)}" placeholder="Ghi chú (tùy chọn)"></td><td><input type="number" min="0" step="1" data-other="qty" value="${safe(r.qty)}"><button type="button" class="btn secondary" data-remove-other="${r.key}">Xóa dòng</button></td></tr>`,
+          `<tr data-other-id="${r.key}"><td>${safe(r.group || "NG khác")}</td><td><input data-other="label" value="${safe(r.label)}" placeholder="Tên lỗi"></td><td><input data-other="detail" value="${safe(r.detail)}" placeholder="Ghi chú (tùy chọn)"></td><td><input type="number" min="0" step="1" data-other="qty" value="${safe(r.qty)}"><button type="button" class="btn secondary" data-remove-other="${r.key}">Xoá dòng</button></td></tr>`,
       )
       .join("");
   }

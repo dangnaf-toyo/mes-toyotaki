@@ -248,7 +248,7 @@
     </select>
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">↻ Tải lại</button>
-  <button type="button" class="btn btn-ghost" id="btnPlan" title="Gán mã SP + KH ca cho máy theo KHSX tuần Gia công hôm nay">⚡ Nạp KH từ KHSX tuần</button>
+  <button type="button" class="btn btn-ghost" id="btnPlan" title="Gán mã SP + KH ca cho máy theo KHSX tuần Gia công hôm nay">Nạp KH từ KHSX tuần</button>
   <button type="button" class="btn btn-ghost" id="btnChep" title="Mở lại các máy của ca trước với cùng mã SP, KH ca, người đứng máy">Chép máy từ ca trước</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa">Báo cáo kết ca</button>
   <a class="btn btn-ghost" href="ipqc-gia-cong.html">IPQC Gia công</a>
@@ -405,6 +405,7 @@ function parseTagNo(raw) {
 }
 function loiDeHieu(e) {
   const m = String((e && e.message) || e || '');
+  if (MesLoi.daDich(m)) return { t: m, d: MesLoi.chiTiet(e) === m ? '' : MesLoi.chiTiet(e) };   // T242: đã dịch từ shared/supabase-client.js
   if (/Failed to fetch|NetworkError|network/i.test(m)) return { t: 'Mất kết nối mạng. Kiểm tra wifi rồi thử lại.', d: m };
   if (/permission denied|42501|JWT|not authorized/i.test(m)) return { t: 'Phiên đăng nhập hết hạn hoặc thiếu quyền. Đăng nhập lại.', d: m };
   return { t: 'Không thực hiện được. Thử lại, nếu vẫn lỗi báo trưởng ca.', d: m };
@@ -620,7 +621,7 @@ function renderWs() {
     h += '<div class="sec-t">Đã xong trong ca <span class="chip mute">' + X.length + ' thùng · ' + fmt(slMay(m)) + ' pcs</span></div><div class="tbl"><table class="t"><thead><tr><th>Giờ</th><th>Tag No</th><th>Bước</th><th style="text-align:right">Vào</th><th style="text-align:right">NG</th><th style="text-align:right">Test</th><th style="text-align:right">Ra</th><th>Người</th><th></th></tr></thead><tbody>' +
       X.map(b => '<tr><td class="mono">' + hm(b.xong_luc) + '</td><td class="mono"><b>' + esc(b.tag_no) + '</b></td><td>' + b.buoc + '/' + b.tong_buoc + (b.buoc >= b.tong_buoc ? ' <span class="chip ok">cuối</span>' : '') + '</td>' +
         '<td class="n">' + fmt(b.sl_vao) + '</td><td class="n" style="color:var(--alarm-fg)">' + (Number(b.ng) ? fmt(b.ng) : '') + '</td><td class="n" style="color:var(--warn-fg)">' + (Number(b.test) ? fmt(b.test) : '') + '</td><td class="n">' + fmt(b.sl_ra) + '</td><td>' + esc(b.nguoi_lam || '') + '</td>' +
-        '<td>' + (khoa ? '' : '<button class="tiny" type="button" data-huyxong="' + b.id + '" title="Bấm Xong nhầm">Huỷ Xong</button>') + '</td></tr>').join('') +
+        '<td>' + (khoa ? '' : '<button class="tiny" type="button" data-huyxong="' + b.id + '" title="Bấm Xong nhầm">Huỷ xong</button>') + '</td></tr>').join('') +
       '</tbody></table></div>';
   }
 

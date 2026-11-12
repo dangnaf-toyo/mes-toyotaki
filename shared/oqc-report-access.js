@@ -31,7 +31,7 @@ const OqcReportAccess = (() => {
       id +
       ')">Sửa</button> <button type="button" class="btn secondary" onclick="OqcReportAccess.remove(' +
       id +
-      ')">Xóa</button>'
+      ')">Xoá</button>'
     );
   }
   async function remove(id) {

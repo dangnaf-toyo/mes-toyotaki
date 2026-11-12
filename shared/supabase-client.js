@@ -28,7 +28,70 @@ const SUPABASE_ANON_KEY = IS_PROD
 
 const IS_STAGING = !IS_PROD;
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/**
+ * T242 — báo lỗi ngắn gọn bằng tiếng Việt, dùng chung MỌI trang.
+ * MesLoi.gon(err) nhận lỗi Supabase / Error / chuỗi → câu ngắn cho người dùng.
+ * Lỗi kỹ thuật hay gặp (hết phiên / thiếu quyền, mất mạng, máy chủ quá lâu, DB chưa cập nhật)
+ * được đổi sang tiếng Việt; lỗi nghiệp vụ (hàm DB tự báo bằng tiếng Việt) giữ nguyên.
+ * MesLoi.chiTiet(err) = câu gốc tiếng Anh (để hiện ở mục "Chi tiết kỹ thuật" nếu trang có).
+ */
+const MesLoi = {
+  QUYEN: 'Phiên đăng nhập hết hạn hoặc bạn chưa có quyền. Hãy đăng nhập lại.',
+  MANG: 'Mất kết nối mạng. Kiểm tra wifi rồi thử lại.',
+  CHAM: 'Máy chủ xử lý quá lâu. Hãy thử lại.',
+  THIEU: 'Hệ thống chưa cập nhật xong chức năng này. Báo quản trị viên.',
+  /** Trả câu tiếng Việt nếu là lỗi kỹ thuật đã biết, ngược lại null. */
+  dich(msg, code) {
+    const m = String(msg || ''), c = String(code || '');
+    if (c === '42501' || c === 'PGRST301' || /permission denied|row-level security|JWT expired|invalid JWT|not authorized|not authenticated/i.test(m)) return this.QUYEN;
+    if (/Failed to fetch|NetworkError|Load failed|network request failed|ERR_INTERNET/i.test(m)) return this.MANG;
+    if (c === '57014' || /statement timeout|canceling statement/i.test(m)) return this.CHAM;
+    return null;
+  },
+  gon(err) {
+    if (err == null) return 'Có lỗi xảy ra. Hãy thử lại.';
+    const m = typeof err === 'string' ? err : (err.message || err.error_description || err.error || String(err));
+    const c = String((err && err.code) || '');
+    if (c === 'PGRST202' || c === 'PGRST205' || c === '42883' || c === '42P01' || /Could not find the (function|table)|schema cache/i.test(m)) return this.THIEU;
+    return this.dich(m, c) || m;
+  },
+  /** true nếu câu này là câu đã dịch ở trên (trang có bộ dịch riêng thì giữ nguyên, không dịch lần 2). */
+  daDich(msg) { return [this.QUYEN, this.MANG, this.CHAM, this.THIEU].includes(String(msg || '')); },
+  chiTiet(err) {
+    if (err == null || typeof err === 'string') return err || '';
+    return err.details && /^\[goc\] /.test(err.details) ? err.details.slice(6) : (err.message || '');
+  },
+};
+
+// Mọi lời gọi bảng / hàm DB (/rest/v1) đi qua đây: lỗi kỹ thuật đã biết được đổi `message`
+// (hết phiên / thiếu quyền, mất mạng, quá thời gian) sang tiếng Việt ngay từ gốc (trang nào cũng hiện `error.message` nên không phải sửa từng trang);
+// câu gốc giữ ở `details` (tiền tố "[goc] "), `code` giữ nguyên.
+async function mesFetch(input, init) {
+  const url = typeof input === 'string' ? input : (input && input.url) || '';
+  const laRest = url.indexOf('/rest/v1/') >= 0;
+  let res;
+  try {
+    res = await fetch(input, init);
+  } catch (e) {
+    if (laRest && e && e.name !== 'AbortError' && MesLoi.dich(e.message)) {
+      const e2 = new TypeError(MesLoi.MANG); e2.cause = e; throw e2;
+    }
+    throw e;
+  }
+  if (!laRest || res.ok) return res;
+  try {
+    const body = await res.clone().json();
+    const vi = body && typeof body === 'object' && !Array.isArray(body) ? MesLoi.dich(body.message, body.code) : null;
+    if (!vi) return res;
+    body.details = body.details || ('[goc] ' + body.message);
+    body.message = vi;
+    const headers = new Headers(res.headers);
+    headers.delete('content-length'); headers.delete('content-encoding');
+    return new Response(JSON.stringify(body), { status: res.status, statusText: res.statusText, headers });
+  } catch (e) { return res; }
+}
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: mesFetch } });
 
 // Cổng đăng nhập chung: MỌI trang nạp file này đều phải đăng nhập mới được xem.
 // Ẩn trang ngay, chưa có phiên → chuyển sang login (giữ returnTo); có phiên → hiện.

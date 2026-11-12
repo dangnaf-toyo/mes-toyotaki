@@ -31,6 +31,7 @@
       { label: 'Dashboard Sản lượng', href: 'sanluong-supabase.html' },
       { label: 'Dashboard Chất lượng', href: 'chatluong-supabase.html' },
       { label: 'Báo cáo kết ca', href: 'bao-cao-ca.html' },
+      { label: 'Báo cáo cuối ca công đoạn', href: 'cong-doan-bao-cao-ca.html' },
       { label: 'Báo cáo sản xuất tuần', href: 'bao-cao-tuan.html' },
       { label: 'Kế hoạch tuần', href: 'khsx-tuan.html' },
       { label: 'Forecast sản lượng năm', href: 'forecast-san-luong.html' },
@@ -45,17 +46,18 @@
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
       { label: 'Bảng điều khiển Bavia', href: 'bavia-dashboard.html' },
-      { label: 'Bảng điều khiển Gia Công', href: 'gia-cong-dashboard.html' },
+      { label: 'Bảng điều khiển Gia công', href: 'gia-cong-dashboard.html' },
       { label: 'Bảng điều khiển Sơn', href: 'cong-doan-dashboard.html?cd=S%C6%A1n' },
       { label: 'Bảng điều khiển OQC', href: 'cong-doan-dashboard.html?cd=OQC' },
-      { label: 'Nhập liệu di động', href: 'mobile.html' },
-      { label: 'In tem', href: 'intem.html' },
+      // T242: chỉ hiện trên điện thoại (màn rút gọn 1 máy / màn hình).
+      { label: 'Nhập liệu di động', href: 'mobile.html', mobileOnly: true },
+      // T242: In tem + Tra cứu tem đã in = 1 mục, 2 tab.
+      { label: 'In tem', href: 'intem.html', subTabs: 'in_tem' },
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
       // T137: 1 mục "Tổ khuôn" — các trang con hiện dải tab (SUB_TABS bên dưới).
       { label: 'Tổ khuôn', href: 'bao-duong-khuon-tuan.html', subTabs: 'to_khuon' },
-      { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html' },
-      { label: 'Đóng gói Pallet', href: 'oqc.html' },
-      { label: 'Báo cáo cuối ca công đoạn', href: 'cong-doan-bao-cao-ca.html' },
+      // T242: Chuyển công đoạn + Đóng gói Pallet = 1 mục, 2 tab.
+      { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html', subTabs: 'chuyen_dong_goi' },
     ] },
     { label: 'Chất lượng', items: [
       { label: 'IPQC Đúc', href: 'ipqc.html' },
@@ -70,12 +72,11 @@
       { label: 'Kho NVL', href: 'nvl.html' },
       { label: 'Kho thành phẩm', href: 'kho-thanh-pham.html' },
       { label: 'Truy xuất nguồn gốc', href: 'truy-xuat-nguon-goc.html' },
-      { label: 'Tra cứu tem đã in', href: 'tra-cuu-tem.html' },
     ] },
     { label: 'QMS · Tài liệu', items: [
       { label: 'Tài liệu kỹ thuật', href: 'tai-lieu-danh-muc.html' },
       { label: 'BOM sản phẩm', href: 'bom.html' },
-      { label: 'Tài liệu hệ thống (QM/QP/WI/Biểu mẫu)', href: 'tai-lieu-he-thong.html' },
+      { label: 'Tài liệu hệ thống', href: 'tai-lieu-he-thong.html' },
       { label: 'Phiếu thay đổi tài liệu', href: 'danh-sach-phieu-thay-doi.html' },
       { label: 'Tài liệu bên ngoài', href: 'tai-lieu-ben-ngoai.html' },
       { label: 'Cung cấp tài liệu ra ngoài', href: 'cung-cap-tai-lieu-ra-ngoai.html' },
@@ -96,38 +97,38 @@
     'index.html': { icon: '🏠', title: 'Trang chủ MES', desc: 'Chọn chức năng bạn muốn sử dụng', noTitleBar: true },
     'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca', noTitleBar: true },
     'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
-    'ipqc.html': { icon: '🔎', title: 'IPQC — Kiểm tra tuần kiểm', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh', noTitleBar: true },
+    'ipqc.html': { icon: '🔎', title: 'IPQC Đúc', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh', noTitleBar: true },
     'ipqc-gia-cong.html': { icon: '📐', title: 'IPQC Gia công', desc: 'Nhập kết quả và dashboard IPQC Gia công', noTitleBar: true },
-    'ipqc-approval.html': { icon: '⚠️', title: 'Duyệt tiếp tục sản xuất IPQC', desc: 'Tạo, duyệt và theo dõi yêu cầu tiếp tục chạy có điều kiện', noTitleBar: true },
-    'iqc.html': { icon: '📋', title: 'IQC — Dashboard đầu vào', desc: 'Theo dõi LOT, nhà cung cấp, lỗi và tỷ lệ NG theo thời gian', noTitleBar: true },
+    'ipqc-approval.html': { icon: '⚠️', title: 'Duyệt tiếp tục SX IPQC', desc: 'Tạo, duyệt và theo dõi yêu cầu tiếp tục chạy có điều kiện', noTitleBar: true },
+    'iqc.html': { icon: '📋', title: 'IQC đầu vào', desc: 'Theo dõi LOT, nhà cung cấp, lỗi và tỷ lệ NG theo thời gian', noTitleBar: true },
     'oqc-daily.html': { icon: '✅', title: 'OQC kiểm tra', desc: 'Dashboard · CAPA · kế hoạch và hiệu suất kiểm tra', noTitleBar: true },
     'oqc-capacity.html': { icon: '⏱', title: 'Định mức kiểm tra QC', desc: 'Kế hoạch kiểm tra · Hiệu suất kế hoạch 80%', noTitleBar: true },
-    'chuyencongdoan.html': { icon: '🔀', title: 'Chuyển công đoạn & Đóng gói', desc: 'Quét QR chuyển hàng, đóng gói lại, đổi mã SP', noTitleBar: true },
+    'chuyencongdoan.html': { icon: '🔀', title: 'Chuyển công đoạn', desc: 'Quét QR chuyển hàng, đóng gói lại, đổi mã SP', noTitleBar: true },
     'oqc.html': { icon: '📦', title: 'Đóng gói Pallet', desc: 'Quét tem, gom pallet, đóng gói — dùng cho mọi công đoạn cuối trước nhập kho', noTitleBar: true },
-    'kho-thanh-pham.html': { icon: '🏬', title: 'Kho Thành Phẩm', desc: 'Nhập kho / Xuất hàng bằng QR', noTitleBar: true },
-    'truy-xuat-nguon-goc.html': { icon: '🔍', title: 'Truy Xuất Nguồn Gốc', desc: 'Phả hệ tem: tách/gộp xuyên công đoạn', noTitleBar: true },
-    'tra-cuu-tem.html': { icon: '🏷️', title: 'Tra Cứu Tem Đã In', desc: 'Danh sách tem — lọc theo ngày in/máy/mã SP', noTitleBar: true },
-    'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo Cáo Cuối Ca — Ngoài Đúc', desc: 'Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC', noTitleBar: true },
-    'cong-doan-dashboard.html': { icon: '🏭', title: 'Dashboard Công Đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time', noTitleBar: true },
-    'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Dashboard Tổ Khuôn', desc: 'KH bảo dưỡng khuôn tuần + xử lý bất thường A2/B1/F1', noTitleBar: true },
-    'forecast-san-luong.html': { icon: '📈', title: 'Forecast Sản Lượng Năm', desc: 'Dự báo sản lượng từng mã SP theo tháng — giờ máy, tuổi thọ khuôn', noTitleBar: true },
-    'van-de-khuon.html': { icon: '⚠', title: 'Vấn Đề Khuôn', desc: 'Vấn đề khuôn chưa đóng, lịch sử sự cố + IPQC của khuôn', noTitleBar: true },
-    'linh-kien-khuon.html': { icon: '🔩', title: 'Linh Kiện Dự Phòng Khuôn', desc: 'Danh mục, tồn kho, gán khuôn, lịch sử nhập / xuất thay', noTitleBar: true },
-    'bao-cao-to-khuon-tuan.html': { icon: '📊', title: 'Báo Cáo Tuần Tổ Khuôn', desc: 'KH bảo dưỡng, vấn đề khuôn, sự cố, linh kiện, theo người — biểu đồ QC', noTitleBar: true },
-    'quan-ly-khuon.html': { icon: '🧊', title: 'Quản Lý Khuôn', desc: 'Danh sách khuôn, vấn đề khuôn, hạng mục check sheet bảo dưỡng', noTitleBar: true },
-    'checksheet-bao-duong-khuon.html': { icon: '📋', title: 'Check Sheet Bảo Dưỡng Khuôn', desc: 'Ghi kết quả bảo dưỡng từng khuôn theo hạng mục', noTitleBar: true },
-    'khsx-tuan.html': { icon: '📅', title: 'Kế Hoạch Sản Xuất Tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
-    'nvl.html': { icon: '🧪', title: 'Quản Lý Tồn Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
-    'intem.html': { icon: '🏷️', title: 'In Tem', desc: 'Tạo/tra cứu tem Đúc, chỉ thị Kanban, tem thành phẩm', noTitleBar: true },
+    'kho-thanh-pham.html': { icon: '🏬', title: 'Kho thành phẩm', desc: 'Nhập kho / Xuất hàng bằng QR', noTitleBar: true },
+    'truy-xuat-nguon-goc.html': { icon: '🔍', title: 'Truy xuất nguồn gốc', desc: 'Phả hệ tem: tách/gộp xuyên công đoạn', noTitleBar: true },
+    'tra-cuu-tem.html': { icon: '🏷️', title: 'Tra cứu tem đã in', desc: 'Danh sách tem — lọc theo ngày in/máy/mã SP', noTitleBar: true },
+    'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo cáo cuối ca công đoạn', desc: 'Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC', noTitleBar: true },
+    'cong-doan-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển công đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time', noTitleBar: true },
+    'bao-duong-khuon-tuan.html': { icon: '🔧', title: 'Tổ khuôn', desc: 'KH bảo dưỡng khuôn tuần + xử lý bất thường A2/B1/F1', noTitleBar: true },
+    'forecast-san-luong.html': { icon: '📈', title: 'Forecast sản lượng năm', desc: 'Dự báo sản lượng từng mã SP theo tháng — giờ máy, tuổi thọ khuôn', noTitleBar: true },
+    'van-de-khuon.html': { icon: '⚠', title: 'Vấn đề khuôn', desc: 'Vấn đề khuôn chưa đóng, lịch sử sự cố + IPQC của khuôn', noTitleBar: true },
+    'linh-kien-khuon.html': { icon: '🔩', title: 'Linh kiện dự phòng khuôn', desc: 'Danh mục, tồn kho, gán khuôn, lịch sử nhập / xuất thay', noTitleBar: true },
+    'bao-cao-to-khuon-tuan.html': { icon: '📊', title: 'Báo cáo tuần tổ khuôn', desc: 'KH bảo dưỡng, vấn đề khuôn, sự cố, linh kiện, theo người — biểu đồ QC', noTitleBar: true },
+    'quan-ly-khuon.html': { icon: '🧊', title: 'Quản lý khuôn', desc: 'Danh sách khuôn, vấn đề khuôn, hạng mục check sheet bảo dưỡng', noTitleBar: true },
+    'checksheet-bao-duong-khuon.html': { icon: '📋', title: 'Check sheet bảo dưỡng khuôn', desc: 'Ghi kết quả bảo dưỡng từng khuôn theo hạng mục', noTitleBar: true },
+    'khsx-tuan.html': { icon: '📅', title: 'Kế hoạch sản xuất tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
+    'nvl.html': { icon: '🧪', title: 'Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
+    'intem.html': { icon: '🏷️', title: 'In tem', desc: 'Tạo/tra cứu tem Đúc, chỉ thị Kanban, tem thành phẩm', noTitleBar: true },
     'ghi-nhan-kanban.html': { icon: '📥', title: 'Ghi nhận thùng (Kanban)', desc: 'Quét QR ghi nhận thùng sản phẩm đã sản xuất — máy chạy theo tem chỉ thị in trước' },
     'gia-cong-dashboard.html': { icon: '⚙️', title: 'Bảng điều khiển Gia công', desc: '30 máy CNC: quét tem thùng, NG, hàng test, dừng máy, kết ca', noTitleBar: true },
     'bavia-dashboard.html': { icon: '🛠️', title: 'Bảng điều khiển Bavia', desc: 'Line Bavia: khai báo tem Đúc, NG, hàng test, đóng thùng in tem xuất hàng / quét tem thùng', noTitleBar: true },
     'bavia-tem-xuat-hang.html': { icon: '🏷️', title: 'Tem xuất hàng Bavia', desc: 'Quét QR tem Đúc ghi nhận sản lượng Bavia — đủ thùng in tem xuất hàng theo mẫu khách (FCC / Astemo / Soji / Mikasa / Cosmos)' },
     'ghi-nhan-tem-thanh-pham.html': { icon: '📦', title: 'Ghi nhận thùng thành phẩm', desc: 'Quét QR tem thành phẩm in trước — tự trừ nguồn từ tem Đúc, truy xuất nguồn gốc' },
-    'qc-manager.html': { icon: '🔬', title: 'QC Giám Sát & NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
+    'qc-manager.html': { icon: '🔬', title: 'QC Manager / NCP', desc: 'Giám sát real-time, xử lý SP không phù hợp', noTitleBar: true },
     'bieu-do-chat-luong.html': { icon: '📈', title: 'Biểu đồ chất lượng', desc: 'Biểu đồ kiểm soát kích thước IPQC · P-Chart NG OQC', noTitleBar: true },
-    'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Quản Lý Danh Mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin', noTitleBar: true },
-    'tai-lieu-danh-muc.html': { icon: '📁', title: 'Quản lý tài liệu kỹ thuật', desc: 'Bản vẽ SP/khuôn, dữ liệu báo giá, KQ sản xuất thử, Jig - đồ gá, LK dự phòng khuôn, dưỡng kiểm, QCP, tiêu chuẩn — theo mã SP', noTitleBar: true },
+    'quan-ly-danh-muc.html': { icon: '⚙️', title: 'Danh mục', desc: 'Máy, sản phẩm, nhân sự, khuôn — chỉ Admin', noTitleBar: true },
+    'tai-lieu-danh-muc.html': { icon: '📁', title: 'Tài liệu kỹ thuật', desc: 'Bản vẽ SP/khuôn, dữ liệu báo giá, KQ sản xuất thử, Jig - đồ gá, LK dự phòng khuôn, dưỡng kiểm, QCP, tiêu chuẩn — theo mã SP', noTitleBar: true },
     'tai-lieu-chi-tiet.html': { icon: '📄', title: 'Chi tiết tài liệu kỹ thuật', desc: 'Xem view-only, tải bản gốc CAD (nếu có quyền), quản lý phiên bản', noTitleBar: true },
     'tai-lieu-he-thong.html': { icon: '📘', title: 'Tài liệu hệ thống', desc: 'Sổ tay chất lượng, thủ tục, phương pháp/tiêu chuẩn, biểu mẫu — theo cấp 1-4', noTitleBar: true },
     'phieu-thay-doi-tai-lieu.html': { icon: '📝', title: 'Lập phiếu thay đổi tài liệu', desc: 'Tạo mới / sửa đổi / huỷ tài liệu — tự tính tầng rủi ro A/B/C', noTitleBar: true },
@@ -136,14 +137,14 @@
     'tai-lieu-ben-ngoai.html': { icon: '📥', title: 'Tài liệu bên ngoài', desc: 'Tiếp nhận, bảng kiểm 7 mục, duyệt áp dụng', noTitleBar: true },
     'cung-cap-tai-lieu-ra-ngoai.html': { icon: '📤', title: 'Cung cấp tài liệu ra ngoài', desc: 'Ghi nhận cung cấp tài liệu nội bộ/bên ngoài cho khách hàng, NCC', noTitleBar: true },
     'cau-hinh-tai-lieu.html': { icon: '⚙️', title: 'Cấu hình kiểm soát tài liệu', desc: '16 tham số, ủy quyền duyệt, mức mật, chỉ số — chỉ Admin', noTitleBar: true },
-    'nang-luc-cnc.html': { icon: '🛠️', title: 'Năng Lực Máy Gia Công CNC', desc: 'Quy trình CNC theo SP, forecast tháng, tính số máy cần — chỉ Admin', noTitleBar: true },
-    'quan-ly-tai-khoan.html': { icon: '👤', title: 'Quản Lý Tài Khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin', noTitleBar: true },
-    'ncp-detail.html': { icon: '📝', title: 'Chi Tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },
-    'bao-cao-ca.html': { icon: '🗂️', title: 'Xem Lại Báo Cáo Kết Ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
-    'bao-cao-tuan.html': { icon: '📅', title: 'Báo Cáo Sản Xuất Tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
-    'bom.html': { icon: '🧾', title: 'BOM Sản Phẩm', desc: 'Định mức kim loại theo shot, vật tư theo công đoạn, duyệt phiên bản', noTitleBar: true },
-    'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản Lượng & Giao Hàng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
-    'chatluong-supabase.html': { icon: '📈', title: 'Dashboard KPI Chất Lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
+    'nang-luc-cnc.html': { icon: '🛠️', title: 'Năng lực máy CNC', desc: 'Quy trình CNC theo SP, forecast tháng, tính số máy cần — chỉ Admin', noTitleBar: true },
+    'quan-ly-tai-khoan.html': { icon: '👤', title: 'Tài khoản', desc: 'Tạo tài khoản, phân quyền — chỉ Admin', noTitleBar: true },
+    'ncp-detail.html': { icon: '📝', title: 'Chi tiết NCP', desc: 'Nguyên nhân & Đối sách', noTitleBar: true },
+    'bao-cao-ca.html': { icon: '🗂️', title: 'Báo cáo kết ca', desc: 'Tra cứu báo cáo đã lưu theo ngày/ca', noTitleBar: true },
+    'bao-cao-tuan.html': { icon: '📅', title: 'Báo cáo sản xuất tuần', desc: 'KPI, dừng máy, vấn đề & hành động đối ứng — theo tuần bất kỳ', noTitleBar: true },
+    'bom.html': { icon: '🧾', title: 'BOM sản phẩm', desc: 'Định mức kim loại theo shot, vật tư theo công đoạn, duyệt phiên bản', noTitleBar: true },
+    'sanluong-supabase.html': { icon: '📊', title: 'Dashboard Sản lượng', desc: 'Tỷ lệ giao hàng, hoàn thành KHSX, forecast', noTitleBar: true },
+    'chatluong-supabase.html': { icon: '📈', title: 'Dashboard Chất lượng', desc: 'Tổng quan, theo công đoạn, theo khách hàng', noTitleBar: true },
     // T161: Quản lý công việc
     'cong-viec-cua-toi.html': { icon: '✅', title: 'Việc của tôi', desc: 'Việc tôi làm, tôi giao, chờ tôi duyệt — quá hạn, hôm nay, tuần này', noTitleBar: true },
     'cong-viec.html': { icon: '🗂️', title: 'Bảng công việc', desc: 'Kanban theo trạng thái · ma trận ưu tiên Quan trọng × Gấp', noTitleBar: true },
@@ -162,6 +163,14 @@
       { label: 'Quản lý khuôn', href: 'quan-ly-khuon.html', also: ['van-de-khuon.html'] },
       { label: 'Linh kiện dự phòng khuôn', href: 'linh-kien-khuon.html' },
       { label: 'Báo cáo tuần', href: 'bao-cao-to-khuon-tuan.html' },   // T193
+    ] },
+    in_tem: { label: 'In tem', tabs: [
+      { label: 'In tem', href: 'intem.html' },
+      { label: 'Tra cứu tem đã in', href: 'tra-cuu-tem.html' },
+    ] },
+    chuyen_dong_goi: { label: 'Chuyển công đoạn / Đóng gói', tabs: [
+      { label: 'Chuyển công đoạn', href: 'chuyencongdoan.html' },
+      { label: 'Đóng gói Pallet', href: 'oqc.html' },
     ] },
   };
   function subTabPages(key) {
@@ -192,6 +201,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-item{padding:9px 12px;border-radius:6px;color:#333;text-decoration:none;font-size:13px;font-weight:600}
 .mnb-item:hover{background:#faf5f0;color:#C87941}
 .mnb-item.route-active{background:#f5e6d7;color:#a85e2a}
+.mnb-item.mnb-mobile-only{display:none}
 .mnb-folder{padding:9px 12px;border-radius:6px;color:#333;font-size:13px;font-weight:600;cursor:default}
 .mnb-auth{flex-shrink:0;font-size:11.5px;color:#c9c2b6;display:flex;align-items:center;gap:8px;white-space:nowrap;padding-right:6px}
 .mnb-auth a{color:#C87941;text-decoration:none;font-weight:700}
@@ -214,6 +224,7 @@ body{padding-top:var(--navbar-h)}
   .mnb-group-btn:hover,.mnb-group.route-active .mnb-group-btn{color:#8a5a30;background:#faf5f0}
   .mnb-dropdown{display:none;position:static;box-shadow:none;padding:0 0 6px 12px;min-width:0}
   .mnb-group.mobile-open .mnb-dropdown{display:flex}
+  .mnb-item.mnb-mobile-only{display:block}
   .mnb-burger{display:block}
   .mnb-auth{display:none}
   .mnb-auth-mobile{display:flex;margin-top:8px;padding:12px 8px;border-top:2px solid #f0e6d8;font-size:12.5px;color:#666}
@@ -263,7 +274,7 @@ body{padding-top:var(--navbar-h)}
     return groups.map(g => {
       const itemsHtml = g.items.map(it => it.folder
         ? `<div class="mnb-folder" title="Thư mục Bom">${it.label}</div>`
-        : `<a href="${it.href}" class="mnb-item${itemActive(it, cur) ? ' route-active' : ''}">${it.label}</a>`
+        : `<a href="${it.href}" class="mnb-item${it.mobileOnly ? ' mnb-mobile-only' : ''}${itemActive(it, cur) ? ' route-active' : ''}">${it.label}</a>`
       ).join('');
       const groupActive = g.items.some(it => itemActive(it, cur));
       return `<div class="mnb-group${groupActive ? ' route-active' : ''}">
@@ -366,7 +377,7 @@ body{padding-top:var(--navbar-h)}
     pwMask.id = 'mnbPwMask';
     pwMask.innerHTML =
       '<div class="mnb-pw-modal">' +
-        '<h3>🔑 Đổi mật khẩu</h3>' +
+        '<h3>Đổi mật khẩu</h3>' +
         // Bọc trong <form> + 1 ô "username" ẩn cho 3 ô mật khẩu bên dưới —
         // nếu không, Chrome/Edge (nhất là trên di động) coi 3 ô mật khẩu này
         // là "mồ côi" (orphan, xem cảnh báo DOM "Password field is not
