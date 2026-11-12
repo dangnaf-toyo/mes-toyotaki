@@ -3,7 +3,9 @@
  * tong-quan-demo.js — T245: dữ liệu DEMO cho wallboard khi MES phủ toàn bộ
  * công đoạn (NVL/IQC → Đúc → Bavia → Gia công → Sơn → OQC → Kho TP → Xuất).
  *
- * Bật bằng wallboard.html?demo=1 (kèm ?k= hoặc đăng nhập như thường).
+ * Bật bằng wallboard.html?demo=1 (kèm ?k= hoặc đăng nhập như thường). Ở chế độ này
+ * Đúc cũng được chỉnh thành "mọi mã đạt mục tiêu" (ducDat) và P-Chart không mã nào vượt UCL
+ * (pchart) để user duyệt UI; không có nhãn DEMO trên màn hình (user yêu cầu 12/11).
  * Chỉ SINH số cho công đoạn chưa có số liệu thật; Đúc, OQC, IPQC, NCP, sự cố
  * vẫn là số thật từ RPC tong_quan_hom_nay. Mọi số demo bám theo số thật:
  *   - Đầu vào Bavia hôm nay = sản lượng Đúc thật ngày hôm trước (trend[-2]).
@@ -68,6 +70,7 @@
   function apply(M, D) {
     var ngay = M.ngay, R = rng(hash('demo|' + ngay)), f = fracNgay();
     var jit = function (a, b) { return a + (b - a) * R(); };
+    ducDat(M, D, R, jit);
     var tr = M.trend, homQua = tr.length > 1 ? tr[tr.length - 2] : null;
     // ---- Đầu vào Bavia = Đúc thật hôm qua (fallback: KH ngày hoặc 24.000) ----
     var ducHomQua = 0; (D.bao_cao || []).forEach(function (b) { if (homQua && b.ngay === homQua.ngay) ducHomQua += num(b.tt); });
@@ -176,5 +179,49 @@
     return M;
   }
 
-  window.TongQuanDemo = { apply: apply, ROUTE: ROUTE };
+  // ---- Đúc đạt mục tiêu (user 12/11: xem UI khi mọi mã đạt hiệu suất / phế phẩm / tiến độ) ----
+  // Giữ tên máy + mã SP thật; máy chưa có KH được gán mã theo bảng dưới; ca ngày 06–18 ở mốc 17:00 → 92 %.
+  var SP_MAC_DINH = { 'DC 3': 'MIK-389-01', 'DC 9': 'OKA-GJT-01', 'DC 10': 'OKA-GMN-02', 'Kẽm 160T': 'EXE-SHO-01', 'Kẽm 190T': 'YHS-HAN-01', 'Cắt gate 8001': 'TTI-MOT-02', 'Dập Ghế': 'OKA-GJT-01' };
+  var KH_MAC_DINH = { 'Kẽm 160T': 3600, 'Kẽm 190T': 4800, 'DC 3': 2100, 'DC 9': 900, 'DC 10': 900, 'Cắt gate 8001': 2100, 'Dập Ghế': 900 };
+  function ducDat(M, D, R, jit) {
+    var fr = (DEMO_GIO - 6) / 12, caTT = 0, caKH = 0, caNG = 0, dem = { run: 0, warn: 0, alarm: 0, idle: 0, cho: 0 };
+    var hq = M.trend.length > 1 ? M.trend[M.trend.length - 2].ngay : M.ngay;
+    M.machines.forEach(function (m) {
+      if (m.may === 'Sửa hàng') { m.st = 'idle'; m.nhan = 'Không chạy'; dem.idle++; return; }
+      var kh = m.kh || KH_MAC_DINH[m.may] || 2000, sp = m.sp || SP_MAC_DINH[m.may] || 'TTI-MOT-05', pct = jit(0.97, 1.04);
+      m.kh = kh; m.sp = sp; m.khNow = kh * fr; m.tt = Math.round(kh * fr * pct); m.pct = m.tt / m.khNow; m.ng = Math.round(m.tt * jit(0.012, 0.022));
+      m.st = 'run'; m.nhan = 'Đang chạy'; delete m.loai; delete m.van_de; delete m.phut; dem.run++;
+      caTT += m.tt; caKH += kh; caNG += m.ng;
+    });
+    M.machines.sort(function (a, b) { return (a.st === 'idle') - (b.st === 'idle') || String(a.may).localeCompare(String(b.may), 'vi', { numeric: true }); });
+    M.demSt = dem;
+    if (M.ca) { M.ca.frac = fr; M.ca.trangThai = 'chay'; }
+    var khNow = caKH * fr, du = M.duc;
+    du.caTT = caTT; du.caKH = caKH; du.caKHNow = khNow; du.pace = caTT / khNow; du.duBao = Math.round(caTT / fr);
+    du.homNay = { kh: caKH, tt: caTT, ng: caNG, ngTT: caTT }; du.ngPct = caNG / (caTT + caNG);
+    du.khDenGio = khNow; du.pNgay = du.pace; du.xongNgay = false;
+    if (!du.khNgay) du.khNgay = Math.round(caKH * 1.85);
+    M.oee = { ganNhat: { oee: jit(0.86, 0.89), ca: 'Ca đêm', ngay: hq }, truoc: null };
+    M.dung = { phut: 0, n: 0, list: [], dangDung: [], tach: { xl: 0, cl: 0, n: 0 } };
+    M.ipqc = []; M.ipqcTre = 0; M.ncp = []; M.ncpQuaHan = [];
+    M.oqc.ucl = []; if (M.oqc.pct != null && M.oqc.pct > M.oqc.mt) { M.oqc.ng = Math.round(M.oqc.n * 0.022); M.oqc.pct = M.oqc.ng / M.oqc.n; }
+    M.actions = [];
+  }
+  // P-Chart (màn 3–4): giữ mã, ngày, số kiểm thật; NG đặt dưới CL và mục tiêu để không mã nào vượt UCL
+  function pchart(PC) {
+    if (!PC) return PC;
+    ['oqc', 'bavia'].forEach(function (k) {
+      var src = PC[k]; if (!src) return;
+      var R = rng(hash('pc|' + k + '|' + PC.den)), cfg = {};
+      (src.cfg || []).forEach(function (c) { cfg[c[0]] = c[1] == null ? null : Number(c[1]); });
+      var mt = src.mt != null ? Number(src.mt) : 0.03;
+      src.rows = (src.rows || []).map(function (r) {
+        var n = Number(r[2]) || 0, cl = cfg[r[1]], tran = Math.min(mt, cl == null ? mt : cl);
+        return [r[0], r[1], n, Math.round(n * tran * (0.35 + 0.5 * R()))];
+      });
+    });
+    return PC;
+  }
+
+  window.TongQuanDemo = { apply: apply, pchart: pchart, ROUTE: ROUTE };
 })();

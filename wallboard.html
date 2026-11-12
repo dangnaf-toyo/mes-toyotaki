@@ -49,7 +49,7 @@
   .mg{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:14px}
   .mc{display:flex;flex-direction:column;justify-content:space-between;gap:6px;padding:14px 18px;border-radius:12px;background:#13233A;border-left:10px solid #22C55E;min-height:0;overflow:hidden}
   .mc.warn{background:#2A2210;border-left-color:#F59E0B}.mc.alarm{background:#2B1216;border-left-color:#EF4444}.mc.cho{background:#151C2B;border-left-color:#5B6B86}
-  .mc .n{font-size:34px;font-weight:800}.mc .p{font-size:34px;font-weight:800}
+  .mc .n{font-size:30px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.mc .p{font-size:30px;font-weight:800;flex:none;margin-left:8px}
   .mc .sp{font-size:20px;color:#B6C3D8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bar{height:14px;border-radius:7px;background:#22304A;overflow:hidden}.bar i{display:block;height:100%;background:#60A5FA}
   .mc .st{font-size:22px;font-weight:800;letter-spacing:.03em;text-transform:uppercase}
@@ -155,7 +155,7 @@
   function header(title, idx) {
     var c = M.ca, wd = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(M.ngay + 'T00:00:00').getDay()];
     return '<header class="hd"><div style="display:flex;flex-direction:column"><span class="co">TOYOTAKI · NHÀ MÁY ĐÚC</span><span class="ti">' + title + '</span></div>' +
-      (c ? '<span class="pill">' + esc(c.nhan) + '</span>' : '') + (DEMO ? '<span class="demo" title="Số công đoạn chưa lên MES là mô phỏng">DEMO</span>' : '') +
+      (c ? '<span class="pill">' + esc(c.nhan) + '</span>' : '') + '' +
       '<div style="margin-left:auto;display:flex;align-items:center;gap:26px"><div class="dots">' + coMan().map(function (i) { return '<span class="' + (idx === i ? 'on' : '') + '"></span>'; }).join('') + '</div>' +
       '<div class="clk"><div class="d">' + wd + ' ' + TongQuan.ddmm(M.ngay) + '</div><div class="t mono clock">' + TongQuan.hm(new Date()) + '</div></div></div></header>';
   }
@@ -224,7 +224,7 @@
     }
     function off(ten) { return '<div class="stg off"><span class="nm">' + ten + '</span><span style="font-size:18px">Chưa lên MES</span></div>'; }
     var st = [];
-    if (X) st.push(stg('NVL · Lò', '#60A5FA', N(X.nvl.capLoKg) + ' kg', 'nhôm lỏng cấp lò · IQC chờ ' + X.nvl.iqc.choKiem + ' lô', 0, 0, 0));
+    if (X) st.push(stg('NVL · Lò', '#60A5FA', N(X.nvl.capLoKg), 'kg nhôm lỏng cấp lò · IQC chờ ' + X.nvl.iqc.choKiem + ' lô', 0, 0, 0));
     else st.push(off('NVL · IQC'));
     st.push(stg('Đúc', mau(pD), N(h.tt), 'KH ngày ' + N(du.khNgay), h.tt, du.khNgay, frac));
     if (X) {
@@ -264,6 +264,7 @@
       '<div class="panel" style="padding:20px 24px;display:flex;flex-direction:column;gap:12px;border-color:#713F12"><h2 class="a">Việc đang mở</h2>' +
       '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">' +
       dem.map(function (c) { return '<div style="background:#1A2540;border-radius:10px;padding:10px 14px;display:flex;flex-direction:column"><span class="mono ' + (c[1] ? 'a' : 'g') + '" style="font-size:44px;font-weight:800;line-height:1">' + c[1] + '</span><span style="font-size:18px;color:#B6C3D8">' + c[0] + '</span></div>'; }).join('') + '</div>' +
+      (acts.length ? '' : '<div class="g" style="font-size:24px;font-weight:700;margin-top:auto">Không có việc cần xử lý ngay</div>') +
       acts.map(function (x) { return '<div style="display:flex;align-items:center;gap:14px;padding:9px 12px;border-radius:10px;background:#1A1A22"><span style="width:14px;height:14px;border-radius:99px;flex:none;background:' + (x.muc <= 1 ? '#EF4444' : '#F59E0B') + '"></span><span style="flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.t) + '</span><span class="mono ' + (x.muc <= 1 ? 'r' : 'a') + '" style="font-size:22px;font-weight:800">' + esc(x.tuoi) + '</span></div>'; }).join('') +
       '</div></div>' + footer('Tự cập nhật mỗi 60 giây · màn tiếp theo sau 20 giây');
   }
@@ -423,7 +424,7 @@
     return p.then(function (d) { if (!d || d.ok === false) throw new Error((d && d.error) || 'Không có dữ liệu'); return d; });
   }
   function taiP() {
-    return goi('wallboard_pchart').then(function (d) { PC = d; renderP(); show(cur); })
+    return goi('wallboard_pchart').then(function (d) { PC = DEMO && typeof TongQuanDemo !== 'undefined' ? TongQuanDemo.pchart(d) : d; renderP(); show(cur); })
       .catch(function () { /* giữ màn cũ; chưa có thì bỏ qua 2 màn P-Chart */ });
   }
 
