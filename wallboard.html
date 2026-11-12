@@ -15,7 +15,7 @@
   màn hình TV. Các màn tự xoay 20 giây: (1) Sản xuất Đúc, (2) Dòng chảy & chất lượng,
   (3) P-Chart NG OQC sau gia công, (4) P-Chart NG Bavia — từ đầu tháng (T167, RPC wallboard_pchart,
   tải lại mỗi 5 phút; màn 3–4 chỉ xoay tới khi đã tải được số liệu),
-  (5) Bảng công việc — việc công khai đang mở theo nhóm ưu tiên (T168, RPC wallboard_cong_viec, 60 giây).
+  (5) Bảng công việc (T168) — ĐÃ BỎ khỏi vòng xoay 12/11 (T245d), code giữ lại chưa gọi.
   Số liệu: RPC tong_quan_hom_nay + shared/tong-quan.js (chung với index.html), tải lại
   mỗi 60 giây, tải lại cả trang mỗi 6 giờ cho TV chạy lâu không bị đầy bộ nhớ.
   (6) Xưởng sau Đúc — Bavia / Gia công / Sơn ngay lúc này, (7) NVL & Kho thành phẩm: T245, hiện khi có
@@ -481,7 +481,8 @@
   }
 
   // Các màn đang có số liệu (màn P-Chart / công việc chỉ xoay tới khi đã tải được)
-  function coMan() { var a = [0, 1]; if (M && PC && PC.oqc) a.push(2); if (M && PC && PC.bavia) a.push(3); if (M && CVD) a.push(4); if (M && M.demo) a.push(5, 6); return a; }
+  // Màn 5 (Bảng công việc, T168) bỏ khỏi vòng xoay theo yêu cầu user 12/11 (T245d); code renderCV/taiCV giữ lại, bật lại bằng cách thêm 4 vào đây và gọi taiCV() trong tai().
+  function coMan() { var a = [0, 1]; if (M && PC && PC.oqc) a.push(2); if (M && PC && PC.bavia) a.push(3); if (M && M.demo) a.push(5, 6); return a; }
   function show(i) { cur = i; SCR.forEach(function (s, k) { $(s).className = 'scr' + (k === i ? '' : ' off'); }); }
   function tai() {
     return TongQuan.load(KHOA).then(function (D) {
@@ -489,9 +490,8 @@
       M = TongQuan.compute(D, Date.now());
       if (DEMO && typeof TongQuanDemo !== 'undefined') TongQuanDemo.apply(M, D);
       $('msg').style.display = 'none';
-      render1(); render2(); renderP(); renderCV(); render6(); render7(); show(cur);
+      render1(); render2(); renderP(); render6(); render7(); show(cur);
       if (lan1) taiP();
-      taiCV();
     }).catch(function (e) {
       if (M) return; // giữ màn cũ khi rớt mạng tạm thời
       $('msg').textContent = (KHOA ? '' : 'Mở bằng link có khoá (?k=…) hoặc đăng nhập. ') + 'Không tải được số liệu: ' + (e.message || e);
