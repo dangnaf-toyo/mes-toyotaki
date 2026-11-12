@@ -48,14 +48,14 @@
       { label: 'Bảng điều khiển Gia công', href: 'gia-cong-dashboard.html' },
       { label: 'Bảng điều khiển Sơn', href: 'cong-doan-dashboard.html?cd=S%C6%A1n' },
       { label: 'Bảng điều khiển OQC', href: 'cong-doan-dashboard.html?cd=OQC' },
-      // T242: chỉ hiện trên điện thoại (màn rút gọn 1 máy / màn hình).
+      // T246: chỉ hiện trên điện thoại (màn rút gọn 1 máy / màn hình).
       { label: 'Nhập liệu di động', href: 'mobile.html', mobileOnly: true },
-      // T242: In tem + Tra cứu tem đã in = 1 mục, 2 tab.
+      // T246: In tem + Tra cứu tem đã in = 1 mục, 2 tab.
       { label: 'In tem', href: 'intem.html', subTabs: 'in_tem' },
       { label: 'Ghi nhận thùng thành phẩm', href: 'ghi-nhan-tem-thanh-pham.html' },
       // T137: 1 mục "Tổ khuôn" — các trang con hiện dải tab (SUB_TABS bên dưới).
       { label: 'Tổ khuôn', href: 'bao-duong-khuon-tuan.html', subTabs: 'to_khuon' },
-      // T242: Chuyển công đoạn + Đóng gói Pallet = 1 mục, 2 tab.
+      // T246: Chuyển công đoạn + Đóng gói Pallet = 1 mục, 2 tab.
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html', subTabs: 'chuyen_dong_goi' },
     ] },
     { label: 'Chất lượng', items: [
