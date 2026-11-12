@@ -152,7 +152,7 @@ const MesQcUi = (() => {
         if (["PGRST202", "42883"].includes(code) || /could not find the function|does not exist/i.test(msg))
           return {
             duoc: false,
-            ly_do: "Chức năng đóng tồn đọng chưa bật trên máy chủ (cần chạy migration T141).",
+            ly_do: "Chức năng đóng tồn đọng chưa bật trên hệ thống — liên hệ quản trị.",
           };
         return { duoc: true };
       })();

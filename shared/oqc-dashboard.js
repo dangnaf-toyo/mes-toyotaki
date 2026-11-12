@@ -290,7 +290,7 @@ const OqcDashboard = (() => {
     try {
       await MesAuth.requireAuth();
       info = await rpc("oqc_dashboard_info");
-      if (info?.version !== "oqc-dashboard-20261021") throw backendError("oqc_dashboard_info: sai phiên bản " + info?.version);
+      if (info?.version !== "oqc-dashboard-20261021") throw backendError("Hệ thống OQC không đúng phiên bản (" + info?.version + ")");
       if (info.inspection_scope_version !== 2) throw backendError("Máy chủ thiếu phần phạm vi kiểm / thứ tự lỗi OQC.");
       if (info.planning_config_version !== 1)
         throw backendError("Máy chủ thiếu phần cấu hình giờ/hiệu suất OQC.");
