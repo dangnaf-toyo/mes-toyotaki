@@ -528,7 +528,7 @@ const MesIpqcApproval = (() => {
     const off = closeSupport === false;
     el("wfCloseBtn").disabled = off || !picked.size;
     el("wfCloseNote").textContent = off
-      ? "Chức năng đóng cảnh báo chưa được cập nhật trên hệ thống (cần migration T140) — liên hệ admin."
+      ? "Chức năng đóng cảnh báo chưa bật trên hệ thống — liên hệ quản trị."
       : "";
     for (const id of ["wfAll", "wfSelectOld", "wfOldDays", "wfClearSel"]) el(id).disabled = off;
     return show && !off;
