@@ -98,7 +98,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fe
 // Lỗi mạng khi làm mới phiên (wifi xưởng chập chờn) → vẫn hiện trang, không đá ra login.
 (function () {
   const loginUrl = new URL('login.html', document.currentScript.src);
-  if (location.pathname === loginUrl.pathname) return;
+  // Staging (Cloudflare) bỏ đuôi .html trên URL → so sánh không đuôi, tránh lặp chuyển hướng.
+  const boDuoi = (p) => p.replace(/\.html$/, '');
+  if (boDuoi(location.pathname) === boDuoi(loginUrl.pathname)) return;
   const html = document.documentElement;
   html.style.visibility = 'hidden';
   sb.auth.getSession().then(({ data, error }) => {
