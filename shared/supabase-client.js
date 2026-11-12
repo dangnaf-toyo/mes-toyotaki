@@ -29,7 +29,7 @@ const SUPABASE_ANON_KEY = IS_PROD
 const IS_STAGING = !IS_PROD;
 
 /**
- * T242 — báo lỗi ngắn gọn bằng tiếng Việt, dùng chung MỌI trang.
+ * T246 — báo lỗi ngắn gọn bằng tiếng Việt, dùng chung MỌI trang.
  * MesLoi.gon(err) nhận lỗi Supabase / Error / chuỗi → câu ngắn cho người dùng.
  * Lỗi kỹ thuật hay gặp (hết phiên / thiếu quyền, mất mạng, máy chủ quá lâu, DB chưa cập nhật)
  * được đổi sang tiếng Việt; lỗi nghiệp vụ (hàm DB tự báo bằng tiếng Việt) giữ nguyên.
