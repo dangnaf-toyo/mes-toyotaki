@@ -12,7 +12,9 @@
  *   - Tỷ lệ NG theo mô tả nhà máy (Công đoạn của Toyotaki.md): Bavia ≈3%,
  *     Gia công ≈1%, Sơn ≈10%; Đúc mục tiêu 2,5% (tong-quan.js).
  *   - Nhôm lỏng cấp lò = Σ sản lượng Đúc thật × trọng lượng SP (T244) × 1,03.
- *   - Tiến độ trong ngày theo đồng hồ thật (ca 06:00–22:00 cho công đoạn sau Đúc).
+ *   - Tiến độ trong ngày cố định ở mốc DEMO_GIO = 17:00 (ca 06:00–22:00 → 69 %) để
+ *     xem lúc nào cũng thấy bức tranh cuối chiều; chỉ 1 bất thường nhẹ (1 máy CNC
+ *     đổi jig), NG mọi công đoạn dưới mục tiêu, tồn giữa công đoạn trong mức.
  *   - Số ngẫu nhiên có hạt giống = ngày → tải lại trong ngày không nhảy số.
  * Khi công đoạn nào lên MES thật thì thay nguồn tương ứng trong RPC và xoá
  * phần demo của nó ở đây. Viết kiểu ES2017 cho trình duyệt TV.
@@ -51,6 +53,7 @@
   var GC_MAY = { phay3: ['Phay 01', 'Phay 02', 'Phay 03', 'Phay 04', 'Phay 05', 'Phay 06', 'Phay 07', 'Phay 09', 'Phay 11', 'Phay 12', 'Phay 13', 'Phay 14', 'Phay 15'],
     phay4: ['Phay 08', 'Phay 10', 'Phay 16', 'Phay 17'], tien: ['Tiện 01', 'Tiện 02', 'Tiện 03', 'Tiện 04', 'Tiện 05', 'Tiện 06', 'Tiện 07', 'Tiện 08', 'Tiện 09', 'Tiện 10', 'Tiện 11', 'Tiện 12'], chuot: ['Chuốt 01'] };
   var NG = { bavia: 0.03, gc: 0.01, son: 0.10, kem: 0.03 };
+  var DEMO_GIO = 17; // mốc giờ mô phỏng (user 12/11: xem số lúc 17h chiều)
   var NG_MT = { bavia: 0.03, gc: 0.01, son: 0.08, oqc: 0.03 };
 
   // PRNG có hạt giống (mulberry32) — cùng ngày cùng số
@@ -60,13 +63,10 @@
   function r(x) { return Math.round(x); }
   function has(ma, k) { return (ROUTE[ma] || 'BK').indexOf(k) >= 0; }
   // Tiến độ ngày của công đoạn sau Đúc: 2 ca 8h, 06:00–22:00 (giờ địa phương máy TV)
-  function fracNgay(now, ngay) {
-    var d = new Date(ngay + 'T06:00:00'), e = new Date(ngay + 'T22:00:00');
-    return Math.max(0, Math.min(1, (now - d) / (e - d)));
-  }
+  function fracNgay() { return (DEMO_GIO - 6) / 16; }
 
   function apply(M, D) {
-    var now = M.now, ngay = M.ngay, R = rng(hash('demo|' + ngay)), f = fracNgay(now, ngay);
+    var ngay = M.ngay, R = rng(hash('demo|' + ngay)), f = fracNgay();
     var jit = function (a, b) { return a + (b - a) * R(); };
     var tr = M.trend, homQua = tr.length > 1 ? tr[tr.length - 2] : null;
     // ---- Đầu vào Bavia = Đúc thật hôm qua (fallback: KH ngày hoặc 24.000) ----
@@ -83,6 +83,8 @@
     var kgHomNay = 0, kgKem = 0;
     M.machines.forEach(function (m) { var kg = m.tt * (TL[m.sp] || 0.25) * 1.03; if (KEM[m.sp]) kgKem += kg; else kgHomNay += kg; });
     (D.bao_cao || []).forEach(function (b) { if (b.ngay === ngay) kgHomNay += num(b.tt) * 0.3 * 1.03; }); // ca đã kết: TL trung bình 0,3 kg
+    kgHomNay = Math.max(kgHomNay, ducHomQua * f * 0.3 * 1.03); // mở demo lúc sáng vẫn thấy số như 17h
+    if (!kgKem) kgKem = r(1800 * f * 0.21 * 1.03);
     var nvl = {
       ton: [
         { ma: 'ADC12-CHT', ten: 'Nhôm ADC12 Chiến Thắng', kg: r(58235 - kgHomNay * 0.6), ngay: null },
@@ -93,45 +95,45 @@
       ],
       lo: [{ ten: 'Lò 1 · 800 kg/h', nhiet: r(jit(735, 748)), kgh: r(jit(560, 700)), st: 'run' }, { ten: 'Lò 2 · 1000 kg/h', nhiet: r(jit(738, 750)), kgh: r(jit(700, 880)), st: 'run' }],
       capLoKg: r(kgHomNay), kemKg: r(kgKem),
-      iqc: { choKiem: r(jit(0, 2.9)), homNay: 2, ng: 0, lo: [{ ma: 'ADC12-CHT', sl: 8000, kq: 'OK', luc: '07:40' }, { ma: 'EZDA3-HDT', sl: 2000, kq: 'OK', luc: '09:15' }] },
+      iqc: { choKiem: 0, homNay: 2, ng: 0, lo: [{ ma: 'ADC12-CHT', sl: 8000, kq: 'OK', luc: '07:40' }, { ma: 'EZDA3-HDT', sl: 2000, kq: 'OK', luc: '09:15' }] },
       phe: r(kgHomNay * jit(0.012, 0.02)),
     };
-    nvl.ton.forEach(function (t) { var tieu = t.ma === 'EZDA3-HDT' ? 450 : t.ma === 'HD2-HDT' ? 300 : t.ma === 'ADC6-CHT' ? 60 : 4800; t.ngay = Math.floor(t.kg / tieu); });
+    nvl.ton.forEach(function (t) { var tieu = t.ma === 'EZDA3-HDT' ? 450 : t.ma === 'HD2-HDT' ? 300 : t.ma === 'ADC6-CHT' ? 25 : 4800; t.ngay = Math.floor(t.kg / tieu); });
 
     // ---- Bavia: 13 line, 45 người/ca, NG ≈3% ----
-    var khBavia = r(ducHomQua * 0.97), ttBavia = r(khBavia * f * jit(0.93, 1.02));
-    var ngBavia = r(ttBavia * jit(0.022, 0.038));
+    var khBavia = r(ducHomQua * 0.97), ttBavia = r(khBavia * f * jit(0.96, 1.03));
+    var ngBavia = r(ttBavia * jit(0.021, 0.028));
     var maB = maCo('B'), lines = [];
     for (var i = 1; i <= 13; i++) {
       var ma = maB[(i - 1) % Math.max(1, maB.length)], kh = r(khBavia / 10 * jit(0.8, 1.2)); // 10 line chạy, 3 line dự phòng
-      var pct = jit(0.78, 1.06), st = i > 10 ? 'idle' : R() < 0.08 ? 'warn' : 'run';
+      var pct = jit(0.9, 1.06), st = i > 10 ? 'idle' : 'run';
       lines.push({ ten: 'LINE ' + (i < 10 ? '0' + i : i), sp: st === 'idle' ? '' : ma, kh: st === 'idle' ? 0 : kh, tt: st === 'idle' ? 0 : r(kh * f * pct), pct: st === 'idle' ? null : pct, nguoi: st === 'idle' ? 0 : 4 + (i % 3), st: st, nhan: st === 'idle' ? 'Không chạy' : st === 'warn' ? 'Chờ hàng Đúc' : 'Đang chạy' });
     }
     var bavia = { kh: khBavia, tt: ttBavia, ng: ngBavia, ngPct: ttBavia ? ngBavia / ttBavia : null, ngMt: NG_MT.bavia, lines: lines, nguoi: 45,
-      phunBi: [{ ten: 'Phun bi 1', st: 'run', me: r(f * 14) }, { ten: 'Phun bi 2', st: R() < 0.2 ? 'warn' : 'run', me: r(f * 11) }], mai: { dang: 5 - (R() < 0.3 ? 1 : 0), tong: 5 },
-      kem: { kh: r(ducHomQua * share('Z') || 1800), tt: r((ducHomQua * share('Z') || 1800) * f * jit(0.9, 1.0)), ng: 0 } };
+      phunBi: [{ ten: 'Phun bi 1', st: 'run', me: r(f * 14) }, { ten: 'Phun bi 2', st: 'run', me: r(f * 11) }], mai: { dang: 5, tong: 5 },
+      kem: { kh: r(ducHomQua * share('Z') || 1800), tt: r((ducHomQua * share('Z') || 1800) * f * jit(0.95, 1.02)), ng: 0 } };
     bavia.kem.ng = r(bavia.kem.tt * NG.kem);
 
     // ---- Gia công: 30 máy, 15 người/ca, NG ≈1% ----
-    var khGC = r(ducHomQua * Math.max(share('G'), 0.3) * 0.97), ttGC = r(khGC * f * jit(0.9, 1.0)), ngGC = r(ttGC * jit(0.006, 0.014));
+    var khGC = r(ducHomQua * Math.max(share('G'), 0.3) * 0.97), ttGC = r(khGC * f * jit(0.96, 1.02)), ngGC = r(ttGC * jit(0.005, 0.009));
     // mã Gia công: mã đang đúc đi tiếp Gia công + hàng tồn hôm trước (mã có OQC gần đây)
     var maG = maCo('G'); ['EXE-OUT-01', 'EXE-PLT-01', 'MIK-389-02', 'PRE-W99-01', 'EXE-CEN-01', 'MIK-399-01'].forEach(function (x) { if (maG.indexOf(x) < 0) maG.push(x); });
-    var gcMay = [], k = 0, sucoMay = Math.floor(R() * 30);
+    var gcMay = [], k = 0, jigMay = Math.floor(R() * 30), nghi = { 'Phay 05': 1, 'Phay 14': 1 }; // 1 máy đổi jig, 2 máy không KH
     [['phay3', 'Phay 3 trục'], ['phay4', 'Phay 4 trục'], ['tien', 'Tiện'], ['chuot', 'Chuốt']].forEach(function (g) {
       GC_MAY[g[0]].forEach(function (ten) {
-        var ma = maG[k % maG.length], pct = jit(0.8, 1.05), idle = R() < 0.12, warn = !idle && R() < 0.07, alarm = k === sucoMay;
+        var ma = maG[k % maG.length], pct = jit(0.9, 1.05), idle = !!nghi[ten], warn = !idle && k === jigMay, alarm = false;
         var khM = r(khGC / 26), st = idle ? 'idle' : alarm ? 'alarm' : warn ? 'warn' : 'run';
         gcMay.push({ may: ten, loai: g[1], sp: idle ? '' : ma, kh: idle ? 0 : khM, tt: idle ? 0 : r(khM * f * pct), pct: idle ? null : pct, st: st,
-          nhan: idle ? 'Không có KH' : alarm ? 'Gãy dao ' + r(jit(8, 40)) + '′' : warn ? 'Đổi jig ' + r(jit(5, 25)) + '′' : 'Đang chạy', phut: alarm ? r(jit(8, 40)) : warn ? r(jit(5, 25)) : 0 });
+          nhan: idle ? 'Không có KH' : warn ? 'Đổi jig ' + r(jit(5, 15)) + '′' : 'Đang chạy', phut: warn ? r(jit(5, 15)) : 0 });
         k++;
       });
     });
     var thuTu = { alarm: 0, warn: 1, run: 2, idle: 3 }; gcMay.sort(function (a, b) { return thuTu[a.st] - thuTu[b.st] || a.may.localeCompare(b.may, 'vi', { numeric: true }); });
     var dem = { run: 0, warn: 0, alarm: 0, idle: 0 }; gcMay.forEach(function (m) { dem[m.st]++; });
-    var gc = { kh: khGC, tt: ttGC, ng: ngGC, ngPct: ttGC ? ngGC / ttGC : null, ngMt: NG_MT.gc, may: gcMay, dem: dem, nguoi: 15, vatMep: 3, ipqcTre: R() < 0.3 ? 1 : 0 };
+    var gc = { kh: khGC, tt: ttGC, ng: ngGC, ngPct: ttGC ? ngGC / ttGC : null, ngMt: NG_MT.gc, may: gcMay, dem: dem, nguoi: 15, vatMep: 3, ipqcTre: 0 };
 
     // ---- Sơn: 1 dây chuyền bán tự động, masking, NG ≈10%, hao sơn 20–60% ----
-    var khSon = r(ducHomQua * Math.max(share('S'), 0.12) * 0.95), ttSon = r(khSon * f * jit(0.85, 1.0)), ngSon = r(ttSon * jit(0.07, 0.12));
+    var khSon = r(ducHomQua * Math.max(share('S'), 0.12) * 0.95), ttSon = r(khSon * f * jit(0.95, 1.02)), ngSon = r(ttSon * jit(0.06, 0.075));
     var maS = maCo('S'); if (!maS.length) maS = ['OKA-GMN-02', 'FCC-TAD-01', 'IWT-114-01'];
     var son = { kh: khSon, tt: ttSon, ng: ngSon, ngPct: ttSon ? ngSon / ttSon : null, ngMt: NG_MT.son, sp: maS[0], loai: R() < 0.5 ? 'Sơn bột tĩnh điện' : 'Sơn nước',
       tienXuLy: { tt: r(khSon * Math.min(1, f + 0.12) * 0.98), kh: khSon }, say: { nhiet: r(jit(178, 186)), st: 'run' },
@@ -140,8 +142,8 @@
 
     // ---- OQC: thật nếu có; demo thêm phần sau Sơn ----
     var oqcThat = M.oqc.n > 0;
-    var oqcN = oqcThat ? M.oqc.n : r((ttGC + ttSon) * 0.9), oqcNG = oqcThat ? M.oqc.ng : r(oqcN * jit(0.025, 0.045));
-    var oqc = { n: oqcN, ng: oqcNG, pct: oqcN ? oqcNG / oqcN : null, mt: M.oqc.mt, that: oqcThat, nguoi: 6, sauGC: r(oqcN * 0.6), sauSon: r(oqcN * 0.4), choKiem: r((ttGC + ttSon) * jit(0.05, 0.12)) };
+    var oqcN = oqcThat ? M.oqc.n : r((ttGC + ttSon) * 0.9), oqcNG = oqcThat ? M.oqc.ng : r(oqcN * jit(0.02, 0.028));
+    var oqc = { n: oqcN, ng: oqcNG, pct: oqcN ? oqcNG / oqcN : null, mt: M.oqc.mt, that: oqcThat, nguoi: 6, sauGC: r(oqcN * 0.6), sauSon: r(oqcN * 0.4), choKiem: r((ttGC + ttSon) * jit(0.04, 0.08)) };
 
     // ---- Kho thành phẩm & xuất hàng ----
     var nhapKho = M.nhapKho > 0 ? M.nhapKho : r((oqcN - oqcNG) * 0.85 + ttBavia * share('K') * 0.4 * (1 - share('G') - share('S')));
@@ -152,10 +154,10 @@
 
     // ---- WIP giữa công đoạn (sọt/thùng chờ) ----
     var wip = [
-      { tu: 'Đúc', den: 'Bavia', sl: r(ducHomQua * jit(0.9, 1.3)), mt: r(ducHomQua * 1.2) },
-      { tu: 'Bavia', den: 'Gia công', sl: r(khGC * jit(0.5, 0.9)), mt: r(khGC * 0.8) },
+      { tu: 'Đúc', den: 'Bavia', sl: r(ducHomQua * jit(0.8, 1.05)), mt: r(ducHomQua * 1.2) },
+      { tu: 'Bavia', den: 'Gia công', sl: r(khGC * jit(0.45, 0.7)), mt: r(khGC * 0.8) },
       { tu: 'Gia công', den: 'Sơn', sl: r(khSon * 0.4 * jit(0.3, 0.8)), mt: r(khSon * 0.5) },
-      { tu: 'Sơn', den: 'OQC', sl: oqc.choKiem, mt: r((ttGC + ttSon) * 0.1) },
+      { tu: 'Sơn', den: 'OQC', sl: oqc.choKiem, mt: r((ttGC + ttSon) * 0.15) },
     ];
 
     // ---- Việc đang mở thêm từ công đoạn demo ----
