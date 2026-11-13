@@ -161,12 +161,12 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 // Cùng danh mục với CONFIG.LOAI_SU_CO ở duc-dashboard.html.
 const LOAI = [
   ['A1', 'Sự cố máy đúc'], ['A2', 'Sự cố khuôn'], ['A3', 'Sự cố hạ tầng (Điện, khí nén, nước...)'],
-  ['B1', 'Chất lượng SP · SX phát hiện'], ['F1', 'Chất lượng SP · IPQC phát hiện'], ['B2', 'Sự cố CL nguyên liệu'],
+  ['B1', 'Chất lượng sản phẩm'], ['F1', 'Chất lượng sản phẩm · IPQC phát hiện'], ['B2', 'Sự cố CL nguyên liệu'],
   ['C1', 'Thay đổi KHSX'], ['C2', 'Hết nguyên liệu'], ['C3', 'Đổi khuôn'],
   ['D1', 'Thiếu nhân lực'], ['D2', 'Đào tạo / Người mới'],
   ['E1', 'Bảo dưỡng khuôn KH'], ['E2', 'Vệ sinh theo KH'], ['E3', 'Kiểm kê định kỳ'],
 ];
-// T248: F1 (IPQC phát hiện) nằm chung nhóm B với B1 (SX phát hiện) — cùng là chất lượng SP.
+// T248: F1 (IPQC phát hiện) nằm chung nhóm B với B1 (SX phát hiện) — cùng là chất lượng sản phẩm.
 const NHOM = { A: 'A — Sự cố', B: 'B — Chất lượng', C: 'C — Kế hoạch', D: 'D — Nhân lực', E: 'E — Theo kế hoạch' };
 const nhomCua = ma => ma === 'F1' ? 'B' : ma[0];
 const CL_SP = ['B1', 'F1'];
@@ -333,7 +333,7 @@ function fillOptions(){
   let h = '<option value="">Mọi loại vấn đề</option>';
   for (const [g, ten] of Object.entries(NHOM)) {
     h += '<optgroup label="' + escapeHtml(ten) + '"><option value="g:' + g + '">Cả nhóm ' + escapeHtml(ten) + n('g:' + g) + '</option>' +
-      (g === 'B' ? '<option value="cl">Chất lượng SP (B1 + F1)' + n('cl') + '</option>' : '') +
+      (g === 'B' ? '<option value="cl">Chất lượng sản phẩm (B1 + F1)' + n('cl') + '</option>' : '') +
       LOAI.filter(([m]) => nhomCua(m) === g).map(([m, t]) => '<option value="' + m + '">' + m + ' — ' + escapeHtml(t) + n(m) + '</option>').join('') + '</optgroup>';
   }
   if (dem.has('??') || cur === '??') h += '<option value="??">?? — Không rõ loại' + n('??') + '</option>';
@@ -356,7 +356,7 @@ function datGiaTri(id, v){
 }
 function hopLoai(r, v){
   if (!v) return true;
-  if (v === 'cl') return CL_SP.includes(r.ma);   // T248: Chất lượng SP = B1 + F1
+  if (v === 'cl') return CL_SP.includes(r.ma);   // T248: Chất lượng sản phẩm = B1 + F1
   if (v.startsWith('g:')) return nhomCua(r.ma) === v.slice(2) || r.ma[0] === v.slice(2);   // g:F (link cũ) vẫn ra F1
   return r.ma === v;
 }
