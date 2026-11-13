@@ -89,12 +89,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .header-live{display:flex;align-items:center;gap:6px;color:#94A3B8}
 .header-live .live-badge{color:#94A3B8}
 .header-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.more-wrap{position:relative}
-.more-menu{display:none;position:absolute;right:0;top:calc(100% + 4px);background:#FFF;color:var(--text);border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow-md);min-width:210px;padding:4px;z-index:50;flex-direction:column}
-.more-wrap.open .more-menu{display:flex}
-.more-menu a,.more-menu button{display:block;width:100%;text-align:left;padding:7px 10px;border:none;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--text);text-decoration:none;border-radius:4px;cursor:pointer}
-.more-menu a:hover,.more-menu button:hover{background:var(--bg-sunken)}
-.more-sep{height:1px;background:var(--border);margin:4px 2px}
+a.btn{text-decoration:none}
 @media (max-width:768px){
   .app{padding:4px;gap:4px}
   header{padding:6px 10px;gap:8px}
@@ -367,22 +362,16 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <div class="header-actions">
       <button class="btn btn-ghost" id="btn-khsx-batch" onclick="openKhsxBatchModal()">Nạp kế hoạch</button>
       <button class="btn btn-ghost" id="btn-bulk-incident" onclick="openBulkIncidentModal()">Sự cố nhiều máy</button>
-      <div class="more-wrap" id="more-wrap">
-        <button class="btn btn-ghost" id="btn-more" type="button" aria-haspopup="true" aria-expanded="false">Khác ▾</button>
-        <div class="more-menu" id="more-menu" role="menu">
-          <a href="quan-ly-khuon.html" id="btn-khuon-manage">Quản lý khuôn</a>
-          <a href="bao-duong-khuon-tuan.html" target="_blank">Bảng điều khiển tổ khuôn</a>
-          <button type="button" id="btn-weekly-report" onclick="openWeeklyReportFull()">Báo cáo tuần</button>
-          <a href="bao-cao-ca.html" target="_blank">Báo cáo ca</a>
-          <a href="chuyencongdoan.html?tab=confirm&amp;dept=%C4%90%C3%BAc" target="_blank">Xác nhận giao hàng</a>
-          <a href="su-co-duc.html" target="_blank">Tra cứu sự cố</a>
-          <a href="tra-cuu-tem.html" target="_blank">Tra cứu tem</a>
-          <a href="ghi-nhan-kanban.html" target="_blank">Ghi nhận Kanban</a>
-          <div class="more-sep"></div>
-          <button type="button" id="btn-refresh">Làm mới</button>
-          <button type="button" id="btn-fullscreen">Toàn màn hình</button>
-        </div>
-      </div>
+      <a class="btn btn-ghost" href="quan-ly-khuon.html" id="btn-khuon-manage">Quản lý khuôn</a>
+      <a class="btn btn-ghost" href="bao-duong-khuon-tuan.html" target="_blank">Tổ khuôn</a>
+      <button class="btn btn-ghost" type="button" id="btn-weekly-report" onclick="openWeeklyReportFull()">Báo cáo tuần</button>
+      <a class="btn btn-ghost" href="bao-cao-ca.html" target="_blank">Báo cáo ca</a>
+      <a class="btn btn-ghost" href="chuyencongdoan.html?tab=confirm&amp;dept=%C4%90%C3%BAc" target="_blank">Xác nhận giao hàng</a>
+      <a class="btn btn-ghost" href="su-co-duc.html" target="_blank">Tra cứu sự cố</a>
+      <a class="btn btn-ghost" href="tra-cuu-tem.html" target="_blank">Tra cứu tem</a>
+      <a class="btn btn-ghost" href="ghi-nhan-kanban.html" target="_blank">Kanban</a>
+      <button class="btn btn-ghost" type="button" id="btn-refresh">Làm mới</button>
+      <button class="btn btn-ghost" type="button" id="btn-fullscreen">Toàn màn hình</button>
       <button class="btn btn-primary" id="btn-end-shift">Kết ca</button>
     </div>
   </header>
@@ -1609,17 +1598,6 @@ function populateLoaiSuCo(selectId){
 // =============================================================================
 // EVENT LISTENERS
 // =============================================================================
-// Menu "Khác" trên thanh tiêu đề (T247): mở/đóng, đóng khi bấm ngoài / Esc / chọn mục.
-// Gắn ngay khi nạp trang (không đợi tải danh mục) để các liên kết vẫn mở được khi lỗi mạng.
-(function(){
-  const wrap = document.getElementById('more-wrap'), btn = document.getElementById('btn-more');
-  const set = (o) => { wrap.classList.toggle('open', o); btn.setAttribute('aria-expanded', o ? 'true' : 'false'); };
-  btn.addEventListener('click', (e) => { e.stopPropagation(); set(!wrap.classList.contains('open')); });
-  document.getElementById('more-menu').addEventListener('click', () => set(false));
-  document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) set(false); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
-})();
-
 function attachEventListeners(){
   document.getElementById('sel-phuong-an').addEventListener('change', () => {
     updateCaDropdown(); onShiftContextChange(); saveSelection();
