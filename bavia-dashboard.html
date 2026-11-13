@@ -50,16 +50,16 @@
 
   header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;margin:6px 12px 0;}
   .brand{display:flex;flex-direction:column;line-height:1.2;}
-  .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
+  .brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
   .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF;}
   .header-group{display:flex;align-items:center;gap:6px;}
-  .header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
+  .header-label{font-size:11px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
   .header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;outline:none;min-height:28px;}
   .btn{padding:6px 12px;border-radius:5px;border:none;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;min-height:32px;}
   .btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;}
   .btn-ghost:hover:not(:disabled){background:#334155;}
   .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15;}
-  .header-clock .date{font-size:10px;color:#94A3B8;}
+  .header-clock .date{font-size:11px;color:#94A3B8;}
   .header-clock .time{font-family:var(--mono);font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
 
   .page{padding:8px 12px 50px;display:flex;flex-direction:column;gap:10px;}
@@ -238,6 +238,13 @@
   .modal .opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:240px;overflow:auto;}
   .modal label.o{display:flex;gap:7px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:12.5px;font-weight:600;cursor:pointer;}
   .modal .acts{display:flex;justify-content:flex-end;gap:8px;}
+  .info-btn{border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text-muted);border-radius:50%;width:20px;height:20px;padding:0;font-size:12px;font-weight:700;line-height:1;display:inline-grid;place-items:center;cursor:pointer;text-transform:none;letter-spacing:0;flex:none;}
+  .info-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .info-txt{font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:7px;padding:7px 9px;text-transform:none;letter-spacing:0;font-weight:500;line-height:1.45;}
+  #xnModal{z-index:70;}
+  #xnModal .xn-nd{font-size:14px;line-height:1.5;white-space:pre-line;}
+  #xnModal textarea{border:1.5px solid var(--border-strong);border-radius:7px;padding:8px 10px;font-family:inherit;font-size:13.5px;min-height:70px;}
+  .mbtn.danger{background:var(--alarm-fg);}
   .mbtn{border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;background:var(--accent);color:#fff;min-height:36px;}
   .mbtn.ghost{background:#fff;color:var(--text);border:1.5px solid var(--border-strong);}
   .modal .err{color:var(--alarm-fg);font-weight:600;font-size:12.5px;}
@@ -329,8 +336,8 @@
     <span class="header-label">Trưởng ca</span>
     <select id="fTruongCa" class="header-select" aria-label="Trưởng ca"></select>
   </div>
-  <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">↻ Tải lại</button>
-  <button type="button" class="btn btn-ghost" id="btnKetCa">Báo cáo kết ca</button>
+  <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">Làm mới</button>
+  <button type="button" class="btn btn-ghost" id="btnKetCa">Kết ca</button>
   <div class="header-clock">
     <div class="date" id="hdrDate">—</div>
     <div class="time" id="hdrTime">--:--:--</div>
@@ -343,9 +350,9 @@
   <main class="app" id="app" hidden>
     <aside class="col side-l">
       <div class="card">
-        <h3>Line Bavia <span class="cnt" id="lineCnt"></span><span class="sp"></span><button class="h3-btn" type="button" id="btnPlan">Nạp KH từ KHSX tuần</button></h3>
+        <h3>Line Bavia <span class="cnt" id="lineCnt"></span><span class="sp"></span><button class="h3-btn" type="button" id="btnPlan" title="Nạp kế hoạch từ KHSX tuần">Nạp KH</button></h3>
         <div class="lines-wrap" id="lines"></div>
-        <button class="add-line" type="button" id="btnAddLine">+ Mở Line</button>
+        <button class="add-line" type="button" id="btnAddLine">Mở Line</button>
       </div>
     </aside>
     <section class="col" id="ws"></section>
@@ -372,14 +379,12 @@
     <label class="f"><span>Mã SP</span><input id="lmMa" list="dsMa" autocomplete="off" placeholder="Gõ để tìm mã SP có công đoạn Bavia"></label>
     <datalist id="dsMa"></datalist>
     <label class="f"><span>Người thao tác</span>
-      <input id="lmOps" type="text" autocomplete="off" placeholder="VD: Nguyễn Thị Hoa, Lê Văn Tuấn">
-      <small style="color:var(--text-muted);font-size:11.5px">Trưởng ca gõ tên, nhiều người cách nhau bằng dấu phẩy.</small>
+      <input id="lmOps" type="text" autocomplete="off" placeholder="Nhiều người cách nhau dấu phẩy">
     </label>
     <label class="f"><span>Người phun bi</span>
       <select id="lmPhunBi"></select>
-      <small style="color:var(--text-muted);font-size:11.5px">In vào dòng Sandblast trên Phiếu quản lý lô.</small>
     </label>
-    <label class="f"><span>Người kiểm tra (in lên tem)</span><select id="lmKiem"></select></label>
+    <label class="f"><span>Người kiểm tra</span><select id="lmKiem"></select></label>
     <div class="err" id="lmErr"></div>
     <div class="acts">
       <button class="mbtn ghost" type="button" data-close>Huỷ</button>
@@ -390,7 +395,8 @@
 
 <div class="modal-bg" id="planModal" hidden>
   <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pTitle">
-    <h4 id="pTitle">Nạp kế hoạch Bavia từ KHSX tuần</h4>
+    <h4 id="pTitle" style="display:flex;align-items:center;gap:8px">Nạp kế hoạch Bavia <button class="info-btn" type="button" data-info title="Giải thích">ⓘ</button></h4>
+    <div class="info-txt" hidden>KH ca = KH ngày ÷ số ca (mặc định 1 ca/ngày; 1 ca/ngày thì ca đêm không có KH). Số ca chọn ở đây được nhớ cho các ngày sau trong tuần. Nạp lại giữa ca sẽ ghi đè KH ca và lưu nhật ký. Line còn hàng dở của mã khác thì không nhận mã mới.</div>
     <div class="sub" id="pSub"></div>
     <div class="tbl"><table class="boxes plan-tbl" style="min-width:680px">
       <thead><tr><th>Mã SP</th><th>Dạng</th><th style="text-align:right">KH ngày</th><th>Số ca</th><th style="text-align:right">KH ca</th><th>Line</th></tr></thead>
@@ -407,6 +413,17 @@
 
 <div class="modal-bg" id="rpModal" hidden>
   <div class="modal xl" role="dialog" aria-modal="true" aria-labelledby="rpTitle" id="rpBody"></div>
+</div>
+
+<div class="modal-bg" id="xnModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" style="width:min(420px,100%)">
+    <div class="xn-nd" id="xnNd"></div>
+    <textarea id="xnNhap" hidden></textarea>
+    <div class="acts">
+      <button class="mbtn ghost" type="button" id="xnHuy">Huỷ</button>
+      <button class="mbtn" type="button" id="xnOk">Đồng ý</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-bg" id="camModal" hidden>
@@ -482,6 +499,22 @@ function loiDeHieu(e) {
   return { t: 'Không thực hiện được. Thử lại, nếu vẫn lỗi báo trưởng ca.', d: m };
 }
 function setFlash(k, t, detail) { flash = { k, t, detail }; }
+// hoiXacNhan(noiDung, {nutOk, nguyHiem, nhap, goiY}) → Promise<true|false>, hoặc chuỗi đã nhập ('' = huỷ) khi nhap=true
+function hoiXacNhan(noiDung, o) {
+  o = o || {};
+  return new Promise(res => {
+    const w = $('#xnModal'), ta = $('#xnNhap'), ok = $('#xnOk'), huy = $('#xnHuy');
+    $('#xnNd').textContent = noiDung;
+    ta.hidden = !o.nhap; ta.value = ''; ta.placeholder = o.goiY || '';
+    ok.textContent = o.nutOk || 'Đồng ý';
+    ok.classList.toggle('danger', !!o.nguyHiem);
+    const xong = v => { w.hidden = true; ok.onclick = huy.onclick = null; res(v); };
+    ok.onclick = () => { if (o.nhap && !ta.value.trim()) { ta.focus(); return; } xong(o.nhap ? ta.value.trim() : true); };
+    huy.onclick = () => xong(o.nhap ? '' : false);
+    w.hidden = false;
+    setTimeout(() => (o.nhap ? ta : ok).focus(), 30);
+  });
+}
 function errFlash(e) { const x = loiDeHieu(e); setFlash('bad', esc(x.t), x.d); }
 
 /* ── Ca theo giờ, chỉ dùng khi không lấy được ca đang mở từ server ── */
@@ -620,13 +653,13 @@ function renderLines() {
   $('#btnAddLine').disabled = !!(D && D.ket_ca);
   $('#btnPlan').disabled = !D || !!D.ket_ca;
   const kb = $('#btnKetCa');
-  kb.textContent = D && D.ket_ca ? 'Báo cáo ca (đã kết)' : 'Báo cáo kết ca';
+  kb.textContent = D && D.ket_ca ? 'Báo cáo ca' : 'Kết ca';
   kb.classList.toggle('done', !!(D && D.ket_ca));
 }
 
 function srcList(l) {
   const N = l.nguon || [];
-  if (!N.length) return '<div class="empty-box">Chưa khai báo tem Đúc nào.<br>Quét QR tem Đúc của thùng đang làm.</div>';
+  if (!N.length) return '<div class="empty-box">Chưa khai báo tem Đúc.</div>';
   const first = N.findIndex(n => Number(n.con) > 0);
   const khoa = !!D.ket_ca;
   return '<div class="src">' + N.map((n, i) => {
@@ -653,7 +686,7 @@ function ngRowHtml() {
 }
 function ngForm(n, i) {
   return '<div class="ng-form" data-con="' + n.con + '"><div id="ngRows">' + ngRowHtml() + '</div>' +
-    '<div class="ng-acts"><button class="tiny" type="button" data-ngadd>+ Thêm dòng</button><span class="ng-sum" id="ngSum"></span>' +
+    '<div class="ng-acts"><button class="tiny" type="button" data-ngadd>Thêm dòng</button><span class="ng-sum" id="ngSum"></span>' +
     '<span class="sp"></span><button class="tiny bad" type="button" data-ngsave="' + i + '">Ghi NG</button>' +
     '<button class="tiny" type="button" data-cancel>Huỷ</button></div></div>';
 }
@@ -689,14 +722,14 @@ function packPanel(l) {
   const du = conOf(l) >= sl, khoa = !!D.ket_ca;
   const lp = lastPrint[l.ten_line];
   return '<div class="card pack">' +
-    '<h3><span class="step">2</span> Đóng thùng · in tem xuất hàng <span class="sp"></span><span class="chip ship">' + esc(BaviaInTem.MAU_TEN[l.info.mau] || '') + '</span></h3>' +
+    '<h3><span class="step">2</span> Đóng thùng · in tem <button class="info-btn" type="button" data-info title="Giải thích">ⓘ</button><span class="sp"></span><span class="chip ship">' + esc(BaviaInTem.MAU_TEN[l.info.mau] || '') + '</span></h3>' +
+    '<div class="info-txt" hidden>Sản lượng tính lúc in tem. Hết ca chưa đủ thùng thì để lẻ, không in tem: số lẻ nằm lại trên tem Đúc đang dùng, ca sau làm tiếp và tính vào ca sau.</div>' +
     '<div class="pack-ctl"><div class="fld"><span class="lab">SL thùng</span><div class="fixed-qty">' + fmt(sl) + '</div><div class="u">pcs · theo Danh mục SP</div></div>' +
     '<button class="big" type="button" id="btnPack" ' + (ops.length && l.nguoi_kiem_tra && du && !khoa ? '' : 'disabled') + '>Đóng thùng · In tem <kbd>F2</kbd></button></div>' +
-    (!l.nguoi_kiem_tra ? '<div class="flash bad" style="margin:0">Chưa có người kiểm tra. Trưởng ca chọn ở ô "Người kiểm tra" phía trên.</div>' : '') +
+    (!l.nguoi_kiem_tra ? '<div class="flash bad" style="margin:0">Chưa chọn người kiểm tra.</div>' : '') +
     (!ops.length ? '<div class="flash bad" style="margin:0">Chưa gán người thao tác.</div>' : '') +
     '<div class="take">' + takeText(l) + '</div>' +
     '<div class="opt"><label>Số bản in / thùng <input type="number" id="optBan" min="1" max="6" value="' + esc(lsGet('bvdb_ban', '1')) + '"></label></div>' +
-    '<div class="take">Sản lượng tính lúc in tem. Hết ca chưa đủ thùng thì để lẻ, không in tem: số lẻ nằm lại trên tem Đúc đang dùng, ca sau làm tiếp và tính vào ca sau.</div>' +
     '<div class="label-wrap"><div class="label-cap"><span>' + (lp ? 'Tem vừa in · ' + esc(lp.tag_no) : 'Tem gần nhất') + '</span>' +
       (lp ? '<span><button class="link-btn" type="button" id="btnA6Real">' + (a6Real ? 'Thu vừa khung' : 'Cỡ thật 100%') + '</button><button class="link-btn" type="button" data-in="' + esc(lp.tag_no) + '">In lại</button></span>' : '') + '</div>' +
       (lp ? '<div class="a6fit" id="a6fit">' + BaviaInTem.veMot(lp) + '</div>' : '<div class="empty-box">Chưa in thùng nào ở Line này trong ca.</div>') +
@@ -707,15 +740,15 @@ function prePanel(l) {
   const sl = Number(l.info.sl_thung) || 0, con = PRE[l.ma_sp] || 0;
   const last = (l.thung || [])[0];
   return '<div class="card pack">' +
-    '<h3><span class="step">2</span> Quét tem thùng in sẵn <span class="sp"></span><span class="chip flow">→ ' + esc(nextStep(l)) + '</span></h3>' +
+    '<h3><span class="step">2</span> Quét tem thùng in sẵn <button class="info-btn" type="button" data-info title="Cách làm">ⓘ</button><span class="sp"></span><span class="chip flow">→ ' + esc(nextStep(l)) + '</span></h3>' +
     '<div class="spec"><div><div class="l">Quy cách</div><div class="v">' + fmt(sl) + ' <small>pcs/thùng</small></div></div>' +
     '<div><div class="l">Tem in sẵn còn</div><div class="v" style="color:' + (con < 3 ? 'var(--warn-fg)' : 'inherit') + '">' + con + ' <small>tem</small></div></div>' +
     '<div><div class="l">Đủ cho</div><div class="v">' + (sl ? Math.floor(conOf(l) / sl) : 0) + ' <small>thùng</small></div></div></div>' +
-    '<div class="howto"><div><span class="n">1</span><span>Dán tem in sẵn lên thùng khi đóng đủ <b>' + fmt(sl) + ' pcs</b>.</span></div>' +
+    '<div class="howto info-txt" hidden><div><span class="n">1</span><span>Dán tem in sẵn lên thùng khi đóng đủ <b>' + fmt(sl) + ' pcs</b>.</span></div>' +
     '<div><span class="n">2</span><span>Quét QR tem thùng vào ô quét. Hệ thống trừ nguồn từ tem Đúc đang dùng và chuyển thùng sang <b>' + esc(nextStep(l)) + '</b>.</span></div>' +
     '<div><span class="n">3</span><span>Hết ca chưa đủ thùng thì để lẻ, chưa dán tem. Ca sau làm tiếp và tính sản lượng vào ca sau.</span></div></div>' +
-    (con < 3 ? '<div class="flash warn" style="margin:0">Còn ' + con + ' tem thùng in sẵn cho mã ' + esc(l.ma_sp) + '. Báo QLSX in thêm ở <a href="intem.html?tab=tp" target="_blank">In tem › Tem Thành Phẩm</a>.</div>' : '') +
-    (last ? '<div class="last-box"><div class="sub" style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Thùng vừa ghi nhận · ' + hm(last.thoi_diem) + '</div>' +
+    (con < 3 ? '<div class="flash warn" style="margin:0">Còn ' + con + ' tem in sẵn · <a href="intem.html?tab=tp" target="_blank">In thêm</a></div>' : '') +
+    (last ? '<div class="last-box"><div class="sub" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Thùng vừa ghi nhận · ' + hm(last.thoi_diem) + '</div>' +
       '<div class="tg">' + esc(last.tag_tp) + '</div><div style="font-size:12px;color:var(--text-muted)">' + fmt(last.so_luong) + ' pcs · ' + esc(last.nguoi_lam || '—') + '</div></div>' : '') +
     '</div>';
 }
@@ -743,8 +776,6 @@ function renderWs() {
   const route = info.ok ? (info.quy_trinh || []).map((r, i) => (i ? '<i>›</i>' : '') + '<span class="' + (r === 'Bavia' ? 'cur' : r === info.buoc_sau ? 'next' : '') + '">' + esc(r) + '</span>').join('') : '';
   const kiemDs = dsNguoiKiem();
   if (l.nguoi_kiem_tra && !kiemDs.includes(l.nguoi_kiem_tra)) kiemDs.unshift(l.nguoi_kiem_tra);
-  const hint = !info.ok ? '' : info.dang === 1 ? 'Quét <b>tem Đúc đã chuyển sang Bavia</b> để khai báo nguồn. Tem xuất hàng in khi bấm Đóng thùng.'
-    : 'Quét <b>tem Đúc đã chuyển sang Bavia</b> để khai báo nguồn, quét <b>tem thùng in sẵn</b> để ghi nhận thùng.';
   const T = l.thung || [];
   $('#ws').innerHTML =
     '<div class="card"><div class="ws-head">' +
@@ -764,7 +795,7 @@ function renderWs() {
     '<div class="scan"><span class="ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M11 8v8M14 8v8M17 8v8"/></svg></span>' +
       '<input id="scan" type="text" autocomplete="off" placeholder="Quét QR tem Đúc' + (info.dang === 2 ? ' hoặc tem thùng' : '') + '…" aria-label="Ô quét mã QR" ' + (khoa || !info.ok ? 'disabled' : '') + '>' +
       '<button class="cam" type="button" id="btnCam" title="Quét bằng camera" ' + (khoa || !info.ok ? 'disabled' : '') + '>📷</button></div>' +
-    '<div class="scan-hint">' + hint + '</div>' + fl + '</div>' +
+    fl + '</div>' +
 
     '<div class="ws-grid">' +
       '<div class="card"><h3><span class="step">1</span> Tem Đúc đang dùng <span class="sp"></span><span class="cnt">' + (l.nguon || []).filter(n => n.con > 0).length + ' tem</span></h3>' +
@@ -787,7 +818,7 @@ function renderWs() {
       ((l.test || []).length ? '<div class="tbl" style="margin-top:8px"><table class="boxes"><thead><tr><th>Giờ</th><th>Tem Đúc</th><th style="text-align:right">SL</th><th>Mục đích</th><th>Người test</th><th>Kết quả</th></tr></thead><tbody>' +
         l.test.map((t, i) => '<tr><td class="mono">' + hm(t.thoi_diem) + (t.id_tram !== l.id_tram ? '<div class="sub">ca trước</div>' : '') + '</td><td class="mono">' + esc(t.tag_no) + '</td><td class="n">' + fmt(t.so_luong) + '</td>' +
           '<td><b>' + esc(t.muc_dich) + '</b><div class="sub">' + esc(t.noi_dung) + '</div></td><td>' + esc(t.nguoi_test) + '</td><td>' + testResult(t, i) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
-      (!(l.ng || []).length && !(l.test || []).length ? '<div class="empty-box">Chưa có NG / hàng test. Bấm <b>NG</b> hoặc <b>Test</b> trên dòng tem Đúc.</div>' : '') +
+      (!(l.ng || []).length && !(l.test || []).length ? '<div class="empty-box">Chưa có NG / hàng test.</div>' : '') +
     '</div>';
   fitA6();
   bindWs(l);
@@ -920,6 +951,12 @@ document.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
   const l = curLine();
   if (t.dataset.line) { selLine = t.dataset.line; lsSet('bvdb_line', selLine); flash = null; ngOpen = testOpen = retOpen = null; renderLines(); renderWs(); const s = $('#scan'); if (s) s.focus({ preventScroll: true }); return; }
+  if (t.dataset.info !== undefined) {
+    const h = t.closest('h3,h4,h5'), nx = h && h.nextElementSibling;
+    const x = nx && nx.classList.contains('info-txt') ? nx : (h && h.parentElement.querySelector('.info-txt'));
+    if (x) { x.hidden = !x.hidden; t.classList.toggle('on', !x.hidden); }
+    return;
+  }
   if (t.dataset.close !== undefined) { const m = t.closest('.modal-bg'); m.hidden = true; if (m.id === 'rpModal') taiLai(); return; }
   if (t.dataset.veca !== undefined) { flash = null; veCaMo(); taiLai(); return; }
   if (!l) return;
@@ -936,7 +973,7 @@ document.addEventListener('click', async e => {
   if (t.dataset.in) { await chay(async () => { await inLai(t.dataset.in, l.ten_line); setFlash('ok', 'Đã gửi in lại tem <b>' + esc(t.dataset.in) + '</b>.'); renderWs(); }); return; }
   if (t.dataset.rm) {
     const n = (l.nguon || []).find(x => String(x.id) === t.dataset.rm);
-    if (!confirm('Bỏ khai báo tem ' + (n ? n.tag_no : '') + '? Số còn lại vẫn nằm trên tem, Line khác khai báo được.')) return;
+    if (!(await hoiXacNhan('Bỏ khai báo tem ' + (n ? n.tag_no : '') + '?', { nutOk: 'Bỏ', nguyHiem: true }))) return;
     await chay(async () => { await goi('bavia_bo_nguon', { p_id: Number(t.dataset.rm) }); setFlash('warn', 'Đã bỏ khai báo tem <b>' + esc(n ? n.tag_no : '') + '</b>.'); await taiLai(); });
     return;
   }
@@ -986,7 +1023,10 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'F2') { const b = $('#btnPack'); if (b && !b.disabled) { e.preventDefault(); dongThung(); } }
-  if (e.key === 'Escape') document.querySelectorAll('.modal-bg').forEach(m => { if (m.id !== 'camModal') m.hidden = true; });
+  if (e.key === 'Escape') {
+    if (!$('#xnModal').hidden) { $('#xnHuy').click(); return; }
+    document.querySelectorAll('.modal-bg').forEach(m => { if (m.id !== 'camModal') m.hidden = true; });
+  }
 });
 
 /* ── Mở / sửa Line ────────────────────────────────────────────────────────── */
@@ -1049,8 +1089,7 @@ async function moNapKh() {
     ? (KH.duyet.trang_thai === 'da_duyet' ? 'KH tuần đã duyệt.' : '<b style="color:var(--warn-fg)">KH tuần chưa duyệt xong.</b>')
     : '<b style="color:var(--warn-fg)">Tuần này chưa có trạng thái duyệt KH.</b>';
   $('#pSub').innerHTML = esc(thu + ' ' + dmy(ngay) + ' · ' + ca) + '. ' + duyet +
-    ' Mặc định 1 ca/ngày, KH ca = KH ngày ÷ số ca; 1 ca/ngày thì ca đêm / ca 2 không có KH. Số ca chọn ở đây được nhớ cho các ngày sau trong tuần.' +
-    ' Nạp lại giữa ca sẽ ghi đè KH ca và lưu nhật ký. Line còn hàng dở của mã khác thì không nhận mã mới.';
+    '';
   const dangChay = {};
   (D.lines || []).forEach(l => { dangChay[l.ten_line] = l; });
   const daGan = new Set((KH.ma || []).map(m => m.line).filter(Boolean));
@@ -1177,9 +1216,9 @@ function reportHtml() {
       '" placeholder="VD: thiếu tem Đúc từ DC5" aria-label="Lý do ' + esc(r.l.ten_line) + ' chưa đạt KH">') + '</td></tr>';
   return '<div class="rp-head"><div class="tt2"><h4 id="rpTitle">Báo cáo kết ca Bavia · ' + esc($('#fCa').value) + ' ' + dmy($('#fNgay').value) + '</h4>' +
       '<div class="sub">Trưởng ca ' + esc($('#fTruongCa').value) + ' · ' + rows.length + ' Line</div></div>' +
-      '<button class="mbtn ghost" type="button" data-rp="xls">Xuất Excel</button><button class="mbtn ghost" type="button" data-rp="in">In / PDF</button></div>' +
+      '<button class="mbtn ghost" type="button" data-rp="xls">Xuất Excel</button><button class="mbtn ghost" type="button" data-rp="in">In</button></div>' +
     (kc ? '<div class="done-banner">Đã kết ca lúc ' + hm(kc.ket_luc) + ' · ' + esc(tenNguoi(kc.nguoi)) + ' xác nhận' +
-      '<span>Số liệu ca này đã khoá. Muốn sửa phải nhờ admin mở lại ca (có ghi lý do). Tem Đúc còn dở và hàng đang test đã chuyển sang ca sau.</span></div>' : '') +
+      '<span>Số liệu đã khoá. Muốn sửa: admin mở lại ca.</span></div>' : '') +
     '<div class="rp-kpis"><div><div class="l">Kế hoạch ca</div><div class="v">' + fmt(kh) + '</div></div>' +
       '<div><div class="l">OK</div><div class="v" style="color:var(--run-fg)">' + fmt(ok) + ' <small>' + (kh ? Math.round(ok / kh * 100) : 0) + '% KH</small></div></div>' +
       '<div><div class="l">NG</div><div class="v" style="color:var(--alarm-fg)">' + fmt(ng) + ' <small>' + (ok + ng ? (ng / (ok + ng) * 100).toFixed(1) : '0.0') + '%</small></div></div>' +
@@ -1201,18 +1240,19 @@ function reportHtml() {
         fmt(t.so_luong - (t.sl_tra_lai || 0)) + '</span><span class="d">' + esc(l.ten_line) + ' · ' + esc(t.nguoi_test) + ' · ' +
         (t.ket_thuc_luc ? 'trả lại ' + fmt(t.sl_tra_lai) + ', huỷ ' + fmt(t.so_luong - t.sl_tra_lai) : 'đang test') + '</span></div>').join('')
         : '<div class="empty-box">Không lấy hàng test.</div>') +
-    '</div><div class="rp-sec"><h5>Theo người thao tác</h5>' +
+    '</div><div class="rp-sec"><h5 style="display:flex;align-items:center;gap:6px">Theo người thao tác <button class="info-btn" type="button" data-info title="Cách tính">ⓘ</button></h5>' +
+      '<div class="info-txt" hidden style="margin-bottom:6px">Thùng làm chung thì chia đều số pcs cho số người đứng Line lúc ghi nhận thùng.</div>' +
       (per.length ? '<div class="tbl"><table class="boxes" style="min-width:0"><thead><tr><th>Người</th><th>Line</th><th style="text-align:right">Thùng</th>' +
         '<th style="text-align:right">pcs</th></tr></thead><tbody>' + per.map(([p, r]) => '<tr><td>' + esc(p) + '</td><td class="sub">' +
         esc([...r.lines].join(', ')) + '</td><td class="n">' + r.thung + '</td><td class="n">' + fmt(Math.round(r.pcs)) + '</td></tr>').join('') +
-        '</tbody></table></div><div class="sub" style="margin-top:6px">Thùng làm chung thì chia đều số pcs cho số người đứng Line lúc ghi nhận thùng.</div>'
+        '</tbody></table></div>'
         : '<div class="empty-box">Chưa có thùng nào.</div>') +
     '</div></div>' +
     (kc ? '' : '<div class="rp-sec"><h5>Kiểm tra trước khi kết ca</h5><div class="chk" id="rpChecks"></div></div>') +
     '<div class="rp-acts"><span class="why" id="rpWhy"></span><span class="sp"></span>' +
-      (kc && laAdmin ? '<button class="mbtn ghost" type="button" data-rp="mo">Mở lại ca (admin)</button>' : '') +
+      (kc && laAdmin ? '<button class="mbtn ghost" type="button" data-rp="mo">Mở lại ca</button>' : '') +
       '<button class="mbtn ghost" type="button" data-close>Đóng</button>' +
-      (kc ? '' : '<button class="mbtn" type="button" id="rpConfirm">Xác nhận kết ca</button>') + '</div>';
+      (kc ? '' : '<button class="mbtn" type="button" id="rpConfirm">Kết ca</button>') + '</div>';
 }
 function refreshRp() {
   if (!$('#rpChecks')) return;
@@ -1232,7 +1272,7 @@ function moBaoCao() {
   const c = $('#rpConfirm');
   if (c) c.onclick = async () => {
     if (rpChecks(rpRows()).some(x => x[0] === 'bad')) return;
-    if (!confirm('Kết ca ' + $('#fCa').value + ' ' + dmy($('#fNgay').value) + '? Sau khi kết, số liệu ca bị khoá và sản lượng tiếp theo tính vào ca sau.')) return;
+    if (!(await hoiXacNhan('Kết ca ' + $('#fCa').value + ' ' + dmy($('#fNgay').value) + '?\nSố liệu ca sẽ bị khoá.', { nutOk: 'Kết ca' }))) return;
     c.disabled = true;
     try {
       const ly = {};
@@ -1258,8 +1298,8 @@ $('#rpModal').addEventListener('click', async e => {
   } else if (b.dataset.rp === 'xls') {
     xuatExcel();
   } else if (b.dataset.rp === 'mo') {
-    const ly = prompt('Lý do mở lại ca (bắt buộc):');
-    if (ly === null) return;
+    const ly = await hoiXacNhan('Mở lại ca ' + $('#fCa').value + ' ' + dmy($('#fNgay').value) + '?', { nutOk: 'Mở lại', nhap: true, goiY: 'Lý do (bắt buộc)' });
+    if (!ly) return;
     try {
       await goi('bavia_mo_lai_ca', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ly_do: ly });
       setFlash('warn', 'Đã mở lại ca. Sửa xong nhớ kết ca lại.');
