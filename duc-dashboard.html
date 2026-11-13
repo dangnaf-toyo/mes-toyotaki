@@ -992,7 +992,8 @@ const CONFIG = {
     { code: 'A1', name: 'Sự cố máy đúc',       group: 'A — Sự cố' },
     { code: 'A2', name: 'Sự cố khuôn',          group: 'A — Sự cố' },
     { code: 'A3', name: 'Sự cố hạ tầng (Điện, khí nén, nước...)', group: 'A — Sự cố' },
-    { code: 'B1', name: 'Sự cố CL sản phẩm',    group: 'B — Chất lượng' },
+    { code: 'B1', name: 'Chất lượng SP · SX phát hiện',   group: 'B — Chất lượng' },
+    { code: 'F1', name: 'Chất lượng SP · IPQC phát hiện', group: 'B — Chất lượng' },   // T248: IPQC tự mở khi kiểm NG
     { code: 'B2', name: 'Sự cố CL nguyên liệu', group: 'B — Chất lượng' },
     { code: 'C1', name: 'Thay đổi KHSX',        group: 'C — Kế hoạch' },
     { code: 'C2', name: 'Hết nguyên liệu',      group: 'C — Kế hoạch' },
@@ -1002,7 +1003,6 @@ const CONFIG = {
     { code: 'E1', name: 'Bảo dưỡng khuôn KH',   group: 'E — Theo kế hoạch' },
     { code: 'E2', name: 'Vệ sinh theo KH',      group: 'E — Theo kế hoạch' },
     { code: 'E3', name: 'Kiểm kê định kỳ',      group: 'E — Theo kế hoạch' },
-    { code: 'F1', name: 'Chất lượng - IPQC phát hiện NG', group: 'F — IPQC' },
   ],
   DOWNTIME_COST_PER_MIN: 13800,
   MOLD: { MAINTENANCE_SHOT: 10000, REPLACEMENT_SHOT: 100000, WARN_RATIO: 0.8 },
@@ -1575,11 +1575,21 @@ function addPersonnelToDatalist(name){
   document.getElementById('dl-personnel').appendChild(opt);
 }
 
+// T248: B1 và F1 cùng là "Chất lượng SP", chỉ khác người phát hiện (SX tự phát hiện /
+// IPQC phát hiện). Mã trong DB giữ nguyên; chỉ đổi nhãn hiển thị. Chuỗi cũ của B1/F1
+// (vd "B1 — Sự cố CL sản phẩm", hoặc trần "F1" do IPQC tự mở) → nhãn mới.
+function hienLoai(str){
+  const ma = String(str || '').trim().slice(0, 2).toUpperCase();
+  if (ma === 'B1') return 'B1 — Chất lượng SP · SX phát hiện';
+  if (ma === 'F1') return 'F1 — Chất lượng SP · IPQC phát hiện';
+  return str || '';
+}
 function populateLoaiSuCo(selectId){
   const sel = document.getElementById(selectId || 'ma-loai');
   sel.innerHTML = '<option value="">-- Chọn loại sự cố --</option>';
   const groups = {};
   state.loaiSuCo.forEach(l => {
+    if (l.code === 'F1') return;   // T248: F1 do IPQC tự mở, không chọn tay
     if (!groups[l.group]) groups[l.group] = [];
     groups[l.group].push(l);
   });
@@ -2253,7 +2263,7 @@ async function giaoQc(idDong, idSuCo){
     showToast('⛔ Chưa đủ điều kiện can thiệp khuôn — khai / chờ duyệt trước khi giao QC', true);
     return moKhuonCT(idDong, s.open_id_su_co);
   }
-  if (!confirm('Xác nhận ĐÃ XỬ LÝ XONG sự cố ' + (s.open_id_su_co || '') + ' (' + (s.open_loai_su_co || '') + ') trên ' + s.ma_may +
+  if (!confirm('Xác nhận ĐÃ XỬ LÝ XONG sự cố ' + (s.open_id_su_co || '') + ' (' + hienLoai(s.open_loai_su_co) + ') trên ' + s.ma_may +
     ' và đã lấy mẫu giao IPQC kiểm?\n\nTừ lúc này thời gian dừng được tính là "xác nhận chất lượng".')) return;
   showOverlay('Đang giao QC...');
   try {
@@ -2578,7 +2588,7 @@ function makeRowHTML(row, stateClass, isActive){
       const args = idDongJson + ',' + JSON.stringify(s.open_id_su_co || null);
       return '<div class="issue-open">' +
         '<div class="issue-open-top">' +
-          '<span class="issue-code">' + escapeHtml(s.open_loai_su_co || '—') + '</span>' +
+          '<span class="issue-code">' + escapeHtml(hienLoai(s.open_loai_su_co) || '—') + '</span>' +
           (s.open_id_su_co ? '<span class="issue-ma-su-co">' + escapeHtml(s.open_id_su_co) + '</span>' : '') +
           SuCoAnh.badge((state.anhSuCoCount || {})[s.open_id_su_co], ' onclick=\'openEditOpenIncidentModal(' + args + ')\'') +
           '<span class="timer" data-start="' + startTime.toISOString() + '">--:--</span>' +
@@ -2611,7 +2621,7 @@ function makeRowHTML(row, stateClass, isActive){
     : '<div class="chips">' + inc.map(i => {
         const start = new Date(i.gio_phat_sinh);
         const end = new Date(i.gio_tro_lai);
-        const title = i.loai_su_co + '\n' + pad(start.getHours()) + ':' + pad(start.getMinutes()) + ' → ' +
+        const title = hienLoai(i.loai_su_co) + '\n' + pad(start.getHours()) + ':' + pad(start.getMinutes()) + ' → ' +
           pad(end.getHours()) + ':' + pad(end.getMinutes()) + ' — ' + i.thoi_gian_dung_phut + "'\n" +
           IpqcText.gon(i.van_de) + '\nXử lý: ' + (i.noi_dung_xu_ly || '') + '\n\n(Click để chỉnh sửa)';
         const shortCode = (i.loai_su_co || '').split(' ')[0];
@@ -3614,7 +3624,7 @@ async function openResolveModal(idDong, idSuCo){
   const startTime = new Date(row.open_gio_phat_sinh);
   document.getElementById('mr-summary').innerHTML =
     (row.open_id_su_co ? '<div class="issue-ma-su-co" style="display:inline-block;margin-bottom:4px">' + escapeHtml(row.open_id_su_co) + '</div>' : '') +
-    '<div style="font-weight:600;color:var(--alarm-fg);margin-bottom:4px">' + escapeHtml(row.open_loai_su_co) + '</div>' +
+    '<div style="font-weight:600;color:var(--alarm-fg);margin-bottom:4px">' + escapeHtml(hienLoai(row.open_loai_su_co)) + '</div>' +
     '<div style="color:var(--text)">' + escapeHtml(IpqcText.gon(row.open_van_de) || '(chưa nhập mô tả)') + '</div>' +
     '<div style="color:var(--text-muted);margin-top:6px;font-size:11px">🕐 Phát sinh: ' +
       pad(startTime.getHours()) + ':' + pad(startTime.getMinutes()) +
@@ -3724,7 +3734,7 @@ async function openChangeProductModal(idDong){
     ? toLocalInputValue(new Date(Math.max(...dsSuCo.map(s => new Date(s.open_gio_phat_sinh).getTime())))) : '';
   const warn = document.getElementById('cp-su-co-warn');
   warn.innerHTML = dsSuCo.length
-    ? '⚠ Đang có sự cố mở: <b>' + dsSuCo.map(s => escapeHtml((s.open_id_su_co || '') + ' ' + (s.open_loai_su_co || ''))).join(', ') + '</b>.<br>' +
+    ? '⚠ Đang có sự cố mở: <b>' + dsSuCo.map(s => escapeHtml((s.open_id_su_co || '') + ' ' + hienLoai(s.open_loai_su_co))).join(', ') + '</b>.<br>' +
       'Đổi SP sẽ <b>kết thúc sự cố tại giờ bắt đầu đổi khuôn</b> (ghi thời gian dừng đến lúc đó, ghi chú "chưa xử lý xong"). ' +
       'Sự cố khuôn / chất lượng: khuôn <b>' + escapeHtml(row.so_khuon || '') + '</b> chuyển tổ khuôn xử lý dứt điểm — chưa ghi xử lý thì không lên lại máy được.'
     : '';
@@ -3861,7 +3871,9 @@ function _populateEiLoaiSelect(currentValue){
   const optBlank = document.createElement('option');
   optBlank.value = ''; optBlank.textContent = '— Chọn loại sự cố —';
   sel.appendChild(optBlank);
+  const laF1 = String(currentValue || '').trim().slice(0, 2).toUpperCase() === 'F1';
   state.loaiSuCo.forEach(loai => {
+    if (loai.code === 'F1' && !laF1) return;   // T248: chỉ hiện F1 khi sự cố đang là F1
     const opt = document.createElement('option');
     const value = loai.code + ' - ' + loai.name;
     opt.value = value; opt.textContent = value;
@@ -5020,7 +5032,7 @@ function renderShiftReport(d, snap){
         return '<tr>' +
           '<td>' + escapeHtml(i.ma_may) + '</td>' +
           '<td>' + escapeHtml(i.ma_sp || '—') + '</td>' +
-          '<td>' + escapeHtml(i.loai_su_co || '—') + '</td>' +
+          '<td>' + escapeHtml(hienLoai(i.loai_su_co) || '—') + '</td>' +
           '<td>' + pad(st.getHours()) + ':' + pad(st.getMinutes()) + ' → ' + pad(en.getHours()) + ':' + pad(en.getMinutes()) + '</td>' +
           '<td class="num">' + i.thoi_gian_dung_phut + "'</td>" +
           '<td>' + escapeHtml(IpqcText.gon(i.van_de) || '—') + '</td>' +
