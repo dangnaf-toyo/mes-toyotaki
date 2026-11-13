@@ -174,12 +174,25 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 .toast{position:fixed;left:.75rem;right:.75rem;bottom:1rem;background:#1E293B;color:#fff;padding:.8rem 1rem;border-radius:.6rem;font-size:.95rem;box-shadow:var(--shadow-md);transform:translateY(120%);transition:transform .25s;z-index:110}
 .toast.show{transform:translateY(0)}
 .toast.error{background:#B91C1C}
+.toast.sticky{white-space:pre-line;padding-right:2.6rem}
+.toast.sticky::after{content:'×';position:absolute;right:.9rem;top:.55rem;font-size:1.4rem;line-height:1;opacity:.85}
+.hxn{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-end;justify-content:center;z-index:120}
+.hxn.show{display:flex}
+.hxn-box{background:var(--bg-panel);color:var(--text);width:100%;max-width:520px;border-radius:.9rem .9rem 0 0;padding:1rem .9rem calc(1rem + env(safe-area-inset-bottom));box-shadow:var(--shadow-md)}
+.hxn-nd{font-size:1rem;line-height:1.45;white-space:pre-line;margin-bottom:.8rem}
+.hxn textarea{width:100%;font-size:1rem;padding:.6rem;border:1px solid var(--border);border-radius:.5rem;margin-bottom:.8rem;font-family:inherit}
+.hxn-nut{display:flex;gap:.6rem}
+.hxn-nut button{flex:1;padding:.85rem;border-radius:.6rem;font-size:1.05rem;font-weight:700;border:none}
+.hxn-huy{background:var(--bg-sunken);color:var(--text)}
+.hxn-ok{background:var(--accent);color:#fff}
+.hxn-ok.danger{background:var(--alarm-fg)}
 </style>
 </head>
 <body>
 
 <div id="overlay" class="overlay"><div class="spinner"></div><div id="overlay-text">Đang tải...</div></div>
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast" onclick="dongToast()"></div>
+<div id="hoi-xac-nhan" class="hxn"><div class="hxn-box"><div id="hxn-noi-dung" class="hxn-nd"></div><textarea id="hxn-nhap" class="hidden" rows="2"></textarea><div class="hxn-nut"><button type="button" id="hxn-huy" class="hxn-huy">Huỷ</button><button type="button" id="hxn-ok" class="hxn-ok">Đồng ý</button></div></div></div>
 
 <!-- ============ SCREEN: Danh sách máy ============ -->
 <div class="screen active" id="scr-list">
@@ -206,11 +219,11 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
     </div>
   </div>
   <div class="quick-actions">
-    <button class="btn-endshift" onclick="openEndShiftScreen()">✓ Kết ca &amp; xuất báo cáo</button>
+    <button class="btn-endshift" onclick="openEndShiftScreen()">Kết ca</button>
     <button class="btn-viewreport" onclick="window.open('ghi-nhan-kanban.html','_blank')">Ghi nhận Kanban</button>
-    <button class="btn-viewreport" onclick="window.open('bao-cao-ca.html','_blank')">Xem lại báo cáo ca</button>
+    <button class="btn-viewreport" onclick="window.open('bao-cao-ca.html','_blank')">Báo cáo ca</button>
   </div>
-  <div class="search-wrap"><input type="text" autocomplete="off" id="search-machine" placeholder="🔍 Tìm máy..." oninput="renderMachineList()"></div>
+  <div class="search-wrap"><input type="text" autocomplete="off" id="search-machine" placeholder="Tìm máy" oninput="renderMachineList()"></div>
   <div class="list" id="machine-list"></div>
 </div>
 
@@ -230,7 +243,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 
 <!-- ============ SCREEN: Gán / Sửa kế hoạch ============ -->
 <div class="screen" id="scr-plan">
-  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">📋 Gán / Sửa kế hoạch</div></div>
+  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Kế hoạch</div></div>
   <div class="form-wrap">
     <div class="field ac-field">
       <label>Mã sản phẩm <span class="req">*</span></label>
@@ -260,13 +273,13 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
         <div class="ac-dropdown hidden" id="pl-nv-dem-dropdown"></div>
       </div>
     </div>
-    <button class="btn-submit" onclick="submitPlanMobile()">Lưu kế hoạch</button>
+    <button class="btn-submit" onclick="submitPlanMobile()">Lưu</button>
   </div>
 </div>
 
 <!-- ============ SCREEN: Báo sự cố ============ -->
 <div class="screen" id="scr-incident">
-  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">⚠ Báo sự cố</div></div>
+  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Báo sự cố</div></div>
   <div class="form-wrap">
     <div class="field"><label>Loại sự cố <span class="req">*</span></label><select id="in-loai"></select></div>
     <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="in-gio"></div>
@@ -278,26 +291,26 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
       <div class="ac-dropdown hidden" id="in-dam-nhiem-dropdown"></div>
     </div>
     <div class="field" id="in-anh"></div>
-    <button class="btn-submit danger" onclick="submitIncidentMobile()">⚠ Ghi nhận sự cố</button>
+    <button class="btn-submit danger" onclick="submitIncidentMobile()">Ghi nhận</button>
   </div>
 </div>
 
 <!-- ============ SCREEN: Xử lý xong sự cố ============ -->
 <div class="screen" id="scr-resolve">
-  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">✓ Xử lý xong sự cố</div></div>
+  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Xử lý xong sự cố</div></div>
   <div class="form-wrap">
     <div class="field"><label>Giờ sản xuất trở lại <span class="req">*</span></label><input type="datetime-local" id="rs-gio"></div>
     <div class="field" id="rs-phut-wrap"><label>Thời gian dừng</label><input type="text" autocomplete="off" id="rs-phut" disabled></div>
     <div class="field"><label>Bổ sung nội dung xử lý</label><textarea id="rs-bonus"></textarea></div>
     <div class="field" id="rs-anh-truoc"></div>
     <div class="field" id="rs-anh-sau"></div>
-    <button class="btn-submit" onclick="submitResolveMobile()">✓ Xác nhận xong</button>
+    <button class="btn-submit" onclick="submitResolveMobile()">Xác nhận</button>
   </div>
 </div>
 
 <!-- ============ SCREEN: Đổi SP ============ -->
 <div class="screen" id="scr-changeproduct">
-  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">⇄ Đổi sản phẩm</div></div>
+  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Đổi sản phẩm</div></div>
   <div class="form-wrap">
     <div id="cp-su-co-warn" class="hidden" style="background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45"></div>
     <div class="field ac-field">
@@ -322,14 +335,13 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
       <input type="text" id="cp-dam-nhiem" placeholder="Chạm để chọn hoặc gõ tìm" autocomplete="off">
       <div class="ac-dropdown hidden" id="cp-dam-nhiem-dropdown"></div>
     </div>
-    <div class="form-hint">Sẽ tự tạo sự cố C3 "Đổi khuôn" trên dòng SP cũ.</div>
-    <button class="btn-submit" onclick="submitChangeProductMobile()">⇄ Xác nhận đổi SP</button>
+    <button class="btn-submit" onclick="submitChangeProductMobile()">Đổi sản phẩm</button>
   </div>
 </div>
 
 <!-- ============ SCREEN: Nhập Shot / NG ============ -->
 <div class="screen" id="scr-shot">
-  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">🔢 Shot &amp; NG</div></div>
+  <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Shot &amp; NG</div></div>
   <div class="form-wrap">
     <div class="field-row">
       <div class="field"><label>Shot đầu ca</label><input type="number" id="sh-dau" placeholder="—" oninput="recomputeShotMobile()"></div>
@@ -337,22 +349,22 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
     </div>
     <div class="field"><label>Shot nóng máy</label><input type="number" id="sh-nong" min="0" oninput="recomputeShotMobile()"></div>
     <div class="field"><label>NG</label><input type="number" id="sh-ng" min="0"></div>
-    <div class="form-hint" id="sh-hint">Nhập đủ Shot đầu + cuối để tự tính NG theo cavity.</div>
+    <div class="form-hint" id="sh-hint"></div>
     <div class="field"><label>Phân loại NG</label><input type="text" autocomplete="off" id="sh-loi" placeholder="VD 6F;4E"></div>
-    <button class="btn-submit" onclick="submitShotMobile()">Lưu shot / NG</button>
+    <button class="btn-submit" onclick="submitShotMobile()">Lưu</button>
   </div>
 </div>
 
 <!-- ============ SCREEN: Kết ca ============ -->
 <div class="screen" id="scr-endshift">
-  <div class="appbar"><button class="back" onclick="showScreen('scr-list')">←</button><div class="title">✅ Kết ca &amp; xuất báo cáo</div></div>
+  <div class="appbar"><button class="back" onclick="showScreen('scr-list')">←</button><div class="title">Kết ca</div></div>
   <div class="form-wrap" style="padding-bottom:6px">
     <div class="field"><label>Ghi chú của trưởng ca</label><textarea id="es-comment" placeholder="Bàn giao, đề xuất... (không bắt buộc)"></textarea></div>
   </div>
   <div id="es-list"></div>
   <div class="form-wrap" style="padding-top:0">
     <div class="form-hint" id="es-warn-note"></div>
-    <button class="btn-submit" onclick="submitEndShiftMobile()">✓ Xác nhận kết ca</button>
+    <button class="btn-submit" onclick="submitEndShiftMobile()">Kết ca</button>
   </div>
 </div>
 
@@ -412,14 +424,37 @@ function showOverlay(t){ document.getElementById('overlay-text').textContent = t
 function hideOverlay(){ document.getElementById('overlay').classList.remove('show'); }
 let toastTimer;
 function showToast(text, isError){
-  // T170: lỗi chặn (⛔ — vd chưa có IPQC OK nên chưa được chạy lại) phải bấm xác nhận, không để toast tự tắt
-  if (isError && String(text).includes('⛔')) { alert(String(text).replace(/^Lỗi:\s*/, '')); return; }
+  // T170/T247: lỗi chặn (⛔ — vd chưa có IPQC OK nên chưa được chạy lại) không tự tắt,
+  // hiện kèm dấu × ở góc dưới thay cho hộp thoại trình duyệt; chạm để đóng.
   const t = document.getElementById('toast');
-  t.textContent = text;
+  const giu = !!isError && String(text).includes('⛔');
+  t.textContent = giu ? String(text).replace(/^Lỗi:\s*/, '') : text;
   t.classList.toggle('error', !!isError);
+  t.classList.toggle('sticky', giu);
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  if (!giu) toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+function dongToast(){ document.getElementById('toast').classList.remove('show'); }
+// T247: hộp xác nhận / nhập lý do trong trang thay cho confirm()/prompt() của trình duyệt.
+// hoiXacNhan(noiDung, {nutOk, nutHuy, nguyHiem, nhap, goiY}) → Promise<true|false>, hoặc chuỗi đã nhập ('' = huỷ) khi nhap=true
+function hoiXacNhan(noiDung, o){
+  o = o || {};
+  return new Promise(res => {
+    const w = document.getElementById('hoi-xac-nhan');
+    document.getElementById('hxn-noi-dung').textContent = noiDung;
+    const ta = document.getElementById('hxn-nhap');
+    ta.classList.toggle('hidden', !o.nhap); ta.value = ''; ta.placeholder = o.goiY || '';
+    const ok = document.getElementById('hxn-ok'), huy = document.getElementById('hxn-huy');
+    ok.textContent = o.nutOk || 'Đồng ý'; huy.textContent = o.nutHuy || 'Huỷ';
+    ok.classList.toggle('danger', !!o.nguyHiem);
+    const xong = v => { w.classList.remove('show'); ok.onclick = huy.onclick = w.onclick = null; res(v); };
+    ok.onclick = () => xong(o.nhap ? ta.value.trim() : true);
+    huy.onclick = () => xong(o.nhap ? '' : false);
+    w.onclick = e => { if (e.target === w) huy.onclick(); };
+    w.classList.add('show');
+    if (o.nhap) setTimeout(() => ta.focus(), 50);
+  });
 }
 
 // Bàn phím ảo che ô đang gõ/nút Lưu bên dưới trên nhiều trình duyệt di động
@@ -451,7 +486,7 @@ function gotoLogin(){ window.location.href = 'shared/login.html?returnTo=' + enc
 async function ensureAuth(){
   const session = await MesAuth.getSession();
   if (!session) {
-    showToast('Cần đăng nhập để thao tác — đang chuyển sang trang đăng nhập…', true);
+    showToast('Cần đăng nhập — đang chuyển trang…', true);
     setTimeout(gotoLogin, 1200);
     return false;
   }
@@ -707,7 +742,7 @@ function renderMoldBdStatusMobile(prefix, maSp){
                               : '<br><span style="font-weight:500">Báo Quản lý bộ phận Đúc để bảo dưỡng hoặc cho phép chạy tạm.</span>') : '');
   const btn = box.querySelector('[data-cho-phep-tam]');
   if (btn) btn.onclick = async () => {
-    const lyDo = (prompt('Cho phép khuôn ' + mk + ' chạy tạm trên máy ' + maMay + ' (1 lần lên khuôn, hiệu lực 12 giờ).\nLý do:') || '').trim();
+    const lyDo = await hoiXacNhan('Cho phép khuôn ' + mk + ' chạy tạm trên máy ' + maMay + ' (1 lần lên khuôn, 12 giờ).', { nutOk: 'Cho phép', nhap: true, goiY: 'Lý do (bắt buộc)' });
     if (!lyDo) return;
     const { data, error } = await sb.rpc('duc_khuon_cho_phep_chay_tam', { p_ma_khuon: mk, p_ma_may: maMay, p_ly_do: lyDo });
     if (error || (data && data.ok === false)) return showToast('Lỗi: ' + (error ? error.message : data.error), true);
@@ -735,7 +770,7 @@ function populateSoKhuonMobile(prefix, maSp, currentValue){
   if (molds.length === 0) {
     chipsEl.innerHTML = '';
     inputEl.value = '';
-    hintEl.textContent = maSp ? 'SP ' + maSp + ' chưa khai báo số khuôn — nhờ quản lý khai báo ở Quản lý danh mục → Sản phẩm.' : '';
+    hintEl.textContent = maSp ? 'Sản phẩm chưa khai báo khuôn — báo quản lý.' : '';
     renderMoldBdStatusMobile(prefix, maSp);
     return;
   }
@@ -1024,10 +1059,9 @@ function dieuKienHTMLM(s){
 async function giaoQcM(idSuCo){
   const row = state.rows.find(r => r.id_dong === state.currentIdDong);
   const s = suCoMoCuaDongM(row).find(x => (x.open_id_su_co || null) === (idSuCo || null));
-  if (!s) return showToast('Không tìm thấy sự cố đang mở — tải lại', true);
+  if (!s) return showToast('Không thấy sự cố đang mở — tải lại', true);
   if (!(await ensureAuth())) return;
-  if (!confirm('Xác nhận ĐÃ XỬ LÝ XONG sự cố ' + (s.open_loai_su_co || '') + ' trên ' + s.ma_may +
-    ' và đã lấy mẫu giao IPQC kiểm?\n\nTừ lúc này thời gian dừng được tính là "xác nhận chất lượng".')) return;
+  if (!(await hoiXacNhan('Đã xử lý xong sự cố ' + (s.open_loai_su_co || '') + ' trên ' + s.ma_may + ' và đã giao mẫu IPQC?\nThời gian dừng từ giờ tính là "xác nhận chất lượng".', { nutOk: 'Giao QC' }))) return;
   showOverlay('Đang giao QC...');
   try {
     const d = await rpcWrite('duc_giao_qc_x', { p_id_dong: state.currentIdDong, p_id_su_co: idSuCo || null, p_user: state.user });
@@ -1110,7 +1144,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
     document.getElementById('detail-sub').textContent = 'Chưa có kế hoạch';
     info.innerHTML = '<div style="color:var(--text-muted);font-size:13px">Máy này chưa được gán kế hoạch trong ca hiện tại.</div>';
     issueBox.classList.add('hidden');
-    actions.innerHTML = `<button class="action-btn primary" onclick="openPlanScreen(null)"><span class="ic">📋</span>Gán kế hoạch mới<span class="chev">›</span></button>`;
+    actions.innerHTML = `<button class="action-btn primary" onclick="openPlanScreen(null)"><span class="ic">📋</span>Gán kế hoạch<span class="chev">›</span></button>`;
     if (!isRefresh) showScreen('scr-detail');
     return;
   }
@@ -1150,7 +1184,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
       const ten = suCoList.length > 1 ? ' ' + escapeHtml((s.open_loai_su_co || '').split(' ')[0]) : '';
       if (canIpqcM(s.open_loai_su_co) && s.open_id_su_co) {
         const g = (state.giaoQc || {})[s.open_id_su_co];
-        btns.push(`<button class="action-btn giao-qc" onclick="giaoQcM(${arg})"><span class="ic">📦</span>${g ? 'Giao QC lại (IPQC NG)' : 'Hoàn thành mẫu & giao QC'}${ten}<span class="chev">›</span></button>`);
+        btns.push(`<button class="action-btn giao-qc" onclick="giaoQcM(${arg})"><span class="ic">📦</span>${g ? 'Giao QC lại' : 'Giao QC'}${ten}<span class="chev">›</span></button>`);
       }
       btns.push(`<button class="action-btn primary" onclick="openResolveScreen(${arg})"><span class="ic">✓</span>Xử lý xong ${suCoList.length > 1 ? escapeHtml((s.open_loai_su_co || '').split(' ')[0]) : 'sự cố'}<span class="chev">›</span></button>`);
     });
@@ -1158,7 +1192,7 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
       btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo thêm sự cố (${suCoList.length}/${SU_CO_MO_TOI_DA})<span class="chev">›</span></button>`);
     }
     // T188: sự cố lớn chưa xử lý ngay được → đổi sang khuôn khác cho máy chạy
-    btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm (sự cố chưa xong)<span class="chev">›</span></button>`);
+    btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm<span class="chev">›</span></button>`);
   } else {
     btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo sự cố<span class="chev">›</span></button>`);
     btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm<span class="chev">›</span></button>`);
@@ -1297,16 +1331,15 @@ async function openResolveScreen(idSuCoChon){
   if (!(await ensureAuth())) return;
   state.currentIdSuCo = idSuCoChon || null;
   const sChon = suCoDangChonM();
-  if (!sChon) return showToast('Không tìm thấy sự cố đang mở — tải lại', true);
+  if (!sChon) return showToast('Không thấy sự cố đang mở — tải lại', true);
   // T232: chưa đủ điều kiện đóng → báo bước còn thiếu, không mở form rồi mới bị từ chối.
   const dk = (state.dieuKien || {})[sChon.open_id_su_co];
   if (dk && dk.buoc && dk.buoc !== 'duoc_dong') {
     if (dk.duoc_vuot) {
-      if (!confirm('⚠ Sự cố chưa đủ điều kiện đóng:\n\n' + (dk.thong_bao || '') +
-        '\n\nBạn có quyền đóng vượt (hệ thống ghi chú kèm tên bạn). Vẫn đóng?')) return;
+      if (!(await hoiXacNhan('Chưa đủ điều kiện đóng:\n' + (dk.thong_bao || '') + '\nBạn có quyền đóng vượt (ghi chú kèm tên bạn).', { nutOk: 'Vẫn đóng', nguyHiem: true }))) return;
     } else {
-      alert('⛔ Chưa đóng được sự cố ' + (sChon.open_id_su_co || '') + '\n\n' + (dk.thong_bao || '') +
-        (dk.buoc === 'can_thiep' ? '\n\n(Khai can thiệp khuôn trên Dashboard Đúc ở máy tính.)' : ''));
+      showToast('⛔ Chưa đóng được sự cố ' + (sChon.open_id_su_co || '') + '\n' + (dk.thong_bao || '') +
+        (dk.buoc === 'can_thiep' ? '\nKhai can thiệp khuôn trên Bảng điều khiển Đúc (máy tính).' : ''), true);
       if (dk.buoc === 'giao_qc' || dk.buoc === 'giao_lai') return giaoQcM(idSuCoChon || null);
       return;
     }
@@ -1446,15 +1479,15 @@ function recomputeShotMobile(){
   const ttCa = row ? (row.tt_ca || 0) : 0;
 
   ngEl.readOnly = false; ngEl.classList.remove('ng-auto');
-  if (dau == null || cuoi == null) { hint.textContent = 'Nhập đủ Shot đầu + cuối để tự tính NG theo cavity.'; return; }
-  if (!cavity) { hint.textContent = 'Sản phẩm chưa khai báo số cavity — nhập NG thủ công.'; return; }
-  if (cuoi < dau) { hint.textContent = '⚠ Shot cuối phải ≥ Shot đầu.'; return; }
+  if (dau == null || cuoi == null) { hint.textContent = ''; return; }
+  if (!cavity) { hint.textContent = 'Chưa có cavity — nhập NG tay.'; return; }
+  if (cuoi < dau) { hint.textContent = 'Shot cuối phải ≥ Shot đầu.'; return; }
   const chay = cuoi - dau - nong;
-  if (chay < 0) { hint.textContent = '⚠ Shot nóng lớn hơn tổng shot chạy (' + fmtNum(cuoi-dau) + ').'; return; }
+  if (chay < 0) { hint.textContent = 'Shot nóng > tổng shot (' + fmtNum(cuoi-dau) + ').'; return; }
   const ng = Math.round(chay * cavity - ttCa);
   ngEl.value = Math.max(0, ng);
   ngEl.readOnly = true; ngEl.classList.add('ng-auto');
-  hint.textContent = 'Tự tính: (' + fmtNum(cuoi) + ' − ' + fmtNum(dau) + ' − ' + fmtNum(nong) + ') × ' + cavity + ' cavity − ' + fmtNum(ttCa) + ' OK' + (ng < 0 ? ' → ÂM, kiểm tra lại!' : '');
+  hint.textContent = '(' + fmtNum(cuoi) + ' − ' + fmtNum(dau) + ' − ' + fmtNum(nong) + ') × ' + cavity + ' − ' + fmtNum(ttCa) + (ng < 0 ? ' → âm, kiểm tra lại' : '');
 }
 async function submitShotMobile(){
   if (!(await ensureAuth())) return;
@@ -1533,7 +1566,7 @@ async function openEndShiftScreen(){
           <div class="field"><label>NG</label><input type="number" id="es-ng-${idx}" min="0" value="${r.so_luong_ng||0}"></div>
           <div class="field"><label>Phân loại NG</label><input type="text" autocomplete="off" id="es-loi-${idx}" value="${escapeHtml(r.phan_loai_ng||'')}"></div>
         </div>
-        ${!cavity ? '<div class="form-hint" style="margin-top:8px">⚠ SP chưa có cavity — NG nhập tay</div>' : ''}
+        ${!cavity ? '<div class="form-hint" style="margin-top:8px">Chưa có cavity — NG nhập tay</div>' : ''}
       </div>`;
     }).join('');
     activeRows.forEach((r, idx) => recomputeEsNg(idx));
@@ -1541,7 +1574,7 @@ async function openEndShiftScreen(){
 
   const openCount = activeRows.filter(r => r.open_gio_phat_sinh).length;
   document.getElementById('es-warn-note').textContent = openCount > 0
-    ? '🔴 ' + openCount + ' máy đang có sự cố mở — sẽ tự động chuyển tiếp sang ca sau.'
+    ? openCount + ' máy còn sự cố mở — tự chuyển sang ca sau.'
     : '';
   document.getElementById('es-comment').value = '';
   showScreen('scr-endshift');
