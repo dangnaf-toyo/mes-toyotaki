@@ -1129,6 +1129,18 @@ async function ghiNhanKanban(raw){
   var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) { showMsg('Chưa có Tag No để ghi nhận.', 'err', 4000); return; }
   if (busyKanban) return;
+  // T251: Đúc Kẽm chỉ nhận tem Đúc (TKD… / D-TKD…) — chặn tem thành phẩm TP… và tem lạ.
+  if (!/^(D-)?TKD/i.test(tagNo)) {
+    renderResult('err', 'Sai loại tem', [['Tem', tagNo], ['Thông báo', /^TP/i.test(tagNo)
+      ? 'Đây là tem THÀNH PHẨM (TP…) — không ghi nhận ở Đúc Kẽm. Hãy đọc tem Đúc (TKD…).'
+      : 'Chỉ nhận tem Đúc có tiền tố TKD…']]);
+    beep(false); showMsg('', ''); focusScan(); return;
+  }
+  const spSel = document.getElementById('spDangSx').value;
+  if (!spSel) {
+    renderResult('err', 'Chưa chọn mã SP', [['Thông báo', 'Chọn Mã SP đang sản xuất trước khi quét tem.']]);
+    beep(false); showMsg('', ''); focusScan(); return;
+  }
   busyKanban = true;
   showMsg('⏳ Đang ghi nhận ' + tagNo + '…', 'wait');
 
@@ -1136,6 +1148,15 @@ async function ghiNhanKanban(raw){
   const p_nguoi_tt = document.getElementById('nguoiKiem').value || myIdentity;
 
   try {
+    // T251: tem phải đúng mã SP đang sản xuất.
+    const { data: tem, error: temErr } = await sb.from('duc_tem').select('ma_sp').eq('tag_no', tagNo).maybeSingle();
+    if (temErr) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', rpcErrText(temErr)]]); beep(false); showMsg('', ''); return; }
+    if (!tem) { renderResult('err', 'Không tìm thấy tem', [['Tem', tagNo]]); beep(false); showMsg('', ''); return; }
+    if (tem.ma_sp !== spSel) {
+      renderResult('err', 'Sai mã sản phẩm', [['Tem', tagNo], ['Mã trên tem', tem.ma_sp || '—'], ['Đang sản xuất', spSel],
+        ['Thông báo', 'Tem không đúng mã SP đang sản xuất — KHÔNG ghi nhận.']]);
+      beep(false); showMsg('', ''); return;
+    }
     const { data, error } = await sb.rpc('duc_ghi_nhan_tem_kanban', { p_tag_no: tagNo, p_may_tt, p_nguoi_tt });
     if (error) { renderResult('err', 'Lỗi hệ thống', [['Chi tiết', rpcErrText(error)]]); beep(false); showMsg('', ''); return; }
     if (!data || data.ok === false) {
