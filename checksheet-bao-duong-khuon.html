@@ -788,10 +788,23 @@ const laTraLai = g => g.loai === 'thao_ra' && g.ket_qua_thao === 'cho_su_dung' &
 const SUB = s => '<div class="sub">' + s + '</div>';
 let lk = { dm: [], gan: [], gd: [], chon: [] };   // chon = danh sách được chọn
 
+// T249: linh kiện riêng đặt mã theo MÃ SẢN PHẨM — các khuôn giống nhau (#1, #2) dùng chung 1 mã,
+// nhưng thường chỉ được gán cho 1 khuôn. Lấy cả khuôn "anh em" cùng sản phẩm (master_products.so_khuon).
+async function khuonCungSp(maKhuon){
+  const set = new Set([maKhuon]);
+  const { data } = await sb.from('master_products').select('so_khuon').ilike('so_khuon', '%' + maKhuon + '%');
+  (data || []).forEach(p => {
+    const ds = String(p.so_khuon || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (ds.includes(maKhuon)) ds.forEach(k => set.add(k));
+  });
+  return [...set];
+}
+
 async function lkLoad(){
+  const dsKhuon = await khuonCungSp(kh.ma_khuon);
   const [dm, gan, gd] = await Promise.all([
     sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,pham_vi,don_vi,ton_cho_su_dung').eq('dang_dung', true).order('ma_lk'),
-    sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').eq('ma_khuon', kh.ma_khuon),
+    sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').in('ma_khuon', dsKhuon),
     cs ? sb.from('khuon_lk_giao_dich').select('id,thoi_diem,loai,id_lk,ma_lk,ten_lk,so_luong,ma_khuon,vi_tri,ket_qua_thao,muc_dich,nguoi')
       .eq('id_checksheet', cs.id).order('thoi_diem') : Promise.resolve({ data: [] }),
   ]);

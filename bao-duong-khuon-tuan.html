@@ -1256,12 +1256,29 @@ const LK_TRA_LAI = 'Trả lại kho (ghi nhầm / dùng không hết)';
 const laTraLai = g => g.loai === 'thao_ra' && g.ket_qua_thao === 'cho_su_dung' && g.muc_dich === LK_TRA_LAI;
 let xlLk = { dm: [], gan: [], gd: [], chon: [] };   // chon = danh sách được chọn (T111)
 
+// T249: linh kiện riêng đặt mã theo MÃ SẢN PHẨM — khuôn giống nhau (#1, #2) dùng chung mã nhưng
+// thường chỉ gán cho 1 khuôn. Danh sách khuôn = khuôn của sự cố ("A, B" tách ra) + khuôn anh em
+// cùng sản phẩm (master_products.so_khuon) + mọi khuôn của mã SP sự cố.
+async function xlKhuonCungSp(soKhuon, maSp){
+  const goc = String(soKhuon || '').split(',').map(s => s.trim()).filter(Boolean);
+  const set = new Set(goc);
+  const qs = goc.map(k => sb.from('master_products').select('so_khuon').ilike('so_khuon', '%' + k + '%'));
+  if (maSp) qs.push(sb.from('master_products').select('so_khuon').eq('ma_sp', maSp));
+  const res = await Promise.all(qs);
+  res.forEach((x, i) => (x.data || []).forEach(p => {
+    const ds = String(p.so_khuon || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (i >= goc.length || ds.includes(goc[i])) ds.forEach(k => set.add(k));
+  }));
+  return [...set];
+}
+
 async function xlLkLoad(r, sua){
   const box = document.getElementById('xl-lk');
   box.innerHTML = '<h4>🔩 Linh kiện / vật tư tiêu hao đã dùng</h4><div class="ton">Đang tải…</div>';
+  const dsKhuon = r.so_khuon ? await xlKhuonCungSp(r.so_khuon, r.ma_sp) : [];
   const [dm, gan, gd] = await Promise.all([
     sb.from('khuon_lk_danh_muc').select('id,ma_lk,ten_lk,loai,pham_vi,don_vi,ton_cho_su_dung').eq('dang_dung', true).order('ma_lk'),
-    r.so_khuon ? sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').eq('ma_khuon', r.so_khuon) : Promise.resolve({ data: [] }),
+    dsKhuon.length ? sb.from('khuon_lk_gan').select('id_lk,vi_tri_lap').in('ma_khuon', dsKhuon) : Promise.resolve({ data: [] }),
     sb.from('khuon_lk_giao_dich').select('id,thoi_diem,loai,id_lk,ma_lk,ten_lk,so_luong,ma_khuon,vi_tri,ket_qua_thao,muc_dich,nguoi')
       .eq('id_su_co', r.id_su_co).order('thoi_diem'),
   ]);
