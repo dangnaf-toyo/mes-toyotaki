@@ -1440,6 +1440,23 @@ function xlThieuDeHoanThanh(){
 ['xl-chinh','xl-bd','xl-kt','xl-nd'].forEach(id => ['input','change'].forEach(ev =>
   document.getElementById(id).addEventListener(ev, e => e.target.classList.remove('xl-thieu'))));
 
+// T250: nhắc khai báo linh kiện dự phòng khi Hoàn thành — đọc mới từ DB, SL thực dùng = xuất − trả lại.
+function lkTomTatDung(gd, dm){
+  const m = new Map();
+  (gd || []).forEach(g => {
+    const d = g.loai === 'xuat_thay' ? Number(g.so_luong) : laTraLai(g) ? -Number(g.so_luong) : 0;
+    if (!d) return;
+    const x = m.get(g.ma_lk) || { ma: g.ma_lk, ten: g.ten_lk, id: g.id_lk, sl: 0 };
+    x.sl += d; m.set(g.ma_lk, x);
+  });
+  const ds = [...m.values()].filter(x => x.sl > 0);
+  if (!ds.length) return '🔩 Lần này KHÔNG dùng linh kiện dự phòng nào.';
+  return '🔩 Lần này CÓ dùng linh kiện dự phòng:\n' + ds.map(x => {
+    const z = (dm || []).find(k => Number(k.id) === Number(x.id));
+    return '   • Mã ' + x.ma + ' — ' + x.ten + ': số lượng ' + fmtNum(x.sl) + (z ? ' ' + z.don_vi : '');
+  }).join('\n');
+}
+
 async function luuXl(hanhDong){
   const r = xlEditing;
   if (!r) return;
@@ -1451,7 +1468,12 @@ async function luuXl(hanhDong){
     if (thieu.length) return xlBaoLoi(thieu);
   }
   xlBaoLoi([]);
-  if (hanhDong === 'hoan_thanh' && !confirm('Xác nhận hoàn thành xử lý ' + r.id_su_co + '?')) return;
+  if (hanhDong === 'hoan_thanh') {
+    const gdLk = await sb.from('khuon_lk_giao_dich').select('loai,id_lk,ma_lk,ten_lk,so_luong,ket_qua_thao,muc_dich').eq('id_su_co', r.id_su_co);
+    if (gdLk.error) return xlBaoLoi([{ text: 'Lỗi tải linh kiện đã dùng: ' + gdLk.error.message }], 'Chưa hoàn thành được:');
+    if (!confirm(lkTomTatDung(gdLk.data, xlLk.dm) + '\nBạn có đồng ý không? (Nếu chưa khai báo, bấm Hủy và ghi ở khung 🔩 Linh kiện)\n\n' +
+      'Xác nhận hoàn thành xử lý ' + r.id_su_co + '?')) return;
+  }
   if (hanhDong === 'mo_lai' && !confirm('Mở lại phiếu đã hoàn thành để sửa?')) return;
   const btns = ['xlLuu','xlXong','xlMoLai'].map(k => document.getElementById(k));
   btns.forEach(b => { b.disabled = true; });
