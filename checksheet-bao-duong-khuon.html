@@ -746,6 +746,23 @@ async function autoSave(okText){
   showMsg(okText, 'okmsg', 2000);
 }
 
+// T250: nhắc khai báo linh kiện dự phòng khi Hoàn thành — đọc mới từ DB, SL thực dùng = xuất − trả lại.
+function lkTomTatDung(gd, dm){
+  const m = new Map();
+  (gd || []).forEach(g => {
+    const d = g.loai === 'xuat_thay' ? Number(g.so_luong) : laTraLai(g) ? -Number(g.so_luong) : 0;
+    if (!d) return;
+    const x = m.get(g.ma_lk) || { ma: g.ma_lk, ten: g.ten_lk, id: g.id_lk, sl: 0 };
+    x.sl += d; m.set(g.ma_lk, x);
+  });
+  const ds = [...m.values()].filter(x => x.sl > 0);
+  if (!ds.length) return '🔩 Lần này KHÔNG dùng linh kiện dự phòng nào.';
+  return '🔩 Lần này CÓ dùng linh kiện dự phòng:\n' + ds.map(x => {
+    const z = (dm || []).find(k => Number(k.id) === Number(x.id));
+    return '   • Mã ' + x.ma + ' — ' + x.ten + ': số lượng ' + fmtNum(x.sl) + (z ? ' ' + z.don_vi : '');
+  }).join('\n');
+}
+
 async function save(hoanThanh){
   const data = collect();
   if (data.nguoi_thuc_hien_phu && data.nguoi_thuc_hien_phu === data.nguoi_thuc_hien) return showMsg('Đảm nhiệm phụ phải khác đảm nhiệm chính', 'err', 3500);
@@ -767,7 +784,10 @@ async function save(hoanThanh){
         '). Ghi nội dung và tích "Đã xử lý vấn đề này" cho tất cả vấn đề ở khung ⚠ Vấn đề khuôn chưa đóng.', 'err', 9000);
     }
     const ng = items.filter(it => it.ket_qua === 'NG').length;
-    if (!confirm('Hoàn thành check sheet khuôn ' + kh.ma_khuon + ' — kết luận ' + (ketLuan === 'dat' ? 'ĐẠT' : 'KHÔNG ĐẠT') +
+    const gdLk = cs ? await sb.from('khuon_lk_giao_dich').select('loai,id_lk,ma_lk,ten_lk,so_luong,ket_qua_thao,muc_dich').eq('id_checksheet', cs.id) : { data: [] };
+    if (gdLk.error) return showMsg('Lỗi tải linh kiện đã dùng: ' + gdLk.error.message, 'err', 5000);
+    if (!confirm(lkTomTatDung(gdLk.data, lk.dm) + '\nBạn có đồng ý không? (Nếu chưa khai báo, bấm Hủy và ghi ở khung 🔩 Linh kiện)\n\n' +
+      'Hoàn thành check sheet khuôn ' + kh.ma_khuon + ' — kết luận ' + (ketLuan === 'dat' ? 'ĐẠT' : 'KHÔNG ĐẠT') +
       (ng ? ' (' + ng + ' hạng mục NG)' : '') + '?\nSau khi hoàn thành sẽ không sửa được nữa.')) return;
   }
   document.querySelectorAll('#btnDraft,#btnDone').forEach(b => b.disabled = true);
