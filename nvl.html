@@ -117,6 +117,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .form-group { display: flex; flex-direction: column; }
+.form-group[hidden] { display: none; }
 .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--gray); text-transform: uppercase; margin-bottom: 0.5rem; }
 .form-group input, .form-group select, .form-group textarea { padding: 0.7rem; border: 1px solid var(--border-strong); border-radius: 4px; font-size: 0.95rem; font-family: inherit; background: var(--bg-panel); color: var(--text); }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,95,165,.14); }
@@ -344,6 +345,10 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
             <option value="IN">NHẬP KHO</option>
           </select>
         </div>
+        <div class="form-group" id="cartBoPhanWrap">
+          <label>Xuất cho bộ phận</label>
+          <select id="cartBoPhan" class="sel-bo-phan"><option value="">— Chọn —</option></select>
+        </div>
         <div class="form-group" style="grid-column: span 2;">
           <label>Quét QR Code (hoặc gõ Tag No + Enter)</label>
           <div style="display: flex; gap: 0.5rem;">
@@ -405,6 +410,9 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
         <div class="form-group"><label>Ngày</label><input type="date" id="manNgay"></div>
         <div class="form-group"><label>Loại</label>
           <select id="manLoai"><option value="IN">NHẬP</option><option value="OUT">XUẤT</option></select>
+        </div>
+        <div class="form-group" id="manBoPhanWrap" hidden><label>Xuất cho bộ phận</label>
+          <select id="manBoPhan" class="sel-bo-phan"><option value="">— Chọn —</option></select>
         </div>
         <div class="form-group"><label>Mã NVL</label><select id="manMaNvl"></select></div>
         <div class="form-group"><label>Khối lượng (kg)</label><input type="number" id="manSoLuong" step="0.001" min="0" placeholder="0"></div>
@@ -574,8 +582,8 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
       <div class="card-title">Lịch Sử Giao Dịch (100 mới nhất)</div>
       <div class="table-scroll">
         <table class="data-table">
-          <thead><tr><th>Ngày</th><th>Loại</th><th>Mã NVL</th><th>Khối Lượng (kg)</th><th>Tồn Sau (kg)</th><th>Ghi Chú</th></tr></thead>
-          <tbody id="transactionHistoryTable"><tr><td colspan="6" style="text-align: center; color: var(--gray);">Đang tải...</td></tr></tbody>
+          <thead><tr><th>Ngày</th><th>Loại</th><th>Mã NVL</th><th>Bộ phận</th><th>Khối Lượng (kg)</th><th>Tồn Sau (kg)</th><th>Ghi Chú</th></tr></thead>
+          <tbody id="transactionHistoryTable"><tr><td colspan="7" style="text-align: center; color: var(--gray);">Đang tải...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1188,6 +1196,8 @@ async function submitCartTransaction() {
 
   const txType = $('cartTxType').value;
   const typeText = txType === 'IN' ? 'NHẬP' : 'XUẤT';
+  const boPhan = txType === 'OUT' ? $('cartBoPhan').value : '';
+  if (txType === 'OUT' && !boPhan) { alert('Chọn bộ phận nhận trước khi xuất kho'); $('cartBoPhan').focus(); return; }
   const fifoWarns = validItems.filter(x => x.validationStatus === 'fifo-warn').length;
 
   let msg = 'Sẽ ' + typeText + ' kho ' + validItems.length + ' pallet.';
@@ -1200,6 +1210,7 @@ async function submitCartTransaction() {
         : ('\n  • ' + w.material + ': Tồn dự kiến ' + fmtKg(w.after) + ' kg < Min ' + fmtKg(w.lsl) + ' kg (thiếu -' + fmtKg(w.delta) + ')');
     });
   }
+  if (boPhan) msg += '\n\nXuất cho bộ phận: ' + boPhan;
   if (errorItems.length) msg += '\n\n(' + errorItems.length + ' pallet lỗi sẽ bị bỏ qua)';
   msg += '\n\nTiếp tục?';
   if (!confirm(msg)) return;
@@ -1213,7 +1224,8 @@ async function submitCartTransaction() {
     const res = await sb.rpc('nvl_process_multi_transaction', {
       p_loai: txType,
       p_items: validItems.map(x => ({ tagNo: x.tagNo, ghiChu: '' })),
-      p_user: user
+      p_user: user,
+      p_bo_phan: boPhan || null
     });
     const errMsg = rpcError(res);
     if (errMsg) {
@@ -1269,16 +1281,19 @@ async function submitManualTransaction() {
   const ma = $('manMaNvl').value;
   const sl = num($('manSoLuong').value);
   const ghiChu = $('manGhiChu').value.trim();
+  const boPhan = loai === 'OUT' ? $('manBoPhan').value : '';
   if (!ma) { alert('Chọn mã NVL'); return; }
   if (sl <= 0) { alert('Khối lượng phải > 0'); return; }
-  if (!confirm('Ghi giao dịch ' + (loai === 'IN' ? 'NHẬP' : 'XUẤT') + ' ' + fmtKg(sl, 3) + ' kg mã ' + ma + ' ngày ' + ngay + '?')) return;
+  if (loai === 'OUT' && !boPhan) { alert('Chọn bộ phận nhận khi xuất kho'); $('manBoPhan').focus(); return; }
+  if (!confirm('Ghi giao dịch ' + (loai === 'IN' ? 'NHẬP' : 'XUẤT') + ' ' + fmtKg(sl, 3) + ' kg mã ' + ma + ' ngày ' + ngay + (boPhan ? ' cho ' + boPhan : '') + '?')) return;
 
   const user = await requireLoginOrRedirect();
   if (user === null) return;
   showLoading(true);
   try {
     const res = await sb.rpc('nvl_add_transaction', {
-      p_ngay: ngay, p_loai: loai, p_ma_nvl: ma, p_so_luong_kg: sl, p_ghi_chu: ghiChu, p_user: user
+      p_ngay: ngay, p_loai: loai, p_ma_nvl: ma, p_so_luong_kg: sl, p_ghi_chu: ghiChu, p_user: user,
+      p_bo_phan: boPhan || null
     });
     const err = rpcError(res);
     if (err) throw new Error(err);
@@ -2001,7 +2016,7 @@ function renderTransactionHistory() {
   const tbody = $('transactionHistoryTable');
   tbody.innerHTML = '';
   if (!DB.transactions.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);">Chưa có giao dịch</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray);">Chưa có giao dịch</td></tr>';
     return;
   }
   DB.transactions.slice().reverse().slice(0, 100).forEach(tx => {
@@ -2010,6 +2025,7 @@ function renderTransactionHistory() {
       '<td>' + esc(tx.ngay) + '</td>' +
       '<td>' + (tx.loai === 'IN' ? 'Nhập' : 'Xuất') + '</td>' +
       '<td><strong>' + esc(tx.ma_nvl) + '</strong></td>' +
+      '<td>' + esc(tx.bo_phan_nhan || '-') + '</td>' +
       '<td>' + fmtKg(tx.so_luong_kg, 3) + '</td>' +
       '<td style="color:var(--primary);font-weight:600;">' + fmtKg(tx.ton_sau_kg, 3) + '</td>' +
       '<td style="font-size:.85rem;">' + esc(tx.ghi_chu || '-') + '</td>';
@@ -2063,7 +2079,23 @@ $('cartTxType').addEventListener('change', () => {
   renderCart();
   scanCart.forEach((_, idx) => validatePalletAsync(idx));
   updateFsTypeBadge();
+  capNhatOBoPhan();
 });
+$('manLoai').addEventListener('change', capNhatOBoPhan);
+// T264: xuất kho bắt buộc chọn bộ phận nhận (danh sách bộ phận ở Giao việc — cv_bo_phan)
+function capNhatOBoPhan() {
+  $('cartBoPhanWrap').hidden = $('cartTxType').value !== 'OUT';
+  $('manBoPhanWrap').hidden = $('manLoai').value !== 'OUT';
+}
+async function napBoPhan() {
+  const { data, error } = await sb.from('cv_bo_phan').select('ten,thu_tu').order('thu_tu');
+  if (error) { console.warn('Không tải được danh sách bộ phận:', error.message); return; }
+  const html = '<option value="">— Chọn —</option>' + (data || []).map(r => '<option>' + esc(r.ten) + '</option>').join('');
+  document.querySelectorAll('.sel-bo-phan').forEach(sel => {
+    const prev = sel.value; sel.innerHTML = html;
+    if (prev && (data || []).some(r => r.ten === prev)) sel.value = prev;
+  });
+}
 $('qrScanInput').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   e.preventDefault();
@@ -2107,6 +2139,8 @@ function startClock() {
   $('temDate').value = todayISO();
   $('manNgay').value = todayISO();
   startClock();
+  capNhatOBoPhan();
+  napBoPhan();
   await loadAllData();
   rerenderTemQtyTable();
   renderCart();
