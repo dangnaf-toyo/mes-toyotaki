@@ -539,7 +539,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
       <div class="section-title">Danh mục mã NVL <button class="info-btn" type="button" data-info="iDanhMuc" title="Lưu ý">ⓘ</button></div>
       <div class="info-txt" id="iDanhMuc" hidden>Nguồn duy nhất của mã/tên NVL — mọi màn khác (in tem, giao dịch, tồn đầu kỳ, kế hoạch) lấy mã từ đây.<br>Thêm mã mới xong nhớ vào <b>Thiết lập → Tồn đầu kỳ</b> khai tồn, nếu không tồn hiện tại của mã đó sẽ không hiện.</div>
       <div class="form-row">
-        <div class="form-group"><label>Mã NVL</label><input type="text" autocomplete="off" id="newMaCode" placeholder="VD: ADC12-DAK"></div>
+        <div class="form-group"><label>Mã NVL</label><div class="gy-row"><input type="text" autocomplete="off" id="newMaCode" placeholder="VD: K-NHN-12-001"><button type="button" class="gy-btn" id="newMaGoiY" title="Nhập Tên NVL rồi bấm">Gợi ý</button></div><div class="gy-note" id="newMaNote" hidden></div></div>
         <div class="form-group"><label>Tên NVL</label><input type="text" autocomplete="off" id="newMaName" placeholder="VD: Nhôm ADC12 Daikin"></div>
       </div>
       <div class="btn-group" style="margin-top: 0;"><button class="btn-primary" id="btnUpsertMaterial">Thêm / cập nhật</button></div>
@@ -600,6 +600,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js?v=T169"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/goi-y-ma.js?v=T258"></script>
 <script>
 /* ==========================================================================
  * DỮ LIỆU CHUNG — mọi số đều là KG (xem chú thích đầu file).
@@ -1512,7 +1513,25 @@ function editMaterial(code) {
   $('newMaCode').value = code;
   $('newMaName').value = m ? (m.ten_nvl || '') : '';
   $('newMaName').focus();
+  nvlKiemMa();
 }
+// T258: gợi ý mã NVL theo quy tắc N-LLL-QQ-STT; mã đã có = chỉ cập nhật tên.
+function nvlKiemMa(note) {
+  const ma = $('newMaCode').value.trim();
+  const kq = DB.materials.some(x => x.ma_nvl === ma) ? { muc: 'ok', text: 'Mã đã có — chỉ cập nhật tên' } : GoiYMa.nvlKiem(ma, DB.materials);
+  GoiYMa.hien($('newMaNote'), kq, note);
+}
+$('newMaCode').addEventListener('input', () => nvlKiemMa());
+function nvlGoiY(tuDong) {
+  const o = $('newMaCode');
+  if (tuDong && o.value.trim() && o.value !== o.dataset.goiY) return;
+  const kq = GoiYMa.nvl({ ten: $('newMaName').value }, DB.materials);
+  if (kq.loi) return tuDong ? null : GoiYMa.hien($('newMaNote'), { muc: 'canh', text: '⚠ ' + kq.loi });
+  o.value = o.dataset.goiY = kq.ma;
+  nvlKiemMa(kq.note);
+}
+$('newMaGoiY').addEventListener('click', () => nvlGoiY(false));
+$('newMaName').addEventListener('change', () => nvlGoiY(true));
 async function upsertMaterial() {
   const ma = $('newMaCode').value.trim();
   const ten = $('newMaName').value.trim();
@@ -1527,7 +1546,7 @@ async function upsertMaterial() {
     const res = await sb.rpc('nvl_upsert_material', { p_ma_nvl: ma, p_ten_nvl: ten || ma, p_user: user });
     const err = rpcError(res);
     if (err) throw new Error(err);
-    $('newMaCode').value = ''; $('newMaName').value = '';
+    $('newMaCode').value = ''; $('newMaName').value = ''; GoiYMa.hien($('newMaNote'), null);
     await loadAllData();
     alert('✓ Đã lưu mã ' + ma + (exists ? '' : '.\n\nNhớ vào Thiết lập → Tồn đầu kỳ khai tồn cho mã này.'));
   } catch (e) { alert('Lỗi: ' + e.message); }

@@ -689,9 +689,19 @@ function goiYMa(){
     ma = pre + '-' + sp + '-' + String(n).padStart(2, '0');
   } else {
     const q = chuanQuyCach(qc);
-    if (!q) return showMsg('Linh kiện dùng chung: nhập Quy cách (VD Ø6×150) để gợi ý mã', 'err');
-    ma = pre + '-' + q;
-    for (let i = 0; dangCo.has(ma); i++) ma = pre + '-' + q + '-' + String.fromCharCode(65 + i);
+    // T258: chưa có quy cách (hay gặp ở vật tư tiêu hao: dầu, giẻ, keo…) → viết tắt 3 chữ đầu tên + STT 2 số, VD CSM-DTK-01.
+    const tenGo = document.getElementById('lk-ten').value.trim();
+    if (!q && !tenGo) return showMsg('Dùng chung: nhập Quy cách (VD Ø6×150) hoặc Tên để gợi ý mã', 'err');
+    if (q) {
+      ma = pre + '-' + q;
+      for (let i = 0; dangCo.has(ma); i++) ma = pre + '-' + q + '-' + String.fromCharCode(65 + i);
+    } else {
+      const w = khongDau(tenGo).toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+      const vt = (w.length >= 3 ? w.slice(0, 3).map(x => x[0]).join('') : w.length === 2 ? w[0].slice(0, 2) + w[1][0] : w[0].slice(0, 3)).padEnd(3, 'X');
+      let n = 1;
+      while (dangCo.has(pre + '-' + vt + '-' + String(n).padStart(2, '0'))) n++;
+      ma = pre + '-' + vt + '-' + String(n).padStart(2, '0');
+    }
   }
   document.getElementById('lk-ma').value = ma;
   const ten = document.getElementById('lk-ten');
@@ -707,7 +717,7 @@ function capNhatQuyTac(){
     !!(lkEditing && lkEditing.ma_lk === ma)).join(' · ') : '';
   const el = document.getElementById('lk-quy-tac');
   el.style.color = loi ? 'var(--warn-fg)' : 'var(--text-muted)';
-  el.textContent = loi ? '⚠ ' + loi : 'Quy tắc: ' + (pv === 'rieng' ? pre + '-<Mã SP>-<STT 2 số>, VD ' + pre + '-TTI-MOT-02-01' : pre + '-<Quy cách>, VD ' + pre + '-D06-L150 (Ø6×150)') +
+  el.textContent = loi ? '⚠ ' + loi : 'Quy tắc: ' + (pv === 'rieng' ? pre + '-<Mã SP>-<STT 2 số>, VD ' + pre + '-TTI-MOT-02-01' : pre + '-<Quy cách>, VD ' + pre + '-D06-L150 (Ø6×150) — không có quy cách: ' + pre + '-<3 chữ đầu tên>-01') +
     ' · Tên: ' + LOAI[loai] + ' + vị trí / quy cách' + (pv === 'rieng' ? ' – mã SP' : '');
 }
 
@@ -1050,6 +1060,8 @@ function bindAll(){
   document.getElementById('hXuat').onclick = xuatLichSu;
   document.getElementById('lk-save').onclick = e => saveLk(e.currentTarget);
   document.getElementById('lk-goi-y').onclick = goiYMa;
+  // T258: vật tư tiêu hao thường dùng chung cho mọi khuôn → chọn loại này tự đặt phạm vi Dùng chung.
+  document.getElementById('lk-loai').addEventListener('change', e => { if (e.target.value === 'vat_tu_tieu_hao' && !lkEditing) document.getElementById('lk-pham-vi').value = 'chung'; });
   ['lk-loai', 'lk-pham-vi'].forEach(id => document.getElementById(id).addEventListener('change', capNhatQuyTac));
   ['lk-ma', 'lk-ten', 'lk-quy-cach', 'lk-vat-lieu', 'lk-dv'].forEach(id => document.getElementById(id).addEventListener('input', capNhatQuyTac));
   document.getElementById('lk-del').onclick = delLk;

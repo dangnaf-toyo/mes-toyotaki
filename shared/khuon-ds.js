@@ -105,7 +105,7 @@
   <div class="hd"><span>✏ <span data-f="cfg-title">Sửa khuôn</span></span><button type="button" data-close>✕</button></div>
   <div class="bd">
     <div class="hint" style="background:var(--bg-sunken);border-radius:6px;padding:8px 10px">Để trống ô nào thì giữ nguyên giá trị hiện tại của ô đó. Dùng khi cần khai báo baseline hoặc sửa ngưỡng riêng cho khuôn này.</div>
-    <div class="fg"><label>Mã khuôn *</label><input data-f="ma-khuon" placeholder="VD: K-DC5-01"><div class="sub" data-f="ma-khuon-hint"></div></div>
+    <div class="fg"><label>Mã khuôn *</label><div class="gy-row"><input data-f="ma-khuon" placeholder="VD: OUT #3"><button type="button" class="gy-btn" data-act="ma-goiy" title="Chọn Mã sản phẩm (có thể gõ số khắc, VD 4) rồi bấm">Gợi ý</button></div><div class="gy-note" data-f="ma-khuon-note" hidden></div><div class="sub" data-f="ma-khuon-hint"></div></div>
     <div class="fg"><label>Mã sản phẩm <span data-f="sp-req">*</span></label><select data-f="ma-sp"></select><div class="sub">Mỗi khuôn đúc đúng 1 mã SP cố định.</div></div>
     <div class="row2">
       <div class="fg"><label>Tổng shot lũy kế</label><input type="number" data-f="tong-shot" min="0" step="1" placeholder="Để trống nếu giữ nguyên"></div>
@@ -306,6 +306,7 @@
       cur = m;
       f('cfg-title').textContent = m ? 'Sửa khuôn ' + m.ma_khuon : 'Khai báo khuôn mới';
       f('ma-khuon').value = m ? m.ma_khuon : '';
+      f('ma-khuon').dataset.goiY = '';
       f('ma-khuon-hint').textContent = m
         ? 'Đổi mã ở đây = đổi tên khuôn — chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai, không sửa lại lịch sử (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in).' : '';
       const sel = f('ma-sp');
@@ -319,11 +320,29 @@
       f('chu-ky').value = m && m.chu_ky_bao_duong_ngay ? m.chu_ky_bao_duong_ngay : '';
       f('ghi-chu').value = '';
       host.querySelector('[data-act="cfg-del"]').hidden = !m;
+      host.querySelector('[data-act="ma-goiy"]').hidden = !!m || !window.GoiYMa;
+      kiemMa();
       openDlg('cfg');
+    }
+    // T258: gợi ý mã khuôn "Tên ngắn #Số" theo khuôn anh em cùng SP + cảnh báo sai mẫu.
+    function kiemMa(note){
+      if (!window.GoiYMa) return;
+      const kq = f('ma-khuon').value.trim() ? GoiYMa.khuonKiem(f('ma-khuon').value, molds, f('ma-sp').value || (cur && cur.ma_sp), cur && cur.ma_khuon) : null;
+      GoiYMa.hien(f('ma-khuon-note'), kq, note);
+    }
+    function goiYMa(tuDong){
+      const o = f('ma-khuon');
+      if (!window.GoiYMa || cur || (tuDong && o.value.trim() && o.value !== o.dataset.goiY)) return;
+      const p = products.find(x => x.ma_sp === f('ma-sp').value);
+      const kq = GoiYMa.khuon({ maSp: f('ma-sp').value, tenSp: p && p.ten_sp, maGo: o.value === o.dataset.goiY ? '' : o.value }, molds);
+      if (kq.loi) return tuDong ? null : GoiYMa.hien(f('ma-khuon-note'), { muc: 'canh', text: '⚠ ' + kq.loi });
+      o.value = o.dataset.goiY = kq.ma;
+      kiemMa(kq.note);
     }
     async function saveCfg(btn){
       const maMoi = f('ma-khuon').value.trim();
       if (!maMoi) return showMsg('Cần nhập mã khuôn', 'err');
+      if (!cur && window.GoiYMa && GoiYMa.khuonKiem(maMoi, molds).muc === 'loi') return showMsg('Mã khuôn ' + maMoi + ' đã có', 'err');
       const maSp = f('ma-sp').value.trim();
       if (!cur && !maSp) return showMsg('Khuôn mới cần khai báo mã sản phẩm', 'err');
       btn.disabled = true;
@@ -462,11 +481,14 @@
         const b = e.target.closest('[data-act]');
         if (!b) return;
         if (b.dataset.act === 'cfg-save') return saveCfg(b);
+        if (b.dataset.act === 'ma-goiy') return goiYMa(false);
         if (b.dataset.act === 'cfg-del') return deleteCfg();
         if (b.dataset.act === 'ut-save') return saveUt(b);
         if (b.dataset.act === 'tt-save') return saveTt(b);
       });
       document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDlg(); });
+      f('ma-khuon').addEventListener('input', () => kiemMa());
+      f('ma-sp').addEventListener('change', () => { goiYMa(true); kiemMa(); });
     }
 
     load();
