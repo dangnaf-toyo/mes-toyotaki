@@ -131,7 +131,23 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
 .card { background: var(--bg-panel); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm); border: 1px solid var(--border); border-top: 3px solid var(--primary); margin-bottom: 1.5rem; }
 .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
 .chart-container { position: relative; height: 400px; margin-bottom: 1rem; }
-#overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+#overview-grid { display: block; }
+.ov-tong { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: .5rem; }
+.ov-chip { min-height: 30px; border: 1.5px solid var(--border); background: var(--bg-panel); border-radius: 16px; padding: 4px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text); }
+.ov-chip b { font-family: 'JetBrains Mono', monospace; margin-left: 4px; }
+.ov-chip.on { border-color: var(--accent); background: rgba(15,95,165,0.1); color: var(--accent); }
+.ov-table { margin-top: 0; }
+.ov-table td, .ov-table th { padding: .5rem .6rem; white-space: nowrap; }
+.ov-table td.so, .ov-table th.so { text-align: right; font-family: 'JetBrains Mono', monospace; }
+.ov-table tbody tr { cursor: pointer; }
+.ov-table tbody tr:hover { background: var(--bg-sunken); }
+.ov-table .ma { font-weight: 700; color: var(--primary); font-family: 'JetBrains Mono', monospace; }
+.data-table.ov-table th { font-size: 11px; }
+.ov-table .badge { font-size: 11px; }
+.ov-table .ten { display: block; white-space: normal; min-width: 120px; max-width: 260px; color: var(--gray); font-size: 12px; font-weight: 400; font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+.ov-table .am { color: var(--danger); }
+.ov-table .duong { color: var(--success); }
+.badge-none { background: var(--bg-sunken); color: var(--gray); }
 .overview-card { background: var(--bg-panel); border-radius: 8px; padding: 1.5rem; border: 1px solid var(--border); border-top: 3px solid var(--primary); box-shadow: var(--shadow-sm); cursor: pointer; }
 .overview-card:hover { box-shadow: var(--shadow-md); }
 .overview-card-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; gap: .5rem; }
@@ -250,7 +266,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
   .container { padding: 1rem; }
   .form-row { grid-template-columns: 1fr; }
   .chart-container { height: 300px; }
-  #overview-grid { grid-template-columns: 1fr; }
+
   .sync-status { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
 }
 </style>
@@ -785,43 +801,63 @@ function getBeRong(code) { const v = DB.settings[code]; return (v === undefined 
 /* ==========================================================================
  * TAB TỔNG QUAN
  * ========================================================================== */
+let ovLoc = '';
 function renderOverview() {
   const container = $('overview-grid');
-  container.innerHTML = '';
   if (!DB.materials.length) {
     container.innerHTML = '<div class="alert alert-warn">Chưa có mã NVL nào trong danh mục. Vào tab "Danh mục NVL" để thêm.</div>';
     return;
   }
-  DB.materials.forEach(m => {
+  const NHAN = { danger: '⚠ Thấp', warning: '⚠ Cao', ok: '✓ Ổn', none: 'Chưa có KH' };
+  const THU_TU = { danger: 0, warning: 1, none: 2, ok: 3 };
+  const gdCuoi = {};
+  DB.transactions.forEach(t => { if (!gdCuoi[t.ma_nvl] || t.ngay > gdCuoi[t.ma_nvl]) gdCuoi[t.ma_nvl] = t.ngay; });
+  const rows = DB.materials.map(m => {
     const code = m.ma_nvl;
     const stock = getCurrentStock(code);
+    const coKH = !!DB.plan[code];
     const planToday = getPlanTodayForMaterial(code);
     const bw = getBeRong(code);
     const lsl = Math.max(0, planToday - bw);
     const usl = planToday + bw;
+    let st = 'ok';
+    if (!coKH) st = 'none';
+    else if (stock < lsl) st = 'danger';
+    else if (stock > usl) st = 'warning';
+    return { code, ten: m.ten_nvl || '', stock, coKH, planToday, lsl, usl, st, gd: gdCuoi[code] || '' };
+  }).sort((a, b) => (THU_TU[a.st] - THU_TU[b.st]) || a.code.localeCompare(b.code));
 
-    let status, statusText;
-    if (stock < lsl) { status = 'danger'; statusText = '⚠ Tồn kho thấp'; }
-    else if (stock > usl) { status = 'warning'; statusText = '⚠ Tồn kho cao'; }
-    else { status = 'ok'; statusText = '✓ Bình Thường'; }
+  const dem = { danger: 0, warning: 0, ok: 0, none: 0 };
+  rows.forEach(r => dem[r.st]++);
+  if (ovLoc && !dem[ovLoc]) ovLoc = '';
+  const chip = (k, nhan, n) => '<button type="button" class="ov-chip' + (ovLoc === k ? ' on' : '') + '" data-loc="' + k + '">' + nhan + '<b>' + n + '</b></button>';
+  const ngayVN = d => { if (!d) return '—'; const p = String(d).slice(0, 10).split('-'); return p[2] + '/' + p[1]; };
+  const tongTon = rows.reduce((t, r) => t + r.stock, 0);
 
-    const card = document.createElement('div');
-    card.className = 'overview-card';
-    card.onclick = () => { currentMaterial = code; switchTab('charts'); };
-    card.innerHTML =
-      '<div class="overview-card-header">' +
-        '<div><div class="overview-card-code">' + esc(code) + '</div>' +
-        '<div style="font-size:.75rem;color:var(--gray);margin-top:2px;">' + esc(m.ten_nvl || '') + '</div></div>' +
-        '<span class="badge badge-' + status + '">' + statusText + '</span>' +
-      '</div>' +
-      '<div class="overview-card-stats">' +
-        '<div class="stat-small"><div class="stat-label">Tồn Thực Tế (kg)</div><div class="stat-value" style="color: var(--primary);">' + fmtKg(stock) + '</div></div>' +
-        '<div class="stat-small"><div class="stat-label">KH Hôm Nay (kg)</div><div class="stat-value">' + fmtKg(planToday) + '</div></div>' +
-        '<div class="stat-small"><div class="stat-label">Min (kg)</div><div class="stat-value" style="font-size:.95rem;color:#8d6e00;">' + fmtKg(lsl) + '</div></div>' +
-        '<div class="stat-small"><div class="stat-label">Max (kg)</div><div class="stat-value" style="font-size:.95rem;color:#8d6e00;">' + fmtKg(usl) + '</div></div>' +
-      '</div>';
-    container.appendChild(card);
+  let html = '<div class="ov-tong">' + chip('', 'Tất cả', rows.length) +
+    (dem.danger ? chip('danger', '⚠ Thấp', dem.danger) : '') +
+    (dem.warning ? chip('warning', '⚠ Cao', dem.warning) : '') +
+    chip('ok', '✓ Ổn', dem.ok) +
+    (dem.none ? chip('none', 'Chưa có KH', dem.none) : '') + '</div>';
+  html += '<div class="table-scroll"><table class="data-table ov-table"><thead><tr>' +
+    '<th>Mã NVL</th><th class="so">Tồn (kg)</th><th>Trạng thái</th><th class="so">KH hôm nay</th>' +
+    '<th class="so">Chênh</th><th class="so">Min</th><th class="so">Max</th><th>GD cuối</th></tr></thead><tbody>';
+  rows.filter(r => !ovLoc || r.st === ovLoc).forEach(r => {
+    const chenh = r.stock - r.planToday;
+    html += '<tr data-ma="' + esc(r.code) + '">' +
+      '<td class="ma">' + esc(r.code) + (r.ten ? '<span class="ten">' + esc(r.ten) + '</span>' : '') + '</td>' +
+      '<td class="so"><b>' + fmtKg(r.stock) + '</b></td>' +
+      '<td><span class="badge badge-' + r.st + '">' + NHAN[r.st] + '</span></td>' +
+      '<td class="so">' + (r.coKH ? fmtKg(r.planToday) : '—') + '</td>' +
+      '<td class="so ' + (!r.coKH ? '' : chenh < 0 ? 'am' : chenh > 0 ? 'duong' : '') + '">' + (r.coKH ? (chenh > 0 ? '+' : '') + fmtKg(chenh) : '—') + '</td>' +
+      '<td class="so">' + (r.coKH ? fmtKg(r.lsl) : '—') + '</td>' +
+      '<td class="so">' + (r.coKH ? fmtKg(r.usl) : '—') + '</td>' +
+      '<td>' + ngayVN(r.gd) + '</td></tr>';
   });
+  html += '</tbody><tfoot><tr><td><b>Tổng</b></td><td class="so"><b>' + fmtKg(tongTon) + '</b></td><td colspan="6"></td></tr></tfoot></table></div>';
+  container.innerHTML = html;
+  container.querySelectorAll('.ov-chip').forEach(b => b.onclick = () => { ovLoc = b.dataset.loc; renderOverview(); });
+  container.querySelectorAll('tbody tr[data-ma]').forEach(tr => tr.onclick = () => { currentMaterial = tr.dataset.ma; switchTab('charts'); });
 }
 
 /* ==========================================================================
