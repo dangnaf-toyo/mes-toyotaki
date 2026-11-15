@@ -198,6 +198,16 @@ button{cursor:pointer;font-family:inherit}
 .overlay.show{display:flex}
 .spinner{width:2.2rem;height:2.2rem;border:.2rem solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.info-btn{border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text-muted);border-radius:50%;width:20px;height:20px;padding:0;font-size:12px;font-weight:700;line-height:1;display:inline-grid;place-items:center;cursor:pointer;vertical-align:middle;margin-left:.3rem}
+.info-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+#xnModal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:grid;place-items:center;padding:16px;z-index:105}
+#xnModal[hidden]{display:none}
+#xnModal .xn-box{background:var(--bg-panel);border-radius:12px;width:min(420px,100%);padding:16px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-md)}
+#xnModal .xn-nd{font-size:1rem;line-height:1.5;white-space:pre-line}
+#xnModal .xn-acts{display:flex;justify-content:flex-end;gap:.5rem}
+#xnModal .xn-acts button{min-height:44px;padding:.5rem 1.1rem;border-radius:.5rem;font:inherit;font-weight:700;cursor:pointer;border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text)}
+#xnModal .xn-acts #xnOk{background:var(--accent);border-color:var(--accent);color:#fff}
+#xnModal .xn-acts #xnOk.bad{background:var(--alarm-fg);border-color:var(--alarm-fg)}
 .toast{position:fixed;left:.75rem;right:.75rem;bottom:1rem;background:#1E293B;color:#fff;padding:.8rem 1rem;border-radius:.6rem;font-size:.95rem;box-shadow:var(--shadow-md);transform:translateY(120%);transition:transform .25s;z-index:110}
 .toast.show{transform:translateY(0)}
 .toast.error{background:#B91C1C}
@@ -207,19 +217,20 @@ button{cursor:pointer;font-family:inherit}
 
 <div id="overlay" class="overlay"><div class="spinner"></div><div id="overlay-text">Đang tải...</div></div>
 <div id="toast" class="toast"></div>
+<div id="xnModal" hidden><div class="xn-box" role="dialog" aria-modal="true"><div class="xn-nd" id="xnNd"></div><div class="xn-acts"><button type="button" id="xnHuy">Huỷ</button><button type="button" id="xnOk">Đồng ý</button></div></div></div>
 
 <!-- ============ SCREEN: Hàng đợi ============ -->
 <div class="screen active" id="scr-queue">
   <div class="appbar ipqc-head">
     <div class="brand"><div class="co">Toyotaki</div><div class="title">IPQC Đúc</div></div>
     <div class="head-info">
-      <span class="chip">Hàng đợi kiểm · 2 giờ/lần · 1 shot/lần</span>
+      <span class="chip">2 giờ/lần · 1 shot</span>
       <div class="sub" id="queue-user-label">…</div>
     </div>
     <div class="head-actions">
       <a class="hbtn" href="ipqc-gia-cong.html">IPQC Gia công</a>
-      <a class="hbtn" href="ipqc-gia-cong.html?view=dashboard">Dashboard IPQC tổng hợp</a>
-      <a class="hbtn" href="qc-manager.html?tab=tracuu" target="_blank" rel="noopener" title="Tra cứu lịch sử IPQC và ảnh kiểm tra (mở tab mới)">🔎 Tra cứu lịch sử</a>
+      <a class="hbtn" href="ipqc-gia-cong.html?view=dashboard">Tổng hợp</a>
+      <a class="hbtn" href="qc-manager.html?tab=tracuu" target="_blank" rel="noopener" title="Tra cứu lịch sử IPQC và ảnh kiểm tra (mở tab mới)">Lịch sử</a>
       <button type="button" class="hbtn" id="btn-bao-mau">Bật thông báo</button>
       <button class="hbtn daynight-btn hidden" id="btn-ket-thuc-ngay" onclick="onKetThucNgay()">Kết thúc ngày</button>
     </div>
@@ -228,7 +239,7 @@ button{cursor:pointer;font-family:inherit}
   <div class="err-notice hidden" id="ipqc-err-notice" role="alert"></div>
   <div class="daynight-banner hidden" id="daynight-banner">
     <div id="daynight-banner-text">—</div>
-    <button id="btn-bat-dau-ngay" onclick="onBatDauNgay()">Bắt đầu ngày làm việc</button>
+    <button id="btn-bat-dau-ngay" onclick="onBatDauNgay()">Bắt đầu ngày</button>
   </div>
   <div class="list" id="queue-list"></div>
 </div>
@@ -247,18 +258,18 @@ button{cursor:pointer;font-family:inherit}
     <div class="detail-meta" id="ck-meta">—</div>
   </div>
   <div class="incident-info hidden" id="ck-incident-info">
-    <div class="ii-title">⚠ Nội dung sự cố (trưởng ca đã ghi)</div>
+    <div class="ii-title">Sự cố (trưởng ca ghi)</div>
     <div class="ii-row" id="ck-incident-loai"></div>
     <div class="ii-row" id="ck-incident-van-de"></div>
     <div class="ii-row" id="ck-incident-xu-ly"></div>
     <div class="ii-row" id="ck-incident-dam-nhiem"></div>
   </div>
   <details class="incident-info hidden" id="ck-su-co-lich-su" open>
-    <summary class="ii-title" style="cursor:pointer">🕘 Lịch sử sự cố — từ khi phát sinh đến hiện tại</summary>
+    <summary class="ii-title" style="cursor:pointer">Lịch sử sự cố</summary>
     <div id="ck-su-co-lich-su-body" style="margin-top:.5rem"></div>
   </details>
   <div class="incident-info vdt hidden" id="ck-vd-truoc"></div>
-  <button class="pdf-btn hidden" id="ck-pdf-btn">Xem tiêu chuẩn (PDF)</button>
+  <button class="pdf-btn hidden" id="ck-pdf-btn">Tiêu chuẩn (PDF)</button>
 
   <div class="hidden" id="ck-btk"></div>   <!-- T133: kết quả đo theo bảng tuần kiểm -->
   <div class="checklist" id="ck-checklist"></div>
@@ -267,11 +278,11 @@ button{cursor:pointer;font-family:inherit}
     <div class="photo-actions">
       <button class="photo-btn" id="ck-photo-btn" onclick="document.getElementById('ck-photo-input').click()">
         <span style="font-size:1.6rem">📷</span>
-        <span id="ck-photo-label">Bấm để chụp ảnh bằng chứng (bắt buộc, tối đa 10 ảnh)</span>
+        <span id="ck-photo-label">Chụp ảnh (bắt buộc, tối đa 10)</span>
       </button>
       <button class="photo-btn" id="ck-album-btn" onclick="document.getElementById('ck-album-input').click()">
         <span style="font-size:1.6rem">🖼️</span>
-        <span>Chọn từ album</span>
+        <span>Album</span>
       </button>
     </div>
     <input type="file" accept="image/*" capture="environment" id="ck-photo-input" class="hidden" onchange="onPhotoSelected(event)">
@@ -280,8 +291,8 @@ button{cursor:pointer;font-family:inherit}
   </div>
 
   <div class="field">
-    <label>Ghi chú (tuỳ chọn)</label>
-    <textarea id="ck-ghi-chu" placeholder="Ghi chú thêm nếu cần..."></textarea>
+    <label>Ghi chú</label>
+    <textarea id="ck-ghi-chu" placeholder="Không bắt buộc"></textarea>
   </div>
 
   <div class="result-grid">
@@ -290,7 +301,7 @@ button{cursor:pointer;font-family:inherit}
       <button class="btn-result ok" onclick="submitCheck('OK')">✓ OK<br><span style="font-weight:500;font-size:.75rem">Cho phép SX</span></button>
       <button class="btn-result ng" onclick="submitCheck('NG')">✕ NG<br><span style="font-weight:500;font-size:.75rem">Dừng máy</span></button>
     </div>
-    <button class="btn-result warn" id="ipqcWarningButton" onclick="MesIpqcWarning.open()">⚠️ Cảnh báo<br><span style="font-weight:500;font-size:.75rem">Ghi nhận cảnh báo để Sản xuất xử lý</span></button>
+    <button class="btn-result warn" id="ipqcWarningButton" onclick="MesIpqcWarning.open()">Cảnh báo<br><span style="font-weight:500;font-size:.75rem">Sản xuất xử lý</span></button>
   </div>
 </div>
 
@@ -637,9 +648,9 @@ function renderQueue(){
   banner.classList.toggle('hidden', !paused);
   if (paused){
     document.getElementById('daynight-banner-text').textContent =
-      '🌙 Đã kết thúc ngày làm việc lúc ' + fmtDateTime24(state.tamDung.pausedAt)
+      'Đã kết thúc ngày lúc ' + fmtDateTime24(state.tamDung.pausedAt)
       + (state.tamDung.pausedBy ? ' (' + state.tamDung.pausedBy + ')' : '')
-      + ' — hàng đợi tạm dừng đếm giờ, không hiện điểm kiểm mới.';
+      + ' — hàng đợi tạm dừng.';
     list.innerHTML = '';
     return;
   }
@@ -652,11 +663,11 @@ function renderQueue(){
   const tonOpen = !!(document.getElementById('ton-group') || {}).open;
 
   let html = chinh.length ? chinh.map(queueCardHtml).join('')
-    : '<div class="empty-note">✅ Không có điểm kiểm nào đang chờ.<br>Hàng đợi sẽ tự cập nhật khi có yêu cầu mới.</div>';
+    : '<div class="empty-note">Không có điểm kiểm đang chờ.</div>';
   if (ton.length) {
     html += '<details class="ton-group" id="ton-group"' + (tonOpen ? ' open' : '') + '>'
-      + '<summary>Tồn đọng (<span class="n">' + ton.length + '</span>) — chờ quá 24 giờ</summary>'
-      + '<div class="ton-note">Thường do ca của máy chưa được Kết ca hoặc máy không còn chạy mã này. Vẫn bấm vào để kiểm được nếu máy còn chạy; QC Manager có thể đóng các điểm kiểm không còn ý nghĩa.</div>'
+      + '<summary>Tồn đọng (<span class="n">' + ton.length + '</span>) — quá 24 giờ <button class="info-btn" type="button" data-info="tonInfo" title="Giải thích">ⓘ</button></summary>'
+      + '<div class="ton-note" id="tonInfo" hidden>Thường do ca chưa Kết ca hoặc máy đã đổi mã. Vẫn kiểm được nếu máy còn chạy; QC Manager có thể đóng điểm kiểm không còn ý nghĩa.</div>'
       + '<div class="ton-actions" id="ton-actions"></div>'
       + '<div class="ton-list">' + ton.map(queueCardHtml).join('') + '</div></details>';
   }
@@ -702,6 +713,31 @@ function queueCardHtml(cp){
     </div>`;
 }
 
+// hoiXacNhan(noiDung, {nutOk, nguyHiem}) → Promise<true|false>; Esc / bấm nền = Huỷ
+function hoiXacNhan(noiDung, o){
+  o = o || {};
+  return new Promise(res => {
+    const w = document.getElementById('xnModal'), ok = document.getElementById('xnOk'), huy = document.getElementById('xnHuy');
+    document.getElementById('xnNd').textContent = noiDung;
+    ok.textContent = o.nutOk || 'Đồng ý';
+    ok.classList.toggle('bad', !!o.nguyHiem);
+    const esc = e => { if (e.key === 'Escape') xong(false); };
+    const xong = v => { w.hidden = true; ok.onclick = huy.onclick = w.onclick = null; document.removeEventListener('keydown', esc); res(v); };
+    ok.onclick = () => xong(true);
+    huy.onclick = () => xong(false);
+    w.onclick = e => { if (e.target === w) xong(false); };
+    document.addEventListener('keydown', esc);
+    w.hidden = false;
+    setTimeout(() => ok.focus(), 30);
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-info]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const x = document.getElementById(b.dataset.info); if (!x) return;
+  x.hidden = !x.hidden; b.classList.toggle('on', !x.hidden);
+});
+
 async function onKetThucNgay(){
   const session = await MesAuth.getSession();
   if (!session){
@@ -709,7 +745,7 @@ async function onKetThucNgay(){
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
     return;
   }
-  if (!confirm('Kết thúc ngày làm việc? Hàng đợi IPQC sẽ tạm dừng đếm giờ chờ kiểm cho đến khi bấm "Bắt đầu ngày làm việc".')) return;
+  if (!(await hoiXacNhan('Kết thúc ngày làm việc?\nHàng đợi dừng đếm giờ đến khi bấm "Bắt đầu ngày".', { nutOk: 'Kết thúc ngày' }))) return;
   showOverlay('Đang kết thúc ngày làm việc...');
   try {
     const nguoi = await getNguoiKiemIdentity();
@@ -1105,9 +1141,9 @@ function renderPhotoGrid(){
   const label = document.getElementById('ck-photo-label');
   const n = state.photos.length;
   btn.classList.toggle('has-photo', n > 0);
-  if (n === 0) label.textContent = 'Bấm để chụp ảnh bằng chứng (bắt buộc, tối đa ' + IPQC_MAX_PHOTOS + ' ảnh)';
-  else if (n >= IPQC_MAX_PHOTOS) label.textContent = '✓ Đã đủ ' + IPQC_MAX_PHOTOS + ' ảnh (tối đa)';
-  else label.textContent = '✓ Đã có ' + n + '/' + IPQC_MAX_PHOTOS + ' ảnh — bấm để chụp thêm';
+  if (n === 0) label.textContent = 'Chụp ảnh (bắt buộc, tối đa ' + IPQC_MAX_PHOTOS + ')';
+  else if (n >= IPQC_MAX_PHOTOS) label.textContent = 'Đủ ' + IPQC_MAX_PHOTOS + ' ảnh';
+  else label.textContent = n + '/' + IPQC_MAX_PHOTOS + ' ảnh — chụp thêm';
   btn.disabled = n >= IPQC_MAX_PHOTOS;
   document.getElementById('ck-album-btn').disabled = n >= IPQC_MAX_PHOTOS;
 }
@@ -1165,11 +1201,11 @@ async function uploadEvidencePhotos(maMay, maSp, ketQua){
   return urls;
 }
 
-function finishCastingCheck(){
+async function finishCastingCheck(){
   const d = state.btk?.trangThai();
   if (d && !d.du) return showToast(d.errors[0] + '. Bỏ chọn hạng mục chưa thực hiện để kết thúc.', true);
   const ng = d?.dat === false || state.checklistAnswers.some(a => a.dat === false);
-  if (ng && !confirm('Có kết quả NG. Kết thúc và giữ quy trình xử lý NG hiện tại?')) return;
+  if (ng && !(await hoiXacNhan('Có kết quả NG — kết thúc kiểm tra?\nGiữ quy trình xử lý NG hiện tại.', { nutOk: 'Kết thúc (NG)', nguyHiem: true }))) return;
   return submitCheck(ng ? 'NG' : 'OK');
 }
 

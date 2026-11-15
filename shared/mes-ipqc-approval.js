@@ -787,7 +787,12 @@ const MesIpqcApproval = (() => {
     await loadWarnings();
   }
   async function reopenWarning(id) {
-    const reason = prompt("Lý do mở lại cảnh báo (tối thiểu 3 ký tự):");
+    const reason = await hoiXacNhan("Mở lại cảnh báo này?", {
+      nutOk: "Mở lại",
+      nhap: true,
+      batBuoc: true,
+      goiY: "Lý do (tối thiểu 3 ký tự)",
+    });
     if (reason === null) return;
     if (reason.trim().length < 3) return alert("Lý do tối thiểu 3 ký tự.");
     const { data, error } = await sb.rpc("duc_ipqc_mo_lai_canh_bao", { p_id: id, p_ly_do: reason.trim() });
