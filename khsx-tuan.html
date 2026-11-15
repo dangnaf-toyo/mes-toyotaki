@@ -238,8 +238,8 @@ tr:hover td{background:var(--bg-sunken)}
       <button class="modal-close" onclick="closeRowModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div class="fg"><label>Mã máy *</label><select id="f-ma-may"><option value="">— Chọn máy —</option></select></div>
-      <div class="fg"><label>Mã SP *</label><select id="f-ma-sp" onchange="onMaSpChange()"><option value="">— Chọn mã SP —</option></select></div>
+      <div class="fg"><label>Mã máy *</label><select id="f-ma-may" onchange="onMaMayChange()"><option value="">— Chọn máy —</option></select></div>
+      <div class="fg"><label>Mã SP *</label><select id="f-ma-sp" onchange="if(this.value==='__all__'){fillSpForMachine('', '');}onMaSpChange()"><option value="">— Chọn mã SP —</option></select></div>
       <div class="fg full"><label>Tên SP</label><input id="f-ten-sp" disabled style="background:var(--bg-sunken)"></div>
       <div class="fg full">
         <label>Số khuôn *</label>
@@ -688,8 +688,33 @@ async function loadMasterLists(){
 
   const productOptionsHtml = '<option value="">— Chọn mã SP —</option>' +
     products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp) + (p.ten_sp ? ' — ' + escapeHtml(p.ten_sp) : '') + '</option>').join('');
+  productListCache = products;
   document.getElementById('f-ma-sp').innerHTML = productOptionsHtml;
   document.getElementById('cf-ma-sp').innerHTML = productOptionsHtml;
+}
+
+// Modal Đúc: chọn máy → ô Mã SP chỉ hiện mã chạy trên máy đó (ma_sp_dung).
+// Máy chưa khai mã → mọi mã. Cuối danh sách có "Mã khác…" để mở mọi mã.
+let productListCache = [];
+function fillSpForMachine(maMay, keepSp){
+  const sel = document.getElementById('f-ma-sp');
+  let l = maMay && spByMachine[maMay];
+  if (l && keepSp && !l.includes(keepSp)) l = null; // dòng cũ có mã ngoài danh sách máy → hiện mọi mã
+  const opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
+  const lbl = sp => sp + (productMap[sp] ? ' — ' + productMap[sp] : '');
+  sel.innerHTML = l
+    ? '<option value="">— Mã chạy trên ' + escapeHtml(maMay) + ' (' + l.length + ') —</option>' + l.map(sp => opt(sp, lbl(sp))).join('') + opt('__all__', 'Mã khác…')
+    : '<option value="">— Chọn mã SP —</option>' + productListCache.map(p => opt(p.ma_sp, lbl(p.ma_sp))).join('');
+  if (keepSp) ensureOptionExists(sel, keepSp);
+  sel.value = keepSp || '';
+}
+function onMaMayChange(){
+  const sel = document.getElementById('f-ma-sp');
+  const cur = sel.value && sel.value !== '__all__' ? sel.value : '';
+  const l = spByMachine[document.getElementById('f-ma-may').value];
+  const keep = !l || l.includes(cur) ? cur : '';
+  fillSpForMachine(document.getElementById('f-ma-may').value, keep);
+  if (keep !== cur) onMaSpChange();
 }
 
 function ensureOptionExists(selectEl, value, labelSuffix){
@@ -940,9 +965,9 @@ function openRowModal(id){
   const r = id ? ducRows.find(x => x.id === id) : null;
   document.getElementById('modalTitleDuc').textContent = r ? 'Sửa dòng kế hoạch — Đúc' : 'Thêm dòng kế hoạch — Đúc';
   const selMay = document.getElementById('f-ma-may'), selSp = document.getElementById('f-ma-sp');
-  if (r) { ensureOptionExists(selMay, r.ma_may); ensureOptionExists(selSp, r.ma_sp); }
+  if (r) ensureOptionExists(selMay, r.ma_may);
   selMay.value = r ? r.ma_may : '';
-  selSp.value = r ? r.ma_sp : '';
+  fillSpForMachine(selMay.value, r ? r.ma_sp : '');
   document.getElementById('f-ten-sp').value = r ? r.ten_sp : (productMap[selSp.value] || '');
   document.getElementById('f-ghi-chu').value = r ? r.ghi_chu : '';
   populateSoKhuonField(r ? r.ma_sp : '', r ? r.so_khuon : '');
