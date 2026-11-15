@@ -138,9 +138,9 @@
     const { data } = await sb.auth.getSession();
     const s = data.session;
     if (!s) return null;
-    const { data: r } = await sb.from('user_roles').select('role,full_name,username').eq('user_id', s.user.id).maybeSingle();
+    const { data: r } = await sb.from('user_roles').select('role,chuc_danh,full_name,username').eq('user_id', s.user.id).maybeSingle();
     const role = r ? r.role : null;
-    _me = { id: s.user.id, ten: (r && (r.full_name || r.username)) || s.user.email, role, laBGD: role === 'admin' || role === 'giam_doc_sx' };
+    _me = { id: s.user.id, ten: (r && (r.full_name || r.username)) || s.user.email, role, laBGD: role === 'admin' || role === 'giam_doc_sx' || !!(r && r.chuc_danh === 'giam_doc_sx') };
     return _me;
   }
 

@@ -47,8 +47,9 @@ const MesIpqcFlow = (() => {
     return values;
   }
   const stepRoles={1:['qc_manager'],2:['ke_hoach','qlsx_truong_phong'],3:['quan_ly_bo_phan','truong_ca'],4:['giam_doc_sx']};
-  function canDecide(role,step,override=false){return role==='admin'||(override?role==='giam_doc_sx':(stepRoles[step]||[]).includes(role));}
-  function canPropose(role){return ['admin','nhan_vien_duc','nhan_vien_bavia','nhan_vien_gia_cong','nhan_vien_danh_bong','truong_ca','quan_ly_bo_phan','qlsx_nhan_vien','qlsx_truong_phong','ke_hoach','giam_doc_sx'].includes(role);}
+  const vt=r=>Array.isArray(r)?r:[r];   // T286: nhận 1 vai trò hoặc [role, chuc_danh]
+  function canDecide(role,step,override=false){const v=vt(role);return v.includes('admin')||(override?v.includes('giam_doc_sx'):(stepRoles[step]||[]).some(x=>v.includes(x)));}
+  function canPropose(role){const v=vt(role);return ['admin','nhan_vien_duc','nhan_vien_bavia','nhan_vien_gia_cong','nhan_vien_danh_bong','truong_ca','quan_ly_bo_phan','qlsx_nhan_vien','qlsx_truong_phong','ke_hoach','giam_doc_sx'].some(x=>v.includes(x));}
   function defects(cp){return (Array.isArray(cp.checklist_json)?cp.checklist_json:[]).filter(r=>r.dat===false).map(r=>String(r.muc||r.label||'')).filter(Boolean);}
   async function warnings(){
     const checkpoints=await readRows('duc_ipqc_checkpoint','id_checkpoint',{ket_qua:'CANH_BAO',trang_thai:'da_kiem'}),requests=[],source=[];
