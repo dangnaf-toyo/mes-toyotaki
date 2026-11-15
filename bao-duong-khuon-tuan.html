@@ -437,7 +437,7 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js"></script>
 <script src="shared/su-co-anh.js"></script>
-<script src="shared/khuon-can-thiep.js?v=T210f"></script>
+<script src="shared/khuon-can-thiep.js?v=T261"></script>
 <script>
 const THU_COLS = ['t2','t3','t4','t5','t6','t7','cn'];
 const THU_LABEL = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -976,7 +976,7 @@ function renderDuyet(){
     '<div class="log-list" id="logList">' + (duyetLog.length ? duyetLog.map(l =>
       '<div class="log-item"><div class="lh"><span>' + (SU_KIEN_LABEL[l.su_kien] || escapeHtml(l.su_kien)) + '</span><span class="lm">' + escapeHtml(l.nguoi) + ' · ' + fmtTs(l.thoi_diem) + '</span></div>' +
       (l.noi_dung ? '<div class="lm">' + escapeHtml(l.noi_dung) + '</div>' : '') +
-      (l.ly_do ? '<div class="lr">Lý do: ' + escapeHtml(l.ly_do) + '</div>' : '') + '</div>').join('')
+      (l.ly_do ? '<div class="lr">' + (l.su_kien === 'tu_choi' ? 'Lý do: ' : 'Ghi chú: ') + escapeHtml(l.ly_do) + '</div>' : '') + '</div>').join('')
       : '<div class="log-item"><span class="lm">Chưa có thay đổi nào.</span></div>') + '</div>';
 
   document.getElementById('btnLog').onclick = () => document.getElementById('logList').classList.toggle('open');
@@ -996,11 +996,10 @@ async function onGuiDuyet(){
 }
 
 async function onXuLyDuyet(dongY){
-  let lyDo = '';
-  if (!dongY) {
-    lyDo = (prompt('Lý do từ chối (bắt buộc) — kế hoạch sẽ trả về người lập:') || '').trim();
-    if (!lyDo) return;
-  } else if (!confirm(trangThai() === 'cho_kiem_tra' ? 'Xác nhận kiểm tra đạt, chuyển Giám đốc SX phê duyệt?' : 'Xác nhận phê duyệt kế hoạch bảo dưỡng tuần này?')) return;
+  const lyDo = dongY
+    ? await hoiGhiChuDuyet(trangThai() === 'cho_kiem_tra' ? 'Xác nhận kiểm tra đạt, chuyển Giám đốc SX phê duyệt?' : 'Xác nhận phê duyệt kế hoạch bảo dưỡng tuần này?', { nutOk: trangThai() === 'cho_kiem_tra' ? 'Kiểm tra đạt' : 'Phê duyệt' })
+    : await hoiGhiChuDuyet('Từ chối — kế hoạch trả về người lập.', { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' });
+  if (lyDo === null) return;
   const { data, error } = await sb.rpc('duc_khuon_bd_xu_ly_duyet', { p_tuan: fmtDate(weekMonday), p_dong_y: dongY, p_ly_do: lyDo });
   if (error || !data || !data.ok) return showMsg('Lỗi: ' + rpcErr(data, error), 'err', 5000);
   showMsg(!dongY ? '✓ Đã từ chối, trả về người lập' : data.trang_thai_moi === 'da_duyet' ? '✓ Đã phê duyệt' : '✓ Đã kiểm tra, chuyển Giám đốc SX', 'ok', 2500);

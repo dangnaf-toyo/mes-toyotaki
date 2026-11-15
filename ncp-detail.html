@@ -532,7 +532,7 @@ function renderBanner(){
       <button class="btn btn-alarm" onclick="approve('Tu_choi')">✕ Từ chối</button>`;
   } else if (c.rc_trang_thai_duyet === 'da_duyet') {
     msg.textContent = '🟢 Đã phê duyệt';
-    detail.textContent = 'Duyệt bởi ' + c.rc_nguoi_duyet + ' lúc ' + fmtDT(c.rc_thoi_diem_duyet);
+    detail.textContent = 'Duyệt bởi ' + c.rc_nguoi_duyet + ' lúc ' + fmtDT(c.rc_thoi_diem_duyet) + (c.rc_ghi_chu_duyet ? ' — Ghi chú: ' + c.rc_ghi_chu_duyet : '');
     actions.innerHTML = `<button class="btn btn-outline" onclick="reopen()">Mở lại để chỉnh sửa</button>`;
   } else if (c.rc_trang_thai_duyet === 'tu_choi') {
     msg.textContent = '🔴 Bị từ chối';
@@ -722,11 +722,10 @@ async function approve(ketQua){
   if (ketQua === 'Duyet' && state.case.rc_nguoi_gui_duyet === state.currentUserEmail) {
     if (!confirm('Bạn đang tự duyệt phiếu do chính bạn gửi — vẫn tiếp tục?')) return;
   }
-  let ghiChu = '';
-  if (ketQua === 'Tu_choi') {
-    ghiChu = prompt('Lý do từ chối (bắt buộc):') || '';
-    if (!ghiChu.trim()) return alert('Cần nhập lý do từ chối');
-  }
+  const ghiChu = ketQua === 'Tu_choi'
+    ? await hoiGhiChuDuyet('Từ chối Nguyên nhân & Đối sách?', { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' })
+    : await hoiGhiChuDuyet('Duyệt Nguyên nhân & Đối sách?', { nutOk: 'Duyệt' });
+  if (ghiChu === null) return;
   showOverlay('Đang xử lý...');
   const { data, error } = await sb.rpc('duc_ncp_approve_root_cause', { p_id_ncp: state.id, p_ket_qua: ketQua, p_ghi_chu: ghiChu, p_user: state.currentUserEmail });
   hideOverlay();

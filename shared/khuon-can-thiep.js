@@ -226,11 +226,12 @@
         return goi('duc_khuon_ct_khong_tac_dong', { p_id_su_co: String(o.nguonId), p_ghi_chu: g.trim() });
       }
       if (a === 'duyet') {
-        if (!confirm('Duyệt công việc cấp ' + ct.cap + ' trên khuôn ' + (ct.ma_khuon || '') + '?\n\n' + (ct.hang_muc || []).map(x => '• ' + x.noi_dung).join('\n'))) return;
-        return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: true, p_ly_do: '', p_cap_nhat_luc: ct.cap_nhat_luc }, '✓ Đã duyệt');
+        const g = await hoiGhiChuDuyet('Duyệt công việc cấp ' + ct.cap + ' trên khuôn ' + (ct.ma_khuon || '') + '?\n\n' + (ct.hang_muc || []).map(x => '• ' + x.noi_dung).join('\n'), { nutOk: 'Duyệt' });
+        if (g === null) return;
+        return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: true, p_ly_do: g, p_cap_nhat_luc: ct.cap_nhat_luc }, '✓ Đã duyệt');
       }
       if (a === 'tuchoi') {
-        const l = (prompt('Lý do từ chối (bắt buộc):') || '').trim();
+        const l = await hoiGhiChuDuyet('Từ chối công việc cấp ' + ct.cap + ' trên khuôn ' + (ct.ma_khuon || '') + '?', { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' });
         if (!l) return;
         return goi('duc_khuon_ct_duyet', { p_id: ct.id, p_dong_y: false, p_ly_do: l, p_cap_nhat_luc: ct.cap_nhat_luc }, '✓ Đã từ chối');
       }
@@ -278,13 +279,17 @@
       const r = rows.find(x => x.id === id); if (!r) return;
       let fn, args;
       if (a === 'duyet') {
-        if (!confirm('Duyệt công việc cấp ' + r.cap + ' trên khuôn ' + (r.ma_khuon || '') + '?\n\n' + (r.hang_muc || []).map(x => '• ' + x.noi_dung).join('\n'))) return;
-        fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: true, p_ly_do: '', p_cap_nhat_luc: r.cap_nhat_luc };
+        const g = await hoiGhiChuDuyet('Duyệt công việc cấp ' + r.cap + ' trên khuôn ' + (r.ma_khuon || '') + '?\n\n' + (r.hang_muc || []).map(x => '• ' + x.noi_dung).join('\n'), { nutOk: 'Duyệt' });
+        if (g === null) return;
+        fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: true, p_ly_do: g, p_cap_nhat_luc: r.cap_nhat_luc };
       } else if (a === 'tuchoi') {
-        const l = (prompt('Lý do từ chối (bắt buộc):') || '').trim(); if (!l) return;
+        const l = await hoiGhiChuDuyet('Từ chối công việc cấp ' + r.cap + ' trên khuôn ' + (r.ma_khuon || '') + '?', { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' });
+        if (!l) return;
         fn = 'duc_khuon_ct_duyet'; args = { p_id: id, p_dong_y: false, p_ly_do: l, p_cap_nhat_luc: r.cap_nhat_luc };
       } else {
-        fn = 'duc_khuon_ct_qlbp_xac_nhan'; args = { p_id: id, p_ghi_chu: '' };
+        const g = await hoiGhiChuDuyet('Xác nhận duyệt ca đêm của trưởng ca?', { nutOk: 'Xác nhận' });
+        if (g === null) return;
+        fn = 'duc_khuon_ct_qlbp_xac_nhan'; args = { p_id: id, p_ghi_chu: g };
       }
       el.querySelectorAll('.kct-b').forEach(b => { b.disabled = true; });
       const { data, error } = await sb.rpc(fn, args);

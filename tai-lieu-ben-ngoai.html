@@ -343,6 +343,7 @@ function renderDetailInfo(){
     <div><div class="k">Mức mật</div><div class="v">${MUC_MAT_LABELS[d.muc_mat] || d.muc_mat}</div></div>
     <div><div class="k">Ngày nhận</div><div class="v">${d.ngay_nhan ? new Date(d.ngay_nhan + 'T00:00:00').toLocaleDateString('vi-VN') : '—'}</div></div>
     <div><div class="k">Ngày áp dụng</div><div class="v">${d.ngay_ap_dung ? new Date(d.ngay_ap_dung + 'T00:00:00').toLocaleDateString('vi-VN') : '—'}</div></div>
+    ${d.ghi_chu_duyet ? `<div style="grid-column:1/-1"><div class="k">${d.trang_thai === 'tu_choi' ? 'Lý do từ chối' : 'Ghi chú duyệt'}</div><div class="v">${escapeHtml(d.ghi_chu_duyet)}</div></div>` : ''}
   `;
 }
 
@@ -433,9 +434,13 @@ async function changeStatus(newStatus){
 async function approveOrReject(dongY){
   const msg = document.getElementById('dt-msg');
   msg.style.display = 'none';
+  const gc = dongY
+    ? await hoiGhiChuDuyet('Duyệt áp dụng tài liệu này?', { nutOk: 'Duyệt' })
+    : await hoiGhiChuDuyet('Từ chối tài liệu này?', { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' });
+  if (gc === null) return;
   const update = dongY
-    ? { trang_thai: 'ap_dung', ngay_ap_dung: new Date().toISOString().slice(0, 10) }
-    : { trang_thai: 'tu_choi' };
+    ? { trang_thai: 'ap_dung', ngay_ap_dung: new Date().toISOString().slice(0, 10), ghi_chu_duyet: gc || null }
+    : { trang_thai: 'tu_choi', ghi_chu_duyet: gc };
   const { error } = await sb.from('external_documents').update(update).eq('id', state.currentDetail.id);
   if (error){ msg.style.display = 'block'; msg.textContent = 'Lỗi: ' + error.message; return; }
   Object.assign(state.currentDetail, update);

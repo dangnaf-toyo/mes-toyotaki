@@ -490,7 +490,12 @@ dialog.dlg::backdrop{background:rgba(15,23,42,.45)}
         const moi = await CV.rpc('cv_bao_xong', { p_id: r.id });
         msg = moi === 'hoan_thanh' ? 'Đã báo hoàn thành' : 'Đã báo hoàn thành — chờ người giao duyệt';
       }
-      else if (c.action === 'duyet') { if (card) card.classList.add('busy'); await CV.rpc('cv_duyet', { p_id: r.id }); msg = 'Đã duyệt hoàn thành'; }
+      else if (c.action === 'duyet') {
+        const gc = await hoiGhiChuDuyet('Duyệt hoàn thành việc "' + r.tieu_de + '"?', { nutOk: 'Duyệt' });
+        if (gc === null) return;
+        if (card) card.classList.add('busy');
+        await CV.rpc('cv_duyet', { p_id: r.id, p_ghi_chu: gc || null }); msg = 'Đã duyệt hoàn thành';
+      }
       else if (c.action === 'tra_lai') {
         const lyDo = await hoiLyDo(r);
         if (!lyDo) return;

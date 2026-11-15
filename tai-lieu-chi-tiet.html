@@ -346,6 +346,7 @@ async function renderVersionList(){
       </div>
       <div class="meta">Tải lên: ${fmtDT(v.uploaded_at)}${v.file_path_goc ? ' · có bản gốc CAD' : ''}</div>
       ${v.ghi_chu_thay_doi ? `<div class="note">${escapeHtml(v.ghi_chu_thay_doi)}</div>` : ''}
+      ${v.ghi_chu_duyet ? `<div class="note">Ghi chú duyệt: ${escapeHtml(v.ghi_chu_duyet)}</div>` : ''}
       <div class="actions">
         ${canApprove ? `<button type="button" class="btn-success" data-approve="${v.id}">Duyệt</button>` : ''}
         ${canRevoke ? `<button type="button" class="btn-danger" data-revoke="${v.id}">Thu hồi</button>` : ''}
@@ -362,8 +363,10 @@ async function renderVersionList(){
   box.querySelectorAll('[data-approve]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
+      const gc = await hoiGhiChuDuyet('Duyệt phiên bản này?', { nutOk: 'Duyệt' });
+      if (gc === null) return;
       btn.disabled = true;
-      const { error } = await sb.rpc('doc_approve_version', { p_version_id: btn.dataset.approve });
+      const { error } = await sb.rpc('doc_approve_version', { p_version_id: btn.dataset.approve, p_ghi_chu: gc || null });
       if (error){ toast('Lỗi duyệt: ' + error.message, true); btn.disabled = false; return; }
       toast('Đã duyệt phiên bản.');
       await loadDoc();

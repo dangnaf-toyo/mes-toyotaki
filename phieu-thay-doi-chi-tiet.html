@@ -334,8 +334,10 @@ function renderSteps(){
 }
 
 async function doConfirm(boPhan, dongY){
-  const yKien = window.prompt(dongY ? 'Ý kiến (không bắt buộc):' : 'Lý do từ chối:', '') || null;
-  if (!dongY && yKien === null) return;
+  const yk = await hoiGhiChuDuyet(dongY ? 'Xác nhận phiếu thay đổi?' : 'Từ chối phiếu thay đổi?',
+    dongY ? { nutOk: 'Xác nhận' } : { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' });
+  if (yk === null) return;
+  const yKien = yk || null;
   try {
     const { error } = await sb.rpc('dcr_confirm', { p_dcr_id: dcrId, p_bo_phan: boPhan, p_dong_y: dongY, p_y_kien: yKien });
     if (error) throw error;
@@ -347,8 +349,10 @@ async function doConfirm(boPhan, dongY){
 }
 
 async function doApproveStep(dongY){
-  const yKien = window.prompt(dongY ? 'Ý kiến (không bắt buộc):' : 'Lý do từ chối:', '') || null;
-  if (!dongY && yKien === null) return;
+  const yk = await hoiGhiChuDuyet(dongY ? 'Duyệt bước này?' : 'Từ chối phiếu thay đổi?',
+    dongY ? { nutOk: 'Duyệt' } : { nutOk: 'Từ chối', nguyHiem: true, batBuoc: true, goiY: 'Lý do từ chối (bắt buộc)' });
+  if (yk === null) return;
+  const yKien = yk || null;
   try {
     const { error } = await sb.rpc('dcr_approve_step', { p_dcr_id: dcrId, p_dong_y: dongY, p_y_kien: yKien });
     if (error) throw error;

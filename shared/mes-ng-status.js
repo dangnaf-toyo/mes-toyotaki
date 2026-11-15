@@ -529,7 +529,9 @@ const MesNg = (() => {
   async function decide(id, decision) {
     const actor = (await MesAuth.getCurrentUserIdentity()) || "MES";
     if (decision === "Từ chối") {
-      const note = prompt("Lý do không cho tiếp tục SX:");
+      const note = window.hoiGhiChuDuyet
+        ? await hoiGhiChuDuyet("Không cho tiếp tục sản xuất?", { nutOk: "Từ chối", nguyHiem: true, batBuoc: true, goiY: "Lý do (bắt buộc)" })
+        : prompt("Lý do không cho tiếp tục SX:");
       if (note === null) return;
       const r = await sb.rpc("duc_ipqc_decide_ng", {
         p_request_id: id,
