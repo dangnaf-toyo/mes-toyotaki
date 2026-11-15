@@ -325,7 +325,7 @@
             <div class="msg" id="nvl-msg"></div>
             <form id="nvl-form">
               <div class="form-grid">
-                <div><label for="nvl-toyotaki-code">Mã NVL hệ thống Toyotaki</label><input id="nvl-toyotaki-code" required /></div>
+                <div><label for="nvl-toyotaki-code">Mã NVL hệ thống Toyotaki</label><div class="gy-row"><input id="nvl-toyotaki-code" required placeholder="VD K-NHN-12-001" /><button type="button" class="gy-btn" id="nvl-goiy" title="Nhập Tên NVL, chọn Nhóm / Mác rồi bấm">Gợi ý</button></div><div class="gy-note" id="nvl-ma-note" hidden></div></div>
                 <div><label for="nvl-name">Tên NVL</label><input id="nvl-name" required /></div>
                 <div>
                   <label for="nvl-nhom">Nhóm vật tư</label
@@ -502,6 +502,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="shared/supabase-client.js?v=T169"></script>
     <script src="shared/navbar.js"></script>
+    <script src="shared/goi-y-ma.js?v=T258"></script>
     <script>
       // T238 — BOM Giai đoạn 1. Lưu trình lấy từ Danh mục SP (master_products.quy_trinh_cong_doan).
       // Ghi chỉ qua RPC bom_* (kiểm quyền Lập = Admin/Kỹ thuật, Duyệt = GĐSX/TGĐ ở server).
@@ -791,8 +792,29 @@
         $("nvl-form-title").textContent = "Thêm nguyên vật liệu";
         $("nvl-submit").textContent = "Thêm nguyên vật liệu";
         $("nvl-toyotaki-code").readOnly = false;
+        $("nvl-goiy").hidden = false;
+        $("nvl-toyotaki-code").dataset.goiY = "";
+        GoiYMa.hien($("nvl-ma-note"), null);
         syncMacField();
       }
+      // T258: gợi ý mã NVL theo quy tắc N-LLL-QQ-STT + cảnh báo sai mẫu khi gõ.
+      const nvlDsMa = () => nvlRows.map((x) => ({ ma_nvl: x.toyotakiCode, ten_nvl: x.name }));
+      function nvlKiemMa(note) {
+        if (nvlEditingIndex !== null) return;
+        GoiYMa.hien($("nvl-ma-note"), GoiYMa.nvlKiem($("nvl-toyotaki-code").value, nvlDsMa()), note);
+      }
+      $("nvl-toyotaki-code").addEventListener("input", () => nvlKiemMa());
+      function nvlGoiY(tuDong) {
+        const o = $("nvl-toyotaki-code");
+        if (nvlEditingIndex !== null || (tuDong && o.value.trim() && o.value !== o.dataset.goiY)) return;
+        const mac = macs.find((m) => m.ma_mac === $("nvl-mac").value);
+        const kq = GoiYMa.nvl({ nhom: $("nvl-nhom").value, mac: $("nvl-mac").value, macKem: mac && mac.loai_kim_loai === "kem", ten: $("nvl-name").value }, nvlDsMa());
+        if (kq.loi) return tuDong ? null : GoiYMa.hien($("nvl-ma-note"), { muc: "canh", text: "⚠ " + kq.loi });
+        o.value = o.dataset.goiY = kq.ma;
+        nvlKiemMa(kq.note);
+      }
+      $("nvl-goiy").addEventListener("click", () => nvlGoiY(false));
+      ["nvl-name", "nvl-nhom", "nvl-mac"].forEach((id) => $(id).addEventListener("change", () => nvlGoiY(true)));
       function openNvlEdit(index) {
         const row = nvlRows[index];
         if (!row) return;
@@ -805,6 +827,7 @@
         $("nvl-code").value = row.code;
         $("nvl-toyotaki-code").value = row.toyotakiCode;
         $("nvl-toyotaki-code").readOnly = true;
+        $("nvl-goiy").hidden = true;
         $("nvl-customer").value = row.customer;
         $("nvl-product").value = row.product;
         $("nvl-nhom").value = row.nhomKey;

@@ -249,7 +249,7 @@
           <div class="msg" id="sp-msg"></div>
           <form id="sp-form">
             <div class="form-grid">
-              <div><label for="sp-ma">Mã SP</label><input type="text" autocomplete="off" id="sp-ma" required></div>
+              <div><label for="sp-ma">Mã SP</label><div class="gy-row"><input type="text" autocomplete="off" id="sp-ma" required placeholder="VD EXE-OUT-01"><button type="button" class="gy-btn" id="sp-goiy" title="Gõ 3 chữ khách (hoặc nhập Tên khách hàng) + Tên SP rồi bấm">Gợi ý</button></div><div class="gy-note" id="sp-ma-note" hidden></div></div>
               <div><label for="sp-ten">Tên SP</label><input type="text" autocomplete="off" id="sp-ten"></div>
               <div><label for="sp-makhachhang">Mã khách hàng</label><input type="text" autocomplete="off" id="sp-makhachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
               <div><label for="sp-khachhang">Tên khách hàng</label><input type="text" autocomplete="off" id="sp-khachhang" placeholder="Xuất hiện trên tem thành phẩm"></div>
@@ -490,7 +490,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js?v=T169"></script>
 <script src="shared/navbar.js"></script>
-<script src="shared/khuon-ds.js"></script>
+<script src="shared/goi-y-ma.js?v=T258"></script>
+<script src="shared/khuon-ds.js?v=T258"></script>
 <script>
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -658,6 +659,7 @@ function initCatalog(cfg){
       render();
     },
     close: () => ov._close(),
+    rows: () => state.rows,
   };
   catalogs[cfg.id] = cat;
   return cat;
@@ -786,6 +788,9 @@ function spResetForm(){
   setQuyTrinhValue('');
   setSlThungCdValue(null);
   document.getElementById('sp-ma').disabled = false;
+  document.getElementById('sp-goiy').hidden = false;
+  document.getElementById('sp-ma').dataset.goiY = document.getElementById('sp-ma').dataset.khGo = '';
+  GoiYMa.hien(document.getElementById('sp-ma-note'), null);
   document.getElementById('sp-form-title').textContent = 'Thêm sản phẩm';
   document.getElementById('sp-submit').textContent = 'Thêm sản phẩm';
 }
@@ -794,6 +799,8 @@ function spFillForm(r){
   clearMsg('sp-msg');
   document.getElementById('sp-ma').value = r.ma_sp;
   document.getElementById('sp-ma').disabled = true;
+  document.getElementById('sp-goiy').hidden = true;
+  GoiYMa.hien(document.getElementById('sp-ma-note'), null);
   document.getElementById('sp-ten').value = r.ten_sp || '';
   document.getElementById('sp-makhachhang').value = r.ma_khach_hang || '';
   document.getElementById('sp-khachhang').value = r.ten_khach_hang || '';
@@ -829,6 +836,7 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   let sl_thung_cong_doan;
   try { sl_thung_cong_doan = getSlThungCdValue(); } catch (e) { return showMsg('sp-msg', 'error', e.message); }
   if (!ma_sp) return;
+  if (!spEditing && GoiYMa.spKiem(ma_sp, catalogs.sp.rows()).muc === 'loi') return showMsg('sp-msg', 'error', 'Mã ' + ma_sp + ' đã có');
   let error;
   if (spEditing){
     ({ error } = await sb.from('master_products').update({ ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, quy_trinh_cong_doan, sl_thung_cong_doan, chi_thi_kanban }).eq('ma_sp', spEditing));
@@ -840,6 +848,27 @@ document.getElementById('sp-form').addEventListener('submit', async (e) => {
   catalogs.sp.close();
   catalogs.sp.reload();
 });
+// T258: gợi ý mã SP theo quy tắc KHÁCH-SẢN PHẨM-STT + cảnh báo sai mẫu khi gõ.
+function spKiemMa(note){
+  if (spEditing) return;
+  GoiYMa.hien(document.getElementById('sp-ma-note'), GoiYMa.spKiem(document.getElementById('sp-ma').value, catalogs.sp.rows()), note);
+}
+document.getElementById('sp-ma').addEventListener('input', e => {
+  const t = e.target.value.trim();
+  e.target.dataset.khGo = /^[A-Za-z]{3}(?![A-Za-z])/.test(t) ? t.slice(0, 3) : '';   // 3 chữ khách gõ tay → giữ khi tự gợi ý lại
+  spKiemMa();
+});
+// tuDong = true: tự điền khi ô Mã SP trống / còn là mã gợi ý trước (người dùng chưa gõ tay), không báo thiếu dữ liệu.
+function spGoiY(tuDong){
+  const v = id => document.getElementById(id).value, o = document.getElementById('sp-ma');
+  if (spEditing || (tuDong && o.value.trim() && o.value !== o.dataset.goiY && !/^[A-Za-z]{3}$/.test(o.value.trim()))) return;
+  const kq = GoiYMa.sp({ maGo: o.value === o.dataset.goiY ? (o.dataset.khGo || '') : v('sp-ma'), maKh: v('sp-makhachhang'), tenKh: v('sp-khachhang'), tenSp: v('sp-ten'), maSpKh: v('sp-masptaikh') }, catalogs.sp.rows());
+  if (kq.loi) return tuDong ? null : GoiYMa.hien(document.getElementById('sp-ma-note'), { muc: 'canh', text: '⚠ ' + kq.loi });
+  o.value = o.dataset.goiY = kq.ma;
+  spKiemMa(kq.note);
+}
+document.getElementById('sp-goiy').addEventListener('click', () => spGoiY(false));
+['sp-ten', 'sp-makhachhang', 'sp-khachhang', 'sp-masptaikh'].forEach(id => document.getElementById(id).addEventListener('change', () => spGoiY(true)));
 initCatalog({
   id: 'sp',
   emptyText: 'Chưa có sản phẩm nào.',
