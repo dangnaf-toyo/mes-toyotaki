@@ -65,7 +65,7 @@
       '.bq .li{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent}' +
       '.bq .li:hover{background:#F1F5F9}.bq .li.on{background:#EFF6FF;border-color:#93C5FD}' +
       '.bq .li .m{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:12.5px}.bq .li .t{font-size:11.5px;color:#64748B}' +
-      '.bq .tag{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:10px;white-space:nowrap}' +
+      '.bq .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;white-space:nowrap}' +
       '.bq .tag.ok{background:#DCFCE7;color:#166534}.bq .tag.no{background:#FEF3C7;color:#92400E}.bq .tag.ng{background:#FEE2E2;color:#991B1B}.bq .tag.w{background:#FEF3C7;color:#92400E}' +
       '.bq .flds{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end}' +
       '.bq table{width:100%;border-collapse:collapse}.bq th{background:#F1F5F9;color:#475569;text-align:left;padding:6px;font-size:12px;white-space:nowrap}' +
@@ -91,7 +91,7 @@
       '.bq-mask{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:14px}' +
       '.bq-dlg{background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:90vh;overflow:auto;padding:14px 16px;font-size:13px}' +
       '.bq input:disabled,.bq select:disabled{background:#F8FAFC;color:#0F172A;border-color:#E2E8F0;opacity:1}' +
-      '.bq .tag.no{display:inline-block;width:auto;height:auto;border-radius:10px;background:#FEF3C7;color:#92400E;font-size:10.5px}' +
+      '.bq .tag.no{display:inline-block;width:auto;height:auto;border-radius:10px;background:#FEF3C7;color:#92400E;font-size:11px}' +
       '.bq td.doi input,.bq td.doi select{background:#FEF9C3;border-color:#EAB308}.bq tr.moi td:first-child{box-shadow:inset 3px 0 #16A34A}' +
       '.tcd{border:1.5px solid #FCD34D;background:#FFFBEB;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px}' +
       '.tcd .bcs{display:flex;flex-wrap:wrap;gap:6px}.tcd .bc{flex:1 1 150px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:6px 9px;display:flex;flex-direction:column;gap:2px;font-size:12px;color:#64748B}' +
