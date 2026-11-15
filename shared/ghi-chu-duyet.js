@@ -9,7 +9,7 @@
     if (css) return; css = true;
     const st = document.createElement('style');
     st.textContent =
-      'dialog.gcd{border:0;border-radius:12px;padding:18px;width:min(440px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.25);font:500 14px/1.45 Inter,system-ui,sans-serif;color:#14181F;background:#fff}' +
+      'dialog.gcd{position:fixed;inset:0;margin:auto;height:fit-content;max-height:calc(100vh - 32px);overflow:auto;border:0;border-radius:12px;padding:18px;width:min(440px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.25);font:500 14px/1.45 Inter,system-ui,sans-serif;color:#14181F;background:#fff}' +
       'dialog.gcd::backdrop{background:rgba(15,23,42,.45)}' +
       'dialog.gcd h3{margin:0 0 6px;font-size:16px;font-weight:700}' +
       'dialog.gcd .nd{white-space:pre-line;margin:0 0 10px;color:#334155}' +
