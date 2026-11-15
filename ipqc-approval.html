@@ -668,6 +668,66 @@
         box-shadow: var(--shadow-lg);
         padding: 14px 16px;
       }
+      .info-btn {
+        border: 1px solid var(--border-strong, #cbd5e1);
+        background: #fff;
+        color: var(--text-muted);
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-grid;
+        place-items: center;
+        cursor: pointer;
+        vertical-align: middle;
+        margin-left: 4px;
+      }
+      .info-btn.on {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      #xnDlg .xn-nd {
+        font-size: 15px;
+        line-height: 1.5;
+        white-space: pre-line;
+        margin: 0 0 8px;
+      }
+      #xnDlg textarea,
+      #xnDlg input {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+      }
+      #thongBao {
+        position: fixed;
+        left: 50%;
+        bottom: 16px;
+        transform: translateX(-50%);
+        z-index: 1000;
+        max-width: min(560px, calc(100vw - 32px));
+        background: #1e293b;
+        color: #fff;
+        padding: 10px 40px 10px 14px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.45;
+        white-space: pre-line;
+        box-shadow: var(--shadow-lg);
+      }
+      #thongBao button {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        border: none;
+        background: none;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      }
       dialog::backdrop {
         background: rgba(15, 23, 42, 0.45);
       }
@@ -821,11 +881,11 @@
     <main>
       <section class="panel" id="warningPanel">
         <div class="head">
-          <span>Cảnh báo IPQC chưa có đề nghị tiếp tục SX<span class="count-badge" id="warnCount">…</span></span>
+          <span>Cảnh báo chưa đề nghị chạy tiếp<span class="count-badge" id="warnCount">…</span></span>
           <div class="head-actions">
             <button type="button" class="btn secondary" id="refreshWarnings">Làm mới</button
             ><button type="button" class="btn secondary" id="directProposal" hidden>
-              Đề nghị trực tiếp cho phiên sản xuất
+              Đề nghị trực tiếp
             </button>
           </div>
         </div>
@@ -848,7 +908,7 @@
             <option value="open">Chưa đề nghị</option>
             <option value="closed">Đã đóng</option>
           </select>
-          <input type="search" id="wfSearch" placeholder="Tìm máy, model, lỗi, người IPQC…" />
+          <input type="search" id="wfSearch" placeholder="Tìm máy, model, lỗi…" />
         </div>
         <div class="wf-bulk hidden" id="warnBulk">
           <label><input type="checkbox" id="wfAll" /> Chọn cả trang</label>
@@ -858,7 +918,7 @@
           >
           <span>Đã chọn <b id="wfSelCount">0</b></span>
           <button type="button" class="btn secondary" id="wfClearSel">Bỏ chọn</button>
-          <button type="button" class="btn reject" id="wfCloseBtn" disabled>Đóng cảnh báo đã chọn</button>
+          <button type="button" class="btn reject" id="wfCloseBtn" disabled>Đóng đã chọn</button>
           <span class="help" id="wfCloseNote"></span>
         </div>
         <div class="body">
@@ -888,18 +948,16 @@
       </dialog>
       <dialog id="closeWarnDialog" style="width: min(520px, 95vw)">
         <form method="dialog" id="closeWarnForm">
-          <p class="dlg-title">Đóng cảnh báo IPQC cũ</p>
+          <p class="dlg-title">Đóng cảnh báo <button class="info-btn" type="button" data-info="closeWarnHelp" title="Giải thích">ⓘ</button></p>
           <p class="help" id="closeWarnInfo"></p>
           <div class="field">
-            <label for="closeWarnReason">Lý do đóng * (tối thiểu 3 ký tự)</label>
+            <label for="closeWarnReason">Lý do đóng *</label>
             <textarea
               id="closeWarnReason"
-              placeholder="VD: Cảnh báo tồn từ ca cũ, máy đã đổi khuôn / đã xử lý ngoài hệ thống"
+              placeholder="VD: Tồn từ ca cũ, máy đã đổi khuôn"
             ></textarea>
           </div>
-          <p class="help">
-            Cảnh báo chỉ được ẩn khỏi danh sách "Chưa đề nghị"; dữ liệu kiểm gốc giữ nguyên và có lịch sử người đóng.
-          </p>
+          <p class="help" id="closeWarnHelp" hidden>Chỉ ẩn khỏi danh sách "Chưa đề nghị"; dữ liệu kiểm gốc giữ nguyên, có lưu người đóng.</p>
           <div id="closeWarnMsg"></div>
           <div class="dlg-actions">
             <button type="button" class="btn secondary" id="closeWarnCancel">Huỷ</button>
@@ -909,7 +967,7 @@
       </dialog>
       <section class="panel hidden" id="proposalPanel">
         <div class="head">
-          <span>Đề nghị tiếp tục sản xuất — dành cho Sản xuất</span
+          <span>Đề nghị chạy tiếp (Sản xuất)</span
           ><button class="btn secondary" onclick="resetForm()">Làm mới</button>
         </div>
         <div class="body">
@@ -922,7 +980,7 @@
                 <label>Máy / công việc đang chạy</label
                 ><input id="runningSearch" placeholder="Tìm máy, model hoặc phiên" /><select id="runningJob">
                   <option value="">Đang tải...</option></select
-                ><button type="button" id="refreshRunning" class="btn secondary">Cập nhật danh sách</button>
+                ><button type="button" id="refreshRunning" class="btn secondary">Làm mới</button>
               </div>
               <div class="field two">
                 <label>Phiên sản xuất</label>
@@ -934,7 +992,7 @@
                   <option value="">Chọn phiên trước</option>
                 </select>
               </div>
-              <div class="field"><label>Task No (nếu có liên kết xác minh)</label><input id="taskNo" readonly /></div>
+              <div class="field"><label>Task No</label><input id="taskNo" readonly /></div>
               <div id="warningEvidence" class="full"></div>
               <p id="proposalWarningFaults" class="full"></p>
               <div class="field">
@@ -945,12 +1003,12 @@
                 </select>
               </div>
               <div class="field">
-                <label>Số lượng lỗi (nếu có)</label><input id="approvalDefectQty" type="number" min="0" step="1" />
+                <label>Số lượng lỗi</label><input id="approvalDefectQty" type="number" min="0" step="1" />
               </div>
               <div class="field"><label>Máy *</label><input id="machine" readonly required /></div>
               <div class="field"><label>Công đoạn *</label><input id="process" readonly required /></div>
               <div class="field"><label>Mã sản phẩm *</label><input id="productCode" readonly required /></div>
-              <div class="field"><label>LOT (nếu có)</label><input id="lotNo" readonly /></div>
+              <div class="field"><label>LOT</label><input id="lotNo" readonly /></div>
               <div class="field two">
                 <label>Nội dung cảnh báo *</label><textarea id="warningContent" required></textarea>
               </div>
@@ -1017,13 +1075,13 @@
                 </div>
               </div>
             </div>
-            <br /><button class="btn primary" id="createBtn">Gửi yêu cầu phê duyệt</button>
+            <br /><button class="btn primary" id="createBtn">Gửi duyệt</button>
           </form>
         </div>
       </section>
       <section class="panel">
         <div class="head">
-          <span>Danh sách yêu cầu và tình trạng phê duyệt</span
+          <span>Yêu cầu &amp; phê duyệt</span
           ><label><input type="checkbox" id="onlyMyRequests" /> Yêu cầu của tôi</label
           ><span id="myRequestsCount" class="help"></span
           ><button class="btn secondary" onclick="loadRequests()">Làm mới</button>
@@ -1048,7 +1106,7 @@
       </section>
       <section class="panel hidden" id="auditPanel">
         <div class="head">
-          <span>Lịch sử audit — không thể xóa</span
+          <span>Lịch sử thao tác</span
           ><button class="btn secondary" onclick="document.getElementById('auditPanel').classList.add('hidden')">
             Đóng
           </button>
@@ -1056,6 +1114,76 @@
         <div class="body" id="auditBody"></div>
       </section>
     </main>
+    <dialog id="xnDlg" style="width: min(440px, 95vw)">
+      <p class="xn-nd" id="xnNd"></p>
+      <textarea id="xnNhap" rows="3" hidden></textarea>
+      <input id="xnSo" type="number" min="0" step="1" hidden />
+      <div class="dlg-actions">
+        <button type="button" class="btn secondary" id="xnHuy">Huỷ</button>
+        <button type="button" class="btn primary" id="xnOk">Đồng ý</button>
+      </div>
+    </dialog>
+    <div id="thongBao" role="status" hidden><span id="thongBaoNd"></span><button type="button" aria-label="Đóng" onclick="this.parentNode.hidden = true">×</button></div>
+    <script>
+      // Hộp xác nhận trong trang thay prompt()/confirm() của trình duyệt.
+      // hoiXacNhan(noiDung, {nutOk, nguyHiem, nhap, batBuoc, so, goiY, giaTri})
+      //   → Promise<true|false>; khi nhap=true → chuỗi đã nhập, hoặc null nếu Huỷ (Esc = Huỷ).
+      function hoiXacNhan(noiDung, o) {
+        o = o || {};
+        return new Promise((res) => {
+          const dlg = document.getElementById("xnDlg");
+          const ok = document.getElementById("xnOk");
+          const huy = document.getElementById("xnHuy");
+          const o1 = o.nhap ? document.getElementById(o.so ? "xnSo" : "xnNhap") : null;
+          document.getElementById("xnNd").textContent = noiDung;
+          document.getElementById("xnNhap").hidden = !(o.nhap && !o.so);
+          document.getElementById("xnSo").hidden = !(o.nhap && o.so);
+          if (o1) {
+            o1.value = o.giaTri ?? "";
+            o1.placeholder = o.goiY || "";
+          }
+          ok.textContent = o.nutOk || "Đồng ý";
+          ok.className = "btn " + (o.nguyHiem ? "reject" : "primary");
+          let daXong = false;
+          const xong = (v) => {
+            if (daXong) return;
+            daXong = true;
+            ok.onclick = huy.onclick = dlg.oncancel = null;
+            if (dlg.open) dlg.close();
+            res(v);
+          };
+          ok.onclick = () => {
+            if (o1 && o.batBuoc && !String(o1.value).trim()) return o1.focus();
+            xong(o1 ? String(o1.value).trim() : true);
+          };
+          huy.onclick = () => xong(o1 ? null : false);
+          dlg.oncancel = (e) => {
+            e.preventDefault();
+            xong(o1 ? null : false);
+          };
+          dlg.showModal();
+          setTimeout(() => (o1 || ok).focus(), 30);
+        });
+      }
+      // Thông báo trong trang (không chặn) thay alert() của trình duyệt — dùng cho cả các file shared/ của trang này.
+      let thongBaoHen = 0;
+      window.alert = function (msg) {
+        const w = document.getElementById("thongBao");
+        document.getElementById("thongBaoNd").textContent = String(msg ?? "");
+        w.hidden = false;
+        clearTimeout(thongBaoHen);
+        thongBaoHen = setTimeout(() => (w.hidden = true), 8000);
+      };
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-info]");
+        if (!b) return;
+        e.preventDefault();
+        const x = document.getElementById(b.dataset.info);
+        if (!x) return;
+        x.hidden = !x.hidden;
+        b.classList.toggle("on", !x.hidden);
+      });
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script src="shared/supabase-client.js"></script>
     <script src="shared/navbar.js"></script>
@@ -1223,11 +1351,11 @@
                 (pending
                   ? '<button class="btn approve" onclick="decide(' +
                     r.id +
-                    ',\'Duyệt\')">ĐỒNG Ý — bước hiện tại</button><button class="btn reject" onclick="decide(' +
+                    ',\'Duyệt\')">Đồng ý</button><button class="btn reject" onclick="decide(' +
                     r.id +
                     ',\'Từ chối\')">Từ chối</button><button class="btn override" onclick="decide(' +
                     r.id +
-                    ',\'Phê duyệt trực tiếp\')">GĐSX duyệt trực tiếp</button><button class="btn secondary" onclick="cancelRequest(' +
+                    ',\'Phê duyệt trực tiếp\')">GĐSX duyệt</button><button class="btn secondary" onclick="cancelRequest(' +
                     r.id +
                     ')">Huỷ yêu cầu</button>'
                   : "") +
@@ -1241,7 +1369,7 @@
                 (r.checkpoint_id
                   ? '<button class="btn secondary" onclick="MesNg.requestDetails(' +
                     r.id +
-                    ',rows)">Xem lượt kiểm gốc / xử lý</button>'
+                    ',rows)">Lượt kiểm gốc</button>'
                   : "") +
                 '<button class="btn secondary" onclick="audit(' +
                 r.id +
@@ -1252,11 +1380,15 @@
       }
       async function decide(id, d) {
         if (await MesNg.isNg(id, rows)) return MesNg.decide(id, d);
-        const note = prompt(
-          d === "Phê duyệt trực tiếp" ? "Bắt buộc nhập lý do phê duyệt trực tiếp:" : "Ghi chú quyết định:",
-        );
+        const truc = d === "Phê duyệt trực tiếp";
+        const note = await hoiXacNhan((truc ? "GĐSX duyệt" : d) + " yêu cầu #" + id + "?", {
+          nutOk: truc ? "GĐSX duyệt" : d,
+          nguyHiem: d === "Từ chối",
+          nhap: true,
+          batBuoc: truc,
+          goiY: truc ? "Lý do (bắt buộc)" : "Ghi chú (không bắt buộc)",
+        });
         if (note === null) return;
-        if (d === "Phê duyệt trực tiếp" && !note.trim()) return alert("Bắt buộc nhập lý do override");
         const { error } = await sb.rpc("duc_ipqc_decide_continue_request", {
           p_request_id: id,
           p_decision: d,
@@ -1267,7 +1399,13 @@
         loadRequests();
       }
       async function production(id, current) {
-        const qty = prompt("Nhập tổng sản lượng thực tế hiện tại:", current);
+        const qty = await hoiXacNhan("Tổng sản lượng thực tế hiện tại:", {
+          nutOk: "Lưu",
+          nhap: true,
+          batBuoc: true,
+          so: true,
+          giaTri: current,
+        });
         if (qty === null) return;
         if (!Number.isFinite(Number(qty)) || Number(qty) < 0) return alert("Sản lượng không hợp lệ");
         const { error } = await sb.rpc("duc_ipqc_update_continue_production", {
@@ -1279,9 +1417,14 @@
         loadRequests();
       }
       async function cancelRequest(id) {
-        const reason = prompt("Nhập lý do hủy yêu cầu:");
+        const reason = await hoiXacNhan("Huỷ yêu cầu #" + id + "?", {
+          nutOk: "Huỷ yêu cầu",
+          nguyHiem: true,
+          nhap: true,
+          batBuoc: true,
+          goiY: "Lý do (bắt buộc)",
+        });
         if (reason === null) return;
-        if (!reason.trim()) return alert("Bắt buộc nhập lý do hủy");
         const { error } = await sb.rpc("duc_ipqc_cancel_continue_request", {
           p_request_id: id,
           p_actor: identity,
