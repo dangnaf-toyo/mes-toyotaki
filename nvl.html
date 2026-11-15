@@ -426,7 +426,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
   <div id="tem-nvl" class="tab-content">
     <div class="section">
       <div class="section-title">In tem NVL (70×100 mm) <button class="info-btn" type="button" data-info="iInTem" title="Cách in tem">ⓘ</button></div>
-      <div class="info-txt" id="iInTem" hidden>Chọn thông tin pallet → xem trước → in. Tag No tự sinh dạng <b>TYK-YYYYMMDD-XXXX</b>.<br>In được 1 hoặc nhiều tem một lần; mỗi tem có Tag No riêng và tự sinh giao dịch NHẬP.</div>
+      <div class="info-txt" id="iInTem" hidden>Chọn thông tin pallet → xem trước → in. Tag No tự sinh dạng <b>NVL20261115-0001</b> (NVL + ngày nhập + số thứ tự). QR chỉ chứa Tag No.<br>In được 1 hoặc nhiều tem một lần; mỗi tem có Tag No riêng và tự sinh giao dịch NHẬP.</div>
 
       <div class="form-row">
         <div class="form-group">
@@ -474,7 +474,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
           <div style="font-size: 0.85rem; color: var(--gray); max-width: 320px;">
             <p style="margin-bottom: 0.5rem;"><b>Tem preview:</b></p>
             <p>• Tag No hiện là mẫu, khi in sẽ sinh mã thực tế từ database.</p>
-            <p>• QR Code chứa: <code>Tag No&gt;Mã&gt;Tên&gt;Ngày&gt;SL&gt;ĐV</code></p>
+            <p>• QR chỉ chứa Tag No.</p>
             <p>• Khi bấm "In Tem", browser sẽ mở dialog in — chọn máy in nhiệt Zywell 307 hoặc PDF để lưu.</p>
             <p style="margin-top: 0.5rem;">• <b>Chú ý</b> khi in: set giấy = 70x100mm, margin = 0.</p>
           </div>
@@ -950,7 +950,9 @@ let currentPlanWarnings = [];
 function focusQRInput() { $('qrScanInput').focus(); }
 
 function parseQRContent(rawText) {
+  // T270: tem mới QR = Tag No; tem cũ TYK-… QR dạng Tag>Mã>Tên>Ngày>SL>ĐV vẫn đọc được.
   const parts = String(rawText).split('>').map(p => p.trim());
+  parts[0] = parts[0].toUpperCase();
   if (parts.length >= 6) {
     return { tagNo: parts[0], material: parts[1], tenNVL: parts[2], ngayNhap: parts[3], soLuong: num(parts[4]), donVi: parts[5], fromQR: true };
   }
@@ -1724,8 +1726,9 @@ function generateQRSvg(text) {
     return '<span style="color:red;font-size:2mm">QR error</span>';
   }
 }
+// T270: QR chỉ chứa Tag No — thông tin còn lại tra từ DB khi quét.
 function temQrContent(tem) {
-  return [tem.tagNo, tem.material, tem.tenNVL, tem.ngayNhap, tem.soLuong, tem.donVi].join('>');
+  return String(tem.tagNo || '');
 }
 function renderQRsInContainer(container, tems) {
   const wrappers = container.querySelectorAll('.tem-qr-wrapper > div');
@@ -1744,7 +1747,7 @@ function updateTemPreview() {
   const preview = Object.assign({}, form, {
     soLuong: list.length ? list[0].soLuong : 0,
     ghiChu: (list.length && list[0].ghiChuRieng) ? list[0].ghiChuRieng : form.ghiChu,
-    tagNo: 'TYK-' + String(form.ngayNhap).replace(/-/g, '') + '-0001'
+    tagNo: 'NVL' + String(form.ngayNhap).replace(/-/g, '') + '-0001'
   });
   const container = $('temPreviewSingle');
   container.innerHTML = buildTemHTML(preview);
