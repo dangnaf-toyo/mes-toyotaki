@@ -712,8 +712,10 @@ async function onQrDecoded(text){
   // mặc định "Đúc" vì mọi tem đều được in ra từ công đoạn Đúc.
   let viTriHienTai = "Đúc";
   try {
-    const { data: pos } = await sb.from('cd_v_vi_tri_hien_tai').select('vi_tri_hien_tai').eq('tag_no', tagNo).maybeSingle();
-    if (pos && pos.vi_tri_hien_tai) viTriHienTai = pos.vi_tri_hien_tai;
+    // T252 (R18): lấy vị trí từ DB (cd_vi_tri_tem — cùng hàm DB dùng để kiểm khi
+    // ghi phiếu): bỏ phiếu bị từ chối, tem con tách theo vị trí tem cha, tem TP theo trạm.
+    const { data: pos } = await sb.rpc('cd_vi_tri_tem', { p_tag_no: tagNo });
+    if (pos) viTriHienTai = pos;
   } catch(e){ /* không chặn luồng chính nếu lỗi */ }
 
   // Cả lô phải cùng 1 "Công đoạn giao" — tem đầu tiên định vị trí giao, tem

@@ -530,8 +530,8 @@ async function boot(){
   if (cdParam === 'Bavia') { location.replace('bavia-dashboard.html'); return; }
   if (cdParam && CONG_DOAN_LIST.includes(cdParam)) document.getElementById('congDoan').value = cdParam;
   applyMode(); // đã tự nạp Trạm/tổ hoặc Máy đúc theo đúng chế độ
-  const tasks = [loadNguoiKiem(), loadSpDangSx(), loadKpi()];
-  if (!isKanban()) tasks.push(loadNguonList());
+  // T252: nạp danh sách nguồn SAU khi đã có mã SP đang SX (lọc theo mã)
+  const tasks = [loadNguoiKiem(), loadSpDangSx().then(() => { if (!isKanban()) return loadNguonList(); }), loadKpi()];
   await Promise.all(tasks);
   wire();
 }
@@ -579,7 +579,7 @@ function onCongDoanChange(){
   applyMode();
   loadNguoiKiem();
   loadKpi();
-  if (!isKanban()) updateGhiNhanGate();
+  if (!isKanban()) loadNguonList();
   else suggestMayKem(document.getElementById('spDangSx').value);
 }
 
@@ -893,11 +893,16 @@ function updateGhiNhanGate(){
 }
 
 async function loadNguonList(){
-  const { data, error } = await sb.from('duc_tem')
+  // T252 (R17): chỉ tem nguồn khai ở ĐÚNG công đoạn đang chọn + mã SP đang chọn
+  // (khớp cách cd_ghi_nhan_tem_thanh_pham trừ nguồn) — không còn dùng chung toàn nhà máy.
+  const spSel = document.getElementById('spDangSx').value;
+  let q = sb.from('duc_tem')
     .select('tag_no,ma_sp,ten_sp,so_luong')
     .not('thoi_diem_bat_dau_dung', 'is', null)
-    .gt('so_luong', 0)
-    .order('thoi_diem_bat_dau_dung', { ascending: true });
+    .eq('cong_doan_dang_dung', document.getElementById('congDoan').value)
+    .gt('so_luong', 0);
+  if (spSel) q = q.eq('ma_sp', spSel);
+  const { data, error } = await q.order('thoi_diem_bat_dau_dung', { ascending: true }).order('tag_no');
   const box = document.getElementById('nguonList');
   if (error){ box.innerHTML = '<div class="empty">Không tải được danh sách: ' + escapeHtml(error.message) + '</div>'; return; }
   const rows = data || [];
@@ -919,6 +924,7 @@ async function loadNguonList(){
         '<div class="n-con">' + fmtNum(r.so_luong) + ' <small style="font-size:11px;color:var(--text-dim);font-weight:500">pcs</small></div>' +
         '<button type="button" class="tiny bad" data-act="ng-toggle">NG</button>' +
         (isBavia ? '<button type="button" class="tiny bad" data-act="ng-sua-toggle">NG cần sửa</button>' : '') +
+        '<button type="button" class="tiny" data-act="bo-nguon" title="Bỏ tem khỏi danh sách đang dùng (số còn lại giữ nguyên trên tem)">Bỏ</button>' +
       '</div>' +
     '</div>' +
     '<div class="ng-form" data-role="ng-form">' +
@@ -1033,7 +1039,20 @@ document.getElementById('nguonList').addEventListener('click', (e) => {
   else if (act === 'ng-submit') submitNg(wrap);
   else if (act === 'ng-sua-toggle') toggleNgSuaForm(wrap);
   else if (act === 'ng-sua-submit') submitNgSua(wrap);
+  else if (act === 'bo-nguon') boNguon(wrap);
 });
+
+// ── T252 (R17): Bỏ tem nguồn khỏi danh sách đang dùng ─────────────────────────
+async function boNguon(wrap){
+  const tagNo = wrap.getAttribute('data-tag-no');
+  if (!confirm('Bỏ tem ' + tagNo + ' khỏi danh sách đang dùng?\nSố còn lại vẫn giữ trên tem, quét lại khi cần dùng tiếp.')) return;
+  const { data, error } = await sb.rpc('cd_bo_nguon_dang_dung', { p_tag_no: tagNo });
+  if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); return; }
+  if (!data || data.ok === false) { showMsg((data && data.error) || 'Không bỏ được', 'err', 6000); return; }
+  showMsg('✓ Đã bỏ ' + tagNo + ' (còn ' + fmtNum(data.so_luong) + ' pcs trên tem)', 'ok', 3000);
+  await loadNguonList();
+  focusScan();
+}
 document.getElementById('nguonList').addEventListener('change', (e) => {
   if (e.target.getAttribute('data-role') !== 'ng-loai') return;
   const wrap = e.target.closest('.nguon-item-wrap');
@@ -1306,7 +1325,7 @@ function tickClock(){
 var lastScanSubmitAt = 0;
 function wire(){
   document.getElementById('congDoan').addEventListener('change', onCongDoanChange);
-  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); updateWsSub(); if (!isKanban()) updateGhiNhanGate(); });
+  document.getElementById('spDangSx').addEventListener('change', (e) => { loadTonKho(e.target.value); ensureLine1(); suggestMayKem(e.target.value); updateWsSub(); if (!isKanban()) loadNguonList(); });
   document.getElementById('btnCam').addEventListener('click', openCamera);
   document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
   document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
