@@ -5,6 +5,7 @@ const MesIpqcApproval = (() => {
     checkpoint = null,
     account = null,
     role = "",
+    vaiTro = [],
     turn = 0,
     busy = false,
     token = "",
@@ -128,7 +129,7 @@ const MesIpqcApproval = (() => {
     el("runningJob").disabled = true;
     el("warningCheckpoint").disabled = true;
     try {
-      if (!MesIpqcFlow.canPropose(role)) throw new Error("Chỉ bộ phận Sản xuất được lập đề nghị chạy tiếp.");
+      if (!MesIpqcFlow.canPropose(vaiTro)) throw new Error("Chỉ bộ phận Sản xuất được lập đề nghị chạy tiếp.");
       if (!selected) throw new Error("Chọn đúng công việc đang sản xuất.");
       if (proposalWarningId && checkpoint?.id_checkpoint !== proposalWarningId)
         throw new Error("Đề nghị không thuộc đúng cảnh báo đã mở.");
@@ -198,11 +199,12 @@ const MesIpqcApproval = (() => {
     account = session;
     const user = await sb
       .from("user_roles")
-      .select("role,bo_phan_phu_trach")
+      .select("role,chuc_danh,bo_phan_phu_trach")
       .eq("user_id", session.user.id)
       .maybeSingle();
     role = user.error ? "" : user.data?.role || "";
-    el("directProposal").hidden = !MesIpqcFlow.canPropose(role);
+    vaiTro = [role, user.error ? "" : user.data?.chuc_danh].filter(Boolean);   // T286: chức danh (admin kiêm GĐSX)
+    el("directProposal").hidden = !MesIpqcFlow.canPropose(vaiTro);
     el("proposalRequester").value = identity;
     if (typeof sb.channel === "function") {
       const update = () => {
@@ -227,9 +229,9 @@ const MesIpqcApproval = (() => {
       [...el("requests").children].forEach((tr, index) => {
         const row = visible[index];
         if (!row) return;
-        if (!MesIpqcFlow.canDecide(role, row.current_step))
+        if (!MesIpqcFlow.canDecide(vaiTro, row.current_step))
           tr.querySelectorAll(".approve,.reject").forEach((button) => button.remove());
-        if (!MesIpqcFlow.canDecide(role, row.current_step, true))
+        if (!MesIpqcFlow.canDecide(vaiTro, row.current_step, true))
           tr.querySelectorAll(".override").forEach((button) => button.remove());
       });
       el("myRequestsCount").textContent =
@@ -237,7 +239,7 @@ const MesIpqcApproval = (() => {
     };
     decide = async function (id, decision) {
       const row = rows.find((r) => r.id === id);
-      if (!row || !MesIpqcFlow.canDecide(role, row.current_step, decision === "Phê duyệt trực tiếp"))
+      if (!row || !MesIpqcFlow.canDecide(vaiTro, row.current_step, decision === "Phê duyệt trực tiếp"))
         return alert("Tài khoản không có quyền duyệt bước này.");
       return previousDecide(id, decision);
     };
@@ -255,7 +257,7 @@ const MesIpqcApproval = (() => {
       if (r.error) throw new Error(r.error.message);
       jobId = r.data?.id_dong;
     }
-    if (jobId && MesIpqcFlow.canPropose(role)) {
+    if (jobId && MesIpqcFlow.canPropose(vaiTro)) {
       el("runningJob").value = jobId;
       await choose(jobId, cp || "");
       el("proposalPanel").classList.remove("hidden");
@@ -621,7 +623,7 @@ const MesIpqcApproval = (() => {
       open.title = "Xem chi tiết cảnh báo";
       open.onclick = () => detail(item);
       buttons.append(open);
-      if (MesIpqcFlow.canPropose(role) && !closedMap.has(cp.id_checkpoint)) {
+      if (MesIpqcFlow.canPropose(vaiTro) && !closedMap.has(cp.id_checkpoint)) {
         const propose = document.createElement("button");
         propose.type = "button";
         propose.className = "btn primary";
@@ -1018,7 +1020,7 @@ const MesIpqcApproval = (() => {
   }
   async function startProposal(item) {
     if (busy) return;
-    if (!MesIpqcFlow.canPropose(role)) throw new Error("Chỉ bộ phận Sản xuất được lập đề nghị.");
+    if (!MesIpqcFlow.canPropose(vaiTro)) throw new Error("Chỉ bộ phận Sản xuất được lập đề nghị.");
     await refresh();
     const job = available.find(
       (r) =>
@@ -1052,7 +1054,7 @@ const MesIpqcApproval = (() => {
     else dialog.removeAttribute("open");
   };
   el("directProposal").onclick = () => {
-    if (!MesIpqcFlow.canPropose(role)) return;
+    if (!MesIpqcFlow.canPropose(vaiTro)) return;
     resetForm();
     proposalWarningId = "";
     el("runningJob").disabled = false;
