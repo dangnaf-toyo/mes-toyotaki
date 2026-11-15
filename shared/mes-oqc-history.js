@@ -143,7 +143,7 @@ const MesOqcHistory = (() => {
       (item) => setModels([...selectedModels, item.value]),
       true,
     );
-    const employees = await Qc02Data.employees();
+    const employees = await Qc02Data.employees("oqc"); /* lọc thống kê: chỉ người vai trò OQC */
     picker(
       "inspectorSearch",
       "inspectorSuggestions",
