@@ -3,6 +3,7 @@
 //   GoiYMa.sp / spKiem      — KHÁCH-SẢN PHẨM-STT   (EXE-OUT-01)
 //   GoiYMa.nvl / nvlKiem    — N-LLL-QQ-STT         (K-NHN-12-001)
 //   GoiYMa.khuon / khuonKiem — Tên ngắn #Số khuôn  (OUT #3)
+//   GoiYMa.dao / daoKiem    — N-LOẠI-KÍCH THƯỚC-STT (D-PNG-0800-001) — T272 dao cụ Gia công
 // Kết quả gợi ý: { ma, note } hoặc { loi }. Kết quả kiểm: { muc: 'ok'|'canh'|'loi', text }.
 (function () {
   const khongDau = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
@@ -164,6 +165,59 @@
     return { muc: 'ok', text: '✓ Đúng mẫu' };
   }
 
+  // ── Dao cụ Gia công (T272) — N-LOẠI-KÍCH THƯỚC-STT ───────────────────────
+  const DAO_NHOM = { D: 'Dao cắt', M: 'Mảnh cắt', H: 'Đầu kẹp BT', C: 'Collet / áo kẹp', K: 'Cán dao', P: 'Phụ trợ' };
+  const DAO_LOAI = {
+    D: { PNG: 'Dao phay ngón', PCA: 'Dao phay cầu', PCT: 'Dao phay chữ T', PDH: 'Dao phay định hình', PVM: 'Dao vát mép',
+         PRE: 'Dao phay ren', KHO: 'Mũi khoan', KTA: 'Mũi khoan tâm', DOA: 'Mũi doa', TRO: 'Mũi taro', CHU: 'Dao chuốt' },
+    M: { TIE: 'Mảnh tiện', TTR: 'Mảnh tiện trong', MLO: 'Mảnh móc lỗ', RAN: 'Mảnh cắt rãnh', PHA: 'Mảnh dao phay', PRE: 'Mảnh phay ren', DEM: 'Mảnh đệm' },
+    K: { TIE: 'Cán dao tiện ngoài', MLO: 'Cán móc lỗ', RAN: 'Cán dao cắt rãnh', PRE: 'Thân dao phay ren' },
+    P: { CHM: 'Chấu mềm', SGO: 'Thiết bị set gốc dao', BGO: 'Đầu dò bổ gốc' },
+  };
+  const DAO_RE = {
+    D: /^D-(PNG|PCA|PCT|PDH|PVM|PRE|KHO|KTA|DOA|TRO|CHU)-[0-9P][0-9]{3}-\d{3}$/,
+    M: /^M-(TIE|TTR|MLO|RAN|PHA|PRE|DEM)-[A-Z]{4}-\d{3}$/,
+    H: /^H-[A-Z0-9]{2,7}-\d{3}-\d{3}$/,
+    C: /^C-[A-Z0-9]{2,7}-\d{4}-\d{3}$/,
+    K: /^K-(TIE|MLO|RAN|PRE)-\d{4}-\d{3}$/,
+    P: /^P-(CHM|SGO|BGO)-[0-9]{4}-\d{3}$/,
+  };
+  // Kích thước: Ø8 → 0800, 2.76 → 0276, M3 → 0300, PT1/4 → P014; nhóm H = chiều dài 3 số; nhóm M = 4 chữ hình dạng mảnh.
+  function daoKt(nhom, raw){
+    const t = hoa(raw).replace(/\s+/g, '');
+    if (!t) return nhom === 'P' ? '0000' : '';
+    if (nhom === 'M') { const m = t.match(/[A-Z]{4}/); return m ? m[0] : ''; }
+    const pt = t.match(/PT(\d+)\/(\d+)/);
+    if (pt) return 'P' + pad(pt[1] + pt[2], 3).slice(-3);
+    const so = t.replace(',', '.').match(/(\d+(?:\.\d+)?)/);
+    if (!so) return '';
+    const n = Number(so[1]);
+    if (nhom === 'H') return pad(Math.round(n), 3).slice(-3);
+    return pad(Math.round(n * 100), 4).slice(-4);
+  }
+  // inp: { nhom, loai, kt } ; dsMa: mảng mã đã có
+  function dao(inp, dsMa){
+    const nhom = String(inp.nhom || '').toUpperCase();
+    if (!DAO_NHOM[nhom]) return { loi: 'Chọn nhóm' };
+    const loai = hoa(inp.loai).replace(/[^A-Z0-9]/g, '');
+    if (!loai) return { loi: nhom === 'H' || nhom === 'C' ? 'Nhập kiểu kẹp, VD ER20' : 'Chọn loại' };
+    const kt = daoKt(nhom, inp.kt);
+    if (!kt) return { loi: nhom === 'M' ? 'Nhập mã mảnh, VD DCMT070204' : nhom === 'H' ? 'Nhập chiều dài, VD 70' : 'Nhập kích thước, VD Ø8 / M3' };
+    const ma = sttTiep(dsMa, nhom + '-' + loai + '-' + kt + '-', 3);
+    let ten = (DAO_LOAI[nhom] && DAO_LOAI[nhom][loai]) || (nhom === 'H' ? 'Đầu kẹp BT30 ' + loai : nhom === 'C' ? 'Collet ' + loai : '');
+    const kx = String(inp.kt || '').trim();
+    if (ten && kx && nhom !== 'H' && nhom !== 'P') ten += nhom === 'M' ? ' ' + hoa(kx) : /^M|^PT/i.test(kx) ? ' ' + kx.toUpperCase() : ' Ø' + kx.replace(/^[ØD]/i, '');
+    return { ma, ten, note: '' };
+  }
+  function daoKiem(ma, dsMa, maCu){
+    ma = String(ma || '').trim().toUpperCase();
+    if (!ma || (maCu && ma === String(maCu).toUpperCase())) return { muc: 'ok', text: '' };
+    if (dsMa.some(m => String(m || '').toUpperCase() === ma)) return { muc: 'loi', text: '⛔ Mã đã có' };
+    const re = DAO_RE[ma[0]];
+    if (!re || !re.test(ma)) return { muc: 'canh', text: '⚠ Sai mẫu N-LOẠI-KÍCH THƯỚC-STT, VD D-PNG-0800-001' };
+    return { muc: 'ok', text: '✓ Đúng mẫu' };
+  }
+
   // ── Hiển thị ─────────────────────────────────────────────────────────────
   function hien(el, kq, note){
     if (!el) return;
@@ -181,5 +235,5 @@
     document.head.appendChild(st);
   }
 
-  window.GoiYMa = { sp, spKiem, nvl, nvlKiem, khuon, khuonKiem, hien, khongDau };
+  window.GoiYMa = { sp, spKiem, nvl, nvlKiem, khuon, khuonKiem, dao, daoKiem, DAO_NHOM, DAO_LOAI, hien, khongDau };
 })();

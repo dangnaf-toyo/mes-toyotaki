@@ -403,6 +403,7 @@
         <button type="button" data-qt="nvl">Nguyên vật liệu</button>
         <button type="button" data-qt="bom">BOM</button>
         <button type="button" data-qt="tag">Tag No</button>
+        <button type="button" data-qt="dao">Dao cụ</button>
       </div>
 
       <div class="qt-card" data-qt-pane="may">
@@ -500,6 +501,25 @@
           <div class="luu-y">Hệ thống tự sinh, không gõ tay. Tem đã in giữ nguyên mã (tem NVL cũ TYK-… vẫn quét được).</div>
         </div>
       </div>
+
+      <div class="qt-card" data-qt-pane="dao" hidden>
+        <div class="qt-cong-thuc">N-LOẠI-KÍCH THƯỚC-STT</div>
+        <div class="qt-phan">
+          <div>N (nhóm)</div><div><code>D</code> dao cắt · <code>M</code> mảnh cắt · <code>H</code> đầu kẹp BT · <code>C</code> collet / áo kẹp · <code>K</code> cán dao · <code>P</code> phụ trợ</div>
+          <div>LOẠI — D</div><div><code>PNG</code> phay ngón · <code>PCA</code> cầu · <code>PCT</code> chữ T · <code>PDH</code> định hình · <code>PVM</code> vát mép · <code>PRE</code> phay ren · <code>KHO</code> khoan · <code>KTA</code> khoan tâm · <code>DOA</code> doa · <code>TRO</code> taro · <code>CHU</code> chuốt</div>
+          <div>LOẠI — M</div><div><code>TIE</code> tiện · <code>TTR</code> tiện trong · <code>MLO</code> móc lỗ · <code>RAN</code> cắt rãnh · <code>PHA</code> phay · <code>PRE</code> phay ren · <code>DEM</code> đệm</div>
+          <div>LOẠI — H, C</div><div>Kiểu kẹp: <code>ER20</code> <code>GSK10</code> <code>MEGA45</code>… · áo kẹp thẳng <code>D25</code> · <code>TAR</code> collet taro</div>
+          <div>LOẠI — K, P</div><div>K: <code>TIE</code> <code>MLO</code> <code>RAN</code> <code>PRE</code> · P: <code>CHM</code> chấu mềm, <code>SGO</code> set gốc, <code>BGO</code> đầu dò</div>
+          <div>KÍCH THƯỚC</div><div>D, K, C: Ø×100 đủ 4 số (Ø8 → <code>0800</code>, Ø2.76 → <code>0276</code>, M3 → <code>0300</code>, PT1/4 → <code>P014</code>) · M: 4 chữ hình dạng mảnh (<code>DCMT</code>) · H: chiều dài 3 số (<code>070</code>)</div>
+          <div>STT (3 số)</div><div><code>001</code>, <code>002</code>… cùng loại + kích thước khác quy cách / hãng</div>
+          <div>Tên chuẩn</div><div>Loại + kích thước: <code>Dao phay ngón Ø8</code>. Quy cách, hãng, mã SP ghi ô riêng</div>
+        </div>
+        <div class="qt-vd">
+          <div class="dung"><span class="nhan">Đúng</span><code>D-PNG-0800-001</code> <code>D-TRO-0300-001</code> <code>M-TIE-DCMT-001</code> <code>H-ER20-070-001</code> <code>C-ER20-0600-001</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>D-PNG-8-1</code> <code>Dao phay D8 HLC</code> <code>D-PNG-0800-001 (1012)</code></div>
+          <div class="luu-y">Trang Kho dao cụ có nút Gợi ý mã. Mã đã có phiếu thì không đổi.</div>
+        </div>
+      </div>
     </section>
   </div>
 </div>
@@ -565,7 +585,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 { const t = new URLSearchParams(location.search).get('tab');   // ?tab=khuon (link từ quan-ly-khuon.html)
   const btn = t && document.querySelector('.tab-btn[data-tab="' + t + '"]');
-  if (btn) btn.click(); }
+  if (btn) btn.click();
+  const q = new URLSearchParams(location.search).get('qt');   // T272: ?tab=quytac&qt=dao
+  if (q && t === 'quytac') qtChon(q); }
 
 // ── Danh mục dùng chung: lọc + sắp xếp + bảng + modal thêm/sửa ───────────
 function cmp(a, b){
