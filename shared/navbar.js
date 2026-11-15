@@ -133,6 +133,7 @@
     ] },
     { label: 'Kho & Truy xuất', items: [
       { label: 'Kho NVL', href: 'nvl.html' },
+      { label: 'Kho dao cụ', href: 'dao-cu.html' },   // T272
       { label: 'Kho thành phẩm', href: 'kho-thanh-pham.html' },
       { label: 'Truy xuất nguồn gốc', href: 'truy-xuat-nguon-goc.html' },
     ] },
@@ -182,6 +183,7 @@
     'checksheet-bao-duong-khuon.html': { icon: '📋', title: 'Check sheet bảo dưỡng khuôn', desc: 'Ghi kết quả bảo dưỡng từng khuôn theo hạng mục', noTitleBar: true },
     'khsx-tuan.html': { icon: '📅', title: 'Kế hoạch sản xuất tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
     'nvl.html': { icon: '🧪', title: 'Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
+    'dao-cu.html': { icon: '🔪', title: 'Kho dao cụ', desc: 'Dao cụ Gia công: danh mục, tồn Mới / Đang dùng / NG, phiếu nhập xuất', noTitleBar: true },
     'intem.html': { icon: '🏷️', title: 'In tem', desc: 'Tạo/tra cứu tem Đúc, chỉ thị Kanban, tem thành phẩm', noTitleBar: true },
     'ghi-nhan-kanban.html': { icon: '📥', title: 'Ghi nhận thùng (Kanban)', desc: 'Quét QR ghi nhận thùng sản phẩm đã sản xuất — máy chạy theo tem chỉ thị in trước' },
     'gia-cong-dashboard.html': { icon: '⚙️', title: 'Bảng điều khiển Gia công', desc: '30 máy CNC: quét tem thùng, NG, hàng test, dừng máy, kết ca', noTitleBar: true },
