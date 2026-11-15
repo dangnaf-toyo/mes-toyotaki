@@ -344,7 +344,8 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 
         <div class="field-row" id="ncp-src-ng-wrap">
           <label>Chọn lần NG (7 ngày gần nhất)</label>
-          <select id="ncp-src-ng" onchange="onNcpNgSelected()"></select>
+          <div style="display:flex;gap:6px"><select id="ncp-src-ng" onchange="onNcpNgSelected()" style="flex:1;min-width:0"></select>
+          <button type="button" class="btn btn-outline" onclick="ncpNgKhongCan()" title="Lần NG này không cần NCP — tắt nhắc">Không cần</button></div>
         </div>
 
         <div class="field-row">
@@ -958,6 +959,9 @@ async function loadQcFilters(){
   fillSelect('fl-ma-sp', state.products);
   fillSelect('tc-ma-sp', state.products);
   searchHistory();
+  // T278: link từ IPQC / chuông "NG chưa mở NCP" → mở thẳng form NCP với lần NG đó
+  const ngId = new URLSearchParams(location.search).get('ncp_ng');
+  if (ngId) { switchTab('ncp'); openNcpNewModal(ngId); }
 }
 
 function populateSoKhuonField(prefix, maSp, currentValue){
@@ -1149,7 +1153,7 @@ function renderNcpList(){
 
 function closeNcpModal(id){ document.getElementById(id).classList.remove('show'); }
 
-async function openNcpNewModal(){
+async function openNcpNewModal(chonNg){
   if (!(await ensureAuth())) return;
   document.getElementById('ncp-src-ng').innerHTML = '<option value="">Đang tải...</option>';
   document.getElementById('ncp-ma-may').innerHTML = '<option value="">-- Chọn máy --</option>';
@@ -1176,9 +1180,25 @@ async function openNcpNewModal(){
     state.ncpAvailableNg = data.map(x => ({ id_checkpoint: x.id_checkpoint, ma_may: x.ma_may, ma_sp: x.ma_sp, so_khuon: x.so_khuon, thoi_diem_kiem_thuc_te: x.thoi_diem_kiem_thuc_te, mo_ta_de_xuat: x.mo_ta_de_xuat }));
     sel.innerHTML = '<option value="">-- Chọn --</option>' + state.ncpAvailableNg.map(x =>
       `<option value="${escapeHtml(x.id_checkpoint)}">${escapeHtml(x.ma_may)} · ${escapeHtml(x.ma_sp)} · ${new Date(x.thoi_diem_kiem_thuc_te).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false })}</option>`).join('');
+    if (typeof chonNg === 'string' && chonNg) {
+      if (state.ncpAvailableNg.some(x => x.id_checkpoint === chonNg)) sel.value = chonNg;
+      else alert('Lần NG này đã có NCP, đã đánh dấu Không cần, hoặc quá 7 ngày');
+    }
     onNcpNgSelected();
   }
   document.getElementById('ncp-modal-new').classList.add('show');
+}
+
+// T278: lần NG không cần NCP (SP đã xử lý tại chỗ / không có SP nghi vấn) → bỏ khỏi danh sách + tắt nhắc
+async function ncpNgKhongCan(){
+  const id = document.getElementById('ncp-src-ng').value;
+  if (!id) return alert('Chọn 1 lần NG');
+  const lyDo = await hoiGhiChuDuyet('Lần NG này không cần mở NCP?', { tieuDe: 'Không cần NCP', nutOk: 'Xác nhận', batBuoc: true, goiY: 'Lý do (vd: không có SP nghi vấn, đã lọc tại máy)' });
+  if (lyDo == null) return;
+  const { error } = await sb.rpc('ipqc_ng_khong_can_ncp', { p_id_checkpoint: id, p_ly_do: lyDo });
+  if (error) return alert('Lỗi: ' + error.message);
+  closeNcpModal('ncp-modal-new');
+  openNcpNewModal();
 }
 
 function ncpSourceChanged(){

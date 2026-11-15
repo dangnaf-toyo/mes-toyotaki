@@ -129,6 +129,11 @@ button{cursor:pointer;font-family:inherit}
 .bao-mau button{align-self:flex-start;min-height:36px;padding:.45rem 1rem;border:none;border-radius:.45rem;background:#fff;color:#1D4ED8;font-weight:700;font-size:.9rem;cursor:pointer}
 @keyframes bm-nhay{50%{box-shadow:0 0 0 7px #FCD34D}}
 .daynight-banner{margin:.7rem .75rem 0;padding:.8rem .9rem;border-radius:.7rem;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A5F;display:flex;flex-direction:column;gap:.55rem;font-size:.85rem}
+/* T278: sau khi lưu NG — gợi ý mở NCP */
+.ncp-goi-y{margin:.7rem .75rem 0;padding:.6rem .75rem;border-radius:.6rem;background:var(--alarm-bg);border:1px solid #FCA5A5;display:flex;gap:.5rem;align-items:center;font-size:.85rem}
+.ncp-goi-y span{flex:1;min-width:0}
+.ncp-goi-y a{padding:.5rem .8rem;border-radius:.5rem;background:#DC2626;color:#fff;font-weight:700;text-decoration:none;white-space:nowrap}
+.ncp-goi-y .x{border:none;background:none;font-size:1.1rem;color:var(--text-muted);min-width:32px;min-height:32px}
 .daynight-banner button{padding:.7rem;border:none;border-radius:.5rem;background:var(--accent);color:#fff;font-weight:700;font-size:.9rem}
 
 .detail-info{background:var(--bg-panel);margin:.75rem;padding:.9rem;border-radius:.7rem;box-shadow:var(--shadow-sm)}
@@ -241,6 +246,7 @@ button{cursor:pointer;font-family:inherit}
     <div id="daynight-banner-text">—</div>
     <button id="btn-bat-dau-ngay" onclick="onBatDauNgay()">Bắt đầu ngày</button>
   </div>
+  <div class="ncp-goi-y hidden" id="ncp-goi-y"><span id="ncp-goi-y-text"></span><a id="ncp-goi-y-link" target="_blank" rel="noopener">Mở NCP</a><button type="button" class="x" onclick="this.parentNode.classList.add('hidden')" aria-label="Đóng">✕</button></div>
   <div class="list" id="queue-list"></div>
 </div>
 
@@ -1273,7 +1279,12 @@ async function submitCheck(ketQua){
       : ketQua === 'NG' ? '✓ Đã lưu — NG, đã cảnh báo dashboard Đúc'
       : '✓ Đã ghi nhận cảnh báo — hiển thị tại Duyệt tiếp tục SX IPQC; chưa có đề nghị chạy tiếp';
     showToast(msg + (data && data.note ? ' (' + data.note + ')' : ''));
-    state.queue = state.queue.filter(x => x.id_checkpoint !== state.current.id_checkpoint);
+    if (ketQua === 'NG') {   // T278: gợi ý mở NCP cho SP nghi vấn
+      document.getElementById('ncp-goi-y-text').textContent = 'NG ' + (state.current.ma_may || '') + ' · ' + (state.current.ma_sp || '') + ' — có SP nghi vấn?';
+      document.getElementById('ncp-goi-y-link').href = 'qc-manager.html?tab=ncp&ncp_ng=' + encodeURIComponent(submittedCheckpoint.id_checkpoint);
+      document.getElementById('ncp-goi-y').classList.remove('hidden');
+    }
+    state.queue =state.queue.filter(x => x.id_checkpoint !== state.current.id_checkpoint);
     state.current = null;
     renderQueue();
     showScreen('scr-queue');
