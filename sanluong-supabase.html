@@ -27,14 +27,14 @@
 
   header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm);flex-wrap:wrap;}
   .brand{display:flex;flex-direction:column;line-height:1.2;}
-  .brand .co{font-size:9px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
+  .brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500;}
   .brand .title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#FFF;}
   .header-group{display:flex;align-items:center;gap:6px;}
-  .header-label{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
+  .header-label{font-size:11px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
   .header-select{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none;}
   .header-select:hover{background:#3F5266;}
   .header-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 10px;line-height:1.15;}
-  .header-clock .date{font-size:10px;color:#94A3B8;}
+  .header-clock .date{font-size:11px;color:#94A3B8;}
   .header-clock .time{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:#FFF;letter-spacing:-.02em;}
   .btn{padding:6px 12px;border-radius:5px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;display:inline-flex;align-items:center;gap:6px;}
   .btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569;}
@@ -139,7 +139,7 @@
   table.kpi-table{width:100%;border-collapse:collapse;font-size:11.8px;}
   table.kpi-table th,table.kpi-table td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--border);}
   table.kpi-table th:first-child,table.kpi-table td:first-child{text-align:left;}
-  table.kpi-table thead th{color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.02em;border-bottom:2px solid var(--border-strong);background:var(--bg-sunken);}
+  table.kpi-table thead th{color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:2px solid var(--border-strong);background:var(--bg-sunken);}
   table.kpi-table tbody tr:hover{background:var(--bg-sunken);}
   table.kpi-table tbody tr:last-child td{border-bottom:none;font-weight:600;}
   .pill{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;}
@@ -157,6 +157,22 @@
   @media (max-width:900px){
     .kpi-grid,.grid-2,.grid-3{grid-template-columns:1fr;}
   }
+  .info-btn{border:1px solid #cbd5e1;background:#fff;color:#64748b;border-radius:50%;width:20px;height:20px;padding:0;font-size:12px;font-weight:700;line-height:1;display:inline-grid;place-items:center;cursor:pointer;vertical-align:middle;margin-left:6px;font-family:inherit}
+  .info-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .info-txt{font-size:12px;font-weight:400;color:#475569;background:var(--bg-sunken);border-radius:7px;padding:7px 9px;line-height:1.5;margin:6px 0 10px}
+  @media print{ .info-btn,.info-txt{display:none !important;} }
+  @media (max-width:640px){
+    .wrap{padding:0 10px 40px;} .hdr-wrap{padding:0 10px;}
+    header{gap:8px;padding:6px 10px;}
+    .tabnav{flex-wrap:nowrap;overflow-x:auto;flex:1 1 100%;min-width:0;order:3;-webkit-overflow-scrolling:touch;}
+    .tabnav .tab-btn{white-space:nowrap;flex:none;}
+    .header-clock{display:none;}
+    .kpi-grid{grid-template-columns:1fr 1fr;gap:8px;}
+    .section-head{flex-wrap:wrap;}
+    .section-head .note{margin-left:0;}
+    .cmt-month-bar{padding:8px 10px;flex-wrap:wrap;}
+    footer{flex-direction:column;gap:4px;}
+  }
 </style>
 </head>
 <body>
@@ -170,8 +186,8 @@
     <nav class="tabnav">
       <button class="tab-btn active" data-tab="tab1">Giao hàng đúng hạn</button>
       <button class="tab-btn" data-tab="tab2">Hoàn thành KHSX</button>
-      <button class="tab-btn" data-tab="tab3">Capacity máy</button>
-      <button class="tab-btn" data-tab="tab4">Forecast sản lượng</button>
+      <button class="tab-btn" data-tab="tab3">Công suất máy</button>
+      <button class="tab-btn" data-tab="tab4">Dự báo sản lượng</button>
     </nav>
     <button type="button" class="btn btn-ghost" id="btnRefresh" onclick="loadData()">↻ Làm mới</button>
     <button type="button" class="btn btn-ghost" onclick="window.print()">In / PDF</button>
@@ -183,9 +199,10 @@
 </div>
 
 <div class="cmt-month-bar" id="cmtMonthBar">
-  <span>📝 Xem/ghi chú (comment) của tháng:</span>
+  <span>Ghi chú tháng</span>
   <select id="cmtMonthSelect"></select>
-  <span class="cmt-month-hint">Mỗi tháng có ô comment riêng — đổi tháng để xem lại comment tháng khác (không ảnh hưởng số liệu/biểu đồ).</span>
+  <button type="button" class="info-btn" data-info="iCmtThang" title="Giải thích">ⓘ</button>
+  <span class="info-txt" id="iCmtThang" hidden style="margin:0">Mỗi tháng một ô ghi chú riêng; đổi tháng không đổi số liệu biểu đồ.</span>
 </div>
 
 
@@ -215,12 +232,13 @@
       </div>
 
       <div class="card" style="margin-top:22px;">
-        <h3>Tỷ lệ giao hàng đúng hạn theo tháng (T1 – T12)</h3>
-        <div class="card-sub">Thực tế giao hàng OK / Kế hoạch giao hàng · Mục tiêu 100%</div>
+        <h3>Tỷ lệ giao hàng đúng hạn theo tháng<button type="button" class="info-btn" data-info="iGhdh" title="Giải thích">ⓘ</button></h3>
+        <p class="info-txt" id="iGhdh" hidden>Tỷ lệ = thực tế giao hàng OK / kế hoạch giao hàng.</p>
+        <div class="card-sub">Mục tiêu 100%</div>
         <div class="chart-box wide"><canvas id="chartGHDH"></canvas></div>
         <div class="comment-box">
-          <div class="comment-label"><span class="dot"></span>Ghi chú / Comment tháng hiện tại</div>
-          <textarea class="comment-edit" id="cmt-giaohang" spellcheck="false" placeholder="Nhập nhận xét về tình hình giao hàng..."></textarea>
+          <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+          <textarea class="comment-edit" id="cmt-giaohang" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
         </div>
       </div>
     </section>
@@ -241,8 +259,8 @@
           <div class="card-sub" id="sub-duc">Lũy kế năm: —</div>
           <div class="chart-box"><canvas id="chartDuc"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Ghi chú / Comment</div>
-            <textarea class="comment-edit" id="cmt-duc" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-duc" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
         <div class="card">
@@ -250,8 +268,8 @@
           <div class="card-sub" id="sub-bavia">Lũy kế năm: —</div>
           <div class="chart-box"><canvas id="chartBavia"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Ghi chú / Comment</div>
-            <textarea class="comment-edit" id="cmt-bavia" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-bavia" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
         <div class="card">
@@ -259,8 +277,8 @@
           <div class="card-sub" id="sub-giacong">Lũy kế năm: —</div>
           <div class="chart-box"><canvas id="chartGiaCong"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Ghi chú / Comment</div>
-            <textarea class="comment-edit" id="cmt-giacong" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-giacong" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
         <div class="card">
@@ -268,8 +286,8 @@
           <div class="card-sub" id="sub-son">Lũy kế năm: —</div>
           <div class="chart-box"><canvas id="chartSon"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Ghi chú / Comment</div>
-            <textarea class="comment-edit" id="cmt-son" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-son" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
       </div>
@@ -281,8 +299,8 @@
     <section style="margin-top:26px;">
       <div class="section-head">
         <span class="no">03</span>
-        <h2>Tỷ lệ sử dụng Capacity của máy</h2>
-        <span class="note">Thời gian chạy máy theo FCST / Năng lực máy tại xưởng</span>
+        <h2>Tỷ lệ sử dụng công suất máy<button type="button" class="info-btn" data-info="iCapa" title="Giải thích">ⓘ</button></h2>
+        <span class="info-txt" id="iCapa" hidden style="margin:0 0 0 8px">Tỷ lệ = thời gian chạy máy theo dự báo / năng lực máy tại xưởng.</span>
       </div>
 
       <div class="grid-3">
@@ -291,8 +309,8 @@
           <div class="card-sub" id="sub-capa350">Mục tiêu 70% · Lũy kế: —</div>
           <div class="chart-box"><canvas id="chartCapa350"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Comment</div>
-            <textarea class="comment-edit" id="cmt-capa350" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-capa350" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
         <div class="card">
@@ -300,8 +318,8 @@
           <div class="card-sub" id="sub-capa850">Mục tiêu 50% · Lũy kế: —</div>
           <div class="chart-box"><canvas id="chartCapa850"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Comment</div>
-            <textarea class="comment-edit" id="cmt-capa850" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-capa850" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
         <div class="card">
@@ -309,8 +327,8 @@
           <div class="card-sub" id="sub-capaGC">Mục tiêu 90% · Lũy kế: —</div>
           <div class="chart-box"><canvas id="chartCapaGC"></canvas></div>
           <div class="comment-box">
-            <div class="comment-label"><span class="dot"></span>Comment</div>
-            <textarea class="comment-edit" id="cmt-capaGC" spellcheck="false" placeholder="Nhập nhận xét..."></textarea>
+            <div class="comment-label"><span class="dot"></span>Ghi chú</div>
+            <textarea class="comment-edit" id="cmt-capaGC" spellcheck="false" placeholder="Ghi chú tháng này..."></textarea>
           </div>
         </div>
       </div>
@@ -322,33 +340,33 @@
     <section style="margin-top:26px;">
       <div class="section-head">
         <span class="no">04</span>
-        <h2>Forecast sản lượng hàng tháng theo khách hàng</h2>
+        <h2>Dự báo sản lượng theo khách hàng</h2>
         <span class="note">FCC · Exedy · Astemo · TTI · Khác</span>
       </div>
 
       <div class="card">
-        <h3>Forecast sản lượng theo khách hàng lớn (nghìn Pcs/tháng)</h3>
-        <div class="card-sub">Tháng 1 – Tháng 12, 2026 · Đậm = Thực tế · Nhạt = Dự báo</div>
+        <h3>Sản lượng theo khách hàng lớn (nghìn Pcs/tháng)</h3>
+        <div class="card-sub">Đậm = Thực tế · Nhạt = Dự báo</div>
         <div id="fcYearLine" style="margin-top:8px;font-size:13px;font-weight:600;"></div>
         <div class="chart-box wide"><canvas id="chartForecast"></canvas></div>
       </div>
 
       <div class="grid-2" style="margin-top:20px;">
         <div class="card">
-          <div class="comment-label"><span class="dot"></span>Nội dung đối ứng đáp ứng sản lượng tháng tới</div>
-          <textarea class="comment-edit" id="cmt-forecast-doiung" spellcheck="false" placeholder="Nhập kế hoạch đối ứng để đáp ứng forecast sản lượng tháng tới…" style="min-height:120px;"></textarea>
+          <div class="comment-label"><span class="dot"></span>Đối ứng sản lượng tháng tới</div>
+          <textarea class="comment-edit" id="cmt-forecast-doiung" spellcheck="false" placeholder="Kế hoạch đối ứng..." style="min-height:120px;"></textarea>
         </div>
         <div class="card">
-          <div class="comment-label"><span class="dot"></span>Kế hoạch hoạt động trọng điểm ngoài sản xuất</div>
-          <textarea class="comment-edit" id="cmt-forecast-hoatdong" spellcheck="false" placeholder="Nhập các hoạt động trọng điểm ngoài sản xuất (đào tạo, cải tiến, đầu tư thiết bị...)…" style="min-height:120px;"></textarea>
+          <div class="comment-label"><span class="dot"></span>Hoạt động trọng điểm ngoài sản xuất</div>
+          <textarea class="comment-edit" id="cmt-forecast-hoatdong" spellcheck="false" placeholder="Đào tạo, cải tiến, đầu tư thiết bị..." style="min-height:120px;"></textarea>
         </div>
       </div>
     </section>
   </div>
 
   <footer>
-    <span>TOYOTAKI · Công ty Cổ phần Công nghiệp TOYOTAKI — KCN Khai Quang, phường Vĩnh Phúc, tỉnh Phú Thọ</span>
-    <span>Dashboard nội bộ QLSX</span>
+    <span>TOYOTAKI</span>
+    <span>Lưu ghi chú cần đăng nhập · Chỉ dùng nội bộ</span>
   </footer>
 
 </div>
@@ -625,9 +643,9 @@ chartsByTab.tab2.push(lineTargetChart(document.getElementById('chartDuc'), DEMO_
 chartsByTab.tab2.push(lineTargetChart(document.getElementById('chartBavia'), DEMO_DATA.khsx.bavia, 1, 'Thành tích', pctFmt, months12, scale80_100));
 chartsByTab.tab2.push(lineTargetChart(document.getElementById('chartGiaCong'), DEMO_DATA.khsx.giacong, 1, 'Thành tích', pctFmt, months12, scale80_110));
 chartsByTab.tab2.push(lineTargetChart(document.getElementById('chartSon'), DEMO_DATA.khsx.son, 1, 'Thành tích', pctFmt, months12, scale80_110));
-chartsByTab.tab3.push(lineTargetChart(document.getElementById('chartCapa350'), DEMO_DATA.capacity.c350, 0.7, 'Tỉ lệ Capa', pctFmt, months12, null, DEMO_DATA.capacity.loai));
-chartsByTab.tab3.push(lineTargetChart(document.getElementById('chartCapa850'), DEMO_DATA.capacity.c850, 0.5, 'Tỉ lệ Capa', pctFmt, months12, null, DEMO_DATA.capacity.loai));
-chartsByTab.tab3.push(lineTargetChart(document.getElementById('chartCapaGC'), DEMO_DATA.capacity.gc, 0.9, 'Tỉ lệ Capa', pctFmt, months12, null, DEMO_DATA.capacity.loai));
+chartsByTab.tab3.push(lineTargetChart(document.getElementById('chartCapa350'), DEMO_DATA.capacity.c350, 0.7, 'Tỉ lệ công suất', pctFmt, months12, null, DEMO_DATA.capacity.loai));
+chartsByTab.tab3.push(lineTargetChart(document.getElementById('chartCapa850'), DEMO_DATA.capacity.c850, 0.5, 'Tỉ lệ công suất', pctFmt, months12, null, DEMO_DATA.capacity.loai));
+chartsByTab.tab3.push(lineTargetChart(document.getElementById('chartCapaGC'), DEMO_DATA.capacity.gc, 0.9, 'Tỉ lệ công suất', pctFmt, months12, null, DEMO_DATA.capacity.loai));
 
 const forecastColorsHex = {FCC:'#C87941', Exedy:'#33465C', Astemo:'#4C7A66', TTI:'#B33A3A', Khac:'#8A7F71'};
 function hexToRgba(hex, alpha){
@@ -696,7 +714,7 @@ function renderForecastKpis(data, keHoachNam){
   }
   const el = document.getElementById('fcYearLine');
   if (!hasAny) { el.textContent = ''; return; }
-  let txt = `Dự báo tổng sản lượng năm ${new Date().getFullYear()}: ${fmtK(total)} nghìn Pcs`;
+  let txt = `Tổng năm ${new Date().getFullYear()}: ${fmtK(total)} nghìn Pcs`;
   el.style.color = '';
   if (keHoachNam > 0) {
     // Forecast nhập theo nghìn Pcs nên nhân 1000 khi so với Kế hoạch năm.
@@ -842,7 +860,7 @@ function renderAll(data){
   const tag = document.getElementById('kpiRemainTag');
   tag.textContent = `Còn ${(remainPct*100).toFixed(1)}% · ~${fmtInt(remainPcs)} Pcs`;
   tag.className = 'kpi-tag ' + (pct >= 1 ? 'good' : 'bad');
-  document.getElementById('kpiAsOf').textContent = 'Cập nhật lũy kế theo dữ liệu mới nhất';
+  document.getElementById('kpiAsOf').textContent = 'Lũy kế đến nay';
 
   // Tab 1 chart
   chartsByTab.tab1[0].data.datasets[0].data = data.giaoHang.rates;
@@ -946,7 +964,7 @@ async function saveComment(key, text, btnEl, statusEl){
   if (!session){
     // Lưu tạm nội dung đang gõ để không mất khi quay lại sau khi đăng nhập.
     try { localStorage.setItem(draftKey, text); } catch(e){}
-    statusEl.textContent = '⚠️ Cần đăng nhập trước khi lưu — đang chuyển sang trang đăng nhập…';
+    statusEl.textContent = '⚠ Cần đăng nhập — đang chuyển…';
     statusEl.className = 'save-status err';
     setTimeout(() => { window.location.href = 'shared/login.html?returnTo=' + encodeURIComponent(window.location.href); }, 1200);
     return;
@@ -1048,7 +1066,8 @@ startHeaderClock();
 renderAll(DEMO_DATA);
 loadData();
 setInterval(loadData, AUTO_REFRESH_MS);
+// Nút ⓘ: bấm để hiện / ẩn giải thích (data-info = id khung chữ)
+document.addEventListener("click", e => { const b = e.target.closest("[data-info]"); if (!b) return; e.preventDefault(); const x = document.getElementById(b.dataset.info); if (!x) return; x.hidden = !x.hidden; b.classList.toggle("on", !x.hidden); });
 </script>
-
 </body>
 </html>
