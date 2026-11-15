@@ -223,7 +223,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
         <div class="panel-head">👤 Tuân thủ theo IPQC (24h gần nhất)</div>
         <div class="panel-body table-wrap">
           <table>
-            <thead><tr><th>IPQC</th><th>Tổng</th><th title="Định kỳ: kiểm trong vòng chu kỳ 120 phút + ân hạn 30 phút kể từ lần kiểm trước. Sau sự cố / Đổi khuôn: kiểm trong vòng 30 phút kể từ khi phát sinh.">Đúng hạn</th><th title="Quá hạn nói trên, hoặc thiếu mốc thời gian.">Trễ</th><th>OK</th><th>NG</th><th>Cảnh báo</th><th>Tổng thời gian kiểm</th></tr></thead>
+            <thead><tr><th>IPQC</th><th>Tổng</th><th title="Định kỳ: kiểm trong vòng chu kỳ 120 phút + ân hạn 30 phút kể từ lần kiểm trước. Sau sự cố / Đổi khuôn: kiểm trong vòng 30 phút kể từ khi sản xuất giao mẫu QC (chưa giao mẫu thì không tính).">Đúng hạn</th><th title="Quá hạn nói trên.">Trễ</th><th>OK</th><th>NG</th><th>Cảnh báo</th><th>Tổng thời gian kiểm</th></tr></thead>
             <tbody id="nguoi-tbody"></tbody>
           </table>
           <div class="empty-note hidden" id="nguoi-empty">Chưa có dữ liệu kiểm tra.</div>
@@ -235,7 +235,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
       <div class="panel-head">📋 Kết quả kiểm tra gần đây <span class="count" id="done-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Điều kiện máy</th><th>Liên kết</th></tr></thead>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi giao mẫu QC. Ân hạn 30 phút.">Trễ</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Điều kiện máy</th><th>Liên kết</th></tr></thead>
           <tbody id="done-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="done-empty">Chưa có kết quả kiểm tra nào.</div>
@@ -286,7 +286,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
       <div class="panel-head">📋 Kết quả tra cứu <span class="count" id="history-count">0</span></div>
       <div class="panel-body table-wrap">
         <table>
-          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi phát sinh. Ân hạn 30 phút.">Trễ</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Điều kiện máy</th><th>Liên kết</th></tr></thead>
+          <thead><tr><th>Thời điểm</th><th>Máy</th><th>Mã SP</th><th>Loại</th><th>Người kiểm</th><th title="Số phút trễ so với hạn kiểm. Định kỳ: quá chu kỳ 120 phút; Sau sự cố / Đổi khuôn: từ khi giao mẫu QC. Ân hạn 30 phút.">Trễ</th><th>Thời gian kiểm</th><th>Kết quả</th><th>Điều kiện máy</th><th>Liên kết</th></tr></thead>
           <tbody id="history-tbody"></tbody>
         </table>
         <div class="empty-note hidden" id="history-empty">Không tìm thấy kết quả nào khớp bộ lọc.</div>
@@ -606,8 +606,30 @@ function ipqcDueInfo(loaiKiem, phutDaTroi){
   return { da_den_han: daDenHan, phut_con_lai: daDenHan ? 0 : (dueAfter - phutDaTroi), phut_qua_han: daDenHan ? (phutDaTroi - dueAfter) : 0 };
 }
 
+// R23: mốc tính đúng hạn của Sau sự cố / Đổi khuôn = lần sản xuất bấm
+// "Hoàn thành mẫu & giao QC" (duc_su_co_giao_qc) gần nhất TRƯỚC giờ kiểm —
+// không phải giờ phát sinh sự cố (QC chưa thể kiểm khi chưa có mẫu).
+// Chưa giao mẫu → không tính đúng hạn / trễ.
+async function taiMocGiaoQc(rows){
+  const ids = [...new Set((rows || []).filter(r => r.loai_kiem !== 'dinh_ky' && r.id_su_co_goc).map(r => r.id_su_co_goc))];
+  const map = {};
+  for (let i = 0; i < ids.length; i += 150) {
+    const part = ids.slice(i, i + 150);
+    const { data, error } = await sbTaiHet(() => sb.from('duc_su_co_giao_qc').select('id,id_su_co,thoi_diem').in('id_su_co', part).order('id'));
+    if (error) throw error;
+    (data || []).forEach(g => { (map[g.id_su_co] = map[g.id_su_co] || []).push(new Date(g.thoi_diem)); });
+  }
+  return map;
+}
+function mocGiaoQc(giaoMap, idSuCo, thoiDiemKiem){
+  const list = (giaoMap && giaoMap[idSuCo]) || [];
+  let best = null;
+  list.forEach(t => { if (t <= thoiDiemKiem && (!best || t > best)) best = t; });
+  return best;
+}
+
 // Số phút TRỄ của 1 lần kiểm đã hoàn thành so với hạn phải kiểm.
-// - sau_su_co / doi_khuon: han_kiem = giờ phát sinh → trễ = đúng phut_phan_hoi.
+// - sau_su_co / doi_khuon: mốc = lần giao mẫu QC gần nhất → trễ = đúng phut_phan_hoi.
 // - dinh_ky: han_kiem = giờ lần kiểm TRƯỚC của máy (không cộng chu kỳ), nên
 //   phut_phan_hoi là khoảng cách giữa 2 lần kiểm; hạn thực = lần trước + 120′
 //   → trễ = phut_phan_hoi − 120 (kẹp về 0). Không đủ mốc → null.
@@ -621,16 +643,18 @@ function parsePhotoUrls(raw){
   if (Array.isArray(raw)) return raw;
   try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [raw]; } catch (e) { return [String(raw)]; }
 }
-function mapIpqcDoneRow(r){
-  const mocCho = r.han_kiem ? new Date(r.han_kiem) : null;
+function mapIpqcDoneRow(r, giaoMap){
   const thoiDiemKiem = r.thoi_diem_kiem_thuc_te ? new Date(r.thoi_diem_kiem_thuc_te) : null;
+  const chuaGiao = r.loai_kiem !== 'dinh_ky' && !(thoiDiemKiem && r.id_su_co_goc && mocGiaoQc(giaoMap, r.id_su_co_goc, thoiDiemKiem));
+  const mocCho = r.loai_kiem === 'dinh_ky' ? (r.han_kiem ? new Date(r.han_kiem) : null)
+    : (chuaGiao ? null : mocGiaoQc(giaoMap, r.id_su_co_goc, thoiDiemKiem));
   const phutPhanHoi = (thoiDiemKiem && mocCho) ? Math.round((thoiDiemKiem - mocCho) / 60000) : null;
   const trePhut = ipqcTreMinutes(r.loai_kiem, phutPhanHoi);
   return {
     id_checkpoint: r.id_checkpoint, ma_may: r.ma_may, ma_sp: r.ma_sp, ngay: r.ngay, ca: r.ca,
     loai_kiem: r.loai_kiem, ket_qua: r.ket_qua, nguoi_kiem: r.nguoi_kiem || '(không rõ)',
     thoi_diem_kiem_thuc_te: r.thoi_diem_kiem_thuc_te, phut_phan_hoi: phutPhanHoi,
-    tre_phut: trePhut, dung_han: (trePhut != null && trePhut < IPQC_GRACE_MIN),
+    tre_phut: trePhut, dung_han: (trePhut != null && trePhut < IPQC_GRACE_MIN), chua_giao: chuaGiao,
     anh_bang_chung_urls: parsePhotoUrls(r.anh_bang_chung_url), ghi_chu: r.ghi_chu || '',
     checklist: Array.isArray(r.checklist_json) ? r.checklist_json : [],
     id_van_de_lien_quan: r.id_van_de_lien_quan || '', thoi_gian_kiem_giay: r.thoi_gian_kiem_giay==null?null:Number(r.thoi_gian_kiem_giay), session_started_at:r.session_started_at,session_completed_at:r.session_completed_at,
@@ -656,6 +680,7 @@ async function loadBoard(){
     ]);
     if (cpRes.error) throw new Error(cpRes.error.message);
     if (dinhKyRes.error) throw new Error(dinhKyRes.error.message);
+    const giaoMap = await taiMocGiaoQc((cpRes.data || []).filter(r => r.trang_thai === 'da_kiem'));
     state.suCoLog = (scRes && scRes.data) || [];
     state.suCoPhutDungMap = buildSuCoPhutDungMap(state.suCoLog);
 
@@ -676,13 +701,14 @@ async function loadBoard(){
         const dueInfo = ipqcDueInfo(r.loai_kiem, phutTao);
         pending.push(Object.assign({ id_checkpoint: r.id_checkpoint, ma_may: r.ma_may, ma_sp: r.ma_sp, loai_kiem: r.loai_kiem, phut_da_troi: phutTao }, dueInfo));
       } else if (r.trang_thai === 'da_kiem') {
-        const mapped = mapIpqcDoneRow(r);
+        const mapped = mapIpqcDoneRow(r, giaoMap);
         done.push(mapped);
         const nguoiKiem = mapped.nguoi_kiem;
         const dungHan = mapped.dung_han;
-        if (!byNguoiKiem[nguoiKiem]) byNguoiKiem[nguoiKiem] = { nguoi_kiem: nguoiKiem, dung_han: 0, tre: 0, tong: 0, so_ok: 0, so_ng: 0, so_canh_bao: 0, tong_thoi_gian_kiem_giay: 0, so_bat_thuong: 0 };
+        if (!byNguoiKiem[nguoiKiem]) byNguoiKiem[nguoiKiem] = { nguoi_kiem: nguoiKiem, dung_han: 0, tre: 0, tong: 0, so_ok: 0, so_ng: 0, so_canh_bao: 0, tong_thoi_gian_kiem_giay: 0, so_bat_thuong: 0, chua_giao: 0 };
         byNguoiKiem[nguoiKiem].tong++;
-        if (dungHan) byNguoiKiem[nguoiKiem].dung_han++; else byNguoiKiem[nguoiKiem].tre++;
+        if (mapped.chua_giao) byNguoiKiem[nguoiKiem].chua_giao++;
+        else if (dungHan) byNguoiKiem[nguoiKiem].dung_han++; else byNguoiKiem[nguoiKiem].tre++;
         if (r.ket_qua === 'OK') byNguoiKiem[nguoiKiem].so_ok++;
         if (r.ket_qua === 'NG') byNguoiKiem[nguoiKiem].so_ng++;
         if (r.ket_qua === 'CANH_BAO') byNguoiKiem[nguoiKiem].so_canh_bao++;
@@ -833,7 +859,7 @@ function doneRowHtml(d){
     <td>${escapeHtml(d.nguoi_kiem)}</td>
     <td class="mono"${d.loai_kiem === 'dinh_ky' && d.phut_phan_hoi != null
       ? ' title="Khoảng cách 2 lần kiểm định kỳ: ' + d.phut_phan_hoi + ' phút — chu kỳ chuẩn ' + IPQC_INTERVAL_MIN + ' phút, ân hạn ' + IPQC_GRACE_MIN + ' phút"'
-      : ''}>${d.tre_phut != null ? (d.tre_phut > 0 ? MesQcUi.thoiLuong(d.tre_phut) : '0') : '—'}</td>
+      : (d.chua_giao ? ' title="Chưa giao mẫu QC — không tính đúng hạn"' : '')}>${d.tre_phut != null ? (d.tre_phut > 0 ? MesQcUi.thoiLuong(d.tre_phut) : '0') : '—'}</td>
     <td class="mono">${MesQcUi.thoiGianKiemHtml(d.thoi_gian_kiem_giay)}</td>
     <td><span class="pill ${d.ket_qua === 'OK' ? 'ok' : (d.ket_qua === 'NG' ? 'ng' : 'warn')}">${d.ket_qua === 'CANH_BAO' ? 'CẢNH BÁO' : d.ket_qua}</span></td>
     <td><span class="pill ${machineChecked === 'PASS' ? 'ok' : machineChecked === 'NG' ? 'ng' : 'neutral'}">${machineChecked === 'PASS' ? 'ĐẠT' : machineChecked === 'NG' ? 'NG' : 'Chưa ghi nhận kết quả'}</span></td>
@@ -880,7 +906,7 @@ function renderBoard(b){
   document.getElementById('nguoi-tbody').innerHTML = b.byNguoiKiem.map(n => `
     <tr>
       <td>${escapeHtml(n.nguoi_kiem)}</td>
-      <td class="mono">${n.tong}</td>
+      <td class="mono"${n.chua_giao ? ' title="Gồm ' + n.chua_giao + ' lần kiểm sau sự cố / đổi khuôn chưa giao mẫu — không tính đúng hạn / trễ"' : ''}>${n.tong}</td>
       <td class="mono" style="color:var(--run-fg)">${n.dung_han}</td>
       <td class="mono" style="color:${n.tre > 0 ? 'var(--alarm-fg)' : 'var(--text-muted)'}">${n.tre}</td>
       <td class="mono" style="color:var(--run-fg)">${n.so_ok}</td>
@@ -1017,7 +1043,9 @@ async function searchHistory(){
   state.suCoLog = suCo;
   state.suCoPhutDungMap = buildSuCoPhutDungMap(state.suCoLog);
 
-  const list = data.map(mapIpqcDoneRow);
+  let giaoMap = {};
+  try { giaoMap = await taiMocGiaoQc(data); } catch (e) { console.error('Không tải được mốc giao QC', e); }
+  const list = data.map(r => mapIpqcDoneRow(r, giaoMap));
   if (!state.dynamicFiltersLoaded) { populateDynamicFilterOptions(list); state.dynamicFiltersLoaded = true; }
   renderHistory(list);
 }
