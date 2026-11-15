@@ -90,18 +90,18 @@
     if (!kgKem) kgKem = r(1800 * f * 0.21 * 1.03);
     var nvl = {
       ton: [
-        { ma: 'ADC12-CHT', ten: 'Nhôm ADC12 Chiến Thắng', kg: r(58235 - kgHomNay * 0.6), ngay: null },
-        { ma: 'ADC12-DAK', ten: 'Nhôm ADC12 Daikin', kg: r(42600 - kgHomNay * 0.4), ngay: null },
-        { ma: 'HD2-HDT', ten: 'Nhôm HD2-BS1', kg: 12741, ngay: null },
-        { ma: 'EZDA3-HDT', ten: 'Kẽm Honda Trading', kg: r(13458 - kgKem), ngay: null },
-        { ma: 'ADC6-CHT', ten: 'Nhôm ADC6 Chiến Thắng', kg: 248, ngay: null },
+        { ma: 'K-NHN-12-001', ten: 'Nhôm ADC12 Chiến Thắng', kg: r(58235 - kgHomNay * 0.6), ngay: null },
+        { ma: 'K-NHN-12-002', ten: 'Nhôm ADC12 Daikin', kg: r(42600 - kgHomNay * 0.4), ngay: null },
+        { ma: 'K-NHN-S1-001', ten: 'Nhôm HD2-BS1', kg: 12741, ngay: null },
+        { ma: 'K-KEN-A3-001', ten: 'Kẽm Honda Trading', kg: r(13458 - kgKem), ngay: null },
+        { ma: 'K-NHN-06-001', ten: 'Nhôm ADC6 Chiến Thắng', kg: 248, ngay: null },
       ],
       lo: [{ ten: 'Lò 1 · 800 kg/h', nhiet: r(jit(735, 748)), kgh: r(jit(560, 700)), st: 'run' }, { ten: 'Lò 2 · 1000 kg/h', nhiet: r(jit(738, 750)), kgh: r(jit(700, 880)), st: 'run' }],
       capLoKg: r(kgHomNay), kemKg: r(kgKem),
-      iqc: { choKiem: 0, homNay: 2, ng: 0, lo: [{ ma: 'ADC12-CHT', sl: 8000, kq: 'OK', luc: '07:40' }, { ma: 'EZDA3-HDT', sl: 2000, kq: 'OK', luc: '09:15' }] },
+      iqc: { choKiem: 0, homNay: 2, ng: 0, lo: [{ ma: 'K-NHN-12-001', sl: 8000, kq: 'OK', luc: '07:40' }, { ma: 'K-KEN-A3-001', sl: 2000, kq: 'OK', luc: '09:15' }] },
       phe: r(kgHomNay * jit(0.012, 0.02)),
     };
-    nvl.ton.forEach(function (t) { var tieu = t.ma === 'EZDA3-HDT' ? 450 : t.ma === 'HD2-HDT' ? 300 : t.ma === 'ADC6-CHT' ? 25 : 4800; t.ngay = Math.floor(t.kg / tieu); });
+    nvl.ton.forEach(function (t) { var tieu = t.ma === 'K-KEN-A3-001' ? 450 : t.ma === 'K-NHN-S1-001' ? 300 : t.ma === 'K-NHN-06-001' ? 25 : 4800; t.ngay = Math.floor(t.kg / tieu); });
 
     // ---- Bavia: 13 line, 45 người/ca, NG ≈3% ----
     var khBavia = r(ducHomQua * 0.97), ttBavia = r(khBavia * f * jit(0.96, 1.03));
@@ -170,7 +170,7 @@
     if (bavia.ngPct > NG_MT.bavia) acts.push({ muc: 2, t: 'NG Bavia ' + (bavia.ngPct * 100).toFixed(1).replace('.', ',') + '% > mục tiêu 3%', s: 'phần lớn là lỗi ngoại quan từ Đúc', tuoi: 'hôm nay', w: 0 });
     if (gc.ipqcTre) acts.push({ muc: 2, t: 'IPQC Gia công quá hạn kiểm: 1 máy', s: gcMay[0].may, tuoi: '', w: 0 });
     wip.forEach(function (w) { if (w.sl > w.mt) acts.push({ muc: 2, t: 'Tồn ' + w.tu + ' → ' + w.den + ' vượt mức: ' + w.sl.toLocaleString('vi-VN') + ' pcs', s: 'mức ' + w.mt.toLocaleString('vi-VN'), tuoi: '', w: 0 }); });
-    if (nvl.iqc.choKiem) acts.push({ muc: 3, t: 'IQC: ' + nvl.iqc.choKiem + ' lô NVL chờ kiểm', s: 'ADC12-DAK', tuoi: '2h', w: 120 });
+    if (nvl.iqc.choKiem) acts.push({ muc: 3, t: 'IQC: ' + nvl.iqc.choKiem + ' lô NVL chờ kiểm', s: 'K-NHN-12-002', tuoi: '2h', w: 120 });
     nvl.ton.forEach(function (t) { if (t.ngay <= 3 && t.kg > 0) acts.push({ muc: 2, t: 'NVL ' + t.ma + ' còn ' + t.ngay + ' ngày', s: t.ten, tuoi: '', w: 0 }); });
 
     M.demo = { nvl: nvl, bavia: bavia, gc: gc, son: son, oqc: oqc, kho: kho, wip: wip, actions: acts, ducHomQua: ducHomQua, frac: f, share: { G: share('G'), S: share('S'), Z: share('Z') } };
