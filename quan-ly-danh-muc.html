@@ -104,6 +104,22 @@
   .toast.err{background:var(--alarm-fg);}
 
   /* Lưới phân quyền tài liệu (T62) */
+  /* Tab Quy tắc đặt tên */
+  .qt-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .qt-nav button{padding:6px 12px;border:1px solid var(--border-strong);border-radius:16px;background:var(--bg-panel);color:var(--text);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;}
+  .qt-nav button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .qt-card{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px;box-shadow:var(--shadow-sm);max-width:860px;}
+  .qt-cong-thuc{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);background:var(--bg-sunken);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px;overflow-x:auto;white-space:nowrap;}
+  .qt-phan{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;margin-bottom:12px;}
+  .qt-phan > div:nth-child(odd){font-weight:700;}
+  .qt-phan code,.qt-vd code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap;}
+  .qt-vd{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:10px;}
+  .qt-vd .dung code{color:var(--run-fg);background:var(--run-bg);border-color:#A7F3D0;}
+  .qt-vd .sai code{color:var(--alarm-fg);background:var(--alarm-bg);border-color:#FECACA;text-decoration:line-through;}
+  .qt-vd .nhan{display:inline-block;width:42px;font-weight:700;}
+  .qt-vd .dung .nhan{color:var(--run-fg);} .qt-vd .sai .nhan{color:var(--alarm-fg);}
+  .qt-vd .luu-y{color:var(--text-muted);}
+  @media (max-width:640px){.qt-phan{grid-template-columns:1fr;gap:2px;} .qt-phan > div:nth-child(even){margin-bottom:8px;} .qt-cong-thuc{font-size:15px;} .qt-card{padding:12px;}}
   #dp-table{table-layout:fixed;}
   #dp-table th,#dp-table td{text-align:center;white-space:normal;}
   #dp-table th:first-child,#dp-table td:first-child{text-align:left;width:150px;}
@@ -128,6 +144,7 @@
       <button class="tab-btn" data-tab="nvl">Nguyên vật liệu</button>
       <button class="tab-btn" data-tab="bom">BOM</button>
       <button class="tab-btn" data-tab="taillieu">Phân quyền tài liệu</button>
+      <button class="tab-btn" data-tab="quytac">Quy tắc đặt tên</button>
     </div>
     <div class="header-clock">
       <div class="date" id="hdrClockDate"></div>
@@ -374,6 +391,98 @@
         </div>
       </div>
     </section>
+
+    <!-- ── Tab Quy tắc đặt tên: mã mới đặt theo đúng mẫu để danh mục đồng bộ ── -->
+    <section id="tab-quytac" class="tab-pane" style="display:none">
+      <div class="qt-nav" id="qt-nav">
+        <button type="button" data-qt="may" class="active">Máy-Line</button>
+        <button type="button" data-qt="sp">Sản phẩm</button>
+        <button type="button" data-qt="ns">Nhân sự</button>
+        <button type="button" data-qt="khuon">Khuôn</button>
+        <button type="button" data-qt="nvl">Nguyên vật liệu</button>
+        <button type="button" data-qt="bom">BOM</button>
+      </div>
+
+      <div class="qt-card" data-qt-pane="may">
+        <div class="qt-cong-thuc">Loại máy + dấu cách + Số</div>
+        <div class="qt-phan">
+          <div>Đúc nhôm</div><div><code>DC 12</code> — số không thêm 0</div>
+          <div>Đúc kẽm</div><div><code>Kẽm 200T</code> — lực ép (tấn)</div>
+          <div>Máy phụ Đúc</div><div><code>Cắt gate 8003</code>, <code>Dập KFM</code> — việc + tên ngắn SP</div>
+          <div>Bavia</div><div><code>LINE 14</code> — số 2 chữ số</div>
+          <div>Gia công</div><div><code>Phay 18</code>, <code>Tiện 13</code>, <code>Chuốt 02</code> — số 2 chữ số</div>
+          <div>Đánh bóng Kẽm</div><div><code>Line 3</code></div>
+        </div>
+        <div class="qt-vd">
+          <div class="sai"><span class="nhan">Sai</span><code>DC12</code> <code>dc 12</code> <code>Phay 18 mới</code> <code>Line 14</code> (Bavia)</div>
+          <div class="luu-y">Viết giống hệt các máy cùng bộ phận. Không đổi tên máy đang chạy — tem và lịch sử gắn theo tên.</div>
+        </div>
+      </div>
+
+      <div class="qt-card" data-qt-pane="sp" hidden>
+        <div class="qt-cong-thuc">KHÁCH-SẢN PHẨM-STT</div>
+        <div class="qt-phan">
+          <div>KHÁCH (3 chữ)</div><div>Mã khách hàng đã có: <code>AST</code> <code>BPH</code> <code>COS</code> <code>EXE</code> <code>FCC</code> <code>FMC</code> <code>FUS</code> <code>IWT</code> <code>MIK</code> <code>OKA</code> <code>OSA</code> <code>PRE</code> <code>QTL</code> <code>SOJ</code> <code>SUM</code> <code>SVP</code> <code>TTI</code> <code>YHS</code>. Khách mới: 3 chữ chưa trùng.</div>
+          <div>SẢN PHẨM (3 ký tự)</div><div>Viết tắt tên: <code>OUT</code> Outer, <code>PAN</code> Panel, <code>MOT</code> Motor — hoặc 3 số đầu mã bản vẽ: <code>114</code>, <code>389</code></div>
+          <div>STT (2 số)</div><div><code>01</code>, <code>02</code>… tăng dần trong cùng KHÁCH-SẢN PHẨM</div>
+        </div>
+        <div class="qt-vd">
+          <div class="dung"><span class="nhan">Đúng</span><code>EXE-OUT-01</code> <code>TTI-MOT-05</code> <code>IWT-118-01</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>exe-out-1</code> <code>EXE OUT 01</code> <code>EXEOUT01</code></div>
+          <div class="luu-y">Chữ in hoa, không dấu, ngăn bằng dấu gạch ngang. Mã đã in tem thì không đổi.</div>
+        </div>
+      </div>
+
+      <div class="qt-card" data-qt-pane="ns" hidden>
+        <div class="qt-cong-thuc">Họ Đệm Tên</div>
+        <div class="qt-phan">
+          <div>Tên</div><div>Đầy đủ, có dấu, viết hoa chữ đầu mỗi từ</div>
+          <div>Trùng tên</div><div>Thêm ghi chú ngắn trong ngoặc: <code>Trần Trung Hiếu (Hiếu lớn)</code></div>
+        </div>
+        <div class="qt-vd">
+          <div class="dung"><span class="nhan">Đúng</span><code>Nguyễn Văn Nam</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>nam</code> <code>NGUYỄN VĂN NAM</code> <code>Nguyen Van Nam</code></div>
+        </div>
+      </div>
+
+      <div class="qt-card" data-qt-pane="khuon" hidden>
+        <div class="qt-cong-thuc">Tên ngắn + dấu cách + #Số khuôn</div>
+        <div class="qt-phan">
+          <div>Tên ngắn</div><div>Mã bản vẽ (<code>9002</code>, <code>3B54</code>, <code>MT55</code>) hoặc viết tắt SP (<code>OUT</code>, <code>CEN</code>, <code>KPH</code>)</div>
+          <div>Số khuôn</div><div>Số khắc trên khuôn: <code>#3</code>. Nhiều lòng khuôn: <code>#45-46</code>. Biến thể: <code>#FR25</code></div>
+        </div>
+        <div class="qt-vd">
+          <div class="dung"><span class="nhan">Đúng</span><code>OUT #3</code> <code>9002 #2</code> <code>K09 #45-46</code> <code>PAN #FR25</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>3B69#1</code> <code>OUT 3</code> <code>OUT-3</code></div>
+          <div class="luu-y">Mỗi khuôn gắn đúng 1 mã SP. Đổi mã khuôn không sửa lịch sử cũ.</div>
+        </div>
+      </div>
+
+      <div class="qt-card" data-qt-pane="nvl" hidden>
+        <div class="qt-cong-thuc">N-LLL-QQ-STT</div>
+        <div class="qt-phan">
+          <div>N (nhóm, 1 chữ)</div><div><code>K</code> Kim loại · <code>C</code> Linh kiện · <code>S</code> Sơn / hoá chất · <code>B</code> Bao bì</div>
+          <div>LLL (loại, 3 chữ)</div><div>Viết tắt không dấu: <code>NHN</code> nhôm, <code>KEN</code> kẽm, <code>ONN</code> ống nhôm ngoài, <code>ONT</code> ống nhôm trong, <code>CKL</code> chốt kim loại, <code>BOT</code> sơn bột</div>
+          <div>QQ (đặc tính, 2 ký tự)</div><div>Mác: <code>12</code> ADC12, <code>06</code> ADC6, <code>A3</code> EZDA3, <code>S1</code> HD2-BS1 · Cỡ: <code>SS</code> <code>OS</code> <code>OL</code> <code>LL</code> · Đường kính: <code>19</code> <code>39</code></div>
+          <div>STT (3 số)</div><div><code>001</code>, <code>002</code>… mỗi nhà cung cấp / biến thể 1 số</div>
+        </div>
+        <div class="qt-vd">
+          <div class="dung"><span class="nhan">Đúng</span><code>K-NHN-12-001</code> <code>C-ONN-OS-002</code> <code>S-BOT-TR-001</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>ADC12-DAK</code> <code>OUTER- S</code></div>
+          <div class="luu-y">Nhà cung cấp và mã của nhà cung cấp ghi vào ô riêng, không ghép vào mã.</div>
+        </div>
+      </div>
+
+      <div class="qt-card" data-qt-pane="bom" hidden>
+        <div class="qt-cong-thuc">Mã SP → V1, V2, V3…</div>
+        <div class="qt-phan">
+          <div>Phiên bản</div><div>Hệ thống tự đánh số, không tự đặt</div>
+          <div>Revision bản vẽ</div><div>Ghi đúng như trên bản vẽ khách: <code>Rev C</code></div>
+          <div>Vật tư</div><div>Chọn mã có sẵn ở tab Nguyên vật liệu — chưa có thì tạo mã theo quy tắc trước</div>
+          <div>Lý do thay đổi</div><div>Ngắn, nêu cái đổi: <code>Đổi runner</code>, <code>Lên Rev D</code></div>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -415,8 +524,18 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Tabs ─────────────────────────────────────────────────────────────────
+// Tab Quy tắc đặt tên: mở đúng mục của tab vừa xem (đang ở Sản phẩm → mở quy tắc Sản phẩm).
+function qtChon(k){
+  if (!document.querySelector('[data-qt-pane="' + k + '"]')) return;
+  document.querySelectorAll('#qt-nav button').forEach(b => b.classList.toggle('active', b.dataset.qt === k));
+  document.querySelectorAll('[data-qt-pane]').forEach(p => { p.hidden = p.dataset.qtPane !== k; });
+}
+document.querySelectorAll('#qt-nav button').forEach(b => b.addEventListener('click', () => qtChon(b.dataset.qt)));
+let tabTruoc = 'may';
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.dataset.tab === 'quytac') qtChon(tabTruoc);
+    else tabTruoc = btn.dataset.tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
     btn.classList.add('active');
