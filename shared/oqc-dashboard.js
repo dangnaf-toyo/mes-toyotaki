@@ -301,7 +301,7 @@ const OqcDashboard = (() => {
         read("oqc_work_standard_version"),
         read("oqc_planning_config_version"),
       ]);
-      fillEmployees(employees);
+      fillEmployees(employees.filter((p) => p.roles?.includes("oqc"))); /* chỉ người vai trò OQC */
       await MesOqcHistory.ready;
       for (const p of MesOqcHistory.products())
         $("oqcCapaModel").add(new Option(p.ma_sp + " — " + (p.ten_sp || ""), p.ma_sp));
@@ -1166,14 +1166,14 @@ const OqcDashboard = (() => {
   $("inspectorCode").addEventListener("focus", async () => {
     try {
       employees = await Qc02Data.employees();
-      fillEmployees(employees);
+      fillEmployees(employees.filter((p) => p.roles?.includes("oqc"))); /* chỉ người vai trò OQC */
     } catch (e) {
       oqcShowError($("oqcFormMessage"), e, "Không tải được nhân sự");
     }
   });
   $("code").addEventListener("focus", async () => {
     if (!employees.length && (await boot)) {
-      fillEmployees(employees);
+      fillEmployees(employees.filter((p) => p.roles?.includes("oqc"))); /* chỉ người vai trò OQC */
       renderLabor();
     }
   });

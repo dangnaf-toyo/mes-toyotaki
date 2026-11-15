@@ -190,18 +190,26 @@ const OqcWorkspace = (() => {
     right.append(others);
     const oldRender = renderDefects;
     renderDefects = function () {
+      /* T266: xếp theo nhóm mã lỗi chung (D/B/G/S/T/Z), mỗi nhóm 1 cột dọc, tên lỗi hiện đủ */
       const groups = [...new Set(["NG ngoại quan", "NG kích thước", "NG khác", ...catalog.map((d) => d.defect_group)])];
+      const NHOM = { D: "Lỗi đúc", B: "Lỗi bavia", G: "Lỗi gia công", S: "Lỗi sơn", T: "Thao tác, vận chuyển", Z: "Khác" };
+      const nhomCua = (d) => {
+        const m = /^([A-Z])\d{2}/.exec(String(d.label || "").trim());
+        return m && NHOM[m[1]] ? m[1] : "Z";
+      };
+      const buckets = {};
+      for (const group of groups)
+        for (const d of visibleDefects(group)) (buckets[nhomCua(d)] = buckets[nhomCua(d)] || []).push({ ...d, group });
       renderedProcess = processOf(currentScope());
       $("defects").replaceChildren();
       let k = 0;
-      for (const group of groups) {
-        const rows = visibleDefects(group);
+      for (const key of Object.keys(NHOM)) {
+        const rows = (buckets[key] || []).sort(
+          (a, b) => collator.compare(a.label, b.label) || a.code.localeCompare(b.code),
+        );
         if (!rows.length) continue;
-        /* T139: mỗi lỗi 1 ô gọn (tên | chi tiết | SL), xếp nhiều cột để cả bảng lỗi vừa 1 màn hình */ const box = node(
-            "section",
-            "oqc-dgroup",
-          ),
-          heading = node("h3", "", group),
+        const box = node("section", "oqc-dgroup"),
+          heading = node("h3", "", NHOM[key] + " (" + rows.length + ")"),
           grid = node("div", "oqc-dgrid");
         grid.innerHTML = rows
           .map((d) => {
@@ -224,7 +232,7 @@ const OqcWorkspace = (() => {
               '" data-label="' +
               E(d.label) +
               '" data-group="' +
-              E(group) +
+              E(d.group) +
               '" type="number" min="0" step="1" value="0" inputmode="numeric" aria-label="Số lượng ' +
               E(d.label) +
               '"></div>'
