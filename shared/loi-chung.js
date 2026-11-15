@@ -9,18 +9,19 @@
   'use strict';
   const NHOM = { D: 'Lỗi đúc', B: 'Lỗi bavia', G: 'Lỗi gia công', S: 'Lỗi sơn', T: 'Thao tác, vận chuyển', Z: 'Khác' };
   const T_ALL = 'DUC,DUC_KEM,BAVIA,GIA_CONG,SON,OQC,OQC_SON,IQC';
-  // Bản dự phòng khi chưa nạp được DB — giữ khớp migration T265.
+  // Bản dự phòng khi chưa nạp được DB — giữ khớp migration T265 + T267.
   const DU_PHONG = [
     ['D01', 'Rỗ khí', 'DUC,DUC_KEM,BAVIA,GIA_CONG,OQC,IQC,OQC_SON'], ['D02', 'Thiếu nhôm', 'DUC,DUC_KEM,BAVIA,GIA_CONG,OQC'],
-    ['D03', 'Thiếu nhôm cạnh răng', 'BAVIA,GIA_CONG,OQC'], ['D04', 'Nhăn', 'DUC,BAVIA,GIA_CONG,OQC'],
+    ['D04', 'Nhăn', 'DUC,BAVIA,GIA_CONG,OQC'],
     ['D05', 'Bong nhôm', 'BAVIA,GIA_CONG,OQC'], ['D06', 'Dính nhôm', 'BAVIA,GIA_CONG,OQC'],
     ['D07', 'Nứt', 'DUC,DUC_KEM,BAVIA,GIA_CONG,OQC,IQC'], ['D08', 'Phồng', 'DUC,DUC_KEM,BAVIA,OQC'],
     ['D09', 'Lõm pin', 'BAVIA,GIA_CONG,OQC'], ['D10', 'Lồi, lõm bề mặt', 'BAVIA,GIA_CONG,OQC,IQC'],
     ['D11', 'Bã trầu', 'BAVIA,OQC'], ['D12', 'Mỏng cuống', 'BAVIA'], ['D13', 'Tạp chất, dị vật', 'BAVIA,GIA_CONG,OQC,IQC'],
     ['D14', 'Biến dạng (cong, vênh, méo)', 'DUC,BAVIA,GIA_CONG,OQC,IQC'], ['D15', 'Mờ lot mark', 'BAVIA,GIA_CONG,OQC'],
-    ['D16', 'Bắn nhôm', 'BAVIA,OQC'], ['D17', 'Nhẹ cân', 'DUC_KEM'], ['D18', 'Sai kích thước đúc', 'DUC,BAVIA'],
-    ['B01', 'Sót bavia', 'BAVIA,GIA_CONG,OQC'], ['B02', 'Bẻ lõm sâu', 'BAVIA,OQC'],
-    ['B03', 'Sứt, mẻ', 'DUC_KEM,BAVIA,GIA_CONG,OQC,OQC_SON,IQC'], ['B04', 'Dập lệch', 'BAVIA,OQC'],
+    ['D17', 'Nhẹ cân', 'DUC_KEM'], ['D18', 'Sai kích thước đúc', 'DUC,BAVIA'],
+    ['D19', 'Bẻ lõm sâu', 'BAVIA,OQC'], ['D20', 'Dập lệch', 'BAVIA,OQC'],
+    ['B01', 'Sót bavia', 'BAVIA,GIA_CONG,OQC'],
+    ['B03', 'Sứt, mẻ', 'DUC_KEM,BAVIA,GIA_CONG,OQC,OQC_SON,IQC'],
     ['G01', 'Sai kích thước gia công', 'GIA_CONG,OQC,IQC'], ['G02', 'Lỗi ren', 'GIA_CONG,OQC,IQC'],
     ['G03', 'Gá lệch, lệch tâm', 'GIA_CONG,OQC'], ['G04', 'Cắt vát, vát C', 'GIA_CONG,OQC,IQC'],
     ['G05', 'Thiếu nguyên công', 'GIA_CONG,OQC'], ['G06', 'Chật JIG, không lọt JIG', 'GIA_CONG,OQC,IQC'],
@@ -31,7 +32,7 @@
     ['S10', 'Móp méo chân', 'SON,OQC_SON'], ['S11', 'Vênh chân', 'SON,OQC_SON'], ['S12', 'Lõm sơn', 'SON,OQC_SON'],
     ['T01', 'Va đập', T_ALL], ['T02', 'Xước bề mặt', T_ALL], ['T03', 'Sản phẩm rơi', 'DUC,DUC_KEM,BAVIA,GIA_CONG,SON,OQC,OQC_SON'],
     ['T04', 'Dính dầu, bẩn', T_ALL], ['T05', 'Mốc, ố, rỉ, oxi hóa', 'DUC_KEM,BAVIA,GIA_CONG,SON,OQC,OQC_SON,IQC'],
-    ['Z01', 'Hủy để kiểm tra', 'BAVIA,GIA_CONG,OQC'], ['Z02', 'Hàng chỉnh máy', 'GIA_CONG'], ['Z99', 'Khác', T_ALL],
+    ['Z02', 'Hàng chỉnh máy', 'GIA_CONG'], ['Z99', 'Khác', T_ALL],
   ].map(([ma, ten, cd]) => ({ ma, nhan: ma + ' ' + ten, cd: cd.split(',') }));
 
   let ds = DU_PHONG, dangNap = null;
