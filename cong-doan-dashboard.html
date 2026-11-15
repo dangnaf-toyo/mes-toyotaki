@@ -309,8 +309,8 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <div class="fg" style="flex:1;min-width:110px"><label>NG sửa</label><input type="number" min="0" id="xlt-ngsua" value="0"></div>
       </div>
       <div class="fg">
-        <label>Nội dung NG (bắt buộc nếu có NG) — ghi theo mã lỗi, VD: <b>5V, 4M</b></label>
-        <input type="text" autocomplete="off" id="xlt-ngly" placeholder="VD: 5V, 4M, 2X-nứt chân">
+        <label>Nội dung NG (bắt buộc nếu có NG) — ghi theo mã lỗi, VD: <b>5 D08, 4 T02</b></label>
+        <input type="text" autocomplete="off" id="xlt-ngly" placeholder="VD: 5 D08, 4 T02, 2 Z99-nứt chân">
         <span id="xlt-ngly-sum" style="font-size:11px;color:#999"></span>
       </div>
 
@@ -347,8 +347,8 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
         <div class="fg" style="flex:1;min-width:120px"><label>Bỏ hẳn (NG phế)</label><input type="number" min="0" id="sh-ngphe" value="0"></div>
       </div>
       <div class="fg">
-        <label>Nội dung NG phế (bắt buộc nếu có) — VD: <b>5V, 4M</b></label>
-        <input type="text" autocomplete="off" id="sh-ngly" placeholder="VD: 5V, 4M">
+        <label>Nội dung NG phế (bắt buộc nếu có) — VD: <b>5 D08, 4 T02</b></label>
+        <input type="text" autocomplete="off" id="sh-ngly" placeholder="VD: 5 D08, 4 T02">
         <span id="sh-ngly-sum" style="font-size:11px;color:#999"></span>
       </div>
       <div class="fg">
@@ -399,6 +399,7 @@ td.num{text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js?v=T169"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/loi-chung.js?v=T265"></script>
 <script>
 // "Cắt viền" KHÔNG còn là 1 dashboard riêng — coi là 1 công đoạn con của Gia
 // Công (SP có cả 2 vẫn cần 2 nhãn cong_doan riêng trong DB để phân biệt đúng
@@ -1228,21 +1229,16 @@ async function printTkbTems(tags){
   }
 }
 
-/* ========== Bộ mã lỗi NG (khai báo chủng loại) ========================== */
-const NG_CODES = [
-  ['A','Rỗ khí'],['B','Thiếu nhôm bề mặt'],['C','Lõm pin'],['D','Biến dạng'],['E','Dính dầu'],
-  ['F','Nhăn'],['G','Bẩn nhôm'],['H','Va đập'],['I','Rạn nứt'],['J','Sản phẩm rơi'],
-  ['K','NG kích thước'],['L','Thiếu nhôm cạnh răng'],['M','Mờ lot mark'],['N','Ba trấu'],['O','Bề lõm sâu'],
-  ['P','Dính nhôm'],['Q','Bong nhôm'],['R','Tạp chất'],['S','Xước bề mặt'],['T','Mỏng cuống'],
-  ['V','Phồng nhôm'],['W','Lỗi, lõm'],['X','Khác (ghi rõ nguyên nhân)'],
-];
-const NG_CODE_MAP = Object.fromEntries(NG_CODES);
-const NG_REF_HTML = NG_CODES.map(([k, v]) => `<b>${k}</b> ${escapeHtml(v)}`).join(' &nbsp;·&nbsp; ');
+/* ========== Bảng mã lỗi tham khảo — T265: danh mục lỗi chung (shared/loi-chung.js) ===== */
+const ngRefHtml = () => Object.entries(LoiChung.NHOM).map(([k, ten]) => {
+  const ds = LoiChung.ds().filter(x => x.ma.charAt(0) === k);
+  return ds.length ? '<div><b>' + k + '</b> ' + escapeHtml(ten) + ': ' + ds.map(x => escapeHtml(x.nhan)).join(' · ') + '</div>' : '';
+}).join('');
 
-// "5V, 4M, 2X-nứt" -> tổng số lượng ghi được (chỉ để đối chiếu, không bắt buộc khớp).
+// "5 D08, 4 T02, 2 Z99-nứt" (hoặc kiểu cũ "5V, 4M") -> tổng số lượng ghi được (chỉ để đối chiếu, không bắt buộc khớp).
 function parseNgShorthand(text){
   let sum = 0;
-  (String(text).match(/(\d+)\s*([A-Za-z])/g) || []).forEach(tok => {
+  (String(text).match(/(\d+)\s*[A-Za-z](\d{2})?/g) || []).forEach(tok => {
     sum += Number(tok.match(/\d+/)[0]) || 0;
   });
   return sum;
@@ -1280,7 +1276,7 @@ async function openXuLyThung(idTram){
   document.getElementById('xlt-ngsua').value = 0;
   document.getElementById('xlt-ngly').value = '';
   document.getElementById('xlt-ngly-sum').textContent = '';
-  document.getElementById('xlt-ngref').innerHTML = NG_REF_HTML;
+  document.getElementById('xlt-ngref').innerHTML = ngRefHtml();
   wireNgLySum('xlt');
   document.getElementById('xlt-qc').value = '';
   document.querySelector('input[name="xlt-cach"][value="nguyen"]').checked = true;
@@ -1366,7 +1362,7 @@ document.getElementById('btnSubmitXuLyThung').addEventListener('click', async ()
   const ngsua = Number(document.getElementById('xlt-ngsua').value) || 0;
   if (ok + ngphe + ngsua <= 0) return cb.textContent = 'Nhập OK / NG phế / NG sửa.';
   const ngly = document.getElementById('xlt-ngly').value.trim();
-  if ((ngphe > 0 || ngsua > 0) && !ngly) return cb.textContent = 'Có NG — ghi nội dung NG (VD: 5V, 4M).';
+  if ((ngphe > 0 || ngsua > 0) && !ngly) return cb.textContent = 'Có NG — ghi nội dung NG (VD: 5 D08, 4 T02).';
   const tongNguon = xlt.sources.reduce((s, x) => s + Number(x.so_luong || 0), 0);
   if (ok + ngphe + ngsua > tongNguon) return cb.textContent = 'OK + NG (' + (ok + ngphe + ngsua) + ') vượt tổng SL nguồn (' + tongNguon + ').';
   const cach = document.querySelector('input[name="xlt-cach"]:checked').value;
@@ -1503,7 +1499,7 @@ async function openSuaHang(t){
   document.getElementById('sh-ngphe').value = 0;
   document.getElementById('sh-ngly').value = '';
   document.getElementById('sh-ngly-sum').textContent = '';
-  document.getElementById('sh-ngref').innerHTML = NG_REF_HTML;
+  document.getElementById('sh-ngref').innerHTML = ngRefHtml();
   wireNgLySum('sh');
   document.getElementById('sh-qc').value = '';
   document.querySelector('input[name="sh-cach"][value="nguyen"]').checked = true;
@@ -1530,7 +1526,7 @@ document.getElementById('btnSubmitSuaHang').addEventListener('click', async () =
   if (ok + ngphe <= 0) return cb.textContent = 'Nhập OK / NG phế.';
   if (ok + ngphe > Number(suaHangTem.so_luong)) return cb.textContent = 'OK + NG phế vượt SL còn lại (' + fmtNum(suaHangTem.so_luong) + ').';
   const ngly = document.getElementById('sh-ngly').value.trim();
-  if (ngphe > 0 && !ngly) return cb.textContent = 'Có NG phế — ghi nội dung NG (VD: 5V, 4M).';
+  if (ngphe > 0 && !ngly) return cb.textContent = 'Có NG phế — ghi nội dung NG (VD: 5 D08, 4 T02).';
   const cach = document.querySelector('input[name="sh-cach"]:checked').value;
   const qc = Number(document.getElementById('sh-qc').value) || 0;
   const tagGop = document.getElementById('sh-gop').value;

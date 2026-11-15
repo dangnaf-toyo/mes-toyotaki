@@ -441,18 +441,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/loi-chung.js?v=T265"></script>
 <script src="shared/bavia-in-tem.js?v=t151"></script>
 <script>
 /* ── Danh mục cố định ─────────────────────────────────────────────────────── */
-// Tên lỗi NG tại Bavia — theo ảnh Picture/Danh sách tên lỗi NG tại bavia.png (user xác nhận 23/10/2026).
-const NG_TYPES = [
-  ['A', 'Rỗ khí'], ['B', 'Thiếu nhôm'], ['C', 'Lõm pin'], ['D', 'Biến dạng'], ['E', 'Dính dầu'], ['F', 'Nhăn'],
-  ['G', 'Bắn nhôm'], ['H', 'Va đập'], ['I', 'Rạn nứt'], ['J', 'Sản phẩm rơi'], ['K', 'NG Kích thước'],
-  ['L', 'Thiếu nhôm cạnh răng'], ['M', 'Mờ lot Mark'], ['N', 'Bã trầu'], ['O', 'Bẻ lõm sâu'], ['P', 'Dính nhôm'],
-  ['Q', 'Bong nhôm'], ['R', 'Tạp chất'], ['S', 'Xước bề mặt'], ['T', 'Mỏng cuống'], ['U', 'Gia công kiểm tra rỗ khí'],
-  ['V', 'Phồng AL'], ['W', 'Lồi, lõm bề mặt'], ['X', 'Khác'],
-];
-const NG_KHAC = 'Khác';
+// T265: tên lỗi NG lấy từ danh mục lỗi chung (shared/loi-chung.js), vd "D01 Rỗ khí".
+const NG_KHAC = LoiChung.KHAC;
 // Mục đích test — danh sách tạm (user: "dùng tạm, sửa sau").
 const PURPOSES = ['Kiểm tra kích thước', 'Thử lắp ráp', 'Gửi khách đánh giá', 'Thử nghiệm phá huỷ / độ bền', 'Mẫu lưu', 'Khác'];
 const TRUONG_CA_MAC_DINH = 'Nguyễn Ngọc Tuấn';
@@ -686,8 +680,8 @@ function srcList(l) {
 // T152: NG nhiều dòng — mỗi thùng Đúc có thể có nhiều hạng mục lỗi; ghi tất cả 1 lần (bavia_ng_nhieu).
 function ngRowHtml() {
   return '<div class="ng-row">' +
-    '<select class="ng-loai" aria-label="Tên lỗi NG">' + NG_TYPES.map(([c, t]) => '<option value="' + esc(t) + '">' + c + ' - ' + esc(t) +
-      (t === NG_KHAC ? ' (ghi rõ nguyên nhân)' : '') + '</option>').join('') + '</select>' +
+    '<select class="ng-loai" aria-label="Tên lỗi NG">' + LoiChung.ds('BAVIA').map(({ nhan: t }) => '<option value="' + esc(t) + '">' + esc(t) +
+      (t === NG_KHAC ? ' (ghi rõ)' : '') + '</option>').join('') + '</select>' +
     '<input class="ng-note note" type="text" placeholder="Ghi rõ nguyên nhân" aria-label="Nguyên nhân NG khác" hidden>' +
     '<input class="ng-qty" type="number" min="1" value="1" aria-label="Số lượng NG">' +
     '<button class="tiny" type="button" data-ngdel title="Xoá dòng">✕</button></div>';
