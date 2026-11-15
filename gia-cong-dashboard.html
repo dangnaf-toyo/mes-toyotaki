@@ -368,6 +368,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js?v=T213"></script>
+<script src="shared/loi-chung.js?v=T265"></script>
 <script>
 /* ── Danh mục cố định ─────────────────────────────────────────────────────── */
 // Lý do dừng: bộ mã Đúc, đổi mục khuôn cho CNC (user chốt 03/11/2026). bp = bộ phận xử lý gợi ý.
@@ -388,9 +389,8 @@ const LOAI_DUNG = [
 ];
 const BO_PHAN_XU_LY = ['Thiết bị', 'Tổ Gia công', 'QC', 'Kế hoạch', 'Kỹ thuật'];
 // Tên lỗi NG tại Gia công — danh sách TẠM, user sửa sau.
-const NG_TYPES = ['NG kích thước', 'Rỗ khí (lộ sau gia công)', 'Xước / va đập', 'Ba via / sót phoi', 'Thiếu / sai nguyên công',
-  'Ren hỏng', 'Lệch gá / lệch tâm', 'Độ nhám không đạt', 'Biến dạng', 'Lỗi đúc phát hiện tại gia công', 'Khác'];
-const NG_KHAC = 'Khác';
+// T265: tên lỗi NG lấy từ danh mục lỗi chung (shared/loi-chung.js), vd "G01 Sai kích thước gia công".
+const NG_KHAC = LoiChung.KHAC;
 const PURPOSES = ['Kiểm tra kích thước', 'Thử lắp ráp', 'Gửi khách đánh giá', 'Thử nghiệm phá huỷ / độ bền', 'Mẫu lưu', 'Khác'];
 const NHOM = [
   { key: 'p4', t: 'Phay CNC 4 trục', f: m => m.loai_may === 'Phay CNC' && Number(m.so_truc) >= 4 },
@@ -664,7 +664,7 @@ function renderWs() {
 }
 
 function ngRowHtml() {
-  return '<div class="row ng-line"><select class="ng-loai">' + NG_TYPES.map(x => '<option>' + esc(x) + '</option>').join('') + '</select>' +
+  return '<div class="row ng-line"><select class="ng-loai">' + LoiChung.ds('GIA_CONG').map(x => '<option>' + esc(x.nhan) + '</option>').join('') + '</select>' +
     '<input class="ng-note note" type="text" placeholder="Ghi rõ nguyên nhân" hidden>' +
     '<input class="ng-qty" type="number" min="1" value="1"><button class="tiny" type="button" data-ngdel>✕</button></div>';
 }

@@ -425,6 +425,7 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js"></script>
+<script src="shared/loi-chung.js?v=T265"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -496,11 +497,10 @@ function isKanban(){ return document.getElementById('congDoan').value === CONG_D
 // "Máy đúc" ở chế độ Kanban) để chọn, KHÔNG dùng ô "Đổi máy đúc" riêng nữa.
 const KEM_MACHINES = ["Kẽm 190T", "Kẽm 160T"];
 
-// Chủng loại NG cho công đoạn Đánh bóng Kẽm và Đúc Kẽm — danh sách chính
-// thức do user cung cấp. "Khác" cho phép gõ tay khi phát sinh loại chưa có.
-const NG_TYPES = ["Phồng kẽm", "Nứt kẽm", "Rỗ khí", "Nhẹ cân", "Thiếu kẽm cửa liệu", "Mốc-oxi hóa", "Khác"];
-
-const DUC_NG_TYPES = NG_TYPES;
+// T265: chủng loại NG (Đánh bóng Kẽm, Đúc Kẽm) lấy từ danh mục lỗi chung (shared/loi-chung.js).
+// "Z99 Khác" cho gõ tay → lưu "Z99 Khác: <nội dung>".
+const ngOptionsHtml = () => LoiChung.ds('DUC_KEM').map(x => '<option value="' + escapeHtml(x.nhan) + '">' + escapeHtml(x.nhan) + '</option>').join('');
+const ngLoaiDaChon = (sel, khac) => LoiChung.laKhac(sel.value) ? (khac.value.trim() ? LoiChung.KHAC + ': ' + khac.value.trim() : '') : sel.value;
 
 // Thứ tự công đoạn mặc định khi mã SP chưa khai báo quy_trinh_cong_doan
 // riêng — khớp CONG_DOAN_LIST bên quan-ly-danh-muc.html.
@@ -523,7 +523,8 @@ async function boot(){
   document.getElementById('mainUI').style.display = 'flex';
   myIdentity = (await MesAuth.getCurrentUserIdentity()) || 'Không rõ';
   document.getElementById('congDoan').innerHTML = CONG_DOAN_LIST.map(cd => '<option value="'+cd+'">'+cd+'</option>').join('');
-  document.getElementById('ngKanbanLoai').innerHTML = DUC_NG_TYPES.map(t => '<option value="'+escapeHtml(t)+'">'+escapeHtml(t)+'</option>').join('');
+  await LoiChung.nap();
+  document.getElementById('ngKanbanLoai').innerHTML = ngOptionsHtml();
   // Cho phép mở thẳng vào chế độ Kanban qua link (?cd=Đúc+Kẽm) — dùng khi
   // redirect từ ghi-nhan-kanban.html cũ (T52).
   const cdParam = new URLSearchParams(location.search).get('cd');
@@ -872,7 +873,6 @@ async function khaiBaoNguon(raw){
   }
 }
 
-const NG_OPTIONS_HTML = NG_TYPES.map(t => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
 
 // ── Chặn "Ghi nhận" khi tổng nguồn Đúc đang dùng không đủ 1 thùng thành phẩm ──
 let nguonTotal = 0;
@@ -929,7 +929,7 @@ async function loadNguonList(){
     '</div>' +
     '<div class="ng-form" data-role="ng-form">' +
       '<div class="ng-row">' +
-        '<select data-role="ng-loai">' + NG_OPTIONS_HTML + '</select>' +
+        '<select data-role="ng-loai">' + ngOptionsHtml() + '</select>' +
         '<input type="number" data-role="ng-sl" min="1" step="1" placeholder="SL NG">' +
       '</div>' +
       '<input type="text" class="ng-khac" data-role="ng-khac" placeholder="Ghi rõ loại NG khác…" style="display:none">' +
@@ -959,7 +959,7 @@ async function submitNg(wrap){
   const loaiSel = wrap.querySelector('[data-role="ng-loai"]');
   const khacInput = wrap.querySelector('[data-role="ng-khac"]');
   const slInput = wrap.querySelector('[data-role="ng-sl"]');
-  const loai = loaiSel.value === 'Khác' ? khacInput.value.trim() : loaiSel.value;
+  const loai = ngLoaiDaChon(loaiSel, khacInput);
   const soLuong = Number(slInput.value);
   if (!loai) { showMsg('Chưa ghi rõ chủng loại NG.', 'err', 4000); return; }
   if (!soLuong || soLuong <= 0) { showMsg('Số lượng NG phải lớn hơn 0.', 'err', 4000); return; }
@@ -1056,7 +1056,7 @@ async function boNguon(wrap){
 document.getElementById('nguonList').addEventListener('change', (e) => {
   if (e.target.getAttribute('data-role') !== 'ng-loai') return;
   const wrap = e.target.closest('.nguon-item-wrap');
-  wrap.querySelector('[data-role="ng-khac"]').style.display = e.target.value === 'Khác' ? '' : 'none';
+  wrap.querySelector('[data-role="ng-khac"]').style.display = LoiChung.laKhac(e.target.value) ? '' : 'none';
 });
 
 // ── Ghi nhận 1 tem ─────────────────────────────────────────────────────────
@@ -1215,7 +1215,7 @@ async function ghiNhanNgKanban(){
   if (!maSp) { showMsg('Chọn Mã SP đang sản xuất trước khi ghi nhận NG.', 'err', 5000); return; }
   const loaiSel = document.getElementById('ngKanbanLoai');
   const khacInput = document.getElementById('ngKanbanKhac');
-  const loai = loaiSel.value === 'Khác' ? khacInput.value.trim() : loaiSel.value;
+  const loai = ngLoaiDaChon(loaiSel, khacInput);
   if (!loai) { showMsg('Chưa ghi rõ chủng loại NG.', 'err', 4000); return; }
   const soLuong = Number(document.getElementById('ngKanbanInput').value);
   if (!soLuong || soLuong <= 0) { showMsg('Số lượng NG phải lớn hơn 0.', 'err', 4000); return; }
@@ -1337,7 +1337,7 @@ function wire(){
   });
   document.getElementById('btnNgKanban').addEventListener('click', ghiNhanNgKanban);
   document.getElementById('ngKanbanLoai').addEventListener('change', (e) => {
-    document.getElementById('ngKanbanKhac').style.display = e.target.value === 'Khác' ? '' : 'none';
+    document.getElementById('ngKanbanKhac').style.display = LoiChung.laKhac(e.target.value) ? '' : 'none';
   });
   const scan = document.getElementById('scan');
   const submitScan = () => {
