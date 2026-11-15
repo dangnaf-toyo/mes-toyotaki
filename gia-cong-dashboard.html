@@ -82,8 +82,8 @@
   .grp:last-child{margin-bottom:0;}
   .grp-t{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:0 2px 6px;color:var(--text-muted);display:flex;gap:8px;align-items:center;}
   .grp-t .cnt{font-family:var(--mono);color:var(--text-dim);}
-  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;}
-  .tile{display:block;text-align:left;background:var(--bg-panel);border:1.5px solid var(--border);border-left-width:5px;border-radius:8px;padding:7px 9px;color:var(--text);min-width:0;}
+  .tiles{display:flex;flex-direction:column;gap:6px;}
+  .tile{display:block;width:100%;text-align:left;background:var(--bg-panel);border:1.5px solid var(--border);border-left-width:5px;border-radius:8px;padding:7px 9px;color:var(--text);min-width:0;}
   .tile:hover{border-color:var(--border-strong);}
   .tile.sel{box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent);}
   .tile.run{border-left-color:var(--run-fg);}
@@ -101,7 +101,24 @@
   .tile .do{font-size:11px;font-weight:700;color:var(--warn-fg);margin-top:2px;}
   .tile.stop .do{color:var(--alarm-fg);}
 
-  .app{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:10px;align-items:start;}
+  .off-list{margin-top:10px;}
+  .off-list summary{cursor:pointer;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0 2px 6px;}
+  .off-chips{display:flex;flex-wrap:wrap;gap:5px;}
+  .off-chip{border:1px solid var(--border);background:var(--bg-sunken);border-radius:6px;padding:4px 8px;font-size:12px;font-weight:700;color:var(--text-muted);min-height:30px;}
+  .off-chip:hover{border-color:var(--accent);color:var(--accent);}
+  .off-chip.sel{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+  .h3-btn{border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0;min-height:28px;}
+  .h3-btn:hover:not(:disabled){background:var(--accent);color:#fff;}
+  .sub-t{font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px;display:flex;gap:6px;align-items:center;}
+  .sub-t .cnt{font-family:var(--mono);color:var(--text-dim);}
+  .feed{max-height:460px;overflow:auto;}
+  .ev{display:grid;grid-template-columns:42px minmax(0,1fr);gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
+  .ev:last-child{border-bottom:none;}
+  .ev .h{font-family:var(--mono);color:var(--text-dim);font-size:11.5px;}
+  .ev .tx b{font-family:var(--mono);}
+  .ev .tx .s{color:var(--text-muted);font-size:11px;}
+
+  .app{display:grid;grid-template-columns:270px minmax(0,1fr) 290px;gap:10px;align-items:start;}
   .col{display:flex;flex-direction:column;gap:10px;min-width:0;}
 
   .chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap;}
@@ -231,8 +248,21 @@
   .done-banner span{display:block;font-weight:500;font-size:12px;color:var(--text);margin-top:2px;}
   .qr-box{background:#fff;border-radius:12px;padding:12px;width:min(420px,100%);}
 
-  @media (max-width:1100px){ .app{grid-template-columns:minmax(0,1fr);} .kpis{grid-template-columns:repeat(3,minmax(0,1fr));} }
-  @media (max-width:640px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .frm,.modal .two{grid-template-columns:minmax(0,1fr);} .tiles{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));} }
+  @media (max-width:1240px){
+    .app{grid-template-columns:250px minmax(0,1fr);}
+    .side-r{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+  }
+  @media (max-width:900px){
+    .app{grid-template-columns:minmax(0,1fr);}
+    .side-r{grid-template-columns:minmax(0,1fr);}
+    .tiles-wrap{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;}
+    .tiles-wrap .grp{flex:none;margin:0;}
+    .tiles-wrap .tiles{flex-direction:row;}
+    .tiles-wrap .tile{width:190px;}
+    .tiles-wrap .off-list{flex:none;margin:0;max-width:260px;}
+  }
+  @media (max-width:640px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .frm,.modal .two{grid-template-columns:minmax(0,1fr);} }
 </style>
 </head>
 <body>
@@ -253,8 +283,6 @@
     </select>
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">Làm mới</button>
-  <button type="button" class="btn btn-ghost" id="btnPlan" title="Gán mã SP + KH ca cho máy theo KHSX tuần Gia công hôm nay">Nạp KH</button>
-  <button type="button" class="btn btn-ghost" id="btnChep" title="Mở lại các máy của ca trước với cùng mã SP, KH ca, người đứng máy">Chép ca trước</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa" title="Báo cáo ca, kết ca và khoá số liệu">Kết ca</button>
   <a class="btn btn-ghost" href="ipqc-gia-cong.html">IPQC</a>
   <a class="btn btn-ghost" href="cong-doan-dashboard.html?cd=C%E1%BA%AFt+vi%E1%BB%81n" title="Cắt viền chưa có danh mục máy — vẫn dùng màn cũ">Cắt viền</a>
@@ -267,17 +295,29 @@
 <div class="page">
   <div class="boot" id="boot">Đang tải…</div>
   <section class="kpis" id="kpis" hidden></section>
-  <section class="card" id="tilesCard" hidden>
-    <h3>Máy gia công <span class="cnt" id="mayCnt"></span><span class="sp"></span>
-      <span class="legend"><span><i style="background:var(--run-fg)"></i>Đang chạy</span><span><i style="background:#F59E0B"></i>Chờ hàng</span><span><i style="background:var(--alarm-fg)"></i>Dừng</span><span><i style="background:var(--border-strong)"></i>Chưa mở</span></span>
-    </h3>
-    <div id="tiles"></div>
-  </section>
   <main class="app" id="app" hidden>
-    <section class="col"><div class="card" id="ws"></div></section>
-    <aside class="col">
+    <aside class="col side-l">
+      <div class="card">
+        <h3>Máy <span class="cnt" id="mayCnt"></span><span class="sp"></span>
+          <button class="h3-btn" type="button" id="btnPlan" title="Gán mã SP + KH ca cho máy theo KHSX tuần Gia công hôm nay">Nạp KH</button>
+          <button class="h3-btn" type="button" id="btnChep" title="Mở lại các máy của ca trước với cùng mã SP, KH ca, người đứng máy">Chép ca</button>
+        </h3>
+        <div class="tiles-wrap" id="tiles"></div>
+      </div>
       <div class="card"><h3>Kế hoạch hôm nay <span class="sp"></span><span class="cnt" id="khCnt"></span></h3><div id="khList"></div></div>
-      <div class="card"><h3>Thùng chờ bước sau <span class="sp"></span><span class="cnt" id="choCnt"></span></h3><div id="choList"></div></div>
+    </aside>
+    <section class="col"><div class="card" id="ws"></div></section>
+    <aside class="col side-r">
+      <div class="card">
+        <h3>Tem chờ Gia công <span class="sp"></span><span class="cnt" id="qCnt"></span></h3>
+        <div id="queue"></div>
+        <div class="sub-t">Dở giữa các bước <span class="cnt" id="choCnt"></span></div>
+        <div id="choList"></div>
+      </div>
+      <div class="card">
+        <h3>Hoạt động trong ca</h3>
+        <div class="feed" id="feed"></div>
+      </div>
     </aside>
   </main>
 </div>
@@ -491,9 +531,12 @@ async function taiDanhMuc() {
   $('#dsTaiKhoan').innerHTML = [...new Set([...ACC, ...EMP])].map(n => '<option value="' + esc(n) + '">').join('');
 }
 async function taiLai() {
-  const { data, error } = await sb.rpc('gc_du_lieu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value });
+  const arg = { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value };
+  const [r, q] = await Promise.all([sb.rpc('gc_du_lieu', arg), sb.rpc('gc_tem_cho', arg)]);
+  const { data, error } = r;
   if (error) { errFlash(error); renderAll(); return; }
   D = data || {};
+  D.cho = q.error ? null : (q.data || []);   // T271: tem chờ Gia công (cột phải)
   if (!sel || !MAY().some(m => m.ma_may === sel)) {
     const m = MAY().find(x => x.tram) || MAY()[0];
     sel = m ? m.ma_may : null;
@@ -503,7 +546,7 @@ async function taiLai() {
 
 /* ── Vẽ ───────────────────────────────────────────────────────────────────── */
 function renderAll() {
-  $('#boot').hidden = true; $('#kpis').hidden = false; $('#tilesCard').hidden = false; $('#app').hidden = false;
+  $('#boot').hidden = true; $('#kpis').hidden = false; $('#app').hidden = false;
   renderKpis(); renderTiles(); renderWs(); renderSide();
   const kb = $('#btnKetCa');
   kb.textContent = D && D.ket_ca ? 'Báo cáo ca (đã kết)' : 'Báo cáo kết ca';
@@ -547,15 +590,22 @@ function renderTiles() {
   const M = MAY();
   $('#mayCnt').textContent = M.filter(m => m.tram).length + ' mở / ' + M.length;
   const ngoai = (D && D.tram_ngoai_danh_muc) || [];
+  // T271: bên trái = máy đã mở (hoặc còn thùng dở / đang dừng); máy chưa mở gom gọn ở cuối.
+  const coMo = m => m.tram || (m.dang_lam || []).length || suCoMo(m);
+  const mo = M.filter(coMo), chua = M.filter(m => !coMo(m));
+  const openOff = chua.some(m => m.ma_may === sel) || !mo.length;
   $('#tiles').innerHTML = (M.length ? '' : '<div class="empty-box">Chưa có máy nào trong danh mục (Quản lý danh mục → Máy-Line, bộ phận "Gia công - Sơn").</div>') +
+    (M.length && !mo.length ? '<div class="empty-box">Chưa mở máy nào trong ca.</div>' : '') +
     NHOM.map(g => {
-      const ds = M.filter(g.f);
+      const ds = mo.filter(g.f);
       if (!ds.length) return '';
       const chay = ds.filter(m => trangThai(m) === 'run').length;
       return '<div class="grp"><div class="grp-t">' + g.t + ' <span class="cnt">' + chay + '/' + ds.length + ' chạy</span></div><div class="tiles">' + ds.map(tileHtml).join('') + '</div></div>';
     }).join('') +
+    (chua.length ? '<details class="off-list"' + (openOff ? ' open' : '') + '><summary>Chưa mở · ' + chua.length + '</summary><div class="off-chips">' +
+      chua.map(m => '<button type="button" class="tile-off off-chip' + (m.ma_may === sel ? ' sel' : '') + '" data-may="' + esc(m.ma_may) + '">' + esc(m.ma_may) + '</button>').join('') + '</div></details>' : '') +
     (ngoai.length ? '<div class="flash warn">Có máy mở trong ca nhưng không còn trong danh mục: ' + esc(ngoai.join(', ')) + '</div>' : '');
-  document.querySelectorAll('.tile').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tile, .tile-off').forEach(b => b.onclick = () => {
     sel = b.dataset.may; lsSet('gcdb_may', sel); flash = null; ngOpen = testOpen = null; stopForm = false; renderTiles(); renderWs();
     const s = $('#scan'); if (s) s.focus();
   });
@@ -570,7 +620,7 @@ function routeHtml(maSp, buocCur) {
 
 function renderWs() {
   const ws = $('#ws'), m = curMay();
-  if (!m) { ws.innerHTML = '<div class="empty-box">Chọn 1 máy ở trên.</div>'; return; }
+  if (!m) { ws.innerHTML = '<div class="empty-box">Chọn 1 máy bên trái.</div>'; return; }
   const t = m.tram, st = trangThai(m), khoa = !!(D && D.ket_ca), s = suCoMo(m);
   const p = t ? PROD[t.ma_sp] : null;
   let h = '<div class="ws-head"><div class="ws-id">' +
@@ -789,6 +839,35 @@ function renderSide() {
   $('#choList').innerHTML = C.length ? C.map(c => '<div class="q-row"><div class="m">' + esc(c.tag_no) + ' · ' + esc(c.ma_sp) + '</div>' +
       '<div class="d">Xong bước ' + c.buoc_xong + '/' + c.tong_buoc + ' ở ' + esc(c.may_truoc) + ' ' + hm(c.xong_luc) + ' → chờ ' + esc(TEN_LOAI[c.loai_may_tiep] || '?') + '</div><div class="n">' + fmt(c.con) + '</div></div>').join('')
     : '<div class="empty-box">Không có thùng nào dở giữa các bước.</div>';
+
+  // T271: tem chờ Gia công (giống Bavia) — gom theo mã SP
+  const Q = D && D.cho;
+  $('#qCnt').textContent = Q ? Q.reduce((s, x) => s + Number(x.so_tem), 0) + ' tem' : '';
+  $('#queue').innerHTML = !Q ? '<div class="empty-box">Không tải được tem chờ. Bấm Làm mới.</div>'
+    : Q.length ? Q.map(x => '<div class="q-row"><div class="m">' + esc(x.ma_sp) + '</div>' +
+        '<div class="d">' + x.so_tem + ' tem' + (Number(x.tai_gc) ? ' · ' + x.tai_gc + ' đã ở Gia công' : '') + (x.tu ? ' · ở ' + esc(x.tu) : '') +
+        ' · ' + dmy(x.ngay_tu) + (x.ngay_den && x.ngay_den !== x.ngay_tu ? '–' + dmy(x.ngay_den) : '') + '</div><div class="n">' + fmt(x.pcs) + '</div></div>').join('')
+    : '<div class="empty-box">Không có tem chờ cho các mã có kế hoạch.</div>';
+
+  // Hoạt động trong ca: quét / xong / NG / test / dừng máy
+  const kc = D && D.khung_ca, tu = kc ? String(kc.tu) : '', trong = ts => ts && (!tu || new Date(ts) >= new Date(tu));
+  const ev = [];
+  M.forEach(m => {
+    const mm = esc(m.ma_may);
+    (m.dang_lam || []).forEach(b => {
+      if (trong(b.bat_dau)) ev.push([b.bat_dau, mm + ' quét thùng <b>' + esc(b.tag_no) + '</b>', 'Bước ' + b.buoc + '/' + b.tong_buoc + ' · ' + fmt(b.sl_vao) + ' pcs']);
+      (b.test || []).forEach(x => { if (trong(x.thoi_diem)) ev.push([x.thoi_diem, mm + ' lấy test <b>' + fmt(x.so_luong) + '</b> · ' + esc(x.muc_dich), x.nguoi_test || '']); });
+    });
+    (m.xong || []).forEach(b => ev.push([b.xong_luc, mm + ' xong thùng <b>' + esc(b.tag_no) + '</b> · ra ' + fmt(b.sl_ra), 'Bước ' + b.buoc + '/' + b.tong_buoc + (b.nguoi_lam ? ' · ' + b.nguoi_lam : '')]));
+    (m.ng || []).forEach(g => ev.push([g.ngay_gio, mm + ' NG <b>' + fmt(g.so_luong) + '</b> · ' + esc(g.loai) + (g.ghi_chu ? ': ' + esc(g.ghi_chu) : ''), 'Tem ' + g.tag_no]));
+    (m.su_co || []).forEach(s => {
+      if (trong(s.gio_phat_sinh)) ev.push([s.gio_phat_sinh, mm + ' <span style="color:var(--alarm-fg);font-weight:700">dừng</span> · ' + esc(String(s.loai_su_co || '').split(' — ')[0]), s.van_de || '']);
+      if (s.gio_tro_lai && trong(s.gio_tro_lai)) ev.push([s.gio_tro_lai, mm + ' <span style="color:var(--run-fg);font-weight:700">chạy lại</span>', s.noi_dung_xu_ly || '']);
+    });
+  });
+  ev.sort((a, b) => new Date(b[0]) - new Date(a[0]));
+  $('#feed').innerHTML = ev.length ? ev.slice(0, 40).map(([h, t, s]) => '<div class="ev"><span class="h">' + hm(h) + '</span><span class="tx">' + t + '<div class="s">' + esc(s) + '</div></span></div>').join('')
+    : '<div class="empty-box">Chưa có hoạt động.</div>';
 }
 
 /* ── Mở / sửa máy ────────────────────────────────────────────────────────── */
