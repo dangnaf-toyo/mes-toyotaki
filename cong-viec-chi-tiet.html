@@ -746,13 +746,17 @@ async function xuLyAct(btn){
       if (!v) return;
       return chay(() => CV.rpc('cv_xin_gia_han', { p_id: V.id, p_den: tuVnInput(v.den).toISOString(), p_ly_do: v.ly }), 'Đã gửi xin gia hạn.');
     }
-    case 'gh-dy': return chay(() => CV.rpc('cv_tra_loi_gia_han', { p_id: V.id, p_dong_y: true }), 'Đã đồng ý gia hạn.');
-    case 'gh-kdy': return chay(() => CV.rpc('cv_tra_loi_gia_han', { p_id: V.id, p_dong_y: false }), 'Đã từ chối gia hạn, giữ hạn cũ.');
+    case 'gh-dy': case 'gh-kdy': {
+      const dy = act === 'gh-dy';
+      const v = await hopThoai({ tieuDe: dy ? 'Đồng ý gia hạn' : 'Không đồng ý gia hạn', truong: [{ key: 'gc', label: 'Ghi chú', placeholder: 'Không bắt buộc' }], nut: dy ? 'Đồng ý' : 'Không đồng ý', kieu: dy ? 'ok' : 'bad' });
+      if (!v) return;
+      return chay(() => CV.rpc('cv_tra_loi_gia_han', { p_id: V.id, p_dong_y: dy, p_ghi_chu: v.gc || null }), dy ? 'Đã đồng ý gia hạn.' : 'Đã từ chối gia hạn, giữ hạn cũ.');
+    }
     case 'nhac': return chay(() => CV.rpc('cv_nhac_viec', pid), 'Đã nhắc ' + (V.ten_nguoi_lam || 'người làm') + '.');
     case 'duyet': {
-      const v = await hopThoai({ tieuDe: 'Duyệt hoàn thành', html: canhBaoCon() + `Xác nhận việc <b>"${esc(V.tieu_de)}"</b> đã hoàn thành. ${new Date(V.bao_xong_luc || Date.now()) <= new Date(V.han) ? 'Báo xong trước hạn — tính <b>đúng hạn</b>.' : 'Báo xong sau hạn — tính <b>trễ hạn</b>.'}`, nut: 'Duyệt hoàn thành', kieu: 'ok' });
+      const v = await hopThoai({ tieuDe: 'Duyệt hoàn thành', html: canhBaoCon() + `Xác nhận việc <b>"${esc(V.tieu_de)}"</b> đã hoàn thành. ${new Date(V.bao_xong_luc || Date.now()) <= new Date(V.han) ? 'Báo xong trước hạn — tính <b>đúng hạn</b>.' : 'Báo xong sau hạn — tính <b>trễ hạn</b>.'}`, truong: [{ key: 'gc', label: 'Ghi chú', placeholder: 'Không bắt buộc' }], nut: 'Duyệt hoàn thành', kieu: 'ok' });
       if (!v) return;
-      return chay(() => CV.rpc('cv_duyet', pid), 'Đã duyệt hoàn thành.');
+      return chay(() => CV.rpc('cv_duyet', { p_id: V.id, p_ghi_chu: v.gc || null }), 'Đã duyệt hoàn thành.');
     }
     case 'tralai': {
       const v = await hopThoai({

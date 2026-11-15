@@ -98,6 +98,7 @@
       '.tcd .bc b{color:#0F172A}.tcd .bc.x{border-color:#A7E3C6}.tcd .bc.x b::before{content:"✓ ";color:#047857}.tcd .bc.c{border-color:#F59E0B;box-shadow:0 0 0 2px #FEF3C7}' +
       '.tcd .nut{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}' +
       '.tcd .btn{font:inherit;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:8px;border:1.5px solid #0F5FA5;background:#fff;color:#0F5FA5;cursor:pointer}.tcd .btn.p{background:#0F5FA5;color:#fff}.tcd .btn.d{border-color:#FCA5A5;color:#B91C1C}.tcd .btn:disabled{opacity:.5}' +
+      '.tcd .gc{margin-top:8px;padding:7px 10px;border-radius:8px;background:#F1F5F9;color:#334155;font-size:12.5px}' +
       '.tcd .loi{margin-top:8px;padding:7px 10px;border-radius:8px;background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;font-weight:600;font-size:12.5px}';
     document.head.appendChild(st);
   }
@@ -132,13 +133,14 @@
   const DA_XONG = { kiem_tra: 'Đã kiểm tra — chuyển Giám đốc SX phê duyệt.', phe_duyet: 'Đã phê duyệt — IPQC áp dụng theo ngày hiệu lực của tiêu chuẩn.', tra_lai: 'Đã trả lại cho người soạn.' };
   /** Kiểm tra / phê duyệt / trả lại 1 bản nháp. Trả null nếu người dùng bấm huỷ; ném lỗi nếu không được. */
   async function duyet(loai, id, hanhDong) {
-    let lyDo = null;
-    if (hanhDong === 'tra_lai') {
-      lyDo = prompt('Lý do trả lại (người soạn sẽ thấy):');
-      if (lyDo === null) return null;
-      if (!lyDo.trim()) throw new Error('Nhập lý do trả lại.');
-    }
-    if (hanhDong === 'phe_duyet' && !confirm('Phê duyệt tiêu chuẩn này? IPQC sẽ dùng bản được duyệt theo ngày hiệu lực đã khai báo.')) return null;
+    // T261: kiểm tra / phê duyệt có ô ghi chú (không bắt buộc); trả lại thì bắt buộc lý do.
+    const hoi = window.hoiGhiChuDuyet || ((nd, o) => Promise.resolve(prompt(nd + (o.batBuoc ? '' : ' (ghi chú, không bắt buộc)'))));
+    const lyDo = hanhDong === 'tra_lai'
+      ? await hoi('Trả lại cho người soạn?', { nutOk: 'Trả lại', nguyHiem: true, batBuoc: true, goiY: 'Lý do trả lại (người soạn sẽ thấy)' })
+      : await hoi(hanhDong === 'phe_duyet' ? 'Phê duyệt tiêu chuẩn này? IPQC sẽ dùng bản được duyệt theo ngày hiệu lực đã khai báo.' : 'Kiểm tra đạt — chuyển Giám đốc SX phê duyệt?',
+          { nutOk: hanhDong === 'phe_duyet' ? 'Phê duyệt' : 'Kiểm tra đạt' });
+    if (lyDo === null) return null;
+    if (hanhDong === 'tra_lai' && !String(lyDo).trim()) throw new Error('Nhập lý do trả lại.');
     const { data, error } = await sb.rpc('ipqc_tc_duyet', { p_loai: loai, p_id: id, p_hanh_dong: hanhDong, p_ly_do: lyDo, p_nguoi: await nguoi() });
     if (error) throw new Error(error.message);
     if (!data || !data.ok) throw new Error((data && data.error) || 'Không thực hiện được');
@@ -161,6 +163,7 @@
       buoc('Soạn', r.nguoi_lap, r.gui_luc || r.tao_luc, true, false) +
       buoc('Trưởng phòng QC kiểm tra', r.nguoi_kiem_tra, r.kiem_tra_luc, tt === 'cho_phe_duyet', tt === 'cho_kiem_tra') +
       buoc('Giám đốc SX phê duyệt', r.nguoi_phe_duyet, r.phe_duyet_luc, false, tt === 'cho_phe_duyet') + '</div>';
+    if (r.ghi_chu_kiem_tra && tt === 'cho_phe_duyet') h += '<div class="gc">Ghi chú kiểm tra: ' + esc(r.ghi_chu_kiem_tra) + '</div>';   // T261
     if (tt === 'tra_lai') h += '<div class="loi">Bị trả lại bởi ' + esc(r.nguoi_tra_lai || '') + ' (' + esc(ngayVN(r.tra_lai_luc)) + '): ' + esc(r.ly_do_tra_lai || '') + ' — sửa rồi gửi lại.</div>';
     const nut = [];
     if (tt === 'cho_kiem_tra' && q.kiemTra) nut.push('<button class="btn p" type="button" data-duyet="kiem_tra">✓ Kiểm tra đạt — chuyển GĐ SX</button>', '<button class="btn d" type="button" data-duyet="tra_lai">Trả lại</button>');
@@ -477,10 +480,10 @@
             const tag = choHl(v) ? '<span class="tag w">chờ hiệu lực ' + ngayVi(v.ngay_hieu_luc) + '</span>'
               : v.dang_dung ? '<span class="tag ok">đang dùng</span>'
               : hieuLuc && v.id === hieuLuc.id ? '<span class="tag ok">IPQC đang dùng</span>' : v.trang_thai !== 'da_duyet' ? '<span class="tag ' + (v.trang_thai === 'tra_lai' ? 'ng' : 'w') + '">' + esc(TT[v.trang_thai]) + '</span>' : '<span class="hint">đã thay thế</span>';
-            const ai = (ten, luc) => ten ? esc(ten) + '<div class="hint" style="margin:0">' + esc(ngayVN(luc)) + '</div>' : '';
+            const ai = (ten, luc, gc) => ten ? esc(ten) + '<div class="hint" style="margin:0">' + esc(ngayVN(luc)) + '</div>' + (gc ? '<div class="hint" style="margin:0">📝 ' + esc(gc) + '</div>' : '') : '';
             return '<tr><td><b>' + esc(v.phien_ban) + '</b></td><td>' + tag + '</td><td>' + esc(v.ngay_hieu_luc || '') + '</td><td>' + esc(v.noi_dung_sua_doi || '') + '</td>' +
-              '<td>' + ai(v.nguoi_lap, v.gui_luc || v.tao_luc) + '</td><td>' + ai(v.nguoi_kiem_tra, v.kiem_tra_luc) + '</td>' +
-              '<td>' + (v.nguoi_phe_duyet ? ai(v.nguoi_phe_duyet, v.phe_duyet_luc) : esc(v.nguoi_xac_nhan || '')) + '</td></tr>';
+              '<td>' + ai(v.nguoi_lap, v.gui_luc || v.tao_luc) + '</td><td>' + ai(v.nguoi_kiem_tra, v.kiem_tra_luc, v.ghi_chu_kiem_tra) + '</td>' +
+              '<td>' + (v.nguoi_phe_duyet ? ai(v.nguoi_phe_duyet, v.phe_duyet_luc, v.ghi_chu_phe_duyet) : esc(v.nguoi_xac_nhan || '')) + '</td></tr>';
           }).join('') || '<tr><td colspan="7" class="hint">Chưa có phiên bản nào.</td></tr>') +
         '</table></div></div>'+ (gc()?gcHistory():'');
       if(gc()&&st.sua){

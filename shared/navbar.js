@@ -23,6 +23,12 @@
     s.src = document.currentScript.src.replace(/navbar\.js(\?.*)?$/, 'bang-dai.js');
     document.head.appendChild(s);
   }
+  // T261: hộp duyệt có ô ghi chú (shared/ghi-chu-duyet.js → window.hoiGhiChuDuyet) cho mọi màn phê duyệt.
+  if (document.currentScript && !window.hoiGhiChuDuyet) {
+    const s = document.createElement('script');
+    s.src = document.currentScript.src.replace(/navbar\.js(\?.*)?$/, 'ghi-chu-duyet.js');
+    document.head.appendChild(s);
+  }
   // T255 (X.1): hộp alert của trình duyệt → thông báo góc màn hình (không chặn thao tác) cho MỌI trang có navbar.
   // Trang đã tự thay alert (vd ipqc-approval.html) thì giữ bản của trang. hộp confirm giữ nguyên (xoá/kết ca/không hoàn tác).
   // Tin có ⛔ hoặc dài thì không tự tắt — bấm × để đóng. Tin hiện ngay trước khi tải lại/chuyển trang được mang sang trang sau.
