@@ -120,6 +120,14 @@ tr.off td{color:var(--text-dim)}
 .bo-tbl td small{min-height:14px}
 .bo-tbl .x{border:none;background:none;color:var(--alarm-fg);font-size:15px;cursor:pointer;padding:2px 6px}
 tr.bo-row{cursor:pointer}tr.bo-row:hover td{background:var(--bg-sunken)}
+.bc-kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.bc-kpi div{border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.bc-kpi span{font-size:11px;color:var(--text-muted)}
+.bc-kpi b{font-family:'JetBrains Mono',monospace;font-size:16px;overflow-wrap:anywhere}
+.bc-kpi b.do{color:var(--alarm-fg)}
+.gy{font-weight:700;color:var(--warn-fg)}
+td.do{color:var(--alarm-fg);font-weight:700}
+@media (max-width:640px){.bc-kpi{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .pct{font-weight:700}.pct.vang{color:var(--warn-fg)}.pct.do{color:var(--alarm-fg)}
 @media (max-width:640px){.row2,.row3{grid-template-columns:1fr}.toolbar input[type=search]{flex:1}.header-clock{display:none}.tabs a{padding:7px 11px}}
 </style>
@@ -147,6 +155,7 @@ tr.bo-row{cursor:pointer}tr.bo-row:hover td{background:var(--bg-sunken)}
     <a href="?tab=lich-su" data-tab="lich-su">Lịch sử</a>
     <a href="?tab=bo-dao" data-tab="bo-dao">Bộ dao</a>
     <a href="?tab=thay-dao" data-tab="thay-dao">Thay dao</a>
+    <a href="?tab=bao-cao" data-tab="bao-cao">Báo cáo</a>
   </nav>
 
   <div id="roleNote"></div>
@@ -240,6 +249,31 @@ tr.bo-row{cursor:pointer}tr.bo-row:hover td{background:var(--bg-sunken)}
     <div class="tbl-wrap"><table>
       <thead><tr><th>Máy</th><th>Vị trí</th><th>Mã · tên</th><th>SP · bước</th><th>Lắp</th><th>Tháo</th><th class="num">Đã chạy</th><th class="num">Chuẩn</th><th class="num">%</th><th>Lý do</th><th>Dao cũ</th><th>Người</th></tr></thead>
       <tbody id="tbXd"><tr><td colspan="12" class="empty">Đang tải...</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card" id="sec-bao-cao" hidden>
+    <div class="toolbar">
+      <button type="button" class="chip on" data-bf="tt">Tuổi thọ</button>
+      <button type="button" class="chip" data-bf="cp">Chi phí / SP</button>
+      <span class="lbl">Từ</span><input type="date" id="rTu">
+      <span class="lbl">đến</span><input type="date" id="rDen">
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-outline" id="rXuat">Xuất Excel</button>
+      <button type="button" class="info-btn" data-info="iBc" title="Cách tính">ⓘ</button>
+    </div>
+    <div class="info-txt" id="iBc" hidden style="margin-bottom:10px"><b>Chi phí dao</b> = SL xuất tủ trong kỳ × đơn giá. <b>CT xong</b> = SL ra bước cuối. <b>Tuổi thọ</b>: các lần thay trong kỳ (bỏ lần Đổi mã). <b>Gợi ý</b> = trung vị các lần Hết tuổi thọ / Mòn sớm, khi có từ 3 lần và lệch chuẩn từ 15%. <b>Áp dụng</b> sửa tuổi thọ ở Bộ dao (chưa khai bộ thì sửa Danh mục). <b>Chi phí / SP</b> = Σ đơn giá × SL lắp × lỗ/CT ÷ tuổi thọ theo bộ dao chuẩn.</div>
+    <div class="bc-kpi">
+      <div><span>Chi phí dao</span><b id="rCp">—</b></div>
+      <div><span>CT xong</span><b id="rCt">—</b></div>
+      <div><span>Đ / CT</span><b id="rDct">—</b></div>
+      <div><span>Lần thay</span><b id="rLan">—</b></div>
+      <div><span>Gãy · Mẻ</span><b id="rGay" class="do">—</b></div>
+    </div>
+    <div class="hint" id="rNote" style="margin-bottom:8px"></div>
+    <div class="tbl-wrap"><table>
+      <thead id="thBc"></thead>
+      <tbody id="tbBc"><tr><td class="empty">Đang tải...</td></tr></tbody>
     </table></div>
   </section>
 </div>
@@ -340,7 +374,7 @@ tr.bo-row{cursor:pointer}tr.bo-row:hover td{background:var(--bg-sunken)}
 <script src="shared/navbar.js"></script>
 <script src="shared/goi-y-ma.js"></script>
 <script>
-const TABS = ['ton', 'danh-muc', 'lich-su', 'bo-dao', 'thay-dao'];
+const TABS = ['ton', 'danh-muc', 'lich-su', 'bo-dao', 'thay-dao', 'bao-cao'];
 const NHOM = GoiYMa.DAO_NHOM;
 // [nhãn, quyền: 'dung' = trưởng ca trở lên, 'quan_ly' = quản lý / thống kê]
 const GD = {
@@ -451,7 +485,7 @@ function setTab(t, push){
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
   TABS.forEach(x => { document.getElementById('sec-' + x).hidden = x !== t; });
   if (push) history.replaceState(null, '', '?tab=' + t);
-  if (t === 'ton') renderTon(); else if (t === 'danh-muc') renderDm(); else if (t === 'bo-dao') renderBo(); else if (t === 'thay-dao') loadXd(); else loadLichSu();
+  if (t === 'ton') renderTon(); else if (t === 'danh-muc') renderDm(); else if (t === 'bo-dao') renderBo(); else if (t === 'thay-dao') loadXd(); else if (t === 'bao-cao') loadBc(); else loadLichSu();
 }
 function khop(d, q){
   if (!q) return true;
@@ -782,6 +816,135 @@ function xuatXd(){
   XLSX.writeFile(wb, (xf === 'lap' ? 'Dao_dang_lap_' : 'Ly_lich_thay_dao_') + isoDate(new Date()) + '.xlsx');
 }
 
+// ── Báo cáo (T274) ────────────────────────────────────────────────────────────
+let bf = 'tt', bcTt = [], bcCp = [], bcSeq = 0;
+const LD_MON = ['Hết tuổi thọ', 'Mòn sớm'];
+async function layHet(mk){
+  const out = [];
+  for (let i = 0; ; i += 1000) {
+    const { data, error } = await mk().range(i, i + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data || []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+function trungVi(a){ const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function lamTron(n){ const b = n < 100 ? 5 : n < 1000 ? 10 : 50; return Math.max(b, Math.round(n / b) * b); }
+function tien(n){ return n == null || !isFinite(n) ? '—' : Math.round(n).toLocaleString('vi-VN'); }
+function boKey(sp, b, vt, id){ return sp + '|' + b + '|' + vt + '|' + id; }
+async function loadBc(){
+  const seq = ++bcSeq, tb = document.getElementById('tbBc');
+  tb.innerHTML = '<tr><td class="empty">Đang tải...</td></tr>';
+  const tu = document.getElementById('rTu').value, den = document.getElementById('rDen').value;
+  const t0 = (tu || '2000-01-01') + 'T00:00:00+07:00', t1 = (den || '2100-01-01') + 'T23:59:59+07:00';
+  let thao, xuat, tem, bo;
+  try {
+    [thao, xuat, tem, bo] = await Promise.all([
+      layHet(() => sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,so_luong,ma_sp,buoc,so_ct_thuc_te,so_ct,so_lan_ct,ly_do_thao,thao_luc').gte('thao_luc', t0).lte('thao_luc', t1).order('id')),
+      layHet(() => sb.from('gc_dao_cu_giao_dich').select('id,id_dao,so_luong').eq('loai', 'xuat').gte('thoi_diem', t0).lte('thoi_diem', t1).order('id')),
+      layHet(() => sb.from('gc_tem_buoc').select('id,ma_sp,buoc,tong_buoc,sl_ra').not('xong_luc', 'is', null).is('bo_luc', null).gte('xong_luc', t0).lte('xong_luc', t1).order('id')),
+      layHet(() => sb.from('gc_bo_dao').select('*').order('id')),
+    ]);
+  } catch (e) { if (seq === bcSeq) tb.innerHTML = '<tr><td class="empty">Lỗi: ' + esc(e.message) + '</td></tr>'; return; }
+  if (seq !== bcSeq) return;
+  const boMap = {}; bo.forEach(b => { boMap[boKey(b.ma_sp, b.buoc, b.vi_tri, b.id_dao)] = b; });
+  // KPI kỳ
+  let cp = 0, thieuGia = new Set();
+  xuat.forEach(x => { const d = daoById(x.id_dao); if (d && d.don_gia != null) cp += Number(x.so_luong) * Number(d.don_gia); else thieuGia.add(x.id_dao); });
+  const ctSp = {}; let ctXong = 0;
+  tem.forEach(t => { const k = t.ma_sp + '|' + t.buoc; ctSp[k] = (ctSp[k] || 0) + Number(t.sl_ra || 0); if (t.buoc >= t.tong_buoc) ctXong += Number(t.sl_ra || 0); });
+  const gay = thao.filter(r => r.ly_do_thao === 'Gãy' || r.ly_do_thao === 'Mẻ').length;
+  document.getElementById('rCp').textContent = tien(cp);
+  document.getElementById('rCt').textContent = fmtNum(ctXong);
+  document.getElementById('rDct').textContent = ctXong ? tien(cp / ctXong) : '—';
+  document.getElementById('rLan').textContent = fmtNum(thao.length);
+  document.getElementById('rGay').textContent = fmtNum(gay);
+  // Tuổi thọ theo SP · bước · vị trí · mã dao
+  const g = {};
+  thao.filter(r => r.ly_do_thao !== 'Đổi mã').forEach(r => {
+    const k = boKey(r.ma_sp, r.buoc, r.vi_tri, r.id_dao);
+    const x = g[k] || (g[k] = { k, ma_sp: r.ma_sp, buoc: r.buoc, vi_tri: r.vi_tri, id_dao: r.id_dao, ma_dao: r.ma_dao, ds: [], mon: [], gay: 0 });
+    const v = Number(r.so_ct_thuc_te ?? r.so_ct ?? 0) * Number(r.so_lan_ct || 1);
+    x.ds.push(v);
+    if (LD_MON.includes(r.ly_do_thao)) x.mon.push(v);
+    if (r.ly_do_thao === 'Gãy' || r.ly_do_thao === 'Mẻ') x.gay++;
+  });
+  bcTt = Object.values(g).map(x => {
+    const d = daoById(x.id_dao) || {}, b = boMap[x.k];
+    const chuan = b && b.tuoi_tho_chuan ? Number(b.tuoi_tho_chuan) : (d.tuoi_tho_chuan ? Number(d.tuoi_tho_chuan) : null);
+    const tb = x.ds.reduce((s, v) => s + v, 0) / x.ds.length;
+    let goiY = null;
+    if (x.mon.length >= 3) { const m = lamTron(trungVi(x.mon)); if (!chuan || Math.abs(m - chuan) / chuan >= 0.15) goiY = m; }
+    return Object.assign(x, { ten: d.ten_chuan || '', don_vi: d.tuoi_tho_theo === 'lo_ren' ? 'lỗ ren' : 'CT', chuan, tb, min: Math.min(...x.ds), max: Math.max(...x.ds), goiY, coBo: !!b });
+  }).sort((a, b) => (b.goiY != null) - (a.goiY != null) || natCmp(a.ma_sp, b.ma_sp) || a.buoc - b.buoc || natCmp(a.vi_tri, b.vi_tri));
+  // Chi phí dao / CT theo bộ dao chuẩn
+  const cpG = {};
+  bo.forEach(b => {
+    const k = b.ma_sp + '|' + b.buoc, d = daoById(b.id_dao) || {};
+    const x = cpG[k] || (cpG[k] = { ma_sp: b.ma_sp, buoc: b.buoc, vt: 0, chuan: 0, tt: 0, thieu: 0 });
+    x.vt++;
+    const gia = d.don_gia != null ? Number(d.don_gia) : null;
+    const ttc = b.tuoi_tho_chuan ? Number(b.tuoi_tho_chuan) : (d.tuoi_tho_chuan ? Number(d.tuoi_tho_chuan) : null);
+    const st = g[boKey(b.ma_sp, b.buoc, b.vi_tri, b.id_dao)];
+    const ttt = st && st.tb > 0 ? st.tb : ttc;
+    if (gia == null || !ttc) { x.thieu++; return; }
+    const he = gia * Number(b.so_luong || 1) * Number(b.so_lan_ct || 1);
+    x.chuan += he / ttc; x.tt += he / ttt;
+  });
+  bcCp = Object.values(cpG).map(x => Object.assign(x, { ct: ctSp[x.ma_sp + '|' + x.buoc] || 0 }))
+    .sort((a, b) => b.ct * b.tt - a.ct * a.tt || natCmp(a.ma_sp, b.ma_sp) || a.buoc - b.buoc);
+  const n = thieuGia.size;
+  document.getElementById('rNote').textContent = n ? n + ' mã xuất tủ chưa có đơn giá — chưa tính vào chi phí' : '';
+  veBc();
+}
+function veBc(){
+  const th = document.getElementById('thBc'), tb = document.getElementById('tbBc'), ql = canQL();
+  if (bf === 'tt') {
+    th.innerHTML = '<tr><th>Mã · tên</th><th>SP · bước · vị trí</th><th class="num">Lần</th><th class="num">TB thực tế</th><th class="num">Thấp–cao</th><th class="num">Chuẩn</th><th class="num">%</th><th class="num">Gãy · Mẻ</th><th class="num">Gợi ý</th><th></th></tr>';
+    tb.innerHTML = bcTt.map((r, i) => '<tr><td><span class="mk">' + esc(r.ma_dao) + '</span><small>' + esc(r.ten) + '</small></td>' +
+      '<td>' + esc(r.ma_sp || '—') + ' · B' + r.buoc + ' · <b>' + esc(r.vi_tri) + '</b>' + (r.coBo ? '' : '<small>chưa khai bộ</small>') + '</td>' +
+      '<td class="num">' + r.ds.length + '</td><td class="num">' + fmtNum(Math.round(r.tb)) + '<small>' + r.don_vi + '</small></td>' +
+      '<td class="num" style="white-space:nowrap">' + fmtNum(r.min) + '–' + fmtNum(r.max) + '</td>' +
+      '<td class="num">' + (r.chuan ? fmtNum(r.chuan) : '<span class="zero">—</span>') + '</td>' +
+      pctHtml({ tt: r.chuan, dung: r.tb }) +
+      '<td class="num' + (r.gay ? ' do' : ' zero') + '">' + r.gay + '</td>' +
+      '<td class="num">' + (r.goiY != null ? '<span class="gy">' + fmtNum(r.goiY) + '</span>' : '<span class="zero">—</span>') + '</td>' +
+      '<td>' + (r.goiY != null && ql ? '<button type="button" class="btn btn-outline btn-sm" data-ad="' + i + '">Áp dụng</button>' : '') + '</td></tr>').join('') ||
+      '<tr><td colspan="10" class="empty">Chưa có lần thay dao nào trong kỳ</td></tr>';
+  } else {
+    th.innerHTML = '<tr><th>SP · bước</th><th class="num">Vị trí</th><th class="num">CT trong kỳ</th><th class="num">Đ/CT chuẩn</th><th class="num">Đ/CT thực tế</th><th class="num">Chi phí kỳ</th><th class="num">Thiếu giá / tuổi thọ</th></tr>';
+    tb.innerHTML = bcCp.map(r => '<tr><td><b>' + esc(r.ma_sp) + '</b> · B' + r.buoc + '<small>' + esc((SP[r.ma_sp] && SP[r.ma_sp].ten_sp) || '') + '</small></td>' +
+      '<td class="num">' + r.vt + '</td><td class="num' + (r.ct ? '' : ' zero') + '">' + fmtNum(r.ct) + '</td>' +
+      '<td class="num">' + (r.chuan ? tien(r.chuan) : '<span class="zero">—</span>') + '</td>' +
+      '<td class="num">' + (r.tt ? '<b>' + tien(r.tt) + '</b>' : '<span class="zero">—</span>') + '</td>' +
+      '<td class="num">' + (r.ct && r.tt ? tien(r.ct * r.tt) : '<span class="zero">—</span>') + '</td>' +
+      '<td class="num' + (r.thieu ? ' do' : ' zero') + '">' + r.thieu + '</td></tr>').join('') ||
+      '<tr><td colspan="7" class="empty">Chưa khai bộ dao chuẩn nào (tab Bộ dao)</td></tr>';
+  }
+}
+async function apDung(btn, i){
+  const r = bcTt[i]; if (!r || r.goiY == null) return;
+  const ok = await hoiXacNhan('Đặt tuổi thọ chuẩn ' + r.ma_dao + ' (' + (r.ma_sp || '—') + ' · B' + r.buoc + ' · ' + r.vi_tri + ') = ' + fmtNum(r.goiY) + ' ' + r.don_vi + '?' +
+    (r.coBo ? '' : ' Chưa khai bộ dao → sửa ở Danh mục.'), { nutOk: 'Áp dụng' });
+  if (!ok) return;
+  btn.disabled = true;
+  try {
+    const kq = await rpcWrite('gc_dao_dat_tuoi_tho', { p_ma_sp: r.ma_sp, p_buoc: r.buoc, p_vi_tri: r.vi_tri, p_id_dao: r.id_dao, p_tuoi_tho: r.goiY });
+    showMsg('Đã đặt ' + fmtNum(r.goiY) + (kq.noi === 'bo' ? ' ở Bộ dao' : ' ở Danh mục'), 'okmsg');
+    await loadDm(); loadBc();
+  } catch (e) { showMsg(e.message, 'err', 6000); btn.disabled = false; }
+}
+function xuatBc(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bcTt.map(r => ({ 'Mã dao': r.ma_dao, 'Tên': r.ten, 'Mã SP': r.ma_sp, 'Bước': r.buoc, 'Vị trí': r.vi_tri,
+    'Lần thay': r.ds.length, 'TB thực tế': Math.round(r.tb), 'Thấp nhất': r.min, 'Cao nhất': r.max, 'Đơn vị': r.don_vi, 'Chuẩn': r.chuan || '',
+    '%': r.chuan ? Math.round(r.tb / r.chuan * 100) : '', 'Gãy · Mẻ': r.gay, 'Gợi ý': r.goiY ?? '' }))), 'Tuổi thọ');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bcCp.map(r => ({ 'Mã SP': r.ma_sp, 'Bước': r.buoc, 'Số vị trí': r.vt, 'CT trong kỳ': r.ct,
+    'Đ/CT chuẩn': Math.round(r.chuan), 'Đ/CT thực tế': Math.round(r.tt), 'Chi phí kỳ': Math.round(r.ct * r.tt), 'Thiếu giá / tuổi thọ': r.thieu }))), 'Chi phí SP');
+  XLSX.writeFile(wb, 'Bao_cao_dao_cu_' + document.getElementById('rTu').value + '_' + document.getElementById('rDen').value + '.xlsx');
+}
+
+
 // ── Chung ─────────────────────────────────────────────────────────────────────
 function openDlg(id){ document.getElementById(id).classList.add('open'); }
 function closeDlg(){ document.querySelectorAll('.dlg-mask').forEach(d => d.classList.remove('open')); }
@@ -848,6 +1011,13 @@ function bindAll(){
   ['xTu', 'xDen'].forEach(id => document.getElementById(id).addEventListener('change', loadXd));
   document.getElementById('xTim').addEventListener('keydown', e => { if (e.key === 'Enter') loadXd(); });
   document.getElementById('xXuat').onclick = xuatXd;
+  // T274: báo cáo
+  document.getElementById('sec-bao-cao').addEventListener('click', e => {
+    const c = e.target.closest('[data-bf]'); if (c) { bf = c.dataset.bf; document.querySelectorAll('[data-bf]').forEach(y => y.classList.toggle('on', y === c)); return veBc(); }
+    const a = e.target.closest('[data-ad]'); if (a) apDung(a, Number(a.dataset.ad));
+  });
+  ['rTu', 'rDen'].forEach(id => document.getElementById(id).addEventListener('change', loadBc));
+  document.getElementById('rXuat').onclick = xuatBc;
   document.getElementById('gy-nhom').addEventListener('change', gyLoaiCapNhat);
   document.getElementById('gy-btn').onclick = goiY;
   document.getElementById('gy-kt').addEventListener('keydown', e => { if (e.key === 'Enter') goiY(); });
@@ -871,6 +1041,7 @@ async function init(){
   const d = new Date(); document.getElementById('hDen').value = isoDate(d);
   d.setDate(d.getDate() - 30); document.getElementById('hTu').value = isoDate(d);
   document.getElementById('xDen').value = document.getElementById('hDen').value; document.getElementById('xTu').value = isoDate(d);
+  document.getElementById('rDen').value = document.getElementById('hDen').value; document.getElementById('rTu').value = isoDate(d);
   bindAll();
   if (!(await loadRole())) {
     document.getElementById('roleNote').innerHTML = '<div class="note err">Cần đăng nhập — <a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">Đăng nhập</a></div>';
