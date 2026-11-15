@@ -179,10 +179,13 @@ function setUrl(){
 
 // ── Tải dữ liệu ───────────────────────────────────────────────────────────────
 async function loadIssues(){
-  let q = sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }).limit(1000);
-  if (khuon) q = q.eq('ma_khuon', khuon);
-  if (iFilter === 'open') q = q.neq('trang_thai', 'Đã đóng');
-  const { data, error } = await q;
+  // R26: bảng > 1000 dòng → lấy từng trang (sbTaiHet), order thêm id_van_de để các trang không trùng/sót.
+  const { data, error } = await sbTaiHet(() => {
+    let q = sb.from('duc_van_de_khuon').select('*').order('ngay_phat_hien', { ascending: false }).order('id_van_de');
+    if (khuon) q = q.eq('ma_khuon', khuon);
+    if (iFilter === 'open') q = q.neq('trang_thai', 'Đã đóng');
+    return q;
+  });
   if (error) return showMsg('Lỗi tải vấn đề khuôn: ' + error.message, 'err', 6000);
   const prio = { 'Chờ xác nhận': 0, 'Mở': 1, 'Đã đóng': 2 };
   issues = (data || []).sort((a, b) => ((prio[a.trang_thai] ?? 9) - (prio[b.trang_thai] ?? 9)) ||
@@ -190,11 +193,10 @@ async function loadIssues(){
   // Hạng mục NG + ảnh của lần kiểm IPQC tạo ra vấn đề.
   cpByVd = {};
   const ids = issues.map(x => x.id_van_de).filter(Boolean);
-  for (let i = 0; i < ids.length; i += 150) {
-    const { data: cp } = await sb.from('duc_ipqc_checkpoint').select('id_van_de_lien_quan,checklist_json,anh_bang_chung_url')
-      .in('id_van_de_lien_quan', ids.slice(i, i + 150));
-    (cp || []).forEach(p => { cpByVd[p.id_van_de_lien_quan] = p; });
-  }
+  const { data: cp } = await sbTaiTheoLo(ids, lo => sb.from('duc_ipqc_checkpoint')
+    .select('id_checkpoint,id_van_de_lien_quan,checklist_json,anh_bang_chung_url')
+    .in('id_van_de_lien_quan', lo).order('id_checkpoint'));
+  (cp || []).forEach(p => { cpByVd[p.id_van_de_lien_quan] = p; });
   if (iFilter === 'open') document.getElementById('nOpen').textContent = '(' + issues.length + ')';
 }
 
