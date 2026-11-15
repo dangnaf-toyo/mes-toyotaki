@@ -36,7 +36,7 @@
       '.bd-th-loc{padding-right:22px!important}' +
       '.bd-th-tuongdoi{position:relative}' +
       '.bd-nut{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:17px;height:17px;padding:0;border:1px solid transparent;' +
-        'border-radius:4px;background:transparent;cursor:pointer;color:inherit;opacity:.55;line-height:15px;font-size:10px;font-family:inherit}' +
+        'border-radius:4px;background:transparent;cursor:pointer;color:inherit;opacity:.55;line-height:15px;font-size:11px;font-family:inherit}' +
       '.bd-nut::before{content:"\\25BE"}' +
       '.bd-nut:hover{opacity:1;border-color:currentColor}' +
       '.bd-nut.dang-loc{opacity:1;background:#2563EB;color:#fff;border-color:#2563EB}' +

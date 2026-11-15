@@ -23,6 +23,63 @@
     s.src = document.currentScript.src.replace(/navbar\.js(\?.*)?$/, 'bang-dai.js');
     document.head.appendChild(s);
   }
+  // T255 (X.1): hộp alert của trình duyệt → thông báo góc màn hình (không chặn thao tác) cho MỌI trang có navbar.
+  // Trang đã tự thay alert (vd ipqc-approval.html) thì giữ bản của trang. hộp confirm giữ nguyên (xoá/kết ca/không hoàn tác).
+  // Tin có ⛔ hoặc dài thì không tự tắt — bấm × để đóng. Tin hiện ngay trước khi tải lại/chuyển trang được mang sang trang sau.
+  if (/\[native code\]/.test(String(window.alert))) {
+    const KEY = 'mesThongBaoGoc';
+    let hop = null, giuLai = [];
+    const veHop = () => {
+      if (hop) return hop;
+      const st = document.createElement('style');
+      st.textContent =
+        '#mesTbg{position:fixed;right:16px;bottom:16px;z-index:100000;display:flex;flex-direction:column;gap:8px;max-width:min(420px,calc(100vw - 32px));pointer-events:none}' +
+        '#mesTbg .t{pointer-events:auto;display:flex;gap:10px;align-items:flex-start;background:#14181F;color:#fff;border-radius:8px;padding:10px 12px;font:500 14px/1.45 Inter,system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.25);border-left:4px solid #3B82F6;white-space:pre-line;word-break:break-word}' +
+        '#mesTbg .t.loi{border-left-color:#DC2626}#mesTbg .t.ok{border-left-color:#16A34A}' +
+        '#mesTbg .t span{flex:1}#mesTbg .t button{background:none;border:0;color:#CBD5E1;font-size:18px;line-height:1;cursor:pointer;padding:0 2px}' +
+        '@media print{#mesTbg{display:none}}';
+      document.head.appendChild(st);
+      hop = document.createElement('div');
+      hop.id = 'mesTbg'; hop.setAttribute('role', 'status'); hop.setAttribute('aria-live', 'polite');
+      document.body.appendChild(hop);
+      document.addEventListener('close', (e) => { if (e.target.contains && e.target.contains(hop)) document.body.appendChild(hop); }, true);
+      return hop;
+    };
+    const hien = (msg) => {
+      const s = String(msg ?? '').trim();
+      if (!s) return;
+      if (!document.body) { document.addEventListener('DOMContentLoaded', () => hien(s), { once: true }); return; }
+      const loi = /⛔|❌|lỗi|không (được|thể|có quyền)|thất bại|chưa (chọn|nhập|có)|vui lòng|cần /i.test(s);
+      const ok = !loi && /✅|✓|đã (lưu|gửi|xoá|xóa|cập nhật|tạo|duyệt|ghi)|thành công/i.test(s);
+      const dinh = s.includes('⛔') || s.length > 160;
+      const t = document.createElement('div');
+      t.className = 't' + (loi ? ' loi' : ok ? ' ok' : '');
+      t.innerHTML = '<span></span><button type="button" aria-label="Đóng">×</button>';
+      t.firstChild.textContent = s;
+      const dong = () => { t.remove(); giuLai = giuLai.filter(x => x.t !== t); };
+      t.lastChild.onclick = dong;
+      const h = veHop();
+      // Đang mở hộp sửa (dialog dạng modal) → đặt thông báo bên trong hộp để không bị lớp phủ che.
+      const dlg = [...document.querySelectorAll('dialog[open]')].reverse().find(d => { try { return d.matches(':modal'); } catch (e) { return false; } });
+      const cha = dlg || document.body;
+      if (h.parentNode !== cha) cha.appendChild(h);
+      h.appendChild(t);
+      while (h.children.length > 4) h.firstChild.remove();
+      const muc = { t, s, luc: Date.now() };
+      giuLai.push(muc);
+      if (!dinh) setTimeout(dong, Math.min(12000, 4000 + s.length * 50));
+    };
+    window.alert = hien;
+    window.addEventListener('pagehide', () => {
+      const con = giuLai.filter(x => Date.now() - x.luc < 3000).map(x => x.s);
+      try { if (con.length) sessionStorage.setItem(KEY, JSON.stringify(con)); } catch (e) {}
+    });
+    try {
+      const cu = JSON.parse(sessionStorage.getItem(KEY) || '[]');
+      sessionStorage.removeItem(KEY);
+      cu.forEach(hien);
+    } catch (e) {}
+  }
   // Trang được nhúng trong một tab quản trị không cần thanh điều hướng thứ hai.
   if (new URLSearchParams(location.search).has('embed')) return;
 
@@ -212,7 +269,7 @@ body{padding-top:var(--navbar-h)}
 .mnb-bell:hover,.mnb-bell:focus-visible{color:#fff;background:rgba(255,255,255,.09)}
 .mnb-bell.route-active{color:#C87941}
 .mnb-bell svg{display:block}
-.mnb-bell-n{position:absolute;top:2px;right:1px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#DC2626;color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px #211a15;box-sizing:border-box}
+.mnb-bell-n{position:absolute;top:2px;right:1px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#DC2626;color:#fff;font-size:11px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px #211a15;box-sizing:border-box}
 .mnb-bell-n[hidden]{display:none}
 @media (max-width:820px){
   .mnb-bell{margin-left:auto}

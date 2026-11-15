@@ -41,7 +41,7 @@
       '.sca-t .x{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:22px;cursor:pointer;padding:0}' +
       '.sca-busy{font-size:11.5px;color:#B45309;margin-top:6px}' +
       '.sca-note{font-size:11px;color:#94A3B8;margin-top:6px}' +
-      '.sca-badge{display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;padding:0 5px;border-radius:8px;background:#E0F2FE;color:#075985;margin-left:4px;white-space:nowrap;cursor:pointer;vertical-align:middle;line-height:16px}' +
+      '.sca-badge{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;padding:0 5px;border-radius:8px;background:#E0F2FE;color:#075985;margin-left:4px;white-space:nowrap;cursor:pointer;vertical-align:middle;line-height:16px}' +
       '.sca-badge.co-sau{background:#DCFCE7;color:#166534}';
     document.head.appendChild(st);
   }
