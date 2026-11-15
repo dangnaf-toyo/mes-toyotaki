@@ -661,16 +661,22 @@ function renderTongTuanBar(){
 // =============================================================================
 let machineList = [];
 let productMap = {}; // ma_sp -> ten_sp
+let spByMachine = {}; // ma_may -> [ma_sp] (master_machines.ma_sp_dung) — lọc dropdown Mã SP trong file mẫu
 
 async function loadMasterLists(){
   const [mMachines, mProducts] = await Promise.all([
     // Ô "Mã máy" chỉ dùng ở tab Đúc → chỉ lấy máy bộ phận Đúc (bo_phan null =
     // máy cũ chưa gán). Các tab công đoạn khác lập KH theo (công đoạn, mã SP),
     // không gắn máy nên không cần danh sách này.
-    sb.from('master_machines').select('ma_may').or('bo_phan.eq.Đúc,bo_phan.is.null'),
+    sb.from('master_machines').select('ma_may,ma_sp_dung').or('bo_phan.eq.Đúc,bo_phan.is.null'),
     sb.from('master_products').select('ma_sp,ten_sp,so_khuon'),
   ]);
   machineList = (mMachines.data || []).map(r => r.ma_may).filter(Boolean).sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+  spByMachine = {};
+  (mMachines.data || []).forEach(r => {
+    const l = Array.isArray(r.ma_sp_dung) ? [...new Set(r.ma_sp_dung.filter(Boolean))] : [];
+    if (r.ma_may && l.length) spByMachine[r.ma_may] = l.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+  });
   const products = (mProducts.data || []).filter(p => p.ma_sp).sort((a,b) => a.ma_sp.localeCompare(b.ma_sp, 'vi', { numeric: true }));
   productMap = {};
   products.forEach(p => { productMap[p.ma_sp] = p.ten_sp || ''; });
@@ -1221,6 +1227,16 @@ async function buildTemplateExcel(){
     mr++;
   });
 
+  // I = máy · J = số mã · K.. = mã SP chạy trên máy (ma_sp_dung) → dropdown Mã SP lọc theo máy
+  dm.getCell('I1').value = 'MÁY'; dm.getCell('J1').value = 'SỐ MÃ'; dm.getCell('K1').value = 'MÃ SP CHẠY →';
+  let qr = 2;
+  machines.forEach(m => {
+    const l = spByMachine[m]; if (!l || !l.length) return;
+    dm.getCell('I' + qr).value = m; dm.getCell('J' + qr).value = l.length;
+    l.forEach((sp, j) => dm.getCell(colLetter(11 + j) + qr).value = sp);
+    qr++;
+  });
+
   // ── 1 sheet cho MỖI bộ phận, cùng format ──
   for (const tab of TABS) {
     await buildDeptSheet(wb, wb.addWorksheet(tab), tab, machines, sps);
@@ -1253,10 +1269,12 @@ async function buildDeptSheet(wb, ws, tab, machines, sps){
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).alignment = { vertical: 'middle' };
 
-  const exSp = Object.keys(moldsByProduct).find(sp => moldsByProduct[sp].length === 1)
+  const exMay = (isDuc && machines.find(m => spByMachine[m])) || machines[0] || '';
+  const spPool = (isDuc && spByMachine[exMay]) || Object.keys(moldsByProduct);
+  const exSp = spPool.find(sp => (moldsByProduct[sp] || []).length === 1)
+    || Object.keys(moldsByProduct).find(sp => moldsByProduct[sp].length === 1)
     || Object.keys(moldsByProduct)[0] || sps[0] || '';
   const exMold = (moldsByProduct[exSp] || [])[0] || '';
-  const exMay = machines[0] || '';
   const EXAMPLE_MARK = '◀ DÒNG VÍ DỤ — có thể xoá, hệ thống tự bỏ qua khi nhập';
   const exRow = isDuc
     ? [exMay, exSp, null, exMold, 200, 200, 200, 200, 200, 0, 0, EXAMPLE_MARK]
@@ -1278,7 +1296,11 @@ async function buildDeptSheet(wb, ws, tab, machines, sps){
       ws.getCell(colLetter(c) + r).protection = { locked: colLetter(c) === tenCol };
     }
     if (isDuc) ws.getCell('A' + r).dataValidation = { type: 'list', allowBlank: true, formulae: [mayRange] };
-    ws.getCell(spCol + r).dataValidation = { type: 'list', allowBlank: true, formulae: [spRange] };
+    // Đúc: chọn máy trước → Mã SP chỉ hiện mã chạy trên máy đó; máy chưa khai mã / chưa chọn máy → mọi mã
+    const spList = isDuc
+      ? "IF(COUNTIF('_DM'!$I:$I,$A" + r + ")=0," + spRange + ",OFFSET('_DM'!$K$1,MATCH($A" + r + ",'_DM'!$I:$I,0)-1,0,1,INDEX('_DM'!$J:$J,MATCH($A" + r + ",'_DM'!$I:$I,0))))"
+      : spRange;
+    ws.getCell(spCol + r).dataValidation = { type: 'list', allowBlank: true, formulae: [spList] };
     ws.getCell(tenCol + r).value = { formula: 'IFERROR(VLOOKUP(' + spCol + r + ",'_DM'!$C:$D,2,FALSE),\"\")" };
 
     if (isDuc) {
@@ -1344,6 +1366,7 @@ async function buildGuideSheet(guide){
   P('1. CÁCH ĐIỀN', { head: true });
   P('• Sheet "Đúc" có cột "Mã máy" và "Số khuôn"; các sheet khác chỉ có "Mã SP" và sản lượng.');
   P('• Cột "Mã máy" / "Mã SP": bấm vào ô → chọn từ danh sách xổ xuống (dropdown).');
+  P('• Sheet "Đúc": chọn MÃ MÁY TRƯỚC → ô Mã SP chỉ hiện các mã chạy trên máy đó (theo Danh mục máy, cột "Dùng cho mã SP"). Máy chưa khai mã hoặc chưa chọn máy → hiện mọi mã. Vẫn gõ tay được mã ngoài danh sách.');
   P('• Cột "Tên SP (tự điền)": TỰ HIỆN theo Mã SP bằng công thức — không cần gõ. Ô này đã KHOÁ để tránh xoá nhầm công thức.');
   P('• Cột "Số khuôn" (chỉ sheet Đúc): chọn từ dropdown.');
   P('    – Mã SP chỉ có 1 khuôn → ô đã điền sẵn khuôn đó.');
@@ -1365,8 +1388,8 @@ async function buildGuideSheet(guide){
   P('• KHÔNG cần sửa cột "Tên SP" — nếu thật sự cần: Review ▸ Unprotect Sheet (không có mật khẩu, cứ bấm OK).');
   P('');
   P('4. LƯU Ý TƯƠNG THÍCH', { head: true });
-  P('• Mở file bằng MICROSOFT EXCEL BẢN MÁY TÍNH. Dropdown "Số khuôn" ở dòng trống dùng hàm INDIRECT — KHÔNG hoạt động trên Google Sheets, LibreOffice hay trình xem online.');
-  P('• Các dropdown Mã máy / Mã SP và dropdown khuôn ở dòng có sẵn thì chạy ở mọi nơi.');
+  P('• Mở file bằng MICROSOFT EXCEL BẢN MÁY TÍNH. Dropdown "Mã SP" lọc theo máy (sheet Đúc) và "Số khuôn" ở dòng trống dùng hàm OFFSET / INDIRECT — KHÔNG hoạt động trên Google Sheets, LibreOffice hay trình xem online.');
+  P('• Các dropdown Mã máy, Mã SP (sheet khác Đúc) và dropdown khuôn ở dòng có sẵn thì chạy ở mọi nơi.');
   P('');
   P('5. NHẬP LÊN HỆ THỐNG', { head: true });
   P('• Lưu file (giữ định dạng .xlsx).');
