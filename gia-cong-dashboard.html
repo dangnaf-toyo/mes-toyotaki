@@ -60,7 +60,7 @@
 
   .page{padding:8px 12px 50px;display:flex;flex-direction:column;gap:10px;}
   .boot{padding:40px;text-align:center;color:var(--text-muted);}
-  .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;}
+  .kpis{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;}
   .kpi{background:var(--bg-panel);border:1px solid var(--border);border-radius:9px;padding:8px 12px;min-width:0;}
   .kpi .l{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .kpi .v{font-family:var(--mono);font-size:20px;font-weight:700;}
@@ -248,6 +248,19 @@
   .done-banner span{display:block;font-weight:500;font-size:12px;color:var(--text);margin-top:2px;}
   .qr-box{background:#fff;border-radius:12px;padding:12px;width:min(420px,100%);}
 
+  /* T273: dao trên máy */
+  .dao-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;}
+  .dao-dot.vang{background:#F59E0B;} .dao-dot.do{background:var(--alarm-fg);}
+  .dao-list{display:flex;flex-direction:column;gap:4px;}
+  .dao-r{display:grid;grid-template-columns:44px minmax(0,1fr) 150px auto;gap:8px;align-items:center;border:1px solid var(--border);border-radius:7px;padding:5px 8px;background:var(--bg-panel);}
+  .dao-r .vt{font-family:var(--mono);font-weight:800;font-size:12.5px;}
+  .dao-r .nm{min-width:0;} .dao-r .nm b{font-family:var(--mono);font-size:12px;}
+  .dao-r .nm small{display:block;color:var(--text-muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dao-r .lf{font-size:11px;color:var(--text-muted);font-family:var(--mono);white-space:nowrap;} .dao-r .lf .bar{margin-top:3px;}
+  .dao-r.vang{border-color:var(--warn-bd);background:var(--warn-bg);} .dao-r.vang .bar i{background:#F59E0B;}
+  .dao-r.do{border-color:var(--alarm-bd);background:var(--alarm-bg);} .dao-r.do .bar i{background:var(--alarm-fg);} .dao-r.do .lf b{color:var(--alarm-fg);}
+  .dao-r.trong{border-style:dashed;background:var(--bg-sunken);}
+  @media (max-width:640px){ .dao-r{grid-template-columns:38px minmax(0,1fr) auto;} .dao-r .lf{grid-column:2/3;grid-row:2;} }
   @media (max-width:1240px){
     .app{grid-template-columns:250px minmax(0,1fr);}
     .side-r{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -383,6 +396,34 @@
   <div class="modal xl" role="dialog" aria-modal="true" id="rpBody"></div>
 </div>
 
+<!-- T273: thay / lắp dao -->
+<div class="modal-bg" id="daoModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dmoTitle">
+    <h4 id="dmoTitle">Thay dao</h4>
+    <div class="sub" id="dmoSub"></div>
+    <div class="two" data-dm="thay">
+      <label class="f"><span>Lý do</span><select id="dmoLyDo"></select></label>
+      <label class="f"><span>Dao cũ</span><select id="dmoXuLy"><option value="">— Chọn —</option><option value="mai">Chờ mài</option><option value="bo">Bỏ (hỏng)</option><option value="tra">Trả tủ</option></select></label>
+    </div>
+    <div class="two" data-dm="lap">
+      <label class="f"><span>Vị trí</span><input id="dmoVt" autocomplete="off" placeholder="T01"></label>
+      <label class="f"><span>SL lắp</span><input id="dmoSl" type="number" min="1" step="1" value="1" inputmode="numeric"></label>
+    </div>
+    <label class="f" data-dm="thay lap"><span>Dao mới</span><input id="dmoMa" list="dsDao" autocomplete="off" placeholder="Gõ mã / tên"><small id="dmoMaHint"></small></label>
+    <label data-dm="thay" style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="dmoChiThao"> Chỉ tháo, chưa lắp dao mới</label>
+    <div class="two" data-dm="lap bo">
+      <label class="f"><span>Dao lấy từ</span><select id="dmoNguon"><option value="tu">Tủ dao (trừ tồn Mới)</option><option value="may">Có sẵn trên máy</option></select></label>
+      <label class="f" id="dmoDauWrap"><span>Đã chạy (chi tiết)</span><input id="dmoDau" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+    </div>
+    <label class="f" data-dm="thay lap"><span>Ghi chú</span><input id="dmoGc" autocomplete="off"></label>
+    <div class="err" id="dmoErr"></div>
+    <div class="acts">
+      <button class="mbtn ghost" type="button" data-close>Huỷ</button>
+      <button class="mbtn" type="button" id="dmoSave">Lưu</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="xnModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" style="width:min(420px,100%)">
     <div class="xn-nd" id="xnNd"></div>
@@ -403,6 +444,7 @@
 
 <datalist id="dsNguoi"></datalist>
 <datalist id="dsTaiKhoan"></datalist>
+<datalist id="dsDao"></datalist>
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -532,7 +574,7 @@ async function taiDanhMuc() {
 }
 async function taiLai() {
   const arg = { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value };
-  const [r, q] = await Promise.all([sb.rpc('gc_du_lieu', arg), sb.rpc('gc_tem_cho', arg)]);
+  const [r, q] = await Promise.all([sb.rpc('gc_du_lieu', arg), sb.rpc('gc_tem_cho', arg), taiDao(!DAO.length).catch(e => console.error(e))]);
   const { data, error } = r;
   if (error) { errFlash(error); renderAll(); return; }
   D = data || {};
@@ -563,13 +605,15 @@ function renderKpis() {
   const chay = M.filter(m => trangThai(m) === 'run').length, dung = M.filter(m => trangThai(m) === 'stop').length;
   const phut = M.reduce((s, m) => s + phutDungCa(m), 0), lan = M.reduce((s, m) => s + (m.su_co || []).length, 0);
   const pct = kh ? Math.round(ok / kh * 100) : 0;
+  const dAll = Object.values(DTM).flat(), dSap = dAll.filter(r => daoMuc(r)).length, dQua = dAll.filter(r => daoMuc(r) === 'do').length;
   $('#kpis').innerHTML =
     '<div class="kpi"><div class="l">Kế hoạch ca</div><div class="v">' + fmt(kh) + '</div><div class="s">pcs · ' + mo.length + ' máy đã mở</div></div>' +
     '<div class="kpi ok"><div class="l">OK công đoạn · ' + pct + '% KH</div><div class="v">' + fmt(ok) + '</div><div class="bar"><i style="width:' + Math.min(pct, 100) + '%"></i></div></div>' +
     '<div class="kpi"><div class="l">SL máy (mọi bước)</div><div class="v">' + fmt(slm) + '</div><div class="s">gồm bước trung gian</div></div>' +
     '<div class="kpi bad"><div class="l">NG · Test</div><div class="v">' + fmt(ng) + '<span style="font-size:13px;color:var(--warn-fg)"> · ' + fmt(test) + '</span></div><div class="s">' + (ok + ng ? (ng / (ok + ng) * 100).toFixed(1) : '0.0') + '% NG</div></div>' +
     '<div class="kpi"><div class="l">Máy đang chạy</div><div class="v">' + chay + '<span style="font-size:13px;color:var(--text-dim)"> / ' + M.length + '</span></div><div class="s">Vận hành ' + (M.length ? Math.round(chay / M.length * 100) : 0) + '% · ' + dung + ' máy dừng</div></div>' +
-    '<div class="kpi warn"><div class="l">Phút dừng trong ca</div><div class="v">' + fmt(phut) + '</div><div class="s">' + lan + ' lần dừng</div></div>';
+    '<div class="kpi warn"><div class="l">Phút dừng trong ca</div><div class="v">' + fmt(phut) + '</div><div class="s">' + lan + ' lần dừng</div></div>' +
+    '<div class="kpi' + (dQua ? ' bad' : dSap ? ' warn' : '') + '"><div class="l">Dao sắp hết</div><div class="v">' + dSap + '</div><div class="s">' + dQua + ' quá tuổi thọ · ' + dAll.length + ' dao trên máy</div></div>';
 }
 
 function tileHtml(m) {
@@ -580,7 +624,7 @@ function tileHtml(m) {
   else if (dl && !t) extra = '<div class="do">Có ' + dl + ' thùng dở — mở máy</div>';
   else if (dl) extra = '<div class="do" style="color:var(--run-fg)">' + dl + ' thùng đang làm</div>';
   return '<button type="button" class="tile ' + st + (m.ma_may === sel ? ' sel' : '') + '" data-may="' + esc(m.ma_may) + '">' +
-    '<div class="t">' + esc(m.ma_may) + '<span class="sp"></span><span class="st">' + ST_TEXT[st] + '</span></div>' +
+    '<div class="t">' + esc(m.ma_may) + (daoMucMay(m.ma_may) ? '<span class="dao-dot ' + daoMucMay(m.ma_may) + '" title="Có dao sắp hết tuổi thọ"></span>' : '') + '<span class="sp"></span><span class="st">' + ST_TEXT[st] + '</span></div>' +
     '<div class="ma">' + (t ? esc(t.ma_sp) : '<span style="color:var(--text-dim)">—</span>') + '</div>' +
     '<div class="who">' + (t ? (t.nguoi_thao_tac ? esc(t.nguoi_thao_tac) : '<b style="color:var(--alarm-fg)">chưa gán người</b>') : '&nbsp;') + '</div>' +
     (t ? '<div class="prog"><div class="bar"><i style="width:' + pct + '%"></i></div><span class="mono">' + fmt(sl) + '/' + (kh ? fmt(kh) : '—') + '</span></div>' : '') +
@@ -682,6 +726,8 @@ function renderWs() {
     }).join('') + '</div>';
   }
 
+  h += daoHtml(m);   // T273
+
   // Đã xong trong ca
   const X = m.xong || [];
   if (X.length) {
@@ -710,7 +756,7 @@ function renderWs() {
   }
 
   ws.innerHTML = h;
-  wireWs(m);
+  wireWs(m); wireDao(m);
 }
 
 function ngRowHtml() {
@@ -1134,6 +1180,159 @@ async function dongCam() {
 $('#btnCloseCam').onclick = dongCam;
 
 /* ── Đồng hồ + khởi động ─────────────────────────────────────────────────── */
+/* ── T273: Dao trên máy — tuổi thọ + thay dao ─────────────────────────────────
+   Bộ dao chuẩn (gc_bo_dao) khai ở dao-cu.html?tab=bo-dao theo mã SP + bước.
+   Số chi tiết = số đầu lúc lắp + SL ra các thùng Xong trên máy (view gc_dao_tren_may_v). */
+const QUYEN_DAO = ['admin', 'quan_ly_bo_phan', 'nhan_vien_thong_ke', 'qlsx_truong_phong', 'truong_ca'];
+const LY_DO_THAY = [['Hết tuổi thọ', 'mai'], ['Gãy', 'bo'], ['Mẻ', 'mai'], ['Mòn sớm', 'mai'], ['Đổi mã', 'tra']];
+let DAO = [], BO = {}, DTM = {}, RT = {}, daoTat = false, myRole = '', daoMo = null;
+const canDao = () => QUYEN_DAO.includes(myRole);
+const loiNV = s => { const e = new Error(s); e.nghiep_vu = true; return e; };
+const natCmp = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'vi', { numeric: true, sensitivity: 'base' });
+const daoId = id => DAO.find(x => Number(x.id) === Number(id));
+const daoMa = s => { s = String(s || '').trim().toUpperCase(); return DAO.find(x => x.ma_dao.toUpperCase() === s); };
+async function taiDao(caDanhMuc) {
+  const viec = [sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,ten_chuan,so_luong,ma_sp,buoc,lap_luc,so_ct,tuoi_tho,so_lan_ct,tuoi_tho_theo').is('thao_luc', null).range(0, 4999)];
+  if (caDanhMuc) viec.push(
+    sb.from('gc_dao_cu').select('id,ma_dao,ten_chuan,quy_cach,ton_moi,tuoi_tho_chuan,tuoi_tho_theo,dang_dung').range(0, 4999),
+    sb.from('gc_bo_dao').select('ma_sp,buoc,vi_tri,id_dao,so_luong').range(0, 9999),
+    sb.from('master_cnc_routing').select('ma_sp,buoc,loai_may').range(0, 4999));
+  const [v, a, b, c] = await Promise.all(viec);
+  if (v.error) { daoTat = true; DTM = {}; return; }   // chưa chạy migration T273 → ẩn khối
+  daoTat = false; DTM = {};
+  (v.data || []).forEach(r => { (DTM[r.ma_may] = DTM[r.ma_may] || []).push(r); });
+  if (a && !a.error) {
+    DAO = a.data || [];
+    $('#dsDao').innerHTML = DAO.filter(x => x.dang_dung).sort((x, y) => natCmp(x.ma_dao, y.ma_dao)).map(x => '<option value="' + esc(x.ma_dao) + '">' + esc(x.ten_chuan + (x.quy_cach ? ' · ' + x.quy_cach : '') + ' · Mới ' + fmt(x.ton_moi)) + '</option>').join('');
+  }
+  if (b && !b.error) { BO = {}; (b.data || []).forEach(x => { (BO[x.ma_sp + '|' + x.buoc] = BO[x.ma_sp + '|' + x.buoc] || []).push(x); }); }
+  if (c && !c.error) { RT = {}; (c.data || []).forEach(x => { (RT[x.ma_sp] = RT[x.ma_sp] || []).push(x); }); }
+}
+function loaiMayGc(m) {
+  if (m.loai_may === 'Phay CNC') return Number(m.so_truc) >= 4 ? 'phay_4_truc' : 'phay_3_truc';
+  return ({ 'Tiện CNC': 'tien', 'Chuốt': 'chuot' })[m.loai_may] || '';
+}
+// Bước máy đang làm của mã SP: thùng đang làm → quy trình CNC theo loại máy → 1
+function buocMay(m) {
+  const t = m.tram; if (!t) return 1;
+  const dl = (m.dang_lam || []).find(b => b.ma_sp === t.ma_sp); if (dl) return Number(dl.buoc);
+  const r = (RT[t.ma_sp] || []).slice().sort((x, y) => x.buoc - y.buoc).find(x => x.loai_may === loaiMayGc(m));
+  return r ? Number(r.buoc) : 1;
+}
+function daoPct(r) {
+  const tt = Number(r.tuoi_tho || 0);
+  if (!tt || r.tuoi_tho_theo === 'khong') return null;
+  return Math.round(Number(r.so_ct) * Number(r.so_lan_ct || 1) / tt * 100);
+}
+const daoMuc = r => { const p = daoPct(r); return p == null ? '' : p >= 100 ? 'do' : p >= 80 ? 'vang' : ''; };
+function daoMucMay(ma) { const ds = DTM[ma] || []; return ds.some(r => daoMuc(r) === 'do') ? 'do' : ds.some(r => daoMuc(r) === 'vang') ? 'vang' : ''; }
+function boCuaMay(m) { const t = m.tram; return t ? (BO[t.ma_sp + '|' + buocMay(m)] || []) : []; }
+
+function daoHtml(m) {
+  if (daoTat) return '';
+  const t = m.tram, ds = DTM[m.ma_may] || [], bo = boCuaMay(m), q = canDao();
+  const vts = [...new Set([...bo.map(x => x.vi_tri), ...ds.map(x => x.vi_tri)])].sort(natCmp);
+  const trong = bo.filter(x => !ds.some(d => d.vi_tri === x.vi_tri));
+  const sap = ds.filter(r => daoMuc(r)).length;
+  let h = '<div class="sec-t">Dao trên máy <span class="chip mute">' + ds.length + '</span>' + (sap ? '<span class="chip warn">' + sap + ' sắp hết</span>' : '') +
+    ' <button class="info-btn" type="button" data-info="daoInfo" title="Cách tính">ⓘ</button><span style="flex:1"></span>' +
+    (q && trong.length ? '<button class="tiny" type="button" id="daoLapBo">Lắp theo bộ · ' + trong.length + '</button>' : '') +
+    (q ? '<button class="tiny" type="button" id="daoLap">Lắp dao</button>' : '') + '</div>' +
+    '<div class="info-txt" id="daoInfo" hidden>Số chi tiết tự cộng khi bấm <b>Xong</b> thùng trên máy (huỷ Xong thì trừ lại). Vàng ≥ 80% tuổi thọ, đỏ ≥ 100%. ' +
+    (t ? 'Bộ dao chuẩn ' + esc(t.ma_sp) + ' bước ' + buocMay(m) + ': ' + (bo.length ? bo.length + ' vị trí' : 'chưa khai') + ' — ' : '') +
+    'khai ở <a href="dao-cu.html?tab=bo-dao" target="_blank">Kho dao cụ → Bộ dao</a>. Thay / lắp: trưởng ca trở lên.</div>';
+  if (!vts.length) return h + '<div class="empty-box">Chưa khai dao trên máy.' + (q ? ' Bấm <b>Lắp dao</b>' + (bo.length ? ' hoặc <b>Lắp theo bộ</b>' : '') + '.' : '') + '</div>';
+  return h + '<div class="dao-list">' + vts.map(vt => {
+    const d = ds.find(x => x.vi_tri === vt), s = bo.find(x => x.vi_tri === vt);
+    if (!d) {
+      const dc = daoId(s.id_dao) || {};
+      return '<div class="dao-r trong"><div class="vt">' + esc(vt) + '</div><div class="nm"><b>' + esc(dc.ma_dao || '') + '</b><small>Trống · ' + esc(dc.ten_chuan || '') + '</small></div><div class="lf"></div>' +
+        (q ? '<button class="tiny" type="button" data-lapvt="' + esc(vt) + '">Lắp</button>' : '<span></span>') + '</div>';
+    }
+    const p = daoPct(d), muc = daoMuc(d), dung = Number(d.so_ct) * Number(d.so_lan_ct || 1), lr = d.tuoi_tho_theo === 'lo_ren' ? ' lỗ' : '';
+    return '<div class="dao-r ' + muc + '"><div class="vt">' + esc(vt) + '</div>' +
+      '<div class="nm"><b>' + esc(d.ma_dao) + '</b>' + (s && Number(s.id_dao) !== Number(d.id_dao) ? ' <span class="chip warn">khác bộ</span>' : '') + '<small>' + esc(d.ten_chuan || '') + (Number(d.so_luong) !== 1 ? ' · SL ' + fmt(d.so_luong) : '') + ' · lắp ' + dmy(d.lap_luc) + '</small></div>' +
+      '<div class="lf">' + (p != null ? fmt(dung) + ' / ' + fmt(d.tuoi_tho) + lr + ' · <b>' + p + '%</b><div class="bar"><i style="width:' + Math.min(p, 100) + '%"></i></div>' : fmt(dung) + lr + (d.tuoi_tho_theo === 'khong' ? '' : ' · chưa có tuổi thọ')) + '</div>' +
+      (q ? '<button class="tiny' + (muc ? ' bad' : '') + '" type="button" data-thay="' + d.id + '">Thay</button>' : '<span></span>') + '</div>';
+  }).join('') + '</div>';
+}
+function wireDao(m) {
+  const ws = $('#ws');
+  const a = $('#daoLap'); if (a) a.onclick = () => moDao(m, 'lap', null);
+  const b = $('#daoLapBo'); if (b) b.onclick = () => moDao(m, 'bo', null);
+  ws.querySelectorAll('[data-thay]').forEach(x => x.onclick = () => moDao(m, 'thay', Number(x.dataset.thay)));
+  ws.querySelectorAll('[data-lapvt]').forEach(x => x.onclick = () => moDao(m, 'lap', x.dataset.lapvt));
+}
+function moDao(m, kieu, ref) {
+  const bo = boCuaMay(m), t = m.tram;
+  daoMo = { ma: m.ma_may, kieu, ref };
+  document.querySelectorAll('#daoModal [data-dm]').forEach(x => { x.hidden = !x.dataset.dm.split(' ').includes(kieu); });
+  $('#dmoErr').textContent = ''; $('#dmoGc').value = ''; $('#dmoChiThao').checked = false; $('#dmoNguon').value = 'tu'; $('#dmoDau').value = '0'; $('#dmoSl').value = '1';
+  if (kieu === 'thay') {
+    const d = (DTM[m.ma_may] || []).find(x => x.id === ref); if (!d) return;
+    const s = bo.find(x => x.vi_tri === d.vi_tri), p = daoPct(d);
+    $('#dmoTitle').textContent = 'Thay dao ' + d.vi_tri + ' · ' + m.ma_may;
+    $('#dmoSub').innerHTML = '<b>' + esc(d.ma_dao) + '</b> ' + esc(d.ten_chuan || '') + ' · đã chạy ' + fmt(Number(d.so_ct) * Number(d.so_lan_ct || 1)) + (d.tuoi_tho ? ' / ' + fmt(d.tuoi_tho) + (p != null ? ' (' + p + '%)' : '') : '');
+    $('#dmoLyDo').value = p != null && p >= 100 ? 'Hết tuổi thọ' : '';
+    $('#dmoXuLy').value = p != null && p >= 100 ? 'mai' : '';
+    $('#dmoMa').value = (daoId(s ? s.id_dao : d.id_dao) || {}).ma_dao || '';
+  } else if (kieu === 'lap') {
+    const s = ref ? bo.find(x => x.vi_tri === ref) : null;
+    $('#dmoTitle').textContent = 'Lắp dao · ' + m.ma_may;
+    $('#dmoSub').textContent = t ? 'Mã ' + t.ma_sp + ' · bước ' + buocMay(m) : 'Máy chưa mở trong ca';
+    $('#dmoVt').value = ref || ''; $('#dmoMa').value = s ? ((daoId(s.id_dao) || {}).ma_dao || '') : '';
+    if (s) $('#dmoSl').value = s.so_luong;
+  } else {
+    const trong = bo.filter(x => !(DTM[m.ma_may] || []).some(d => d.vi_tri === x.vi_tri));
+    $('#dmoTitle').textContent = 'Lắp theo bộ · ' + m.ma_may;
+    $('#dmoSub').innerHTML = esc(t.ma_sp) + ' bước ' + buocMay(m) + ' · ' + trong.length + ' vị trí trống: ' + trong.map(x => '<b>' + esc(x.vi_tri) + '</b> ' + esc((daoId(x.id_dao) || {}).ma_dao || '')).join(', ');
+  }
+  daoHint(); $('#daoModal').hidden = false;
+}
+function daoHint() {
+  const d = daoMa($('#dmoMa').value), k = daoMo && daoMo.kieu;
+  $('#dmoMaHint').innerHTML = !$('#dmoMa').value.trim() ? '' : d ? esc(d.ten_chuan + (d.quy_cach ? ' · ' + d.quy_cach : '')) + ' · tồn Mới <b>' + fmt(d.ton_moi) + '</b>' : '<b style="color:var(--alarm-fg)">Mã không có trong danh mục</b>';
+  $('#dmoDauWrap').hidden = !(k === 'lap' && $('#dmoNguon').value === 'may');
+  $('#dmoMa').disabled = k === 'thay' && $('#dmoChiThao').checked;
+}
+$('#dmoMa').oninput = daoHint; $('#dmoNguon').onchange = daoHint; $('#dmoChiThao').onchange = daoHint;
+$('#dmoLyDo').innerHTML = '<option value="">— Chọn —</option>' + LY_DO_THAY.map(x => '<option>' + x[0] + '</option>').join('');
+$('#dmoLyDo').onchange = () => { const x = LY_DO_THAY.find(y => y[0] === $('#dmoLyDo').value); if (x) $('#dmoXuLy').value = x[1]; };
+$('#dmoSave').onclick = async () => {
+  const m = MAY().find(x => x.ma_may === daoMo.ma); if (!m) return;
+  const t = m.tram, btn = $('#dmoSave'); $('#dmoErr').textContent = '';
+  const d = daoMa($('#dmoMa').value), sp = t ? t.ma_sp : '', buoc = buocMay(m);
+  let msg = '';
+  try {
+    btn.disabled = true;
+    if (daoMo.kieu === 'thay') {
+      const chiThao = $('#dmoChiThao').checked;
+      if (!$('#dmoLyDo').value) throw loiNV('Chọn lý do thay');
+      if (!$('#dmoXuLy').value) throw loiNV('Chọn cách xử lý dao cũ');
+      if (!chiThao && !d) throw loiNV('Chọn dao mới đúng danh mục (hoặc tích "Chỉ tháo")');
+      const k = await rpc('gc_dao_thay', { p_id_lap: daoMo.ref, p_ly_do: $('#dmoLyDo').value, p_xu_ly_cu: $('#dmoXuLy').value, p_id_dao_moi: chiThao ? null : d.id,
+        p_so_luong_moi: null, p_ma_sp: sp || null, p_buoc: t ? buoc : null, p_ghi_chu: $('#dmoGc').value });
+      msg = (chiThao ? 'Đã tháo dao' : 'Đã thay dao') + ' · dao cũ chạy ' + fmt(k.so_ct) + (k.tuoi_tho ? ' / ' + fmt(k.tuoi_tho) : '') + '.';
+      if ($('#dmoLyDo').value === 'Gãy') {
+        const dl = (m.dang_lam || []).map(b => b.tag_no);
+        setFlash('warn', '⚠ Dao gãy — kiểm tra lại chi tiết vừa gia công' + (dl.length ? ' trong thùng ' + esc(dl.join(', ')) : '') + '. ' + esc(msg));
+      } else setFlash('ok', esc(msg));
+    } else if (daoMo.kieu === 'lap') {
+      if (!$('#dmoVt').value.trim()) throw loiNV('Nhập vị trí (VD T01)');
+      if (!d) throw loiNV('Chọn mã dao đúng danh mục');
+      await rpc('gc_dao_lap', { p_ma_may: m.ma_may, p_vi_tri: $('#dmoVt').value, p_id_dao: d.id, p_so_luong: Number($('#dmoSl').value) || 1,
+        p_nguon: $('#dmoNguon').value, p_so_ct_dau: Number($('#dmoDau').value) || 0, p_ma_sp: sp, p_buoc: buoc, p_ghi_chu: $('#dmoGc').value });
+      setFlash('ok', 'Đã lắp ' + esc(d.ma_dao) + ' vào ' + esc($('#dmoVt').value.toUpperCase()) + '.');
+    } else {
+      const k = await rpc('gc_dao_lap_bo', { p_ma_may: m.ma_may, p_ma_sp: sp, p_buoc: buoc, p_nguon: $('#dmoNguon').value });
+      setFlash('ok', 'Đã lắp ' + k.so_dao + ' dao theo bộ chuẩn.');
+    }
+    $('#daoModal').hidden = true;
+    await taiDao(true); await taiLai();
+  } catch (e) { $('#dmoErr').textContent = errText(e); }
+  btn.disabled = false;
+};
+
 function tick() {
   const d = new Date();
   $('#hdrDate').textContent = d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -1152,6 +1351,7 @@ function tick() {
     const { data: ss } = await sb.auth.getSession();
     const { data: u } = await sb.from('user_roles').select('role').eq('user_id', ss.session.user.id).maybeSingle();
     laAdmin = !!(u && u.role === 'admin');
+    myRole = (u && u.role) || '';
   } catch (e) { laAdmin = false; }
   await taiLai();
   const s = $('#scan'); if (s) s.focus();

@@ -15,7 +15,8 @@
     gc_dao_cu            — danh mục + tồn 3 trạng thái: Mới / Đang dùng / NG
     gc_dao_cu_giao_dich  — sổ phiếu (chỉ thêm, người + giờ lấy ở server)
   Ghi qua RPC gc_dao_cu_luu (danh mục) và gc_dao_cu_ghi (phiếu) — quyền kiểm ở server.
-  Đợt 2 (chưa làm): bộ dao theo mã SP, dao trên máy, tự cộng số chi tiết, thay dao.
+  T273 Đợt 2: tab Bộ dao (gc_bo_dao theo mã SP + bước) + tab Thay dao (gc_dao_tren_may_v);
+  lắp / thay dao làm ở gia-cong-dashboard.html (RPC gc_dao_lap / gc_dao_lap_bo / gc_dao_thay).
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -112,6 +113,14 @@ tr.off td{color:var(--text-dim)}
 #ovXn{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:6100;padding:16px}
 #ovXn[hidden]{display:none}
 #ovXn .xn-nd{padding:16px;font-size:14px;line-height:1.5;white-space:pre-line}
+.bo-tbl input{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12.5px;width:100%;background:#fff}
+.bo-tbl input.vt{width:62px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;font-weight:700}
+.bo-tbl input.ma{min-width:170px}
+.bo-tbl input.n{width:84px;text-align:right}
+.bo-tbl td small{min-height:14px}
+.bo-tbl .x{border:none;background:none;color:var(--alarm-fg);font-size:15px;cursor:pointer;padding:2px 6px}
+tr.bo-row{cursor:pointer}tr.bo-row:hover td{background:var(--bg-sunken)}
+.pct{font-weight:700}.pct.vang{color:var(--warn-fg)}.pct.do{color:var(--alarm-fg)}
 @media (max-width:640px){.row2,.row3{grid-template-columns:1fr}.toolbar input[type=search]{flex:1}.header-clock{display:none}.tabs a{padding:7px 11px}}
 </style>
 </head>
@@ -136,6 +145,8 @@ tr.off td{color:var(--text-dim)}
     <a href="?tab=ton" data-tab="ton">Tồn kho <span class="n" id="nThieu" hidden></span></a>
     <a href="?tab=danh-muc" data-tab="danh-muc">Danh mục</a>
     <a href="?tab=lich-su" data-tab="lich-su">Lịch sử</a>
+    <a href="?tab=bo-dao" data-tab="bo-dao">Bộ dao</a>
+    <a href="?tab=thay-dao" data-tab="thay-dao">Thay dao</a>
   </nav>
 
   <div id="roleNote"></div>
@@ -197,9 +208,44 @@ tr.off td{color:var(--text-dim)}
       <tbody id="tbLs"><tr><td colspan="10" class="empty">Đang tải...</td></tr></tbody>
     </table></div>
   </section>
+
+  <!-- Bộ dao chuẩn theo mã SP + bước (T273) -->
+  <section class="card" id="sec-bo-dao" hidden>
+    <div class="toolbar">
+      <span class="lbl">Mã SP</span><input id="bSp" list="dlSpGc" placeholder="Gõ mã SP" style="width:170px">
+      <span class="lbl">Bước</span><select id="bBuoc"></select>
+      <span class="spacer"></span>
+      <button type="button" class="info-btn" data-info="iBo" title="Cách khai">ⓘ</button>
+      <button type="button" class="btn btn-outline" id="bThem" hidden>Thêm dòng</button>
+      <button type="button" class="btn" id="bLuu" hidden>Lưu</button>
+    </div>
+    <div class="info-txt" id="iBo" hidden style="margin-bottom:10px">Mỗi mã SP, mỗi bước gia công (theo trang Năng lực CNC) khai 1 bộ dao: vị trí <b>T01, T02…</b> → mã dao, số lượng lắp, tuổi thọ chuẩn. Tuổi thọ trống = lấy theo Danh mục. Dao tính theo lỗ ren: nhập thêm số lỗ / chi tiết.<br>Bảng điều khiển Gia công dùng bộ này để <b>Lắp theo bộ</b> và báo dao sắp hết.</div>
+    <div id="bNoi"></div>
+  </section>
+
+  <!-- Lý lịch thay dao (T273) -->
+  <section class="card" id="sec-thay-dao" hidden>
+    <div class="toolbar">
+      <button type="button" class="chip on" data-xf="thao">Đã thay</button>
+      <button type="button" class="chip" data-xf="lap">Đang lắp</button>
+      <span class="lbl" data-xt>Từ</span><input type="date" id="xTu" data-xt>
+      <span class="lbl" data-xt>đến</span><input type="date" id="xDen" data-xt>
+      <input type="search" id="xTim" placeholder="Máy / mã dao / SP / lý do" style="width:200px">
+      <span class="spacer"></span>
+      <span class="hint" id="xDem"></span>
+      <button type="button" class="btn btn-outline" id="xXuat">Xuất Excel</button>
+      <button type="button" class="info-btn" data-info="iXd" title="Ghi chú">ⓘ</button>
+    </div>
+    <div class="info-txt" id="iXd" hidden style="margin-bottom:10px">Thay / lắp dao làm ở <b>Bảng điều khiển Gia công</b> (khối Dao trên máy). Số chi tiết = số đầu lúc lắp + SL ra các thùng bấm Xong trên máy. <b>%</b> = đã chạy so với tuổi thọ chuẩn — dùng để chỉnh lại tuổi thọ chuẩn.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Máy</th><th>Vị trí</th><th>Mã · tên</th><th>SP · bước</th><th>Lắp</th><th>Tháo</th><th class="num">Đã chạy</th><th class="num">Chuẩn</th><th class="num">%</th><th>Lý do</th><th>Dao cũ</th><th>Người</th></tr></thead>
+      <tbody id="tbXd"><tr><td colspan="12" class="empty">Đang tải...</td></tr></tbody>
+    </table></div>
+  </section>
 </div>
 
 <datalist id="dlDao"></datalist>
+<datalist id="dlSpGc"></datalist>
 <datalist id="dlMay"></datalist>
 <datalist id="dlSp"></datalist>
 <datalist id="dlLyDo"></datalist>
@@ -259,9 +305,9 @@ tr.off td{color:var(--text-dim)}
       <div class="row3">
         <div class="fg"><label>Quản lý<button type="button" class="info-btn" data-info="iQl" title="Giải thích">ⓘ</button></label><select id="dm-ql"><option value="so_luong">Số lượng</option><option value="tung_cai">Từng cái</option></select></div>
         <div class="fg"><label>Tuổi thọ theo</label><select id="dm-ttt"><option value="chi_tiet">Số chi tiết</option><option value="lo_ren">Số lỗ ren</option><option value="khong">Không theo dõi</option></select></div>
-        <div class="fg"><label>Tuổi thọ chuẩn</label><input type="number" id="dm-tt" min="1" step="1" placeholder="Đợt 2"></div>
+        <div class="fg"><label>Tuổi thọ chuẩn</label><input type="number" id="dm-tt" min="1" step="1" placeholder="Mặc định"></div>
       </div>
-      <div class="info-txt" id="iQl" hidden><b>Từng cái</b>: đồ đắt (đầu kẹp, dao phay ren…) sẽ có số cá thể /01 + tem QR ở Đợt 2. Đợt 1 vẫn đếm số lượng.</div>
+      <div class="info-txt" id="iQl" hidden><b>Từng cái</b>: đồ đắt (đầu kẹp, dao phay ren…) sẽ có số cá thể /01 + tem QR (chưa làm). Hiện vẫn đếm số lượng.</div>
       <div class="row3">
         <div class="fg"><label>Tồn tối thiểu</label><input type="number" id="dm-min" min="0" step="1"></div>
         <div class="fg"><label>Đơn giá (đ)</label><input type="number" id="dm-gia" min="0" step="1000"></div>
@@ -294,7 +340,7 @@ tr.off td{color:var(--text-dim)}
 <script src="shared/navbar.js"></script>
 <script src="shared/goi-y-ma.js"></script>
 <script>
-const TABS = ['ton', 'danh-muc', 'lich-su'];
+const TABS = ['ton', 'danh-muc', 'lich-su', 'bo-dao', 'thay-dao'];
 const NHOM = GoiYMa.DAO_NHOM;
 // [nhãn, quyền: 'dung' = trưởng ca trở lên, 'quan_ly' = quản lý / thống kê]
 const GD = {
@@ -306,7 +352,7 @@ const GD = {
   huy_ng:  ['Trả kho NG', 'quan_ly'],
   kiem_ke: ['Kiểm kê', 'quan_ly'],
 };
-const GD_TEN = Object.assign({ ton_dau: 'Tồn đầu' }, Object.fromEntries(Object.entries(GD).map(([k, v]) => [k, v[0]])));
+const GD_TEN = Object.assign({ ton_dau: 'Tồn đầu', bo: 'Bỏ (hỏng)' }, Object.fromEntries(Object.entries(GD).map(([k, v]) => [k, v[0]])));
 const LY_DO = {
   nhap: ['Mua mới', 'Kho cấp', 'Nhận lại'],
   xuat: ['Thay dao', 'Lắp mới', 'Đổi mã SP'],
@@ -373,9 +419,14 @@ async function loadDm(){
 }
 async function loadPhu(){
   const [sp, may] = await Promise.all([
-    sb.from('master_products').select('ma_sp').range(0, 4999),
+    sb.from('master_products').select('ma_sp,ten_sp,quy_trinh_cong_doan').range(0, 4999),
     sb.from('cd_tram_hien_tai').select('ten_tram').eq('cong_doan', 'Gia Công').order('ngay', { ascending: false }).limit(1000),
   ]);
+  if (!sp.error) {
+    SP = {}; (sp.data || []).forEach(x => { SP[x.ma_sp] = x; });
+    document.getElementById('dlSpGc').innerHTML = (sp.data || []).filter(x => /Gia Công/i.test(x.quy_trinh_cong_doan || '')).sort((a, b) => natCmp(a.ma_sp, b.ma_sp))
+      .map(x => '<option value="' + esc(x.ma_sp) + '">' + esc(x.ten_sp || '') + '</option>').join('');
+  }
   if (!sp.error) document.getElementById('dlSp').innerHTML = (sp.data || []).map(x => x.ma_sp).sort(natCmp).map(m => '<option value="' + esc(m) + '">').join('');
   if (!may.error) document.getElementById('dlMay').innerHTML = [...new Set((may.data || []).map(x => x.ten_tram).filter(Boolean))].sort(natCmp).map(m => '<option value="' + esc(m) + '">').join('');
 }
@@ -400,7 +451,7 @@ function setTab(t, push){
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
   TABS.forEach(x => { document.getElementById('sec-' + x).hidden = x !== t; });
   if (push) history.replaceState(null, '', '?tab=' + t);
-  if (t === 'ton') renderTon(); else if (t === 'danh-muc') renderDm(); else loadLichSu();
+  if (t === 'ton') renderTon(); else if (t === 'danh-muc') renderDm(); else if (t === 'bo-dao') renderBo(); else if (t === 'thay-dao') loadXd(); else loadLichSu();
 }
 function khop(d, q){
   if (!q) return true;
@@ -603,6 +654,134 @@ function xuatLichSu(){
   XLSX.writeFile(wb, 'Lich_su_dao_cu_' + isoDate(new Date()) + '.xlsx');
 }
 
+// ── Bộ dao chuẩn theo mã SP + bước (T273) ────────────────────────────────────
+let SP = {}, RT = null, boTong = [], boRows = [], boSp = '', boBuoc = 1, boSua = false;
+const TEN_LOAI_MAY = { phay_3_truc: 'Phay 3 trục', phay_4_truc: 'Phay 4 trục', tien: 'Tiện', chuot: 'Chuốt' };
+async function loadRt(){
+  if (RT) return;
+  const r = await sb.from('master_cnc_routing').select('ma_sp,buoc,loai_may').range(0, 4999);
+  RT = {}; (r.data || []).forEach(x => { (RT[x.ma_sp] = RT[x.ma_sp] || []).push(x); });
+  Object.values(RT).forEach(a => a.sort((x, y) => x.buoc - y.buoc));
+}
+function buocCua(sp){ const a = (RT && RT[sp]) || []; return a.length ? a : [{ buoc: 1, loai_may: '' }]; }
+function tenBuoc(sp, b){ const x = buocCua(sp).find(y => y.buoc === b); return x && x.loai_may ? ' · ' + (TEN_LOAI_MAY[x.loai_may] || x.loai_may) : ''; }
+async function renderBo(){
+  await loadRt();
+  const noi = document.getElementById('bNoi'), sp = document.getElementById('bSp').value.trim();
+  document.getElementById('bThem').hidden = document.getElementById('bLuu').hidden = !(canQL() && sp && SP[sp]);
+  if (!sp) {
+    const r = await sb.from('gc_bo_dao').select('ma_sp,buoc,updated_at,updated_by').range(0, 9999);
+    const g = {};
+    (r.data || []).forEach(x => { const k = x.ma_sp + '|' + x.buoc; const o = g[k] = g[k] || { ma_sp: x.ma_sp, buoc: x.buoc, n: 0, t: '', ai: '' }; o.n++; if (x.updated_at > o.t) { o.t = x.updated_at; o.ai = x.updated_by; } });
+    boTong = Object.values(g).sort((a, b) => natCmp(a.ma_sp, b.ma_sp) || a.buoc - b.buoc);
+    document.getElementById('bBuoc').innerHTML = '';
+    noi.innerHTML = '<div class="hint" style="margin-bottom:6px">' + (boTong.length ? 'Đã khai ' + boTong.length + ' bộ — bấm dòng để mở. Khai mới: gõ mã SP ở trên.' : 'Chưa khai bộ dao nào — gõ mã SP ở trên để khai.') + '</div>' +
+      (boTong.length ? '<div class="tbl-wrap"><table><thead><tr><th>Mã SP</th><th>Tên SP</th><th>Bước</th><th class="num">Số vị trí</th><th>Cập nhật</th></tr></thead><tbody>' +
+        boTong.map(o => '<tr class="bo-row" data-bsp="' + esc(o.ma_sp) + '" data-bb="' + o.buoc + '"><td class="mk">' + esc(o.ma_sp) + '</td><td>' + esc((SP[o.ma_sp] || {}).ten_sp || '') + '</td><td>' + o.buoc + tenBuoc(o.ma_sp, o.buoc) + '</td><td class="num">' + o.n + '</td><td>' + fmtDT(o.t) + ' · ' + esc(o.ai) + '</td></tr>').join('') +
+        '</tbody></table></div>' : '');
+    return;
+  }
+  if (!SP[sp]) { noi.innerHTML = '<div class="empty">Mã SP không có trong Danh mục SP</div>'; return; }
+  const bs = buocCua(sp), sel = document.getElementById('bBuoc');
+  const cu = Number(sel.value) || boBuoc;
+  sel.innerHTML = bs.map(b => '<option value="' + b.buoc + '">' + b.buoc + (b.loai_may ? ' · ' + (TEN_LOAI_MAY[b.loai_may] || b.loai_may) : '') + '</option>').join('');
+  sel.value = bs.some(b => b.buoc === cu) ? cu : bs[0].buoc;
+  const buoc = Number(sel.value);
+  if (sp !== boSp || buoc !== boBuoc || !boSua) {
+    const r = await sb.from('gc_bo_dao').select('*').eq('ma_sp', sp).eq('buoc', buoc).order('vi_tri');
+    boRows = (r.data || []).map(x => { const d = daoById(x.id_dao) || {}; return { vi_tri: x.vi_tri, ma: d.ma_dao || '', so_luong: x.so_luong, tuoi_tho_chuan: x.tuoi_tho_chuan ?? '', so_lan_ct: x.so_lan_ct, ghi_chu: x.ghi_chu }; });
+    boSp = sp; boBuoc = buoc; boSua = false;
+  }
+  veBo();
+}
+function veBo(){
+  const ql = canQL(), noi = document.getElementById('bNoi');
+  const dong = (r, i) => {
+    const d = daoByMa(r.ma), lr = d && d.tuoi_tho_theo === 'lo_ren';
+    const ttDm = d && d.tuoi_tho_chuan ? 'DM ' + fmtNum(d.tuoi_tho_chuan) : (d && d.tuoi_tho_theo === 'khong' ? 'không theo dõi' : (d ? 'DM chưa có' : ''));
+    if (!ql) return '<tr><td class="mk">' + esc(r.vi_tri) + '</td><td><span class="mk">' + esc(r.ma) + '</span><small>' + esc(d ? d.ten_chuan : '') + '</small></td><td class="num">' + fmtNum(r.so_luong) + '</td>' +
+      '<td class="num">' + (r.tuoi_tho_chuan !== '' && r.tuoi_tho_chuan != null ? fmtNum(r.tuoi_tho_chuan) : '<span class="zero">' + esc(ttDm) + '</span>') + '</td><td class="num">' + (lr ? fmtNum(r.so_lan_ct) : '') + '</td><td>' + esc(r.ghi_chu) + '</td><td></td></tr>';
+    return '<tr data-i="' + i + '"><td><input class="vt" data-k="vi_tri" value="' + esc(r.vi_tri) + '" placeholder="T01"></td>' +
+      '<td><input class="ma" data-k="ma" list="dlDao" value="' + esc(r.ma) + '" placeholder="Mã dao"><small>' + (d ? esc(d.ten_chuan + (d.quy_cach ? ' · ' + d.quy_cach : '')) : (r.ma ? '<span style="color:var(--alarm-fg)">Mã không có trong danh mục</span>' : '')) + '</small></td>' +
+      '<td><input class="n" data-k="so_luong" type="number" min="1" step="1" value="' + esc(r.so_luong) + '"></td>' +
+      '<td><input class="n" data-k="tuoi_tho_chuan" type="number" min="1" step="1" value="' + esc(r.tuoi_tho_chuan) + '" placeholder="' + esc(d && d.tuoi_tho_chuan ? d.tuoi_tho_chuan : '') + '"><small>' + (lr ? 'lỗ ren · ' : '') + esc(ttDm) + '</small></td>' +
+      '<td>' + (lr ? '<input class="n" data-k="so_lan_ct" type="number" min="1" step="1" value="' + esc(r.so_lan_ct) + '">' : '') + '</td>' +
+      '<td><input data-k="ghi_chu" value="' + esc(r.ghi_chu) + '"></td><td><button type="button" class="x" data-xoa="' + i + '" title="Xoá dòng">✕</button></td></tr>';
+  };
+  noi.innerHTML = '<div class="hint" style="margin-bottom:6px"><b>' + esc(boSp) + '</b> ' + esc((SP[boSp] || {}).ten_sp || '') + ' · bước ' + boBuoc + tenBuoc(boSp, boBuoc) + ' · ' + boRows.length + ' vị trí' + (boSua ? ' · <b style="color:var(--warn-fg)">chưa lưu</b>' : '') + ' · <a href="#" id="bVe">← danh sách</a></div>' +
+    '<div class="tbl-wrap"><table class="bo-tbl" data-bang-dai="tat"><thead><tr><th>Vị trí</th><th>Mã dao</th><th class="num">SL lắp</th><th class="num">Tuổi thọ (CT)</th><th class="num">Lỗ/CT</th><th>Ghi chú</th><th></th></tr></thead><tbody>' +
+    (boRows.map(dong).join('') || '<tr><td colspan="7" class="empty">Chưa có dao' + (ql ? ' — bấm Thêm dòng' : '') + '</td></tr>') + '</tbody></table></div>';
+}
+function boThem(){
+  const n = boRows.reduce((m, r) => { const k = /^T(\d+)$/i.exec(r.vi_tri || ''); return k ? Math.max(m, Number(k[1])) : m; }, 0) + 1;
+  boRows.push({ vi_tri: 'T' + String(n).padStart(2, '0'), ma: '', so_luong: 1, tuoi_tho_chuan: '', so_lan_ct: 1, ghi_chu: '' });
+  boSua = true; veBo();
+  const ins = document.querySelectorAll('#bNoi input.ma'); if (ins.length) ins[ins.length - 1].focus();
+}
+async function boLuu(btn){
+  const ds = [];
+  for (const r of boRows) {
+    if (!r.vi_tri && !r.ma) continue;
+    const d = daoByMa(r.ma);
+    if (!d) return showMsg('Vị trí ' + (r.vi_tri || '?') + ': mã dao không có trong danh mục', 'err');
+    ds.push({ vi_tri: r.vi_tri, id_dao: d.id, so_luong: r.so_luong || 1, tuoi_tho_chuan: r.tuoi_tho_chuan, so_lan_ct: d.tuoi_tho_theo === 'lo_ren' ? (r.so_lan_ct || 1) : 1, ghi_chu: r.ghi_chu });
+  }
+  if (!ds.length && !(await hoiXacNhan('Bộ dao trống — xoá bộ dao của ' + boSp + ' bước ' + boBuoc + '?', { nutOk: 'Xoá', nguyHiem: true }))) return;
+  btn.disabled = true;
+  try {
+    const k = await rpcWrite('gc_bo_dao_luu', { p_ma_sp: boSp, p_buoc: boBuoc, p_ds: ds });
+    showMsg('Đã lưu ' + k.so_dong + ' vị trí', 'okmsg'); boSua = false; renderBo();
+  } catch (e) { showMsg(e.message, 'err', 6000); }
+  btn.disabled = false;
+}
+
+// ── Lý lịch thay dao (T273) ───────────────────────────────────────────────────
+let xf = 'thao', xdLs = [];
+const XU_LY_TEN = { mai: 'Chờ mài', bo: 'Bỏ', tra: 'Trả tủ' };
+function pctHtml(r){
+  const tt = Number(r.tt || 0); if (!tt) return '<td class="num zero">—</td>';
+  const p = Math.round(Number(r.dung) / tt * 100);
+  return '<td class="num"><span class="pct' + (p >= 100 ? ' do' : p >= 80 ? ' vang' : '') + '">' + p + '%</span></td>';
+}
+async function loadXd(){
+  const tb = document.getElementById('tbXd');
+  tb.innerHTML = '<tr><td colspan="12" class="empty">Đang tải...</td></tr>';
+  document.querySelectorAll('[data-xt]').forEach(x => { x.hidden = xf !== 'thao'; });
+  let req;
+  if (xf === 'lap') req = sb.from('gc_dao_tren_may_v').select('*').is('thao_luc', null).order('ma_may').range(0, 4999);
+  else {
+    req = sb.from('gc_dao_tren_may_v').select('*').not('thao_luc', 'is', null).order('thao_luc', { ascending: false }).limit(3000);
+    const tu = document.getElementById('xTu').value, den = document.getElementById('xDen').value;
+    if (tu) req = req.gte('thao_luc', tu + 'T00:00:00+07:00');
+    if (den) req = req.lte('thao_luc', den + 'T23:59:59+07:00');
+  }
+  const { data, error } = await req;
+  if (error) { tb.innerHTML = '<tr><td colspan="12" class="empty">Lỗi: ' + esc(error.message) + '</td></tr>'; return; }
+  const q = khongDau(document.getElementById('xTim').value.trim());
+  xdLs = (data || []).map(r => {
+    const ct = r.thao_luc ? Number(r.so_ct_thuc_te ?? r.so_ct) : Number(r.so_ct);
+    return Object.assign(r, { ct, tt: r.thao_luc ? (r.tuoi_tho_luc_thao ?? r.tuoi_tho) : r.tuoi_tho, dung: ct * Number(r.so_lan_ct || 1) });
+  }).filter(r => !q || khongDau([r.ma_may, r.vi_tri, r.ma_dao, r.ten_chuan, r.ma_sp, r.ly_do_thao, r.lap_boi, r.thao_boi].join(' ')).includes(q));
+  if (xf === 'lap') xdLs.sort((a, b) => natCmp(a.ma_may, b.ma_may) || natCmp(a.vi_tri, b.vi_tri));
+  document.getElementById('xDem').textContent = xdLs.length + (xf === 'lap' ? ' dao đang lắp' : ' lần thay');
+  tb.innerHTML = xdLs.map(r => '<tr><td style="white-space:nowrap">' + esc(r.ma_may) + '</td><td class="mk">' + esc(r.vi_tri) + '</td>' +
+    '<td><span class="mk">' + esc(r.ma_dao) + '</span><small>' + esc(r.ten_chuan || '') + (Number(r.so_luong) !== 1 ? ' · SL ' + fmtNum(r.so_luong) : '') + '</small></td>' +
+    '<td>' + esc(r.ma_sp || '—') + (r.ma_sp ? ' · B' + r.buoc : '') + '</td>' +
+    '<td style="white-space:nowrap">' + fmtDT(r.lap_luc) + (r.nguon === 'may' ? '<small>có sẵn · đầu ' + fmtNum(r.so_ct_dau) + '</small>' : '') + '</td>' +
+    '<td style="white-space:nowrap">' + (r.thao_luc ? fmtDT(r.thao_luc) : '<span class="zero">đang lắp</span>') + '</td>' +
+    '<td class="num">' + fmtNum(r.dung) + (Number(r.so_lan_ct) > 1 ? '<small>' + fmtNum(r.ct) + ' CT</small>' : '') + '</td><td class="num">' + (r.tt ? fmtNum(r.tt) : '<span class="zero">—</span>') + '</td>' + pctHtml(r) +
+    '<td>' + esc(r.ly_do_thao || '') + '</td><td>' + esc(XU_LY_TEN[r.xu_ly_cu] || '') + '</td><td>' + esc(r.thao_boi || r.lap_boi || '') + '</td></tr>').join('') ||
+    '<tr><td colspan="12" class="empty">' + (xf === 'lap' ? 'Chưa có dao nào được khai trên máy' : 'Chưa có lần thay dao nào') + '</td></tr>';
+}
+function xuatXd(){
+  const rows = xdLs.map(r => ({ 'Máy': r.ma_may, 'Vị trí': r.vi_tri, 'Mã dao': r.ma_dao, 'Tên': r.ten_chuan || '', 'SL': Number(r.so_luong), 'Mã SP': r.ma_sp, 'Bước': r.buoc,
+    'Lắp lúc': fmtDT(r.lap_luc), 'Tháo lúc': r.thao_luc ? fmtDT(r.thao_luc) : '', 'Đã chạy': r.dung, 'Tuổi thọ chuẩn': r.tt || '',
+    '%': r.tt ? Math.round(r.dung / r.tt * 100) : '', 'Lý do': r.ly_do_thao || '', 'Dao cũ': XU_LY_TEN[r.xu_ly_cu] || '', 'Người lắp': r.lap_boi, 'Người tháo': r.thao_boi || '', 'Ghi chú': r.ghi_chu }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), xf === 'lap' ? 'Đang lắp' : 'Thay dao');
+  XLSX.writeFile(wb, (xf === 'lap' ? 'Dao_dang_lap_' : 'Ly_lich_thay_dao_') + isoDate(new Date()) + '.xlsx');
+}
+
 // ── Chung ─────────────────────────────────────────────────────────────────────
 function openDlg(id){ document.getElementById(id).classList.add('open'); }
 function closeDlg(){ document.querySelectorAll('.dlg-mask').forEach(d => d.classList.remove('open')); }
@@ -652,6 +831,23 @@ function bindAll(){
   ['hLoai', 'hTu', 'hDen'].forEach(id => document.getElementById(id).addEventListener('change', () => { qs.delete('dao'); loadLichSu(); }));
   document.getElementById('hTim').addEventListener('keydown', e => { if (e.key === 'Enter') loadLichSu(); });
   document.getElementById('hXuat').onclick = xuatLichSu;
+  // T273: bộ dao + lý lịch thay dao
+  document.getElementById('bSp').addEventListener('change', () => { boSua = false; renderBo(); });
+  document.getElementById('bBuoc').addEventListener('change', () => { boSua = false; renderBo(); });
+  document.getElementById('bThem').onclick = boThem;
+  document.getElementById('bLuu').onclick = e => boLuu(e.currentTarget);
+  const bNoi = document.getElementById('bNoi');
+  bNoi.addEventListener('input', e => { const tr = e.target.closest('tr[data-i]'); if (!tr || !e.target.dataset.k) return; boRows[Number(tr.dataset.i)][e.target.dataset.k] = e.target.dataset.k === 'vi_tri' ? e.target.value.toUpperCase().trim() : e.target.value; boSua = true; });
+  bNoi.addEventListener('change', e => { if (e.target.dataset.k === 'ma') veBo(); });
+  bNoi.addEventListener('click', e => {
+    const x = e.target.closest('[data-xoa]'); if (x) { boRows.splice(Number(x.dataset.xoa), 1); boSua = true; return veBo(); }
+    if (e.target.id === 'bVe') { e.preventDefault(); document.getElementById('bSp').value = ''; boSua = false; return renderBo(); }
+    const r = e.target.closest('tr[data-bsp]'); if (r) { document.getElementById('bSp').value = r.dataset.bsp; document.getElementById('bBuoc').innerHTML = '<option value="' + r.dataset.bb + '">'; boSp = ''; renderBo(); }
+  });
+  document.getElementById('sec-thay-dao').addEventListener('click', e => { const c = e.target.closest('[data-xf]'); if (!c) return; xf = c.dataset.xf; document.querySelectorAll('[data-xf]').forEach(y => y.classList.toggle('on', y === c)); loadXd(); });
+  ['xTu', 'xDen'].forEach(id => document.getElementById(id).addEventListener('change', loadXd));
+  document.getElementById('xTim').addEventListener('keydown', e => { if (e.key === 'Enter') loadXd(); });
+  document.getElementById('xXuat').onclick = xuatXd;
   document.getElementById('gy-nhom').addEventListener('change', gyLoaiCapNhat);
   document.getElementById('gy-btn').onclick = goiY;
   document.getElementById('gy-kt').addEventListener('keydown', e => { if (e.key === 'Enter') goiY(); });
@@ -674,6 +870,7 @@ async function init(){
   document.getElementById('hLoai').innerHTML = '<option value="">Loại: tất cả</option>' + Object.entries(GD_TEN).map(([k, v]) => '<option value="' + k + '">' + v + '</option>').join('');
   const d = new Date(); document.getElementById('hDen').value = isoDate(d);
   d.setDate(d.getDate() - 30); document.getElementById('hTu').value = isoDate(d);
+  document.getElementById('xDen').value = document.getElementById('hDen').value; document.getElementById('xTu').value = isoDate(d);
   bindAll();
   if (!(await loadRole())) {
     document.getElementById('roleNote').innerHTML = '<div class="note err">Cần đăng nhập — <a href="shared/login.html?returnTo=' + encodeURIComponent(location.href) + '">Đăng nhập</a></div>';
