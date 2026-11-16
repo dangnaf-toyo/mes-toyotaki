@@ -86,6 +86,8 @@ th.day .d{display:block;font-size:11px;font-weight:600;color:var(--text-dim);tex
 th.today{background:#DBEAFE;color:var(--accent)}
 td.today{background:#F5F9FF}
 td.khuon{font-weight:800;white-space:nowrap;position:sticky;left:0;background:var(--bg-panel);z-index:1}
+td.khuon a.ls-bd{text-decoration:none;font-size:13px;padding:0 2px;opacity:.75}
+td.khuon a.ls-bd:hover{opacity:1}
 td.sp{font-weight:600;white-space:nowrap;font-size:12px}
 td.sp small{display:block;font-weight:500;color:var(--text-muted);font-size:11px}
 td.status{font-size:11px;color:var(--text-muted);min-width:170px;max-width:240px}
@@ -766,7 +768,8 @@ function render(){
           (k ? ' data-id="' + k.id + '"' : '') + '>' + inner + '</td>';
       }).join('');
 
-      return '<tr class="' + (hasKh ? '' : 'goi-y') + '"><td class="khuon">' + escapeHtml(r.ma) + '</td><td class="sp">' + (escapeHtml(r.sp) || '—') +
+      return '<tr class="' + (hasKh ? '' : 'goi-y') + '"><td class="khuon">' + escapeHtml(r.ma) +
+        ' <a class="ls-bd" href="van-de-khuon.html?khuon=' + encodeURIComponent(r.ma) + '&tab=bao-duong" title="Lịch sử bảo dưỡng khuôn ' + escapeHtml(r.ma) + '">🛠</a></td><td class="sp">' + (escapeHtml(r.sp) || '—') +
         (r.plan ? '<small title="Lần chạy sớm nhất trong KHSX tuần">▶ ' + THU_LABEL[r.plan.day] + ' · ' + escapeHtml(r.plan.may) + '</small>' : '<small>Không có KHSX</small>') +
         '</td><td class="status">' + statusHtml + '</td>' + cells + '</tr>';
     }).join('');
@@ -783,7 +786,7 @@ function render(){
 }
 
 document.querySelector('#tblKhuon tbody').addEventListener('click', e => {
-  if (e.target.closest('a.cs-link')) return;
+  if (e.target.closest('a.cs-link, a.ls-bd')) return;
   const td = e.target.closest('td.cell');
   if (!td || !canEdit) return;
   openModal(td.dataset.id ? Number(td.dataset.id) : null, td.dataset.ma, td.dataset.ngay);

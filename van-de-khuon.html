@@ -101,6 +101,7 @@ table.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
   <nav class="tabs" id="tabs">
     <a href="?tab=chua-dong" data-tab="chua-dong">⚠ Vấn đề chưa đóng <span id="nOpen"></span></a>
     <a href="?tab=lich-su" data-tab="lich-su" id="tabLichSu" title="Chọn 1 khuôn để xem lịch sử">🔎 Lịch sử sự cố + IPQC</a>
+    <a href="?tab=bao-duong" data-tab="bao-duong" id="tabBaoDuong" title="Chọn 1 khuôn để xem lịch sử bảo dưỡng">🛠 Lịch sử bảo dưỡng</a>
   </nav>
 
   <section class="card" id="sec-chua-dong" hidden>
@@ -111,6 +112,11 @@ table.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
       <span class="hint" id="cnt"></span>
     </div>
     <div class="tw"><table class="vdc"><thead id="thead"></thead><tbody id="tbody"><tr><td class="empty">Đang tải...</td></tr></tbody></table></div>
+  </section>
+
+  <section class="card" id="sec-bao-duong" hidden>
+    <div class="toolbar"><span class="hint" id="bdCnt"></span></div>
+    <div class="tw"><table class="vdc"><thead><tr><th>Ngày</th><th>Loại</th><th>Người làm</th><th>Nội dung</th><th>Dừng</th><th>Chi phí</th><th>Ảnh</th><th>Phiếu</th></tr></thead><tbody id="bdBody"></tbody></table></div>
   </section>
 
   <section class="card" id="sec-lich-su" hidden>
@@ -124,7 +130,7 @@ table.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 <script src="shared/navbar.js"></script>
 <script src="shared/khuon-van-de.js"></script>
 <script>
-const TABS = ['chua-dong', 'lich-su'];
+const TABS = ['chua-dong', 'lich-su', 'bao-duong'];
 const qs = new URLSearchParams(location.search);
 let khuon = qs.get('khuon') || '';
 let tab = TABS.includes(qs.get('tab')) ? qs.get('tab') : 'chua-dong';
@@ -202,12 +208,14 @@ async function loadIssues(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function setTab(t){
-  if (t === 'lich-su' && !khuon) t = 'chua-dong';
+  if ((t === 'lich-su' || t === 'bao-duong') && !khuon) t = 'chua-dong';
   tab = t; setUrl();
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   document.getElementById('tabLichSu').classList.toggle('dis', !khuon);
+  document.getElementById('tabBaoDuong').classList.toggle('dis', !khuon);
   TABS.forEach(x => { document.getElementById('sec-' + x).hidden = x !== tab; });
   if (tab === 'chua-dong') renderIssues();
+  else if (tab === 'bao-duong') renderBaoDuong();
   else {
     const m = molds.find(x => x.ma_khuon === khuon);
     KhuonVanDe.mount(document.getElementById('lsBody'), {
@@ -259,6 +267,45 @@ function renderIssues(){
   }).join('');
   const f = document.getElementById('vd-focus');
   if (f && !daCuonToi) { daCuonToi = true; f.scrollIntoView({ block: 'center' }); }
+}
+// ── Lịch sử bảo dưỡng 1 khuôn: check sheet (duc_khuon_checksheet) + ghi nhận cũ không có check sheet (duc_khuon_bao_duong_log) ──
+async function renderBaoDuong(){
+  const tb = document.getElementById('bdBody');
+  const mk = khuon;
+  tb.innerHTML = '<tr><td colspan="8" class="empty">Đang tải...</td></tr>';
+  const [csRes, logRes] = await Promise.all([
+    sb.from('duc_khuon_checksheet').select('id,id_ke_hoach,loai,ngay_ke_hoach,ngay_thuc_hien,nguoi_thuc_hien,nguoi_thuc_hien_phu,thoi_gian_dung_phut,chi_phi,ket_luan,ghi_chu,phu_tung_thay,trang_thai,id_log,anh_truoc,anh_sau')
+      .eq('ma_khuon', mk).order('ngay_thuc_hien', { ascending: false }).limit(1000),
+    sb.from('duc_khuon_bao_duong_log').select('id_log,loai,ngay,nguoi_thuc_hien,mo_ta,chi_phi,thoi_gian_dung_phut,shot_tai_thoi_diem')
+      .eq('ma_khuon', mk).order('ngay', { ascending: false }).limit(1000),
+  ]);
+  if (mk !== khuon || tab !== 'bao-duong') return;
+  if (csRes.error || logRes.error) { tb.innerHTML = '<tr><td colspan="8" class="empty">Lỗi tải: ' + escapeHtml((csRes.error || logRes.error).message) + '</td></tr>'; return; }
+  const logById = {}; (logRes.data || []).forEach(l => { logById[l.id_log] = l; });
+  const coCs = new Set();
+  const rows = (csRes.data || []).map(c => {
+    if (c.id_log) coCs.add(c.id_log);
+    const l = logById[c.id_log] || {};
+    return { ngay: c.ngay_thuc_hien || c.ngay_ke_hoach, loai: c.loai, nguoi: [c.nguoi_thuc_hien, c.nguoi_thuc_hien_phu].filter(Boolean).join(', '),
+      noiDung: [c.ket_luan, c.phu_tung_thay ? 'Thay: ' + c.phu_tung_thay : '', c.ghi_chu].filter(Boolean).join(' · '),
+      dung: c.thoi_gian_dung_phut, chiPhi: c.chi_phi, shot: l.shot_tai_thoi_diem, dangLam: c.trang_thai !== 'hoan_thanh',
+      anh: [...(c.anh_truoc || []), ...(c.anh_sau || [])], idKh: c.id_ke_hoach };
+  });
+  (logRes.data || []).filter(l => !coCs.has(l.id_log)).forEach(l => rows.push({ ngay: l.ngay, loai: l.loai, nguoi: l.nguoi_thuc_hien,
+    noiDung: l.mo_ta, dung: l.thoi_gian_dung_phut, chiPhi: l.chi_phi, shot: l.shot_tai_thoi_diem, anh: [] }));
+  rows.sort((a, b) => String(b.ngay || '').localeCompare(String(a.ngay || '')));
+  const xong = rows.filter(r => !r.dangLam).length;
+  document.getElementById('bdCnt').textContent = 'Khuôn ' + mk + ' — ' + xong + ' lần bảo dưỡng' + (rows.length > xong ? ' · ' + (rows.length - xong) + ' đang làm' : '');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">Chưa có lần bảo dưỡng nào</td></tr>'; return; }
+  const so = v => v == null || v === '' ? '—' : Number(v).toLocaleString('vi-VN');
+  tb.innerHTML = rows.map(r => '<tr><td class="tg">' + fmtDate(r.ngay) + (r.shot != null ? '<small>Shot ' + so(r.shot) + '</small>' : '') + '</td>' +
+    '<td>' + escapeHtml(r.loai || '—') + (r.dangLam ? '<small style="color:var(--warn-fg);font-weight:700">Đang làm</small>' : '') + '</td>' +
+    '<td>' + escapeHtml(r.nguoi || '—') + '</td>' +
+    '<td class="xl">' + (r.noiDung ? escapeHtml(r.noiDung) : '<span style="color:var(--text-dim)">—</span>') + '</td>' +
+    '<td>' + (r.dung ? so(r.dung) + ' ph' : '—') + '</td>' +
+    '<td>' + (r.chiPhi ? so(r.chiPhi) : '—') + '</td>' +
+    '<td>' + (r.anh.length ? '<div class="ph">' + r.anh.map(u => '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(u) + '" loading="lazy" alt=""></a>').join('') + '</div>' : '—') + '</td>' +
+    '<td>' + (r.idKh ? '<a class="btn btn-outline btn-sm" href="checksheet-bao-duong-khuon.html?id=' + r.idKh + '">Mở</a>' : '—') + '</td></tr>').join('');
 }
 async function resolveIssue(id){
   const el = [...document.querySelectorAll('textarea[data-xuly]')].find(t => t.dataset.xuly === id);
