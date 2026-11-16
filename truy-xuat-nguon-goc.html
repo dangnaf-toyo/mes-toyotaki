@@ -231,22 +231,59 @@ async function search(raw){
   if (locRes.data) tagLoc[tagNo] = locRes.data.vi_tri_hien_tai;
 
   document.getElementById('resultArea').style.display = 'block';
-  renderCurrent(temRes.data, locRes.data);
+  laTemGoc = tag => !edges.some(e => e.huong === 'nguoc' && e.den === tag);
+  renderCurrent(temRes.data, locRes.data, tinhGioSxGoc(tagNo, edges, tagInfo));
   renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo, tagLoc, tagHist);
   renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo, tagLoc, tagHist);
   renderHistory(histRes.data || []);
   showMsg('✅ Đã tra cứu ' + tagNo, 'ok');
 }
 
-function renderCurrent(t, loc){
+// Giờ SX thực của tem GỐC (không tách/gộp từ tem nào): giờ SX thực tế đã sửa
+// (ngay_gio_ghi_nhan, T31) → thời điểm SX → giờ in tem. Tem tách/đóng gói có
+// ngay_gio_in = lúc tách/đóng gói, KHÔNG phải lúc sản xuất → lấy từ tem gốc.
+let laTemGoc = () => true;
+function gioSxTemGoc(t){
+  if (!t) return null;
+  if (t.ngay_gio_ghi_nhan) return { ts: t.ngay_gio_ghi_nhan, tuGioIn: false };
+  if (t.thoi_diem_san_xuat) return { ts: t.thoi_diem_san_xuat, tuGioIn: false };
+  if (t.ngay_gio_in) return { ts: t.ngay_gio_in, tuGioIn: true };
+  return null;
+}
+function tinhGioSxGoc(tagNo, edges, tagInfo){
+  const nguoc = edges.filter(e => e.huong === 'nguoc');
+  const goc = new Set(), seen = new Set([tagNo]);
+  const stack = [tagNo];
+  while (stack.length){
+    const tag = stack.pop();
+    const cha = nguoc.filter(e => e.den === tag).map(e => e.tu);
+    if (!cha.length){ goc.add(tag); continue; }
+    cha.forEach(c => { if (!seen.has(c)){ seen.add(c); stack.push(c); } });
+  }
+  const ds = [...goc].map(tag => ({ tag, t: tagInfo[tag], g: gioSxTemGoc(tagInfo[tag]) })).filter(x => x.g);
+  if (!ds.length) return null;
+  ds.sort((a, b) => new Date(a.g.ts) - new Date(b.g.ts));
+  const may = [...new Set(ds.map(x => x.t.may_tt || x.t.may_duc_chi_thi || x.t.tram_cong_doan).filter(Boolean))];
+  return { tu: ds[0].g.ts, den: ds[ds.length - 1].g.ts, soTem: ds.length, may, tuGioIn: ds.some(x => x.g.tuGioIn), chinhNo: goc.has(tagNo) };
+}
+function fmtGioSx(g){
+  if (!g) return '—';
+  const s = g.soTem > 1 && fmtTs(g.tu) !== fmtTs(g.den) ? fmtTs(g.tu) + ' → ' + fmtTs(g.den) : fmtTs(g.tu);
+  return escapeHtml(s) + (g.tuGioIn ? ' <span class="node-meta">(giờ in tem)</span>' : '');
+}
+
+function renderCurrent(t, loc, g){
+  const sr = (k, v) => '<div class="sr"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
   document.getElementById('currentInfo').innerHTML = `
     <div class="sr"><div class="k">Tag No</div><div class="v">${escapeHtml(t.tag_no)}</div></div>
     <div class="sr"><div class="k">Mã SP</div><div class="v">${escapeHtml(t.ma_sp)}</div></div>
     <div class="sr"><div class="k">Tên SP</div><div class="v">${escapeHtml(t.ten_sp || '—')}</div></div>
     <div class="sr"><div class="k">Số lượng còn lại</div><div class="v">${fmtNum(t.so_luong)}</div></div>
-    <div class="sr"><div class="k">Ngày (gốc)</div><div class="v">${fmtDateVN(t.ngay)}</div></div>
+    ${sr('Ngày giờ SX', fmtGioSx(g))}
+    ${g && !g.chinhNo ? sr('Tem gốc', g.soTem + ' tem' + (g.may.length ? ' · ' + escapeHtml(g.may.join(', ')) : '')) : ''}
+    ${g && !g.chinhNo && t.ngay_gio_in ? sr(t.tram_cong_doan ? 'Đóng gói lúc' : 'Tạo tem lúc', escapeHtml(fmtTs(t.ngay_gio_in))) : ''}
     ${t.tram_cong_doan ? '<div class="sr"><div class="k">Trạm/Line/Máy</div><div class="v">' + escapeHtml(t.tram_cong_doan) + '</div></div>' : ''}
-    ${t.thoi_diem_san_xuat ? '<div class="sr"><div class="k">Thời điểm sản xuất</div><div class="v">' + new Date(t.thoi_diem_san_xuat).toLocaleString('vi-VN', { hour12: false }) + '</div></div>' : ''}
+    ${t.may_tt ? sr('Máy', escapeHtml(t.may_tt)) : ''}
     ${t.nguoi_tt ? '<div class="sr"><div class="k">Người thao tác</div><div class="v">' + escapeHtml(t.nguoi_tt) + '</div></div>' : ''}
     <div class="sr"><div class="k">Số khuôn</div><div class="v">${escapeHtml(t.so_khuon) || '—'}</div></div>
     <div class="sr"><div class="k">Nguyên liệu</div><div class="v">${escapeHtml(t.nguyen_lieu) || '—'}</div></div>
@@ -261,18 +298,20 @@ const REL_LABEL = {
 
 function renderNodeDetail(info, loc){
   if (!info) return '<div class="node-detail"><div class="missing">Không tìm thấy dữ liệu tem này (có thể đã bị xoá).</div></div>';
+  const goc = laTemGoc(info.tag_no);
+  const g = goc ? gioSxTemGoc(info) : null;
   const rows = [
     ['Mã SP', info.ma_sp],
     ['Tên SP', info.ten_sp],
     ['Số lượng còn lại', fmtNum(info.so_luong)],
     ['Trạng thái', info.trang_thai],
-    ['Ngày (gốc)', fmtDateVN(info.ngay)],
+    goc ? ['Ngày giờ SX', g ? fmtTs(g.ts) + (g.tuGioIn ? ' (giờ in tem)' : '') : '']
+        : [info.tram_cong_doan ? 'Đóng gói lúc' : 'Tạo tem lúc', fmtTs(info.ngay_gio_in)],
     ['Trạm/Line/Máy', info.tram_cong_doan],
-    ['Thời điểm SX', info.thoi_diem_san_xuat ? new Date(info.thoi_diem_san_xuat).toLocaleString('vi-VN', { hour12: false }) : ''],
+    ['Máy', info.may_tt],
     ['Người thao tác', info.nguoi_tt],
     ['Số khuôn', info.so_khuon],
     ['Nguyên liệu', info.nguyen_lieu],
-    ['Ngày giờ ghi nhận', info.ngay_gio_ghi_nhan ? new Date(info.ngay_gio_ghi_nhan).toLocaleString('vi-VN', { hour12: false }) : ''],
     ['Vị trí hiện tại', loc || ''],
   ].filter(([, v]) => v !== null && v !== undefined && v !== '');
   if (!rows.length) return '';
