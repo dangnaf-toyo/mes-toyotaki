@@ -101,7 +101,7 @@ table.vdc{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
   <nav class="tabs" id="tabs">
     <a href="?tab=chua-dong" data-tab="chua-dong">⚠ Vấn đề chưa đóng <span id="nOpen"></span></a>
     <a href="?tab=lich-su" data-tab="lich-su" id="tabLichSu" title="Chọn 1 khuôn để xem lịch sử">🔎 Lịch sử sự cố + IPQC</a>
-    <a href="?tab=bao-duong" data-tab="bao-duong" id="tabBaoDuong" title="Chọn 1 khuôn để xem lịch sử bảo dưỡng">🛠 Lịch sử bảo dưỡng</a>
+    <a href="?tab=bao-duong" data-tab="bao-duong" id="tabBaoDuong" title="Lý lịch bảo dưỡng của khuôn đang chọn">🛠 Lý lịch bảo dưỡng</a>
   </nav>
 
   <section class="card" id="sec-chua-dong" hidden>
@@ -208,11 +208,10 @@ async function loadIssues(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function setTab(t){
-  if ((t === 'lich-su' || t === 'bao-duong') && !khuon) t = 'chua-dong';
+  if (t === 'lich-su' && !khuon) t = 'chua-dong';
   tab = t; setUrl();
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   document.getElementById('tabLichSu').classList.toggle('dis', !khuon);
-  document.getElementById('tabBaoDuong').classList.toggle('dis', !khuon);
   TABS.forEach(x => { document.getElementById('sec-' + x).hidden = x !== tab; });
   if (tab === 'chua-dong') renderIssues();
   else if (tab === 'bao-duong') renderBaoDuong();
@@ -272,6 +271,11 @@ function renderIssues(){
 async function renderBaoDuong(){
   const tb = document.getElementById('bdBody');
   const mk = khuon;
+  if (!mk) {
+    document.getElementById('bdCnt').textContent = '';
+    tb.innerHTML = '<tr><td colspan="8" class="empty">Chọn khuôn ở ô trên cùng để xem lý lịch bảo dưỡng</td></tr>';
+    return;
+  }
   tb.innerHTML = '<tr><td colspan="8" class="empty">Đang tải...</td></tr>';
   const [csRes, logRes] = await Promise.all([
     sb.from('duc_khuon_checksheet').select('id,id_ke_hoach,loai,ngay_ke_hoach,ngay_thuc_hien,nguoi_thuc_hien,nguoi_thuc_hien_phu,thoi_gian_dung_phut,chi_phi,ket_luan,ghi_chu,phu_tung_thay,trang_thai,id_log,anh_truoc,anh_sau')
