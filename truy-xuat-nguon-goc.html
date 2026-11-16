@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
 <!--
-  truy-xuat-nguon-goc.html — nhập/quét 1 Tag No, hiện toàn bộ phả hệ:
+  truy-xuat-nguon-goc.html — nhập/quét 1 Tag No, hiện phả hệ dạng SƠ ĐỒ NHÁNH (T288,
+  renderMap): tem đang tra ở đầu, tem nguồn toả nhánh sang phải.
   - "Nguồn gốc" (ngược): tem này được TÁCH TỪ hoặc GỘP TỪ những tem nào.
   - "Đã dùng để tạo" (xuôi): tem này đã bị TÁCH RA hoặc DÙNG ĐỂ ĐÓNG GÓI
     thành những tem nào.
@@ -93,6 +94,50 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 .node-hist{margin:0 0 6px;padding:2px 10px;border-left:3px solid var(--border)}
 .node-hist .ttl{font-size:11px;font-weight:700;color:var(--text-muted);margin-top:2px}
 .node-hist .hist-item{font-size:11.5px;padding:3px 0}
+.info{cursor:help;color:var(--text-dim);font-weight:400;text-transform:none}
+/* Sơ đồ nhánh (T288) */
+.mm{overflow-x:auto;padding:4px 2px 8px;-webkit-overflow-scrolling:touch}
+/* Neo nhánh ở dòng tiêu đề ô (cách mép trên --y) để tem đang tra nằm trên cùng */
+.mm{--y:14px}
+.mm-b{display:flex;align-items:flex-start;width:max-content}
+.mm-kids{display:flex;flex-direction:column;position:relative;padding-left:14px}
+.mm-kids::before{content:'';position:absolute;left:0;top:var(--y);width:14px;border-top:2px solid var(--border-strong)}
+.mm-k{display:flex;align-items:flex-start;position:relative;padding:0 0 12px}
+.mm-k:last-child{padding-bottom:0}
+.mm-k::before{content:'';position:absolute;left:0;top:0;bottom:0;border-left:2px solid var(--border-strong)}
+.mm-k:first-child::before{top:var(--y)}
+.mm-k:last-child::before{bottom:auto;height:var(--y)}
+.mm-k:only-child::before{display:none}
+.mm-e{position:relative;width:160px;flex-shrink:0;padding:0 6px 0 12px}
+.mm-e::before{content:'';position:absolute;left:0;right:0;top:var(--y);border-top:2px solid var(--c,var(--border-strong))}
+.mm-e::after{content:'';position:absolute;left:0;top:var(--y);margin-top:-4px;border:5px solid transparent;border-right:7px solid var(--c,var(--border-strong));border-left:none}
+.mm.xuoi .mm-e::after{left:auto;right:0;border-right:none;border-left:7px solid var(--c,var(--border-strong))}
+.mm-e.tach{--c:var(--warn-fg)}
+.mm-e.dong_goi{--c:var(--run-fg)}
+.mm-el{position:relative;z-index:1;margin-top:calc(var(--y) - 10px);background:var(--bg-panel);border:1px solid var(--c);border-radius:7px;padding:3px 6px;font-size:11px;max-width:100%}
+.mm-el b{color:var(--c);white-space:nowrap}
+.mm-cv{margin-top:2px}
+.mm-cv summary{cursor:pointer;color:var(--text-muted);list-style:none;line-height:1.35}
+.mm-cv summary::-webkit-details-marker{display:none}
+.mm-cv .st{white-space:nowrap;font-size:11px;font-weight:700;padding:0 5px;border-radius:9px;background:var(--bg-sunken);color:var(--text-muted)}
+.mm-cv .st.ok{background:var(--run-bg);color:var(--run-fg)}
+.mm-cv .st.cho{background:var(--warn-bg);color:var(--warn-fg)}
+.mm-cv .st.tc{background:var(--alarm-bg);color:var(--alarm-fg)}
+.mm-cv .hist-item{font-size:11px;border-bottom:none;padding:3px 0 0}
+.mm-cv .hist-item .gn{grid-template-columns:1fr}
+.mm-n{width:220px;flex-shrink:0;background:var(--bg-panel);border:1px solid var(--border);border-left:4px solid var(--cd,var(--border-strong));border-radius:8px;padding:6px 8px;box-shadow:var(--shadow-sm);font-size:11.5px}
+.mm-n.root{width:240px;border-color:var(--accent);border-left-color:var(--cd,var(--accent));box-shadow:0 0 0 2px rgba(15,95,165,.15)}
+.mm-n.mini{width:auto}
+.mm-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.mm-cd{font-weight:700;color:var(--cd);font-size:12px}
+.mm-sl{color:var(--text-muted);font-size:11px;white-space:nowrap}
+.mm-tag{margin:2px 0 4px}
+.mm-r{display:flex;justify-content:space-between;gap:8px;padding:1px 0;border-top:1px dashed var(--border)}
+.mm-r .k{color:var(--text-muted);flex-shrink:0}
+.mm-r .v{font-weight:600;text-align:right;word-break:break-word}
+.mm-miss{color:var(--text-dim);font-style:italic}
+.mm-cvs{margin-top:4px;padding-top:3px;border-top:1px solid var(--border)}
+@media (max-width:600px){.mm-n{width:190px}.mm-n.root{width:200px}.mm-e{width:130px}}
 </style>
 </head>
 <body>
@@ -126,23 +171,13 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 
   <div id="resultArea" style="display:none">
     <div class="card">
-      <h2>📦 Tem hiện đang tra</h2>
-      <div id="currentInfo"></div>
+      <h2>Sơ đồ nguồn gốc <span class="info" title="Ô đầu (viền xanh) = tem đang tra. Nhánh sang phải = tem nguồn ở công đoạn trước. Trên đường nối: Tách/Gộp + số lượng + chuyển công đoạn (bấm 🚚 xem người giao/nhận). Thông tin giống tem nguồn chỉ hiện ở tem nguồn.">ⓘ</span></h2>
+      <div id="mapNguoc"></div>
     </div>
 
-    <div class="card">
-      <h2>⬆ Nguồn gốc (tem này được tạo từ)</h2>
-      <div id="nguocTree"></div>
-    </div>
-
-    <div class="card">
-      <h2>⬇ Đã dùng để tạo (tem này đã dùng làm nguồn cho)</h2>
-      <div id="xuoiTree"></div>
-    </div>
-
-    <div class="card">
-      <h2>🔀 Lịch sử chuyển công đoạn (của chính tem này)</h2>
-      <div id="histList"></div>
+    <div class="card" id="cardXuoi" style="display:none">
+      <h2>Đã dùng để tạo <span class="info" title="Các tem được tách/đóng gói từ tem đang tra.">ⓘ</span></h2>
+      <div id="mapXuoi"></div>
     </div>
   </div>
 </div>
@@ -239,10 +274,8 @@ async function search(raw){
     const { data: ks } = await sb.rpc('duc_tem_khoang_sx', { p_tags: temGocMay });
     (ks || []).forEach(k => { khoangSx[k.tag_no] = k; });
   }
-  renderCurrent(temRes.data, locRes.data, tinhGioSxGoc(tagNo, edges, tagInfo));
-  renderTree('nguocTree', edges.filter(e => e.huong === 'nguoc'), tagNo, 'nguoc', tagInfo, tagLoc, tagHist);
-  renderTree('xuoiTree', edges.filter(e => e.huong === 'xuoi'), tagNo, 'xuoi', tagInfo, tagLoc, tagHist);
-  renderHistory(histRes.data || []);
+  tagHist[tagNo] = histRes.data || [];
+  renderMap(tagNo, edges, tagInfo, tagLoc, tagHist, tinhGioSxGoc(tagNo, edges, tagInfo));
   showMsg('✅ Đã tra cứu ' + tagNo, 'ok');
 }
 
@@ -298,81 +331,6 @@ function fmtGioSx(g){
   return escapeHtml(fmtKhoang(g.tu, g.den)) + (g.tuGioIn ? ' <span class="node-meta">(giờ in tem)</span>' : '');
 }
 
-function renderCurrent(t, loc, g){
-  const sr = (k, v) => '<div class="sr"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
-  document.getElementById('currentInfo').innerHTML = `
-    <div class="sr"><div class="k">Tag No</div><div class="v">${escapeHtml(t.tag_no)}</div></div>
-    <div class="sr"><div class="k">Mã SP</div><div class="v">${escapeHtml(t.ma_sp)}</div></div>
-    <div class="sr"><div class="k">Tên SP</div><div class="v">${escapeHtml(t.ten_sp || '—')}</div></div>
-    <div class="sr"><div class="k">Số lượng còn lại</div><div class="v">${fmtNum(t.so_luong)}</div></div>
-    ${g && g.ca.length ? sr('Ca SX', escapeHtml(g.ca.join(', '))) : ''}
-    ${sr('Giờ SX', fmtGioSx(g))}
-    ${g && !g.chinhNo ? sr('Tem gốc', g.soTem + ' tem' + (g.may.length ? ' · ' + escapeHtml(g.may.join(', ')) : '')) : ''}
-    ${g && !g.chinhNo && t.ngay_gio_in ? sr(t.tram_cong_doan ? 'Đóng gói lúc' : 'Tạo tem lúc', escapeHtml(fmtTs(t.ngay_gio_in))) : ''}
-    ${t.tram_cong_doan ? '<div class="sr"><div class="k">Trạm/Line/Máy</div><div class="v">' + escapeHtml(t.tram_cong_doan) + '</div></div>' : ''}
-    ${t.may_tt ? sr('Máy', escapeHtml(t.may_tt)) : ''}
-    ${t.nguoi_tt ? '<div class="sr"><div class="k">Người thao tác</div><div class="v">' + escapeHtml(t.nguoi_tt) + '</div></div>' : ''}
-    <div class="sr"><div class="k">Số khuôn</div><div class="v">${escapeHtml(t.so_khuon) || '—'}</div></div>
-    <div class="sr"><div class="k">Nguyên liệu</div><div class="v">${escapeHtml(t.nguyen_lieu) || '—'}</div></div>
-    <div class="sr"><div class="k">Vị trí hiện tại</div><div class="v">${loc && loc.vi_tri_hien_tai ? '<span class="badge-loc">' + escapeHtml(loc.vi_tri_hien_tai) + '</span>' : '<span style="color:#999">Chưa từng chuyển công đoạn</span>'}</div></div>
-  `;
-}
-
-const REL_LABEL = {
-  nguoc: { tach: '✂ Tách từ', dong_goi: '📦 Gộp từ' },
-  xuoi:  { tach: '✂ Tách ra thành', dong_goi: '📦 Dùng để đóng gói thành' },
-};
-
-function renderNodeDetail(info, loc){
-  if (!info) return '<div class="node-detail"><div class="missing">Không tìm thấy dữ liệu tem này (có thể đã bị xoá).</div></div>';
-  const goc = laTemGoc(info.tag_no);
-  const g = goc ? gioSxTemGoc(info) : null;
-  const rows = [
-    ['Mã SP', info.ma_sp],
-    ['Tên SP', info.ten_sp],
-    ['Số lượng còn lại', fmtNum(info.so_luong)],
-    ['Trạng thái', info.trang_thai],
-    goc ? ['Giờ SX', fmtGioSxGoc(g)]
-        : [info.tram_cong_doan ? 'Đóng gói lúc' : 'Tạo tem lúc', fmtTs(info.ngay_gio_in)],
-    ['Trạm/Line/Máy', info.tram_cong_doan],
-    ['Máy', info.may_tt],
-    ['Người thao tác', info.nguoi_tt],
-    ['Số khuôn', info.so_khuon],
-    ['Nguyên liệu', info.nguyen_lieu],
-    ['Vị trí hiện tại', loc || ''],
-  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
-  if (!rows.length) return '';
-  return '<div class="node-detail">' + rows.map(([k, v]) =>
-    '<div class="sr"><div class="k">' + escapeHtml(k) + '</div><div class="v">' + escapeHtml(v) + '</div></div>').join('') + '</div>';
-}
-
-function renderTree(elId, edges, rootTag, direction, tagInfo, tagLoc, tagHist){
-  const el = document.getElementById(elId);
-  if (!edges.length){ el.innerHTML = '<div class="empty">' + (direction === 'nguoc' ? 'Không có — đây là tem gốc, chưa được tách/gộp từ tem nào khác.' : 'Chưa được dùng để tách/đóng gói thành tem nào khác.') + '</div>'; return; }
-
-  function childrenOf(tag){
-    return edges.filter(e => direction === 'nguoc' ? e.den === tag : e.tu === tag);
-  }
-  function renderChildrenList(tag, visited){
-    const kids = childrenOf(tag);
-    if (!kids.length) return '';
-    return kids.map(e => {
-      const other = direction === 'nguoc' ? e.tu : e.den;
-      if (visited.has(other)) return '<li><span class="tag-chip">' + escapeHtml(other) + '</span> <span class="node-meta">(đã hiện ở nhánh khác)</span></li>';
-      const info = tagInfo[other];
-      const nextVisited = new Set(visited); nextVisited.add(other);
-      const grandChildren = renderChildrenList(other, nextVisited);
-      return '<li>' +
-        '<div class="node-head"><span class="rel-' + e.loai + '">' + REL_LABEL[direction][e.loai] + '</span> ' +
-        '<span class="tag-chip">' + escapeHtml(other) + '</span> — ' + fmtNum(e.so_luong) + ' sp' + '</div>' +
-        renderNodeDetail(info, tagLoc[other]) +
-        ((tagHist[other] || []).length ? '<div class="node-hist"><div class="ttl">🚚 Chuyển công đoạn</div>' + tagHist[other].map(histItemHtml).join('') + '</div>' : '') +
-        (grandChildren ? '<ul class="tree">' + grandChildren + '</ul>' : '') + '</li>';
-    }).join('');
-  }
-  el.innerHTML = '<ul class="tree root">' + renderChildrenList(rootTag, new Set([rootTag])) + '</ul>';
-}
-
 // Một lần chuyển công đoạn: công đoạn nhận quét tem (người nhận + thoi_gian_chuyen)
 // → công đoạn giao xác nhận (người giao + ngay_gio_xac_nhan, chuỗi "HH:mm:ss dd/MM/yyyy").
 function fmtTs(v){ return v ? new Date(v).toLocaleString('vi-VN', { hour12: false }) : ''; }
@@ -393,11 +351,125 @@ function histItemHtml(r){
     (r.ly_do_tu_choi ? '<div class="tc-ly">✖ Lý do từ chối: ' + escapeHtml(r.ly_do_tu_choi) + '</div>' : '') +
     (r.ghi_chu ? '<div class="hist-note">📝 ' + escapeHtml(r.ghi_chu) + '</div>' : '') + '</div>';
 }
-function renderHistory(rows){
-  const el = document.getElementById('histList');
-  if (!rows.length){ el.innerHTML = '<div class="empty">Chưa từng chuyển công đoạn.</div>'; return; }
-  el.innerHTML = rows.map(histItemHtml).join('');
+/* ---------- Sơ đồ nhánh (T288) ----------
+   Tem đang tra ở đầu (trái); các tem nguồn (công đoạn trước) toả nhánh sang
+   phải. Đường nối = quan hệ tách/gộp + số lượng + các lần chuyển công đoạn của
+   tem phía trước. Mỗi ô = thông tin riêng công đoạn đó; trường giống hệt tem
+   nguồn (kế thừa khi tách) chỉ hiện ở tem nguồn; Mã SP/Tên SP chỉ ở tem đang
+   tra (tem khác chỉ hiện khi khác). */
+const MM_STAGE_COLOR = { 'Đúc': '#0F5FA5', 'Bavia': '#B45309', 'Gia công': '#7C3AED', 'Sơn': '#DB2777', 'OQC': '#047857', 'Kho TP': '#047857' };
+const MM_DEDUPE = [['may_tt', 'Máy'], ['so_khuon', 'Khuôn'], ['nguyen_lieu', 'NVL'], ['nguoi_tt', 'Người']];
+function fmtNgan(v){ return v ? fmtGio(v) + ' ' + fmtNgayNgan(v) : ''; }
+function congDoanTem(t){
+  if (!t) return '—';
+  if (t.tram_cong_doan) return t.tram_cong_doan;
+  if (t.may_tt) return 'Đúc';
+  return t.trang_thai || '—';
 }
+function mauCongDoan(cd){
+  const k = Object.keys(MM_STAGE_COLOR).find(x => String(cd).toLowerCase().startsWith(x.toLowerCase()));
+  return k ? MM_STAGE_COLOR[k] : '#64748B';
+}
+function trangThaiNgan(st){
+  if (/từ chối/i.test(st)) return ['tc', 'Từ chối'];
+  if (/^Đã xác nhận/i.test(st)) return ['ok', 'Đã nhận'];
+  if (/^Chờ/i.test(st)) return ['cho', 'Chờ'];
+  return ['', st || ''];
+}
+// 1 lần chuyển công đoạn: 1 dòng gọn, bấm mở chi tiết (người giao/nhận, phiếu...).
+function chuyenHtml(r){
+  const [cls, nhan] = trangThaiNgan(r.trang_thai_xac_nhan);
+  return '<details class="mm-cv"><summary>🚚 ' + escapeHtml(r.cong_doan_giao) + '→' + escapeHtml(r.cong_doan_nhan) +
+    ' ' + fmtNum(r.sl_thuc_chuyen) + (r.thoi_gian_chuyen ? '<br>' + escapeHtml(fmtNgan(r.thoi_gian_chuyen)) : '') +
+    (nhan ? ' <span class="st ' + cls + '">' + escapeHtml(nhan) + '</span>' : '') + '</summary>' + histItemHtml(r) + '</details>';
+}
+function mmRow(k, v, raw){ return '<div class="mm-r"><span class="k">' + escapeHtml(k) + '</span><span class="v">' + (raw ? v : escapeHtml(v)) + '</span></div>'; }
+
+// ctx: { edges(nguoc), tagInfo, tagLoc, tagHist, root, rootInfo, gRoot }
+function mmNode(tag, ctx, opts){
+  const info = ctx.tagInfo[tag];
+  const isRoot = tag === ctx.root;
+  if (!info) return '<div class="mm-n"><div class="mm-h"><span class="tag-chip">' + escapeHtml(tag) + '</span></div><div class="mm-miss">Không có dữ liệu tem</div></div>';
+  const cd = congDoanTem(info);
+  const nguon = ctx.edges.filter(e => e.den === tag);
+  const nguonInfo = nguon.map(e => ctx.tagInfo[e.tu]).filter(Boolean);
+  const rows = [];
+  if (isRoot){
+    rows.push(mmRow('Mã SP', info.ma_sp || '—'));
+    if (info.ten_sp) rows.push(mmRow('Tên SP', info.ten_sp));
+    const g = ctx.gRoot;
+    if (g && g.ca.length) rows.push(mmRow('Ca SX', g.ca.join(', ')));
+    rows.push(mmRow('Giờ SX', fmtGioSx(g), true));
+  } else {
+    if (info.ma_sp && info.ma_sp !== ctx.rootInfo.ma_sp) rows.push(mmRow('Mã SP', info.ma_sp));
+    if (laTemGoc(tag)){
+      const g = gioSxTemGoc(info);
+      if (g) rows.push(mmRow('Giờ SX', fmtGioSxGoc(g)));
+    }
+  }
+  if (nguon.length && info.ngay_gio_in){
+    rows.push(mmRow(nguon.some(e => e.loai === 'dong_goi') ? 'Đóng gói' : 'Tách lúc', fmtNgan(info.ngay_gio_in)));
+  }
+  MM_DEDUPE.forEach(([f, k]) => {
+    const v = info[f];
+    if (v === null || v === undefined || v === '') return;
+    if (nguonInfo.some(p => p[f] === v)) return; // kế thừa từ tem nguồn → đã hiện ở đó
+    if (opts && opts.cha && opts.cha[f] === v) return;
+    rows.push(mmRow(k, v));
+  });
+  if (isRoot && info.trang_thai) rows.push(mmRow('Trạng thái', info.trang_thai));
+  // Vị trí: chỉ tem đang tra + tem còn hàng (tem đã hết 0 sp thì vị trí không còn ý nghĩa).
+  const loc = (isRoot || Number(info.so_luong) > 0) ? ctx.tagLoc[tag] : '';
+  if (loc) rows.push(mmRow('Vị trí', '<span class="badge-loc">' + escapeHtml(loc) + '</span>', true));
+  else if (isRoot) rows.push(mmRow('Vị trí', '<span class="node-meta">Chưa chuyển CĐ</span>', true));
+  const cv = (opts && opts.hienChuyen) ? (ctx.tagHist[tag] || []).map(chuyenHtml).join('') : '';
+  return '<div class="mm-n' + (isRoot ? ' root' : '') + '" style="--cd:' + mauCongDoan(cd) + '">' +
+    '<div class="mm-h"><span class="mm-cd">' + escapeHtml(cd) + '</span><span class="mm-sl">còn ' + fmtNum(info.so_luong) + '</span></div>' +
+    '<div class="mm-tag"><span class="tag-chip">' + escapeHtml(tag) + '</span></div>' +
+    rows.join('') + (cv ? '<div class="mm-cvs">' + cv + '</div>' : '') + '</div>';
+}
+function mmEdge(e, ctx, hienChuyen){
+  const lbl = e.loai === 'tach' ? '✂ Tách' : '📦 Gộp';
+  const cv = hienChuyen ? (ctx.tagHist[e.tu] || []).map(chuyenHtml).join('') : '';
+  return '<div class="mm-e ' + e.loai + '"><div class="mm-el"><b>' + lbl + ' ' + fmtNum(e.so_luong) + '</b>' + cv + '</div></div>';
+}
+// Nhánh ngược: tag → các tem nguồn của nó.
+function mmNguoc(tag, ctx, visited){
+  const kids = ctx.edges.filter(e => e.den === tag);
+  const node = mmNode(tag, ctx, { hienChuyen: tag === ctx.root });
+  if (!kids.length) return '<div class="mm-b">' + node + '</div>';
+  return '<div class="mm-b">' + node + '<div class="mm-kids">' + kids.map(e => {
+    const body = visited.has(e.tu)
+      ? '<div class="mm-n"><span class="tag-chip">' + escapeHtml(e.tu) + '</span> <span class="node-meta">(đã hiện ở nhánh khác)</span></div>'
+      : mmNguoc(e.tu, ctx, new Set([...visited, e.tu]));
+    return '<div class="mm-k">' + mmEdge(e, ctx, true) + body + '</div>';
+  }).join('') + '</div></div>';
+}
+// Nhánh xuôi: tag → các tem đã tạo từ nó (tem đang tra hiện gọn ở đầu).
+function mmXuoi(tag, ctx, xEdges, visited){
+  const kids = xEdges.filter(e => e.tu === tag);
+  const node = tag === ctx.root
+    ? '<div class="mm-n root mini"><span class="tag-chip">' + escapeHtml(tag) + '</span></div>'
+    : mmNode(tag, Object.assign({}, ctx, { edges: [] }), { hienChuyen: !kids.length, cha: ctx.tagInfo[xEdges.find(e => e.den === tag)?.tu] });
+  if (!kids.length) return '<div class="mm-b">' + node + '</div>';
+  return '<div class="mm-b">' + node + '<div class="mm-kids">' + kids.map(e => {
+    const body = visited.has(e.den)
+      ? '<div class="mm-n"><span class="tag-chip">' + escapeHtml(e.den) + '</span> <span class="node-meta">(đã hiện ở nhánh khác)</span></div>'
+      : mmXuoi(e.den, ctx, xEdges, new Set([...visited, e.den]));
+    return '<div class="mm-k">' + mmEdge(e, ctx, e.tu !== ctx.root) + body + '</div>';
+  }).join('') + '</div></div>';
+}
+function renderMap(tagNo, edges, tagInfo, tagLoc, tagHist, gRoot){
+  const nguoc = edges.filter(e => e.huong === 'nguoc');
+  const xuoi = edges.filter(e => e.huong === 'xuoi');
+  const ctx = { edges: nguoc, tagInfo, tagLoc, tagHist, root: tagNo, rootInfo: tagInfo[tagNo] || {}, gRoot };
+  document.getElementById('mapNguoc').innerHTML = '<div class="mm">' + mmNguoc(tagNo, ctx, new Set([tagNo])) + '</div>' +
+    (nguoc.length ? '' : '<div class="empty">Tem gốc — không tách/gộp từ tem nào.</div>');
+  const cardX = document.getElementById('cardXuoi');
+  cardX.style.display = xuoi.length ? '' : 'none';
+  document.getElementById('mapXuoi').innerHTML = xuoi.length ? '<div class="mm xuoi">' + mmXuoi(tagNo, ctx, xuoi, new Set([tagNo])) + '</div>' : '';
+}
+
 
 /* ---------- Quét QR camera (giống chuyencongdoan.html) ---------- */
 let html5QrCode = null;
@@ -465,6 +537,9 @@ setInterval(tickClock, 1000);
 document.getElementById('btnScan').addEventListener('click', openCamera);
 document.getElementById('btnCloseQrModal').addEventListener('click', closeQrModal);
 document.getElementById('qrFileInput').addEventListener('change', onFileChosen);
+// Mở thẳng: truy-xuat-nguon-goc.html?tag=<Tag No>
+const tagUrl = new URLSearchParams(location.search).get('tag');
+if (tagUrl) search(tagUrl);
 
 </script>
 </body>
