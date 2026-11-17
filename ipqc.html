@@ -451,7 +451,7 @@ async function updateUserLabel(){
 // =============================================================================
 async function getActiveIdDongSet(){
   const [chtRes, baoCaoRes] = await Promise.all([
-    sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,ngay,ca,open_gio_phat_sinh'),
+    sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,nhom_khuon,ngay,ca,open_gio_phat_sinh'),
     sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca').order('id_bao_cao')),
   ]);
   if (chtRes.error) throw new Error('Không tải được Ca_hien_tai: ' + chtRes.error.message);
@@ -470,6 +470,7 @@ async function getActiveIdDongSet(){
   Object.values(byMachine).forEach(r => {
     active.add(r.id_dong);
     if (r.khuon_kep_voi) active.add(r.khuon_kep_voi);
+    if (r.nhom_khuon && r.khuon_kep_voi) Object.values(byId).filter(x => x.nhom_khuon === r.nhom_khuon).forEach(x => active.add(x.id_dong));
   });
   // Máy chỉ thật sự "dừng" khi trưởng ca đã KẾT CA cho đúng ngày/ca của dòng
   // đó (không tick "tiếp tục" cho máy này — nếu có tiếp tục thì máy đã có
@@ -1294,7 +1295,7 @@ async function submitCheck(ketQua){
   }
 }
 </script>
-<script src="shared/mes-ipqc-flow.js"></script><script src="shared/mes-ipqc-warning.js"></script>
+<script src="shared/mes-ipqc-flow.js?v=T292"></script><script src="shared/mes-ipqc-warning.js"></script>
 <script src="shared/mes-ng-status.js?v=T261"></script><script src="shared/mes-ipqc-session.js?v=T242"></script>
 </body>
 </html>

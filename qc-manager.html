@@ -572,7 +572,7 @@ function startClock(){
 // =============================================================================
 async function getActiveIdDongSet(){
   const [chtRes, baoCaoRes] = await Promise.all([
-    sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,ngay,ca,open_gio_phat_sinh'),
+    sb.from('duc_ca_hien_tai').select('id_dong,ma_may,row_seq,khuon_kep_voi,nhom_khuon,ngay,ca,open_gio_phat_sinh'),
     sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca').order('id_bao_cao')),
   ]);
   if (chtRes.error) throw new Error(chtRes.error.message);
@@ -586,7 +586,11 @@ async function getActiveIdDongSet(){
     if (!byMachine[r.ma_may] || r.row_seq > byMachine[r.ma_may].row_seq) byMachine[r.ma_may] = r;
   });
   const active = new Set();
-  Object.values(byMachine).forEach(r => { active.add(r.id_dong); if (r.khuon_kep_voi) active.add(r.khuon_kep_voi); });
+  Object.values(byMachine).forEach(r => {
+    active.add(r.id_dong);
+    if (r.khuon_kep_voi) active.add(r.khuon_kep_voi);
+    if (r.nhom_khuon && r.khuon_kep_voi) Object.values(byId).filter(x => x.nhom_khuon === r.nhom_khuon).forEach(x => active.add(x.id_dong));
+  });
   // Máy chỉ thật sự "dừng" khi trưởng ca đã KẾT CA cho đúng ngày/ca của dòng
   // đó (xem comment đầy đủ ở ipqc.html) — không dùng mốc thời gian để đoán.
   const conLai = (idDong) => {
