@@ -352,6 +352,10 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
       <button class="modal-close" type="button" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
+      <div class="fg full" id="f-ly-do-wrap" style="display:none">
+        <label style="color:var(--alarm-fg)" id="f-ly-do-lbl">Lý do thêm / sửa / xoá (bắt buộc)</label>
+        <input id="f-ly-do" maxlength="300" placeholder="VD: khuôn phát sinh vấn đề, cần BD gấp">
+      </div>
       <div class="fg">
         <label>Khuôn</label>
         <select id="f-khuon"></select>
@@ -376,10 +380,6 @@ td.cell.run{box-shadow:inset 0 -3px 0 #F87171}
       <div class="fg full">
         <label>Ghi chú / nội dung cần làm</label>
         <input id="f-ghi-chu" maxlength="300" placeholder="VD: đánh bóng lòng khuôn, thay ty đẩy…">
-      </div>
-      <div class="fg full" id="f-ly-do-wrap" style="display:none">
-        <label style="color:var(--alarm-fg)">Lý do sửa / xoá (bắt buộc — kế hoạch đã gửi, sẽ phải kiểm tra & duyệt lại)</label>
-        <input id="f-ly-do" maxlength="300">
       </div>
       <div class="info-box full" id="f-info"></div>
     </div>
@@ -878,6 +878,9 @@ function openModal(id, ma, ngay){
   document.getElementById('btnDelete').style.display = row ? '' : 'none';
   document.getElementById('f-ly-do').value = '';
   document.getElementById('f-ly-do-wrap').style.display = trangThai() === 'nhap' ? 'none' : '';
+  document.getElementById('f-ly-do-lbl').textContent = trangThai() === 'luu_tru'
+    ? 'Lý do thêm / sửa / xoá (bắt buộc — tuần đã lưu trữ)'
+    : 'Lý do thêm / sửa / xoá (bắt buộc — KH đã gửi, sẽ phải duyệt lại)';
   renderInfo();
   document.getElementById('modalKh').classList.add('open');
 }
@@ -918,7 +921,7 @@ document.getElementById('btnSave').addEventListener('click', async () => {
   const ngay = document.getElementById('f-ngay').value;
   if (!ma) return showMsg('Chọn khuôn', 'err', 2500);
   const lyDo = document.getElementById('f-ly-do').value.trim();
-  if (trangThai() !== 'nhap' && !lyDo) return showMsg('Kế hoạch đã gửi — nhập lý do sửa', 'err', 3000);
+  if (trangThai() !== 'nhap' && !lyDo) { document.getElementById('f-ly-do').focus(); return showMsg('Nhập lý do ở ô đỏ đầu hộp', 'err', 3000); }
   const btn = document.getElementById('btnSave');
   btn.disabled = true;
   const { data, error } = await sb.rpc('duc_khuon_bd_kh_luu', {
@@ -938,7 +941,7 @@ document.getElementById('btnSave').addEventListener('click', async () => {
 document.getElementById('btnDelete').addEventListener('click', async () => {
   if (!editingId) return;
   const lyDo = document.getElementById('f-ly-do').value.trim();
-  if (trangThai() !== 'nhap' && !lyDo) return showMsg('Kế hoạch đã gửi — nhập lý do xoá', 'err', 3000);
+  if (trangThai() !== 'nhap' && !lyDo) { document.getElementById('f-ly-do').focus(); return showMsg('Nhập lý do ở ô đỏ đầu hộp', 'err', 3000); }
   if (!confirm('Xoá lịch bảo dưỡng này?')) return;
   const { data, error } = await sb.rpc('duc_khuon_bd_kh_xoa', { p_id: editingId, p_ly_do: lyDo });
   if (error || !data || !data.ok) return showMsg('Lỗi xoá: ' + rpcErr(data, error), 'err', 5000);
