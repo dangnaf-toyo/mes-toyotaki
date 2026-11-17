@@ -8,7 +8,11 @@ const MesIpqcFlow = (() => {
   function active(rows,reports) {
     const closed=new Set(reports.map(r=>r.ngay+'|'+r.ca)),latest=new Map(),all=new Map(rows.map(r=>[r.id_dong,r])),ids=new Set();
     for(const row of rows)if(row.id_dong&&(!latest.has(row.ma_may)||Number(row.row_seq)>Number(latest.get(row.ma_may).row_seq)))latest.set(row.ma_may,row);
-    for(const row of latest.values()){ids.add(row.id_dong);if(row.khuon_kep_voi)ids.add(row.khuon_kep_voi);}
+    for(const row of latest.values()){
+      ids.add(row.id_dong);
+      if(row.khuon_kep_voi)ids.add(row.khuon_kep_voi);
+      if(row.nhom_khuon&&row.khuon_kep_voi)for(const peer of rows)if(peer.nhom_khuon===row.nhom_khuon)ids.add(peer.id_dong);
+    }
     return [...ids].map(id=>all.get(id)).filter(r=>r&&r.ma_sp&&(r.open_gio_phat_sinh||!closed.has(r.ngay+'|'+r.ca)));
   }
   async function jobs(){const [rows,reports]=await Promise.all([readRows('duc_ca_hien_tai','id_dong'),readRows('duc_bao_cao_ca','id_bao_cao')]);return active(rows,reports);}

@@ -1551,7 +1551,8 @@ async function openEndShiftScreen(){
   Object.keys(byMachine).forEach(m => {
     const rows = byMachine[m].sort((a,b) => (b._rowIndex||0) - (a._rowIndex||0));
     const idSet = new Set(rows.map(r => r.id_dong));
-    rows.forEach((r, idx) => { if (idx === 0 || (r.khuon_kep_voi && idSet.has(r.khuon_kep_voi))) activeRows.push(r); });
+    const activeGroups = new Set(rows.filter(r => r.nhom_khuon && r.khuon_kep_voi).map(r => r.nhom_khuon));
+    rows.forEach((r, idx) => { if (idx === 0 || (r.nhom_khuon && activeGroups.has(r.nhom_khuon)) || (r.khuon_kep_voi && idSet.has(r.khuon_kep_voi))) activeRows.push(r); });
   });
   state.endShiftRows = activeRows;
 

@@ -445,7 +445,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
       <label id="mp-pair-toggle-wrap" style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:var(--bg-sunken);border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">
         <input type="checkbox" id="mp-pair-toggle" style="cursor:pointer">
-        <span>🔗 Khuôn 2 cavity — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)</span>
+        <span>🔗 Khuôn nhiều sản phẩm — ra 2 hoặc 3 SP khác nhau cùng lúc</span>
       </label>
       <div id="mp-pair-block" style="display:none;border:1px dashed var(--border-strong);border-radius:6px;padding:10px;margin-top:6px">
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
@@ -462,6 +462,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field-row">
           <div class="field"><label>KH ca B <span class="req">*</span></label><input type="number" id="mp-kh-ca-b" min="0"></div>
           <div class="field"><label>KH tuần B</label><input type="number" id="mp-kh-tuan-b" min="0"></div>
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
+          <div class="field"><label>Mã sản phẩm C (nếu khuôn ra 3 mã)</label><input list="dl-products" id="mp-ma-sp-c" placeholder="Để trống nếu chỉ có 2 mã"></div>
+          <div class="field"><label>Tên sản phẩm C (tự động)</label><input type="text" id="mp-ten-sp-c" disabled style="background:var(--bg-sunken)"></div>
+          <div class="field-row"><div class="field"><label>KH ca C</label><input type="number" id="mp-kh-ca-c" min="0"></div><div class="field"><label>KH tuần C</label><input type="number" id="mp-kh-tuan-c" min="0"></div></div>
         </div>
       </div>
     </div>
@@ -653,7 +658,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
       <label id="cp-pair-toggle-wrap" style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:var(--bg-sunken);border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">
         <input type="checkbox" id="cp-pair-toggle" style="cursor:pointer">
-        <span id="cp-pair-toggle-label">🔗 Khuôn 2 cavity — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)</span>
+        <span id="cp-pair-toggle-label">🔗 Khuôn nhiều sản phẩm — ra 2 hoặc 3 SP khác nhau cùng lúc</span>
       </label>
       <div id="cp-pair-block" style="display:none;border:1px dashed var(--border-strong);border-radius:6px;padding:10px;margin-top:6px">
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
@@ -670,6 +675,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field-row">
           <div class="field"><label>KH ca B <span class="req">*</span></label><input type="number" id="cp-kh-ca-b" min="0"></div>
           <div class="field"><label>KH tuần B</label><input type="number" id="cp-kh-tuan-b" min="0"></div>
+        </div>
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px">
+          <div class="field"><label>Mã sản phẩm C (nếu khuôn ra 3 mã)</label><input list="dl-products" id="cp-ma-sp-c" placeholder="Để trống nếu chỉ có 2 mã"></div>
+          <div class="field"><label>Tên sản phẩm C (tự động)</label><input type="text" id="cp-ten-sp-c" disabled style="background:var(--bg-sunken)"></div>
+          <div class="field-row"><div class="field"><label>KH ca C</label><input type="number" id="cp-kh-ca-c" min="0"></div><div class="field"><label>KH tuần C</label><input type="number" id="cp-kh-tuan-c" min="0"></div></div>
         </div>
       </div>
 
@@ -1630,6 +1640,9 @@ function attachEventListeners(){
   document.getElementById('mp-ma-sp-b').addEventListener('input', e => {
     document.getElementById('mp-ten-sp-b').value = state.productMap[e.target.value.trim()] || '';
   });
+  document.getElementById('mp-ma-sp-c').addEventListener('input', e => {
+    document.getElementById('mp-ten-sp-c').value = state.productMap[e.target.value.trim()] || '';
+  });
 
   document.getElementById('cp-ma-sp').addEventListener('input', e => {
     const ma = e.target.value.trim();
@@ -1641,6 +1654,9 @@ function attachEventListeners(){
   });
   document.getElementById('cp-ma-sp-b').addEventListener('input', e => {
     document.getElementById('cp-ten-sp-b').value = state.productMap[e.target.value.trim()] || '';
+  });
+  document.getElementById('cp-ma-sp-c').addEventListener('input', e => {
+    document.getElementById('cp-ten-sp-c').value = state.productMap[e.target.value.trim()] || '';
   });
 
   document.getElementById('mp-so-khuon-select').addEventListener('change', () => onSoKhuonSelectChange('mp'));
@@ -2419,11 +2435,11 @@ function renderTable(){
   const html = [];
   machinesWithPlan.forEach(m => {
     const rows = rowsByMachine[m] || [];
-    // Khuôn kép: 2 dòng của cùng 1 cặp đều active song song (2 SP ra cùng 1 shot),
-    // không theo quy tắc "chỉ dòng mới nhất mới active".
+    // Các dòng của cùng nhóm khuôn nhiều SP đều active song song.
     const idSet = new Set(rows.map(r => r.id_dong));
+    const activeGroups = new Set(rows.filter(r => r.nhom_khuon && r.khuon_kep_voi).map(r => r.nhom_khuon));
     rows.forEach((row, idx) => {
-      const isActive = (idx === 0) || (row.khuon_kep_voi && idSet.has(row.khuon_kep_voi));
+      const isActive = (idx === 0) || (row.nhom_khuon && activeGroups.has(row.nhom_khuon)) || (row.khuon_kep_voi && idSet.has(row.khuon_kep_voi));
       html.push(makeRowHTML(row, computeState(row), isActive));
     });
   });
@@ -2547,9 +2563,11 @@ function makeRowHTML(row, stateClass, isActive){
 
   let pairBadge = '';
   if (row.khuon_kep_voi) {
-    const pairRow = state.rows.find(r => r.id_dong === row.khuon_kep_voi);
-    pairBadge = '<span class="pair-badge" title="Khuôn 2 cavity — ra cùng lúc với SP ' +
-      escapeHtml(pairRow ? pairRow.ma_sp : '?') + '">🔗 ' + escapeHtml(pairRow ? pairRow.ma_sp : '?') + '</span>';
+    const siblings = row.nhom_khuon
+      ? state.rows.filter(r => r.nhom_khuon === row.nhom_khuon && r.id_dong !== row.id_dong)
+      : [state.rows.find(r => r.id_dong === row.khuon_kep_voi)].filter(Boolean);
+    const codes = siblings.map(r => r.ma_sp).join(' + ') || '?';
+    pairBadge = '<span class="pair-badge" title="Cùng shot với các SP ' + escapeHtml(codes) + '">🔗 ' + escapeHtml(codes) + '</span>';
   }
 
   const moldColHTML = '<span class="mold">' + escapeHtml(row.so_khuon || '—') + moldBadge + moldIssueBadge + '</span>' +
@@ -3287,6 +3305,7 @@ async function openPlanModal(maMay, idDong){
   document.getElementById('mp-ten-sp-b').value = '';
   document.getElementById('mp-kh-ca-b').value = '';
   document.getElementById('mp-kh-tuan-b').value = '';
+  ['mp-ma-sp-c','mp-ten-sp-c','mp-kh-ca-c','mp-kh-tuan-c'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('mp-pair-toggle-wrap').style.display = (existing && idDong) ? 'none' : 'flex';
 
   modal.classList.add('open');
@@ -3345,10 +3364,14 @@ async function submitPlan(){
 async function submitPairedPlan(maSpA, khCaA, soKhuon){
   const maSpB = document.getElementById('mp-ma-sp-b').value.trim();
   const khCaB = Number(document.getElementById('mp-kh-ca-b').value);
+  const maSpC = document.getElementById('mp-ma-sp-c').value.trim();
+  const khCaC = Number(document.getElementById('mp-kh-ca-c').value);
   if (!soKhuon) return showToast('Khuôn kép cần chọn số khuôn (dùng chung cho cả 2 SP)', true);
   if (!maSpB) return showToast('Nhập mã SP B', true);
   if (!khCaB || khCaB <= 0) return showToast('Nhập KH ca B hợp lệ', true);
   if (maSpB === maSpA) return showToast('SP A và SP B phải khác nhau', true);
+  if (maSpC && (!khCaC || khCaC <= 0)) return showToast('Nhập KH ca C hợp lệ', true);
+  if (maSpC && (maSpC === maSpA || maSpC === maSpB)) return showToast('Mã SP A, B, C phải khác nhau', true);
 
   if (!(await ensureAuthOnSubmit('modal-plan'))) return;
   const nvNgay = document.getElementById('mp-nv-ngay').value;
@@ -3356,19 +3379,21 @@ async function submitPairedPlan(maSpA, khCaA, soKhuon){
 
   showOverlay('Đang lưu kế hoạch khuôn kép...');
   try {
-    const d = await rpcWrite('duc_assign_paired_plan', {
+    const ds = [
+      { ma_sp: maSpA, ten_sp: document.getElementById('mp-ten-sp').value, kh_ca: khCaA, kh_tuan: Number(document.getElementById('mp-kh-tuan').value) || 0 },
+      { ma_sp: maSpB, ten_sp: document.getElementById('mp-ten-sp-b').value, kh_ca: khCaB, kh_tuan: Number(document.getElementById('mp-kh-tuan-b').value) || 0 },
+    ];
+    if (maSpC) ds.push({ ma_sp: maSpC, ten_sp: document.getElementById('mp-ten-sp-c').value, kh_ca: khCaC, kh_tuan: Number(document.getElementById('mp-kh-tuan-c').value) || 0 });
+    const d = await rpcWrite('duc_assign_group_plan', {
       p_ngay: state.ngay, p_ca: state.ca, p_phuong_an_ca: state.phuongAnCa,
       p_ma_may: state.currentTarget.ma_may, p_so_khuon: soKhuon,
       p_nv_ca_ngay: nvNgay, p_nv_ca_dem: nvDem,
-      p_sp_a_ma_sp: maSpA, p_sp_a_ten_sp: document.getElementById('mp-ten-sp').value,
-      p_sp_a_kh_ca: khCaA, p_sp_a_kh_tuan: Number(document.getElementById('mp-kh-tuan').value) || 0,
-      p_sp_b_ma_sp: maSpB, p_sp_b_ten_sp: document.getElementById('mp-ten-sp-b').value,
-      p_sp_b_kh_ca: khCaB, p_sp_b_kh_tuan: Number(document.getElementById('mp-kh-tuan-b').value) || 0,
+      p_ds: ds,
       p_user: state.user,
     });
     hideOverlay(); closeModal();
-    showToast('✓ Đã lưu khuôn kép cho ' + state.currentTarget.ma_may + ': ' + d.ma_sp_a + ' + ' + d.ma_sp_b);
-    addMoldToProductMap(maSpA, soKhuon); addMoldToProductMap(maSpB, soKhuon);
+    showToast('✓ Đã lưu khuôn nhiều sản phẩm cho ' + state.currentTarget.ma_may + ': ' + d.ma_sp.join(' + '));
+    ds.forEach(x => addMoldToProductMap(x.ma_sp, soKhuon));
     addPersonnelToDatalist(nvNgay); addPersonnelToDatalist(nvDem);
     addNvDucToDatalist(nvNgay); addNvDucToDatalist(nvDem);
     loadShiftState(false);
@@ -3697,19 +3722,21 @@ async function submitResolve(){
 async function openChangeProductModal(idDong){
   const row = state.rows.find(r => r.id_dong === idDong);
   if (!row) return;
-  const partner = row.khuon_kep_voi ? state.rows.find(r => r.id_dong === row.khuon_kep_voi) : null;
-  if (row.khuon_kep_voi && !partner) return showToast('Không tìm thấy dòng ghép cặp khuôn kép — báo kỹ thuật', true);
+  const currentGroup = row.nhom_khuon && row.khuon_kep_voi
+    ? state.rows.filter(r => r.nhom_khuon === row.nhom_khuon).sort((a,b) => (a._rowIndex || 0) - (b._rowIndex || 0))
+    : (row.khuon_kep_voi ? [row, state.rows.find(r => r.id_dong === row.khuon_kep_voi)].filter(Boolean) : [row]);
+  if (row.khuon_kep_voi && currentGroup.length < 2) return showToast('Không tìm thấy đủ dòng trong nhóm khuôn đang chạy — tải lại dashboard', true);
+  const isGroup = currentGroup.length > 1;
   if (!(await ensureAuth())) return;
-  state.currentTarget = { id_dong: idDong, ma_may: row.ma_may, isPairOut: !!partner, so_khuon: row.so_khuon };
+  state.currentTarget = { id_dong: idDong, ma_may: row.ma_may, isPairOut: isGroup, groupIds: currentGroup.map(r => r.id_dong), so_khuon: row.so_khuon };
 
   document.getElementById('cp-tag').textContent = row.ma_may;
-  if (partner) {
-    document.getElementById('cp-current-info-label').textContent = 'ĐANG CHẠY KHUÔN KÉP (ĐỔI CẢ CẶP)';
-    document.getElementById('cp-current-info').innerHTML =
-      '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(row.ma_sp) + '</span> — ' + escapeHtml(row.ten_sp || '') +
-      ' <span style="color:var(--text-muted);font-size:11px">(TT ' + fmtNum(row.tt_ca) + '/KH ' + fmtNum(row.kh_ca) + ')</span><br>' +
-      '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(partner.ma_sp) + '</span> — ' + escapeHtml(partner.ten_sp || '') +
-      ' <span style="color:var(--text-muted);font-size:11px">(TT ' + fmtNum(partner.tt_ca) + '/KH ' + fmtNum(partner.kh_ca) + ')</span>';
+  if (isGroup) {
+    document.getElementById('cp-current-info-label').textContent = 'ĐANG CHẠY KHUÔN NHIỀU SẢN PHẨM (ĐỔI CẢ NHÓM)';
+    document.getElementById('cp-current-info').innerHTML = currentGroup.map(r =>
+      '<span style="font-family:\'JetBrains Mono\',monospace">' + escapeHtml(r.ma_sp) + '</span> — ' + escapeHtml(r.ten_sp || '') +
+      ' <span style="color:var(--text-muted);font-size:11px">(TT ' + fmtNum(r.tt_ca) + '/KH ' + fmtNum(r.kh_ca) + ')</span>'
+    ).join('<br>');
   } else {
     document.getElementById('cp-current-info-label').textContent = 'SẢN PHẨM HIỆN TẠI';
     document.getElementById('cp-current-info').innerHTML =
@@ -3729,7 +3756,7 @@ async function openChangeProductModal(idDong){
   document.getElementById('cp-dam-nhiem').value = '';
 
   // T188: đang có sự cố mở → báo trước hệ thống sẽ kết thúc sự cố tại giờ đổi khuôn
-  const dsSuCo = suCoMoCuaDong(row).concat(partner ? suCoMoCuaDong(partner) : []);
+  const dsSuCo = currentGroup.flatMap(r => suCoMoCuaDong(r));
   document.getElementById('cp-gio-bat-dau').min = dsSuCo.length
     ? toLocalInputValue(new Date(Math.max(...dsSuCo.map(s => new Date(s.open_gio_phat_sinh).getTime())))) : '';
   const warn = document.getElementById('cp-su-co-warn');
@@ -3742,13 +3769,14 @@ async function openChangeProductModal(idDong){
 
   document.getElementById('cp-pair-toggle').checked = false;
   document.getElementById('cp-pair-block').style.display = 'none';
-  document.getElementById('cp-pair-toggle-label').textContent = partner
-    ? '🔗 SP mới cũng là khuôn kép — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)'
-    : '🔗 Khuôn 2 cavity — ra 2 SP khác nhau cùng lúc (dùng chung số khuôn ở trên)';
+  document.getElementById('cp-pair-toggle-label').textContent = isGroup
+    ? '🔗 Sản phẩm mới cũng là nhóm khuôn nhiều mã (dùng chung số khuôn ở trên)'
+    : '🔗 Khuôn nhiều sản phẩm — ra 2 hoặc 3 SP khác nhau cùng lúc';
   document.getElementById('cp-ma-sp-b').value = '';
   document.getElementById('cp-ten-sp-b').value = '';
   document.getElementById('cp-kh-ca-b').value = '';
   document.getElementById('cp-kh-tuan-b').value = '';
+  ['cp-ma-sp-c','cp-ten-sp-c','cp-kh-ca-c','cp-kh-tuan-c'].forEach(id => document.getElementById(id).value = '');
 
   document.getElementById('cp-c3-hint').innerHTML =
     'Sự cố <b>C3 Đổi khuôn</b> sẽ tự động tạo trên (các) dòng SP mới. Sau khi đổi khuôn xong, bấm ✓ Xong trên dòng đó.';
@@ -3770,10 +3798,10 @@ async function submitChangeProduct(){
   if (!(await KhuonNamVanDe.damBao(soKhuon, state.currentTarget.ma_may))) return;   // T127
 
   if (state.currentTarget.isPairOut) {
-    return submitChangeProductPairOut(newMaSp, khCa, gioBatDau, soKhuon);
+    return submitGroupChangeProduct(newMaSp, khCa, gioBatDau, soKhuon, true);
   }
   if (document.getElementById('cp-pair-toggle').checked) {
-    return submitPairedChangeProduct(newMaSp, khCa, gioBatDau, soKhuon);
+    return submitGroupChangeProduct(newMaSp, khCa, gioBatDau, soKhuon, false);
   }
   if (!(await ensureAuthOnSubmit('modal-change-product'))) return;
 
@@ -3821,6 +3849,39 @@ async function submitPairedChangeProduct(maSpA, khCaA, gioBatDau, soKhuon){
     hideOverlay(); closeModal();
     showToast('✓ Đã đổi sang khuôn kép: ' + d.ma_sp_a + ' + ' + d.ma_sp_b + ' trên máy ' + d.ma_may);
     addMoldToProductMap(maSpA, soKhuon); addMoldToProductMap(maSpB, soKhuon);
+    addPersonnelToDatalist(damNhiem);
+    loadShiftState(false);
+  } catch (e) { onError(e); }
+}
+
+async function submitGroupChangeProduct(maSpA, khCaA, gioBatDau, soKhuon, replacingGroup){
+  const ds = [{ ma_sp: maSpA, ten_sp: document.getElementById('cp-ten-sp').value, kh_ca: khCaA, kh_tuan: Number(document.getElementById('cp-kh-tuan').value) || 0 }];
+  if (!replacingGroup || document.getElementById('cp-pair-toggle').checked) {
+    const maSpB = document.getElementById('cp-ma-sp-b').value.trim();
+    const khCaB = Number(document.getElementById('cp-kh-ca-b').value);
+    if (!maSpB) return showToast('Nhập mã SP B', true);
+    if (!khCaB || khCaB <= 0) return showToast('Nhập KH ca B hợp lệ', true);
+    ds.push({ ma_sp: maSpB, ten_sp: document.getElementById('cp-ten-sp-b').value, kh_ca: khCaB, kh_tuan: Number(document.getElementById('cp-kh-tuan-b').value) || 0 });
+    const maSpC = document.getElementById('cp-ma-sp-c').value.trim();
+    const khCaC = Number(document.getElementById('cp-kh-ca-c').value);
+    if (maSpC && (!khCaC || khCaC <= 0)) return showToast('Nhập KH ca C hợp lệ', true);
+    if (maSpC) ds.push({ ma_sp: maSpC, ten_sp: document.getElementById('cp-ten-sp-c').value, kh_ca: khCaC, kh_tuan: Number(document.getElementById('cp-kh-tuan-c').value) || 0 });
+  }
+  const mas = ds.map(x => x.ma_sp);
+  if (new Set(mas).size !== mas.length) return showToast('Các mã SP mới phải khác nhau', true);
+  if (!(await ensureAuthOnSubmit('modal-change-product'))) return;
+  const damNhiem = document.getElementById('cp-dam-nhiem').value;
+  showOverlay('Đang đổi nhóm sản phẩm và tạo sự cố C3...');
+  try {
+    const d = await rpcWrite('duc_change_product_group', {
+      p_old_id_dong: state.currentTarget.id_dong,
+      p_so_khuon: soKhuon,
+      p_gio_bat_dau_doi_khuon: new Date(gioBatDau).toISOString(),
+      p_dam_nhiem: damNhiem, p_user: state.user, p_ds: ds,
+    });
+    hideOverlay(); closeModal();
+    showToast('✓ Đã đổi ' + (d.old_ma_sp || 'nhóm SP') + ' → ' + d.ma_sp.join(' + ') + ' trên máy ' + d.ma_may);
+    ds.forEach(x => addMoldToProductMap(x.ma_sp, soKhuon));
     addPersonnelToDatalist(damNhiem);
     loadShiftState(false);
   } catch (e) { onError(e); }
@@ -4108,9 +4169,10 @@ function _applyShiftInputsToState(idDong, params, d){
   if (params.p_so_shot_cuoi_ca !== null) stateRow.so_shot_cuoi_ca = params.p_so_shot_cuoi_ca;
   stateRow.version = d.version;
 
-  if (stateRow.khuon_kep_voi) {
-    const pair = state.rows.find(r => r.id_dong === stateRow.khuon_kep_voi);
-    if (pair) {
+  const siblings = stateRow.nhom_khuon
+    ? state.rows.filter(r => r.nhom_khuon === stateRow.nhom_khuon && r.id_dong !== idDong)
+    : (stateRow.khuon_kep_voi ? state.rows.filter(r => r.id_dong === stateRow.khuon_kep_voi) : []);
+  siblings.forEach(pair => {
       pair.so_shot_nong_khuon = params.p_so_shot_nong_khuon;
       if (params.p_so_shot_dau_ca !== null && params.p_so_shot_cuoi_ca !== null) {
         pair.so_shot_dau_ca = params.p_so_shot_dau_ca;
@@ -4121,8 +4183,7 @@ function _applyShiftInputsToState(idDong, params, d){
             (params.p_so_shot_cuoi_ca - params.p_so_shot_dau_ca - params.p_so_shot_nong_khuon) * cav - (Number(pair.tt_ca) || 0)));
         }
       }
-    }
-  }
+  });
 }
 
 /**
@@ -4135,7 +4196,7 @@ function _wireShotChain(rows, scopeEl, prefix, onChange){
     const prevId = sorted[i - 1].id_dong;
     const curId = sorted[i].id_dong;
     // Cặp khuôn kép dùng mirror (_wireShotMirror), KHÔNG chain nối tiếp.
-    if (sorted[i - 1].khuon_kep_voi === curId || sorted[i].khuon_kep_voi === prevId) continue;
+    if ((sorted[i - 1].nhom_khuon && sorted[i - 1].nhom_khuon === sorted[i].nhom_khuon) || sorted[i - 1].khuon_kep_voi === curId || sorted[i].khuon_kep_voi === prevId) continue;
     const prevCuoiEl = scopeEl.querySelector('.' + prefix + '-shot-cuoi[data-id-dong="' + CSS.escape(prevId) + '"]');
     const curDauEl = scopeEl.querySelector('.' + prefix + '-shot-dau[data-id-dong="' + CSS.escape(curId) + '"]');
     if (!prevCuoiEl || !curDauEl) continue;
@@ -4161,16 +4222,23 @@ function _wireShotChain(rows, scopeEl, prefix, onChange){
  * mirror ở client chỉ để phản hồi tức thì.
  */
 function _wireShotMirror(rows, scopeEl, prefix){
+  const wired = new Set();
   rows.forEach(r => {
-    if (!r.khuon_kep_voi) return;
-    ['shot-dau', 'shot-cuoi', 'shot'].forEach(field => {
-      const selfEl = scopeEl.querySelector('.' + prefix + '-' + field + '[data-id-dong="' + CSS.escape(r.id_dong) + '"]');
-      const sibEl = scopeEl.querySelector('.' + prefix + '-' + field + '[data-id-dong="' + CSS.escape(r.khuon_kep_voi) + '"]');
-      if (!selfEl || !sibEl) return;
-      selfEl.addEventListener('input', () => {
-        if (sibEl.value === selfEl.value) return;
-        sibEl.value = selfEl.value;
-        _recomputeNgPreview(r.khuon_kep_voi, scopeEl, prefix);
+    const siblings = r.nhom_khuon
+      ? rows.filter(x => x.nhom_khuon === r.nhom_khuon && x.id_dong !== r.id_dong)
+      : (r.khuon_kep_voi ? rows.filter(x => x.id_dong === r.khuon_kep_voi) : []);
+    siblings.forEach(sib => {
+      const key = [r.id_dong, sib.id_dong].sort().join('|');
+      if (wired.has(key)) return;
+      wired.add(key);
+      ['shot-dau', 'shot-cuoi', 'shot'].forEach(field => {
+        const selfEl = scopeEl.querySelector('.' + prefix + '-' + field + '[data-id-dong="' + CSS.escape(r.id_dong) + '"]');
+        const sibEl = scopeEl.querySelector('.' + prefix + '-' + field + '[data-id-dong="' + CSS.escape(sib.id_dong) + '"]');
+        if (!selfEl || !sibEl) return;
+        selfEl.addEventListener('input', () => {
+          if (sibEl.value !== selfEl.value) sibEl.value = selfEl.value;
+          _recomputeNgPreview(sib.id_dong, scopeEl, prefix);
+        });
       });
     });
   });
@@ -4528,8 +4596,9 @@ function getActiveMachineRows(rows){
   Object.keys(rowsByMachine).forEach(m => {
     const rows = rowsByMachine[m].slice().sort((a, b) => (b._rowIndex || 0) - (a._rowIndex || 0));
     const idSet = new Set(rows.map(r => r.id_dong));
+    const activeGroups = new Set(rows.filter(r => r.nhom_khuon && r.khuon_kep_voi).map(r => r.nhom_khuon));
     rows.forEach((r, idx) => {
-      if (idx === 0 || (r.khuon_kep_voi && idSet.has(r.khuon_kep_voi))) active.push(r);
+      if (idx === 0 || (r.nhom_khuon && activeGroups.has(r.nhom_khuon)) || (r.khuon_kep_voi && idSet.has(r.khuon_kep_voi))) active.push(r);
     });
   });
   return active;
@@ -4779,9 +4848,19 @@ function toggleAllCarryOver(check){
 }
 
 function onCarryOverToggle(idx){
+  const machine = (state.endShiftMachines || [])[idx];
   const cb = document.querySelector('#es-machine-list input[type="checkbox"][data-idx="' + idx + '"]');
-  const input = document.querySelector('input.es-kh-input[data-idx="' + idx + '"]');
-  if (cb && input) input.disabled = !cb.checked;
+  if (!machine || !cb) return;
+  const linkedIds = machine.nhom_khuon
+    ? (state.endShiftMachines || []).filter(r => r.nhom_khuon === machine.nhom_khuon).map(r => r.id_dong)
+    : (machine.khuon_kep_voi ? [machine.id_dong, machine.khuon_kep_voi] : [machine.id_dong]);
+  (state.endShiftMachines || []).forEach((r, i) => {
+    if (!linkedIds.includes(r.id_dong)) return;
+    const peerCb = document.querySelector('#es-machine-list input[type="checkbox"][data-idx="' + i + '"]');
+    const input = document.querySelector('input.es-kh-input[data-idx="' + i + '"]');
+    if (peerCb && !peerCb.disabled) peerCb.checked = cb.checked;
+    if (input) input.disabled = !(peerCb && peerCb.checked);
+  });
 }
 
 /** Bảng review Shot/NG trong modal Kết ca (gồm cả dòng SP đã kết thúc giữa ca). */
