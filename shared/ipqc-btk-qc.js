@@ -29,6 +29,9 @@
     'tieu_chuan', 'dung_cu', 'tan_suat',
   ]);
   let dongDaSaoChep = null;
+  const noText = item => item.no_hien_thi ?? item.muc_no;
+  const itemOrder = (a, b) => (a.thu_tu_hien_thi ?? a.muc_no) - (b.thu_tu_hien_thi ?? b.muc_no);
+  const validCastingNo = /^[0-9]+(?:-[0-9]+)*$/;
   const noiDungDong = row => Object.fromEntries(COT_SAO_CHEP.map(key => [key, row[key] ?? '']));
   const dungCuHopLe = value => !String(value || '').trim() || DUNG_CU.includes(String(value).trim());
 
@@ -186,9 +189,16 @@
     const listEl = el.querySelector('[data-list]'), main = el.querySelector('[data-main]');
     let drawingSerial = 0, selectionSerial = 0, previewUrl = null;
     const gc = () => st.cd === 'gia_cong';
+    const nextItemKey = () => Math.min(0, ...st.rows.map(row => +row.muc_no)) - 1;
+    const suggestedNo = () => {
+      const used = new Set(st.rows.map(row => String(noText(row)).trim()));
+      let next = st.rows.length + 1;
+      while (used.has(String(next))) next++;
+      return String(next);
+    };
     const sameStep = v => !gc() || (v.buoc_gia_cong || '') === (st.xem?.buoc_gia_cong || '');
     const number = v => String(v ?? '').trim() === '' ? null : Number(soVN(v));
-    const field = (key, fallback) => gc() && st.sua && Object.hasOwn(st.fields || {}, key) ? st.fields[key] : fallback;
+    const field = (key, fallback) => st.sua && Object.hasOwn(st.fields || {}, key) ? st.fields[key] : fallback;
     const copyContent = row => ({...noiDungDong(row),...(gc()?Object.fromEntries(
       ['don_vi','phuong_phap','lsl','usl','co_mau'].map(key=>[key,row[key]??''])):{}),...(gc()?{dung_sai_co_dau:true}:{})});
     function showFailure(error) {
@@ -264,6 +274,9 @@
       st.xem = b; st.sua = false;
       st.rows = b ? st.mucAll.filter(x => x.id_btk === b.id).map(x => ({ ...x })) : [{ muc_no: 1, kieu: 'so', hang_muc: 'Kích thước', tan_suat: '2h/lần' }];
       if(gc())st.rows=st.rows.map(row=>IpqcGcStandard.toSigned(row));
+      else st.rows = b ? st.rows.sort(itemOrder).map(row => ({ ...row, no_hien_thi: String(noText(row)) }))
+        : st.rows.map(row => ({ ...row, muc_no: -1, no_hien_thi: '1' }));
+      if (!gc()) st.noDat = st.rows[0]?.muc_no ?? null;
       st.viTri = b ? (b.ban_ve_vi_tri || []).map(x => ({ ...x })) : [];
       st.banVe = b ? b.ban_ve_url : null;
       st.fields = {}; st.drawingFile = null; st.uploaded = null;
@@ -298,7 +311,8 @@
     function soSanh(cur) {
       if (!cur) return null;
       const goc = {}; st.mucAll.filter(x => x.id_btk === cur.id).forEach(x => { goc[+x.muc_no] = x; });
-      const doi = st.rows.map(r => { const g = goc[+r.muc_no]; return g ? COT_SS.filter(c => !giongNhau(r[c], g[c])) : null; });
+      const doi = st.rows.map(r => { const g = goc[+r.muc_no]; return g ? COT_SS.filter(c => !giongNhau(r[c], g[c])).concat(
+        !gc() && String(noText(r)) !== String(noText(g)) ? ['no_hien_thi'] : []) : null; });
       const nos = new Set(st.rows.map(r => +r.muc_no));
       return { cur, doi, bo: Object.values(goc).filter(g => !nos.has(+g.muc_no)) };
     }
@@ -313,7 +327,7 @@
       const traLai = () => { bv.scrollLeft = cuon[0]; bv.scrollTop = cuon[1]; };
       if (im.complete) traLai(); else im.addEventListener('load', traLai, { once: true });
     }
-    const diemHtml = v => '<span class="b" style="left:' + v.x + '%;top:' + v.y + '%">' + esc(v.no) + '</span>';
+    const diemHtml = v => '<span class="b" style="left:' + v.x + '%;top:' + v.y + '%">' + esc(noText(st.rows.find(row => String(row.muc_no) === String(v.no)) || { muc_no: v.no })) + '</span>';
     // Chỉ vẽ lại các số vị trí đo (không vẽ lại cả trang → không thoát chế độ toàn màn hình).
     function veDiem() {
       const w = main.querySelector('[data-bv] .bvz');
@@ -401,7 +415,7 @@
       const cdKhac = st.cd === 'duc' ? 'gia_cong' : 'duc';
       main.innerHTML =
         '<div class="card"><div class="flds">' +
-          '<div style="flex:1 1 220px"><div style="font-size:11px;color:#64748B;font-weight:600">Biểu kiểm tra tuần kiểm · ' + esc((b && b.ma_bieu) || 'QP-82405-B') + '</div>' +
+          '<div style="flex:1 1 220px"><div style="font-size:11px;color:#64748B;font-weight:600">Biểu kiểm tra tuần kiểm · ' + esc(field('ma_bieu', (b && b.ma_bieu) || 'QP-82405-B')) + '</div>' +
           '<div style="font-size:19px;font-weight:800">' + esc(st.ma) + ' <span class="tag ' + (st.cd === 'duc' ? 'ok' : 'w') + '" style="font-size:12px;vertical-align:middle">' + CD[st.cd] + '</span> <span style="font-size:13px;color:#475569;font-weight:600">' + esc(p.ten_sp || '') + '</span></div>'+ (gc()?'<div class="hint">Khách hàng: '+esc(p.ten_khach_hang||'Chưa khai báo')+'</div>':'')+'</div>' +
           '<label class="f">Đang xem<select data-pb>' + (st.versions.length ? st.versions.map(v => '<option value="' + v.id + '"' + (b && v.id === b.id ? ' selected' : '') + '>' + tenPb(v) + ' — ' + esc(v.ngay_hieu_luc || '') + '</option>').join('') : '<option>Chưa có — lập mới</option>') + '</select></label>' +
           (q.soan ? '<button class="btn" type="button" data-nhap>Nhập từ Excel</button>' : '') + '<button class="btn" type="button" data-mau>Tải file mẫu</button>' +
@@ -414,13 +428,14 @@
         (gc()?gcFields(dis):'')+
         (gc()&&b?.nguon_sao_chep?'<div class="hint">Nguồn sao chép: '+esc(b.nguon_sao_chep.model_nguon)+' · Revision '+esc(b.nguon_sao_chep.phien_ban_nguon)+' · '+esc(b.nguon_sao_chep.nguoi_sao_chep)+' · '+esc(ngayVN(b.nguon_sao_chep.thoi_diem))+'. Đính kèm bản vẽ phù hợp Model đích.</div>':'')+
         '<div class="flds" style="margin-top:10px">' +
-          '<label class="f">Phiên bản' + (sua && !laNhap ? ' mới' : '') + '<input data-f="phien_ban" value="' + esc(!sua&&b?b.phien_ban:nhap ? nhap.phien_ban : phienBanMoi()) + '" style="width:70px"' + dis + '></label>' +
-          '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc((laNhap||!sua) && b?.ngay_hieu_luc ? b.ngay_hieu_luc : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)) + '"' + dis + '></label>' +
-          '<label class="f">Số mẫu đo / lần<select data-f="so_mau"' + dis + '>' + [1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (((b && b.so_mau) || 1) === n ? ' selected' : '') + '>' + n + (n === 1 ? ' (I-MR)' : ' (X̄-R)') + '</option>').join('') + '</select></label>' +
-          '<label class="f">Tần suất<input data-f="tan_suat" value="' + esc((b && b.tan_suat) || '2h/lần') + '" style="width:90px"' + dis + '></label>' +
-          '<label class="f">Mã biểu<input data-f="ma_bieu" value="' + esc((b && b.ma_bieu) || 'QP-82405-B') + '" style="width:110px"' + dis + '></label>' +
-          '<label class="f" style="flex:1 1 200px">Nội dung sửa đổi<input data-f="noi_dung_sua_doi" value="' + esc(laNhap ? b.noi_dung_sua_doi || '' : cur ? '' : 'Lập mới') + '" placeholder="VD: Sửa dung sai hạng mục 2"' + dis + '></label>' +
+          '<label class="f">Phiên bản' + (sua && !laNhap ? ' mới' : '') + '<input data-f="phien_ban" value="' + esc(field('phien_ban', !sua&&b?b.phien_ban:nhap ? nhap.phien_ban : phienBanMoi())) + '" style="width:70px"' + dis + '></label>' +
+          '<label class="f">Ngày hiệu lực<input type="date" data-f="ngay_hieu_luc" value="' + esc(field('ngay_hieu_luc', (laNhap||!sua) && b?.ngay_hieu_luc ? b.ngay_hieu_luc : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10))) + '"' + dis + '></label>' +
+          '<label class="f">Số mẫu đo / lần<select data-f="so_mau"' + dis + '>' + [1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (Number(field('so_mau', (b && b.so_mau) || 1)) === n ? ' selected' : '') + '>' + n + (n === 1 ? ' (I-MR)' : ' (X̄-R)') + '</option>').join('') + '</select></label>' +
+          '<label class="f">Tần suất<input data-f="tan_suat" value="' + esc(field('tan_suat', (b && b.tan_suat) || '2h/lần')) + '" style="width:90px"' + dis + '></label>' +
+          '<label class="f">Mã biểu<input data-f="ma_bieu" value="' + esc(field('ma_bieu', (b && b.ma_bieu) || 'QP-82405-B')) + '" style="width:110px"' + dis + '></label>' +
+          '<label class="f" style="flex:1 1 200px">Nội dung sửa đổi<input data-f="noi_dung_sua_doi" value="' + esc(field('noi_dung_sua_doi', laNhap ? b.noi_dung_sua_doi || '' : cur ? '' : 'Lập mới')) + '" placeholder="VD: Sửa dung sai hạng mục 2"' + dis + '></label>' +
           (sua ? '<button class="btn p" type="button" data-luu>' + (nhap ? 'Cập nhật bản nháp ' + esc(nhap.phien_ban) + ' & gửi lại' : 'Gửi duyệt phiên bản mới') + '</button>' +
+            (!gc() ? '<button class="btn" type="button" data-luu-nhap>Lưu bản nháp</button>' : '') +
             '<button class="btn" type="button" data-huysua>Huỷ chỉnh sửa</button>'
             : q.soan ? '<button class="btn p" type="button" data-sua>✏️ ' + (b ? 'Chỉnh sửa' : 'Lập bảng tuần kiểm') + '</button>' : '') +
         '</div>' +
@@ -436,7 +451,7 @@
             '<div class="bv' + (st.banVe ? (sua ? '' : ' xem') : ' trong') + '" data-bv>' + (st.banVe ? '<div class="bvz" style="width:' + st.zoom * 100 + '%"><img src="' + esc(st.banVe) + '" alt="Bản vẽ" draggable="false">' + st.viTri.map(diemHtml).join('') + '</div>'
               : '<div>[Chưa có bản vẽ]' + (sua ? '<br><span style="font-size:11.5px">Tải ảnh PNG / JPG bản vẽ có các vị trí đo</span>' : '') + '</div>') + '</div>' +
             (sua ? '<div class="flds" style="margin-top:8px"><label class="btn sm" style="display:inline-flex">Tải ảnh bản vẽ<input type="file" accept="image/png,image/jpeg,image/webp" data-up hidden></label>' +
-              (st.banVe ? '<label class="f">Đặt vị trí cho No<select data-nodat>' + st.rows.map(r => '<option' + (+r.muc_no === +st.noDat ? ' selected' : '') + '>' + esc(r.muc_no) + '</option>').join('') + '</select></label>' +
+              (st.banVe ? '<label class="f">Đặt vị trí cho No<select data-nodat>' + st.rows.map(r => '<option value="' + esc(r.muc_no) + '"' + (+r.muc_no === +st.noDat ? ' selected' : '') + '>' + esc(noText(r)) + '</option>').join('') + '</select></label>' +
                 '<button class="btn sm d" type="button" data-xoavt>Xoá vị trí</button>' : '') + '</div>' +
               '<div class="hint">' + (st.banVe ? 'Chọn No rồi bấm lên bản vẽ để đặt số. ' : '') + 'Bản vẽ + vị trí đo đi cùng khi gửi duyệt.</div>' : '') +
             (st.banVe ? '<div class="hint">Phóng to bằng nút + / − hoặc giữ Ctrl + lăn chuột trên bản vẽ; kéo chuột để di chuyển bản vẽ.</div>' : '') + '</div>') +
@@ -452,7 +467,10 @@
               const doi = ss ? ss.doi[i] : [];
               const td = c => '<td' + (doi && doi.includes(c) ? ' class="doi"' : '') + '>';
               const dso = so ? dis : ' disabled';
-              return '<tr data-r="' + i + '"' + (ss && !doi ? ' class="moi"' : '') + '><td><input data-c="muc_no" value="' + esc(r.muc_no ?? '') + '" style="width:44px" inputmode="numeric"' + dis + '></td>' +
+              return '<tr data-r="' + i + '"' + (ss && !doi ? ' class="moi"' : '') + '>' +
+                td('no_hien_thi') + '<input aria-label="NO" data-c="' + (gc() ? 'muc_no' : 'no_hien_thi') + '" value="' +
+                esc((gc() ? r.muc_no : noText(r)) ?? '') + '"' +
+                (gc() ? ' style="width:44px" inputmode="numeric"' : ' style="width:58px"') + dis + '></td>' +
                 td('hang_muc') + '<input data-c="hang_muc" value="' + esc(r.hang_muc || '') + '" style="width:150px"' + dis + '></td>' +
                 td('kieu') + '<select data-c="kieu"' + dis + '><option value="so"' + (so ? ' selected' : '') + '>Đo số</option><option value="okng"' + (!so ? ' selected' : '') + '>OK / NG</option></select></td>' +
                 td('danh_nghia') + '<input data-c="danh_nghia" value="' + esc(r.danh_nghia ?? '') + '" style="width:70px" inputmode="decimal"' + dso + '></td>' +
@@ -469,7 +487,7 @@
                     ' <button class="btn sm d" type="button" data-xoa="' + i + '" aria-label="Xoá hạng mục">✕</button>' : '') + '</td></tr>';
             }).join('') + '</table></div>' +
             (ss ? '<div class="hint"><b>So với bản đang dùng ' + esc(ss.cur.phien_ban) + ':</b> ô vàng = đã sửa, vạch xanh đầu dòng = hạng mục mới' +
-              (ss.bo.length ? '; bỏ: ' + ss.bo.map(g => 'No ' + esc(g.muc_no) + ' ' + esc(g.hang_muc)).join(', ') : '') +
+              (ss.bo.length ? '; bỏ: ' + ss.bo.map(g => 'No ' + esc(gc() ? g.muc_no : noText(g)) + ' ' + esc(g.hang_muc)).join(', ') : '') +
               (b.so_mau !== ss.cur.so_mau ? '; số mẫu/lần ' + ss.cur.so_mau + ' → ' + b.so_mau : '') +
               (b.ban_ve_url !== ss.cur.ban_ve_url ? '; bản vẽ mới' : JSON.stringify(b.ban_ve_vi_tri || []) !== JSON.stringify(ss.cur.ban_ve_vi_tri || []) ? '; đổi vị trí đo trên bản vẽ' : '') + '.</div>' : '') +
             '<div class="hint">Sao chép rồi Dán vào dòng đích hoặc Dán thành dòng mới. Dán giữ nguyên No và vị trí đo của dòng đích.</div>' +
@@ -493,7 +511,7 @@
     }
 
     function docBang() {
-      if(gc())main.querySelectorAll('[data-f]').forEach(input=>{st.fields[input.dataset.f]=input.value;});
+      if(st.sua)main.querySelectorAll('[data-f]').forEach(input=>{st.fields[input.dataset.f]=input.value;});
       main.querySelectorAll('tr[data-r]').forEach(tr => {
         const r = st.rows[+tr.dataset.r];
         tr.querySelectorAll('[data-c]').forEach(i => { r[i.dataset.c] = i.type==='checkbox'?i.checked:i.value; });
@@ -507,7 +525,9 @@
         ma_bieu: f('ma_bieu'), noi_dung_sua_doi: f('noi_dung_sua_doi'),
         ban_ve_url: st.banVe || '', ban_ve_vi_tri: st.viTri,
         ...(gc()?{ma_sp:st.ma,dung_sai_co_dau:true,ma_ban_ve:f('ma_ban_ve'),buoc_gia_cong:f('buoc_gia_cong'),tai_lieu_goc:st.uploaded||st.taiLieuGoc}:{}),
-        muc: st.rows.map(r => ({ muc_no: String(r.muc_no ?? '').trim(), hang_muc: r.hang_muc, kieu: r.kieu,
+        ...(!gc() ? { id_nguon: st.xem?.id } : {}),
+        muc: st.rows.map(r => ({ muc_no: String(r.muc_no ?? '').trim(),
+          ...(!gc() ? { no_hien_thi: String(noText(r)).trim() } : {}), hang_muc: r.hang_muc, kieu: r.kieu,
           danh_nghia: soVN(r.danh_nghia), dung_sai_tren: soVN(r.dung_sai_tren), dung_sai_duoi: soVN(r.dung_sai_duoi),
           tieu_chuan: r.tieu_chuan, dung_cu: r.dung_cu, tan_suat: r.tan_suat,
           ma_dac_tinh:r.ma_dac_tinh,don_vi:r.don_vi,phuong_phap:r.phuong_phap,
@@ -642,6 +662,14 @@
         if(!gc())ve();
       }
       else if(gc()&&t.matches('[data-c="lsl"],[data-c="usl"]')){docBang();st.rows[+t.closest('[data-r]').dataset.r].limitsManual=true;}
+      else if (!gc() && t.matches('[data-c="no_hien_thi"]')) {
+        docBang();
+        const option = main.querySelector('[data-nodat]')?.options[+t.closest('[data-r]').dataset.r];
+        if (option) {
+          option.textContent = t.value;
+          veDiem();
+        }
+      }
       else if (t.matches('[data-nodat]')) st.noDat = t.value;
       else if (t.matches('[data-up]') && t.files[0]) upBanVe(t.files[0]);
       }catch(error){showFailure(error);}
@@ -674,9 +702,11 @@
       const copy = t.closest('[data-sao-chep]');
       if (copy) {
         docBang();
-        dongDaSaoChep = copyContent(st.rows[+copy.dataset.saoChep]);
+        const source = st.rows[+copy.dataset.saoChep];
+        dongDaSaoChep = copyContent(source);
+        if (!gc()) dongDaSaoChep.no_hien_thi = noText(source);
         el.querySelectorAll('[data-dan],[data-dan-moi]').forEach(button => { button.disabled = false; });
-        return msg(main.querySelector('[data-msg]'), 'Đã sao chép dòng No ' + st.rows[+copy.dataset.saoChep].muc_no + '. Chọn Dán hoặc Dán thành dòng mới.');
+        return msg(main.querySelector('[data-msg]'), 'Đã sao chép dòng No ' + (gc() ? source.muc_no : noText(source)) + '. Chọn Dán hoặc Dán thành dòng mới.');
       }
       const zb = t.closest('[data-zoom]');
       if (zb) {
@@ -711,37 +741,64 @@
       if (paste || t.closest('[data-dan-moi]')) {
         if (!dongDaSaoChep) return;
         docBang();
-        if (paste) Object.assign(st.rows[+paste.dataset.dan], copyContent(dongDaSaoChep),{da_xac_nhan:false});
+        const copied = gc() ? copyContent(dongDaSaoChep) : dongDaSaoChep;
+        if (paste) Object.assign(st.rows[+paste.dataset.dan], copied, { da_xac_nhan: false });
         else {
-          const no = Math.max(0, ...st.rows.map(row => +row.muc_no || 0)) + 1;
-          st.rows.push({ ...copyContent(dongDaSaoChep), muc_no: no });
+          const no = gc() ? Math.max(0, ...st.rows.map(row => +row.muc_no || 0)) + 1 : nextItemKey();
+          st.rows.push({ ...(!gc() ? { no_hien_thi: copied.no_hien_thi ?? suggestedNo() } : {}),
+            ...copied, muc_no: no });
         }
         return ve();
       }
-      if (t.closest('[data-them]')) { docBang(); const mx = Math.max(0, ...st.rows.map(r => +r.muc_no || 0)); st.rows.push({ muc_no: mx + 1, kieu: 'so', tan_suat: '2h/lần',...(gc()?{dung_sai_co_dau:true}:{}) }); return ve(); }
+      if (t.closest('[data-them]')) {
+        docBang();
+        const numbering = gc() ? { muc_no: Math.max(0, ...st.rows.map(r => +r.muc_no || 0)) + 1, dung_sai_co_dau: true }
+          : { muc_no: nextItemKey(), no_hien_thi: suggestedNo() };
+        st.rows.push({ ...numbering, kieu: 'so', tan_suat: '2h/lần' });
+        return ve();
+      }
       const x = t.closest('[data-xoa]');
-      if (x) { docBang(); st.rows.splice(+x.dataset.xoa, 1); return ve(); }
+      if (x) {
+        docBang();
+        const [removed] = st.rows.splice(+x.dataset.xoa, 1);
+        if (!gc()) {
+          st.viTri = st.viTri.filter(v => +v.no !== +removed.muc_no);
+          if (+st.noDat === +removed.muc_no) st.noDat = st.rows[0]?.muc_no ?? null;
+        }
+        return ve();
+      }
       if (t.closest('[data-xoavt]')) { st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)); return veDiem(); }
       const img = t.closest('[data-bv] img');
       if (img && st.vuaKeo) { st.vuaKeo = false; return; }   // vừa kéo để di chuyển, không đặt điểm
-      if (img) {
+      if (img && st.noDat != null) {
         const r = img.getBoundingClientRect();
         const x2 = +((e.clientX - r.left) / r.width * 100).toFixed(1), y2 = +((e.clientY - r.top) / r.height * 100).toFixed(1);
         st.viTri = st.viTri.filter(v => String(v.no) !== String(st.noDat)).concat([{ no: +st.noDat, x: x2, y: y2 }]);
-        const nos = st.rows.map(r2 => +r2.muc_no).filter(Boolean).sort((a, b) => a - b);
+        const nos = st.rows.map(r2 => +r2.muc_no).filter(Boolean);
+        if (gc()) nos.sort((a, b) => a - b);
         const k = nos.indexOf(+st.noDat); if (k >= 0 && k < nos.length - 1) st.noDat = nos[k + 1];
         return veDiem();
       }
-      if (t.closest('[data-luu]')) {
+      const saveDraft = !gc() && !!t.closest('[data-luu-nhap]');
+      if (saveDraft || t.closest('[data-luu]')) {
         const m = main.querySelector('[data-msg]');
         const pl = payload();
+        if (!gc()) {
+          const seen = new Set();
+          for (const row of pl.muc) {
+            const no = row.no_hien_thi;
+            if (!validCastingNo.test(no)) return msg(m, 'Nhập NO theo dạng 1 hoặc 1-1.', 'err');
+            if (seen.has(no)) return msg(m, 'Trùng NO ' + no + ' trong phiên bản.', 'err');
+            seen.add(no);
+          }
+        }
         const invalidLimits=gc()&&pl.muc.find(row=>IpqcGcStandard.validate({...row,dung_sai_co_dau:true}));
         if(invalidLimits)return msg(m,'No '+invalidLimits.muc_no+': '+IpqcGcStandard.validate({...invalidLimits,dung_sai_co_dau:true}),'err');
         if(gc()&&pl.muc.some(row=>!row.da_xac_nhan))return msg(m,'Đối chiếu và xác nhận từng đặc tính trước gửi duyệt.','err');
         const invalid = pl.muc.find(row => !dungCuHopLe(row.dung_cu));
-        if (invalid) return msg(m, 'No ' + invalid.muc_no + ': chọn dụng cụ kiểm tra trong danh sách cho phép.', 'err');
+        if (invalid) return msg(m, 'No ' + noText(invalid) + ': chọn dụng cụ kiểm tra trong danh sách cho phép.', 'err');
         if (!pl.noi_dung_sua_doi.trim()) return msg(m, 'Nhập nội dung sửa đổi.', 'err');
-        const btn = t.closest('[data-luu]'); btn.disabled = true;
+        const btn = t.closest('[data-luu],[data-luu-nhap]'); btn.disabled = true;
         let finishSave;
         st.saveGate=new Promise(resolve=>{finishSave=resolve;});
         const controls=[...el.querySelectorAll('input,select,button')].map(input=>[input,input===btn?false:input.disabled]);
@@ -749,10 +806,11 @@
         try {
           if(gc()){await uploadGcDrawing();pl.tai_lieu_goc=st.uploaded||st.taiLieuGoc;}
           const { data, error } = gc()?await sb.rpc('ipqc_gc_luu_tieu_chuan',{p_data:pl}):
-            await sb.rpc('ipqc_btk_luu', { p_ma_sp: st.ma, p_data: pl, p_nguoi: await nguoi(), p_cong_doan: st.cd });
+            await sb.rpc('ipqc_duc_luu_bang_tuan_kiem', { p_ma_sp: st.ma, p_data: pl, p_luu_nhap: saveDraft });
           if (error) throw new Error(error.message);
           if (!data || !data.ok) throw new Error((data && data.error) || 'Không lưu được');
-          await xong('Đã gửi duyệt phiên bản ' + data.phien_ban + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.', data.id);
+          await xong(saveDraft ? 'Đã lưu bản nháp ' + data.phien_ban :
+            'Đã gửi duyệt phiên bản ' + data.phien_ban + ' — chờ Trưởng phòng QC kiểm tra. IPQC vẫn dùng bản đang dùng đến khi Giám đốc SX phê duyệt.', data.id);
         } catch (er) { msg(m, er.message, 'err'); btn.disabled = false; }
         finally{st.saveGate=null;finishSave();controls.forEach(([input,disabled])=>{if(input.isConnected)input.disabled=disabled;});}
       }
@@ -829,7 +887,7 @@
   }
   function xuatExcel(ma, b, rows) {
     if (typeof XLSX === 'undefined') return alert('Chưa tải được thư viện Excel — tải lại trang.');
-    const aoa = [cotExcel(b?.cong_doan)].concat(rows.map(r => [ma, b ? b.phien_ban : '', b ? b.ngay_hieu_luc : '', b ? b.so_mau : 1, r.muc_no, r.hang_muc,
+    const aoa = [cotExcel(b?.cong_doan)].concat(rows.map(r => [ma, b ? b.phien_ban : '', b ? b.ngay_hieu_luc : '', b ? b.so_mau : 1, b?.cong_doan === 'duc' ? String(noText(r)) : r.muc_no, r.hang_muc,
       r.kieu === 'so' ? 'Đo số' : 'OK-NG', r.danh_nghia ?? '', r.dung_sai_tren ?? '', r.dung_sai_duoi ?? '', r.tieu_chuan || '', r.dung_cu || '', r.tan_suat || '',
       b ? b.noi_dung_sua_doi || '' : '', b ? b.nguoi_phe_duyet || b.nguoi_xac_nhan || '' : '']));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Bang tuan kiem');
@@ -876,7 +934,8 @@
         }
         const dong = 'Dòng ' + (hi + k + 2);
         if (!dungCuHopLe(m.dung_cu)) g.loi.push(dong + ': dụng cụ kiểm tra không có trong danh sách cho phép');
-        if (!m.muc_no || !/^\d+$/.test(m.muc_no)) g.loi.push(dong + ': No phải là số');
+        if (!(cd === 'duc' ? validCastingNo : /^\d+$/).test(m.muc_no))
+          g.loi.push(dong + (cd === 'duc' ? ': NO phải có dạng 1 hoặc 1-1' : ': No phải là số'));
         if (!m.hang_muc) g.loi.push(dong + ': thiếu Hạng mục');
         if (kieu === 'so' && (dn === '' || !isFinite(+dn))) g.loi.push(dong + ': Danh nghĩa không phải số');
         if (kieu === 'so' && m.dung_sai_tren === '' && m.dung_sai_duoi === '') g.loi.push(dong + ': thiếu dung sai');
@@ -908,7 +967,9 @@
       ev.target.disabled = true;
       const ten = await nguoi(), kq = [];
       for (const g of ok) {
-        const { data, error } = await sb.rpc('ipqc_btk_luu', { p_ma_sp: g.ma, p_data: g.data, p_nguoi: ten, p_cong_doan: cd });
+        const { data, error } = cd === 'duc'
+          ? await sb.rpc('ipqc_duc_luu_bang_tuan_kiem', { p_ma_sp: g.ma, p_data: g.data })
+          : await sb.rpc('ipqc_btk_luu', { p_ma_sp: g.ma, p_data: g.data, p_nguoi: ten, p_cong_doan: cd });
         kq.push(g.ma + ': ' + (error ? error.message : data && data.ok ? 'đã gửi duyệt phiên bản ' + data.phien_ban : (data && data.error) || 'lỗi'));
       }
       mask.querySelector('[data-kq]').innerHTML = '<div class="msg ok">' + kq.map(esc).join('<br>') + '</div>';
@@ -975,6 +1036,7 @@
     async function ve() {
       let data;
       try { data = await layDuLieu(st.ma, st.ngay, st.cd); } catch (e) { trai.innerHTML = '<div class="card msg err">' + esc(e.message) + '</div>'; return; }
+      if (st.cd === 'duc') data.muc?.sort(itemOrder);
       const mucSo = (data.muc || []).filter(m => m.kieu === 'so');
       if (!st.no || !mucSo.some(m => m.muc_no === st.no)) st.no = mucSo.length ? mucSo[0].muc_no : null;
       const mays = [...new Set((data.lan || []).map(l => l.ma_may).filter(Boolean))].sort();
@@ -984,7 +1046,7 @@
       locEl.innerHTML =
         '<label class="f">Công đoạn<select data-l="cd">' + Object.keys(CD).map(c => '<option value="' + c + '"' + (c === st.cd ? ' selected' : '') + '>' + CD[c] + ' (' + st.dsMa.filter(x => x.cong_doan === c).length + ' mã)</option>').join('') + '</select></label>' +
         '<label class="f">Mã SP<select data-l="ma">' + dsCd().map(x => '<option' + (x.ma_sp === st.ma ? ' selected' : '') + '>' + esc(x.ma_sp) + '</option>').join('') + '</select></label>' +
-        '<label class="f">Hạng mục<select data-l="no">' + mucSo.map(m => '<option value="' + m.muc_no + '"' + (m.muc_no === st.no ? ' selected' : '') + '>' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</option>').join('') + '</select></label>' +
+        '<label class="f">Hạng mục<select data-l="no">' + mucSo.map(m => '<option value="' + m.muc_no + '"' + (m.muc_no === st.no ? ' selected' : '') + '>' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '. ' + esc(m.hang_muc) + ' ' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</option>').join('') + '</select></label>' +
         '<label class="f">Máy<select data-l="may"><option value="">Tất cả</option>' + mays.map(x => '<option' + (x === st.may ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khuôn<select data-l="khuon"><option value="">Tất cả</option>' + khuons.map(x => '<option' + (x === st.khuon ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></label>' +
         '<label class="f">Khoảng thời gian<select data-l="ngay">' + [[7, '7 ngày'], [30, '30 ngày'], [90, '90 ngày'], [0, 'Tất cả']].map(([v, t]) => '<option value="' + v + '"' + (v === st.ngay ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
@@ -1006,7 +1068,7 @@
       const ptsX = pts.map((p, i) => ({ x: p.x, mau: mau(p, i), nhan: nhan(p), tg: ngayVN(p.t) }));
       const rVals = soMau <= 1 ? pts.slice(1).map((p, i) => ({ x: Math.abs(p.x - pts[i].x), tg: ngayVN(p.t) })) : pts.map(p => ({ x: p.r, tg: ngayVN(p.t) }));
       trai.innerHTML =
-        '<div class="card"><div class="ttl"><span class="sp" style="text-transform:none;font-size:14px;color:#0F172A;letter-spacing:0">' + (soMau <= 1 ? 'Biểu đồ giá trị đơn (I)' : 'Biểu đồ trung bình (X̄), ' + soMau + ' mẫu/lần') + ' — ' + m.muc_no + '. ' + esc(m.hang_muc) + ' ' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</span>' +
+        '<div class="card"><div class="ttl"><span class="sp" style="text-transform:none;font-size:14px;color:#0F172A;letter-spacing:0">' + (soMau <= 1 ? 'Biểu đồ giá trị đơn (I)' : 'Biểu đồ trung bình (X̄), ' + soMau + ' mẫu/lần') + ' — ' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '. ' + esc(m.hang_muc) + ' ' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</span>' +
           (lim ? (lim.tam ? '<span class="tag w">Giới hạn tạm (' + lim.n + ' lần)</span>' : '<span class="tag ok">Giới hạn đã khoá</span>') : '<span class="tag no">Chưa đủ dữ liệu tính giới hạn</span>') + '</div>' +
           (pts.length ? S().bieuDo({ pts: ptsX, lim, usl: sp.usl, lsl: sp.lsl, d, h: 290, vung, aria: 'Biểu đồ kiểm soát ' + m.hang_muc }) : '<div class="hint">Chưa có lần đo nào trong khoảng đã chọn.</div>') +
           '<div class="lg"><span style="color:#B91C1C">- - USL / LSL (tiêu chuẩn)</span><span style="color:#B45309">··· UCL / LCL (±3σ)</span><span><span style="color:#DC2626">●</span> ngoài tiêu chuẩn</span><span><span style="color:#D97706">●</span> vi phạm quy tắc</span><span>Rê chuột lên điểm để xem chi tiết</span></div></div>' +
@@ -1017,7 +1079,7 @@
       // Năng lực
       const tatCa = []; pts.forEach(p => tatCa.push(...p.vals));
       const nl = S().nangLuc(tatCa, sp);
-      el.querySelector('[data-nl]').innerHTML = '<div class="ttl"><span class="sp">Năng lực quá trình — hạng mục ' + m.muc_no + '</span></div><div class="kpi">' +
+      el.querySelector('[data-nl]').innerHTML = '<div class="ttl"><span class="sp">Năng lực quá trình — hạng mục ' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '</span></div><div class="kpi">' +
         '<div><div class="k">Số giá trị đo</div><div class="v">' + nl.n + '</div></div><div><div class="k">Trung bình</div><div class="v">' + S().fmt(nl.tb, d) + '</div></div>' +
         '<div><div class="k">Cp</div><div class="v">' + (nl.cp === null ? '—' : nl.cp.toFixed(2)) + '</div></div>' +
         '<div style="background:' + (nl.cpk !== null && nl.cpk < 1.33 ? '#FEF2F2' : '#F8FAFC') + '"><div class="k">Cpk (mục tiêu ≥ 1.33)</div><div class="v" style="color:' + (nl.cpk !== null && nl.cpk < 1.33 ? '#B91C1C' : '#166534') + '">' + (nl.cpk === null ? '—' : nl.cpk.toFixed(2)) + '</div></div></div>' +
@@ -1032,7 +1094,7 @@
         const rows = (data.muc || []).map(m => {
           const results = lan.filter(l => l.id_btk === data.btk?.id).flatMap(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && typeof k.dat === 'boolean'));
           const ng = results.filter(k => k.dat === false).length;
-          return '<tr><td>' + m.muc_no + '</td><td>' + esc(m.hang_muc) + '</td><td>' + results.length + '</td><td>' + (results.length - ng) + '</td><td>' + ng + '</td><td>' +
+          return '<tr><td>' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '</td><td>' + esc(m.hang_muc) + '</td><td>' + results.length + '</td><td>' + (results.length - ng) + '</td><td>' + ng + '</td><td>' +
             (results.length ? (100 * ng / results.length).toFixed(1) + '%' : 'Chưa kiểm') + '</td></tr>';
         }).join('');
         tq.innerHTML = '<b>Tổng quan các hạng mục — phiên bản hiện tại</b><div class="tbl"><table><tr><th>No</th><th>Hạng mục</th><th>Kết quả đo</th><th>OK</th><th>NG</th><th>Tỷ lệ NG</th></tr>' + rows + '</table></div>' +
@@ -1043,7 +1105,7 @@
         if (m.kieu !== 'so') {
           const kq = []; lan.forEach(l => (l.kq || []).filter(k => k.muc_no === m.muc_no).forEach(k => kq.push(k)));
           const ng = kq.filter(k => !k.dat).length;
-          return '<tr><td><span class="no">' + m.muc_no + '</span></td><td>' + esc(m.hang_muc) + '</td><td class="mono">' + kq.length + '</td><td>—</td><td>—</td><td class="mono">NG ' + (kq.length ? (ng / kq.length * 100).toFixed(1) : '0') + '%</td><td>' + (ng ? '<span class="tag ng">Có NG</span>' : '<span class="tag ok">Ổn định</span>') + '</td></tr>';
+          return '<tr><td><span class="no">' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '</span></td><td>' + esc(m.hang_muc) + '</td><td class="mono">' + kq.length + '</td><td>—</td><td>—</td><td class="mono">NG ' + (kq.length ? (ng / kq.length * 100).toFixed(1) : '0') + '%</td><td>' + (ng ? '<span class="tag ng">Có NG</span>' : '<span class="tag ok">Ổn định</span>') + '</td></tr>';
         }
         const r = diemVaViPham(data, m, loc), d = S().soLe(m);
         const vals = []; r.pts.forEach(p => vals.push(...p.vals));
@@ -1051,7 +1113,7 @@
         const ngoai = vals.filter(v => S().datGiaTri(v, r.sp) === false).length;
         const gan = r.vp.some(v => v.i >= r.pts.length - 10);
         const tag = ngoai ? '<span class="tag ng">Có điểm NG</span>' : gan ? '<span class="tag w">Bất thường</span>' : nl.cpk !== null && nl.cpk < 1.33 ? '<span class="tag w">Cpk thấp</span>' : '<span class="tag ok">Ổn định</span>';
-        return '<tr class="clk' + (m.muc_no === st.no ? ' sel' : '') + '" data-chonno="' + m.muc_no + '"><td><span class="no">' + m.muc_no + '</span></td><td>' + esc(m.hang_muc) + ' <span class="mono" style="color:#475569">' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</span></td>' +
+        return '<tr class="clk' + (m.muc_no === st.no ? ' sel' : '') + '" data-chonno="' + m.muc_no + '"><td><span class="no">' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '</span></td><td>' + esc(m.hang_muc) + ' <span class="mono" style="color:#475569">' + esc(st.cd==='gia_cong'?IpqcGcStandard.dimension(m):S().chuanText(m)) + '</span></td>' +
           '<td class="mono">' + r.pts.length + '</td><td class="mono">' + S().fmt(nl.tb, d) + '</td><td class="mono" style="font-weight:700;color:' + (nl.cpk !== null && nl.cpk < 1.33 ? '#B91C1C' : '#166534') + '">' + (nl.cpk === null ? '—' : nl.cpk.toFixed(2)) + '</td><td class="mono">' + ngoai + '</td><td>' + tag + '</td></tr>';
       }).join('');
       tq.innerHTML = '<div class="ttl"><span class="sp">Tổng quan các hạng mục — ' + esc(st.ma) + '</span></div><div class="tbl"><table style="min-width:600px"><tr><th>No</th><th>Hạng mục</th><th>Số lần</th><th>X̄</th><th>Cpk</th><th>Ngoài TC</th><th>Trạng thái</th></tr>' + rows + '</table></div>';
@@ -1066,7 +1128,7 @@
       const { data: ls } = await sb.from('ipqc_gioi_han').select('*').eq('ma_sp', st.ma).eq('cong_doan', st.cd).eq('muc_no', m.muc_no).order('tao_luc', { ascending: false }).limit(10);
       const CACH = { tu_dong: 'Tự khoá 30 lần đầu', tinh_lai: 'Tính lại', tay: 'Nhập tay' };
       const homNay = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
-      box.innerHTML = '<div class="ttl"><span class="sp">Giới hạn kiểm soát — hạng mục ' + m.muc_no + '</span></div>' +
+      box.innerHTML = '<div class="ttl"><span class="sp">Giới hạn kiểm soát — hạng mục ' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '</span></div>' +
         (lim ? '<div class="mono" style="font-size:12.5px">UCL ' + S().fmt(lim.ucl, d) + ' · CL ' + S().fmt(lim.cl, d) + ' · LCL ' + S().fmt(lim.lcl, d) + '</div><div class="hint">' + (lim.tam ? 'Tạm tính từ ' + lim.n + ' lần đo (tự khoá khi đủ 30 lần).' : CACH[lim.cach] + ' · ' + esc(lim.raw.ghi_chu || '') + ' · ' + esc(ngayVN(lim.raw.tao_luc))) + '</div>' : '<div class="hint">Chưa đủ dữ liệu.</div>') +
         '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;color:#0F5FA5">Đặt lại giới hạn (cải tiến / điều chỉnh)</summary>' +
           '<div class="flds" style="margin-top:8px"><label class="f">Cách<select data-gc><option value="tinh_lai">Tính lại từ khoảng thời gian</option><option value="tay">Nhập tay</option></select></label></div>' +
@@ -1103,12 +1165,12 @@
         const tenMa = x.ma_sp + (x.cong_doan === 'gia_cong' ? ' (Gia công)' : '');
         if (x.cong_doan === 'duc') (data.lan || []).filter(l => new Date(l.thoi_diem) >= moc).forEach(l =>
           (l.kq || []).filter(k => k.dat === false).forEach(k => ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan,
-            no: k.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + k.muc_no + ' · CVT ' + (k.ma_cvt ?? 'chưa ghi nhận') + ' NG',
+            no: k.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + noText((l.muc_tieu_chuan || []).find(m => m.muc_no === k.muc_no) || k) + ' · CVT ' + (k.ma_cvt ?? 'chưa ghi nhận') + ' NG',
             moTa: (l.ma_may || '') + ' · ' + (l.nguoi || '') + ' · Phiên bản ' + (l.tieu_chuan?.phien_ban || '') })));
         (data.muc || []).forEach(m => {
           if (m.kieu !== 'so') {
             (data.lan || []).filter(l => x.cong_doan !== 'duc' && new Date(l.thoi_diem) >= moc).forEach(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && !k.dat)
-              .forEach(() => ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' NG', moTa: (l.ma_may || '') + (l.so_khuon ? ' · ' + l.so_khuon : '') })));
+              .forEach(() => ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: l.thoi_diem, tieuDe: tenMa + ' · ' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '. ' + m.hang_muc + ' NG', moTa: (l.ma_may || '') + (l.so_khuon ? ' · ' + l.so_khuon : '') })));
             return;
           }
           const codes = x.cong_doan === 'duc' ? ['', ...new Set((data.lan || []).flatMap(l => (l.kq || []).filter(k => k.muc_no === m.muc_no && k.ma_cvt != null).map(k => k.ma_cvt)))] : [''];
@@ -1117,9 +1179,9 @@
           r.pts.forEach((p, i) => {
             if (new Date(p.t) < moc) return;
             const ngoai = p.vals.filter(v => S().datGiaTri(v, r.sp) === false);
-            if (ngoai.length && x.cong_doan !== 'duc') ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: p.t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' = ' + ngoai.map(v => S().fmt(v, d)).join(' / ') + ' ngoài tiêu chuẩn', moTa: (p.may || '') + (p.khuon ? ' · ' + p.khuon : '') + ' · ' + (p.nguoi || '') });
+            if (ngoai.length && x.cong_doan !== 'duc') ds.push({ ng: true, ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: p.t, tieuDe: tenMa + ' · ' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '. ' + m.hang_muc + ' = ' + ngoai.map(v => S().fmt(v, d)).join(' / ') + ' ngoài tiêu chuẩn', moTa: (p.may || '') + (p.khuon ? ' · ' + p.khuon : '') + ' · ' + (p.nguoi || '') });
           });
-          r.vp.filter(v => new Date(r.pts[v.i].t) >= moc).forEach(v => ds.push({ ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: r.pts[v.i].t, tieuDe: tenMa + ' · ' + m.muc_no + '. ' + m.hang_muc + ' — ' + v.msg, moTa: 'Quy tắc ' + v.quy_tac + (r.lim && r.lim.tam ? ' (giới hạn tạm)' : '') + ' · ' + (r.pts[v.i].may || '') }));
+          r.vp.filter(v => new Date(r.pts[v.i].t) >= moc).forEach(v => ds.push({ ma: x.ma_sp, cd: x.cong_doan, no: m.muc_no, t: r.pts[v.i].t, tieuDe: tenMa + ' · ' + esc(st.cd === 'duc' ? noText(m) : m.muc_no) + '. ' + m.hang_muc + ' — ' + v.msg, moTa: 'Quy tắc ' + v.quy_tac + (r.lim && r.lim.tam ? ' (giới hạn tạm)' : '') + ' · ' + (r.pts[v.i].may || '') }));
           }
         });
       }

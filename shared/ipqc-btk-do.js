@@ -26,7 +26,8 @@
     }
     if (!data?.btk) return null;
     const btk = data.btk,
-      mucs = data.muc || [];
+      mucs = (data.muc || []).slice().sort((a, b) =>
+        (a.thu_tu_hien_thi ?? a.muc_no) - (b.thu_tu_hien_thi ?? b.muc_no));
     const nhap = Object.fromEntries(
       mucs.map((m) => [m.muc_no, { chon: false, rows: [{ cvt: "", value: "" }], dat: null }]),
     );
@@ -90,7 +91,7 @@
         }
         if (errs.length) {
           r.status = "Thiếu kết quả";
-          errors.push("Hạng mục " + m.muc_no + ": " + errs.join("; "));
+          errors.push("Hạng mục " + (m.no_hien_thi ?? m.muc_no) + ": " + errs.join("; "));
         } else {
           measured++;
           r.status = (m.kieu === "so" ? r.results.some((x) => x.dat === false) : a.dat === false) ? "NG" : "OK";
@@ -157,7 +158,7 @@
               '"' +
               (a.chon ? " checked" : "") +
               "> <b>" +
-              m.muc_no +
+              esc(m.no_hien_thi ?? m.muc_no) +
               ". " +
               esc(m.hang_muc) +
               " " +
@@ -291,7 +292,7 @@
                 "%;top:" +
                 Math.max(0, Math.min(100, +v.y || 0)) +
                 '%">' +
-                esc(v.no) +
+                esc(mucs.find((m) => String(m.muc_no) === String(v.no))?.no_hien_thi ?? v.no) +
                 "</span>",
             )
             .join("") +
