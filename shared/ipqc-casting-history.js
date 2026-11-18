@@ -50,7 +50,7 @@
                 const m = items.find((m) => m.muc_no === k.muc_no);
                 return (
                   "<tr><td>" +
-                  k.muc_no +
+                  esc(m?.no_hien_thi ?? k.muc_no) +
                   ". " +
                   esc(m?.hang_muc || "") +
                   "</td><td>" +
@@ -67,7 +67,7 @@
               .filter((m) => !rows.some((k) => k.muc_no === m.muc_no))
               .map(
                 (m) =>
-                  "<tr><td>" + m.muc_no + ". " + esc(m.hang_muc) + "</td><td>—</td><td>—</td><td>Chưa kiểm</td></tr>",
+                  "<tr><td>" + esc(m.no_hien_thi ?? m.muc_no) + ". " + esc(m.hang_muc) + "</td><td>—</td><td>—</td><td>Chưa kiểm</td></tr>",
               )
               .join("") +
             "</tbody></table></div></details>"
