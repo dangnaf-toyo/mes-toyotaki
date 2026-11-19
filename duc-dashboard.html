@@ -1097,7 +1097,7 @@ function showOverlay(text){
   document.getElementById('overlay').style.display = 'flex';
 }
 function hideOverlay(){ document.getElementById('overlay').style.display = 'none'; }
-function updateLiveStatus(text){ document.getElementById('live-status').textContent = text; }
+function updateLiveStatus(text){ const el = document.getElementById('live-status'); el.textContent = text || ''; const b = el.closest('.live-badge'); if (b) b.style.display = text ? '' : 'none'; }
 function onError(e){
   hideOverlay();
   const msg = e && e.message ? e.message : String(e);
@@ -1967,7 +1967,7 @@ async function loadShiftState(showLoader){
     state.dieuKien = data.dieuKien || {};
     renderTable(); updateSummary(); renderOpsWarnings();
     loadKanbanProgress();
-    updateLiveStatus('OK — poll ' + (CONFIG.POLL_MS / 1000) + 's');
+    updateLiveStatus('');
     startPolling();
   } catch (e) {
     if (requestId !== state.currentRequestId) return;
@@ -2172,7 +2172,6 @@ function startPolling(){
   if (state.pollTimer) clearInterval(state.pollTimer);
   state.pollTimer = setInterval(async () => {
     loadLiveMachineStatus();   // độc lập ngày/ca — poll riêng, không phụ thuộc state.ngay/ca
-    updateLiveStatus('Đang poll...');
     try {
       // fetchShiftState() độc lập ngày/ca đang chọn ở header — không cần bỏ
       // qua kết quả dù người dùng có đổi header trong lúc chờ.
@@ -2188,7 +2187,7 @@ function startPolling(){
       updateSummary();
       renderOpsWarnings();
       loadKanbanProgress();
-      updateLiveStatus('OK — cập nhật ' + fmtTime(new Date()));
+      updateLiveStatus('');
     } catch (e) {
       updateLiveStatus('Mất kết nối');
     }
