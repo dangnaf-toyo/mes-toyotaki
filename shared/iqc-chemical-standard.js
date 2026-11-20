@@ -47,21 +47,10 @@ const IqcChemicalStandard = (() => {
     el("tab-tieuchuan").append(root);
     el("iqcTcMaterial").onchange = () => selectMaterial().catch((e) => message(e.message, true));
     el("iqcTcVersions").onchange = () => selectVersion().catch((e) => message(e.message, true));
-    el("iqcTcClassification").onclick = async () => {
-      try {
-        if (!material) throw Error("Chọn mã NVL trước khi phân loại.");
-        await rpc("iqc_nvl_luu_phan_loai", {
-          p_ma_nvl: material.code,
-          p_nhom: el("iqcTcGroup").value,
-          p_mac: el("iqcTcGrade").value,
-        });
-        await IqcMaterialCatalog.load(true);
-        material = IqcMaterialCatalog.resolve(material.code, "nvl");
-        message("Đã lưu phân loại NVL.");
-      } catch (e) {
-        message(e.message, true);
-      }
-    };
+    el("iqcTcClassification").hidden = true;
+    el("iqcTcGroup").disabled = true;
+    el("iqcTcGrade").readOnly = true;
+    root.querySelector(".help").textContent = "Nhóm và mác được lấy từ danh mục NVL. Chỉnh sửa tại Quản trị; tiêu chuẩn hóa học giữ nguyên quy trình phê duyệt.";
     el("iqcTcNew").onclick = () => {
       version = null;
       rows = [];
@@ -140,7 +129,7 @@ const IqcChemicalStandard = (() => {
       el(id).disabled = !editable();
     el("iqcTcNew").disabled = !canEdit || !material || loading || saving;
     for (const id of ["iqcTcGroup", "iqcTcGrade", "iqcTcClassification"])
-      el(id).disabled = !canEdit || !material || saving;
+      el(id).disabled = true;
     el("iqcTcApproval").innerHTML = !material
       ? "Chọn mã NVL để xem hoặc soạn tiêu chuẩn."
       : loading || saving
@@ -288,7 +277,7 @@ const IqcChemicalStandard = (() => {
       new Option("Chọn mã / tên NVL", ""),
       ...catalog.materials.map((n) => new Option(n.code + " — " + n.name, n.code)),
     );
-    for (const id of ["iqcTcGroup", "iqcTcGrade", "iqcTcClassification"]) el(id).disabled = !canEdit;
+    for (const id of ["iqcTcGroup", "iqcTcGrade", "iqcTcClassification"]) el(id).disabled = true;
     const code = new URLSearchParams(location.search).get("ma") || material?.code;
     if (code && catalog.materials.some((x) => x.code === code)) {
       el("iqcTcMaterial").value = code;

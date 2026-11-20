@@ -346,10 +346,10 @@ const IqcWorkspace = (() => {
     throw Error("Chọn người kiểm từ danh sách nhân sự / tài khoản chung.");
   }
   async function prepare(data, previous) {
-    if (!suppliers.includes(data.supplier)) throw Error("Chọn nhà cung cấp trong 5 lựa chọn.");
     if (!scopes.includes(data.scope)) throw Error("Phạm vi là bắt buộc.");
-    await IqcMaterialCatalog.load();
+    await IqcMaterialCatalog.load(true);
     const product=IqcMaterialCatalog.resolve(data.productCode, data.itemKind);
+    if (!suppliers.includes(data.supplier) && !(product?.kind === 'nvl' && product.supplier && product.supplier === data.supplier) && previous?.supplier !== data.supplier) throw Error("Chọn nhà cung cấp hợp lệ của mã NVL.");
     if(!product && previous?.productCode!==data.productCode)throw Error("Chọn mã sản phẩm hoặc định danh NVL từ danh mục chung.");
     if(product?.kind==='nvl'&&['nhom','kem'].includes(product.group))throw Error("NVL Nhôm/Kẽm phải kiểm tra thành phần hóa học.");
     if(product?.kind==='nvl'&&!product.group)throw Error("Phân loại NVL tại Quản lý tiêu chuẩn trước khi lưu kiểm tra.");
@@ -394,11 +394,9 @@ const IqcWorkspace = (() => {
   async function refreshProducts() {
     await IqcMaterialCatalog.load(true);
     const list=$("qc02-products");if(list)IqcMaterialCatalog.options(list);
-    const selected=IqcMaterialCatalog.resolve(val("productCode"));if(selected)$("productName").value=selected.name;
+    // Refresh suggestions only; do not alter an in-progress or historical report.
+    window.dispatchEvent(new Event("iqc-catalog-refreshed"));
   }
-  $("productCode").addEventListener("change", () =>
-    refreshProducts().catch((e) => console.error("Không tải được danh mục sản phẩm", e)),
-  );
   const safeRefresh = () => refresh().catch((e) => console.error("Không làm mới được IQC", e));
   setInterval(safeRefresh, 15000);
   window.addEventListener("focus", safeRefresh);

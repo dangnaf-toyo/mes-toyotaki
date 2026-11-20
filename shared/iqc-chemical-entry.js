@@ -290,8 +290,16 @@ const IqcChemicalEntry = (() => {
       typed = el("productCode").value;
     await IqcMaterialCatalog.load(true);
     if (turn !== selectionSerial || typed !== el("productCode").value) return;
+    const list = el("qc02-products");
+    if (list) IqcMaterialCatalog.options(list);
     const selected = IqcMaterialCatalog.resolve(typed);
-    if (dirty && !confirm("Đổi mã sẽ bỏ kết quả chưa lưu. Tiếp tục?")) {
+    if (!selected) {
+      catalogStatus.textContent = typed.trim() ? "Chưa có mã trong danh mục hoặc mã chưa duy nhất. Chọn gợi ý phù hợp." : "";
+      return;
+    }
+    const changed = !item || selected.kind !== item.kind || selected.code !== item.code || selected.group !== item.group || selected.grade !== item.grade;
+    if (!changed) { el("productName").value = selected.name; item = selected; return; }
+    if ((dirty || reading || pendingFile) && !confirm("Đổi mã hoặc phân loại sẽ bỏ kết quả hóa học chưa lưu. Tiếp tục?")) {
       el("productCode").value = item ? IqcMaterialCatalog.display(item) : "";
       return;
     }
@@ -302,6 +310,10 @@ const IqcChemicalEntry = (() => {
     const on = item?.kind === "nvl" && ["nhom", "kem"].includes(item.group);
     mode(!!on);
     if (item) el("productName").value = item.name;
+    if (item?.supplier) {
+      if (![...el("supplier").options].some((o) => o.value === item.supplier)) el("supplier").add(new Option(item.supplier, item.supplier));
+      el("supplier").value = item.supplier;
+    }
     if (item?.kind === "nvl") {
       catalogStatus.textContent =
         "NVL BOM · " +
@@ -324,7 +336,7 @@ const IqcChemicalEntry = (() => {
     el("iqcChemStandardLink").href =
       "qc-manager.html?tab=tieuchuan&cd=iqc_hoa_hoc&ma=" + encodeURIComponent(item?.code || "");
     if (on) {
-      el("iqcChemDate").value = today();
+      el("iqcChemDate").value ||= today();
       el("iqcChemSupplier").value = item.supplier || "";
       await Promise.all([loadStandard(), loadPeople()]);
     }
@@ -489,6 +501,10 @@ const IqcChemicalEntry = (() => {
     const locked = [...form.querySelectorAll("input,select,button,textarea")].map((e) => [e, e.disabled]);
     locked.forEach(([e]) => (e.disabled = true));
     try {
+      await IqcMaterialCatalog.load(true);
+      const selected = IqcMaterialCatalog.resolve(el("productCode").value);
+      if (!selected || selected.kind !== item?.kind || selected.code !== item?.code || selected.group !== item?.group || selected.grade !== item?.grade)
+        throw Error("Mã hoặc phân loại đã thay đổi. Chọn lại mã trước khi lưu; dữ liệu đang nhập được giữ lại.");
       const person = people.find(
         (p) =>
           el("inspector").value === p.username ||
@@ -553,7 +569,35 @@ const IqcChemicalEntry = (() => {
     item = null;
     queueMicrotask(() => refreshCatalog(false).catch((e) => status(e.message, true)));
   });
-  el("productCode").addEventListener("change", () => select().catch((e) => status(e.message, true)));
+  let selectionTimer;
+  el("productCode").addEventListener("input", () => {
+    ++selectionSerial;
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(() => select().catch((e) => status(e.message, true)), 200);
+  });
+  el("productCode").addEventListener("change", () => {
+    clearTimeout(selectionTimer);
+    select().catch((e) => status(e.message, true));
+  });
+  window.addEventListener("iqc-catalog-refreshed", () => {
+    if (!item || editingId) return;
+    const updated = IqcMaterialCatalog.resolve(el("productCode").value);
+    if (!updated || updated.code !== item.code || updated.kind !== item.kind) return;
+    if (updated.group !== item.group || updated.grade !== item.grade) {
+      if (!dirty && !reading && !pendingFile) select().catch((e) => status(e.message, true));
+      else catalogStatus.textContent = "Nhóm hoặc mác đã thay đổi trong danh mục. Chọn lại mã để xác nhận trước khi lưu.";
+      return;
+    }
+    if (el("productName").value === item.name) el("productName").value = updated.name;
+    if (updated.supplier !== item.supplier && updated.supplier) {
+      if (el("iqcChemSupplier").value === (item.supplier || "")) el("iqcChemSupplier").value = updated.supplier;
+      if (el("supplier").value === item.supplier) {
+        if (![...el("supplier").options].some(o => o.value === updated.supplier)) el("supplier").add(new Option(updated.supplier, updated.supplier));
+        el("supplier").value = updated.supplier;
+      }
+    }
+    item = updated;
+  });
   const previousEdit = editLot;
   editLot = async (id) => {
     if (busy) {

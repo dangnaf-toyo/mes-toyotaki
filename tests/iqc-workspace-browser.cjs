@@ -40,7 +40,9 @@ function backend() {
         },
       };
     },
-    rpc: async () => ({ data: [{ username: "TK01", full_name: "Lê Văn Kho", role: "kho_nvl" }], error: null }),
+    rpc: async (name) => ({ data: name === "iqc_nvl_danh_muc"
+      ? { san_pham: tables.master_products.map((p) => ({ code: p.ma_sp, name: p.ten_sp })), nvl: [] }
+      : [{ username: "TK01", full_name: "Lê Văn Kho", role: "kho_nvl" }], error: null }),
     from(table) {
       let filters = [],
         range = [0, 999],
