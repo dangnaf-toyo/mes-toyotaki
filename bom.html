@@ -1006,7 +1006,19 @@
         selVerId = b.id;
         const editable = perm.lap && b.trang_thai === "nhap",
           dis = editable ? "" : " disabled",
-          okNcc = materials.filter((m) => m.ma_mac && m.ma_mac === b.ma_mac);
+          // T294: chọn thẳng mã NVL kim loại; mác lấy theo NVL (bom_versions.ma_nhom = ma_nvl).
+          kimLoai = materials.filter((m) => m.nhom_vat_tu === "kim_loai"),
+          nvlOpts = (req) =>
+            '<option value="">' + (req ? "— Chọn NVL —" : "—") + "</option>" +
+            kimLoai
+              .map((m) => '<option value="' + esc(m.ma_nvl) + '"' + (m.ma_nvl === b.ma_nhom ? " selected" : "") + ">" + esc(m.ma_nvl + " — " + (m.ten_nvl || "")) + "</option>")
+              .join("") +
+            (b.ma_nhom && !kimLoai.some((m) => m.ma_nvl === b.ma_nhom) ? '<option value="' + esc(b.ma_nhom) + '" selected>' + esc(b.ma_nhom) + " (không còn trong danh mục)</option>" : ""),
+          macNote = (ma) => {
+            const m = kimLoai.find((x) => x.ma_nvl === ma);
+            if (m) return m.ma_mac ? "Mác: " + m.ma_mac : "NVL này chưa gắn mác — sửa ở tab Danh mục NVL";
+            return b.ma_mac ? "Mác cũ: " + b.ma_mac + " — chọn NVL" : "";
+          };
         const versionsHtml = list
           .map((v) => '<button class="version ' + (v.id === b.id ? "active" : "") + '" data-id="' + v.id + '">V' + v.version_no + " " + badge(v.trang_thai) + "</button>")
           .join("");
@@ -1037,9 +1049,8 @@
           // 2. Kim loại
           '<div class="sec"><h3>Kim loại (công đoạn Đúc)</h3>' +
           (duc
-            ? '<div class="grid4"><div class="field"><label>Mác vật liệu *</label><select id="fMac"' + dis + '><option value="">— Chọn mác —</option>' +
-              macs.map((m) => '<option value="' + esc(m.ma_mac) + '"' + (m.ma_mac === b.ma_mac ? " selected" : "") + ">" + esc(m.ma_mac + " — " + (m.ten || "")) + "</option>").join("") +
-              '</select><small id="nccOk">' + (okNcc.length ? "NCC được dùng: " + okNcc.map((m) => esc(m.ma_nvl)).join(", ") : "Chưa có NVL nào thuộc mác này") + "</small></div>" +
+            ? '<div class="grid4"><div class="field"><label>NVL kim loại *</label><select id="fNvl"' + dis + ">" + nvlOpts(true) +
+              '</select><small id="macOk">' + esc(macNote(b.ma_nhom)) + "</small></div>" +
               '<div class="field"><label>Trọng lượng 1 SP (kg) *</label><input id="fSp" inputmode="decimal" value="' + esc(b.trong_luong_sp_kg ?? "") + '"' + dis + "></div>" +
               '<div class="field"><label>Cavity *</label><input id="fCav" inputmode="numeric" value="' + esc(b.cavity ?? "") + '"' + dis + "></div>" +
               '<div class="field"><label>Trọng lượng 1 shot (kg) *</label><input id="fShot" inputmode="decimal" value="' + esc(b.trong_luong_shot_kg ?? "") + '"' + dis +
@@ -1048,9 +1059,8 @@
               '<div class="calc"><div><div class="k">Hiệu suất kim loại</div><div class="v" id="cHs">—</div></div><div><div class="k">Hồi liệu (nấu lại)</div><div class="v" id="cHl">—</div></div>' +
               '<div><div class="k">Định mức gross</div><div class="v main" id="cDm">—</div></div></div><div id="cWarn"></div>'
             : '<p class="sub">Lưu trình không có công đoạn Đúc (VD hàng nhập phôi). Nhập định mức tay nếu cần.</p><div class="grid4" style="margin-top:10px"><div class="field"><label>Định mức (kg/pcs)</label><input id="fDmTay" inputmode="decimal" value="' +
-              esc(b.dinh_muc_nhom_kg_moi_pcs ?? "") + '"' + dis + '></div><div class="field"><label>Mác vật liệu</label><select id="fMac"' + dis + '><option value="">—</option>' +
-              macs.map((m) => '<option value="' + esc(m.ma_mac) + '"' + (m.ma_mac === b.ma_mac ? " selected" : "") + ">" + esc(m.ma_mac) + "</option>").join("") +
-              "</select></div></div>") +
+              esc(b.dinh_muc_nhom_kg_moi_pcs ?? "") + '"' + dis + '></div><div class="field"><label>NVL kim loại</label><select id="fNvl"' + dis + ">" + nvlOpts(false) +
+              '</select><small id="macOk">' + esc(macNote(b.ma_nhom)) + "</small></div></div>") +
           "</div>" +
           // 3. Vật tư theo công đoạn
           '<div class="sec"><h3>Vật tư theo công đoạn<button type="button" class="info-btn" data-info="iVt" title="Giải thích">ⓘ</button></h3><div class="info-txt" id="iVt" hidden>Linh kiện, bao bì, sơn… Định mức tính trên 1 sản phẩm.</div><div class="table-wrap comp-table" style="margin-top:10px"><table><thead><tr><th style="width:160px">Công đoạn</th><th>Mã vật tư</th><th>Tên</th><th style="width:110px">Định mức / pcs</th><th style="width:90px">Đơn vị</th><th>Ghi chú</th><th style="width:44px"></th></tr></thead><tbody id="componentRows">' +
@@ -1073,12 +1083,9 @@
             wire();
             wireCode($("componentRows").lastElementChild.querySelector(".c-code"));
           };
+        $("fNvl").addEventListener("change", () => ($("macOk").textContent = macNote($("fNvl").value)));
         if (duc) {
           ["fSp", "fCav", "fShot", "fHh"].forEach((id) => $(id).addEventListener("input", tinh));
-          $("fMac").addEventListener("change", () => {
-            const ok = materials.filter((m) => m.ma_mac && m.ma_mac === $("fMac").value);
-            $("nccOk").textContent = ok.length ? "NCC được dùng: " + ok.map((m) => m.ma_nvl).join(", ") : "Chưa có NVL nào thuộc mác này";
-          });
           tinh();
         }
         if ($("btnLuu")) $("btnLuu").onclick = () => luu(false);
@@ -1148,7 +1155,7 @@
           so_khuon: val("fKhuon"),
           rev_ban_ve: val("fRev"),
           ly_do_thay_doi: val("fLyDo"),
-          ma_mac: val("fMac"),
+          ma_nvl: val("fNvl"),
           trong_luong_sp_kg: n("fSp"),
           cavity: n("fCav"),
           trong_luong_shot_kg: n("fShot"),
