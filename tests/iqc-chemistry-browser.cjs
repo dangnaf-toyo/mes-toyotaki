@@ -74,7 +74,7 @@ const base = legacy.slice(start, end);
           name = pkg.slice(0, cut).replace(/@[^@]+$/, "");
         if (pkg.startsWith("@tesseract.js-data/")) file = path.resolve(".review/ocr-models/eng.traineddata");
         else if (pkg.startsWith("xlsx@")) file = path.resolve(".review/xlsx.cjs");
-        else file = path.resolve(".review/tools/node_modules", name, pkg.slice(cut + 1));
+        else file = path.resolve(process.env.MES_IQC_REVIEW_TOOLS || ".review/tools/node_modules", name, pkg.slice(cut + 1));
       } else return route.fulfill({ body: "", contentType: "application/javascript" });
       if (!file || !fs.existsSync(file)) return route.fulfill({ status: 404, body: "Missing fixture" });
       const type = file.endsWith(".pdf")
@@ -96,7 +96,7 @@ const base = legacy.slice(start, end);
     await page.waitForFunction(() => document.querySelector('#qc02-products option[value="[NVL] AL-01"]'));
     const catalog = await page.locator("#qc02-products option").evaluateAll((es) => es.map((e) => e.value));
     assert.equal(catalog.length, new Set(catalog).size);
-    assert.ok(catalog.includes("SP01") && catalog.includes("[NVL] SP01"));
+    assert.ok(catalog.includes("[SP] SP01") && catalog.includes("[NVL] SP01"));
     const select = async (code) => {
       await page.locator("#productCode").fill(code);
       await page.locator("#productCode").dispatchEvent("change");
@@ -173,7 +173,8 @@ const base = legacy.slice(start, end);
     await page.locator("#inspector").fill("QC01_Trần QC");
     const before = await page.evaluate(() => JSON.stringify(sb.tables.ipqc_btk_muc));
     await page.locator("#iqcChemFile").setInputFiles(".review/iqc-analysis.pdf");
-    await page.waitForFunction(() => document.querySelector("#iqcChemStatus").textContent.includes("Tự ghép"));
+    await page.waitForFunction(() => document.querySelector("#iqcChemStatus").textContent.includes("Tự ghép"))
+      .catch(async e => { console.error('Chemical reader status:', await page.locator('#iqcChemStatus').textContent()); throw e; });
     assert.deepEqual(await page.locator("#iqcChemRows [data-measure]").evaluateAll((es) => es.map((e) => e.value)), [
       "10.5",
       "0.4",
@@ -364,13 +365,13 @@ const base = legacy.slice(start, end);
     await page.screenshot({ path: ".review/iqc-chem-mobile.png", fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await page.setViewportSize({ width: 1440, height: 960 });
+    await page.evaluate(() => { const data=JSON.parse(localStorage.getItem('iqc-chem-test')); const m=data.materials.find(x=>x.code==='SP01'); m.group='nhom'; m.grade='QC-GRADE'; localStorage.setItem('iqc-chem-test',JSON.stringify(data)); });
     await page.goto("https://mes.test/qc-manager.html?tab=tieuchuan&cd=iqc_hoa_hoc");
     await page.waitForFunction(() => document.getElementById("iqc-chemical-standard")?.hidden === false);
     await page.locator("#iqcTcMaterial").selectOption("SP01");
-    await page.locator("#iqcTcGroup").selectOption("nhom");
-    await page.locator("#iqcTcGrade").fill("QC-GRADE");
-    await page.locator("#iqcTcClassification").click();
-    await page.waitForFunction(() => document.getElementById("iqcTcMessage").textContent.includes("Đã lưu phân loại"));
+    assert.equal(await page.locator("#iqcTcGroup").isDisabled(), true);
+    assert.equal(await page.locator("#iqcTcGrade").isDisabled(), true);
+    assert.equal(await page.locator("#iqcTcClassification").isHidden(), true);
     await page.locator("#iqcTcNew").click();
     await page.locator("#iqcTcRevision").fill("A");
     await page.locator("#iqcTcChange").fill("Test approval workflow");
