@@ -357,7 +357,10 @@ async function loadPeriod(mode, refDate){
 
   const mondayList = (mode === 'week' ? [monday] : mondaysCovering(from, to)).map(fmtISO);
 
-  const [bccRes, sucoRes, lssxRes, chtRes, khsxRes, actionRes] = await Promise.all([
+  // T295: tem Đúc Kẽm trong kỳ (ca tính từ 06:00 VN — tem 0h–6h thuộc Ca đêm hôm trước).
+  const temTu = new Date(fromISO + 'T06:00:00+07:00').toISOString();
+  const temDen = new Date(fmtISO(addDays(to, 1)) + 'T06:00:00+07:00').toISOString();
+  const [bccRes, sucoRes, lssxRes, chtRes, khsxRes, actionRes, temKemRes] = await Promise.all([
     sbTaiHet(() => sb.from('duc_bao_cao_ca').select('ngay,ca,truong_ca,tong_kh_ca,tong_tt_ca,so_su_co_ca,tong_phut_dung_ca,tong_ng_ca')
       .gte('ngay', fromISO).lte('ngay', toISO).in('ca', CA_HOP_LE).order('id_bao_cao')),
     sbTaiHet(() => sb.from('duc_su_co_log').select('ngay,ca,ma_may,ma_sp,ten_sp,loai_su_co,thoi_gian_dung_phut,phut_dung_may,phut_xu_ly,phut_xac_nhan_cl,van_de,truong_ca')
@@ -376,6 +379,11 @@ async function loadPeriod(mode, refDate){
     mode === 'week'
       ? sb.from('duc_bao_cao_tuan_van_de').select('*').eq('tuan_bat_dau', fromISO).order('stt')
       : Promise.resolve({ data: [] }),
+    sbTaiHet(() => sb.from('duc_tem').select('tag_no,may_tt,ma_sp,ten_sp,so_luong_tt,ngay_gio_ghi_nhan,ngay_gio_in')
+      .ilike('may_tt', 'Kẽm%')
+      .or('and(ngay_gio_ghi_nhan.gte.' + temTu + ',ngay_gio_ghi_nhan.lt.' + temDen + '),' +
+          'and(ngay_gio_ghi_nhan.is.null,ngay_gio_in.gte.' + temTu + ',ngay_gio_in.lt.' + temDen + ')')
+      .order('tag_no')),
   ]);
 
   if (bccRes.error || sucoRes.error || lssxRes.error || khsxRes.error) {
@@ -383,14 +391,19 @@ async function loadPeriod(mode, refDate){
     return;
   }
 
-  const bcc = bccRes.data || [];
+  let bcc = bccRes.data || [];
   const suco = sucoRes.data || [];
-  const lssx = lssxRes.data || [];
+  let lssx = lssxRes.data || [];
   const khsx = khsxRes.data || [];
   let cht = chtRes.data || [];
   // tránh đếm trùng: chỉ lấy phần Ca đang chạy dở HÔM NAY (ca chưa có bản ghi kết ca)
   const closedCaToday = new Set(bcc.filter(r => r.ngay === todayISO).map(r => r.ca));
   cht = cht.filter(r => !closedCaToday.has(r.ca));
+  if (temKemRes.error) {
+    console.warn('T295: không tải được tem Đúc Kẽm, dùng số đã chốt ca', temKemRes.error);
+  } else {
+    ({ bcc, lssx, cht } = apDungTemKem(bcc, lssx, cht, temKemRes.data || []));
+  }
 
   renderReport({ mode, monday, from, to, fromISO, toISO, isCurrentPeriod, todayISO, bcc, suco, lssx, cht, khsx });
 
@@ -406,6 +419,57 @@ async function loadPeriod(mode, refDate){
     if (!actionRowsSaved) actionRows = suggestActionRows(suco);
     renderActionTable();
   }
+}
+
+// T295: TT máy Đúc Kẽm lấy THẲNG từ tem đã quét (duc_tem.may_tt 'Kẽm…'),
+// không phụ thuộc trưởng ca có nạp máy Kẽm vào ca trên duc-dashboard hay không
+// (thiếu dòng máy → tem quét không được chốt vào duc_lich_su_san_xuat).
+// Ngày/ca của tem: giờ VN 06–18 = Ca ngày, còn lại = Ca đêm (0h–6h thuộc ngày
+// hôm trước). Chỉ áp dụng từ 24/08/2026 (phương án 2 ca 12h). KH/NG giữ nguyên
+// từ dòng đã chốt; tổng ca (bcc) được bù chênh lệch để các KPI khớp.
+const T295_TU_NGAY = '2026-08-24';
+const laMayKem = m => /^kẽm/i.test(String(m || '').trim());
+function apDungTemKem(bcc, lssx, cht, temRows){
+  const agg = new Map();
+  for (const t of temRows){
+    const ts = t.ngay_gio_ghi_nhan || t.ngay_gio_in;
+    if (!ts || !t.may_tt || !t.ma_sp) continue;
+    const vn = new Date(new Date(ts).getTime() + 7 * 3600e3);    // giờ VN dạng UTC
+    const gio = vn.getUTCHours();
+    const ca = (gio >= 6 && gio < 18) ? 'Ca ngày' : 'Ca đêm';
+    const ngay = new Date(vn.getTime() - 6 * 3600e3).toISOString().slice(0, 10);
+    if (ngay < T295_TU_NGAY) continue;
+    const k = ngay + '|' + ca + '|' + t.may_tt + '|' + t.ma_sp;
+    if (!agg.has(k)) agg.set(k, { ngay, ca, ma_may: t.may_tt, ma_sp: t.ma_sp, ten_sp: t.ten_sp || '', tt: 0, dung: false });
+    agg.get(k).tt += Number(t.so_luong_tt) || 0;
+  }
+  const bccKeys = new Set(bcc.map(r => r.ngay + '|' + r.ca));
+  const delta = new Map();
+  const congDelta = (ngay, ca, v) => { const k = ngay + '|' + ca; delta.set(k, (delta.get(k) || 0) + v); };
+  const thay = (rows, laDaChot) => rows.map(r => {
+    if (!laMayKem(r.ma_may) || r.ngay < T295_TU_NGAY) return r;
+    const a = agg.get(r.ngay + '|' + r.ca + '|' + r.ma_may + '|' + r.ma_sp);
+    const ttMoi = a && !a.dung ? a.tt : 0;
+    if (a) a.dung = true;
+    if (laDaChot && bccKeys.has(r.ngay + '|' + r.ca)) congDelta(r.ngay, r.ca, ttMoi - (Number(r.tt_ca) || 0));
+    return { ...r, tt_ca: ttMoi };
+  });
+  lssx = thay(lssx, true);
+  cht = thay(cht, false);
+  const chtKeys = new Set(cht.map(r => r.ngay + '|' + r.ca));
+  for (const a of agg.values()){
+    if (a.dung || !a.tt) continue;
+    const row = { ngay: a.ngay, ca: a.ca, ma_may: a.ma_may, ma_sp: a.ma_sp, ten_sp: a.ten_sp, kh_ca: 0, tt_ca: a.tt, so_luong_ng: 0 };
+    const k = a.ngay + '|' + a.ca;
+    if (bccKeys.has(k)) { lssx.push(row); congDelta(a.ngay, a.ca, a.tt); }
+    else if (chtKeys.has(k)) cht.push(row);
+    else lssx.push(row);   // ca chưa kết ca: vẫn vào bảng theo mã SP/máy
+  }
+  bcc = bcc.map(r => {
+    const d = delta.get(r.ngay + '|' + r.ca);
+    return d ? { ...r, tong_tt_ca: (Number(r.tong_tt_ca) || 0) + d } : r;
+  });
+  return { bcc, lssx, cht };
 }
 
 // Tên cột ngày trong duc_khsx_tuan_plan, thứ tự khớp index 0=Thứ 2..5=Thứ 7
