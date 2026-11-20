@@ -128,6 +128,12 @@ tr:hover td{background:var(--bg-sunken)}
 #tblSoCa select.dirty{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 #tblSoCa .sc-cap{min-height:12px;font-size:11px;color:var(--text-dim);text-align:center;font-family:'JetBrains Mono',monospace}
 #tblSoCa .sc-src{font-size:11px;color:var(--text-muted)}
+/* Giờ tăng ca dự kiến (T296) */
+.soca-head .tip{cursor:help;color:var(--text-muted);font-size:13px}
+#tblTangCa td{padding:4px 6px}
+#tblTangCa input{border:1.5px solid var(--border-strong);border-radius:5px;padding:3px 4px;font-family:inherit;font-size:12px;width:100%;min-width:56px;text-align:right}
+#tblTangCa input.co{background:var(--warn-bg);color:var(--warn-fg);font-weight:600}
+#tblTangCa input.dirty{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 #ovXn{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:6100;padding:16px}
 #ovXn[hidden]{display:none}
 #ovXn .xn-box{background:var(--bg-panel);border-radius:10px;box-shadow:var(--shadow-lg);width:min(440px,100%)}
@@ -211,6 +217,27 @@ tr:hover td{background:var(--bg-sunken)}
 
     <!-- PANEL: Bavia/Gia Công/Sơn/OQC (khoá theo công đoạn + mã SP) -->
     <div class="panel" id="panelCd">
+      <div class="soca-box" id="tangCaBox" hidden>
+        <div class="soca-head">
+          <b>⏱ Giờ tăng ca dự kiến</b>
+          <span class="tip" title="Số giờ tăng ca dự kiến của bộ phận mỗi ngày (0 = không tăng ca). Bước 0,5 giờ.">ⓘ</span>
+          <div style="flex:1"></div>
+          <button type="button" class="btn" id="btnLuuTangCa" disabled>Lưu</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="tblTangCa">
+            <thead>
+              <tr>
+                <th></th>
+                <th class="day-hdr">T2</th><th class="day-hdr">T3</th><th class="day-hdr">T4</th>
+                <th class="day-hdr">T5</th><th class="day-hdr">T6</th><th class="day-hdr">T7</th><th class="day-hdr">CN</th>
+                <th>Tổng</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTangCa"></tbody>
+          </table>
+        </div>
+      </div>
       <div class="tbl-wrap">
         <table id="tblCd">
           <thead>
@@ -1079,7 +1106,67 @@ async function loadCdRows(){
   cdRows = data || [];
   renderCdRows();
   renderTongTuanBar();
+  loadTangCa();
 }
+
+// =============================================================================
+// Giờ tăng ca dự kiến (T296) — bảng cd_khsx_tuan_tang_ca, khoá (tuần, công
+// đoạn), mỗi ngày số giờ 0–24. Hiện chỉ bật cho các công đoạn trong TANG_CA_CD.
+// =============================================================================
+const TANG_CA_CD = ['Bavia'];
+let tangCaGoc = [0,0,0,0,0,0,0];
+let tangCaSua = null;   // [7] đang sửa chưa lưu
+
+async function loadTangCa(){
+  const box = document.getElementById('tangCaBox');
+  const bat = TANG_CA_CD.includes(activeTab);
+  box.hidden = !bat;
+  tangCaSua = null;
+  if (!bat) return;
+  const cd = activeTab, tuan = fmtDate(weekMonday);
+  const { data, error } = await sb.from('cd_khsx_tuan_tang_ca').select('*')
+    .eq('tuan_bat_dau', tuan).eq('cong_doan', cd).maybeSingle();
+  if (cd !== activeTab || tuan !== fmtDate(weekMonday)) return;   // đã đổi tab/tuần
+  if (error) { showMsg('Lỗi tải giờ tăng ca: ' + error.message, 'err'); return; }
+  tangCaGoc = SO_CA_COLS.map(d => data ? Number(data[d]) || 0 : 0);
+  renderTangCa();
+}
+
+function renderTangCa(){
+  const days = tangCaSua || tangCaGoc;
+  const tong = days.reduce((a, b) => a + b, 0);
+  document.getElementById('tbodyTangCa').innerHTML = '<tr><td><b>Giờ tăng ca</b></td>'
+    + days.map((v, i) => '<td><input type="number" min="0" max="24" step="0.5" inputmode="decimal" data-i="' + i + '"'
+      + ' class="' + (v > 0 ? 'co' : '') + (v !== tangCaGoc[i] ? ' dirty' : '') + '" value="' + (v || '') + '" placeholder="0"></td>').join('')
+    + '<td class="num tong">' + (tong ? fmtNum(tong) + ' giờ' : '—') + '</td></tr>';
+  document.querySelectorAll('#tbodyTangCa input').forEach(inp => inp.addEventListener('change', () => {
+    let v = Number(String(inp.value).replace(',', '.')) || 0;
+    v = Math.min(24, Math.max(0, Math.round(v * 2) / 2));
+    const days = (tangCaSua || tangCaGoc).slice();
+    days[Number(inp.dataset.i)] = v;
+    tangCaSua = days.join() === tangCaGoc.join() ? null : days;
+    renderTangCa();
+  }));
+  const btn = document.getElementById('btnLuuTangCa');
+  btn.disabled = !tangCaSua;
+}
+
+document.getElementById('btnLuuTangCa').addEventListener('click', async () => {
+  if (!tangCaSua) return;
+  if (!(await requireLoginOrRedirect())) return;
+  const days = tangCaSua;
+  const ok = await ghiLogVaXinLyDoNeuCan('sua', 'Giờ tăng ca dự kiến', tangCaGoc.join('/'), days.join('/'));
+  if (!ok) return;
+  const user = await MesAuth.getCurrentUserIdentity();
+  const p = { tuan_bat_dau: fmtDate(weekMonday), cong_doan: activeTab, updated_by: user, updated_at: new Date().toISOString() };
+  SO_CA_COLS.forEach((d, i) => { p[d] = days[i]; });
+  const btn = document.getElementById('btnLuuTangCa');
+  btn.disabled = true;
+  const { error } = await sb.from('cd_khsx_tuan_tang_ca').upsert(p, { onConflict: 'tuan_bat_dau,cong_doan' });
+  if (error) { btn.disabled = false; return showMsg('Lỗi lưu giờ tăng ca: ' + error.message, 'err'); }
+  showMsg('✓ Đã lưu giờ tăng ca', 'ok', 2500);
+  loadTangCa(); loadDuyetInfo(); loadChangeLog();
+});
 
 function renderCdRows(){
   const tbody = document.getElementById('tbodyCd');
