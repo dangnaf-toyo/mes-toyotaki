@@ -1,4 +1,4 @@
--- IQC reads classification from the existing material master. Staging first.
+-- IQC lấy phân loại Nhôm/Kẽm + mác vật liệu từ danh mục NVL (nvl_materials + vat_lieu_mac). Đã chạy staging + prod 20/11/2026.
 begin;
 create or replace function public.iqc_phan_loai_tu_danh_muc(p_ma_nvl text)
 returns public.iqc_nvl_phan_loai language sql stable security definer set search_path=public as $$
