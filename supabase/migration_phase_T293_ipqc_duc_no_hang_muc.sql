@@ -1,4 +1,4 @@
--- T293: NO hiển thị cho IPQC Đúc. Chưa áp dụng.
+-- T293: NO hiển thị cho IPQC Đúc. Đã chạy staging + prod 20/11/2026.
 begin;
 
 -- muc_no là mã nội bộ dùng trong kết quả đo và biểu đồ SPC từ trước.

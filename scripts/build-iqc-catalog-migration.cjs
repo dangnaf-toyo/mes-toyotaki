@@ -8,7 +8,7 @@ function definition(name) {
   if (start < 0 || end < 0) throw Error(`Missing function ${name}`);
   return source.slice(start, end + '\nend $$;'.length);
 }
-let sql = `-- IQC reads classification from the existing material master. Staging first.
+let sql = `-- IQC lấy phân loại Nhôm/Kẽm + mác vật liệu từ danh mục NVL (nvl_materials + vat_lieu_mac). Đã chạy staging + prod 20/11/2026.
 begin;
 create or replace function public.iqc_phan_loai_tu_danh_muc(p_ma_nvl text)
 returns public.iqc_nvl_phan_loai language sql stable security definer set search_path=public as $$
@@ -57,4 +57,4 @@ revoke execute on function public.iqc_nvl_luu_phan_loai(text,text,text) from aut
 notify pgrst,'reload schema';
 commit;
 `;
-fs.writeFileSync('supabase/migration_iqc_catalog_source_staging.sql', sql);
+fs.writeFileSync('supabase/migration_iqc_catalog_source.sql', sql);
