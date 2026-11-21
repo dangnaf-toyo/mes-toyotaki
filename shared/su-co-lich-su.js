@@ -17,6 +17,7 @@
  * dòng thời gian chỉ mốc chính, mỗi mốc 1 dòng; vấn đề / xử lý mỗi thứ hiện 1 lần;
  * ảnh gom 1 dải Trước / Sau / IPQC; việc phụ (sửa nội dung, linh kiện, duyệt đề
  * nghị, xoá, bấm Xong bị chặn) gom vào "Khác (n)" bấm mới mở.
+ * T300: dải ảnh đủ từ phát sinh đến khi đóng (cả phiếu IPQC khác cùng máy), giờ dưới mỗi ảnh.
  * Bấm ảnh mở trình xem phóng to (Qc02View.photo nếu có, không thì tab mới).
  * ============================================================================
  */
@@ -92,6 +93,7 @@
       '.sclh-anh>div{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}.sclh-anh .lb{font-size:.75rem;color:#64748B;font-weight:600}' +
       '.sclh-ph{display:flex;flex-wrap:wrap;gap:.3rem}' +
       '.sclh-ph img{width:56px;height:56px;object-fit:cover;border-radius:.4rem;border:1px solid #CBD5E1;cursor:zoom-in;display:block}' +
+      '.sclh-ph figure{margin:0;text-align:center}.sclh-ph figcaption{font-size:11px;color:#94A3B8;line-height:1.2;margin-top:1px}' +
       '.sclh-khac{margin-top:.2rem}.sclh-khac>summary{cursor:pointer;font-size:.8rem;color:#475569;font-weight:600;padding:.2rem 0;list-style:none}' +
       '.sclh-khac>summary::-webkit-details-marker{display:none}.sclh-khac[open]>summary .mu{display:inline-block;transform:rotate(90deg)}' +
       '.sclh-khac .sclh-tl{margin-top:.4rem}' +
@@ -100,10 +102,14 @@
     document.head.appendChild(st);
   }
 
-  function anhHtml(urls){
-    const ds = (urls || []).filter(Boolean);
+  // T300: ds = [{url, ts, ng}] — mỗi ảnh kèm giờ chụp/kiểm bên dưới, giữ thứ tự thời gian.
+  function anhHtml(ds, gio){
+    ds = (ds || []).filter(a => a && a.url);
     if (!ds.length) return '';
-    return '<div class="sclh-ph">' + ds.map((u, i) => '<img src="' + esc(u) + '" alt="" loading="lazy" data-sclh-i="' + i + '" data-sclh-urls="' + esc(JSON.stringify(ds)) + '">').join('') + '</div>';
+    const urls = esc(JSON.stringify(ds.map(a => a.url)));
+    return '<div class="sclh-ph">' + ds.map((a, i) => '<figure><img src="' + esc(a.url) + '" alt="" loading="lazy" data-sclh-i="' + i + '" data-sclh-urls="' + urls + '"' +
+      (a.ng ? ' title="' + esc(String(a.ng).replace(/^\d+_/, '')) + '"' : '') + '>' +
+      (a.ts ? '<figcaption>' + esc(gio(a.ts)) + '</figcaption>' : '') + '</figure>').join('') + '</div>';
   }
   function ngHtml(checklist){
     const ng = (Array.isArray(checklist) ? checklist : []).filter(x => x && x.dat === false).map(x => x.muc);
@@ -184,6 +190,16 @@
         '🧪 IPQC ' + tagKq(kq) + (c.loai_kiem && c.loai_kiem !== 'sau_su_co' ? ' <span class="ng">' + esc(LOAI_KIEM[c.loai_kiem] || c.loai_kiem) + '</span>' : ''),
         c.nguoi_kiem, ngHtml(c.checklist_json) + dong('', c.ghi_chu));
     });
+    // T300: phiếu IPQC khác cùng máy trong lúc dừng (định kỳ / đổi khuôn / sự cố khác).
+    // NG đã có mốc 'ipqc_ng' (T299) thì không lặp; OK gom vào "Khác".
+    const daNg = new Set(nk.filter(k => k.su_kien === 'ipqc_ng').map(k => (k.du_lieu || {}).id_checkpoint));
+    (d.ipqc_khac || []).filter(c => !daNg.has(c.id_checkpoint)).forEach(c => {
+      const kq = KQ[c.ket_qua] || [c.ket_qua || '?', ''];
+      add(c.thoi_diem_kiem_thuc_te, kq[1] === 'ok' ? 'xanh' : 'do',
+        '🧪 IPQC ' + tagKq(kq) + ' <span class="ng">' + esc(LOAI_KIEM[c.loai_kiem] || c.loai_kiem || '') +
+        (c.id_su_co_goc ? ' · ' + esc(c.id_su_co_goc) : '') + '</span>',
+        c.nguoi_kiem, kq[1] === 'ok' ? '' : ngHtml(c.checklist_json) + dong('', c.ghi_chu), kq[1] === 'ok');
+    });
 
     (d.tiep_tuc || []).forEach(r => {
       add(r.created_at, 'cam', '📝 Đề nghị tiếp tục SX <span class="sclh-tag">' + esc(r.status || '') + '</span>', r.requester_name,
@@ -233,20 +249,27 @@
       (goc.so_khuon ? ' · ' + esc(goc.so_khuon) : '') + '</span></div>' + (bar || '<div style="height:.3rem"></div>');
   }
 
-  // Dải ảnh Trước / Sau / IPQC — thay cho mỗi nhóm ảnh 1 mốc.
-  function daiAnh(d){
+  // Dải ảnh Trước / Sau / IPQC — thay cho mỗi nhóm ảnh 1 mốc. T300: đủ ảnh từ phát sinh đến
+  // khi đóng (cả phiếu IPQC khác cùng máy trong lúc dừng), mỗi nhóm xếp theo giờ.
+  function daiAnh(d, gio){
     const truoc = [], sau = [], qc = [];
-    (d.anh || []).forEach(a => (a.loai === 'sau' ? sau : truoc).push(a.url));
-    [d.phat_hien_ipqc, ...(d.ipqc || []).filter(c => c.trang_thai === 'da_kiem')].filter(Boolean)
-      .forEach(c => (c.anh_bang_chung_url || []).forEach(u => qc.push(u)));
-    const nhom = [['Trước', truoc], ['Sau', sau], ['IPQC', qc]].filter(n => n[1].some(Boolean));
-    return nhom.length ? '<div class="sclh-anh">' + nhom.map(n => '<div><span class="lb">📷 ' + n[0] + '</span>' + anhHtml(n[1]) + '</div>').join('') + '</div>' : '';
+    (d.anh || []).forEach(a => (a.loai === 'sau' ? sau : truoc).push({ url: a.url, ts: a.thoi_diem, ng: a.nguoi }));
+    const daCo = new Set();
+    [d.phat_hien_ipqc, ...(d.ipqc || []).filter(c => c.trang_thai === 'da_kiem'), ...(d.ipqc_khac || [])].filter(Boolean)
+      .forEach(c => {
+        if (daCo.has(c.id_checkpoint)) return; daCo.add(c.id_checkpoint);
+        (Array.isArray(c.anh_bang_chung_url) ? c.anh_bang_chung_url : []).forEach(u => qc.push({ url: u, ts: c.thoi_diem_kiem_thuc_te, ng: c.nguoi_kiem }));
+      });
+    const theoGio = a => a.sort((x, y) => (x.ts ? new Date(x.ts) : 0) - (y.ts ? new Date(y.ts) : 0));
+    const nhom = [['Trước', truoc], ['Sau', sau], ['IPQC', qc]].map(n => [n[0], theoGio(n[1].filter(a => a.url))]).filter(n => n[1].length);
+    return nhom.length ? '<div class="sclh-anh">' + nhom.map(n => '<div><span class="lb">📷 ' + n[0] + ' (' + n[1].length + ')</span>' + anhHtml(n[1], gio) + '</div>').join('') + '</div>' : '';
   }
 
   // Giờ chỉ HH:MM; khác ngày phát sinh mới kèm ngày.
+  const gioFn = ngay0 => ts => { if (!ts) return '—'; const t = new Date(ts); return pad(t.getHours()) + ':' + pad(t.getMinutes()) +
+    (ngay0 && t.toDateString() !== ngay0 ? ' ' + pad(t.getDate()) + '/' + pad(t.getMonth() + 1) : ''); };
   function tlHtml(ev, ngay0){
-    const gio = ts => { if (!ts) return '—'; const t = new Date(ts); return pad(t.getHours()) + ':' + pad(t.getMinutes()) +
-      (ngay0 && t.toDateString() !== ngay0 ? ' ' + pad(t.getDate()) + '/' + pad(t.getMonth() + 1) : ''); };
+    const gio = gioFn(ngay0);
     return '<div class="sclh-tl">' + ev.map(e =>
       '<div class="sclh-ev ' + e.cls + '"><div class="sclh-h"><span class="t">' + gio(e.ts) + '</span><span class="ti">' + e.ti + '</span>' +
       (e.ng ? '<span class="ng">· ' + esc(e.ng) + '</span>' : '') + '</div>' + e.body + '</div>').join('') + '</div>';
@@ -269,7 +292,7 @@
     }
     const ev = suKien(d), chinh = ev.filter(e => !e.phu), phu = ev.filter(e => e.phu);
     const e0 = ev.find(e => e.ts), ngay0 = e0 ? new Date(e0.ts).toDateString() : '';
-    el.innerHTML = '<div class="sclh">' + dauKhung(d) + tlHtml(chinh, ngay0) + daiAnh(d) +
+    el.innerHTML = '<div class="sclh">' + dauKhung(d) + tlHtml(chinh, ngay0) + daiAnh(d, gioFn(ngay0)) +
       (phu.length ? '<details class="sclh-khac"><summary><span class="mu">▸</span> Khác (' + phu.length + ')</summary>' + tlHtml(phu, ngay0) + '</details>' : '') +
       (!(d.nhat_ky || []).length ? '<div class="sclh-note" title="Sự cố trước 20/10/2026 chưa có nhật ký nên không có tên người báo / các lần sửa nội dung.">ⓘ Chưa có nhật ký (trước 20/10/2026)</div>' : '') +
       '</div>';
