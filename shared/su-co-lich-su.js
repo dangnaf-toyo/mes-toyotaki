@@ -15,9 +15,10 @@
  *
  * T298 tinh gọn: đầu khung = trạng thái + thanh chia phút dừng (Xử lý / Chờ QC);
  * dòng thời gian chỉ mốc chính, mỗi mốc 1 dòng; vấn đề / xử lý mỗi thứ hiện 1 lần;
- * ảnh gom 1 dải Trước / Sau / IPQC; việc phụ (sửa nội dung, linh kiện, duyệt đề
+ * việc phụ (sửa nội dung, linh kiện, duyệt đề
  * nghị, xoá, bấm Xong bị chặn) gom vào "Khác (n)" bấm mới mở.
- * T300: dải ảnh đủ từ phát sinh đến khi đóng (cả phiếu IPQC khác cùng máy), giờ dưới mỗi ảnh.
+ * T300: đủ ảnh từ phát sinh đến khi đóng (cả phiếu IPQC khác cùng máy), giờ dưới mỗi ảnh.
+ * T301: bỏ dải ảnh chung — mỗi ảnh nằm ngay dưới mốc giai đoạn của nó (Phát sinh / xử lý / IPQC).
  * Bấm ảnh mở trình xem phóng to (Qc02View.photo nếu có, không thì tab mới).
  * ============================================================================
  */
@@ -89,9 +90,7 @@
       '.sclh-tag.ok{background:#D1FAE5;color:#065F46}.sclh-tag.ng{background:#FEE2E2;color:#991B1B}.sclh-tag.cb{background:#FEF3C7;color:#92400E}' +
       '.sclh-ngl{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.2rem}' +
       '.sclh-ngl span{font-size:.72rem;background:#FEE2E2;color:#991B1B;border-radius:.3rem;padding:.05rem .35rem}' +
-      '.sclh-anh{display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin:.3rem 0 .4rem}' +
-      '.sclh-anh>div{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}.sclh-anh .lb{font-size:.75rem;color:#64748B;font-weight:600}' +
-      '.sclh-ph{display:flex;flex-wrap:wrap;gap:.3rem}' +
+      '.sclh-ph{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem}' +
       '.sclh-ph img{width:56px;height:56px;object-fit:cover;border-radius:.4rem;border:1px solid #CBD5E1;cursor:zoom-in;display:block}' +
       '.sclh-ph figure{margin:0;text-align:center}.sclh-ph figcaption{font-size:11px;color:#94A3B8;line-height:1.2;margin-top:1px}' +
       '.sclh-khac{margin-top:.2rem}.sclh-khac>summary{cursor:pointer;font-size:.8rem;color:#475569;font-weight:600;padding:.2rem 0;list-style:none}' +
@@ -127,11 +126,14 @@
   const tagKq = kq => '<span class="sclh-tag ' + kq[1] + '">' + esc(kq[0]) + '</span>';
 
   // Gom dữ liệu RPC thành danh sách sự kiện {t, cls, ti, ng, body, phu}.
-  // phu = việc phụ → gom vào "Khác (n)". Ảnh không thành mốc riêng (xem daiAnh).
+  // phu = việc phụ → gom vào "Khác (n)". T301: ảnh gắn vào đúng mốc giai đoạn (e.anh).
   function suKien(d){
     const ev = [];
     // Tên người bỏ mã NV phía trước ("210202_Nguyễn Thị Bình" → "Nguyễn Thị Bình").
-    const add = (t, cls, ti, ng, body, phu) => ev.push({ t: t ? new Date(t).getTime() : 0, ts: t, cls, ti, ng: String(ng || '').replace(/^\d+_/, ''), body: body || '', phu: !!phu });
+    const add = (t, cls, ti, ng, body, phu, anh) => { const e = { t: t ? new Date(t).getTime() : 0, ts: t, cls, ti, ng: String(ng || '').replace(/^\d+_/, ''), body: body || '', phu: !!phu, anh: anh || [] }; ev.push(e); return e; };
+    // T301: ảnh nằm ngay trong mốc của giai đoạn đó (IPQC → phiếu IPQC; Trước → Phát sinh; Sau → mốc xử lý).
+    const daAnh = new Set();
+    const anhQc = c => (!c || daAnh.has(c.id_checkpoint) || !daAnh.add(c.id_checkpoint)) ? [] : (Array.isArray(c.anh_bang_chung_url) ? c.anh_bang_chung_url : []).filter(Boolean).map(u => ({ url: u, ts: c.thoi_diem_kiem_thuc_te, ng: c.nguoi_kiem }));
     const log = theoCa(d.log);
     const goc = log[0] || d.dang_mo || {};
     const cuoi = d.dang_mo || log[log.length - 1] || {};
@@ -141,14 +143,15 @@
 
     const ph = d.phat_hien_ipqc;
     if (ph) add(ph.thoi_diem_kiem_thuc_te, 'do', '🔍 IPQC phát hiện ' + tagKq(KQ[ph.ket_qua] || [ph.ket_qua || '?', '']),
-      ph.nguoi_kiem, ngHtml(ph.checklist_json) + dong('', ph.ghi_chu));
+      ph.nguoi_kiem, ngHtml(ph.checklist_json) + dong('', ph.ghi_chu), false, anhQc(ph));
 
     // Vấn đề: bản mới nhất (đã sửa), chỉ hiện 1 lần ở mốc phát sinh.
-    add(goc.gio_phat_sinh || moDl.gio_phat_sinh, 'do', '🚨 Phát sinh', nkMo ? nkMo.nguoi : '',
+    const evPs = add(goc.gio_phat_sinh || moDl.gio_phat_sinh, 'do', '🚨 Phát sinh', nkMo ? nkMo.nguoi : '',
       dong('', gonIpqc(cuoi.van_de || moDl.van_de || goc.van_de)));
 
-    nk.filter(k => k.su_kien === 'giao_qc').forEach(k => add(k.thoi_diem, 'lam',
-      '📦 Giao QC' + (k.du_lieu && k.du_lieu.lan > 1 ? ' (lần ' + k.du_lieu.lan + ')' : ''), k.nguoi, ''));
+    const evXl = [];
+    nk.filter(k => k.su_kien === 'giao_qc').forEach(k => evXl.push(add(k.thoi_diem, 'lam',
+      '📦 Giao QC' + (k.du_lieu && k.du_lieu.lan > 1 ? ' (lần ' + k.du_lieu.lan + ')' : ''), k.nguoi, '')));
     nk.filter(k => k.su_kien === 'cap_nhat' && doiThat(k.thay_doi).length).forEach(k => add(k.thoi_diem, 'lam', '✏️ Sửa nội dung', k.nguoi, diffHtml(k.thay_doi), true));
     nk.filter(k => k.su_kien === 'sua_sau_dong' && doiThat(k.thay_doi).length).forEach(k => add(k.thoi_diem, 'lam', '✏️ Sửa sau khi đóng', k.nguoi, diffHtml(k.thay_doi), true));
     // T232: lần bấm "Xong" bị hệ thống chặn (chưa đủ điều kiện đóng).
@@ -165,12 +168,13 @@
     nk.filter(k => k.su_kien === 'xoa').forEach(k => add(k.thoi_diem, 'do', '🗑 Xoá 1 phần (' + esc(k.ca || '') + ')', k.nguoi, '', true));
 
     const x = d.to_khuon;
+    let evTkNhan = null, evTkXong = null;
     if (x) {
-      add(x.bat_dau || x.cap_nhat_luc, 'lam', '🔧 Tổ khuôn nhận', [x.nguoi_dam_nhiem, x.nguoi_dam_nhiem_phu].filter(Boolean).join(' + '),
+      evTkNhan = add(x.bat_dau || x.cap_nhat_luc, 'lam', '🔧 Tổ khuôn nhận', [x.nguoi_dam_nhiem, x.nguoi_dam_nhiem_phu].filter(Boolean).join(' + '),
         x.trang_thai === 'hoan_thanh' ? '' : dong('', sach(x.noi_dung_xu_ly)));
-      if (x.trang_thai === 'hoan_thanh') add(x.ket_thuc || x.hoan_thanh_luc, 'xanh',
+      if (x.trang_thai === 'hoan_thanh') evXl.push(evTkXong = add(x.ket_thuc || x.hoan_thanh_luc, 'xanh',
         '✅ Tổ khuôn xong' + (x.bat_dau && x.ket_thuc ? ' (' + Math.round((new Date(x.ket_thuc) - new Date(x.bat_dau)) / 60000) + 'p)' : ''),
-        x.nguoi_hoan_thanh, dong('', sach(x.noi_dung_xu_ly)));
+        x.nguoi_hoan_thanh, dong('', sach(x.noi_dung_xu_ly))));
     }
 
     (d.linh_kien || []).forEach(g => add(g.thoi_diem, 'lam',
@@ -188,7 +192,7 @@
       const kq = KQ[c.ket_qua] || [c.ket_qua || '?', ''];
       add(c.thoi_diem_kiem_thuc_te, kq[1] === 'ok' ? 'xanh' : 'do',
         '🧪 IPQC ' + tagKq(kq) + (c.loai_kiem && c.loai_kiem !== 'sau_su_co' ? ' <span class="ng">' + esc(LOAI_KIEM[c.loai_kiem] || c.loai_kiem) + '</span>' : ''),
-        c.nguoi_kiem, ngHtml(c.checklist_json) + dong('', c.ghi_chu));
+        c.nguoi_kiem, ngHtml(c.checklist_json) + dong('', c.ghi_chu), false, anhQc(c));
     });
     // T300: phiếu IPQC khác cùng máy trong lúc dừng (định kỳ / đổi khuôn / sự cố khác).
     // NG đã có mốc 'ipqc_ng' (T299) thì không lặp; OK gom vào "Khác".
@@ -198,7 +202,13 @@
       add(c.thoi_diem_kiem_thuc_te, kq[1] === 'ok' ? 'xanh' : 'do',
         '🧪 IPQC ' + tagKq(kq) + ' <span class="ng">' + esc(LOAI_KIEM[c.loai_kiem] || c.loai_kiem || '') +
         (c.id_su_co_goc ? ' · ' + esc(c.id_su_co_goc) : '') + '</span>',
-        c.nguoi_kiem, kq[1] === 'ok' ? '' : ngHtml(c.checklist_json) + dong('', c.ghi_chu), kq[1] === 'ok');
+        c.nguoi_kiem, kq[1] === 'ok' ? '' : ngHtml(c.checklist_json) + dong('', c.ghi_chu), kq[1] === 'ok', anhQc(c));
+    });
+    // Ảnh IPQC của phiếu NG đã thành mốc 'ipqc_ng' → gắn vào mốc đó.
+    nk.filter(k => k.su_kien === 'ipqc_ng').forEach(k => {
+      const c = (d.ipqc_khac || []).find(z => z.id_checkpoint === (k.du_lieu || {}).id_checkpoint);
+      const e = c && ev.find(z => z.ts === k.thoi_diem && /IPQC/.test(z.ti) && !z.anh.length);
+      if (e) e.anh = anhQc(c);
     });
 
     (d.tiep_tuc || []).forEach(r => {
@@ -217,9 +227,18 @@
       const nkDong = nk.filter(k => k.su_kien === 'dong').pop();
       // Nội dung xử lý chỉ hiện khi khác nội dung tổ khuôn đã ghi.
       const xlSx = x && x.trang_thai === 'hoan_thanh' && giongNhau(x.noi_dung_xu_ly, l.noi_dung_xu_ly) ? '' : sach(l.noi_dung_xu_ly);
-      add(l.gio_tro_lai, 'xanh', '▶ Chạy lại', l.dam_nhiem || (nkDong ? nkDong.nguoi : '') || l.truong_ca || '',
-        dong('', xlSx) + dong('Ghi chú', l.ghi_chu));
+      evXl.push(add(l.gio_tro_lai, 'xanh', '▶ Chạy lại', l.dam_nhiem || (nkDong ? nkDong.nguoi : '') || l.truong_ca || '',
+        dong('', xlSx) + dong('Ghi chú', l.ghi_chu)));
     }
+    // Ảnh sự cố: Trước → Phát sinh; Sau → Tổ khuôn xong (tổ khuôn hay tải ảnh muộn, sau khi máy chạy lại);
+    // không có tổ khuôn → mốc Giao QC / Chạy lại đầu tiên từ lúc tải, rồi mốc cuối, Tổ khuôn nhận, Phát sinh.
+    evXl.sort((a, b) => a.t - b.t);
+    (d.anh || []).filter(a => a && a.url).forEach(a => {
+      const p = { url: a.url, ts: a.thoi_diem, ng: a.nguoi }, t = a.thoi_diem ? new Date(a.thoi_diem).getTime() : 0;
+      const dich = a.loai === 'sau' ? (evTkXong || evXl.find(e => e.t >= t) || evXl[evXl.length - 1] || evTkNhan || evPs) : evPs;
+      dich.anh.push(p);
+    });
+    ev.forEach(e => e.anh.sort((a, b) => (a.ts ? new Date(a.ts) : 0) - (b.ts ? new Date(b.ts) : 0)));
     return ev.sort((a, b) => a.t - b.t);
   }
 
@@ -249,22 +268,6 @@
       (goc.so_khuon ? ' · ' + esc(goc.so_khuon) : '') + '</span></div>' + (bar || '<div style="height:.3rem"></div>');
   }
 
-  // Dải ảnh Trước / Sau / IPQC — thay cho mỗi nhóm ảnh 1 mốc. T300: đủ ảnh từ phát sinh đến
-  // khi đóng (cả phiếu IPQC khác cùng máy trong lúc dừng), mỗi nhóm xếp theo giờ.
-  function daiAnh(d, gio){
-    const truoc = [], sau = [], qc = [];
-    (d.anh || []).forEach(a => (a.loai === 'sau' ? sau : truoc).push({ url: a.url, ts: a.thoi_diem, ng: a.nguoi }));
-    const daCo = new Set();
-    [d.phat_hien_ipqc, ...(d.ipqc || []).filter(c => c.trang_thai === 'da_kiem'), ...(d.ipqc_khac || [])].filter(Boolean)
-      .forEach(c => {
-        if (daCo.has(c.id_checkpoint)) return; daCo.add(c.id_checkpoint);
-        (Array.isArray(c.anh_bang_chung_url) ? c.anh_bang_chung_url : []).forEach(u => qc.push({ url: u, ts: c.thoi_diem_kiem_thuc_te, ng: c.nguoi_kiem }));
-      });
-    const theoGio = a => a.sort((x, y) => (x.ts ? new Date(x.ts) : 0) - (y.ts ? new Date(y.ts) : 0));
-    const nhom = [['Trước', truoc], ['Sau', sau], ['IPQC', qc]].map(n => [n[0], theoGio(n[1].filter(a => a.url))]).filter(n => n[1].length);
-    return nhom.length ? '<div class="sclh-anh">' + nhom.map(n => '<div><span class="lb">📷 ' + n[0] + ' (' + n[1].length + ')</span>' + anhHtml(n[1], gio) + '</div>').join('') + '</div>' : '';
-  }
-
   // Giờ chỉ HH:MM; khác ngày phát sinh mới kèm ngày.
   const gioFn = ngay0 => ts => { if (!ts) return '—'; const t = new Date(ts); return pad(t.getHours()) + ':' + pad(t.getMinutes()) +
     (ngay0 && t.toDateString() !== ngay0 ? ' ' + pad(t.getDate()) + '/' + pad(t.getMonth() + 1) : ''); };
@@ -272,7 +275,7 @@
     const gio = gioFn(ngay0);
     return '<div class="sclh-tl">' + ev.map(e =>
       '<div class="sclh-ev ' + e.cls + '"><div class="sclh-h"><span class="t">' + gio(e.ts) + '</span><span class="ti">' + e.ti + '</span>' +
-      (e.ng ? '<span class="ng">· ' + esc(e.ng) + '</span>' : '') + '</div>' + e.body + '</div>').join('') + '</div>';
+      (e.ng ? '<span class="ng">· ' + esc(e.ng) + '</span>' : '') + '</div>' + e.body + (e.anh.length ? anhHtml(e.anh, gio) : '') + '</div>').join('') + '</div>';
   }
 
   async function mount(el, idSuCo){
@@ -292,7 +295,7 @@
     }
     const ev = suKien(d), chinh = ev.filter(e => !e.phu), phu = ev.filter(e => e.phu);
     const e0 = ev.find(e => e.ts), ngay0 = e0 ? new Date(e0.ts).toDateString() : '';
-    el.innerHTML = '<div class="sclh">' + dauKhung(d) + tlHtml(chinh, ngay0) + daiAnh(d, gioFn(ngay0)) +
+    el.innerHTML = '<div class="sclh">' + dauKhung(d) + tlHtml(chinh, ngay0) +
       (phu.length ? '<details class="sclh-khac"><summary><span class="mu">▸</span> Khác (' + phu.length + ')</summary>' + tlHtml(phu, ngay0) + '</details>' : '') +
       (!(d.nhat_ky || []).length ? '<div class="sclh-note" title="Sự cố trước 20/10/2026 chưa có nhật ký nên không có tên người báo / các lần sửa nội dung.">ⓘ Chưa có nhật ký (trước 20/10/2026)</div>' : '') +
       '</div>';
