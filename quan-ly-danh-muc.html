@@ -143,6 +143,7 @@
       <button class="tab-btn" data-tab="khuon">Khuôn</button>
       <button class="tab-btn" data-tab="nvl">Nguyên vật liệu</button>
       <button class="tab-btn" data-tab="bom">BOM</button>
+      <button class="tab-btn" data-tab="suco">Sự cố Đúc</button>
       <button class="tab-btn" data-tab="taillieu">Phân quyền tài liệu</button>
       <button class="tab-btn" data-tab="quytac">Quy tắc đặt tên</button>
     </div>
@@ -377,6 +378,55 @@
     </section>
     <section id="tab-bom" class="tab-pane" style="display:none">
       <iframe class="bom-frame" title="Quản lý BOM" data-src="bom.html?embed=1&tab=register"></iframe>
+    </section>
+
+    <!-- ── T303: Tab Sự cố Đúc — nút chọn Vấn đề / Xử lý ở form sự cố (bảng duc_su_co_mau) ── -->
+    <section id="tab-suco" class="tab-pane" style="display:none">
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="suco-search" placeholder="Lọc nhanh trong bảng…" autocomplete="off">
+        <select class="list-filter" id="suco-filt-loai"></select>
+        <select class="list-filter" id="suco-filt-hieu_luc"></select>
+        <button type="button" class="btn-reset" id="suco-clear">Xoá lọc</button>
+        <span class="list-count" id="suco-count"></span>
+        <span class="muted" title="Mỗi vấn đề là 1 nút ở form Thêm / Sửa / Xong / Giao QC sự cố Đúc. Bấm vấn đề → hiện các nút cách xử lý của nó. Bỏ tick Đang dùng để ẩn mà không xoá." style="cursor:help">ⓘ</span>
+        <button type="button" class="btn-add" id="suco-add">＋ Thêm mới</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="suco-table" style="display:none">
+            <thead id="suco-thead"></thead>
+            <tbody id="suco-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="suco-empty" style="display:none">Chưa có vấn đề nào.</div>
+      </div>
+
+      <div class="modal-overlay" id="suco-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="suco-form-title">Thêm vấn đề</h2>
+          <div class="msg" id="suco-msg"></div>
+          <form id="suco-form">
+            <div class="form-grid">
+              <div><label for="suco-loai">Loại sự cố</label><select id="suco-loai" required></select></div>
+              <div><label for="suco-ma">Mã</label><input type="text" autocomplete="off" id="suco-ma" required placeholder="Tự điền theo loại"></div>
+              <div><label for="suco-thutu">Thứ tự nút</label><input type="number" min="0" step="1" id="suco-thutu"></div>
+              <div>
+                <label for="suco-hieuluc">Trạng thái</label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:9px 0">
+                  <input type="checkbox" id="suco-hieuluc" style="width:auto" checked> Đang dùng
+                </label>
+              </div>
+              <div style="grid-column:1/-1"><label for="suco-vande">Vấn đề (tên nút)</label><input type="text" autocomplete="off" id="suco-vande" required maxlength="80" placeholder="vd: Dính nhôm"></div>
+              <div style="grid-column:1/-1">
+                <label for="suco-xuly">Cách xử lý <span class="muted" style="font-weight:400">— mỗi dòng 1 nút, nên ≤ 4 dòng, câu ngắn</span></label>
+                <textarea id="suco-xuly" rows="5" placeholder="Đục nhôm bằng que đồng, đánh bóng.&#10;Tăng dầu xịt vị trí dính."></textarea>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" id="suco-submit">Thêm vấn đề</button></div>
+          </form>
+        </div>
+      </div>
     </section>
 
     <!-- ── Tab Phân quyền tài liệu kỹ thuật (T62) ─────────────────────────── -->
@@ -769,6 +819,99 @@ initCatalog({
   ],
 });
 
+// ══ T303: Tab Sự cố Đúc (duc_su_co_mau) ═══════════════════════════════════
+// B1 và F1 dùng chung 1 danh sách (mã CL-..). Thêm loại mới: thêm vào SCM_LOAI + LOAI_SU_CO ở duc-dashboard/mobile.
+const SCM_LOAI = [
+  ['B1,F1', 'B1/F1 — Chất lượng sản phẩm', 'CL'], ['A1', 'A1 — Sự cố máy đúc'], ['A2', 'A2 — Sự cố khuôn'],
+  ['A3', 'A3 — Sự cố hạ tầng'], ['B2', 'B2 — Sự cố CL nguyên liệu'], ['C1', 'C1 — Thay đổi KHSX'],
+  ['C2', 'C2 — Hết nguyên liệu'], ['C3', 'C3 — Đổi khuôn'], ['D1', 'D1 — Thiếu nhân lực'],
+  ['D2', 'D2 — Đào tạo / Người mới'], ['E2', 'E2 — Vệ sinh theo KH'], ['E3', 'E3 — Kiểm kê định kỳ'],
+];
+const scmKhoa = r => (r.loai || []).join(',');
+const scmTen = k => (SCM_LOAI.find(x => x[0] === k) || [k, k])[1];
+const scmViTri = k => { const i = SCM_LOAI.findIndex(x => x[0] === k); return i < 0 ? 99 : i; };
+let scmEditing = null;
+document.getElementById('suco-loai').innerHTML = '<option value="">-- Chọn loại --</option>' +
+  SCM_LOAI.map(x => `<option value="${x[0]}">${escapeHtml(x[1])}</option>`).join('');
+function scmResetForm(){
+  scmEditing = null;
+  clearMsg('suco-msg');
+  document.getElementById('suco-form').reset();
+  document.getElementById('suco-hieuluc').checked = true;
+  document.getElementById('suco-ma').disabled = false;
+  document.getElementById('suco-form-title').textContent = 'Thêm vấn đề';
+  document.getElementById('suco-submit').textContent = 'Thêm vấn đề';
+}
+function scmFillForm(r){
+  scmEditing = r.ma;
+  clearMsg('suco-msg');
+  document.getElementById('suco-loai').value = scmKhoa(r);
+  document.getElementById('suco-ma').value = r.ma;
+  document.getElementById('suco-ma').disabled = true;
+  document.getElementById('suco-thutu').value = r.thu_tu ?? '';
+  document.getElementById('suco-hieuluc').checked = r.hieu_luc !== false;
+  document.getElementById('suco-vande').value = r.van_de || '';
+  document.getElementById('suco-xuly').value = (r.xu_ly || []).join('\n');
+  document.getElementById('suco-form-title').textContent = 'Sửa vấn đề: ' + r.ma;
+  document.getElementById('suco-submit').textContent = 'Lưu thay đổi';
+}
+// Thêm mới: chọn loại → tự gợi ý mã kế tiếp + thứ tự cuối.
+document.getElementById('suco-loai').addEventListener('change', e => {
+  if (scmEditing) return;
+  const k = e.target.value; if (!k) return;
+  const tienTo = (SCM_LOAI.find(x => x[0] === k) || [])[2] || k;
+  const cung = catalogs.suco.rows().filter(r => scmKhoa(r) === k);
+  const so = Math.max(0, ...catalogs.suco.rows().filter(r => r.ma.startsWith(tienTo + '-')).map(r => parseInt(r.ma.slice(tienTo.length + 1), 10) || 0)) + 1;
+  document.getElementById('suco-ma').value = tienTo + '-' + String(so).padStart(2, '0');
+  document.getElementById('suco-thutu').value = Math.max(0, ...cung.map(r => r.thu_tu || 0)) + 1;
+});
+document.getElementById('suco-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const k = document.getElementById('suco-loai').value;
+  const ma = document.getElementById('suco-ma').value.trim().toUpperCase();
+  const van_de = document.getElementById('suco-vande').value.trim().replace(/\s+/g, ' ');
+  const xu_ly = [...new Set(document.getElementById('suco-xuly').value.split('\n').map(x => x.trim().replace(/\s+/g, ' ')).filter(Boolean))];
+  const ttRaw = document.getElementById('suco-thutu').value.trim();
+  if (!k || !ma || !van_de) return showMsg('suco-msg', 'error', 'Nhập đủ Loại, Mã, Vấn đề');
+  const trung = catalogs.suco.rows().find(r => r.ma !== scmEditing && scmKhoa(r) === k && r.van_de.toLowerCase() === van_de.toLowerCase());
+  if (trung) return showMsg('suco-msg', 'error', 'Vấn đề này đã có: ' + trung.ma);
+  const dai = xu_ly.filter(x => x.length > 45);
+  if (dai.length && !confirm('Có ' + dai.length + ' cách xử lý dài hơn 45 ký tự — nút sẽ dài. Vẫn lưu?')) return;
+  const payload = {
+    loai: k.split(','), van_de, xu_ly, hieu_luc: document.getElementById('suco-hieuluc').checked,
+    thu_tu: ttRaw ? parseInt(ttRaw, 10) : 0,
+    nguoi_sua: (await MesAuth.getCurrentUserIdentity()) || null,
+  };
+  let error;
+  if (scmEditing) ({ error } = await sb.from('duc_su_co_mau').update(payload).eq('ma', scmEditing));
+  else ({ error } = await sb.from('duc_su_co_mau').insert({ ma, ...payload }));
+  if (error) return showMsg('suco-msg', 'error', 'Lỗi: ' + error.message + (/duplicate key/.test(error.message) ? ' (mã đã có)' : ''));
+  toast(scmEditing ? 'Đã lưu ' + ma : 'Đã thêm ' + ma);
+  catalogs.suco.close();
+  catalogs.suco.reload();
+});
+initCatalog({
+  id: 'suco',
+  emptyText: 'Chưa có vấn đề nào.',
+  fetch: () => sb.from('duc_su_co_mau').select('ma, loai, thu_tu, van_de, xu_ly, hieu_luc, updated_at, nguoi_sua'),
+  pk: r => r.ma + ' — ' + r.van_de,
+  resetForm: scmResetForm,
+  fillForm: scmFillForm,
+  remove: r => sb.from('duc_su_co_mau').delete().eq('ma', r.ma),
+  filters: [
+    { k: 'loai', label: 'Loại', valOf: r => scmKhoa(r), fmt: v => scmTen(v) },
+    { k: 'hieu_luc', label: 'Trạng thái', valOf: r => r.hieu_luc === false ? 'Đã ẩn' : 'Đang dùng' },
+  ],
+  columns: [
+    { k: 'loai', label: 'Loại', sortable: true, sortVal: r => scmViTri(scmKhoa(r)) * 1000 + (r.thu_tu || 0), text: r => scmTen(scmKhoa(r)), render: r => escapeHtml(scmKhoa(r).replace(',', '/')) },
+    { k: 'thu_tu', label: 'TT', sortable: true, sortVal: r => r.thu_tu || 0, text: () => '', render: r => String(r.thu_tu ?? '') },
+    { k: 'ma', label: 'Mã', sortable: true, sortVal: r => r.ma, text: r => r.ma, render: r => escapeHtml(r.ma) },
+    { k: 'van_de', label: 'Vấn đề', sortable: true, sortVal: r => r.van_de, text: r => r.van_de, render: r => '<b>' + escapeHtml(r.van_de) + '</b>' + (r.hieu_luc === false ? ' <span class="muted">(đã ẩn)</span>' : '') },
+    { k: 'xu_ly', label: 'Cách xử lý', text: r => (r.xu_ly || []).join(' '), render: r => (r.xu_ly || []).length ? '<span style="font-size:12px">' + r.xu_ly.map(escapeHtml).join('<br>') + '</span>' : DASH },
+    { k: 'updated_at', label: 'Sửa lần cuối', sortable: true, sortVal: r => r.updated_at || '', text: r => r.nguoi_sua || '', render: r => '<span style="font-size:12px">' + (r.updated_at ? new Date(r.updated_at).toLocaleDateString('vi-VN') : '') + (r.nguoi_sua ? '<br>' + escapeHtml(r.nguoi_sua) : '') + '</span>' },
+  ],
+});
+
 // ══ Tab Sản phẩm ══════════════════════════════════════════════════════════
 // Quy trình công đoạn chọn qua dropdown (không cho gõ tay) để tránh sai chính
 // tả — sai tên công đoạn sẽ làm chuyencongdoan.html không nhận ra được bước
@@ -1144,6 +1287,7 @@ async function main(){
   catalogs.may.reload();
   catalogs.sp.reload();
   catalogs.ns.reload();
+  catalogs.suco.reload();
   KhuonDs.mount(document.getElementById('khuon-ds'), { admin: true, userName: (await MesAuth.getCurrentUserIdentity()) || '' });
   loadDocPermissions();
 }
