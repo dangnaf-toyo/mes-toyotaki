@@ -301,7 +301,13 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
   <div class="form-wrap">
     <div class="field"><label>Giờ sản xuất trở lại <span class="req">*</span></label><input type="datetime-local" id="rs-gio"></div>
     <div class="field" id="rs-phut-wrap"><label>Thời gian dừng</label><input type="text" autocomplete="off" id="rs-phut" disabled></div>
-    <div class="field"><label>Bổ sung nội dung xử lý</label><textarea id="rs-bonus"></textarea></div>
+    <div id="rs-gio-ipqc" style="display:none;font-size:12px;color:#64748B;margin-top:-6px"></div>
+    <div class="field ac-field hidden" id="rs-dam-nhiem-wrap">
+      <label>Người đảm nhiệm <span class="req">*</span></label>
+      <input type="text" id="rs-dam-nhiem" placeholder="Chạm để chọn hoặc gõ tìm" autocomplete="off">
+      <div class="ac-dropdown hidden" id="rs-dam-nhiem-dropdown"></div>
+    </div>
+    <div class="field"><label id="rs-bonus-lb">Bổ sung nội dung xử lý</label><textarea id="rs-bonus"></textarea></div>
     <div class="field" id="rs-anh-truoc"></div>
     <div class="field" id="rs-anh-sau"></div>
     <button class="btn-submit" onclick="submitResolveMobile()">Xác nhận</button>
@@ -539,6 +545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSimpleAutocomplete('pl-nv-ngay', 'pl-nv-ngay-dropdown', () => state.personnelDuc);
   setupSimpleAutocomplete('pl-nv-dem', 'pl-nv-dem-dropdown', () => state.personnelDuc);
   setupSimpleAutocomplete('in-dam-nhiem', 'in-dam-nhiem-dropdown', () => state.personnel);
+  setupSimpleAutocomplete('rs-dam-nhiem', 'rs-dam-nhiem-dropdown', () => state.personnel);
   setupSimpleAutocomplete('cp-dam-nhiem', 'cp-dam-nhiem-dropdown', () => state.personnel);
   populateHeaderMobile(suggested);
   attachStaticListeners();
@@ -998,6 +1005,7 @@ function suCoMoCuaDongM(row){
   if (!row || !row.open_gio_phat_sinh) return [];
   return [row].concat((row.su_co_phu || []).map(x => Object.assign({}, row, {
     open_loai_su_co: x.loai_su_co, open_gio_phat_sinh: x.gio_phat_sinh, open_van_de: x.van_de, open_id_su_co: x.id_su_co,
+    open_noi_dung_xu_ly: x.noi_dung_xu_ly, open_dam_nhiem: x.dam_nhiem,
   })));
 }
 // Sự cố đang chọn ở màn Xử lý xong (state.currentIdSuCo rỗng = sự cố chính).
@@ -1061,10 +1069,22 @@ async function giaoQcM(idSuCo){
   const s = suCoMoCuaDongM(row).find(x => (x.open_id_su_co || null) === (idSuCo || null));
   if (!s) return showToast('Không thấy sự cố đang mở — tải lại', true);
   if (!(await ensureAuth())) return;
-  if (!(await hoiXacNhan('Đã xử lý xong sự cố ' + hienLoai(s.open_loai_su_co) + ' trên ' + s.ma_may + ' và đã giao mẫu IPQC?\nThời gian dừng từ giờ tính là "xác nhận chất lượng".', { nutOk: 'Giao QC' }))) return;
+  // T299: bắt buộc nội dung xử lý + người đảm nhiệm trước khi giao QC — trống thì hỏi luôn ở đây.
+  const hoi = 'Đã xử lý xong ' + hienLoai(s.open_loai_su_co) + ' trên ' + s.ma_may + ', đã giao mẫu IPQC.\nThời gian dừng từ giờ tính là "xác nhận chất lượng".';
+  let noiDung = null, damNhiem = null;
+  if (!String(s.open_noi_dung_xu_ly || '').trim()) {
+    noiDung = await hoiGhiChuDuyet(hoi, { tieuDe: 'Nội dung xử lý', goiY: 'Đã làm gì (bắt buộc)', batBuoc: true, nutOk: 'Tiếp' });
+    if (noiDung == null) return;
+  }
+  if (!String(s.open_dam_nhiem || '').trim()) {
+    damNhiem = await hoiGhiChuDuyet('Ai xử lý sự cố này?', { tieuDe: 'Người đảm nhiệm', goiY: 'Họ tên (bắt buộc)', batBuoc: true, nutOk: 'Giao QC', giaTri: state.user || '' });
+    if (damNhiem == null) return;
+  }
+  if (noiDung == null && damNhiem == null && !(await hoiXacNhan(hoi, { nutOk: 'Giao QC' }))) return;
   showOverlay('Đang giao QC...');
   try {
-    const d = await rpcWrite('duc_giao_qc_x', { p_id_dong: state.currentIdDong, p_id_su_co: idSuCo || null, p_user: state.user });
+    const d = await rpcWrite('duc_giao_qc_x', { p_id_dong: state.currentIdDong, p_id_su_co: idSuCo || null, p_user: state.user,
+      p_noi_dung: noiDung, p_dam_nhiem: damNhiem });
     hideOverlay();
     showToast('✓ Đã giao QC' + (d.lan > 1 ? ' (lần ' + d.lan + ')' : '') + ' — IPQC OK/Cảnh báo rồi bấm Xử lý xong');
     loadShiftState();
@@ -1356,6 +1376,17 @@ async function openResolveScreen(idSuCoChon){
   const nowStr = toLocalInputValue(nowServer());
   document.getElementById('rs-gio').value = nowStr;
   document.getElementById('rs-gio').max = nowStr;
+  // T299: giờ trở lại không sớm hơn lần IPQC đạt; bắt buộc nội dung xử lý + đảm nhiệm.
+  const lucIpqc = dk && dk.luc_ipqc ? new Date(dk.luc_ipqc) : null;
+  state.lucIpqcResolve = lucIpqc;
+  document.getElementById('rs-gio').min = lucIpqc ? toLocalInputValue(lucIpqc) : '';
+  const hintIpqc = document.getElementById('rs-gio-ipqc');
+  hintIpqc.style.display = lucIpqc ? '' : 'none';
+  hintIpqc.textContent = lucIpqc ? 'ⓘ IPQC đạt lúc ' + pad(lucIpqc.getHours()) + ':' + pad(lucIpqc.getMinutes()) + ' — giờ trở lại không sớm hơn' : '';
+  const thieuXl = !String(sChon.open_noi_dung_xu_ly || '').trim();
+  document.getElementById('rs-bonus-lb').innerHTML = thieuXl ? 'Nội dung xử lý <span class="req">*</span>' : 'Bổ sung nội dung xử lý';
+  document.getElementById('rs-dam-nhiem-wrap').classList.toggle('hidden', !!String(sChon.open_dam_nhiem || '').trim());
+  document.getElementById('rs-dam-nhiem').value = '';
   document.getElementById('rs-bonus').value = '';
   updateResolveMinutesMobile();
   document.getElementById('rs-gio').oninput = updateResolveMinutesMobile;
@@ -1371,13 +1402,24 @@ function updateResolveMinutesMobile(){
   if (!row) return;
   const gio = document.getElementById('rs-gio').value;
   if (!gio) return;
-  const mins = Math.round((new Date(gio) - new Date(row.open_gio_phat_sinh)) / 60000);
+  const luc = state.lucIpqcResolve;   // T299: sớm hơn IPQC đạt thì server tự lấy giờ IPQC
+  const den = luc && new Date(gio) < luc ? luc : new Date(gio);
+  const mins = Math.round((den - new Date(row.open_gio_phat_sinh)) / 60000);
   document.getElementById('rs-phut').value = (mins >= 0 ? mins : 0) + " phút";
 }
 async function submitResolveMobile(){
   const gio = document.getElementById('rs-gio').value;
   if (!gio) return showToast('Nhập giờ trở lại', true);
   if (!(await ensureAuth())) return;
+  // T299: bắt buộc nội dung xử lý + đảm nhiệm
+  const sChon = suCoDangChonM();
+  if (sChon && !String(sChon.open_noi_dung_xu_ly || '').trim() && !document.getElementById('rs-bonus').value.trim()) {
+    showToast('Nhập nội dung xử lý', true); document.getElementById('rs-bonus').focus(); return;
+  }
+  const damNhiemMoi = document.getElementById('rs-dam-nhiem').value.trim();
+  if (sChon && !String(sChon.open_dam_nhiem || '').trim() && !damNhiemMoi) {
+    showToast('Nhập người đảm nhiệm', true); document.getElementById('rs-dam-nhiem').focus(); return;
+  }
 
   // Ảnh sau xử lý: lưu TRƯỚC khi đóng sự cố (lỗi ảnh thì dừng để thử lại).
   if (anhSuCoM.sau && anhSuCoM.sau.hasPending()) {
@@ -1392,9 +1434,10 @@ async function submitResolveMobile(){
       p_id_dong: state.currentIdDong, p_id_su_co: state.currentIdSuCo || null, p_gio_tro_lai: new Date(gio).toISOString(),
       p_bonus_note: document.getElementById('rs-bonus').value,
       p_truong_ca: document.getElementById('sel-truong-ca').value || '', p_user: state.user,
+      p_dam_nhiem: damNhiemMoi || null,
     });
     hideOverlay();
-    showToast('✓ Đã xử lý xong — dừng ' + (d.thoi_gian_dung_phut != null ? d.thoi_gian_dung_phut : '?') + ' phút');
+    showToast('✓ Đã xử lý xong — dừng ' + (d.thoi_gian_dung_phut != null ? d.thoi_gian_dung_phut : '?') + ' phút' + (d.chinh_gio ? ' (tính đến lúc IPQC đạt)' : ''));
     showScreen('scr-list');
     loadShiftState();
   } catch (e) { hideOverlay(); showToast('Lỗi: ' + e.message, true); }

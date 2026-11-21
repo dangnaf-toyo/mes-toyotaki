@@ -146,7 +146,14 @@
     nk.filter(k => k.su_kien === 'cap_nhat' && doiThat(k.thay_doi).length).forEach(k => add(k.thoi_diem, 'lam', '✏️ Sửa nội dung', k.nguoi, diffHtml(k.thay_doi), true));
     nk.filter(k => k.su_kien === 'sua_sau_dong' && doiThat(k.thay_doi).length).forEach(k => add(k.thoi_diem, 'lam', '✏️ Sửa sau khi đóng', k.nguoi, diffHtml(k.thay_doi), true));
     // T232: lần bấm "Xong" bị hệ thống chặn (chưa đủ điều kiện đóng).
-    const LY_DO_TC = { can_thiep: 'chưa duyệt can thiệp khuôn', giao_qc: 'chưa giao QC', ipqc: 'IPQC chưa đạt', khac: 'khác' };
+    const LY_DO_TC = { can_thiep: 'chưa duyệt can thiệp khuôn', giao_qc: 'chưa giao QC', ipqc: 'IPQC chưa đạt', thieu_noi_dung: 'thiếu nội dung xử lý / đảm nhiệm', khac: 'khác' };
+    // T299: IPQC kiểm NG trên máy trong lúc sự cố này đang mở (phiếu định kỳ / sự cố khác).
+    nk.filter(k => k.su_kien === 'ipqc_ng').forEach(k => {
+      const dl = k.du_lieu || {};
+      add(k.thoi_diem, 'do', '🧪 IPQC ' + tagKq(KQ.NG) +
+        (dl.loai_kiem && dl.loai_kiem !== 'sau_su_co' ? ' <span class="ng">' + esc(LOAI_KIEM[dl.loai_kiem] || dl.loai_kiem) + '</span>' : ''),
+        k.nguoi, dong('', gonIpqc(dl.noi_dung)));
+    });
     nk.filter(k => k.su_kien === 'tu_choi_dong').forEach(k => add(k.thoi_diem, 'do',
       '⛔ Bấm Xong bị chặn — ' + esc(LY_DO_TC[(k.du_lieu || {}).ly_do] || 'khác'), k.nguoi, '', true));
     nk.filter(k => k.su_kien === 'xoa').forEach(k => add(k.thoi_diem, 'do', '🗑 Xoá 1 phần (' + esc(k.ca || '') + ')', k.nguoi, '', true));
