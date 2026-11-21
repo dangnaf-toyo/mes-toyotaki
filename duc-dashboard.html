@@ -964,6 +964,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/khuon-nam-van-de.js"></script>
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/khuon-can-thiep.js?v=T261"></script>
+<script src="shared/su-co-mau.js?v=T302"></script>
 <script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
@@ -2273,7 +2274,8 @@ async function giaoQc(idDong, idSuCo){
     ', đã lấy mẫu giao IPQC.\nTừ lúc này thời gian dừng tính là "xác nhận chất lượng".';
   let noiDung = null, damNhiem = null;
   if (!String(s.open_noi_dung_xu_ly || '').trim()) {
-    noiDung = await hoiGhiChuDuyet(hoi, { tieuDe: 'Nội dung xử lý', goiY: 'Đã làm gì (bắt buộc)', batBuoc: true, nutOk: 'Tiếp' });
+    noiDung = await hoiGhiChuDuyet(hoi, { tieuDe: 'Nội dung xử lý', goiY: 'Đã làm gì (bắt buộc)', batBuoc: true, nutOk: 'Tiếp',
+      them: (d, ta) => SuCoMau.gan({ loai: s.open_loai_su_co, vanDe: null, xuLy: ta, vanDeText: s.open_van_de }) });  // T302
     if (noiDung == null) return;
   }
   if (!String(s.open_dam_nhiem || '').trim()) {
@@ -3446,6 +3448,7 @@ async function openAddIncidentModal(idDong){
   document.getElementById('ma-gio-phat-sinh').max = nowStr;
   document.getElementById('ma-van-de').value = '';
   document.getElementById('ma-xu-ly').value = '';
+  SuCoMau.gan({ loai: document.getElementById('ma-loai'), vanDe: document.getElementById('ma-van-de'), xuLy: document.getElementById('ma-xu-ly') });  // T302
   document.getElementById('ma-dam-nhiem').value = '';
   document.getElementById('modal-add').classList.add('open');
   maCtReset();
@@ -3564,6 +3567,7 @@ async function openBulkIncidentModal(){
   document.getElementById('bi-gio-phat-sinh').value = nowStr;
   document.getElementById('bi-gio-phat-sinh').max = nowStr;
   document.getElementById('bi-dam-nhiem').value = '';
+  SuCoMau.gan({ loai: document.getElementById('bi-loai'), vanDe: document.getElementById('bi-van-de'), xuLy: document.getElementById('bi-xu-ly') });  // T302
   document.getElementById('bi-van-de').value = '';
   document.getElementById('bi-xu-ly').value = '';
   document.getElementById('modal-bulk-incident').classList.add('open');
@@ -3672,6 +3676,7 @@ async function openResolveModal(idDong, idSuCo){
   document.getElementById('mr-dam-nhiem-wrap').style.display = thieuDn ? '' : 'none';
   document.getElementById('mr-dam-nhiem').value = '';
   document.getElementById('mr-bonus').value = '';
+  SuCoMau.gan({ loai: row.open_loai_su_co, vanDe: null, xuLy: document.getElementById('mr-bonus'), vanDeText: row.open_van_de });  // T302
   updateResolveMinutes();
   document.getElementById('modal-resolve').classList.add('open');
   anhSuCo.resolveTruoc = await mountAnhSuCo('mr-anh-truoc', 'truoc', row.open_id_su_co, true);
@@ -4005,6 +4010,7 @@ async function openEditIncidentModal(idBanGhi){
   document.getElementById('ei-ghi-chu-wrap').style.display = '';
   document.getElementById('ei-van-de').value = incident.van_de || '';
   document.getElementById('ei-xu-ly').value = incident.noi_dung_xu_ly || '';
+  SuCoMau.gan({ loai: document.getElementById('ei-loai'), vanDe: document.getElementById('ei-van-de'), xuLy: document.getElementById('ei-xu-ly') });  // T302
   document.getElementById('ei-dam-nhiem').value = incident.dam_nhiem || '';
   const ghiChuUser = String(incident.ghi_chu || '').replace(/\n?\[edited [\d:\/ ]+ by [^\]]+\]/g, '').trim();
   document.getElementById('ei-ghi-chu').value = ghiChuUser;
@@ -4035,6 +4041,7 @@ async function openEditOpenIncidentModal(idDong, idSuCo){
   document.getElementById('ei-phut-calc').style.color = 'var(--text-muted)';
   document.getElementById('ei-van-de').value = row.open_van_de || '';
   document.getElementById('ei-xu-ly').value = row.open_noi_dung_xu_ly || '';
+  SuCoMau.gan({ loai: document.getElementById('ei-loai'), vanDe: document.getElementById('ei-van-de'), xuLy: document.getElementById('ei-xu-ly') });  // T302
   document.getElementById('ei-dam-nhiem').value = row.open_dam_nhiem || '';
   document.getElementById('ei-ghi-chu').value = '';
 
