@@ -1,4 +1,4 @@
-// T302: nút chọn sự cố Đúc — chọn Loại → nút Vấn đề → nút Xử lý (điền vào ô chữ, vẫn sửa / gõ thêm được).
+// T302/T304: chọn sự cố Đúc — chọn Loại → ô xổ xuống Vấn đề → ô xổ xuống Xử lý (điền vào ô chữ, vẫn sửa / gõ thêm được).
 // Danh mục: bảng duc_su_co_mau (ma, loai[], thu_tu, van_de, xu_ly[]). Bảng lỗi / chưa chạy SQL → không hiện nút, form như cũ.
 //
 // SuCoMau.gan({ loai, vanDe, xuLy, vanDeText })
@@ -31,15 +31,28 @@
     const st = document.createElement('style');
     st.textContent =
       '.scm{margin:2px 0 6px}.scm:empty{display:none}' +
-      '.scm-h{font-size:11px;color:var(--text-muted,#64748B);margin:2px 0 4px}' +
-      '.scm button.scm-c{display:inline-block;margin:0 4px 4px 0;padding:4px 10px;border:1px solid var(--border-strong,#CBD5E1);border-radius:14px;' +
-        'background:var(--bg-panel,#fff);color:var(--text,#14181F);font-family:inherit;font-size:12px;font-weight:500;line-height:1.35;cursor:pointer;text-align:left;max-width:100%}' +
-      '.scm button.scm-c:hover{border-color:var(--accent,#2563EB)}' +
-      '.scm button.scm-c.on{background:#DBEAFE;border-color:#2563EB;color:#1E3A8A;font-weight:600}' +
-      '.scm button.scm-c.on::before{content:"✓ "}' +
-      '.scm button.scm-c.khac{border-style:dashed;color:var(--text-muted,#64748B)}';
+      '.scm button.scm-dd{display:flex;align-items:center;gap:6px;width:100%;padding:6px 10px;border:1px solid var(--border-strong,#CBD5E1);border-radius:6px;' +
+        'background:var(--bg-panel,#fff);color:var(--text,#14181F);font-family:inherit;font-size:12px;line-height:1.35;cursor:pointer;text-align:left}' +
+      '.scm button.scm-dd:hover,.scm button.scm-dd.mo{border-color:var(--accent,#2563EB)}' +
+      '.scm .scm-dd-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.scm .scm-dd-t.trong{color:var(--text-muted,#64748B)}' +
+      '.scm .scm-dd-m{flex:none;color:var(--text-muted,#64748B);font-size:14px}' +
+      '.scm .scm-ds{margin-top:2px;border:1px solid var(--accent,#2563EB);border-radius:6px;background:var(--bg-panel,#fff);max-height:240px;overflow:auto;box-shadow:0 4px 12px rgba(15,23,42,.12)}' +
+      '.scm button.scm-o{display:block;width:100%;padding:7px 10px 7px 28px;border:0;border-bottom:1px solid var(--border,#E2E8F0);background:none;position:relative;' +
+        'color:var(--text,#14181F);font-family:inherit;font-size:12px;line-height:1.35;cursor:pointer;text-align:left}' +
+      '.scm button.scm-o:last-child{border-bottom:0}' +
+      '.scm button.scm-o:hover{background:#F1F5F9}' +
+      '.scm button.scm-o.on{background:#DBEAFE;color:#1E3A8A;font-weight:600}' +
+      '.scm button.scm-o.on::before{content:"✓";position:absolute;left:10px}' +
+      '.scm button.scm-o.khac{color:var(--text-muted,#64748B);font-style:italic}';
     document.head.appendChild(st);
   }
+  // Bấm ra ngoài → đóng mọi danh sách đang xổ.
+  const dsMo = new Set();
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('.scm')) return;
+    dsMo.forEach((st) => { st.mo = {}; dsMo.delete(st); tai().then(st.ve); });
+  });
 
   const maLoai = (v) => String(v || '').trim().split(/[\s—–-]/)[0].toUpperCase();
   const NHIEU = { B1: 1, F1: 1 };
@@ -55,13 +68,34 @@
     el._scmHop = d;
     return d;
   }
-  function nut(text, on, click, khac) {
+  function opt(text, on, click, khac) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'scm-c' + (on ? ' on' : '') + (khac ? ' khac' : '');
+    b.className = 'scm-o' + (on ? ' on' : '') + (khac ? ' khac' : '');
     b.textContent = text;
     b.onclick = click;
     return b;
+  }
+  // Ô xổ xuống: dòng tóm tắt (bấm để mở / đóng) + danh sách lựa chọn.
+  function oXo(hopEl, st, khoa, tomTat, trong, mo) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'scm-dd' + (mo ? ' mo' : '');
+    const t = document.createElement('span');
+    t.className = 'scm-dd-t' + (tomTat ? '' : ' trong');
+    t.textContent = tomTat || trong;
+    if (tomTat) b.title = tomTat;
+    const m = document.createElement('span');
+    m.className = 'scm-dd-m';
+    m.textContent = mo ? '▴' : '▾';
+    b.append(t, m);
+    b.onclick = () => { st.mo = mo ? {} : { [khoa]: 1 }; st.mo[khoa] ? dsMo.add(st) : dsMo.delete(st); tai().then(st.ve); };
+    hopEl.appendChild(b);
+    if (!mo) return null;
+    const ds = document.createElement('div');
+    ds.className = 'scm-ds';
+    hopEl.appendChild(ds);
+    return ds;
   }
   function batInput(ta) { ta.dispatchEvent(new Event('input', { bubbles: true })); }
   // Thêm / bỏ 1 cụm trong ô chữ, giữ nguyên phần người dùng tự gõ.
@@ -85,7 +119,7 @@
     const st = ta._scm || (ta._scm = {});
     st.o = o;
     st.chon = null;   // null = chưa chọn tay → tự khớp theo chữ vấn đề
-    st.moRong = false; // ô vấn đề cố định: chỉ hiện vấn đề đã khớp, bấm "Vấn đề khác…" mới hiện hết
+    st.mo = {};       // danh sách đang xổ: { vd: 1 } hoặc { xl: 1 }
     const hopVd = hop(o.vanDe || ta), hopXl = o.vanDe ? hop(ta) : (st.hopXl || (st.hopXl = (() => {
       const d = document.createElement('div'); d.className = 'scm'; hopVd.after(d); return d;
     })()));
@@ -102,45 +136,43 @@
       if (!st.chon) st.chon = ds.filter((x) => txtVd && coChu(txtVd, x.van_de)).map((x) => x.ma);
       if (!nhieu && st.chon.length > 1) st.chon = st.chon.slice(0, 1);
 
-      const h = document.createElement('div');
-      h.className = 'scm-h';
-      h.textContent = o.vanDe ? (nhieu ? 'Chọn vấn đề (chọn nhiều được):' : 'Chọn vấn đề:') : 'Vấn đề để gợi ý cách xử lý:';
-      hopVd.appendChild(h);
-      const gon = !o.vanDe && !st.moRong && st.chon.length > 0;
-      ds.forEach((x) => {
-        const on = st.chon.indexOf(x.ma) >= 0;
-        if (gon && !on) return;
-        hopVd.appendChild(nut(x.van_de, on, () => {
-          if (on) {
-            st.chon = st.chon.filter((m) => m !== x.ma);
-            if (o.vanDe) boCum(o.vanDe, x.van_de);
-          } else {
-            if (!nhieu) {
-              const cu = ds.find((y) => y.ma === st.chon[0]);
-              if (cu && o.vanDe) boCum(o.vanDe, cu.van_de);
-              st.chon = [];
+      const dong = () => { st.mo = {}; dsMo.delete(st); };
+      const tenChon = st.chon.map((m) => (ds.find((y) => y.ma === m) || {}).van_de).filter(Boolean);
+      const dsVd = oXo(hopVd, st, 'vd', tenChon.join(', '), nhieu ? 'Chọn vấn đề (chọn nhiều được)' : 'Chọn vấn đề', !!st.mo.vd);
+      if (dsVd) {
+        ds.forEach((x) => {
+          const on = st.chon.indexOf(x.ma) >= 0;
+          dsVd.appendChild(opt(x.van_de, on, () => {
+            if (on) {
+              st.chon = st.chon.filter((m) => m !== x.ma);
+              if (o.vanDe) boCum(o.vanDe, x.van_de);
+            } else {
+              if (!nhieu) {
+                const cu = ds.find((y) => y.ma === st.chon[0]);
+                if (cu && o.vanDe) boCum(o.vanDe, cu.van_de);
+                st.chon = [];
+              }
+              st.chon.push(x.ma);
+              if (o.vanDe && !coChu(o.vanDe.value, x.van_de)) themCum(o.vanDe, x.van_de, ', ');
             }
-            st.chon.push(x.ma);
-            if (o.vanDe && !coChu(o.vanDe.value, x.van_de)) themCum(o.vanDe, x.van_de, ', ');
-          }
-          ve(list);
-        }));
-      });
-      if (o.vanDe) hopVd.appendChild(nut('Khác…', false, () => o.vanDe.focus(), true));
-      else if (gon) hopVd.appendChild(nut('Vấn đề khác…', false, () => { st.moRong = true; ve(list); }, true));
+            if (!nhieu) dong();
+            ve(list);
+          }));
+        });
+        if (o.vanDe) dsVd.appendChild(opt('Khác… (tự gõ)', false, () => { dong(); ve(list); o.vanDe.focus(); }, true));
+      }
 
       const xl = [];
       st.chon.forEach((m) => { const x = ds.find((y) => y.ma === m); (x && x.xu_ly || []).forEach((t) => { if (xl.indexOf(t) < 0) xl.push(t); }); });
       if (!xl.length) return;
-      const h2 = document.createElement('div');
-      h2.className = 'scm-h';
-      h2.textContent = 'Chọn cách xử lý (chọn nhiều được):';
-      hopXl.appendChild(h2);
+      const soXl = xl.filter((t) => coChu(ta.value, t)).length;
+      const dsXl = oXo(hopXl, st, 'xl', soXl ? 'Đã chọn ' + soXl + ' cách xử lý' : '', 'Chọn cách xử lý (chọn nhiều được)', !!st.mo.xl);
+      if (!dsXl) return;
       xl.forEach((t) => {
         const on = coChu(ta.value, t);
-        hopXl.appendChild(nut(t, on, () => { on ? boCum(ta, t) : themCum(ta, t, ' '); ve(list); }));
+        dsXl.appendChild(opt(t, on, () => { on ? boCum(ta, t) : themCum(ta, t, ' '); ve(list); }));
       });
-      hopXl.appendChild(nut('Khác…', false, () => ta.focus(), true));
+      dsXl.appendChild(opt('Khác… (tự gõ)', false, () => { dong(); ve(list); ta.focus(); }, true));
     }
 
     const veLai = () => tai().then(ve);
