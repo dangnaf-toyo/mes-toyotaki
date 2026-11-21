@@ -525,8 +525,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="ma-gio-phat-sinh"></div>
         <div class="field"><label>Đảm nhiệm</label><input list="dl-personnel" id="ma-dam-nhiem"></div>
       </div>
-      <div class="field"><label>Vấn đề</label><textarea id="ma-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
-      <div class="field"><label>Nội dung xử lý</label><textarea id="ma-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
+      <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="ma-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
+      <div class="field"><label>Nội dung xử lý <span class="req">*</span></label><textarea id="ma-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
       <div class="field" id="ma-ct-wrap" style="display:none">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;color:#B45309">
           <input type="checkbox" id="ma-ct-co" style="width:18px;height:18px">🔧 Sự cố cần can thiệp khuôn
@@ -573,8 +573,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="bi-gio-phat-sinh"></div>
         <div class="field"><label>Đảm nhiệm</label><input list="dl-personnel" id="bi-dam-nhiem"></div>
       </div>
-      <div class="field"><label>Vấn đề</label><textarea id="bi-van-de" placeholder="Mô tả ngắn gọn vấn đề (áp dụng chung cho các máy chọn)"></textarea></div>
-      <div class="field"><label>Nội dung xử lý</label><textarea id="bi-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
+      <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="bi-van-de" placeholder="Mô tả ngắn gọn vấn đề (áp dụng chung cho các máy chọn)"></textarea></div>
+      <div class="field"><label>Nội dung xử lý <span class="req">*</span></label><textarea id="bi-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
     </div>
     <div class="modal-foot">
       <span class="hint">Mỗi máy vẫn tạo 1 bản ghi sự cố riêng — có thể sửa/đóng từng máy độc lập sau này</span>
@@ -931,8 +931,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="field"><label>TG dừng (tự tính)</label><input type="text" autocomplete="off" id="ei-phut-calc" disabled style="background:var(--bg-sunken);color:var(--alarm-fg);font-weight:600"></div>
         <div class="field"><label>Đảm nhiệm</label><input list="dl-personnel" id="ei-dam-nhiem"></div>
       </div>
-      <div class="field"><label>Vấn đề</label><textarea id="ei-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
-      <div class="field"><label>Nội dung xử lý</label><textarea id="ei-xu-ly" placeholder="Cách xử lý đã/đang thực hiện"></textarea></div>
+      <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="ei-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
+      <div class="field"><label>Nội dung xử lý <span class="req">*</span></label><textarea id="ei-xu-ly" placeholder="Cách xử lý đã/đang thực hiện"></textarea></div>
       <div class="field" id="ei-ghi-chu-wrap"><label>Ghi chú thêm</label><input type="text" autocomplete="off" id="ei-ghi-chu" placeholder="Note bổ sung"></div>
       <div class="field" id="ei-anh-truoc"></div>
       <div class="field" id="ei-anh-sau"></div>
@@ -3491,6 +3491,8 @@ async function submitAddIncident(){
   const gioPS = document.getElementById('ma-gio-phat-sinh').value;
   if (!loai) return showToast('Chọn loại sự cố', true);
   if (!gioPS) return showToast('Nhập giờ phát sinh', true);
+  if (!document.getElementById('ma-van-de').value.trim()) return showToast('Nhập vấn đề', true);  // T305
+  if (!document.getElementById('ma-xu-ly').value.trim()) return showToast('Nhập nội dung xử lý', true);
   // T210f: can thiệp khuôn
   const ctAp = document.getElementById('ma-ct-wrap').style.display !== 'none';
   const ctCo = ctAp && document.getElementById('ma-ct-co').checked;
@@ -3584,6 +3586,8 @@ async function submitBulkIncident(){
   if (idDongList.length === 0) return showToast('Chọn ít nhất 1 máy', true);
   if (!loai) return showToast('Chọn loại sự cố', true);
   if (!gioPS) return showToast('Nhập giờ phát sinh', true);
+  if (!document.getElementById('bi-van-de').value.trim()) return showToast('Nhập vấn đề', true);  // T305
+  if (!document.getElementById('bi-xu-ly').value.trim()) return showToast('Nhập nội dung xử lý', true);
   if (!(await ensureAuthOnSubmit('modal-bulk-incident'))) return;
 
   const damNhiem = document.getElementById('bi-dam-nhiem').value;
@@ -4062,6 +4066,8 @@ async function submitEditIncident(){
   const vanDe = document.getElementById('ei-van-de').value.trim();
   const xuLy = document.getElementById('ei-xu-ly').value.trim();
   const damNhiem = document.getElementById('ei-dam-nhiem').value.trim();
+  if (!vanDe) return showToast('Nhập vấn đề', true);  // T305
+  if (!xuLy) return showToast('Nhập nội dung xử lý', true);
 
   if (t.mode === 'closed') {
     const gioTL = document.getElementById('ei-gio-tro-lai').value;

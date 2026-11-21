@@ -283,8 +283,8 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
   <div class="form-wrap">
     <div class="field"><label>Loại sự cố <span class="req">*</span></label><select id="in-loai"></select></div>
     <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="in-gio"></div>
-    <div class="field"><label>Vấn đề</label><textarea id="in-van-de" placeholder="Mô tả ngắn gọn"></textarea></div>
-    <div class="field"><label>Nội dung xử lý (nếu có)</label><textarea id="in-xu-ly"></textarea></div>
+    <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="in-van-de" placeholder="Mô tả ngắn gọn"></textarea></div>
+    <div class="field"><label>Nội dung xử lý <span class="req">*</span></label><textarea id="in-xu-ly"></textarea></div>
     <div class="field ac-field">
       <label>Người đảm nhiệm</label>
       <input type="text" id="in-dam-nhiem" placeholder="Chạm để chọn hoặc gõ tìm" autocomplete="off">
@@ -1325,6 +1325,8 @@ async function submitIncidentMobile(){
   const gio = document.getElementById('in-gio').value;
   if (!loai) return showToast('Chọn loại sự cố', true);
   if (!gio) return showToast('Nhập giờ phát sinh', true);
+  if (!document.getElementById('in-van-de').value.trim()) return showToast('Nhập vấn đề', true);  // T305
+  if (!document.getElementById('in-xu-ly').value.trim()) return showToast('Nhập nội dung xử lý', true);
   if (!(await ensureAuth())) return;
 
   const damNhiem = document.getElementById('in-dam-nhiem').value;
