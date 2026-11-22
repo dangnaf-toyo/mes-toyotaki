@@ -60,6 +60,8 @@
 ## Nhóm 7 — Quản lý điểm thay đổi (Henkaten / 4M) — chống phát sinh và lọt NG
 
 > Đề xuất ngày 2026-10-20 theo yêu cầu người dùng ("nhà máy quản lý điểm thay đổi rất kém, cả có kế hoạch lẫn bất thường"). Làm dần theo giai đoạn; mỗi giai đoạn cần người dùng chốt các điểm ở cuối mục trước khi code.
+>
+> **[x] 2026-11-22 T307 — chốt lại hướng đơn giản:** thay đổi BẤT THƯỜNG = sự cố (đã có, IPQC bắt buộc trước khi chạy lại); chỉ làm thêm thay đổi **CHỦ ĐỘNG**. Danh mục 51 mục (Điều kiện đúc / Khuôn / Máy / Vật liệu / Người & khác) có sẵn nội dung xác nhận chất lượng + người duyệt, sửa ở Danh mục → tab "Thay đổi Đúc" (`duc_thay_doi_mau`). Chỉ trưởng ca ghi phiếu (nút "± Thay đổi" Bảng điều khiển Đúc + ĐT). Điều kiện đúc kiểu số: trong ±5% so với **giá trị chuẩn** (`duc_thay_doi_chuan`: lần đầu = Trước, sau mỗi lần Kỹ thuật duyệt = Sau) trưởng ca tự chỉnh, vượt → Kỹ thuật duyệt (GĐSX duyệt thay được). Ca đêm cho "Áp dụng khẩn" (bắt buộc IPQC, duyệt bù). Lần kiểm IPQC `sau_thay_doi` (dùng chung lần kiểm sau sự cố / đổi khuôn đang chờ), IPQC chọn Đạt / Không đạt từng nội dung; NG → F1 như cũ. Trang `diem-thay-doi.html` (lịch sử + duyệt). Migration `T307a`, `T307b`. Phần còn lại của Nhóm 7 bên dưới (giữ hàng, tăng tần suất…) chưa làm.
 
 **Số liệu thực tế 60 ngày đến 20/10/2026 (prod)** — lý do ưu tiên:
 

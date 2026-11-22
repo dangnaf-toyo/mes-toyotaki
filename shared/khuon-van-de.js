@@ -88,7 +88,7 @@
     function vdGio(ts){ return ts ? new Date(ts).toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''; }
     const VD_KQ = { OK: ['ok', '✓ OK'], NG: ['ng', '✗ NG'], CANH_BAO: ['cb', '⚠ Cảnh báo'] };
     function vdKq(k){ return VD_KQ[k] || ['cho', String(k || '')]; }
-    const VD_LOAI_KIEM = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Đổi khuôn', dau_ca: 'Đầu ca' };
+    const VD_LOAI_KIEM = { dinh_ky: 'Định kỳ', sau_su_co: 'Sau sự cố', doi_khuon: 'Đổi khuôn', dau_ca: 'Đầu ca', sau_thay_doi: 'Sau thay đổi' };
     // Gộp sự cố + IPQC thành các dòng bảng, mới nhất trước.
     function vdRows(){
       const sc = (vdData.su_co || []).map(x => {

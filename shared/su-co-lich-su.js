@@ -26,7 +26,7 @@
   const COT = { loai: 'Loại', gio_phat_sinh: 'Giờ phát sinh', gio_tro_lai: 'Giờ trở lại', van_de: 'Vấn đề',
     noi_dung_xu_ly: 'Xử lý', dam_nhiem: 'Đảm nhiệm' };
   const KQ = { OK: ['OK', 'ok'], NG: ['NG', 'ng'], CANH_BAO: ['Cảnh báo', 'cb'] };
-  const LOAI_KIEM = { dinh_ky: 'định kỳ', sau_su_co: 'sau sự cố', doi_khuon: 'đổi khuôn' };
+  const LOAI_KIEM = { dinh_ky: 'định kỳ', sau_su_co: 'sau sự cố', doi_khuon: 'đổi khuôn', sau_thay_doi: 'sau thay đổi' };
   const LK_LOAI = { xuat_thay: 'Thay', thao_ra: 'Tháo', nhap: 'Nhập kho', dieu_chinh: 'Điều chỉnh' };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

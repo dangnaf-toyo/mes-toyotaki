@@ -108,6 +108,7 @@
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
+      { label: 'Điểm thay đổi Đúc', href: 'diem-thay-doi.html' },   // T307
       { label: 'Bảng điều khiển Bavia', href: 'bavia-dashboard.html' },
       { label: 'Bảng điều khiển Gia công', href: 'gia-cong-dashboard.html' },
       { label: 'Bảng điều khiển Sơn', href: 'cong-doan-dashboard.html?cd=S%C6%A1n' },
@@ -160,6 +161,7 @@
   const PAGE_META = {
     'index.html': { icon: '🏠', title: 'Trang chủ MES', desc: 'Chọn chức năng bạn muốn sử dụng', noTitleBar: true },
     'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca', noTitleBar: true },
+    'diem-thay-doi.html': { icon: '±', title: 'Điểm thay đổi Đúc', desc: 'Thay đổi chủ động: duyệt, IPQC sau thay đổi, lịch sử', noTitleBar: true },   // T307
     'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
     'ipqc.html': { icon: '🔎', title: 'IPQC Đúc', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh', noTitleBar: true },
     'ipqc-gia-cong.html': { icon: '📐', title: 'IPQC Gia công', desc: 'Nhập kết quả và dashboard IPQC Gia công', noTitleBar: true },

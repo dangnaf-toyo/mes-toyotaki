@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Điểm thay đổi Đúc — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  diem-thay-doi.html — T307: lịch sử điểm thay đổi chủ động Đúc (duc_thay_doi) + duyệt.
+  ?id=N → mở thẳng phiếu (chuông "Cần duyệt" trỏ về đây). ?may=DC 7 → lọc theo máy.
+  Ghi phiếu ở Bảng điều khiển Đúc (nút "± Thay đổi", chỉ trưởng ca). Danh mục sửa ở Danh mục → tab "Thay đổi Đúc".
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;color:#FFF}
+.header-divider{width:1px;height:28px;background:#334155}
+.btn{border:none;border-radius:5px;padding:7px 12px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--accent-hover)}
+.btn-ghost{background:transparent;color:#F1F5F9;border:1px solid #475569}
+.btn-ghost:hover{background:#334155}
+.btn-outline{background:#fff;border:1.5px solid var(--border-strong);color:var(--text)}
+.btn-ok{background:#16A34A}.btn-ok:hover{background:#15803D}
+.btn-do{background:#fff;color:var(--alarm-fg);border:1.5px solid #FCA5A5}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:10px 12px}
+.card-title{font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.filters select,.filters input{border:1.5px solid var(--border-strong);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12.5px;background:#fff;color:var(--text);max-width:100%}
+.filters input[type=search]{min-width:200px}
+.chip{border:1px solid var(--border-strong);background:#fff;border-radius:100px;padding:5px 11px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted)}
+.chip.on{background:var(--text);color:#fff;border-color:var(--text)}
+.chip .n{display:inline-block;min-width:16px;margin-left:4px;border-radius:8px;background:#DC2626;color:#fff;font-size:11px;text-align:center}
+.tw{overflow:auto;border:1px solid var(--border);border-radius:6px}
+table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.ds th{position:sticky;top:0;z-index:1;background:var(--bg-sunken);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.ds td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.ds td small{display:block;color:var(--text-muted);font-size:11px}
+.ds td.nw{white-space:nowrap}
+.ds tr.row{cursor:pointer}
+.ds tr.row:hover td{background:#F8FAFC}
+.ds tr.row.open td{background:#EEF4FB}
+.ds tr.ct td{background:#F8FAFC;padding:10px 12px}
+.tt{display:inline-block;font-weight:700;font-size:11px;padding:1px 7px;border-radius:10px;white-space:nowrap;background:#E2E8F0;color:#334155}
+.tt.cho_duyet{background:#FEF3C7;color:#92400E}.tt.cho_ap_dung{background:#DBEAFE;color:#1E40AF}.tt.cho_ipqc{background:#FFEDD5;color:#9A3412}
+.tt.ok{background:var(--run-bg);color:var(--run-fg)}.tt.ng,.tt.khong_duyet{background:var(--alarm-bg);color:var(--alarm-fg)}
+.tt.khan{background:#FFEDD5;color:#C2410C}
+.ct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.ct-grid h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:4px}
+.ct-grid table{border-collapse:collapse;width:100%}
+.ct-grid table td{padding:3px 6px;border-bottom:1px solid var(--border);font-size:12px}
+.ct-grid ul{padding-left:16px}
+.ct-grid small{display:block;color:var(--text-muted);font-size:11px}
+.duyet-box{border:1.5px solid #FCD34D;background:#FFFBEB;border-radius:8px;padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.duyet-box .t{flex:1 1 220px;font-weight:600}
+.ph{display:flex;gap:6px;flex-wrap:wrap}.ph img{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer}
+.vuot{color:var(--warn-fg);font-weight:700}.dat{color:var(--run-fg);font-weight:700}.kdat{color:var(--alarm-fg);font-weight:700}
+.empty{padding:18px;text-align:center;color:var(--text-dim)}
+.hint{font-size:12px;color:var(--text-muted)}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:200;max-width:min(560px,92vw);padding:11px 16px;border-radius:8px;font-size:13px;font-weight:600;display:none;box-shadow:var(--shadow-lg)}
+#msg.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block}
+#msg.ok{background:var(--run-bg);color:var(--run-fg);border:1px solid #86EFAC;display:block}
+@media (max-width:640px){.filters input[type=search]{flex:1;min-width:0}.hide-m{display:none}}
+</style>
+</head>
+<body>
+<div id="msg"></div>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="co">Toyotaki</div><div class="title">± Điểm thay đổi Đúc</div></div>
+    <div class="header-divider"></div>
+    <a class="btn btn-ghost" href="duc-dashboard.html">← Dashboard Đúc</a>
+  </header>
+
+  <section class="card">
+    <div class="filters">
+      <button type="button" class="chip" data-nhanh="7">7 ngày</button>
+      <button type="button" class="chip on" data-nhanh="30">30 ngày</button>
+      <button type="button" class="chip" data-nhanh="90">90 ngày</button>
+      <input type="date" id="fTu" title="Từ ngày"> → <input type="date" id="fDen" title="Đến ngày">
+      <select id="fMay"><option value="">Mọi máy</option></select>
+      <select id="fNhom"><option value="">Mọi nhóm</option></select>
+      <select id="fTt">
+        <option value="">Mọi trạng thái</option><option value="mo">Đang mở</option>
+        <option value="cho_duyet">⏳ Chờ duyệt</option><option value="cho_ap_dung">✋ Chờ chỉnh</option><option value="cho_ipqc">⚠ Chờ IPQC</option>
+        <option value="ok">✅ OK</option><option value="ng">⛔ NG</option><option value="khan">⚡ Khẩn</option>
+        <option value="khong_duyet">Không duyệt</option><option value="ghi_nhan">Ghi nhận</option><option value="huy">Đã huỷ</option>
+      </select>
+      <input type="search" id="fQ" placeholder="Tìm mục / mã SP / người…">
+      <button type="button" class="chip" id="chipToi" hidden>Chờ tôi duyệt<span class="n" id="nToi"></span></button>
+    </div>
+  </section>
+
+  <section class="card" id="cardMot" hidden></section>
+
+  <section class="card">
+    <div class="card-title" id="dsTitle">Danh sách</div>
+    <div class="tw"><table class="ds">
+      <thead><tr>
+        <th>Giờ ghi</th><th>Máy</th><th>Mã SP</th><th>Thay đổi</th><th class="hide-m">Lý do</th><th class="hide-m">Trưởng ca</th><th>Trạng thái</th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="7" class="empty">Đang tải…</td></tr></tbody>
+    </table></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js"></script>
+<script src="shared/qc02-view.js"></script>
+<script src="shared/thay-doi.js?v=T307"></script>
+<script>
+const P = new URLSearchParams(location.search);
+let all = [], openId = null, mot = null, quyen = { ghi: false, duyet: [] };
+
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pad(n){ return String(n).padStart(2, '0'); }
+function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function fmtTs(ts){ if (!ts) return ''; const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1); }
+const soVi = v => (v == null || v === '') ? '' : String(v).replace('.', ',');
+let msgT = null;
+function showMsg(t, cls){ const el = document.getElementById('msg'); el.textContent = t; el.className = cls || 'ok'; clearTimeout(msgT); msgT = setTimeout(() => { el.className = ''; }, 4500); }
+window.showToast = (t, loi) => showMsg(t, loi ? 'err' : 'ok');
+
+// Nhóm duyệt còn chờ + nhóm của tôi trong đó
+function choDuyet(p){ return (p.can_duyet || []).filter(g => !(p.da_duyet || []).some(x => x.nhom === g && x.dong_y)); }
+function dangChoDuyet(p){ return (p.trang_thai === 'cho_duyet' || (p.khan && !p.ket_qua_duyet && p.trang_thai !== 'huy')) && choDuyet(p).length > 0; }
+function toiDuyet(p){ return dangChoDuyet(p) && choDuyet(p).some(g => (quyen.duyet || []).includes(g)); }
+
+function ttHtml(p){
+  return '<span class="tt ' + p.trang_thai + '">' + esc(ThayDoi.TT[p.trang_thai] || p.trang_thai) + '</span>' +
+    (p.khan ? ' <span class="tt khan">⚡ Khẩn' + (p.ket_qua_duyet ? '' : ' · chờ duyệt bù') + '</span>' : '');
+}
+
+async function tai(){
+  const tu = document.getElementById('fTu').value, den = document.getElementById('fDen').value;
+  let q = () => {
+    let x = sb.from('duc_thay_doi').select('*').order('id', { ascending: false });
+    if (tu) x = x.gte('thoi_diem_ghi', tu + 'T00:00:00+07:00');
+    if (den) x = x.lte('thoi_diem_ghi', den + 'T23:59:59+07:00');
+    return x;
+  };
+  const { data, error } = await sbTaiHet(q);
+  if (error) { document.getElementById('tbody').innerHTML = '<tr><td colspan="7" class="empty">Lỗi tải: ' + esc(error.message) + '</td></tr>'; return; }
+  all = data || [];
+  // Phiếu chờ duyệt cũ hơn khoảng ngày vẫn phải thấy
+  const { data: cho } = await sb.from('duc_thay_doi').select('*').or('trang_thai.in.(cho_duyet,cho_ap_dung,cho_ipqc),and(khan.eq.true,ket_qua_duyet.is.null)').order('id', { ascending: false }).limit(500);
+  const ids = new Set(all.map(p => p.id));
+  (cho || []).forEach(p => { if (!ids.has(p.id)) all.push(p); });
+  all.sort((a, b) => b.id - a.id);
+  veLoc(); ve();
+}
+
+function veLoc(){
+  const may = [...new Set(all.map(p => p.ma_may))].sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
+  const fm = document.getElementById('fMay'), cu = fm.value || P.get('may') || '';
+  fm.innerHTML = '<option value="">Mọi máy</option>' + may.map(m => '<option' + (m === cu ? ' selected' : '') + '>' + esc(m) + '</option>').join('');
+  const fn = document.getElementById('fNhom');
+  if (fn.options.length <= 1) fn.innerHTML = '<option value="">Mọi nhóm</option>' + Object.entries(ThayDoi.NHOM_DAY).map(([k, v]) => '<option value="' + k + '">' + esc(v) + '</option>').join('');
+  const n = all.filter(toiDuyet).length;
+  document.getElementById('chipToi').hidden = !(quyen.duyet || []).length;
+  document.getElementById('nToi').textContent = n || '';
+}
+
+function locDs(){
+  const may = document.getElementById('fMay').value, nhom = document.getElementById('fNhom').value, tt = document.getElementById('fTt').value;
+  const q = document.getElementById('fQ').value.trim().toLowerCase(), toi = document.getElementById('chipToi').classList.contains('on');
+  return all.filter(p => {
+    if (toi && !toiDuyet(p)) return false;
+    if (may && p.ma_may !== may) return false;
+    if (nhom && !(p.chi_tiet || []).some(e => e.nhom === nhom)) return false;
+    if (tt === 'mo' && !ThayDoi.MO.includes(p.trang_thai)) return false;
+    if (tt === 'khan' && !p.khan) return false;
+    if (tt && tt !== 'mo' && tt !== 'khan' && p.trang_thai !== tt) return false;
+    if (q) {
+      const s = [ThayDoi.tomTat(p.chi_tiet), (p.chi_tiet || []).map(e => e.ma).join(' '), p.ma_sp, p.so_khuon, p.nguoi_ghi, p.ly_do, p.ghi_chu, 'TD-' + p.id].join(' ').toLowerCase();
+      if (!s.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function chiTietHtml(p){
+  const rows = (p.chi_tiet || []).map(e =>
+    '<tr><td><b>' + esc(e.ma) + '</b> ' + esc(e.ten) + '</td><td class="nw">' + esc(soVi(e.truoc)) + ' → <b>' + esc(soVi(e.sau)) + '</b> ' + esc(e.don_vi || '') + '</td>' +
+    '<td class="nw">' + (e.pct != null ? '<span class="' + (e.vuot ? 'vuot' : 'dat') + '">±' + soVi(e.pct) + '%</span> <small>chuẩn ' + esc(soVi(e.chuan)) + '</small>' : '') +
+      (e.nguoi_duyet ? '<small>Duyệt: ' + esc(ThayDoi.DUYET[e.nguoi_duyet] || e.nguoi_duyet) + '</small>' : '<small>Tự chỉnh</small>') + '</td></tr>').join('');
+  const duyet = (p.da_duyet || []).map(d => '<li>' + (d.dong_y ? '✅ ' : '⛔ ') + esc(ThayDoi.DUYET[d.nhom] || d.nhom) + ' — ' + esc(d.nguoi || '') + ' ' + esc(fmtTs(d.luc)) +
+    (d.ghi_chu ? ': ' + esc(d.ghi_chu) : '') + '</li>').join('');
+  const cho = dangChoDuyet(p) ? choDuyet(p).map(g => '<li>⏳ Chờ ' + esc(ThayDoi.DUYET[g] || g) + '</li>').join('') : '';
+  const xn = (p.xac_nhan_kq || []).map(x => '<li class="' + (x.dat ? 'dat' : 'kdat') + '">' + (x.dat ? 'Đạt' : 'Không đạt') + ' — ' + esc(String(x.muc || '').replace(/^Thay đổi TD-\d+: /, '')) + '</li>').join('');
+  const xnCan = [...new Set((p.chi_tiet || []).flatMap(e => e.xac_nhan || []))];
+  const anh = (p.anh_urls || []).map(u => '<img src="' + esc(u) + '" alt="" loading="lazy" data-anh="' + esc(u) + '">').join('');
+  const nut = toiDuyet(p)
+    ? '<div class="duyet-box"><span class="t">' + (p.khan ? '⚡ Đã áp dụng khẩn — duyệt bù' : 'Phiếu chờ bạn duyệt') + '</span>' +
+        '<button type="button" class="btn btn-do" data-khong="' + p.id + '">Không duyệt</button><button type="button" class="btn btn-ok" data-duyet="' + p.id + '">Duyệt</button></div>'
+    : '';
+  return nut + '<div class="ct-grid" style="margin-top:' + (nut ? '10px' : '0') + '">' +
+    '<div><h4>TD-' + p.id + ' · ' + esc(p.ma_may) + ' · ' + esc(p.ma_sp || '') + (p.so_khuon ? ' · ' + esc(p.so_khuon) : '') + '</h4><table>' + rows + '</table></div>' +
+    '<div><h4>Thông tin</h4><ul>' +
+      '<li>Ghi: ' + esc(fmtTs(p.thoi_diem_ghi)) + ' · ' + esc(p.nguoi_ghi || '') + ' · ' + esc(p.ca || '') + '</li>' +
+      '<li>Lý do: ' + esc(p.ly_do || '') + (p.ma_loi ? ' · ' + esc(p.ma_loi) : '') + '</li>' +
+      (p.ghi_chu ? '<li>Ghi chú: ' + esc(p.ghi_chu) + '</li>' : '') +
+      (p.khan ? '<li>⚡ Lý do khẩn: ' + esc(p.ly_do_khan || '') + '</li>' : '') +
+      (p.thoi_diem_ap_dung ? '<li>Áp dụng: ' + esc(fmtTs(p.thoi_diem_ap_dung)) + '</li>' : '') +
+      (p.ly_do_huy ? '<li>Huỷ: ' + esc(p.ly_do_huy) + '</li>' : '') +
+    '</ul>' + (duyet || cho ? '<h4 style="margin-top:8px">Duyệt</h4><ul>' + duyet + cho + '</ul>' : '') + '</div>' +
+    '<div><h4>IPQC ' + (p.ket_qua_ipqc ? '— ' + esc(p.ket_qua_ipqc) + ' ' + esc(fmtTs(p.thoi_diem_ipqc)) + ' · ' + esc(p.nguoi_kiem || '') : (p.can_ipqc ? '' : '— không cần')) + '</h4>' +
+      (xn ? '<ul>' + xn + '</ul>' : (xnCan.length ? '<ul>' + xnCan.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '')) +
+      (p.id_su_co ? '<div style="margin-top:4px">Sự cố: <a href="su-co-duc.html?q=' + encodeURIComponent(p.id_su_co) + '" target="_blank" rel="noopener">' + esc(p.id_su_co) + ' ↗</a></div>' : '') +
+      (anh ? '<h4 style="margin-top:8px">Ảnh</h4><div class="ph">' + anh + '</div>' : '') + '</div>' +
+  '</div>';
+}
+
+function ve(){
+  const ds = locDs();
+  document.getElementById('dsTitle').textContent = 'Danh sách (' + ds.length + ')';
+  const tb = document.getElementById('tbody');
+  if (!ds.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">Không có phiếu thay đổi nào.</td></tr>'; return; }
+  tb.innerHTML = ds.map(p =>
+    '<tr class="row' + (openId === p.id ? ' open' : '') + '" data-id="' + p.id + '">' +
+      '<td class="nw">' + esc(fmtTs(p.thoi_diem_ghi)) + '<small>TD-' + p.id + '</small></td>' +
+      '<td class="nw"><b>' + esc(p.ma_may) + '</b></td>' +
+      '<td class="nw">' + esc(p.ma_sp || '') + (p.so_khuon ? '<small>' + esc(p.so_khuon) + '</small>' : '') + '</td>' +
+      '<td>' + esc(ThayDoi.tomTat(p.chi_tiet)) + '</td>' +
+      '<td class="hide-m">' + esc(p.ly_do || '') + (p.ma_loi ? '<small>' + esc(p.ma_loi) + '</small>' : '') + '</td>' +
+      '<td class="hide-m nw">' + esc(p.nguoi_ghi || '') + '</td>' +
+      '<td>' + ttHtml(p) + (toiDuyet(p) ? '<small class="vuot">Chờ bạn duyệt</small>' : '') + '</td>' +
+    '</tr>' + (openId === p.id ? '<tr class="ct"><td colspan="7">' + chiTietHtml(p) + '</td></tr>' : '')).join('');
+}
+
+function veMot(){
+  const c = document.getElementById('cardMot');
+  if (!mot) { c.hidden = true; return; }
+  const p = all.find(x => x.id === mot) ;
+  if (!p) { c.hidden = true; return; }
+  c.hidden = false;
+  c.innerHTML = '<div class="card-title">Phiếu TD-' + p.id + ' ' + ttHtml(p) + '</div>' + chiTietHtml(p);
+}
+
+async function duyet(id, dongY){
+  const p = all.find(x => x.id === id);
+  const nd = (p ? p.ma_may + ' · ' + ThayDoi.tomTat(p.chi_tiet) : 'TD-' + id);
+  const gc = await hoiGhiChuDuyet(nd, dongY
+    ? { tieuDe: 'Duyệt thay đổi TD-' + id, nutOk: 'Duyệt' }
+    : { tieuDe: 'Không duyệt TD-' + id, nutOk: 'Không duyệt', nguyHiem: true, batBuoc: true, goiY: 'Lý do không duyệt (bắt buộc)' });
+  if (gc == null) return;
+  const { data, error } = await sb.rpc('duc_td_duyet', { p_id: id, p_dong_y: dongY, p_ghi_chu: gc || null });
+  if (error) return showMsg('⛔ ' + error.message, 'err');
+  showMsg(dongY ? (data && data.trang_thai === 'cho_ap_dung' ? '✅ Đã duyệt — trưởng ca được báo để chỉnh máy.' : '✅ Đã duyệt.') : 'Đã từ chối — trưởng ca được báo.');
+  await tai(); veMot();
+}
+
+document.addEventListener('click', e => {
+  const bd = e.target.closest('[data-duyet]'), bk = e.target.closest('[data-khong]');
+  if (bd) return duyet(Number(bd.dataset.duyet), true);
+  if (bk) return duyet(Number(bk.dataset.khong), false);
+  const im = e.target.closest('img[data-anh]');
+  if (im) { if (window.Qc02View) Qc02View.photo(im.dataset.anh); else window.open(im.dataset.anh, '_blank'); return; }
+  const tr = e.target.closest('tr.row');
+  if (tr) { const id = Number(tr.dataset.id); openId = openId === id ? null : id; ve(); return; }
+  const ch = e.target.closest('.chip[data-nhanh]');
+  if (ch) {
+    document.querySelectorAll('.chip[data-nhanh]').forEach(x => x.classList.toggle('on', x === ch));
+    const d = new Date();
+    document.getElementById('fTu').value = ymd(new Date(d.getTime() - Number(ch.dataset.nhanh) * 86400000));
+    document.getElementById('fDen').value = ymd(d);
+    tai();
+  }
+  if (e.target.closest('#chipToi')) { document.getElementById('chipToi').classList.toggle('on'); ve(); }
+});
+['fMay', 'fNhom', 'fTt'].forEach(id => document.getElementById(id).addEventListener('change', ve));
+document.getElementById('fQ').addEventListener('input', ve);
+['fTu', 'fDen'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+  document.querySelectorAll('.chip[data-nhanh]').forEach(x => x.classList.remove('on')); tai();
+}));
+
+(async () => {
+  const d = new Date();
+  document.getElementById('fTu').value = ymd(new Date(d.getTime() - 30 * 86400000));
+  document.getElementById('fDen').value = ymd(d);
+  quyen = await ThayDoi.taiQuyen();
+  await tai();
+  if (P.get('id')) {
+    mot = Number(P.get('id'));
+    if (!all.some(p => p.id === mot)) {
+      const { data } = await sb.from('duc_thay_doi').select('*').eq('id', mot).maybeSingle();
+      if (data) all.push(data);
+    }
+    veMot();
+  }
+})();
+</script>
+</body>
+</html>
