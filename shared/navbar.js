@@ -108,7 +108,6 @@
     ] },
     { label: 'Sản xuất', items: [
       { label: 'Bảng điều khiển Đúc', href: 'duc-dashboard.html' },
-      { label: 'Điểm thay đổi Đúc', href: 'diem-thay-doi.html' },   // T307
       { label: 'Bảng điều khiển Bavia', href: 'bavia-dashboard.html' },
       { label: 'Bảng điều khiển Gia công', href: 'gia-cong-dashboard.html' },
       { label: 'Bảng điều khiển Sơn', href: 'cong-doan-dashboard.html?cd=S%C6%A1n' },
