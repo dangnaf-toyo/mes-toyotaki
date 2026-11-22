@@ -4,7 +4,7 @@
 // Bảng điều khiển:
 //   ThayDoi.batDau({ onDoi, layDong(idDong) → row, layDongMay(maMay) → row đang chạy })
 //   ThayDoi.badge(maMay)  → html biểu tượng ⏳ / ✋ / ⚠ (bấm mở hộp phiếu của máy)
-//   ThayDoi.nut(row, cls) → html nút "± Thay đổi" (chỉ trưởng ca)
+//   ThayDoi.nut(row, cls) → html nút "± Thay đổi" (trưởng ca + admin, T315)
 // IPQC:
 //   await ThayDoi.ipqcMount(box, idCheckpoint) · ThayDoi.ipqcKiemTra() → '' | lỗi · ThayDoi.ipqcChecklist() → mục checklist
 (function () {
@@ -182,7 +182,7 @@
     const row = typeof opt.layDong === 'function' ? opt.layDong(idDong) : null;
     if (!row || !row.ma_sp) return bao('Máy chưa chạy mã nào.', true);
     await taiQuyen();
-    if (!quyen.ghi) return bao('⛔ Chỉ trưởng ca được ghi phiếu thay đổi.', true);
+    if (!quyen.ghi) return bao('⛔ Chỉ trưởng ca hoặc admin được ghi phiếu thay đổi.', true);
     const ds = await taiMau();
     if (!ds.length) return bao('Chưa có danh mục thay đổi (chưa chạy SQL T307?).', true);
 
