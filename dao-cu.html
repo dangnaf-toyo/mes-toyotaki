@@ -120,7 +120,7 @@ tr.off td{color:var(--text-dim)}
 .bo-tbl td small{min-height:14px}
 .bo-tbl .x{border:none;background:none;color:var(--alarm-fg);font-size:15px;cursor:pointer;padding:2px 6px}
 tr.bo-row{cursor:pointer}tr.bo-row:hover td{background:var(--bg-sunken)}
-.bc-kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.bc-kpi{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:10px}
 .bc-kpi div{border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .bc-kpi span{font-size:11px;color:var(--text-muted)}
 .bc-kpi b{font-family:'JetBrains Mono',monospace;font-size:16px;overflow-wrap:anywhere}
@@ -257,19 +257,21 @@ td.do{color:var(--alarm-fg);font-weight:700}
     <div class="toolbar">
       <button type="button" class="chip on" data-bf="tt">Tuổi thọ</button>
       <button type="button" class="chip" data-bf="cp">Chi phí / SP</button>
+      <button type="button" class="chip" data-bf="pd">Phút dừng</button>
       <span class="lbl">Từ</span><input type="date" id="rTu">
       <span class="lbl">đến</span><input type="date" id="rDen">
       <span class="spacer"></span>
       <button type="button" class="btn btn-outline" id="rXuat">Xuất Excel</button>
       <button type="button" class="info-btn" data-info="iBc" title="Cách tính">ⓘ</button>
     </div>
-    <div class="info-txt" id="iBc" hidden style="margin-bottom:10px"><b>Chi phí dao</b> = SL xuất tủ trong kỳ × đơn giá. <b>CT xong</b> = SL ra bước cuối. <b>Tuổi thọ</b>: các lần thay + xoay cạnh trong kỳ (bỏ lần Đổi mã); mảnh nhiều cạnh tính 1 cạnh. <b>Gợi ý</b> = trung vị các lần Hết tuổi thọ / Mòn sớm, khi có từ 3 lần và lệch chuẩn từ 15%. <b>Áp dụng</b> sửa tuổi thọ ở Bộ dao (chưa khai bộ thì sửa Danh mục). <b>Chi phí / SP</b> = Σ đơn giá × SL lắp × lỗ/CT ÷ tuổi thọ theo bộ dao chuẩn (mảnh nhiều cạnh chia thêm số cạnh).</div>
+    <div class="info-txt" id="iBc" hidden style="margin-bottom:10px"><b>Chi phí dao</b> = SL xuất tủ trong kỳ × đơn giá. <b>CT xong</b> = SL ra bước cuối. <b>Tuổi thọ</b>: các lần thay + xoay cạnh trong kỳ (bỏ lần Đổi mã); mảnh nhiều cạnh tính 1 cạnh. <b>Gợi ý</b> = trung vị các lần Hết tuổi thọ / Mòn sớm, khi có từ 3 lần và lệch chuẩn từ 15%. <b>Áp dụng</b> sửa tuổi thọ ở Bộ dao (chưa khai bộ thì sửa Danh mục). <b>Phút dừng</b> = phút máy dừng ghi lúc Thay / Xoay cạnh, cộng theo máy. <b>Chi phí / SP</b> = Σ đơn giá × SL lắp × lỗ/CT ÷ tuổi thọ theo bộ dao chuẩn (mảnh nhiều cạnh chia thêm số cạnh).</div>
     <div class="bc-kpi">
       <div><span>Chi phí dao</span><b id="rCp">—</b></div>
       <div><span>CT xong</span><b id="rCt">—</b></div>
       <div><span>Đ / CT</span><b id="rDct">—</b></div>
       <div><span>Lần thay</span><b id="rLan">—</b></div>
       <div><span>Gãy · Mẻ</span><b id="rGay" class="do">—</b></div>
+      <div><span>Phút dừng</span><b id="rPd">—</b></div>
     </div>
     <div class="hint" id="rNote" style="margin-bottom:8px"></div>
     <div class="tbl-wrap"><table>
@@ -832,7 +834,7 @@ async function loadXd(){
     '<td style="white-space:nowrap">' + fmtDT(r.lap_luc) + (r.nguon === 'may' ? '<small>có sẵn · đầu ' + fmtNum(r.so_ct_dau) + '</small>' : '') + '</td>' +
     '<td style="white-space:nowrap">' + (r.thao_luc ? fmtDT(r.thao_luc) : '<span class="zero">đang lắp</span>') + '</td>' +
     '<td class="num">' + fmtNum(r.dung) + (Number(r.so_lan_ct) > 1 ? '<small>' + fmtNum(r.ct) + ' CT</small>' : '') + '</td><td class="num">' + (r.tt ? fmtNum(r.tt) : '<span class="zero">—</span>') + '</td>' + pctHtml(r) +
-    '<td>' + esc(r.ly_do_thao || '') + '</td><td>' + esc(XU_LY_TEN[r.xu_ly_cu] || '') + '</td><td>' + esc(r.thao_boi || r.lap_boi || '') + '</td></tr>').join('') ||
+    '<td>' + esc(r.ly_do_thao || '') + (r.phut_dung != null ? '<small>dừng ' + fmtNum(r.phut_dung) + ' phút</small>' : '') + '</td><td>' + esc(XU_LY_TEN[r.xu_ly_cu] || '') + '</td><td>' + esc(r.thao_boi || r.lap_boi || '') + '</td></tr>').join('') ||
     '<tr><td colspan="12" class="empty">' + (xf === 'lap' ? 'Chưa có dao nào được khai trên máy' : 'Chưa có lần thay dao nào') + '</td></tr>';
 }
 function xuatXd(){
@@ -845,14 +847,14 @@ function xuatXd(){
   }
   const rows = xdLs.map(r => ({ 'Máy': r.ma_may, 'Vị trí': r.vi_tri, 'Mã dao': r.ma_dao, 'Tên': r.ten_chuan || '', 'SL': Number(r.so_luong), 'Cạnh': Number(r.so_canh) > 1 ? r.canh + '/' + r.so_canh : '', 'Mã SP': r.ma_sp, 'Bước': r.buoc,
     'Lắp lúc': fmtDT(r.lap_luc), 'Tháo lúc': r.thao_luc ? fmtDT(r.thao_luc) : '', 'Đã chạy': r.dung, 'Tuổi thọ chuẩn': r.tt || '',
-    '%': r.tt ? Math.round(r.dung / r.tt * 100) : '', 'Lý do': r.ly_do_thao || '', 'Dao cũ': XU_LY_TEN[r.xu_ly_cu] || '', 'Người lắp': r.lap_boi, 'Người tháo': r.thao_boi || '', 'Ghi chú': r.ghi_chu }));
+    '%': r.tt ? Math.round(r.dung / r.tt * 100) : '', 'Lý do': r.ly_do_thao || '', 'Phút dừng': r.phut_dung ?? '', 'Dao cũ': XU_LY_TEN[r.xu_ly_cu] || '', 'Người lắp': r.lap_boi, 'Người tháo': r.thao_boi || '', 'Ghi chú': r.ghi_chu }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), xf === 'lap' ? 'Đang lắp' : 'Thay dao');
   XLSX.writeFile(wb, (xf === 'lap' ? 'Dao_dang_lap_' : 'Ly_lich_thay_dao_') + isoDate(new Date()) + '.xlsx');
 }
 
 // ── Báo cáo (T274) ────────────────────────────────────────────────────────────
-let bf = 'tt', bcTt = [], bcCp = [], bcSeq = 0;
+let bf = 'tt', bcTt = [], bcCp = [], bcPd = [], bcSeq = 0;
 const LD_MON = ['Hết tuổi thọ', 'Mòn sớm'];
 async function layHet(mk){
   const out = [];
@@ -875,7 +877,7 @@ async function loadBc(){
   let thao, xuat, tem, bo;
   try {
     [thao, xuat, tem, bo] = await Promise.all([
-      layHet(() => sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,so_luong,ma_sp,buoc,so_ct_thuc_te,so_ct,so_dung_thuc_te,so_dung,so_lan_ct,ly_do_thao,xu_ly_cu,thao_luc').gte('thao_luc', t0).lte('thao_luc', t1).order('id')),
+      layHet(() => sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,so_luong,ma_sp,buoc,so_ct_thuc_te,so_ct,so_dung_thuc_te,so_dung,so_lan_ct,ly_do_thao,xu_ly_cu,thao_luc,phut_dung').gte('thao_luc', t0).lte('thao_luc', t1).order('id')),
       layHet(() => sb.from('gc_dao_cu_giao_dich').select('id,id_dao,so_luong').eq('loai', 'xuat').gte('thoi_diem', t0).lte('thoi_diem', t1).order('id')),
       layHet(() => sb.from('gc_tem_buoc').select('id,ma_sp,buoc,tong_buoc,sl_ra').not('xong_luc', 'is', null).is('bo_luc', null).gte('xong_luc', t0).lte('xong_luc', t1).order('id')),
       layHet(() => sb.from('gc_bo_dao').select('*').order('id')),
@@ -894,6 +896,16 @@ async function loadBc(){
   document.getElementById('rDct').textContent = ctXong ? tien(cp / ctXong) : '—';
   document.getElementById('rLan').textContent = fmtNum(thao.filter(r => r.xu_ly_cu !== 'xoay').length);
   document.getElementById('rGay').textContent = fmtNum(gay);
+  // T313: phút dừng thay / xoay dao theo máy (bỏ lần Đổi mã)
+  const pdG = {};
+  thao.filter(r => r.ly_do_thao !== 'Đổi mã').forEach(r => {
+    const x = pdG[r.ma_may] || (pdG[r.ma_may] = { ma_may: r.ma_may, thay: 0, xoay: 0, phut: 0, coPhut: 0, gay: 0 });
+    if (r.xu_ly_cu === 'xoay') x.xoay++; else x.thay++;
+    if (r.phut_dung != null) { x.phut += Number(r.phut_dung); x.coPhut++; }
+    if (r.ly_do_thao === 'Gãy' || r.ly_do_thao === 'Mẻ') x.gay++;
+  });
+  bcPd = Object.values(pdG).sort((a, b) => b.phut - a.phut || natCmp(a.ma_may, b.ma_may));
+  document.getElementById('rPd').textContent = fmtNum(bcPd.reduce((s, x) => s + x.phut, 0));
   // Tuổi thọ theo SP · bước · vị trí · mã dao
   const g = {};
   thao.filter(r => r.ly_do_thao !== 'Đổi mã').forEach(r => {
@@ -946,6 +958,13 @@ function veBc(){
       '<td class="num">' + (r.goiY != null ? '<span class="gy">' + fmtNum(r.goiY) + '</span>' : '<span class="zero">—</span>') + '</td>' +
       '<td>' + (r.goiY != null && ql ? '<button type="button" class="btn btn-outline btn-sm" data-ad="' + i + '">Áp dụng</button>' : '') + '</td></tr>').join('') ||
       '<tr><td colspan="10" class="empty">Chưa có lần thay dao nào trong kỳ</td></tr>';
+  } else if (bf === 'pd') {
+    th.innerHTML = '<tr><th>Máy</th><th class="num">Lần thay</th><th class="num">Lần xoay</th><th class="num">Tổng phút</th><th class="num">TB / lần</th><th class="num">Gãy · Mẻ</th><th class="num">Chưa ghi phút</th></tr>';
+    tb.innerHTML = bcPd.map(r => '<tr><td><b>' + esc(r.ma_may) + '</b></td><td class="num">' + r.thay + '</td><td class="num' + (r.xoay ? '' : ' zero') + '">' + r.xoay + '</td>' +
+      '<td class="num"><b>' + fmtNum(r.phut) + '</b></td><td class="num">' + (r.coPhut ? fmtNum(Math.round(r.phut / r.coPhut * 10) / 10) : '<span class="zero">—</span>') + '</td>' +
+      '<td class="num' + (r.gay ? ' do' : ' zero') + '">' + r.gay + '</td>' +
+      '<td class="num' + (r.thay + r.xoay - r.coPhut ? '' : ' zero') + '">' + (r.thay + r.xoay - r.coPhut) + '</td></tr>').join('') ||
+      '<tr><td colspan="7" class="empty">Chưa có lần thay / xoay dao nào trong kỳ</td></tr>';
   } else {
     th.innerHTML = '<tr><th>SP · bước</th><th class="num">Vị trí</th><th class="num">CT trong kỳ</th><th class="num">Đ/CT chuẩn</th><th class="num">Đ/CT thực tế</th><th class="num">Chi phí kỳ</th><th class="num">Thiếu giá / tuổi thọ</th></tr>';
     tb.innerHTML = bcCp.map(r => '<tr><td><b>' + esc(r.ma_sp) + '</b> · B' + r.buoc + '<small>' + esc((SP[r.ma_sp] && SP[r.ma_sp].ten_sp) || '') + '</small></td>' +
@@ -976,6 +995,8 @@ function xuatBc(){
     '%': r.chuan ? Math.round(r.tb / r.chuan * 100) : '', 'Gãy · Mẻ': r.gay, 'Gợi ý': r.goiY ?? '' }))), 'Tuổi thọ');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bcCp.map(r => ({ 'Mã SP': r.ma_sp, 'Bước': r.buoc, 'Số vị trí': r.vt, 'CT trong kỳ': r.ct,
     'Đ/CT chuẩn': Math.round(r.chuan), 'Đ/CT thực tế': Math.round(r.tt), 'Chi phí kỳ': Math.round(r.ct * r.tt), 'Thiếu giá / tuổi thọ': r.thieu }))), 'Chi phí SP');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bcPd.map(r => ({ 'Máy': r.ma_may, 'Lần thay': r.thay, 'Lần xoay': r.xoay, 'Tổng phút dừng': r.phut,
+    'TB phút / lần': r.coPhut ? Math.round(r.phut / r.coPhut * 10) / 10 : '', 'Gãy · Mẻ': r.gay, 'Chưa ghi phút': r.thay + r.xoay - r.coPhut }))), 'Phút dừng');
   XLSX.writeFile(wb, 'Bao_cao_dao_cu_' + document.getElementById('rTu').value + '_' + document.getElementById('rDen').value + '.xlsx');
 }
 

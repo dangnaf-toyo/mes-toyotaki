@@ -427,6 +427,7 @@
       <label class="f" id="dmoDauWrap"><span>Đã chạy (chi tiết)</span><input id="dmoDau" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
       <label class="f" id="dmoCanhWrap" hidden><span>Cạnh đang dùng</span><input id="dmoCanh" type="number" min="1" step="1" value="1" inputmode="numeric"></label>
     </div>
+    <label class="f" data-dm="thay xoay"><span>Phút dừng máy</span><input id="dmoPhut" type="number" min="0" max="600" step="1" inputmode="numeric" placeholder="0 nếu không dừng"></label>
     <label class="f" data-dm="thay lap xoay bu"><span>Ghi chú</span><input id="dmoGc" autocomplete="off"></label>
     <div class="err" id="dmoErr"></div>
     <div class="acts">
@@ -1323,7 +1324,7 @@ function moDao(m, kieu, ref) {
   const bo = boCuaMay(m), t = m.tram;
   daoMo = { ma: m.ma_may, kieu, ref };
   document.querySelectorAll('#daoModal [data-dm]').forEach(x => { x.hidden = !x.dataset.dm.split(' ').includes(kieu); });
-  $('#dmoErr').textContent = ''; $('#dmoGc').value = ''; $('#dmoChiThao').checked = false; $('#dmoNguon').value = 'tu'; $('#dmoDau').value = '0'; $('#dmoSl').value = '1'; $('#dmoCanh').value = '1'; $('#dmoLyDoX').value = '';
+  $('#dmoErr').textContent = ''; $('#dmoGc').value = ''; $('#dmoChiThao').checked = false; $('#dmoNguon').value = 'tu'; $('#dmoDau').value = '0'; $('#dmoSl').value = '1'; $('#dmoCanh').value = '1'; $('#dmoLyDoX').value = ''; $('#dmoPhut').value = '';
   if (kieu === 'thay') {
     const d = (DTM[m.ma_may] || []).find(x => x.id === ref); if (!d) return;
     const s = bo.find(x => x.vi_tri === d.vi_tri), p = daoPct(d);
@@ -1372,6 +1373,12 @@ $('#dmoSave').onclick = async () => {
   const t = m.tram, btn = $('#dmoSave'); $('#dmoErr').textContent = '';
   const d = daoMa($('#dmoMa').value), sp = t ? t.ma_sp : '', buoc = buocMay(m);
   let msg = '';
+  // T313: phút dừng máy khi thay / xoay (bắt buộc, 0–600)
+  const phut = () => {
+    const v = String($('#dmoPhut').value).trim();
+    if (v === '' || !/^\d+$/.test(v) || Number(v) > 600) throw loiNV('Nhập số phút dừng máy (0–600)');
+    return Number(v);
+  };
   try {
     btn.disabled = true;
     if (daoMo.kieu === 'thay') {
@@ -1379,8 +1386,9 @@ $('#dmoSave').onclick = async () => {
       if (!$('#dmoLyDo').value) throw loiNV('Chọn lý do thay');
       if (!$('#dmoXuLy').value) throw loiNV('Chọn cách xử lý dao cũ');
       if (!chiThao && !d) throw loiNV('Chọn dao mới đúng danh mục (hoặc tích "Chỉ tháo")');
+      const pd = phut();
       const k = await rpc('gc_dao_thay', { p_id_lap: daoMo.ref, p_ly_do: $('#dmoLyDo').value, p_xu_ly_cu: $('#dmoXuLy').value, p_id_dao_moi: chiThao ? null : d.id,
-        p_so_luong_moi: null, p_ma_sp: sp || null, p_buoc: t ? buoc : null, p_ghi_chu: $('#dmoGc').value });
+        p_so_luong_moi: null, p_ma_sp: sp || null, p_buoc: t ? buoc : null, p_ghi_chu: $('#dmoGc').value, p_phut_dung: pd });
       msg = (chiThao ? 'Đã tháo dao' : 'Đã thay dao') + ' · dao cũ chạy ' + fmt(k.so_dung ?? k.so_ct) + (k.tuoi_tho ? ' / ' + fmt(k.tuoi_tho) : '') + '.';
       if ($('#dmoLyDo').value === 'Gãy') {
         const dl = (m.dang_lam || []).map(b => b.tag_no);
@@ -1396,7 +1404,8 @@ $('#dmoSave').onclick = async () => {
       setFlash('ok', 'Đã ghi bù ' + esc($('#dmoTruc').value) + ' ' + soBu(so) + ' mm — kiểm thùng đầu.');
     } else if (daoMo.kieu === 'xoay') {
       if (!$('#dmoLyDoX').value) throw loiNV('Chọn lý do xoay');
-      const k = await rpc('gc_dao_xoay_canh', { p_id_lap: daoMo.ref, p_ly_do: $('#dmoLyDoX').value, p_ghi_chu: $('#dmoGc').value });
+      const pd = phut();
+      const k = await rpc('gc_dao_xoay_canh', { p_id_lap: daoMo.ref, p_ly_do: $('#dmoLyDoX').value, p_ghi_chu: $('#dmoGc').value, p_phut_dung: pd });
       setFlash('ok', 'Đã xoay sang cạnh ' + k.canh + '/' + k.so_canh + ' · cạnh cũ chạy ' + fmt(k.so_dung ?? k.so_ct) + (k.tuoi_tho ? ' / ' + fmt(k.tuoi_tho) : '') + '.');
     } else if (daoMo.kieu === 'lap') {
       if (!$('#dmoVt').value.trim()) throw loiNV('Nhập vị trí (VD T01)');
