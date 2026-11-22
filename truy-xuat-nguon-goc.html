@@ -137,6 +137,11 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 .mm-r .v{font-weight:600;text-align:right;word-break:break-word}
 .mm-miss{color:var(--text-dim);font-style:italic}
 .mm-cvs{margin-top:4px;padding-top:3px;border-top:1px solid var(--border)}
+/* T312: dao trên máy Gia công lúc thùng Xong */
+.mm-dao{font-size:11px;line-height:1.4;padding:2px 0 0}
+.mm-dao .dr{display:flex;gap:6px;justify-content:space-between}
+.mm-dao .p{font-weight:700;white-space:nowrap}
+.mm-dao .p.v{color:var(--warn-fg)} .mm-dao .p.d{color:var(--alarm-fg)}
 @media (max-width:600px){.mm-n{width:190px}.mm-n.root{width:200px}.mm-e{width:130px}}
 </style>
 </head>
@@ -171,7 +176,7 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 
   <div id="resultArea" style="display:none">
     <div class="card">
-      <h2>Sơ đồ nguồn gốc <span class="info" title="Ô đầu (viền xanh) = tem đang tra. Nhánh sang phải = tem nguồn ở công đoạn trước. Trên đường nối: Tách/Gộp + số lượng + chuyển công đoạn (bấm 🚚 xem người giao/nhận). Thông tin giống tem nguồn chỉ hiện ở tem nguồn.">ⓘ</span></h2>
+      <h2>Sơ đồ nguồn gốc <span class="info" title="Ô đầu (viền xanh) = tem đang tra. Nhánh sang phải = tem nguồn ở công đoạn trước. Trên đường nối: Tách/Gộp + số lượng + chuyển công đoạn (bấm 🚚 xem người giao/nhận). 🔧 Dao = dao trên máy Gia công lúc thùng Xong, % tuổi thọ lúc đó. Thông tin giống tem nguồn chỉ hiện ở tem nguồn.">ⓘ</span></h2>
       <div id="mapNguoc"></div>
     </div>
 
@@ -275,6 +280,14 @@ async function search(raw){
     (ks || []).forEach(k => { khoangSx[k.tag_no] = k; });
   }
   tagHist[tagNo] = histRes.data || [];
+  // T312: dao đang lắp trên máy Gia công lúc từng thùng Xong.
+  daoTheoTem = {};
+  const { data: daoRows } = await sb.rpc('gc_tem_dao', { p_tags: [...allTags] });
+  (daoRows || []).forEach(r => {
+    const k = r.buoc + '|' + r.ma_may + '|' + r.xong_luc;
+    const m = (daoTheoTem[r.tag_no] = daoTheoTem[r.tag_no] || {});
+    (m[k] = m[k] || { buoc: r.buoc, may: r.ma_may, luc: r.xong_luc, sl: r.sl_ra, dao: [] }).dao.push(r);
+  });
   renderMap(tagNo, edges, tagInfo, tagLoc, tagHist, tinhGioSxGoc(tagNo, edges, tagInfo));
   showMsg('✅ Đã tra cứu ' + tagNo, 'ok');
 }
@@ -286,6 +299,24 @@ async function search(raw){
 // máy/mã SP hoặc đầu ca → lúc đầy thùng); "ngay" trên tem là ngày lịch lúc in
 // nên tem in sau 0h thuộc Ca đêm của ngày hôm trước.
 let laTemGoc = () => true;
+let daoTheoTem = {};
+// T312: mỗi bước Gia công đã Xong = 1 dòng gọn, bấm mở danh sách dao lúc đó.
+function daoHtml(tag){
+  const m = daoTheoTem[tag];
+  if (!m) return '';
+  return Object.values(m).map(g => {
+    const max = Math.max(...g.dao.map(d => Number(d.pct) || 0));
+    const cls = max >= 100 ? 'd' : max >= 80 ? 'v' : '';
+    return '<details class="mm-cv"><summary>🔧 Dao B' + g.buoc + ' · ' + escapeHtml(g.may) + '<br>' + escapeHtml(fmtNgan(g.luc)) +
+      ' · ' + g.dao.length + ' dao' + (cls ? ' <span class="st ' + (cls === 'd' ? 'tc' : 'cho') + '">' + max + '%</span>' : '') + '</summary>' +
+      '<div class="mm-dao">' + g.dao.map(d => {
+        const p = d.pct == null ? '—' : d.pct + '%';
+        const c = Number(d.pct) >= 100 ? ' d' : Number(d.pct) >= 80 ? ' v' : '';
+        return '<div class="dr"><span>' + escapeHtml(d.vi_tri) + ' · ' + escapeHtml(d.ma_dao) +
+          (Number(d.so_canh) > 1 ? ' · C' + d.canh + '/' + d.so_canh : '') + '</span><span class="p' + c + '">' + p + '</span></div>';
+      }).join('') + '</div></details>';
+  }).join('');
+}
 let khoangSx = {};
 function nhanCa(k){ return k && k.ca ? k.ca + ' ' + fmtDateVN(k.ngay_ca).slice(0, 5) : ''; }
 function gioSxTemGoc(t){
@@ -422,7 +453,7 @@ function mmNode(tag, ctx, opts){
   const loc = (isRoot || Number(info.so_luong) > 0) ? ctx.tagLoc[tag] : '';
   if (loc) rows.push(mmRow('Vị trí', '<span class="badge-loc">' + escapeHtml(loc) + '</span>', true));
   else if (isRoot) rows.push(mmRow('Vị trí', '<span class="node-meta">Chưa chuyển CĐ</span>', true));
-  const cv = (opts && opts.hienChuyen) ? (ctx.tagHist[tag] || []).map(chuyenHtml).join('') : '';
+  const cv = daoHtml(tag) + ((opts && opts.hienChuyen) ? (ctx.tagHist[tag] || []).map(chuyenHtml).join('') : '');
   return '<div class="mm-n' + (isRoot ? ' root' : '') + '" style="--cd:' + mauCongDoan(cd) + '">' +
     '<div class="mm-h"><span class="mm-cd">' + escapeHtml(cd) + '</span><span class="mm-sl">còn ' + fmtNum(info.so_luong) + '</span></div>' +
     '<div class="mm-tag"><span class="tag-chip">' + escapeHtml(tag) + '</span></div>' +
