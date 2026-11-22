@@ -1192,7 +1192,7 @@ const natCmp = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'vi', { 
 const daoId = id => DAO.find(x => Number(x.id) === Number(id));
 const daoMa = s => { s = String(s || '').trim().toUpperCase(); return DAO.find(x => x.ma_dao.toUpperCase() === s); };
 async function taiDao(caDanhMuc) {
-  const viec = [sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,ten_chuan,so_luong,ma_sp,buoc,lap_luc,so_ct,tuoi_tho,so_lan_ct,tuoi_tho_theo').is('thao_luc', null).range(0, 4999)];
+  const viec = [sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,ten_chuan,so_luong,ma_sp,buoc,lap_luc,so_ct,so_dung,tuoi_tho,so_lan_ct,tuoi_tho_theo').is('thao_luc', null).range(0, 4999)];
   if (caDanhMuc) viec.push(
     sb.from('gc_dao_cu').select('id,ma_dao,ten_chuan,quy_cach,ton_moi,tuoi_tho_chuan,tuoi_tho_theo,dang_dung').range(0, 4999),
     sb.from('gc_bo_dao').select('ma_sp,buoc,vi_tri,id_dao,so_luong').range(0, 9999),
@@ -1219,10 +1219,12 @@ function buocMay(m) {
   const r = (RT[t.ma_sp] || []).slice().sort((x, y) => x.buoc - y.buoc).find(x => x.loai_may === loaiMayGc(m));
   return r ? Number(r.buoc) : 1;
 }
+// T308: số lần dùng (lỗ ren tính theo mã SP từng thùng) — view gc_dao_tren_may_v.so_dung
+const daoDung = r => Number(r.so_dung ?? (Number(r.so_ct) * Number(r.so_lan_ct || 1)));
 function daoPct(r) {
   const tt = Number(r.tuoi_tho || 0);
   if (!tt || r.tuoi_tho_theo === 'khong') return null;
-  return Math.round(Number(r.so_ct) * Number(r.so_lan_ct || 1) / tt * 100);
+  return Math.round(daoDung(r) / tt * 100);
 }
 const daoMuc = r => { const p = daoPct(r); return p == null ? '' : p >= 100 ? 'do' : p >= 80 ? 'vang' : ''; };
 function daoMucMay(ma) { const ds = DTM[ma] || []; return ds.some(r => daoMuc(r) === 'do') ? 'do' : ds.some(r => daoMuc(r) === 'vang') ? 'vang' : ''; }
@@ -1249,7 +1251,7 @@ function daoHtml(m) {
       return '<div class="dao-r trong"><div class="vt">' + esc(vt) + '</div><div class="nm"><b>' + esc(dc.ma_dao || '') + '</b><small>Trống · ' + esc(dc.ten_chuan || '') + '</small></div><div class="lf"></div>' +
         (q ? '<button class="tiny" type="button" data-lapvt="' + esc(vt) + '">Lắp</button>' : '<span></span>') + '</div>';
     }
-    const p = daoPct(d), muc = daoMuc(d), dung = Number(d.so_ct) * Number(d.so_lan_ct || 1), lr = d.tuoi_tho_theo === 'lo_ren' ? ' lỗ' : '';
+    const p = daoPct(d), muc = daoMuc(d), dung = daoDung(d), lr = d.tuoi_tho_theo === 'lo_ren' ? ' lỗ' : '';
     return '<div class="dao-r ' + muc + '"><div class="vt">' + esc(vt) + '</div>' +
       '<div class="nm"><b>' + esc(d.ma_dao) + '</b>' + (s && Number(s.id_dao) !== Number(d.id_dao) ? ' <span class="chip warn">khác bộ</span>' : '') + '<small>' + esc(d.ten_chuan || '') + (Number(d.so_luong) !== 1 ? ' · SL ' + fmt(d.so_luong) : '') + ' · lắp ' + dmy(d.lap_luc) + '</small></div>' +
       '<div class="lf">' + (p != null ? fmt(dung) + ' / ' + fmt(d.tuoi_tho) + lr + ' · <b>' + p + '%</b><div class="bar"><i style="width:' + Math.min(p, 100) + '%"></i></div>' : fmt(dung) + lr + (d.tuoi_tho_theo === 'khong' ? '' : ' · chưa có tuổi thọ')) + '</div>' +
@@ -1272,7 +1274,7 @@ function moDao(m, kieu, ref) {
     const d = (DTM[m.ma_may] || []).find(x => x.id === ref); if (!d) return;
     const s = bo.find(x => x.vi_tri === d.vi_tri), p = daoPct(d);
     $('#dmoTitle').textContent = 'Thay dao ' + d.vi_tri + ' · ' + m.ma_may;
-    $('#dmoSub').innerHTML = '<b>' + esc(d.ma_dao) + '</b> ' + esc(d.ten_chuan || '') + ' · đã chạy ' + fmt(Number(d.so_ct) * Number(d.so_lan_ct || 1)) + (d.tuoi_tho ? ' / ' + fmt(d.tuoi_tho) + (p != null ? ' (' + p + '%)' : '') : '');
+    $('#dmoSub').innerHTML = '<b>' + esc(d.ma_dao) + '</b> ' + esc(d.ten_chuan || '') + ' · đã chạy ' + fmt(daoDung(d)) + (d.tuoi_tho ? ' / ' + fmt(d.tuoi_tho) + (p != null ? ' (' + p + '%)' : '') : '');
     $('#dmoLyDo').value = p != null && p >= 100 ? 'Hết tuổi thọ' : '';
     $('#dmoXuLy').value = p != null && p >= 100 ? 'mai' : '';
     $('#dmoMa').value = (daoId(s ? s.id_dao : d.id_dao) || {}).ma_dao || '';
@@ -1312,7 +1314,7 @@ $('#dmoSave').onclick = async () => {
       if (!chiThao && !d) throw loiNV('Chọn dao mới đúng danh mục (hoặc tích "Chỉ tháo")');
       const k = await rpc('gc_dao_thay', { p_id_lap: daoMo.ref, p_ly_do: $('#dmoLyDo').value, p_xu_ly_cu: $('#dmoXuLy').value, p_id_dao_moi: chiThao ? null : d.id,
         p_so_luong_moi: null, p_ma_sp: sp || null, p_buoc: t ? buoc : null, p_ghi_chu: $('#dmoGc').value });
-      msg = (chiThao ? 'Đã tháo dao' : 'Đã thay dao') + ' · dao cũ chạy ' + fmt(k.so_ct) + (k.tuoi_tho ? ' / ' + fmt(k.tuoi_tho) : '') + '.';
+      msg = (chiThao ? 'Đã tháo dao' : 'Đã thay dao') + ' · dao cũ chạy ' + fmt(k.so_dung ?? k.so_ct) + (k.tuoi_tho ? ' / ' + fmt(k.tuoi_tho) : '') + '.';
       if ($('#dmoLyDo').value === 'Gãy') {
         const dl = (m.dang_lam || []).map(b => b.tag_no);
         setFlash('warn', '⚠ Dao gãy — kiểm tra lại chi tiết vừa gia công' + (dl.length ? ' trong thùng ' + esc(dl.join(', ')) : '') + '. ' + esc(msg));
