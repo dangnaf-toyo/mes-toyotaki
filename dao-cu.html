@@ -794,7 +794,7 @@ async function loadXd(){
   const q = khongDau(document.getElementById('xTim').value.trim());
   xdLs = (data || []).map(r => {
     const ct = r.thao_luc ? Number(r.so_ct_thuc_te ?? r.so_ct) : Number(r.so_ct);
-    return Object.assign(r, { ct, tt: r.thao_luc ? (r.tuoi_tho_luc_thao ?? r.tuoi_tho) : r.tuoi_tho, dung: ct * Number(r.so_lan_ct || 1) });
+    return Object.assign(r, { ct, tt: r.thao_luc ? (r.tuoi_tho_luc_thao ?? r.tuoi_tho) : r.tuoi_tho, dung: r.thao_luc ? Number(r.so_dung_thuc_te ?? r.so_dung ?? ct * Number(r.so_lan_ct || 1)) : Number(r.so_dung ?? ct * Number(r.so_lan_ct || 1)) });
   }).filter(r => !q || khongDau([r.ma_may, r.vi_tri, r.ma_dao, r.ten_chuan, r.ma_sp, r.ly_do_thao, r.lap_boi, r.thao_boi].join(' ')).includes(q));
   if (xf === 'lap') xdLs.sort((a, b) => natCmp(a.ma_may, b.ma_may) || natCmp(a.vi_tri, b.vi_tri));
   document.getElementById('xDem').textContent = xdLs.length + (xf === 'lap' ? ' dao đang lắp' : ' lần thay');
@@ -840,7 +840,7 @@ async function loadBc(){
   let thao, xuat, tem, bo;
   try {
     [thao, xuat, tem, bo] = await Promise.all([
-      layHet(() => sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,so_luong,ma_sp,buoc,so_ct_thuc_te,so_ct,so_lan_ct,ly_do_thao,thao_luc').gte('thao_luc', t0).lte('thao_luc', t1).order('id')),
+      layHet(() => sb.from('gc_dao_tren_may_v').select('id,ma_may,vi_tri,id_dao,ma_dao,so_luong,ma_sp,buoc,so_ct_thuc_te,so_ct,so_dung_thuc_te,so_dung,so_lan_ct,ly_do_thao,thao_luc').gte('thao_luc', t0).lte('thao_luc', t1).order('id')),
       layHet(() => sb.from('gc_dao_cu_giao_dich').select('id,id_dao,so_luong').eq('loai', 'xuat').gte('thoi_diem', t0).lte('thoi_diem', t1).order('id')),
       layHet(() => sb.from('gc_tem_buoc').select('id,ma_sp,buoc,tong_buoc,sl_ra').not('xong_luc', 'is', null).is('bo_luc', null).gte('xong_luc', t0).lte('xong_luc', t1).order('id')),
       layHet(() => sb.from('gc_bo_dao').select('*').order('id')),
@@ -864,7 +864,7 @@ async function loadBc(){
   thao.filter(r => r.ly_do_thao !== 'Đổi mã').forEach(r => {
     const k = boKey(r.ma_sp, r.buoc, r.vi_tri, r.id_dao);
     const x = g[k] || (g[k] = { k, ma_sp: r.ma_sp, buoc: r.buoc, vi_tri: r.vi_tri, id_dao: r.id_dao, ma_dao: r.ma_dao, ds: [], mon: [], gay: 0 });
-    const v = Number(r.so_ct_thuc_te ?? r.so_ct ?? 0) * Number(r.so_lan_ct || 1);
+    const v = Number(r.so_dung_thuc_te ?? r.so_dung ?? Number(r.so_ct_thuc_te ?? r.so_ct ?? 0) * Number(r.so_lan_ct || 1));
     x.ds.push(v);
     if (LD_MON.includes(r.ly_do_thao)) x.mon.push(v);
     if (r.ly_do_thao === 'Gãy' || r.ly_do_thao === 'Mẻ') x.gay++;
