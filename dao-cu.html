@@ -237,6 +237,7 @@ td.do{color:var(--alarm-fg);font-weight:700}
     <div class="toolbar">
       <button type="button" class="chip on" data-xf="thao">Đã thay</button>
       <button type="button" class="chip" data-xf="lap">Đang lắp</button>
+      <button type="button" class="chip" data-xf="bu">Bù dao</button>
       <span class="lbl" data-xt>Từ</span><input type="date" id="xTu" data-xt>
       <span class="lbl" data-xt>đến</span><input type="date" id="xDen" data-xt>
       <input type="search" id="xTim" placeholder="Máy / mã dao / SP / lý do" style="width:200px">
@@ -245,9 +246,9 @@ td.do{color:var(--alarm-fg);font-weight:700}
       <button type="button" class="btn btn-outline" id="xXuat">Xuất Excel</button>
       <button type="button" class="info-btn" data-info="iXd" title="Ghi chú">ⓘ</button>
     </div>
-    <div class="info-txt" id="iXd" hidden style="margin-bottom:10px">Thay / lắp dao làm ở <b>Bảng điều khiển Gia công</b> (khối Dao trên máy). Số chi tiết = số đầu lúc lắp + SL ra các thùng bấm Xong trên máy. <b>%</b> = đã chạy so với tuổi thọ chuẩn — dùng để chỉnh lại tuổi thọ chuẩn.</div>
+    <div class="info-txt" id="iXd" hidden style="margin-bottom:10px">Thay / lắp dao làm ở <b>Bảng điều khiển Gia công</b> (khối Dao trên máy). Số chi tiết = số đầu lúc lắp + SL ra các thùng bấm Xong trên máy. <b>%</b> = đã chạy so với tuổi thọ chuẩn — dùng để chỉnh lại tuổi thọ chuẩn. <b>Bù dao</b>: mỗi lần bù + kết quả kiểm thùng đầu sau đó.</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Máy</th><th>Vị trí</th><th>Mã · tên</th><th>SP · bước</th><th>Lắp</th><th>Tháo</th><th class="num">Đã chạy</th><th class="num">Chuẩn</th><th class="num">%</th><th>Lý do</th><th>Dao cũ</th><th>Người</th></tr></thead>
+      <thead id="thXd"><tr><th>Máy</th><th>Vị trí</th><th>Mã · tên</th><th>SP · bước</th><th>Lắp</th><th>Tháo</th><th class="num">Đã chạy</th><th class="num">Chuẩn</th><th class="num">%</th><th>Lý do</th><th>Dao cũ</th><th>Người</th></tr></thead>
       <tbody id="tbXd"><tr><td colspan="12" class="empty">Đang tải...</td></tr></tbody>
     </table></div>
   </section>
@@ -779,8 +780,33 @@ function pctHtml(r){
   const p = Math.round(Number(r.dung) / tt * 100);
   return '<td class="num"><span class="pct' + (p >= 100 ? ' do' : p >= 80 ? ' vang' : '') + '">' + p + '%</span></td>';
 }
+const TH_XD = '<tr><th>Máy</th><th>Vị trí</th><th>Mã · tên</th><th>SP · bước</th><th>Lắp</th><th>Tháo</th><th class="num">Đã chạy</th><th class="num">Chuẩn</th><th class="num">%</th><th>Lý do</th><th>Dao cũ</th><th>Người</th></tr>';
+const TH_BU = '<tr><th>Lúc</th><th>Máy</th><th>Vị trí</th><th>Mã dao</th><th>Trục</th><th class="num">Bù (mm)</th><th>Lý do</th><th>Thùng đầu</th><th>Người</th><th>Ghi chú</th></tr>';
+const TRUC_TEN = { X: 'X', Y: 'Y', Z: 'Z', H: 'H (dài)', D: 'D (bán kính)' };
+const soBu = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(Number(n)).toFixed(3).replace('.', ',');
+function tdTxt(t){ return !t ? '' : !t.ket_qua ? 'Chờ kiểm' : (t.ket_qua === 'dat' ? 'Đạt' : 'Không đạt') + (t.tag_no ? ' · ' + t.tag_no : ''); }
+async function loadBu(){
+  const tb = document.getElementById('tbXd');
+  let req = sb.from('gc_dao_bu').select('*, gc_thung_dau(ket_qua,tag_no,kiem_boi,ghi_chu)').order('luc', { ascending: false }).limit(3000);
+  const tu = document.getElementById('xTu').value, den = document.getElementById('xDen').value;
+  if (tu) req = req.gte('luc', tu + 'T00:00:00+07:00');
+  if (den) req = req.lte('luc', den + 'T23:59:59+07:00');
+  const { data, error } = await req;
+  if (error) { tb.innerHTML = '<tr><td colspan="10" class="empty">Lỗi: ' + esc(error.message) + '</td></tr>'; return; }
+  const q = khongDau(document.getElementById('xTim').value.trim());
+  xdLs = (data || []).filter(r => !q || khongDau([r.ma_may, r.vi_tri, r.ma_dao, r.ly_do, r.nguoi, r.ghi_chu].join(' ')).includes(q));
+  document.getElementById('xDem').textContent = xdLs.length + ' lần bù';
+  tb.innerHTML = xdLs.map(r => { const t = r.gc_thung_dau;
+    return '<tr><td style="white-space:nowrap">' + fmtDT(r.luc) + '</td><td style="white-space:nowrap">' + esc(r.ma_may) + '</td><td class="mk">' + esc(r.vi_tri) + '</td><td class="mk">' + esc(r.ma_dao) + '</td>' +
+      '<td>' + esc(TRUC_TEN[r.truc] || r.truc) + '</td><td class="num">' + soBu(r.so_bu) + '</td><td>' + esc(r.ly_do) + '</td>' +
+      '<td' + (t && t.ket_qua === 'khong_dat' ? ' style="color:var(--alarm-fg)"' : '') + '>' + esc(tdTxt(t)) + (t && t.ghi_chu ? '<small>' + esc(t.ghi_chu) + '</small>' : '') + '</td>' +
+      '<td>' + esc(r.nguoi) + '</td><td>' + esc(r.ghi_chu || '') + '</td></tr>'; }).join('') ||
+    '<tr><td colspan="10" class="empty">Chưa có lần bù dao nào</td></tr>';
+}
 async function loadXd(){
   const tb = document.getElementById('tbXd');
+  document.getElementById('thXd').innerHTML = xf === 'bu' ? TH_BU : TH_XD;
+  if (xf === 'bu') { document.querySelectorAll('[data-xt]').forEach(x => { x.hidden = false; }); tb.innerHTML = '<tr><td colspan="10" class="empty">Đang tải...</td></tr>'; return loadBu(); }
   tb.innerHTML = '<tr><td colspan="12" class="empty">Đang tải...</td></tr>';
   document.querySelectorAll('[data-xt]').forEach(x => { x.hidden = xf !== 'thao'; });
   let req;
@@ -810,6 +836,13 @@ async function loadXd(){
     '<tr><td colspan="12" class="empty">' + (xf === 'lap' ? 'Chưa có dao nào được khai trên máy' : 'Chưa có lần thay dao nào') + '</td></tr>';
 }
 function xuatXd(){
+  if (xf === 'bu') {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(xdLs.map(r => ({ 'Lúc': fmtDT(r.luc), 'Máy': r.ma_may, 'Vị trí': r.vi_tri, 'Mã dao': r.ma_dao, 'Trục': TRUC_TEN[r.truc] || r.truc,
+      'Bù (mm)': Number(r.so_bu), 'Lý do': r.ly_do, 'Thùng đầu': tdTxt(r.gc_thung_dau), 'Ghi chú kiểm': (r.gc_thung_dau || {}).ghi_chu || '', 'Người kiểm': (r.gc_thung_dau || {}).kiem_boi || '',
+      'Người bù': r.nguoi, 'Ghi chú': r.ghi_chu }))), 'Bù dao');
+    return XLSX.writeFile(wb, 'Bu_dao_' + isoDate(new Date()) + '.xlsx');
+  }
   const rows = xdLs.map(r => ({ 'Máy': r.ma_may, 'Vị trí': r.vi_tri, 'Mã dao': r.ma_dao, 'Tên': r.ten_chuan || '', 'SL': Number(r.so_luong), 'Cạnh': Number(r.so_canh) > 1 ? r.canh + '/' + r.so_canh : '', 'Mã SP': r.ma_sp, 'Bước': r.buoc,
     'Lắp lúc': fmtDT(r.lap_luc), 'Tháo lúc': r.thao_luc ? fmtDT(r.thao_luc) : '', 'Đã chạy': r.dung, 'Tuổi thọ chuẩn': r.tt || '',
     '%': r.tt ? Math.round(r.dung / r.tt * 100) : '', 'Lý do': r.ly_do_thao || '', 'Dao cũ': XU_LY_TEN[r.xu_ly_cu] || '', 'Người lắp': r.lap_boi, 'Người tháo': r.thao_boi || '', 'Ghi chú': r.ghi_chu }));
