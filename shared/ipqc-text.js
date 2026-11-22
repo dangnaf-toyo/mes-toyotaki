@@ -21,7 +21,7 @@
 (function () {
   const DAU = /^IPQC (phát hiện NG khi kiểm tra|cảnh báo NG \(cho sản xuất tiếp\) lúc kiểm tra)/;
   const NHAN = { loai: ' — loại kiểm: ', hm: ' — Hạng mục không đạt: ', gc: ' — Ghi chú IPQC: ' };
-  const LOAI = { dinh_ky: 'định kỳ', sau_su_co: 'sau sự cố', doi_khuon: 'đổi khuôn' };
+  const LOAI = { dinh_ky: 'định kỳ', sau_su_co: 'sau sự cố', doi_khuon: 'đổi khuôn', sau_thay_doi: 'sau thay đổi' };
   const GC_THUA = /^(yêu cầu |đề nghị )?(bộ phận |bp |bộ )?(đúc )?(xử|sử) lý( giúp| ạ| nhé)?[.!]*$/i;
 
   function doan(s, nhan){

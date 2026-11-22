@@ -380,6 +380,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 <script src="shared/khuon-nam-van-de.js"></script>
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/su-co-mau.js?v=T302"></script>
+<script src="shared/thay-doi.js?v=T307"></script>
 <script src="shared/navbar.js"></script>
 <script>
 const TEM_PRINT_URL = 'intem.html';
@@ -989,6 +990,7 @@ async function loadShiftState(){
     if (document.getElementById('scr-detail').classList.contains('active') && state.currentIdDong) {
       openMachineDetail(state.currentIdDong, true);
     }
+    batDauThayDoiM();   // T307
   } catch (e) {
     hideOverlay();
     showToast('Lỗi mạng: ' + e.message, true);
@@ -1107,6 +1109,20 @@ function getActiveRowForMachine(maMay){
   return rows[0];
 }
 
+// T307: điểm thay đổi chủ động — bật 1 lần sau lần tải dữ liệu đầu tiên.
+function batDauThayDoiM(){
+  if (!window.ThayDoi || state.thayDoiBat) return;
+  state.thayDoiBat = true;
+  ThayDoi.batDau({
+    onDoi: () => {
+      renderMachineList();
+      if (document.getElementById('scr-detail').classList.contains('active') && state.currentIdDong) openMachineDetail(state.currentIdDong, true);
+    },
+    layDong: id => state.rows.find(r => r.id_dong === id) || null,
+    layDongMay: m => getActiveRowForMachine(m),
+  });
+}
+
 function renderMachineList(){
   const wrap = document.getElementById('machine-list');
   const q = (document.getElementById('search-machine').value || '').trim().toLowerCase();
@@ -1143,6 +1159,7 @@ function renderMachineList(){
         <div class="mcard-sp">${escapeHtml(row.ma_sp)} — ${escapeHtml(row.ten_sp||'')}</div>
         <div class="mcard-meta">TT ${fmtNum(row.tt_ca)} / KH ${fmtNum(row.kh_ca)} (${pct}%)</div>
         ${ipqcMeta}
+        ${window.ThayDoi && ThayDoi.badge(m) ? '<div class="mcard-meta">' + ThayDoi.badge(m) + '</div>' : ''}
       </div>
       <span class="mcard-badge ${st}">${badgeLabel}</span><span class="mcard-arrow">›</span>
     </div>`;
@@ -1218,6 +1235,12 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
   } else {
     btns.push(`<button class="action-btn danger" onclick="openIncidentScreen()"><span class="ic">⚠</span>Báo sự cố<span class="chev">›</span></button>`);
     btns.push(`<button class="action-btn" onclick="openChangeProductScreen()"><span class="ic">⇄</span>Đổi sản phẩm<span class="chev">›</span></button>`);
+  }
+  // T307: điểm thay đổi chủ động
+  if (window.ThayDoi) {
+    const nTd = ThayDoi.mo.filter(p => p.ma_may === row.ma_may).length;
+    if (ThayDoi.quyen && ThayDoi.quyen.ghi) btns.push(`<button class="action-btn" onclick='ThayDoi.moGhi(${JSON.stringify(idDong)})'><span class="ic">±</span>Thay đổi (điều kiện, khuôn, máy…)<span class="chev">›</span></button>`);
+    if (nTd) btns.push(`<button class="action-btn" onclick='ThayDoi.xemMay(${JSON.stringify(row.ma_may)})'><span class="ic">⚠</span>Thay đổi đang mở (${nTd})<span class="chev">›</span></button>`);
   }
   btns.push(`<button class="action-btn" onclick="openShotScreen()"><span class="ic">🔢</span>Nhập Shot / NG<span class="chev">›</span></button>`);
   btns.push(`<button class="action-btn" onclick="openTemPrintMobile()"><span class="ic">🖨</span>In tem QR<span class="chev">›</span></button>`);

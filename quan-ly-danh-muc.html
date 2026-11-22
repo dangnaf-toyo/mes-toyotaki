@@ -145,6 +145,7 @@
       <button class="tab-btn" data-tab="nvl">Nguyên vật liệu</button>
       <button class="tab-btn" data-tab="bom">BOM</button>
       <button class="tab-btn" data-tab="suco">Sự cố Đúc</button>
+      <button class="tab-btn" data-tab="thaydoi">Thay đổi Đúc</button>
       <button class="tab-btn" data-tab="taillieu">Phân quyền tài liệu</button>
       <button class="tab-btn" data-tab="quytac">Quy tắc đặt tên</button>
     </div>
@@ -426,6 +427,64 @@
               </div>
             </div>
             <div class="form-actions"><button type="submit" id="suco-submit">Thêm vấn đề</button></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── T307: Tab Thay đổi Đúc — danh mục điểm thay đổi chủ động (bảng duc_thay_doi_mau) ── -->
+    <section id="tab-thaydoi" class="tab-pane" style="display:none">
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="thaydoi-search" placeholder="Lọc nhanh trong bảng…" autocomplete="off">
+        <select class="list-filter" id="thaydoi-filt-nhom"></select>
+        <select class="list-filter" id="thaydoi-filt-duyet"></select>
+        <select class="list-filter" id="thaydoi-filt-hieu_luc"></select>
+        <button type="button" class="btn-reset" id="thaydoi-clear">Xoá lọc</button>
+        <span class="list-count" id="thaydoi-count"></span>
+        <span class="muted" title="Mỗi mục là 1 lựa chọn ở nút ± Thay đổi (Bảng điều khiển Đúc). Ngưỡng %: trong ± ngưỡng so với giá trị chuẩn thì trưởng ca tự chỉnh, vượt thì người duyệt duyệt. Bỏ tick Đang dùng để ẩn mà không xoá." style="cursor:help">ⓘ</span>
+        <a class="btn-reset" href="diem-thay-doi.html" style="text-decoration:none">Lịch sử</a>
+        <button type="button" class="btn-add" id="thaydoi-add">＋ Thêm mới</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="thaydoi-table" style="display:none">
+            <thead id="thaydoi-thead"></thead>
+            <tbody id="thaydoi-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="thaydoi-empty" style="display:none">Chưa có mục nào.</div>
+      </div>
+
+      <div class="modal-overlay" id="thaydoi-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="thaydoi-form-title">Thêm mục thay đổi</h2>
+          <div class="msg" id="thaydoi-msg"></div>
+          <form id="thaydoi-form">
+            <div class="form-grid">
+              <div><label for="thaydoi-nhom">Nhóm</label><select id="thaydoi-nhom" required></select></div>
+              <div><label for="thaydoi-ma">Mã</label><input type="text" autocomplete="off" id="thaydoi-ma" required maxlength="8" placeholder="Tự điền theo nhóm"></div>
+              <div style="grid-column:1/-1"><label for="thaydoi-ten">Tên mục</label><input type="text" autocomplete="off" id="thaydoi-ten" required maxlength="80" placeholder="vd: Tốc độ pha 2"></div>
+              <div><label for="thaydoi-kieu">Kiểu nhập</label><select id="thaydoi-kieu"><option value="so">Số (Trước → Sau)</option><option value="chu">Chữ (Trước → Sau)</option></select></div>
+              <div><label for="thaydoi-donvi">Đơn vị</label><input type="text" autocomplete="off" id="thaydoi-donvi" maxlength="12" placeholder="vd: MPa"></div>
+              <div><label for="thaydoi-duyet">Người duyệt</label><select id="thaydoi-duyet"></select></div>
+              <div><label for="thaydoi-nguong">Ngưỡng tự chỉnh ±%</label><input type="number" min="0.1" step="0.1" id="thaydoi-nguong" placeholder="trống = luôn duyệt"></div>
+              <div><label for="thaydoi-thutu">Thứ tự</label><input type="number" min="0" step="1" id="thaydoi-thutu"></div>
+              <div>
+                <label>IPQC / trạng thái</label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:4px 0">
+                  <input type="checkbox" id="thaydoi-ipqc" style="width:auto" checked> Cần IPQC kiểm
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text);padding:4px 0">
+                  <input type="checkbox" id="thaydoi-hieuluc" style="width:auto" checked> Đang dùng
+                </label>
+              </div>
+              <div style="grid-column:1/-1">
+                <label for="thaydoi-xacnhan">Nội dung xác nhận chất lượng <span class="muted" style="font-weight:400">— mỗi dòng 1 ý, IPQC chọn Đạt / Không đạt từng dòng</span></label>
+                <textarea id="thaydoi-xacnhan" rows="4" placeholder="Cắt 1 SP kiểm rỗ khí&#10;Bavia mặt phân khuôn"></textarea>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" id="thaydoi-submit">Thêm mục</button></div>
           </form>
         </div>
       </div>
@@ -912,6 +971,122 @@ initCatalog({
   ],
 });
 
+// ══ T307: Tab Thay đổi Đúc (duc_thay_doi_mau) ═════════════════════════════
+const TDM_NHOM = [['dieu_kien', 'Điều kiện đúc', 'D'], ['khuon', 'Khuôn', 'K'], ['may', 'Máy', 'M'], ['vat_lieu', 'Vật liệu', 'V'], ['khac', 'Người & khác', 'N']];
+const TDM_DUYET = { khong: 'Không cần', ky_thuat: 'Kỹ thuật', thiet_bi: 'Thiết bị', to_truong_khuon: 'Tổ trưởng khuôn', qlbp_duc: 'QLBP Đúc', qa: 'QA' };
+const tdmTen = k => (TDM_NHOM.find(x => x[0] === k) || [k, k])[1];
+const tdmViTri = k => { const i = TDM_NHOM.findIndex(x => x[0] === k); return i < 0 ? 99 : i; };
+const tdmDuyetHtml = r => r.tu_chon ? 'Trưởng ca chọn'
+  : (r.nguong_pct != null ? 'Trong ±' + String(r.nguong_pct).replace('.', ',') + '%: tự chỉnh<br>Vượt: ' + escapeHtml(TDM_DUYET[r.nguoi_duyet] || r.nguoi_duyet) : escapeHtml(TDM_DUYET[r.nguoi_duyet] || r.nguoi_duyet));
+let tdmEditing = null, tdmTuChon = false;
+document.getElementById('thaydoi-nhom').innerHTML = '<option value="">-- Chọn nhóm --</option>' + TDM_NHOM.map(x => `<option value="${x[0]}">${escapeHtml(x[1])}</option>`).join('');
+document.getElementById('thaydoi-duyet').innerHTML = Object.entries(TDM_DUYET).map(([k, v]) => `<option value="${k}">${escapeHtml(v)}</option>`).join('');
+function tdmKieu(){
+  const so = document.getElementById('thaydoi-kieu').value === 'so';
+  document.getElementById('thaydoi-nguong').disabled = !so;
+  if (!so) document.getElementById('thaydoi-nguong').value = '';
+}
+document.getElementById('thaydoi-kieu').addEventListener('change', tdmKieu);
+function tdmResetForm(){
+  tdmEditing = null; tdmTuChon = false;
+  clearMsg('thaydoi-msg');
+  document.getElementById('thaydoi-form').reset();
+  document.getElementById('thaydoi-ipqc').checked = true;
+  document.getElementById('thaydoi-hieuluc').checked = true;
+  document.getElementById('thaydoi-kieu').value = 'chu';
+  document.getElementById('thaydoi-duyet').value = 'khong';
+  document.getElementById('thaydoi-ma').disabled = false;
+  tdmKieu();
+  document.getElementById('thaydoi-form-title').textContent = 'Thêm mục thay đổi';
+  document.getElementById('thaydoi-submit').textContent = 'Thêm mục';
+}
+function tdmFillForm(r){
+  tdmEditing = r.ma; tdmTuChon = !!r.tu_chon;
+  clearMsg('thaydoi-msg');
+  document.getElementById('thaydoi-nhom').value = r.nhom;
+  document.getElementById('thaydoi-ma').value = r.ma;
+  document.getElementById('thaydoi-ma').disabled = true;
+  document.getElementById('thaydoi-ten').value = r.ten || '';
+  document.getElementById('thaydoi-kieu').value = r.kieu_nhap;
+  document.getElementById('thaydoi-donvi').value = r.don_vi || '';
+  document.getElementById('thaydoi-duyet').value = r.nguoi_duyet || 'khong';
+  document.getElementById('thaydoi-nguong').value = r.nguong_pct ?? '';
+  document.getElementById('thaydoi-thutu').value = r.thu_tu ?? '';
+  document.getElementById('thaydoi-ipqc').checked = !!r.can_ipqc;
+  document.getElementById('thaydoi-hieuluc').checked = r.hieu_luc !== false;
+  document.getElementById('thaydoi-xacnhan').value = (r.xac_nhan || []).join('\n');
+  tdmKieu();
+  document.getElementById('thaydoi-nguong').value = r.nguong_pct ?? '';
+  document.getElementById('thaydoi-form-title').textContent = 'Sửa mục: ' + r.ma + (r.tu_chon ? ' (trưởng ca tự chọn IPQC / người duyệt)' : '');
+  document.getElementById('thaydoi-submit').textContent = 'Lưu thay đổi';
+}
+// Thêm mới: chọn nhóm → gợi ý mã kế tiếp + thứ tự cuối.
+document.getElementById('thaydoi-nhom').addEventListener('change', e => {
+  if (tdmEditing) return;
+  const k = e.target.value; if (!k) return;
+  const tienTo = (TDM_NHOM.find(x => x[0] === k) || [])[2] || 'X';
+  const cung = catalogs.thaydoi.rows().filter(r => r.nhom === k && !r.tu_chon);
+  const so = Math.max(0, ...catalogs.thaydoi.rows().filter(r => r.ma.startsWith(tienTo) && /^\d+$/.test(r.ma.slice(1))).map(r => parseInt(r.ma.slice(1), 10))) + 1;
+  document.getElementById('thaydoi-ma').value = tienTo + String(so).padStart(2, '0');
+  document.getElementById('thaydoi-thutu').value = Math.max(0, ...cung.map(r => r.thu_tu || 0)) + 1;
+  if (k === 'dieu_kien') { document.getElementById('thaydoi-kieu').value = 'so'; document.getElementById('thaydoi-duyet').value = 'ky_thuat'; tdmKieu(); document.getElementById('thaydoi-nguong').value = 5; }
+});
+document.getElementById('thaydoi-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nhom = document.getElementById('thaydoi-nhom').value;
+  const ma = document.getElementById('thaydoi-ma').value.trim().toUpperCase();
+  const ten = document.getElementById('thaydoi-ten').value.trim().replace(/\s+/g, ' ');
+  const kieu = document.getElementById('thaydoi-kieu').value;
+  const nguongRaw = document.getElementById('thaydoi-nguong').value.trim();
+  const ipqc = document.getElementById('thaydoi-ipqc').checked;
+  const xac_nhan = [...new Set(document.getElementById('thaydoi-xacnhan').value.split('\n').map(x => x.trim().replace(/\s+/g, ' ')).filter(Boolean))];
+  const ttRaw = document.getElementById('thaydoi-thutu').value.trim();
+  if (!nhom || !ma || !ten) return showMsg('thaydoi-msg', 'error', 'Nhập đủ Nhóm, Mã, Tên mục');
+  const trung = catalogs.thaydoi.rows().find(r => r.ma !== tdmEditing && r.ten.toLowerCase() === ten.toLowerCase());
+  if (trung) return showMsg('thaydoi-msg', 'error', 'Tên mục này đã có: ' + trung.ma);
+  if (ipqc && !xac_nhan.length && !tdmTuChon) return showMsg('thaydoi-msg', 'error', 'Cần IPQC thì phải có ít nhất 1 nội dung xác nhận');
+  const nguong = kieu === 'so' && nguongRaw ? Number(nguongRaw) : null;
+  if (nguong != null && !(nguong > 0)) return showMsg('thaydoi-msg', 'error', 'Ngưỡng % phải > 0');
+  const duyet = document.getElementById('thaydoi-duyet').value;
+  if (nguong != null && duyet === 'khong') return showMsg('thaydoi-msg', 'error', 'Có ngưỡng % thì phải chọn người duyệt khi vượt ngưỡng');
+  const payload = {
+    nhom, ten, kieu_nhap: kieu, don_vi: document.getElementById('thaydoi-donvi').value.trim() || null,
+    can_ipqc: ipqc, xac_nhan: ipqc ? xac_nhan : [], nguoi_duyet: duyet, nguong_pct: nguong,
+    hieu_luc: document.getElementById('thaydoi-hieuluc').checked, thu_tu: ttRaw ? parseInt(ttRaw, 10) : 0,
+    nguoi_sua: (await MesAuth.getCurrentUserIdentity()) || null,
+  };
+  let error;
+  if (tdmEditing) ({ error } = await sb.from('duc_thay_doi_mau').update(payload).eq('ma', tdmEditing));
+  else ({ error } = await sb.from('duc_thay_doi_mau').insert({ ma, ...payload }));
+  if (error) return showMsg('thaydoi-msg', 'error', 'Lỗi: ' + error.message + (/duplicate key/.test(error.message) ? ' (mã đã có)' : ''));
+  toast(tdmEditing ? 'Đã lưu ' + ma : 'Đã thêm ' + ma);
+  catalogs.thaydoi.close();
+  catalogs.thaydoi.reload();
+});
+initCatalog({
+  id: 'thaydoi',
+  emptyText: 'Chưa có mục nào.',
+  fetch: () => sb.from('duc_thay_doi_mau').select('*'),
+  pk: r => r.ma + ' — ' + r.ten,
+  resetForm: tdmResetForm,
+  fillForm: tdmFillForm,
+  remove: r => sb.from('duc_thay_doi_mau').delete().eq('ma', r.ma),
+  filters: [
+    { k: 'nhom', label: 'Nhóm', valOf: r => r.nhom, fmt: v => tdmTen(v) },
+    { k: 'duyet', label: 'Người duyệt', valOf: r => r.tu_chon ? 'tu_chon' : r.nguoi_duyet, fmt: v => v === 'tu_chon' ? 'Trưởng ca chọn' : (TDM_DUYET[v] || v) },
+    { k: 'hieu_luc', label: 'Trạng thái', valOf: r => r.hieu_luc === false ? 'Đã ẩn' : 'Đang dùng' },
+  ],
+  columns: [
+    { k: 'nhom', label: 'Nhóm', sortable: true, sortVal: r => tdmViTri(r.nhom) * 1000 + (r.thu_tu || 0), text: r => tdmTen(r.nhom), render: r => escapeHtml(tdmTen(r.nhom)) },
+    { k: 'ma', label: 'Mã', sortable: true, sortVal: r => r.ma, text: r => r.ma, render: r => escapeHtml(r.ma) },
+    { k: 'ten', label: 'Mục', sortable: true, sortVal: r => r.ten, text: r => r.ten, render: r => '<b>' + escapeHtml(r.ten) + '</b>' + (r.don_vi ? ' <span class="muted">(' + escapeHtml(r.don_vi) + ')</span>' : '') + (r.hieu_luc === false ? ' <span class="muted">(đã ẩn)</span>' : '') },
+    { k: 'duyet', label: 'Người duyệt', text: r => TDM_DUYET[r.nguoi_duyet] || '', render: r => '<span style="font-size:12px">' + tdmDuyetHtml(r) + '</span>' },
+    { k: 'ipqc', label: 'IPQC', sortable: true, sortVal: r => !!r.can_ipqc, text: r => r.can_ipqc ? 'ipqc' : '', render: r => r.tu_chon ? '<span class="muted">Tự chọn</span>' : (r.can_ipqc ? '✔' : DASH) },
+    { k: 'xac_nhan', label: 'Nội dung xác nhận', text: r => (r.xac_nhan || []).join(' '), render: r => (r.xac_nhan || []).length ? '<span style="font-size:12px">' + r.xac_nhan.map(escapeHtml).join('<br>') + '</span>' : DASH },
+    { k: 'updated_at', label: 'Sửa lần cuối', sortable: true, sortVal: r => r.updated_at || '', text: r => r.nguoi_sua || '', render: r => '<span style="font-size:12px">' + (r.updated_at ? new Date(r.updated_at).toLocaleDateString('vi-VN') : '') + (r.nguoi_sua ? '<br>' + escapeHtml(r.nguoi_sua) : '') + '</span>' },
+  ],
+});
+
 // ══ Tab Sản phẩm ══════════════════════════════════════════════════════════
 // Quy trình công đoạn chọn qua dropdown (không cho gõ tay) để tránh sai chính
 // tả — sai tên công đoạn sẽ làm chuyencongdoan.html không nhận ra được bước
@@ -1288,6 +1463,7 @@ async function main(){
   catalogs.sp.reload();
   catalogs.ns.reload();
   catalogs.suco.reload();
+  catalogs.thaydoi.reload();
   KhuonDs.mount(document.getElementById('khuon-ds'), { admin: true, userName: (await MesAuth.getCurrentUserIdentity()) || '' });
   loadDocPermissions();
 }

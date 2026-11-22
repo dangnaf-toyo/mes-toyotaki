@@ -965,6 +965,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/khuon-can-thiep.js?v=T261"></script>
 <script src="shared/su-co-mau.js?v=T302"></script>
+<script src="shared/thay-doi.js?v=T307"></script>
 <script src="shared/navbar.js"></script>
 <script>
 /* ============================================================================
@@ -1972,6 +1973,7 @@ async function loadShiftState(showLoader){
     loadKanbanProgress();
     updateLiveStatus('');
     startPolling();
+    batDauThayDoi();   // T307
   } catch (e) {
     if (requestId !== state.currentRequestId) return;
     hideOverlay(); onError(e);
@@ -2169,6 +2171,14 @@ async function fetchShiftState(){
   // T232: sự cố còn thiếu bước gì mới đóng được (cùng quy tắc server duc_resolve_incident).
   const dieuKien = await taiDieuKienDong(rows.map(r => r.open_id_su_co).concat(...rows.map(r => r.su_co_phu.map(x => x.id_su_co))));
   return { rows, incidents, warnings, anhCount, giaoQc, canThiep, dieuKien };
+}
+
+// T307: điểm thay đổi chủ động — nút "± Thay đổi" (trưởng ca) + biểu tượng trên ô máy.
+function batDauThayDoi(){
+  if (!window.ThayDoi || state.thayDoiBat) return;
+  state.thayDoiBat = true;
+  const dongMay = m => state.rows.filter(r => r.ma_may === m && r.ma_sp).sort((a, b) => (b._rowIndex || 0) - (a._rowIndex || 0))[0] || null;
+  ThayDoi.batDau({ onDoi: renderTable, layDong: id => state.rows.find(r => r.id_dong === id) || null, layDongMay: dongMay });
 }
 
 function startPolling(){
@@ -2536,7 +2546,7 @@ function makeRowHTML(row, stateClass, isActive){
   // Form NỘP kết quả kiểm nằm ở ipqc-dashboard.html (file riêng, chưa làm).
   let ipqcBadge = '';
   if (row.ipqc_cho_kiem) {
-    const IPQC_LOAI_LABEL = { dinh_ky: 'định kỳ', sau_su_co: 'sau sự cố', doi_khuon: 'lên khuôn/SP mới' };
+    const IPQC_LOAI_LABEL = { dinh_ky: 'định kỳ', sau_su_co: 'sau sự cố', doi_khuon: 'lên khuôn/SP mới', sau_thay_doi: 'sau thay đổi' };
     const lvl = row.ipqc_phut_cho >= 90 ? 'alarm' : (row.ipqc_phut_cho >= 30 ? 'warn' : 'ok');
     ipqcBadge = '<span class="badge-ipqc-wait ' + lvl + '" title="Đang chờ IPQC kiểm tra (' +
       escapeHtml(IPQC_LOAI_LABEL[row.ipqc_loai_kiem] || row.ipqc_loai_kiem) + ') — đã ' + row.ipqc_phut_cho +
@@ -2551,7 +2561,8 @@ function makeRowHTML(row, stateClass, isActive){
       '📥 Kanban: ' + kb.done + '/' + (kb.done + kb.pending) + ' thùng · ' + fmtNum(kb.pcs) + ' pcs</span>';
   }
 
-  const machineHTML = '<span class="name">' + escapeHtml(row.ma_may) + '</span>' + swapBtn + closedBadge + extendBadge + ipqcBadge + kanbanNoteHTML;
+  const tdBadge = (isActive && window.ThayDoi) ? ThayDoi.badge(row.ma_may) : '';   // T307: điểm thay đổi đang mở
+  const machineHTML = '<span class="name">' + escapeHtml(row.ma_may) + '</span>' + swapBtn + closedBadge + extendBadge + ipqcBadge + tdBadge + kanbanNoteHTML;
 
   const moldBadge = _renderMoldBadge(row);
   const moldIssueBadge = _renderMoldIssueBadge(row);
@@ -2629,10 +2640,11 @@ function makeRowHTML(row, stateClass, isActive){
     }).join('') +
       (isActive && list.length < SU_CO_MO_TOI_DA
         ? '<button class="no-issue-add" onclick=\'openAddIncidentModal(' + idDongJson + ')\'>+ Thêm sự cố khác (' + list.length + '/' + SU_CO_MO_TOI_DA + ')</button>'
-        : '');
+        : '') + (isActive && window.ThayDoi ? ThayDoi.nut(row, 'no-issue-add') : '');
   } else if (isActive) {
     issueHTML = '<span class="running-badge">Đang chạy ổn định</span>' +
-      '<button class="no-issue-add" onclick=\'openAddIncidentModal(' + idDongJson + ')\'>+ Thêm sự cố nếu phát sinh</button>';
+      '<button class="no-issue-add" onclick=\'openAddIncidentModal(' + idDongJson + ')\'>+ Thêm sự cố nếu phát sinh</button>' +
+      (window.ThayDoi ? ThayDoi.nut(row, 'no-issue-add') : '');
   } else {
     issueHTML = '<span class="no-plan-note" style="font-size:11px">SP đã kết thúc trong ca (' + fmtNum(row.tt_ca) + '/' + fmtNum(row.kh_ca) + ')</span>';
   }

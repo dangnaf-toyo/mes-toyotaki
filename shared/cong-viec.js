@@ -58,11 +58,11 @@
     cap_nhat_viec: 'Cập nhật', mo_lai: 'Mở lại', huy_viec: 'Huỷ việc', binh_luan: 'Bình luận',
     gop_y: 'Góp ý', nhac_ten: 'Nhắc tên', qua_han: 'Quá hạn', giao_mau: 'Đã giao mẫu', giao_mau_cham: 'IPQC kiểm chậm',
     // T162 — thông báo từ các luồng phê duyệt sẵn có (KHSX, BD khuôn, IPQC, NCP, tài liệu).
-    can_duyet: 'Chờ bạn duyệt', da_duyet: 'Đã duyệt', tu_choi_duyet: 'Bị từ chối',
+    can_duyet: 'Chờ bạn duyệt', da_duyet: 'Đã duyệt', tu_choi_duyet: 'Bị từ chối', thay_doi: 'Kiểm sau thay đổi',
   };
   /** Nguồn của thông báo (cột cv_thong_bao.nguon, T162); null/thiếu = 'cong_viec'. */
   const NGUON_THONG_BAO = {
-    cong_viec: 'Công việc', khsx: 'KH sản xuất', bd_khuon: 'BD khuôn', ipqc: 'IPQC', ncp: 'NCP', tai_lieu: 'Tài liệu', tieu_chuan: 'Tiêu chuẩn',
+    cong_viec: 'Công việc', khsx: 'KH sản xuất', bd_khuon: 'BD khuôn', ipqc: 'IPQC', ncp: 'NCP', tai_lieu: 'Tài liệu', tieu_chuan: 'Tiêu chuẩn', thay_doi: 'Thay đổi Đúc',
   };
   /** URL tương đối để mở 1 thông báo: lien_ket (nguồn phê duyệt) hoặc trang chi tiết việc; null nếu không có. */
   function lienKetThongBao(tb) {
