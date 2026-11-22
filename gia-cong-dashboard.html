@@ -1243,7 +1243,7 @@ function daoHtml(m) {
     ' <button class="info-btn" type="button" data-info="daoInfo" title="Cách tính">ⓘ</button><span style="flex:1"></span>' +
     (q && trong.length ? '<button class="tiny" type="button" id="daoLapBo">Lắp theo bộ · ' + trong.length + '</button>' : '') +
     (q ? '<button class="tiny" type="button" id="daoLap">Lắp dao</button>' : '') + '</div>' +
-    '<div class="info-txt" id="daoInfo" hidden>Số chi tiết tự cộng khi bấm <b>Xong</b> thùng trên máy (huỷ Xong thì trừ lại). Vàng ≥ 80% tuổi thọ, đỏ ≥ 100%. Mảnh nhiều cạnh: bấm <b>Xoay</b> sang cạnh mới, số chi tiết tính lại từ 0. ' +
+    '<div class="info-txt" id="daoInfo" hidden>Số chi tiết tự cộng khi bấm <b>Xong</b> thùng trên máy (huỷ Xong thì trừ lại). Vàng ≥ 80% tuổi thọ, đỏ ≥ 100%. Mảnh nhiều cạnh: bấm <b>Xoay</b> sang cạnh mới, số chi tiết tính lại từ 0. Chuông: 80% báo tổ trưởng, 100% báo tổ trưởng + quản lý, nhắc mỗi 24 giờ tới khi thay. ' +
     (t ? 'Bộ dao chuẩn ' + esc(t.ma_sp) + ' bước ' + buocMay(m) + ': ' + (bo.length ? bo.length + ' vị trí' : 'chưa khai') + ' — ' : '') +
     'khai ở <a href="dao-cu.html?tab=bo-dao" target="_blank">Kho dao cụ → Bộ dao</a>. Thay / lắp: trưởng ca trở lên.</div>';
   if (!vts.length) return h + '<div class="empty-box">Chưa khai dao trên máy.' + (q ? ' Bấm <b>Lắp dao</b>' + (bo.length ? ' hoặc <b>Lắp theo bộ</b>' : '') + '.' : '') + '</div>';
@@ -1364,7 +1364,7 @@ function tick() {
   await MesAuth.requireAuth();
   const g = goiYNgayCa();
   $('#fNgay').value = g.ngay; $('#fCa').value = g.ca;
-  sel = lsGet('gcdb_may', null);
+  sel = new URLSearchParams(location.search).get('may') || lsGet('gcdb_may', null);   // T310: chuông dao mở thẳng máy
   $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; reasons = {}; ngOpen = testOpen = null; stopForm = false; taiLai(); };
   $('#btnReload').onclick = () => { flash = null; taiLai(); };
   try { await taiDanhMuc(); } catch (e) { console.error(e); }
