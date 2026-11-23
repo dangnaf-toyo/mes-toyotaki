@@ -381,6 +381,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/su-co-mau.js?v=T302"></script>
 <script src="shared/thay-doi.js?v=T315"></script>
+<script src="shared/dk-duc.js?v=T322"></script>
 <script src="shared/navbar.js?v=T320"></script>
 <script>
 const TEM_PRINT_URL = 'intem.html';
@@ -991,6 +992,9 @@ async function loadShiftState(){
       openMachineDetail(state.currentIdDong, true);
     }
     batDauThayDoiM();   // T307
+    if (window.DkDuc) DkDuc.batDau(() => {   // T322
+      if (document.getElementById('scr-detail').classList.contains('active') && state.currentIdDong) openMachineDetail(state.currentIdDong, true);
+    });
   } catch (e) {
     hideOverlay();
     showToast('Lỗi mạng: ' + e.message, true);
@@ -1241,6 +1245,12 @@ function openMachineDetail(idDong, isRefresh, maMayNoPlan){
     const nTd = ThayDoi.mo.filter(p => p.ma_may === row.ma_may).length;
     if (ThayDoi.quyen && ThayDoi.quyen.ghi) btns.push(`<button class="action-btn" onclick='ThayDoi.moGhi(${JSON.stringify(idDong)})'><span class="ic">±</span>Thay đổi (điều kiện, khuôn, máy…)<span class="chev">›</span></button>`);
     if (nTd) btns.push(`<button class="action-btn" onclick='ThayDoi.xemMay(${JSON.stringify(row.ma_may)})'><span class="ic">⚠</span>Thay đổi đang mở (${nTd})<span class="chev">›</span></button>`);
+  }
+  // T322: phiếu điều kiện đúc hiệu lực của mã SP đang chạy
+  if (window.DkDuc && DkDuc.daTai && row.ma_sp) {
+    btns.push(DkDuc.co(row.ma_may, row.ma_sp)
+      ? `<a class="action-btn" target="_blank" rel="noopener" style="text-decoration:none" href="${DkDuc.link(row.ma_may, row.ma_sp)}"><span class="ic">📋</span>Điều kiện đúc<span class="chev">›</span></a>`
+      : `<a class="action-btn" target="_blank" rel="noopener" style="opacity:.5;text-decoration:none" href="${DkDuc.link(row.ma_may, row.ma_sp)}"><span class="ic">📋</span>Chưa có ĐK đúc<span class="chev">›</span></a>`);
   }
   btns.push(`<button class="action-btn" onclick="openShotScreen()"><span class="ic">🔢</span>Nhập Shot / NG<span class="chev">›</span></button>`);
   btns.push(`<button class="action-btn" onclick="openTemPrintMobile()"><span class="ic">🖨</span>In tem QR<span class="chev">›</span></button>`);
