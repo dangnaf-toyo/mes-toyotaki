@@ -13,7 +13,9 @@
   Danh sách phiếu (Mã SP × Máy) · Xem ?id=N (hoặc ?ma_may=&ma_sp= → lần hiệu lực) · Lập ?moi=1 · Sửa ?id=N&sua=1.
   Ghi qua hàm DB T319: duc_dk_luu / gui / kiem / duyet / huy_nhap, quyền duc_dk_quyen.
   Ảnh: bucket su-co-duc/dieu-kien-duc/ (nén như ảnh sự cố). Tệp PDF/Excel: bucket cong-viec/dieu-kien-duc/.
-  Bước 5 (Lần mới, So sánh, In, Excel) chưa làm.
+  T321 Bước 5: Lần mới (duc_dk_lan_moi → mở sửa nháp) · So sánh ?ss=A&voi=B (tô dòng khác) · In A4 dọc (#vIn + @media print, ô ký 3 bước)
+  · Excel: xuất 1 phiếu (SheetJS, tải khi cần) — file xuất cũng là mẫu nhập; Nhập Excel ở form Lập/Sửa → điền form, bấm Lưu = nháp.
+  Mẫu Excel: cột A = mã thông số (VL01…) / loại dụng cụ (DT, OL…) / nhãn "Máy", "Mã SP", "Lý do ban hành"; Chuẩn cột D, Ghi chú cột I, mã dụng cụ cột C.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -124,6 +126,36 @@ dialog.xn{position:fixed;inset:0;margin:auto;height:fit-content;border:0;border-
 dialog.xn::backdrop{background:rgba(15,23,42,.45)}
 dialog.xn p{white-space:pre-line;margin-bottom:12px}
 dialog.xn .nut{justify-content:flex-end}
+table.ss td.khac{background:#FEF9C3;font-weight:700}
+table.ss tr.nh td{background:var(--bg-sunken);font-weight:700;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+table.ss.chi-khac tr.giong{display:none}
+.ss-chon{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;margin-top:8px}
+.ss-chon .f small{color:var(--text-muted);font-size:11px}
+#vIn{display:none}
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  html,body{background:#fff!important;padding:0!important;min-height:0}
+  body>*:not(#vIn){display:none!important}
+  #vIn{display:block;font-size:9pt;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #vIn .in-dau{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:6px}
+  #vIn .in-dau h1{font-size:15pt;letter-spacing:.02em}
+  #vIn .in-dau small{font-size:8pt;letter-spacing:.1em}
+  #vIn .in-so{text-align:right;font-weight:700;font-size:10.5pt}
+  #vIn table{width:100%;border-collapse:collapse}
+  #vIn th,#vIn td{border:1px solid #555;padding:2px 4px;text-align:left;vertical-align:top}
+  #vIn .in-tt th{width:16%;background:#EEE}
+  #vIn .in-luoi{columns:2;column-gap:5mm;margin-top:6px}
+  #vIn .in-ts{break-inside:avoid;margin-bottom:5px}
+  #vIn .in-ts .nh th{background:#DDD;font-size:9pt}
+  #vIn .in-ts td.r{text-align:right;white-space:nowrap;font-weight:700}
+  #vIn .in-ts td.n{white-space:nowrap}
+  #vIn .in-ghi{font-size:7.5pt;color:#333;margin-top:2px}
+  #vIn .in-chua{border:1.5px solid #000;padding:3px 6px;font-weight:700;text-align:center;margin-top:6px}
+  #vIn .in-ky{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm;margin-top:8px;break-inside:avoid}
+  #vIn .ky{border:1px solid #555;padding:4px;text-align:center}
+  #vIn .ky .cho{height:15mm}
+  #vIn .in-chan{margin-top:4px;font-size:7.5pt;color:#555;text-align:right}
+}
 @media (max-width:640px){.filters input[type=search]{flex:1;min-width:0}.hide-m{display:none}.ts td:first-child,.ts th:first-child{min-width:120px;max-width:150px}}
 </style>
 </head>
@@ -132,6 +164,8 @@ dialog.xn .nut{justify-content:flex-end}
 <dialog class="xn" id="dlgXn"><p id="xnNd"></p><div class="nut"><button type="button" class="btn btn-outline" id="xnHuy">Huỷ</button><button type="button" class="btn" id="xnOk">Đồng ý</button></div></dialog>
 <input type="file" id="fileAnh" accept="image/*" multiple hidden>
 <input type="file" id="fileTep" accept=".pdf,.xlsx,.xls,.doc,.docx" multiple hidden>
+<input type="file" id="fileXlsx" accept=".xlsx,.xls" hidden>
+<div id="vIn"></div>
 <div class="wrap">
   <header>
     <div class="brand"><div class="co">Toyotaki</div><div class="title">⚙ Điều kiện đúc</div></div>
@@ -325,14 +359,15 @@ async function taiPhieu(id){
   return ph;
 }
 function hienDong(t, gt){ return !t.phu_thuoc || (gt[t.phu_thuoc] && gt[t.phu_thuoc].gia_tri_chu === 'co'); }
-function giaTriXem(t, p){
+function giaTriTho(t, p){   // chữ thô (chưa esc)
   const g = p.gt[t.ma_ts];
-  if (t.kieu === 'chon_nvl') return p.ma_nvl ? esc(p.ma_nvl) : '';
+  if (t.kieu === 'chon_nvl') return p.ma_nvl || '';
   if (!g) return '';
   if (t.kieu === 'co_khong') return g.gia_tri_chu === 'co' ? 'Có' : g.gia_tri_chu === 'khong' ? 'Không' : '';
-  if (t.kieu === 'so') return esc(soVi(g.chuan));
-  return esc(g.gia_tri_chu || '');
+  if (t.kieu === 'so') return soVi(g.chuan);
+  return g.gia_tri_chu || '';
 }
+function giaTriXem(t, p){ return esc(giaTriTho(t, p)); }
 function bangXem(p, loai){
   return '<div class="luoi">' + Object.keys(NHOM).map(nh => {
     const ds = tsApDung(loai).filter(t => t.nhom === nh && hienDong(t, p.gt));
@@ -350,10 +385,15 @@ function bangXem(p, loai){
       }).join('') + '</tbody></table></div></section>';
   }).join('') + '</div>';
 }
+function nguoiBuoc(p){
+  return {
+    lap: lsCuoi(p, ['gui']) || lsCuoi(p, ['lap', 'lan_moi']),
+    kiem: ['cho_duyet', 'hieu_luc', 'het_hieu_luc'].includes(p.trang_thai) ? lsCuoi(p, ['kiem_dong_y']) : null,
+    duyet: ['hieu_luc', 'het_hieu_luc'].includes(p.trang_thai) ? lsCuoi(p, ['duyet_dong_y']) : null,
+  };
+}
 function buocHtml(p){
-  const lap = lsCuoi(p, ['gui']) || lsCuoi(p, ['lap', 'lan_moi']);
-  const kiem = ['cho_duyet', 'hieu_luc', 'het_hieu_luc'].includes(p.trang_thai) ? lsCuoi(p, ['kiem_dong_y']) : null;
-  const duyet = ['hieu_luc', 'het_hieu_luc'].includes(p.trang_thai) ? lsCuoi(p, ['duyet_dong_y']) : null;
+  const { lap, kiem, duyet } = nguoiBuoc(p);
   const o = (ten, e, xong, dang) => '<div class="b' + (xong ? ' xong' : dang ? ' dang' : '') + '"><b>' + (xong ? '✓ ' : '') + ten + '</b>' +
     (e ? '<small>' + esc(e.nguoi || '') + '</small><small>' + esc(fmtTs(e.luc)) + '</small>' : '<small>' + (dang ? 'Đang chờ' : '—') + '</small>') + '</div>';
   const daGui = p.trang_thai !== 'nhap';
@@ -386,6 +426,10 @@ async function veXem(id){
   let nut = '';
   if (p.trang_thai === 'nhap' && quyen.lap) nut = '<button type="button" class="btn btn-outline" data-act="sua">Sửa</button><button type="button" class="btn" data-act="gui">Gửi</button>' +
     (laLap ? '<button type="button" class="btn btn-do" data-act="huy">Xoá nháp</button>' : '');
+  const mo = cacLan.find(x => ['nhap', 'cho_kiem', 'cho_duyet'].includes(x.trang_thai));
+  if (quyen.lap && ['hieu_luc', 'het_hieu_luc'].includes(p.trang_thai) && !mo) nut += '<button type="button" class="btn btn-outline" data-act="lanmoi">Lần mới</button>';
+  if (cacLan.length > 1) nut += '<button type="button" class="btn btn-outline" data-act="ss">So sánh</button>';
+  nut += '<button type="button" class="btn btn-outline" data-act="in">In</button><button type="button" class="btn btn-outline" data-act="xlsx">Excel</button>';
   const choKiem = p.trang_thai === 'cho_kiem' && quyen.kiem, choDuyet = p.trang_thai === 'cho_duyet' && quyen.duyet;
   let hop = '';
   if ((choKiem || choDuyet) && p.nguoi_lap !== uid)
@@ -422,6 +466,13 @@ async function veXem(id){
     if (act === 'gui') return gui(p);
     if (act === 'huy') return huyNhap(p);
     if (act === 'dongy' || act === 'tra') return kiemDuyet(p, act === 'dongy');
+    if (act === 'lanmoi') return lanMoi(p);
+    if (act === 'in') return inPhieu(p);
+    if (act === 'xlsx') return xuatExcel(p).catch(err => showMsg('⛔ ' + (err.message || err), 'err'));
+    if (act === 'ss') {
+      const truoc = cacLan.filter(x => x.lan < p.lan).pop(), sau = cacLan.find(x => x.lan > p.lan);
+      return truoc ? urlDi('ss=' + truoc.id + '&voi=' + p.id) : urlDi('ss=' + p.id + '&voi=' + sau.id);
+    }
   };
 }
 async function gui(p){
@@ -502,7 +553,9 @@ function veForm(){
         '<div class="tep" id="eTep" style="margin-top:6px"></div></section>') +
     '<section class="card"><div class="nut"><button type="button" class="btn" id="eLuu"' + (chuaChon ? ' disabled' : '') + '>Lưu</button>' +
       '<button type="button" class="btn btn-ok" id="eGui"' + (chuaChon ? ' disabled' : '') + '>Lưu + Gửi</button>' +
-      '<button type="button" class="btn btn-outline" id="eHuy">Huỷ</button></div></section>';
+      '<button type="button" class="btn btn-outline" id="eHuy">Huỷ</button><span class="sp"></span>' +
+      '<button type="button" class="btn btn-outline" id="eMau"' + (chuaChon ? ' disabled' : '') + ' title="Tải file Excel theo nội dung đang nhập (dùng làm mẫu)">⬇ Mẫu Excel</button>' +
+      '<button type="button" class="btn btn-outline" id="eNhap" title="Điền form từ file Excel mẫu">⬆ Nhập Excel</button></div></section>';
   if (moi) {
     $('eMay').onchange = () => { docForm(); ed.ma_may = $('eMay').value; ed.dc = {}; veForm(); };
     $('eSp').onchange = () => {
@@ -514,6 +567,8 @@ function veForm(){
   $('eHuy').onclick = () => urlDi(ed.id ? 'id=' + ed.id : '');
   $('eLuu').onclick = () => luu(false);
   $('eGui').onclick = () => luu(true);
+  $('eMau').onclick = () => { docForm(); xuatExcel(ed).catch(err => showMsg('⛔ ' + (err.message || err), 'err')); };
+  $('eNhap').onclick = () => $('fileXlsx').click();
   if (!chuaChon) {
     veAnh(); veTep();
     $('eThemAnh').onclick = () => $('fileAnh').click();
@@ -669,11 +724,219 @@ $('fileTep').addEventListener('change', async e => {
   b.disabled = false; b.textContent = '＋ Tệp'; veTep();
 });
 
+// ── Bước 5: Lần mới · So sánh · In · Excel ────────────────────────────────
+async function lanMoi(p){
+  if (!(await hoiXacNhan('Chép lần ' + p.lan + ' (' + p.ma_may + ' · ' + p.ma_sp + ') thành nháp lần mới để sửa?', { nutOk: 'Chép' }))) return;
+  const { data, error } = await sb.rpc('duc_dk_lan_moi', { p_id: p.id });
+  if (error) return showMsg('⛔ ' + error.message, 'err');
+  await taiDs();
+  showMsg('✅ Đã tạo nháp lần ' + data.lan + ' — ghi lý do rồi sửa thông số.');
+  urlDi('id=' + data.id + '&sua=1');
+}
+
+async function veSoSanh(idA, idB){
+  const v = $('vPhieu');
+  v.innerHTML = '<section class="card"><div class="empty">Đang tải…</div></section>';
+  const [a, b] = await Promise.all([taiPhieu(idA), taiPhieu(idB)]);
+  if (!a || !b) { v.innerHTML = '<section class="card"><div class="empty">Không tìm thấy phiếu.</div></section>'; return; }
+  if (a.ma_may !== b.ma_may || a.ma_sp !== b.ma_sp) { v.innerHTML = '<section class="card"><div class="empty">Hai phiếu khác Máy / Mã SP — không so sánh.</div></section>'; return; }
+  const loai = loaiMay(a.ma_may) || 'nhom';
+  const cacLan = DS.filter(x => x.ma_may === a.ma_may && x.ma_sp === a.ma_sp).sort((x, y) => x.lan - y.lan);
+  const chon = (p, k) => '<div class="f"><label>' + (k === 'ss' ? 'Bên trái' : 'Bên phải') + '</label><select data-ss="' + k + '">' +
+    cacLan.map(x => '<option value="' + x.id + '"' + (x.id === p.id ? ' selected' : '') + '>Lần ' + x.lan + ' · ' + esc(TT[x.trang_thai]) + '</option>').join('') + '</select>' +
+    '<small>' + esc(p.hieu_luc_tu ? 'Hiệu lực từ ' + fmtNgay(p.hieu_luc_tu) : '') + (p.ly_do ? ' · ' + esc(p.ly_do) : '') + '</small></div>';
+  let nKhac = 0;
+  const trong = '<span style="color:var(--text-dim)">—</span>';
+  const dong = (ten, va, vb, dv, them) => {
+    const khac = va !== vb; if (khac) nKhac++;
+    const k = khac ? ' khac' : '';
+    return '<tr class="' + (khac ? 'khac' : 'giong') + '"><td>' + ten + '</td><td class="gt' + k + '">' + (esc(va) || trong) + '</td>' +
+      '<td class="gt' + k + '">' + (esc(vb) || trong) + (them || '') + '</td><td>' + esc(dv || '') + '</td></tr>';
+  };
+  let rows = '<tr class="nh"><td colspan="4">Dụng cụ</td></tr>' + DC_THEO_LOAI[loai].filter(l => a.dc[l] || b.dc[l] || DC_BB[loai].includes(l))
+    .map(l => dong(esc(LOAI_DC[l]), a.dc[l] || '', b.dc[l] || '', '')).join('');
+  Object.keys(NHOM).forEach(nh => {
+    const ds = tsApDung(loai).filter(t => t.nhom === nh && (hienDong(t, a.gt) || hienDong(t, b.gt)));
+    if (!ds.length) return;
+    rows += '<tr class="nh"><td colspan="4">' + nh + ' · ' + esc(NHOM[nh]) + '</td></tr>' + ds.map(t => {
+      const va = giaTriTho(t, a), vb = giaTriTho(t, b), ga = a.gt[t.ma_ts], gb = b.gt[t.ma_ts];
+      let them = '';
+      if (t.kieu === 'so' && ga && gb && ga.chuan != null && gb.chuan != null && Number(ga.chuan) !== 0 && va !== vb) {
+        const pct = (Number(gb.chuan) - Number(ga.chuan)) / Math.abs(Number(ga.chuan)) * 100;
+        them = ' <small class="hint">(' + (pct > 0 ? '+' : '') + soVi(Math.round(pct * 10) / 10) + '%)</small>';
+      }
+      return dong('<span class="ma">' + t.ma_ts + '</span>' + esc(t.ten), va, vb, t.don_vi, them);
+    }).join('');
+  });
+  v.innerHTML =
+    '<section class="card"><div class="ph-dau"><h2>So sánh · ' + esc(a.ma_may) + ' · ' + esc(a.ma_sp) + '</h2><span class="sp"></span>' +
+      '<button type="button" class="chip" id="ssChi">Chỉ dòng khác<span class="n">' + (nKhac || '') + '</span></button>' +
+      '<a class="btn btn-outline" href="?id=' + b.id + '" data-href="id=' + b.id + '">Về phiếu</a></div>' +
+      '<div class="ss-chon">' + chon(a, 'ss') + chon(b, 'voi') + '</div></section>' +
+    '<section class="card"><div class="tw"><table class="ts ss" id="ssBang"><thead><tr><th>Thông số</th><th>Lần ' + a.lan + '</th><th>Lần ' + b.lan + '</th><th>ĐV</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>' + (!nKhac ? '<div class="hint" style="margin-top:6px">Hai lần giống nhau.</div>' : '') + '</section>';
+  $('ssChi').onclick = () => { $('ssChi').classList.toggle('on'); $('ssBang').classList.toggle('chi-khac'); };
+  v.querySelectorAll('[data-ss]').forEach(s => s.onchange = () => {
+    urlDi('ss=' + v.querySelector('[data-ss="ss"]').value + '&voi=' + v.querySelector('[data-ss="voi"]').value);
+  });
+  v.onclick = null;
+}
+
+function inPhieu(p){
+  const loai = loaiMay(p.ma_may) || 'nhom', nb = nguoiBuoc(p);
+  const nhomHtml = Object.keys(NHOM).map(nh => {
+    const ds = tsApDung(loai).filter(t => t.nhom === nh && hienDong(t, p.gt));
+    if (!ds.length) return '';
+    return '<table class="in-ts"><thead><tr class="nh"><th colspan="4">' + nh + ' · ' + esc(NHOM[nh]) + '</th></tr><tr><th>Thông số</th><th>Chuẩn</th><th>ĐV</th><th>Cho phép</th></tr></thead><tbody>' +
+      ds.map(t => {
+        const g = p.gt[t.ma_ts], v = t.kieu === 'so' && g && g.chuan != null ? Number(g.chuan) : null;
+        return '<tr><td>' + t.ma_ts + ' ' + esc(t.ten) + (batBuoc(t, loai) ? ' *' : '') + (g && g.ghi_chu ? '<div class="in-ghi">' + esc(g.ghi_chu) + '</div>' : '') + '</td>' +
+          '<td class="r">' + giaTriXem(t, p) + '</td><td class="n">' + esc(t.don_vi || '') + '</td><td class="n">' + (v != null ? esc(choPhep(t, v).replace(/ \(.*\)$/, '')) : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }).join('');
+  const dc = DC_THEO_LOAI[loai].filter(l => p.dc[l]).map(l => LOAI_DC[l] + ': ' + p.dc[l]).join(' · ');
+  const ky = (ten, e) => '<div class="ky"><b>' + ten + '</b><div class="cho"></div><div>' + esc(e ? e.nguoi || '' : '') + '</div><small>' + esc(e ? fmtTs(e.luc) : '') + '</small></div>';
+  $('vIn').innerHTML =
+    '<div class="in-dau"><div><small>TOYOTAKI</small><h1>PHIẾU ĐIỀU KIỆN ĐÚC</h1></div><div class="in-so">' + esc(p.ma_may) + ' · ' + esc(p.ma_sp) + '<br>Lần ' + p.lan + ' · ' + esc(TT[p.trang_thai] || '') + '</div></div>' +
+    '<table class="in-tt"><tr><th>Máy</th><td>' + esc(p.ma_may) + ' (' + tenLoai(loai) + ')</td><th>Hiệu lực từ</th><td>' + esc(fmtNgay(p.hieu_luc_tu)) + '</td></tr>' +
+      '<tr><th>Mã SP</th><td>' + esc(p.ma_sp) + '</td><th>Tên SP</th><td>' + esc(SP.get(p.ma_sp) || '') + '</td></tr>' +
+      '<tr><th>Dụng cụ</th><td colspan="3">' + esc(dc) + '</td></tr>' +
+      (p.ly_do ? '<tr><th>Lý do</th><td colspan="3">' + esc(p.ly_do) + '</td></tr>' : '') + '</table>' +
+    (p.trang_thai !== 'hieu_luc' ? '<div class="in-chua">BẢN ' + esc((TT[p.trang_thai] || '').toUpperCase()) + ' — KHÔNG DÙNG ĐỂ SẢN XUẤT</div>' : '') +
+    '<div class="in-luoi">' + nhomHtml + '</div>' +
+    '<div class="in-ghi">* bắt buộc · Cho phép = Chuẩn ± ngưỡng (mặc định 5%)</div>' +
+    '<div class="in-ky">' + ky('Lập', nb.lap) + ky('Kiểm tra', nb.kiem) + ky('Duyệt', nb.duyet) + '</div>' +
+    '<div class="in-chan">In lúc ' + esc(fmtTs(new Date())) + ' · MES Toyotaki</div>';
+  window.print();
+}
+
+// Excel (SheetJS, tải khi cần). File xuất 1 phiếu cũng là mẫu để nhập lại.
+let xlsxHua = null;
+function napXlsx(){
+  if (window.XLSX) return Promise.resolve();
+  if (!xlsxHua) xlsxHua = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = res; s.onerror = () => { xlsxHua = null; rej(new Error('Không tải được thư viện Excel — kiểm tra mạng.')); };
+    document.head.appendChild(s);
+  });
+  return xlsxHua;
+}
+const NHAN_XLSX = { may: 'Máy', sp: 'Mã SP', ly_do: 'Lý do ban hành' };
+async function xuatExcel(p){
+  if (!p.ma_may) return showMsg('Chọn Máy trước.', 'err');
+  await napXlsx();
+  const loai = loaiMay(p.ma_may) || 'nhom', nb = nguoiBuoc(p);
+  const r = [
+    ['PHIẾU ĐIỀU KIỆN ĐÚC — TOYOTAKI'],
+    [NHAN_XLSX.may, p.ma_may], [NHAN_XLSX.sp, p.ma_sp || ''], ['Tên SP', SP.get(p.ma_sp) || ''], ['Loại máy', tenLoai(loai)],
+    ['Lần', p.lan || ''], ['Trạng thái', p.id ? (TT[p.trang_thai] || '') : 'Mẫu'], [NHAN_XLSX.ly_do, p.ly_do || ''],
+    [],
+    ['Mã', 'Nhóm', 'Thông số', 'Chuẩn', 'ĐV', 'Cho phép', 'Gợi ý HPDC', 'Bắt buộc', 'Ghi chú'],
+  ];
+  tsApDung(loai).forEach(t => {
+    const g = p.gt[t.ma_ts];
+    const val = t.kieu === 'so' ? (g && g.chuan != null ? Number(g.chuan) : '') : giaTriTho(t, p);
+    const pt = t.phu_thuoc ? TS.find(x => x.ma_ts === t.phu_thuoc) : null;
+    r.push([t.ma_ts, NHOM[t.nhom], t.ten + (t.kieu === 'co_khong' ? ' (Có / Không)' : '') + (pt ? ' — khi ' + pt.ma_ts + ' = Có' : ''),
+      val, t.don_vi || '', t.kieu === 'so' && val !== '' ? choPhep(t, val) : '', goiYChu(t, loai).replace('Gợi ý HPDC ', ''),
+      batBuoc(t, loai) ? '*' : '', (g && g.ghi_chu) || '']);
+  });
+  r.push([]);
+  r.push(['Loại', 'Dụng cụ', 'Mã dụng cụ', '', '', 'Mã dùng được cho máy']);
+  DC_THEO_LOAI[loai].forEach(l => r.push([l, LOAI_DC[l] + (DC_BB[loai].includes(l) ? ' *' : ''), p.dc[l] || '', '', '',
+    DC.filter(u => u.loai === l && u.hien && (u.may_dung || []).includes(p.ma_may)).map(u => u.ma).join(', ')]));
+  if (p.id) {
+    r.push([]);
+    [['Lập', nb.lap], ['Kiểm tra', nb.kiem], ['Duyệt', nb.duyet]].forEach(([ten, e]) => r.push([ten, e ? e.nguoi || '' : '', e ? fmtTs(e.luc) : '']));
+  }
+  const ws = XLSX.utils.aoa_to_sheet(r);
+  ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 44 }, { wch: 14 }, { wch: 8 }, { wch: 22 }, { wch: 18 }, { wch: 9 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DK duc');
+  const ten = ('DK_duc_' + p.ma_may + '_' + (p.ma_sp || 'mau') + (p.lan ? '_lan' + p.lan : '')).replace(/[^A-Za-z0-9_-]/g, '_');
+  XLSX.writeFile(wb, ten + '.xlsx');
+}
+async function nhapExcel(file){
+  await napXlsx();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+  const tsMa = new Map(TS.map(t => [t.ma_ts, t]));
+  const nhan = {}, gt = {}, dc = {};
+  rows.forEach(r => {
+    const a = String(r[0] ?? '').trim(), A = a.toUpperCase();
+    if (Object.values(NHAN_XLSX).includes(a)) nhan[a] = String(r[1] ?? '').trim();
+    else if (tsMa.has(A)) gt[A] = { v: r[3], gc: String(r[8] ?? '').trim() };
+    else if (LOAI_DC[A]) dc[A] = String(r[2] ?? '').trim().toUpperCase();
+  });
+  if (!Object.keys(gt).length) throw new Error('File không đúng mẫu — không thấy mã thông số (VL01, PE01…) ở cột A. Bấm "Mẫu Excel" để lấy file mẫu.');
+  docForm();
+  const fMay = nhan[NHAN_XLSX.may] || '', fSp = (nhan[NHAN_XLSX.sp] || '').toUpperCase();
+  if (ed.id) {
+    if ((fMay && fMay !== ed.ma_may) || (fSp && fSp !== ed.ma_sp)) throw new Error('File là ' + (fMay || '?') + ' · ' + (fSp || '?') + ', khác phiếu đang sửa ' + ed.ma_may + ' · ' + ed.ma_sp + '.');
+  } else {
+    if (fMay) { if (!loaiMay(fMay)) throw new Error('Máy "' + fMay + '" trong file không phải máy Đúc nhôm / Đúc kẽm.'); if (fMay !== ed.ma_may) ed.dc = {}; ed.ma_may = fMay; }
+    if (fSp) { if (!SP.has(fSp)) throw new Error('Mã SP "' + fSp + '" trong file không có trong danh mục.'); ed.ma_sp = fSp; }
+    if (!ed.ma_may) throw new Error('File chưa ghi Máy — chọn Máy trên form rồi nhập lại.');
+    const mo = ed.ma_sp && DS.find(x => x.ma_may === ed.ma_may && x.ma_sp === ed.ma_sp && ['nhap', 'cho_kiem', 'cho_duyet'].includes(x.trang_thai));
+    if (mo) throw new Error(ed.ma_may + ' · ' + ed.ma_sp + ' đang có lần ' + mo.lan + ' (' + TT[mo.trang_thai] + ')' + (mo.trang_thai === 'nhap' ? ' — mở nháp đó rồi Nhập Excel.' : ' — chờ xử lý xong.'));
+  }
+  if (nhan[NHAN_XLSX.ly_do]) ed.ly_do = nhan[NHAN_XLSX.ly_do];
+  const loai = loaiMay(ed.ma_may), cb = [];
+  let n = 0;
+  for (const [ma, o] of Object.entries(gt)) {
+    const t = tsMa.get(ma);
+    if (t.ap_dung !== 'ca_hai' && t.ap_dung !== loai) continue;
+    const s = String(o.v ?? '').trim();
+    if (t.kieu === 'chon_nvl') {
+      if (!s) ed.ma_nvl = null;
+      else if (NVL.some(x => x.ma_nvl === s)) { ed.ma_nvl = s; n++; }
+      else cb.push(ma + ': mã NVL "' + s + '" không có trong danh mục');
+      continue;
+    }
+    const g = { ma_ts: ma, ghi_chu: o.gc || null, chuan: null, gia_tri_chu: null };
+    if (t.kieu === 'so') {
+      if (s !== '') {
+        const v = typeof o.v === 'number' ? o.v : docSo(s);
+        if (isNaN(v)) { cb.push(ma + ': "' + s + '" không phải số — bỏ qua'); continue; }
+        g.chuan = v;
+      }
+    } else if (t.kieu === 'co_khong') {
+      const l = s.toLowerCase();
+      g.gia_tri_chu = ['có', 'co', 'x', '1', 'true'].includes(l) ? 'co' : ['không', 'khong', '0', 'false'].includes(l) ? 'khong' : null;
+      if (s && !g.gia_tri_chu) { cb.push(ma + ': "' + s + '" — ghi Có hoặc Không'); continue; }
+    } else g.gia_tri_chu = s || null;
+    ed.gt[ma] = g;
+    if (g.chuan != null || g.gia_tri_chu) n++;
+  }
+  DC_THEO_LOAI[loai].forEach(l => {
+    if (!(l in dc)) return;
+    const m = dc[l];
+    if (!m) { delete ed.dc[l]; return; }
+    const u = DC.find(x => x.ma === m && x.loai === l);
+    if (!u) { cb.push(LOAI_DC[l] + ' ' + m + ' không có trong danh mục'); return; }
+    ed.dc[l] = m;
+    if (!(u.may_dung || []).includes(ed.ma_may)) cb.push(m + ' chưa ghi dùng được cho ' + ed.ma_may);
+  });
+  veForm();
+  showMsg((cb.length ? '⚠ ' : '✅ ') + 'Đã điền ' + n + ' thông số từ Excel — xem lại rồi bấm Lưu.' + (cb.length ? '\n• ' + cb.join('\n• ') : ''), cb.length ? 'err' : 'ok');
+}
+$('fileXlsx').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f || !ed) return;
+  try { await nhapExcel(f); } catch (err) { showMsg('⛔ ' + (err.message || err), 'err'); }
+});
+
 // ── Điều hướng ─────────────────────────────────────────────────────────────
 async function route(){
   const P = new URLSearchParams(location.search);
   let id = P.get('id') ? Number(P.get('id')) : null;
-  const moi = P.get('moi'), sua = P.get('sua');
+  const moi = P.get('moi'), sua = P.get('sua'), ss = P.get('ss') ? Number(P.get('ss')) : null;
+  if (ss && P.get('voi')) {
+    $('hDs').hidden = false; $('vDs').hidden = true; $('vPhieu').hidden = false; ed = null;
+    try { await veSoSanh(ss, Number(P.get('voi'))); window.scrollTo(0, 0); } catch (e) { showMsg('⛔ ' + (e.message || e), 'err'); }
+    return;
+  }
   if (!id && !moi && P.get('ma_may') && P.get('ma_sp')) {
     const cap = DS.filter(x => x.ma_may === P.get('ma_may') && x.ma_sp === P.get('ma_sp').toUpperCase()).sort((a, b) => b.lan - a.lan);
     const hl = cap.find(x => x.trang_thai === 'hieu_luc') || cap[0];
