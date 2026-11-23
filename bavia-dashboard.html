@@ -158,6 +158,7 @@
   .tiny:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
   .tiny.bad{color:var(--alarm-fg);border-color:var(--alarm-bd);}
   .tiny.test{color:var(--warn-fg);border-color:var(--warn-bd);}
+  .tiny.xe{color:#fff;background:var(--run-fg);border-color:var(--run-fg);font-weight:700;}
   .ng-form{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;background:var(--alarm-bg);border:1px solid var(--alarm-bd);border-radius:7px;padding:6px 8px;}
   .ng-form select,.ng-form input,.test-form select,.test-form input,.ret-form input{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--text);min-height:30px;}
   .ng-form select{max-width:100%;}
@@ -338,6 +339,7 @@
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">Làm mới</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa">Kết ca</button>
+  <button type="button" class="btn btn-ghost" id="btnNguyenXe" hidden title="Bavia → Gia công chuyển nguyên xe (tạm, chưa đủ thùng)">Nguyên xe</button>
   <div class="header-clock">
     <div class="date" id="hdrDate">—</div>
     <div class="time" id="hdrTime">--:--:--</div>
@@ -662,7 +664,8 @@ function srcList(l) {
       '<div class="tg">' + esc(n.tag_no) + ' ' + (i === first ? '<span class="chip ok">đang trừ</span>' : het ? '<span class="chip mute">đã hết</span>' : '<span class="chip mute">tiếp theo</span>') + '</div>' +
       '<div class="qty">' + fmt(con) + '<small> / ' + fmt(n.sl_khai_bao) + '</small></div>' +
       '<div class="meta">Đúc ' + esc(n.may || '?') + ' · ' + dmy(n.ngay_duc) + (n.so_khuon ? ' · khuôn ' + esc(n.so_khuon) : '') + '</div>' +
-      '<div class="acts">' + (!het && !khoa ? '<button class="tiny bad" type="button" data-ng="' + i + '">NG</button><button class="tiny test" type="button" data-test="' + i + '">Test</button>' : '') +
+      '<div class="acts">' + (!het && !khoa ? '<button class="tiny bad" type="button" data-ng="' + i + '">NG</button><button class="tiny test" type="button" data-test="' + i + '">Test</button>' +
+          (l.info && l.info.nguyen_xe ? '<button class="tiny xe" type="button" data-xe="' + n.id + '" title="Làm xong cả xe → chuyển Gia công">Xong xe</button>' : '') : '') +
         (!khoa ? '<button class="tiny" type="button" data-rm="' + n.id + '" title="Bỏ khai báo (quét nhầm / chuyển Line khác)">Bỏ</button>' : '') + '</div>' +
       '<div class="bar"><i style="width:' + (n.sl_khai_bao ? Math.max(0, con) / n.sl_khai_bao * 100 : 0) + '%"></i></div>' +
       (ngOpen === i ? ngForm(n, i) : '') + (testOpen === i ? testForm(n, i) : '') +
@@ -730,6 +733,24 @@ function packPanel(l) {
     '</div></div>';
 }
 
+// T338: tạm chuyển nguyên xe sang Gia công (chưa đủ thùng quay vòng).
+function xePanel(l) {
+  const N = (l.nguon || []).filter(n => Number(n.con) > 0);
+  const X = (l.thung || []).filter(b => b.dang === 3);
+  const last = X[0];
+  return '<div class="card pack">' +
+    '<h3><span class="step">2</span> Xong xe → ' + esc(nextStep(l)) + ' <button class="info-btn" type="button" data-info title="Cách làm">ⓘ</button><span class="sp"></span><span class="chip flow">Nguyên xe</span></h3>' +
+    '<div class="howto info-txt" hidden><div><span class="n">1</span><span>Làm hết cả xe, không chia thùng.</span></div>' +
+    '<div><span class="n">2</span><span>Bấm <b>Xong xe</b> ở tem Đúc của xe. Sản lượng = số còn trên tem (đã trừ NG).</span></div>' +
+    '<div><span class="n">3</span><span>Đẩy xe + tem thùng in sẵn xuống ' + esc(nextStep(l)) + '. Ở đó chia thùng và dán tem.</span></div></div>' +
+    '<div class="spec"><div><div class="l">Xe đang làm</div><div class="v">' + N.length + ' <small>xe</small></div></div>' +
+    '<div><div class="l">Còn trên xe</div><div class="v">' + fmt(conOf(l)) + ' <small>pcs</small></div></div>' +
+    '<div><div class="l">Xe xong</div><div class="v">' + X.length + ' <small>xe</small></div></div></div>' +
+    (last ? '<div class="last-box"><div class="sub" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">Xe vừa xong · ' + hm(last.thoi_diem) + '</div>' +
+      '<div class="tg">' + esc(last.tag_tp) + '</div><div style="font-size:12px;color:var(--text-muted)">' + fmt(last.so_luong) + ' pcs · ' + esc(last.nguoi_lam || '—') + '</div></div>' : '') +
+    '</div>';
+}
+
 function prePanel(l) {
   const sl = Number(l.info.sl_thung) || 0, con = PRE[l.ma_sp] || 0;
   const last = (l.thung || [])[0];
@@ -766,7 +787,8 @@ function renderWs() {
   }
   const info = l.info, ops = opsOf(l), khoa = !!D.ket_ca;
   const dangChip = !info.ok ? '<span class="chip bad">Thiếu thông tin Danh mục SP</span>'
-    : info.dang === 1 ? '<span class="chip ship">Dạng 1 · Đóng gói xuất hàng</span>' : '<span class="chip flow">Dạng 2 · Chuyển ' + esc(nextStep(l)) + '</span>';
+    : info.dang === 1 ? '<span class="chip ship">Dạng 1 · Đóng gói xuất hàng</span>'
+    : info.nguyen_xe ? '<span class="chip flow">Nguyên xe → ' + esc(nextStep(l)) + '</span>' : '<span class="chip flow">Dạng 2 · Chuyển ' + esc(nextStep(l)) + '</span>';
   const route = info.ok ? (info.quy_trinh || []).map((r, i) => (i ? '<i>›</i>' : '') + '<span class="' + (r === 'Bavia' ? 'cur' : r === info.buoc_sau ? 'next' : '') + '">' + esc(r) + '</span>').join('') : '';
   const kiemDs = dsNguoiKiem();
   if (l.nguoi_kiem_tra && !kiemDs.includes(l.nguoi_kiem_tra)) kiemDs.unshift(l.nguoi_kiem_tra);
@@ -787,14 +809,14 @@ function renderWs() {
         kiemDs.map(k => '<option ' + (k === l.nguoi_kiem_tra ? 'selected' : '') + '>' + esc(k) + '</option>').join('') + '</select></div>' +
     '</div>' +
     '<div class="scan"><span class="ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M11 8v8M14 8v8M17 8v8"/></svg></span>' +
-      '<input id="scan" type="text" autocomplete="off" placeholder="Quét QR tem Đúc' + (info.dang === 2 ? ' hoặc tem thùng' : '') + '…" aria-label="Ô quét mã QR" ' + (khoa || !info.ok ? 'disabled' : '') + '>' +
+      '<input id="scan" type="text" autocomplete="off" placeholder="Quét QR tem Đúc' + (info.dang === 2 && !info.nguyen_xe ? ' hoặc tem thùng' : '') + '…" aria-label="Ô quét mã QR" ' + (khoa || !info.ok ? 'disabled' : '') + '>' +
       '<button class="cam" type="button" id="btnCam" title="Quét bằng camera" ' + (khoa || !info.ok ? 'disabled' : '') + '>📷</button></div>' +
     fl + '</div>' +
 
     '<div class="ws-grid">' +
       '<div class="card"><h3><span class="step">1</span> Tem Đúc đang dùng <span class="sp"></span><span class="cnt">' + (l.nguon || []).filter(n => n.con > 0).length + ' tem</span></h3>' +
         srcList(l) + balanceHtml(l) + '</div>' +
-      (info.ok ? (info.dang === 1 ? packPanel(l) : prePanel(l)) : '<div class="card"><div class="empty-box">' + esc(info.error || '') + '</div></div>') +
+      (info.ok ? (info.dang === 1 ? packPanel(l) : info.nguyen_xe ? xePanel(l) : prePanel(l)) : '<div class="card"><div class="empty-box">' + esc(info.error || '') + '</div></div>') +
     '</div>' +
 
     '<div class="card"><h3>Thùng của ' + esc(l.ten_line) + ' trong ca <span class="sp"></span><span class="cnt">' + T.length + ' thùng · ' + fmt(okOf(l)) + ' pcs</span></h3>' +
@@ -802,7 +824,9 @@ function renderWs() {
         T.map(b => '<tr><td class="mono">' + hm(b.thoi_diem) + '</td><td class="mono">' + esc(b.tag_tp) + '</td><td class="n">' + fmt(b.so_luong) + '</td>' +
           '<td class="mono" style="font-weight:500;font-size:11.5px">' + (b.nguon || []).map(s => esc(s.tag_no) + ' (' + fmt(s.so_luong_lay) + ')').join(', ') + '</td>' +
           '<td>' + esc(b.nguoi_lam || '') + '</td><td>' + esc(b.nguoi_kiem || '') + '</td>' +
-          '<td>' + (b.dang === 1 ? '<button class="tiny" type="button" data-in="' + esc(b.tag_tp) + '">In lại</button>' : '<span class="chip flow">' + esc(nextStep(l)) + '</span>') + '</td></tr>').join('') +
+          '<td>' + (b.dang === 1 ? '<button class="tiny" type="button" data-in="' + esc(b.tag_tp) + '">In lại</button>'
+            : b.dang === 3 ? '<span class="chip flow">Xe → ' + esc(nextStep(l)) + '</span>' + (!khoa ? ' <button class="tiny" type="button" data-xehuy="' + esc(b.tag_tp) + '" title="Bấm nhầm Xong xe">Huỷ</button>' : '')
+            : '<span class="chip flow">' + esc(nextStep(l)) + '</span>') + '</td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty-box">Chưa có thùng nào trong ca.</div>') + '</div>' +
 
     '<div class="card"><h3>NG và hàng test của ' + esc(l.ten_line) + ' <span class="sp"></span><span class="cnt">NG ' + fmt(ngOf(l)) + ' · test ' + fmt(testOf(l)) + ' pcs</span></h3>' +
@@ -827,7 +851,7 @@ function renderSide() {
     : '<div class="empty-box">Không có tem Đúc chờ cho các mã đang chạy.</div>';
   const ev = [];
   ((D && D.lines) || []).forEach(l => {
-    (l.thung || []).forEach(b => ev.push([b.thoi_diem, esc(l.ten_line) + (b.dang === 1 ? ' đóng thùng ' : ' quét tem thùng ') + '<b>' + esc(b.tag_tp) + '</b> · ' + fmt(b.so_luong) + ' pcs', b.dang === 1 ? 'In tem xuất hàng' : 'Chuyển ' + nextStep(l)]));
+    (l.thung || []).forEach(b => ev.push([b.thoi_diem, esc(l.ten_line) + (b.dang === 1 ? ' đóng thùng ' : b.dang === 3 ? ' xong xe ' : ' quét tem thùng ') + '<b>' + esc(b.tag_tp) + '</b> · ' + fmt(b.so_luong) + ' pcs', b.dang === 1 ? 'In tem xuất hàng' : 'Chuyển ' + nextStep(l)]));
     (l.ng || []).forEach(g => ev.push([g.ngay_gio, esc(l.ten_line) + ' NG <b>' + fmt(g.so_luong) + '</b> · ' + esc(g.loai) + (g.ghi_chu ? ': ' + esc(g.ghi_chu) : ''), 'Tem ' + g.tag_no]));
     (l.test || []).filter(t => t.id_tram === l.id_tram).forEach(t => ev.push([t.thoi_diem, esc(l.ten_line) + ' lấy test <b>' + fmt(t.so_luong) + '</b> · ' + esc(t.muc_dich), t.nguoi_test]));
     (l.nguon || []).forEach(n => ev.push([n.thoi_diem, esc(l.ten_line) + ' khai báo tem Đúc <b>' + esc(n.tag_no) + '</b>', fmt(n.sl_khai_bao) + ' pcs · ' + (n.may || '')]));
@@ -965,6 +989,27 @@ document.addEventListener('click', async e => {
   if (t.dataset.cancel !== undefined) { ngOpen = testOpen = retOpen = null; renderWs(); return; }
   if (t.dataset.tend) { retOpen = Number(t.dataset.tend); renderWs(); const q = $('#retQty'); if (q) q.focus(); return; }
   if (t.dataset.in) { await chay(async () => { await inLai(t.dataset.in, l.ten_line); setFlash('ok', 'Đã gửi in lại tem <b>' + esc(t.dataset.in) + '</b>.'); renderWs(); }); return; }
+  if (t.dataset.xe) {
+    const n = (l.nguon || []).find(x => String(x.id) === t.dataset.xe);
+    if (!n) return;
+    if (!(await hoiXacNhan('Xong xe ' + n.tag_no + '?\nOK ' + fmt(n.con) + ' pcs → chuyển ' + nextStep(l) + '.', { nutOk: 'Xong xe' }))) return;
+    await chay(async () => {
+      const r = await goi('bavia_xong_xe', { p_id_tram: l.id_tram, p_id: Number(t.dataset.xe) });
+      setFlash('ok', 'Xong xe <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs → ' + esc(r.buoc_sau || '') + '.');
+      ngOpen = testOpen = retOpen = null;
+      await taiLai();
+    });
+    return;
+  }
+  if (t.dataset.xehuy) {
+    if (!(await hoiXacNhan('Huỷ Xong xe ' + t.dataset.xehuy + '?\nXe quay lại Line, trừ sản lượng.', { nutOk: 'Huỷ xe', nguyHiem: true }))) return;
+    await chay(async () => {
+      const r = await goi('bavia_xong_xe_huy', { p_id_tram: l.id_tram, p_tag: t.dataset.xehuy });
+      setFlash('warn', 'Đã huỷ Xong xe <b>' + esc(r.tag_no) + '</b>.');
+      await taiLai();
+    });
+    return;
+  }
   if (t.dataset.rm) {
     const n = (l.nguon || []).find(x => String(x.id) === t.dataset.rm);
     if (!(await hoiXacNhan('Bỏ khai báo tem ' + (n ? n.tag_no : '') + '?', { nutOk: 'Bỏ', nguyHiem: true }))) return;
@@ -1352,6 +1397,28 @@ async function dongCam() {
 }
 $('#btnCloseCam').onclick = dongCam;
 
+/* ── T338: công tắc chuyển nguyên xe (admin / quản lý) ───────────────────── */
+let laQuanLy = false, nguyenXe = false;
+async function veNguyenXe() {
+  const { data } = await sb.rpc('bavia_nguyen_xe');
+  nguyenXe = !!data;
+  const b = $('#btnNguyenXe');
+  b.textContent = 'Nguyên xe: ' + (nguyenXe ? 'Bật' : 'Tắt');
+  b.style.color = nguyenXe ? '#FCD34D' : '';
+}
+async function doiNguyenXe() {
+  const bat = !nguyenXe;
+  const nd = bat ? 'Bật chuyển nguyên xe?\nMã Bavia → Gia công: bấm Xong xe, không quét tem thùng. Gia công chia xe.'
+    : 'Tắt chuyển nguyên xe?\nBavia quay lại quét tem thùng in sẵn như cũ.';
+  if (!(await hoiXacNhan(nd, { nutOk: bat ? 'Bật' : 'Tắt' }))) return;
+  await chay(async () => {
+    await goi('bavia_nguyen_xe_dat', { p_bat: bat });
+    await veNguyenXe();
+    setFlash('ok', 'Chuyển nguyên xe: <b>' + (nguyenXe ? 'Bật' : 'Tắt') + '</b>.');
+    await taiLai();
+  });
+}
+
 /* ── Đồng hồ + khởi động ─────────────────────────────────────────────────── */
 function tick() {
   const d = new Date();
@@ -1372,7 +1439,9 @@ function tick() {
     const { data: ss } = await sb.auth.getSession();
     const { data: u } = await sb.from('user_roles').select('role').eq('user_id', ss.session.user.id).maybeSingle();
     laAdmin = !!(u && u.role === 'admin');
+    laQuanLy = !!(u && ['admin', 'quan_ly_bo_phan', 'qlsx_truong_phong'].includes(u.role));
   } catch (e) { laAdmin = false; }
+  if (laQuanLy) { $('#btnNguyenXe').hidden = false; $('#btnNguyenXe').onclick = doiNguyenXe; veNguyenXe(); }
   await taiLai();
   const s = $('#scan'); if (s) s.focus();
   // Tự tải lại mỗi 60 giây (khi không đang gõ / mở form) để thấy thao tác của máy khác.
