@@ -665,7 +665,7 @@ function srcList(l) {
       '<div class="qty">' + fmt(con) + '<small> / ' + fmt(n.sl_khai_bao) + '</small></div>' +
       '<div class="meta">Đúc ' + esc(n.may || '?') + ' · ' + dmy(n.ngay_duc) + (n.so_khuon ? ' · khuôn ' + esc(n.so_khuon) : '') + '</div>' +
       '<div class="acts">' + (!het && !khoa ? '<button class="tiny bad" type="button" data-ng="' + i + '">NG</button><button class="tiny test" type="button" data-test="' + i + '">Test</button>' +
-          (l.info && l.info.nguyen_xe ? '<button class="tiny xe" type="button" data-xe="' + n.id + '" title="Làm xong cả xe → chuyển Gia công">Xong xe</button>' : '') : '') +
+          (l.info && l.info.nguyen_xe ? '<button class="tiny xe" type="button" data-xe="' + n.id + '" title="Làm xong cả xe">Xong xe</button>' : '') : '') +
         (!khoa ? '<button class="tiny" type="button" data-rm="' + n.id + '" title="Bỏ khai báo (quét nhầm / chuyển Line khác)">Bỏ</button>' : '') + '</div>' +
       '<div class="bar"><i style="width:' + (n.sl_khai_bao ? Math.max(0, con) / n.sl_khai_bao * 100 : 0) + '%"></i></div>' +
       (ngOpen === i ? ngForm(n, i) : '') + (testOpen === i ? testForm(n, i) : '') +
@@ -742,7 +742,8 @@ function xePanel(l) {
     '<h3><span class="step">2</span> Xong xe → ' + esc(nextStep(l)) + ' <button class="info-btn" type="button" data-info title="Cách làm">ⓘ</button><span class="sp"></span><span class="chip flow">Nguyên xe</span></h3>' +
     '<div class="howto info-txt" hidden><div><span class="n">1</span><span>Làm hết cả xe, không chia thùng.</span></div>' +
     '<div><span class="n">2</span><span>Bấm <b>Xong xe</b> ở tem Đúc của xe. Sản lượng = số còn trên tem (đã trừ NG).</span></div>' +
-    '<div><span class="n">3</span><span>Đẩy xe + tem thùng in sẵn xuống ' + esc(nextStep(l)) + '. Ở đó chia thùng và dán tem.</span></div></div>' +
+    '<div><span class="n">3</span><span>Quét tem xe ở <b>Chuyển công đoạn</b> → ' + esc(nextStep(l)) + '.</span></div>' +
+    '<div><span class="n">4</span><span>Đẩy xe + tem thùng in sẵn xuống ' + esc(nextStep(l)) + '. Ở đó chia thùng và dán tem.</span></div></div>' +
     '<div class="spec"><div><div class="l">Xe đang làm</div><div class="v">' + N.length + ' <small>xe</small></div></div>' +
     '<div><div class="l">Còn trên xe</div><div class="v">' + fmt(conOf(l)) + ' <small>pcs</small></div></div>' +
     '<div><div class="l">Xe xong</div><div class="v">' + X.length + ' <small>xe</small></div></div></div>' +
@@ -992,10 +993,10 @@ document.addEventListener('click', async e => {
   if (t.dataset.xe) {
     const n = (l.nguon || []).find(x => String(x.id) === t.dataset.xe);
     if (!n) return;
-    if (!(await hoiXacNhan('Xong xe ' + n.tag_no + '?\nOK ' + fmt(n.con) + ' pcs → chuyển ' + nextStep(l) + '.', { nutOk: 'Xong xe' }))) return;
+    if (!(await hoiXacNhan('Xong xe ' + n.tag_no + '?\nOK ' + fmt(n.con) + ' pcs. Sau đó quét tem ở Chuyển công đoạn.', { nutOk: 'Xong xe' }))) return;
     await chay(async () => {
       const r = await goi('bavia_xong_xe', { p_id_tram: l.id_tram, p_id: Number(t.dataset.xe) });
-      setFlash('ok', 'Xong xe <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs → ' + esc(r.buoc_sau || '') + '.');
+      setFlash('ok', 'Xong xe <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs. Quét tem ở Chuyển công đoạn → ' + esc(r.buoc_sau || '') + '.');
       ngOpen = testOpen = retOpen = null;
       await taiLai();
     });

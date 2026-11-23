@@ -722,6 +722,11 @@ async function onQrDecoded(text){
     const { data: pos } = await sb.rpc('cd_vi_tri_tem', { p_tag_no: tagNo });
     if (pos) viTriHienTai = pos;
   } catch(e){ /* không chặn luồng chính nếu lỗi */ }
+  if (viTriHienTai === 'Bavia'){
+    // T339: xe Bavia chuyển nguyên chưa bấm Xong xe → chặn ngay lúc quét
+    const { data: loiXe } = await sb.rpc('cd_kiem_xe_bavia', { p_tag_no: tagNo, p_sl: null });
+    if (loiXe){ err(loiXe); return; }
+  }
 
   // Cả lô phải cùng 1 "Công đoạn giao" — tem đầu tiên định vị trí giao, tem
   // quét sau phải khớp đúng vị trí đó mới gộp chung được (khác vị trí thì
@@ -905,6 +910,11 @@ async function submitTransfer(){
     // phần còn lại tại công đoạn nguồn — khác với hao hụt (mất hẳn).
     let tagNoDeChuyen = s.tagNo;
     let slTemDeChuyen = Number(s.soLuongTem);
+    // T339: xe Bavia chuyển nguyên — phải Xong xe + chuyển đủ (chặn trước khi tách tem)
+    if (congDoanGiao === 'Bavia'){
+      const { data: loiXe } = await sb.rpc('cd_kiem_xe_bavia', { p_tag_no: s.tagNo, p_sl: s.soLuongChuyen });
+      if (loiXe){ failed++; lastMsgs.push(s.tagNo + ": " + loiXe); continue; }
+    }
     if (s.tach && s.soLuongChuyen < s.soLuongTem){
       const { data: tagCon, error: tachErr } = await sb.rpc('duc_tach_tem', {
         p_tag_no_cha: s.tagNo, p_so_luong_tach: s.soLuongChuyen,
