@@ -52,9 +52,10 @@
     if (dc.length) {
       html += '<div class="dkxn-g">Dụng cụ đang lắp</div>';
       dc.forEach(x => {
-        html += '<div class="dkxn-r" data-dc="' + esc(x.loai) + '" data-can="' + esc(x.ma) + '"><div><div class="t">' + esc(LOAI[x.loai] || x.loai) + '</div>' +
-          '<div class="m">Phiếu: ' + esc(x.ma) + '</div><div class="ms"></div></div>' +
-          '<select><option value="">— chọn —</option>' + (x.chon || []).map(o => '<option value="' + esc(o.ma) + '">' + esc(o.ma) + '</option>').join('') + '</select></div>';
+        html += '<div class="dkxn-r" data-dc="' + esc(x.loai) + '" data-can="' + esc(x.ma) + '" data-dang="' + esc(x.dang || '') + '"><div><div class="t">' + esc(LOAI[x.loai] || x.loai) + '</div>' +
+          '<div class="m">Phiếu: ' + esc(x.ma) + (x.dang ? ' · đang lắp ' + esc(x.dang) : '') + '</div><div class="ms"></div></div>' +
+          '<select><option value="">— chọn —</option>' + (x.chon || []).map(o => '<option value="' + esc(o.ma) + '"' + (o.ma === x.dang ? ' selected' : '') + '>' + esc(o.ma) +
+            (o.pct != null ? ' · ' + o.pct + '%' : '') + (o.may && o.may !== p.ma_may ? ' · ở ' + esc(o.may) : o.may ? ' · đang lắp' : '') + '</option>').join('') + '</select></div>';
       });
     }
     let nhom = '';
@@ -93,7 +94,7 @@
         if (r.dataset.dc) {
           const v = r.querySelector('select').value;
           if (!v) { du = false; return; }
-          if (v === r.dataset.can) r.classList.add('dat');
+          if (v.split('/')[0] === r.dataset.can) { r.classList.add('dat'); if (v.includes('/') && v !== r.dataset.dang) ms.textContent = 'Sẽ lắp ' + v + (r.dataset.dang ? ', tháo ' + r.dataset.dang : ''); }
           else { r.classList.add('lech'); ms.textContent = 'Khác phiếu (' + r.dataset.can + ')'; du = false; lech++; }
         } else if (r.dataset.k === 'so') {
           const t = ts.find(x => x.ma_ts === r.dataset.ts), v = so(r.querySelector('input').value);
@@ -131,6 +132,7 @@
         }
         dong(true);
       };
+      kiem();
       const first = mask.querySelector('select, input'); if (first) first.focus();
     });
   }
