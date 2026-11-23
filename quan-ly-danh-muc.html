@@ -268,7 +268,7 @@
               <div><label for="sp-masptaikh">Mã SP tại khách hàng</label><input type="text" autocomplete="off" id="sp-masptaikh" placeholder="SKU/mã hàng phía khách hàng — tem thành phẩm"></div>
               <div><label for="sp-cavity">Cavity</label><input type="number" step="any" id="sp-cavity"></div>
               <div><label for="sp-ct">Cycle time (giây)</label><input type="number" step="any" id="sp-ct"></div>
-              <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
+              <div><label for="sp-nguyenlieu">Nguyên liệu (tự điền khi in tem) <span id="sp-nl-bom" hidden style="color:var(--run-fg);font-weight:600">· Theo BOM</span></label><input type="text" autocomplete="off" id="sp-nguyenlieu"></div>
               <div><label for="sp-sokhuon">Số khuôn (gợi ý, tự điền khi in tem)</label><input type="text" autocomplete="off" id="sp-sokhuon" placeholder="VD 1 hoặc 1,2"></div>
               <div style="grid-column:1/-1">
                 <label for="sp-kanban">Chỉ thị sản xuất bằng Kanban</label>
@@ -1617,10 +1617,19 @@ function setQuyTrinhValue(str){
 }
 
 let spEditing = null;
+// T334: mã có BOM hiệu lực → Nguyên liệu lấy theo NVL của BOM (DB tự đồng bộ), khoá ô gõ tay.
+let spNlTheoBom = new Set();
+function spKhoaNl(khoa){
+  const o = document.getElementById('sp-nguyenlieu');
+  o.readOnly = khoa;
+  o.title = khoa ? 'Đổi NVL ở tab BOM' : '';
+  document.getElementById('sp-nl-bom').hidden = !khoa;
+}
 function spResetForm(){
   spEditing = null;
   clearMsg('sp-msg');
   document.getElementById('sp-form').reset();
+  spKhoaNl(false);
   setQuyTrinhValue('');
   setSlThungCdValue(null);
   document.getElementById('sp-ma').disabled = false;
@@ -1644,6 +1653,7 @@ function spFillForm(r){
   document.getElementById('sp-cavity').value = r.cavity ?? '';
   document.getElementById('sp-ct').value = r.cycle_time_s ?? '';
   document.getElementById('sp-nguyenlieu').value = r.nguyen_lieu || '';
+  spKhoaNl(spNlTheoBom.has(r.ma_sp));
   document.getElementById('sp-sokhuon').value = r.so_khuon || '';
   document.getElementById('sp-sldonggoi').value = r.sl_dong_goi_chuan ?? '';
   document.getElementById('sp-kanban').checked = !!r.chi_thi_kanban;
@@ -1708,7 +1718,10 @@ document.getElementById('sp-goiy').addEventListener('click', () => spGoiY(false)
 initCatalog({
   id: 'sp',
   emptyText: 'Chưa có sản phẩm nào.',
-  fetch: () => sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, sl_thung_cong_doan, quy_trinh_cong_doan, chi_thi_kanban'),
+  fetch: () => {
+    sb.rpc('sp_nguyen_lieu_theo_bom').then(({ data, error }) => { if (!error) spNlTheoBom = new Set((data || []).map(x => typeof x === 'string' ? x : Object.values(x)[0])); });
+    return sb.from('master_products').select('ma_sp, ten_sp, ma_khach_hang, ten_khach_hang, ma_sp_khach_hang, cavity, cycle_time_s, nguyen_lieu, so_khuon, sl_dong_goi_chuan, sl_thung_cong_doan, quy_trinh_cong_doan, chi_thi_kanban');
+  },
   pk: r => r.ma_sp,
   resetForm: spResetForm,
   fillForm: spFillForm,
