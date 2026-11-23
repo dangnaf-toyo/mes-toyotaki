@@ -477,27 +477,32 @@ document.getElementById("congDoanGiao").addEventListener("change", () => {
   renderScannedList();
 });
 
-// Cảnh báo FIFO (MỀM — không chặn), tính riêng cho từng tem khi đổi công
-// đoạn nhận của chính nó — có lô cùng mã SP, cùng đang chờ ở đúng công đoạn
-// nhận vừa chọn, nhưng có ngày trên tem CŨ HƠN tem đang xử lý.
-async function checkFifoWarningFor(i){
-  const s = scannedList[i];
-  if (!s || !s.congDoanNhan){ if (s) s.fifoWarn = ''; renderScannedList(); return; }
-  const { data: positions } = await sbTaiHet(() => sb.from('cd_v_vi_tri_hien_tai').select('tag_no').eq('vi_tri_hien_tai', s.congDoanNhan).order('tag_no'));
-  const scannedTags = new Set(scannedList.map(x => x.tagNo));
-  const tags = (positions || []).map(p => p.tag_no).filter(t => !scannedTags.has(t));
-  let warn = '';
-  if (tags.length){
-    const { data: tems } = await sbTaiTheoLo(tags, lo => sb.from('duc_tem').select('tag_no,ngay').in('tag_no', lo).eq('ma_sp', s.maSP).gt('so_luong', 0).order('tag_no'));
-    const curNgay = new Date(s.ngay);
-    if (tems && tems.length && !isNaN(curNgay)){
-      const older = tems.filter(t => t.ngay && new Date(t.ngay) < curNgay).sort((a, b) => new Date(a.ngay) - new Date(b.ngay));
-      if (older.length){
-        warn = "⚠️ Có " + older.length + " lô cùng mã SP CŨ HƠN đang chờ ở " + s.congDoanNhan + " (VD: " + older[0].tag_no + ") — nên ưu tiên xử lý trước (FIFO).";
-      }
-    }
-  }
-  if (scannedList[i]){ scannedList[i].fifoWarn = warn; renderScannedList(); }
+// T337: FIFO theo NGÀY IN TEM — tem quét phải là tem in cũ nhất của cùng mã
+// SP đang ở cùng công đoạn giao (DB: cd_fifo_tem_cu_hon, chỉ xét tem in ≤ 14
+// ngày). Các tem đã quét cùng lô coi như đã lấy. Chỉ cảnh báo, không chặn.
+// Kiểm lại cả lô mỗi lần thêm/bớt tem (thêm tem cũ hơn vào lô thì hết cảnh báo).
+let fifoLuot = 0;
+async function checkFifoAll(){
+  const luot = ++fifoLuot;
+  const boQua = scannedList.map(x => x.tagNo);
+  const kq = await Promise.all(scannedList.map(s =>
+    sb.rpc('cd_fifo_tem_cu_hon', { p_tag_no: s.tagNo, p_bo_qua: boQua })
+      .then(({ data }) => ({ tag: s.tagNo, d: data }), () => ({ tag: s.tagNo, d: null }))));
+  if (luot !== fifoLuot) return;
+  kq.forEach(({ tag, d }) => {
+    const s = scannedList.find(x => x.tagNo === tag);
+    if (!s) return;
+    s.fifoWarn = (d && d.so_lo > 0)
+      ? "⚠️ Sai FIFO: còn " + d.so_lo + " tem in cũ hơn — lấy " + d.tag_no + " (in " + fmtNgayIn(d.ngay_gio_in) + ") trước"
+      : '';
+  });
+  renderScannedList();
+}
+function fmtNgayIn(ts){
+  const d = new Date(ts);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getDate()) + "/" + p(d.getMonth() + 1) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
 }
 
 /* ─── Chụp ảnh + giải mã QR (giữ nguyên cách làm bản cũ: chụp ảnh tĩnh rồi
@@ -743,6 +748,7 @@ async function onQrDecoded(text){
   document.getElementById(activeMsgId).style.display = "none";
   renderScannedList();
   checkReady();
+  checkFifoAll();
 }
 
 function renderScannedList(){
@@ -827,12 +833,12 @@ function setScannedNhan(i, v){
   if (!scannedList[i]) return;
   scannedList[i].congDoanNhan = v;
   checkReady();
-  checkFifoWarningFor(i);
 }
 function setScannedTach(i, v){ if (scannedList[i]) scannedList[i].tach = v; }
 function removeScannedItem(i){
   scannedList.splice(i, 1);
   renderScannedList();
+  if (scannedList.length) checkFifoAll();
   if (!scannedList.length){ resetForNext(); }
 }
 
