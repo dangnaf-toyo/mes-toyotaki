@@ -966,6 +966,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/khuon-can-thiep.js?v=T261"></script>
 <script src="shared/su-co-mau.js?v=T302"></script>
 <script src="shared/thay-doi.js?v=T315"></script>
+<script src="shared/dk-duc.js?v=T322"></script>
 <script src="shared/navbar.js?v=T320"></script>
 <script>
 /* ============================================================================
@@ -1969,6 +1970,7 @@ async function loadShiftState(showLoader){
     updateLiveStatus('');
     startPolling();
     batDauThayDoi();   // T307
+    if (window.DkDuc) DkDuc.batDau(renderTable);   // T322
   } catch (e) {
     if (requestId !== state.currentRequestId) return;
     hideOverlay(); onError(e);
@@ -2568,7 +2570,8 @@ function makeRowHTML(row, stateClass, isActive){
   const moldIssueConfirmBanner = _renderMoldIssueConfirmBanner(row);
 
   const productHTML = '<span class="code">' + escapeHtml(row.ma_sp) + '</span>' +
-    '<span class="name">' + escapeHtml(row.ten_sp || '') + '</span>';
+    '<span class="name">' + escapeHtml(row.ten_sp || '') + '</span>' +
+    (window.DkDuc ? DkDuc.nut(row.ma_may, row.ma_sp) : '');   // T322: phiếu điều kiện đúc hiệu lực
 
   let pairBadge = '';
   if (row.khuon_kep_voi) {
