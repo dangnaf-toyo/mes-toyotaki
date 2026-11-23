@@ -1,7 +1,8 @@
 // T302/T304: chọn sự cố Đúc — chọn Loại → ô xổ xuống Vấn đề → ô xổ xuống Xử lý (điền vào ô chữ, vẫn sửa / gõ thêm được).
 // Danh mục: bảng duc_su_co_mau (ma, loai[], thu_tu, van_de, xu_ly[]). Bảng lỗi / chưa chạy SQL → không hiện nút, form như cũ.
 //
-// SuCoMau.gan({ loai, vanDe, xuLy, vanDeText })
+// T336: thêm bang ('gc_su_co_mau' cho Gia công), nhieu ({B1:1,...}); xuLy = null → chỉ chọn vấn đề.
+// SuCoMau.gan({ loai, vanDe, xuLy, vanDeText, bang, nhieu })
 //   loai      : <select> loại sự cố, hoặc chuỗi loại cố định ("F1 — ...")
 //   vanDe     : <textarea> vấn đề (null = không ghi vấn đề, nút vấn đề chỉ để lọc cách xử lý)
 //   xuLy      : <textarea> nội dung xử lý
@@ -9,20 +10,21 @@
 // B1/F1 cho chọn nhiều vấn đề. Gọi lại mỗi lần mở hộp (dùng lại khung nút đã tạo).
 (function () {
   if (window.SuCoMau) return;
-  let cache = null, dang = null;
-  function tai() {
-    if (cache) return Promise.resolve(cache);
-    if (dang) return dang;
-    dang = (async () => {
+  const cache = {}, dang = {};
+  function tai(bang) {
+    bang = bang || 'duc_su_co_mau';
+    if (cache[bang]) return Promise.resolve(cache[bang]);
+    if (dang[bang]) return dang[bang];
+    dang[bang] = (async () => {
       try {
-        const { data, error } = await sb.from('duc_su_co_mau').select('ma,loai,thu_tu,van_de,xu_ly').eq('hieu_luc', true).order('thu_tu');
+        const { data, error } = await sb.from(bang).select('ma,loai,thu_tu,van_de,xu_ly').eq('hieu_luc', true).order('thu_tu');
         if (error) throw error;
-        cache = data || [];
-      } catch (e) { console.warn('duc_su_co_mau:', e.message || e); cache = []; }
-      dang = null;
-      return cache;
+        cache[bang] = data || [];
+      } catch (e) { console.warn(bang + ':', e.message || e); cache[bang] = []; }
+      dang[bang] = null;
+      return cache[bang];
     })();
-    return dang;
+    return dang[bang];
   }
 
   let css = false;
@@ -30,7 +32,7 @@
     if (css) return; css = true;
     const st = document.createElement('style');
     st.textContent =
-      '.scm{margin:2px 0 6px}.scm:empty{display:none}' +
+      '.scm{margin:2px 0 6px;text-transform:none;letter-spacing:normal;font-weight:400}.scm:empty{display:none}' +
       '.scm button.scm-dd{display:flex;align-items:center;gap:6px;width:100%;padding:6px 10px;border:1px solid var(--border-strong,#CBD5E1);border-radius:6px;' +
         'background:var(--bg-panel,#fff);color:var(--text,#14181F);font-family:inherit;font-size:12px;line-height:1.35;cursor:pointer;text-align:left}' +
       '.scm button.scm-dd:hover,.scm button.scm-dd.mo{border-color:var(--accent,#2563EB)}' +
@@ -51,11 +53,11 @@
   const dsMo = new Set();
   document.addEventListener('mousedown', (e) => {
     if (e.target.closest && e.target.closest('.scm')) return;
-    dsMo.forEach((st) => { st.mo = {}; dsMo.delete(st); tai().then(st.ve); });
+    dsMo.forEach((st) => { st.mo = {}; dsMo.delete(st); st.tai().then(st.ve); });
   });
 
   const maLoai = (v) => String(v || '').trim().split(/[\s—–-]/)[0].toUpperCase();
-  const NHIEU = { B1: 1, F1: 1 };
+  const NHIEU_MAC_DINH = { B1: 1, F1: 1 };
   const chuan = (s) => String(s || '').toLowerCase().normalize('NFC');
   const coChu = (txt, cum) => chuan(txt).indexOf(chuan(cum)) >= 0;
 
@@ -89,7 +91,7 @@
     m.className = 'scm-dd-m';
     m.textContent = mo ? '▴' : '▾';
     b.append(t, m);
-    b.onclick = () => { st.mo = mo ? {} : { [khoa]: 1 }; st.mo[khoa] ? dsMo.add(st) : dsMo.delete(st); tai().then(st.ve); };
+    b.onclick = () => { st.mo = mo ? {} : { [khoa]: 1 }; st.mo[khoa] ? dsMo.add(st) : dsMo.delete(st); st.tai().then(st.ve); };
     hopEl.appendChild(b);
     if (!mo) return null;
     const ds = document.createElement('div');
@@ -114,13 +116,15 @@
 
   function gan(o) {
     napCss();
-    const ta = o.xuLy;
-    if (!ta) return;
-    const st = ta._scm || (ta._scm = {});
+    const ta = o.xuLy, goc = ta || o.vanDe;   // goc: ô giữ trạng thái (ô xử lý, hoặc ô vấn đề khi không có ô xử lý)
+    if (!goc) return;
+    const st = goc._scm || (goc._scm = {});
     st.o = o;
+    st.tai = () => tai(o.bang);
+    const NHIEU = o.nhieu || NHIEU_MAC_DINH;
     st.chon = null;   // null = chưa chọn tay → tự khớp theo chữ vấn đề
     st.mo = {};       // danh sách đang xổ: { vd: 1 } hoặc { xl: 1 }
-    const hopVd = hop(o.vanDe || ta), hopXl = o.vanDe ? hop(ta) : (st.hopXl || (st.hopXl = (() => {
+    const hopVd = hop(o.vanDe || ta), hopXl = !ta ? null : o.vanDe ? hop(ta) : (st.hopXl || (st.hopXl = (() => {
       const d = document.createElement('div'); d.className = 'scm'; hopVd.after(d); return d;
     })()));
     if (!o.vanDe) hopVd.classList.add('scm-vd');
@@ -129,7 +133,7 @@
     function ve(list) {
       const code = loaiNow();
       const ds = list.filter((x) => (x.loai || []).indexOf(code) >= 0);
-      hopVd.innerHTML = ''; hopXl.innerHTML = '';
+      hopVd.innerHTML = ''; if (hopXl) hopXl.innerHTML = '';
       if (!ds.length) return;
       const nhieu = !!NHIEU[code];
       const txtVd = o.vanDe ? o.vanDe.value : (o.vanDeText || '');
@@ -162,6 +166,7 @@
         if (o.vanDe) dsVd.appendChild(opt('Khác… (tự gõ)', false, () => { dong(); ve(list); o.vanDe.focus(); }, true));
       }
 
+      if (!ta) return;
       const xl = [];
       st.chon.forEach((m) => { const x = ds.find((y) => y.ma === m); (x && x.xu_ly || []).forEach((t) => { if (xl.indexOf(t) < 0) xl.push(t); }); });
       if (!xl.length) return;
@@ -175,15 +180,15 @@
       dsXl.appendChild(opt('Khác… (tự gõ)', false, () => { dong(); ve(list); ta.focus(); }, true));
     }
 
-    const veLai = () => tai().then(ve);
+    const veLai = () => st.tai().then(ve);
     if (o.loai && typeof o.loai !== 'string' && !o.loai._scmNghe) {
       o.loai._scmNghe = true;
-      o.loai.addEventListener('change', () => { if (ta._scm.o.loai === o.loai) { ta._scm.chon = null; tai().then(ta._scm.ve); } });
+      o.loai.addEventListener('change', () => { if (goc._scm.o.loai === o.loai) { goc._scm.chon = null; goc._scm.tai().then(goc._scm.ve); } });
     }
-    if (!ta._scmNghe) {   // gõ tay → cập nhật dấu ✓ trên nút
-      ta._scmNghe = true;
+    if (!goc._scmNghe) {   // gõ tay → cập nhật dấu ✓ trên nút
+      goc._scmNghe = true;
       let hen = null;
-      ta.addEventListener('input', () => { clearTimeout(hen); hen = setTimeout(() => tai().then(ta._scm.ve), 250); });
+      goc.addEventListener('input', () => { clearTimeout(hen); hen = setTimeout(() => goc._scm.tai().then(goc._scm.ve), 250); });
     }
     st.ve = ve;
     veLai();
