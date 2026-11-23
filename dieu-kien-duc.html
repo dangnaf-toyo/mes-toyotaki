@@ -90,6 +90,7 @@ table.ts{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .ts td.so{text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px}
 .ts td.cp{white-space:nowrap;color:var(--text-muted);font-size:11.5px}
 .ts td.ngoai{background:#FEF9C3}
+.ts td.ttc{font-weight:700}.ts td[data-tt]{cursor:pointer}.ts td .but{color:var(--text-dim);font-size:11px;font-weight:400}
 .ts .ma{color:var(--text-dim);font-size:11px;margin-right:4px}
 .ts .bb{color:var(--alarm-fg);font-weight:700}
 .ts input,.ts select{width:100%;min-width:90px;padding:4px 6px}
@@ -163,6 +164,7 @@ table.ss.chi-khac tr.giong{display:none}
 <body>
 <div id="msg"></div>
 <dialog class="xn" id="dlgXn"><p id="xnNd"></p><div class="nut"><button type="button" class="btn btn-outline" id="xnHuy">Huỷ</button><button type="button" class="btn" id="xnOk">Đồng ý</button></div></dialog>
+<dialog class="xn" id="dlgTt"><p><b>Thực tế đang cài</b><br><span id="ttTen"></span></p><input id="ttGt" type="text" maxlength="200" style="width:100%;margin-bottom:12px"><div class="nut"><button type="button" class="btn btn-outline" id="ttHuy">Huỷ</button><button type="button" class="btn" id="ttOk">Lưu</button></div></dialog>
 <input type="file" id="fileAnh" accept="image/*" multiple hidden>
 <input type="file" id="fileTep" accept=".pdf,.xlsx,.xls,.doc,.docx" multiple hidden>
 <input type="file" id="fileXlsx" accept=".xlsx,.xls" hidden>
@@ -399,18 +401,54 @@ function giaTriTho(t, p){   // chữ thô (chưa esc)
   return g.gia_tri_chu || '';
 }
 function giaTriXem(t, p){ return esc(giaTriTho(t, p)); }
+// T331: Thực tế đang cài trên máy (chỉ phiếu Hiệu lực)
+const TT_NGUON = { xac_nhan: 'Xác nhận lên khuôn', thay_doi: 'Điểm thay đổi', hoan: 'Hoàn (thay đổi bị huỷ / không duyệt)', sua_tay: 'Kỹ thuật sửa' };
+function thucTeTho(t, r){
+  if (!r) return '';
+  if (t.kieu === 'so') return r.gia_tri != null ? soVi(r.gia_tri) : '';
+  if (t.kieu === 'co_khong') return r.gia_tri_chu === 'co' ? 'Có' : r.gia_tri_chu === 'khong' ? 'Không' : '';
+  return r.gia_tri_chu || '';
+}
+function thucTeO(t, p){
+  const r = p.tt[t.ma_ts], v = thucTeTho(t, r), g = p.gt[t.ma_ts];
+  const ngoai = r && t.kieu === 'so' && r.gia_tri != null && coSo(g) && !trongCP(t, g, Number(r.gia_tri));
+  const sua = quyen.lap && t.kieu !== 'chon_nvl';
+  const tip = r ? TT_NGUON[r.nguon] + (r.nguon === 'thay_doi' && r.id_nguon ? ' TD-' + r.id_nguon : '') + ' · ' + (r.nguoi || '') + ' ' + fmtTs(r.luc) : '';
+  return '<td class="' + (t.kieu === 'so' ? 'so' : 'gt') + ' ttc' + (ngoai ? ' ngoai' : '') + '"' + (tip ? ' title="' + esc(tip) + '"' : '') +
+    (sua ? ' data-act="tt" data-tt="' + t.ma_ts + '"' : '') + '>' +
+    (v ? esc(v) : '<span style="color:var(--text-dim)">—</span>') + (sua ? ' <span class="but">✎</span>' : '') + '</td>';
+}
+async function suaThucTe(p, maTs){
+  const t = TS.find(x => x.ma_ts === maTs); if (!t) return;
+  const d = $('dlgTt'), ip = $('ttGt');
+  $('ttTen').textContent = t.ten + (t.don_vi ? ' (' + t.don_vi + ')' : '');
+  ip.value = thucTeTho(t, p.tt[maTs]);
+  ip.placeholder = t.kieu === 'co_khong' ? 'Có / Không' : t.kieu === 'so' ? 'Số' : '';
+  ip.inputMode = t.kieu === 'so' ? 'decimal' : 'text';
+  const ok = await new Promise(res => {
+    const xong = v => { $('ttOk').onclick = $('ttHuy').onclick = d.oncancel = null; d.close(); res(v); };
+    $('ttOk').onclick = () => xong(true); $('ttHuy').onclick = () => xong(false); d.oncancel = e => { e.preventDefault(); xong(false); };
+    d.showModal(); setTimeout(() => ip.select(), 30);
+  });
+  if (!ok) return;
+  const { error } = await sb.rpc('duc_dk_thuc_te_sua', { p_ma_may: p.ma_may, p_ma_sp: p.ma_sp, p_ma_ts: maTs, p_gia_tri: ip.value });
+  if (error) return showMsg('⛔ ' + error.message, 'err');
+  showMsg('Đã lưu Thực tế'); veXem(p.id);
+}
 function bangXem(p, loai){
+  const coTT = !!p.tt;
   return '<div class="luoi">' + Object.keys(NHOM).map(nh => {
     const ds = tsApDung(loai).filter(t => t.nhom === nh && hienDong(t, p.gt));
     if (!ds.length) return '';
     return '<section class="card" style="padding:8px"><div class="card-title">' + nh + ' · ' + esc(NHOM[nh]) + '</div><div class="tw"><table class="ts">' +
-      '<thead><tr><th>Thông số</th><th>Chuẩn</th><th>ĐV</th><th>Cho phép</th></tr></thead><tbody>' +
+      '<thead><tr><th>Thông số</th><th>Chuẩn</th>' + (coTT ? '<th title="Giá trị đang cài trên máy: lấy từ lần xác nhận lên khuôn, đổi theo Điểm thay đổi đã áp dụng">Thực tế</th>' : '') + '<th>ĐV</th><th>Cho phép</th></tr></thead><tbody>' +
       ds.map(t => {
         const g = p.gt[t.ma_ts], v = g && t.kieu === 'so' ? Number(g.chuan) : null, gy = goiYChu(t, loai);
         const ngoai = t.kieu === 'so' && ngoaiGoiYG(t, loai, g);
         return '<tr><td><span class="ma">' + t.ma_ts + '</span>' + esc(t.ten) + (batBuoc(t, loai) ? ' <span class="bb">*</span>' : '') +
             (gy ? '<i class="i" data-gy="' + esc(gy) + '">i</i>' : '') + (g && g.ghi_chu ? '<small class="hint">' + esc(g.ghi_chu) + '</small>' : '') + '</td>' +
           '<td class="' + (t.kieu === 'so' ? 'so' : 'gt') + (ngoai ? ' ngoai' : '') + '"' + (ngoai ? ' title="' + esc(gy) + '"' : '') + '>' + (giaTriXem(t, p) || '<span style="color:var(--text-dim)">—</span>') + '</td>' +
+          (coTT ? thucTeO(t, p) : '') +
           '<td>' + esc(t.don_vi || '') + '</td>' +
           '<td class="cp">' + (t.kieu === 'so' && coSo(g) ? esc(choPhep(t, v, g)) : '') + '</td></tr>';
       }).join('') + '</tbody></table></div></section>';
@@ -472,6 +510,10 @@ async function veXem(id){
   v.innerHTML = '<section class="card"><div class="empty">Đang tải…</div></section>';
   const p = await taiPhieu(id);
   if (!p) { v.innerHTML = '<section class="card"><div class="empty">Không tìm thấy phiếu.</div></section>'; return; }
+  if (p.trang_thai === 'hieu_luc') {   // T331
+    const { data: tt } = await sb.from('duc_dk_thuc_te').select('*').eq('ma_may', p.ma_may).eq('ma_sp', p.ma_sp).range(0, 199);
+    p.tt = {}; (tt || []).forEach(r => { p.tt[r.ma_ts] = r; });
+  }
   const loai = loaiMay(p.ma_may) || 'nhom';
   const cacLan = DS.filter(x => x.ma_may === p.ma_may && x.ma_sp === p.ma_sp).sort((a, b) => a.lan - b.lan);
   const laLap = quyen.lap && (p.nguoi_lap === uid || quyen.admin);
@@ -521,6 +563,7 @@ async function veXem(id){
     if (!b) return;
     const act = b.dataset.act;
     if (act === 'sua') return urlDi('id=' + p.id + '&sua=1');
+    if (act === 'tt') return suaThucTe(p, b.dataset.tt);
     if (act === 'gui') return gui(p);
     if (act === 'huy') return huyNhap(p);
     if (act === 'dongy' || act === 'tra') return kiemDuyet(p, act === 'dongy');

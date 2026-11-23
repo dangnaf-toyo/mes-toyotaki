@@ -188,12 +188,26 @@
 
     // Giá trị chuẩn + giá trị "Sau" lần gần nhất (tự điền ô Trước)
     // T323: chuẩn nguồn 'phieu_dk' = Chuẩn của phiếu ĐK đúc hiệu lực → ô Trước lấy từ phiếu (trừ khi đã có thay đổi sau lúc phiếu hiệu lực)
-    const [chuanRes, cuRes, dkRes] = await Promise.all([
+    const [chuanRes, cuRes, dkRes, ttRes, nhRes] = await Promise.all([
       sb.from('duc_thay_doi_chuan').select('ma_muc,gia_tri,nguon').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp),
       sb.from('duc_thay_doi').select('chi_tiet,trang_thai,thoi_diem_ap_dung,thoi_diem_ghi').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp)
         .in('trang_thai', ['cho_ipqc', 'ok', 'ng', 'ghi_nhan', 'khong_kiem']).order('id', { ascending: false }).limit(60),
       sb.from('duc_dk_phieu').select('id,lan,hieu_luc_tu,ma_nvl').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp).eq('trang_thai', 'hieu_luc').maybeSingle(),
+      sb.from('duc_dk_thuc_te').select('ma_ts,gia_tri,gia_tri_chu').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp).range(0, 199),
+      sb.from('duc_dk_thong_so').select('ma_ts,ma_muc_td,kieu').not('ma_muc_td', 'is', null).range(0, 199),
     ]);
+    // T331: Thực tế đang cài — mục nối 1–1 với thông số cùng kiểu → ô Trước tự điền + khoá (server cũng chặn)
+    const thucTe = {};
+    {
+      const tt = {}; (ttRes.data || []).forEach(r => { tt[r.ma_ts] = r; });
+      const theoMuc = {}; (nhRes.data || []).forEach(x => { (theoMuc[x.ma_muc_td] = theoMuc[x.ma_muc_td] || []).push(x); });
+      Object.entries(theoMuc).forEach(([ma, a]) => {
+        if (a.length !== 1 || !tt[a[0].ma_ts]) return;
+        const r = tt[a[0].ma_ts];
+        if (a[0].kieu === 'so' && r.gia_tri != null) thucTe[ma] = { so: true, v: Number(r.gia_tri) };
+        else if (a[0].kieu === 'chu' && r.gia_tri_chu) thucTe[ma] = { so: false, v: r.gia_tri_chu };
+      });
+    }
     const chuan = {}, tuPhieu = {};
     (chuanRes.data || []).forEach(c => { chuan[c.ma_muc] = Number(c.gia_tri); if (c.nguon === 'phieu_dk') tuPhieu[c.ma_muc] = true; });
     const dk = dkRes.data || null, dkTu = dk && dk.hieu_luc_tu ? new Date(dk.hieu_luc_tu).getTime() : 0;
@@ -266,7 +280,7 @@
         const m = byMa[c.ma], so = m.kieu_nhap === 'so';
         const kieu = so ? ' type="text" inputmode="decimal"' : ' type="text" maxlength="200"';
         return '<div class="muc" data-i="' + i + '"><div class="t"><span>' + esc(m.ma) + ' ' + esc(m.ten) + '</span><button type="button" class="xoa" title="Bỏ mục">✕</button></div>' +
-          '<div class="v"><input class="truoc"' + kieu + ' placeholder="Trước" value="' + esc(c.truoc) + '"><span>→</span>' +
+          '<div class="v"><input class="truoc"' + kieu + ' placeholder="Trước" value="' + esc(c.truoc) + '"' + (c.khoa ? ' readonly title="Thực tế đang cài trên máy" style="background:#F1F5F9"' : '') + '><span>→</span>' +
             '<input class="sau"' + kieu + ' placeholder="Sau *" value="' + esc(c.sau) + '">' + (m.don_vi ? '<span class="dv">' + esc(m.don_vi) + '</span>' : '') + '</div>' +
           (m.tu_chon ? '<div class="zz"><select class="zipqc"><option value="0">Không cần IPQC</option><option value="1"' + (c.can_ipqc ? ' selected' : '') + '>Cần IPQC</option></select>' +
             '<select class="zduyet">' + Object.keys(DUYET).map(k => '<option value="' + k + '"' + ((c.nguoi_duyet || 'khong') === k ? ' selected' : '') + '>Duyệt: ' + DUYET[k] + '</option>').join('') + '</select></div>' : '') +
@@ -312,10 +326,10 @@
         const ma = bm.dataset.ma, i = st.chon.findIndex(c => c.ma === ma);
         if (i >= 0) st.chon.splice(i, 1);
         else {
-          const m = byMa[ma];
-          const truoc = ma in ganNhat ? ganNhat[ma] : (ma in chuan ? chuan[ma]
+          const m = byMa[ma], tt = thucTe[ma] && thucTe[ma].so === (m.kieu_nhap === 'so') ? thucTe[ma] : null;
+          const truoc = tt ? tt.v : ma in ganNhat ? ganNhat[ma] : (ma in chuan ? chuan[ma]
             : (m.kieu_nhap !== 'so' && dkChu[ma] ? dkChu[ma].join(' · ') : ''));
-          st.chon.push({ ma, truoc: m.kieu_nhap === 'so' ? soVi(truoc) : (truoc || ''), sau: '', can_ipqc: false, nguoi_duyet: 'khong' });
+          st.chon.push({ ma, truoc: m.kieu_nhap === 'so' ? soVi(truoc) : (truoc || ''), khoa: !!tt, sau: '', can_ipqc: false, nguoi_duyet: 'khong' });
         }
         veNhom(); veChon(); return;
       }
