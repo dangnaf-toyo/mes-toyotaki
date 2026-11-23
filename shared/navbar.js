@@ -280,8 +280,14 @@ body{padding-top:var(--navbar-h)}
 .mnb-bell svg{display:block}
 .mnb-bell-n{position:absolute;top:2px;right:1px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#DC2626;color:#fff;font-size:11px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px #211a15;box-sizing:border-box}
 .mnb-bell-n[hidden]{display:none}
+.mnb-fs{display:inline-flex;flex-shrink:0;width:40px;height:40px;border-radius:8px;align-items:center;justify-content:center;background:none;border:none;color:#e8e0d5;cursor:pointer;padding:0}
+.mnb-fs:hover,.mnb-fs:focus-visible{color:#fff;background:rgba(255,255,255,.09)}
+.mnb-fs svg{display:block}
+.mnb-fs[hidden]{display:none}
 @media (max-width:820px){
   .mnb-bell{margin-left:auto}
+  .mnb-fs{margin-left:auto}
+  .mnb-bell.on + .mnb-fs{margin-left:0}
   .mnb-groups{display:none;position:fixed;top:var(--navbar-h);left:0;right:0;bottom:0;
     background:#fff;flex-direction:column;overflow-y:auto;padding:8px;z-index:4999}
   .mnb-groups.open{display:flex}
@@ -427,9 +433,10 @@ body{padding-top:var(--navbar-h)}
       '<button type="button" class="mnb-burger" id="mnbBurger">☰</button>' +
       '<a href="index.html" class="mnb-logo">TOYOTAKI <span>MES</span></a>' +
       '<div class="mnb-groups" id="mnbGroups"></div>' +
-      BELL_HTML +
+      BELL_HTML + FS_HTML +
       '<div class="mnb-auth" id="mnbAuth">…</div>';
     document.body.insertBefore(bar, document.body.firstChild);
+    ganNutToanManHinh();
 
     if (typeof IS_STAGING !== 'undefined' && IS_STAGING) {
       const stagingBanner = document.createElement('div');
@@ -546,6 +553,35 @@ body{padding-top:var(--navbar-h)}
       '<span class="mnb-bell-n" id="mnbBellN" hidden></span>' +
     '</a>';
   let bellUid = null, bellStopped = false, bellBusy = false, bellTimer = null;
+
+  // T316: nút toàn màn hình chung cho mọi màn (trước chỉ có ở Bảng điều khiển Đúc).
+  // Trình duyệt tự thoát toàn màn hình khi chuyển trang — giới hạn của trình duyệt.
+  // Máy không hỗ trợ (iPhone Safari) → ẩn nút.
+  const FS_VAO = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>';
+  const FS_RA = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"></path></svg>';
+  const FS_HTML = '<button type="button" class="mnb-fs" id="mnbFs" title="Toàn màn hình" aria-label="Toàn màn hình" hidden>' + FS_VAO + '</button>';
+  function ganNutToanManHinh() {
+    const b = document.getElementById('mnbFs');
+    const d = document, el = d.documentElement;
+    const vao = el.requestFullscreen || el.webkitRequestFullscreen;
+    const ra = d.exitFullscreen || d.webkitExitFullscreen;
+    if (!b || !vao || !ra) return;
+    const dang = () => !!(d.fullscreenElement || d.webkitFullscreenElement);
+    const ve = () => {
+      const on = dang();
+      b.innerHTML = on ? FS_RA : FS_VAO;
+      b.title = on ? 'Thoát toàn màn hình' : 'Toàn màn hình';
+      b.setAttribute('aria-label', b.title);
+    };
+    b.hidden = false;
+    b.addEventListener('click', () => {
+      try {
+        const r = dang() ? ra.call(d) : vao.call(el);
+        if (r && r.catch) r.catch(() => {});
+      } catch (e) {}
+    });
+    ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => d.addEventListener(ev, ve));
+  }
   async function refreshBell() {
     const el = document.getElementById('mnbBell');
     if (!el || bellStopped || bellBusy || !bellUid) return;
