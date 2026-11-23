@@ -589,6 +589,7 @@
               <div><label for="dungcu-tuoitho">Tuổi thọ dự kiến (lần bắn)</label><input type="number" min="0" step="1" id="dungcu-tuoitho"></div>
               <div><label for="dungcu-vl">Vật liệu</label><input type="text" autocomplete="off" id="dungcu-vl" maxlength="40" list="dungcu-vl-ds" placeholder="vd: SKD61"><datalist id="dungcu-vl-ds"><option value="SKD61"><option value="Đồng berili"><option value="H13"><option value="Gang chịu nhiệt"></datalist></div>
               <div><label for="dungcu-ncc">Nhà cung cấp</label><input type="text" autocomplete="off" id="dungcu-ncc" maxlength="60"></div>
+              <div><label for="dungcu-gia">Đơn giá (đ/cái)</label><input type="number" min="0" step="1000" id="dungcu-gia" placeholder="Giá mua gần nhất"></div>
               <div style="grid-column:1/-1"><label>Máy dùng được</label><div class="dc-may" id="dungcu-may"></div></div>
               <div style="grid-column:1/-1"><label>Ảnh / bản vẽ</label><div class="dc-anh" id="dungcu-anh"></div>
                 <input type="file" id="dungcu-file" accept="image/*" multiple hidden>
@@ -1489,7 +1490,7 @@ function dcFillForm(r){
   clearMsg('dungcu-msg');
   const g = (id, v) => { document.getElementById(id).value = v ?? ''; };
   g('dungcu-loai', r.loai); g('dungcu-dk', r.duong_kinh); g('dungcu-ma', r.ma); g('dungcu-ten', r.ten); g('dungcu-dai', r.chieu_dai);
-  g('dungcu-tuoitho', r.tuoi_tho_du_kien); g('dungcu-vl', r.vat_lieu); g('dungcu-ncc', r.nha_cung_cap); g('dungcu-ghichu', r.ghi_chu);
+  g('dungcu-tuoitho', r.tuoi_tho_du_kien); g('dungcu-vl', r.vat_lieu); g('dungcu-ncc', r.nha_cung_cap); g('dungcu-gia', r.don_gia); g('dungcu-ghichu', r.ghi_chu);
   document.getElementById('dungcu-ten').dataset.tuDien = '';
   document.getElementById('dungcu-hien').checked = r.hien !== false;
   // Mã đã dùng trên phiếu thì không đổi → khoá Mã + Loại + Φ + Dài (nằm trong mã).
@@ -1516,8 +1517,10 @@ document.getElementById('dungcu-form').addEventListener('submit', async (e) => {
   }
   const may = dcMayDs.map(m => m.ma_may).filter(m => dcMaySel.has(m));
   if (!may.length) return showMsg('dungcu-msg', 'error', 'Chọn ít nhất 1 máy dùng được');
-  const tt = soHoacNull('dungcu-tuoitho');
+  const tt = soHoacNull('dungcu-tuoitho'), gia = soHoacNull('dungcu-gia');
+  if (gia != null && gia < 0) return showMsg('dungcu-msg', 'error', 'Đơn giá không âm');
   const payload = {
+    don_gia: gia != null ? Math.round(gia) : null,
     ten, duong_kinh: dk, chieu_dai: dai,
     vat_lieu: document.getElementById('dungcu-vl').value.trim() || null,
     nha_cung_cap: document.getElementById('dungcu-ncc').value.trim() || null,
@@ -1563,6 +1566,7 @@ initCatalog({
     { k: 'vat_lieu', label: 'Vật liệu / NCC', text: () => '', render: r => [r.vat_lieu, r.nha_cung_cap].filter(Boolean).map(escapeHtml).join('<br>') || DASH },
     { k: 'may_dung', label: 'Máy dùng được', text: r => (r.may_dung || []).join(' '), render: r => (r.may_dung || []).length ? '<span style="font-size:12px">' + escapeHtml(r.may_dung.join(', ')) + '</span>' : DASH },
     { k: 'tuoi_tho_du_kien', label: 'Tuổi thọ', sortable: true, sortVal: r => r.tuoi_tho_du_kien || 0, text: () => '', render: r => r.tuoi_tho_du_kien ? Number(r.tuoi_tho_du_kien).toLocaleString('vi-VN') : DASH },
+    { k: 'don_gia', label: 'Đơn giá', sortable: true, sortVal: r => Number(r.don_gia) || 0, text: () => '', render: r => r.don_gia != null ? Number(r.don_gia).toLocaleString('vi-VN') : DASH },
   ],
 });
 
