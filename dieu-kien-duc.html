@@ -225,6 +225,30 @@ function fmtTs(ts){ if (!ts) return ''; const d = new Date(ts); return pad(d.get
 function fmtNgay(ts){ if (!ts) return ''; const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); }
 const soVi = v => (v == null || v === '') ? '' : String(Number(Number(v).toFixed(3))).replace('.', ',');
 const docSo = s => { s = String(s ?? '').trim().replace(',', '.'); return s === '' ? null : (isFinite(Number(s)) ? Number(s) : NaN); };
+// T327: ô số nhận "a ~ b" (khoảng theo QCP) hoặc 1 số. Trả { chuan, cp_min, cp_max } hoặc { loi }.
+function docKhoang(s){
+  const t = String(s ?? '').trim();
+  if (t === '') return { chuan: null, cp_min: null, cp_max: null };
+  const m = t.split(/\s*(?:~|–|—|\s-\s)\s*/);
+  if (m.length === 2) {
+    const a = docSo(m[0]), b = docSo(m[1]);
+    if (a == null || b == null || isNaN(a) || isNaN(b)) return { loi: t };
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    return { chuan: lo === hi ? lo : null, cp_min: lo, cp_max: hi };
+  }
+  const v = docSo(t);
+  return isNaN(v) ? { loi: t } : { chuan: v, cp_min: null, cp_max: null };
+}
+const coKhoang = g => !!g && g.cp_min != null && g.cp_max != null;
+const coSo = g => !!g && (g.chuan != null || coKhoang(g));
+// Chữ ô Chuẩn: khoảng → "a ~ b", cố định / chỉ chuẩn → "a"
+const chuanChu = g => !g ? '' : coKhoang(g) && Number(g.cp_min) !== Number(g.cp_max) ? soVi(g.cp_min) + ' ~ ' + soVi(g.cp_max) : soVi(g.chuan ?? g.cp_min);
+// Trong khoảng cho phép? (khoảng phiếu, không thì Chuẩn ± ngưỡng %)
+function trongCP(t, g, v){
+  if (coKhoang(g)) return v >= Number(g.cp_min) - 1e-9 && v <= Number(g.cp_max) + 1e-9;
+  const c = Number(g.chuan), d = Math.abs(c) * Number((t && t.nguong_pct) ?? 5) / 100;
+  return Math.abs(v - c) <= d + 1e-9;
+}
 let msgT = null;
 function showMsg(t, cls){ const el = $('msg'); el.textContent = t; el.className = cls || 'ok'; clearTimeout(msgT); msgT = setTimeout(() => { el.className = ''; }, cls === 'err' ? 7000 : 4500); }
 window.showToast = (t, loi) => showMsg(t, loi ? 'err' : 'ok');
@@ -252,6 +276,10 @@ function toiCho(p){
 }
 function tsApDung(loai){ return TS.filter(t => t.ap_dung === 'ca_hai' || t.ap_dung === loai); }
 function goiY(t, loai){ return loai === 'kem' ? [t.goi_y_kem_min, t.goi_y_kem_max] : [t.goi_y_nhom_min, t.goi_y_nhom_max]; }
+function ngoaiGoiYG(t, loai, g){
+  if (!coSo(g)) return false;
+  return coKhoang(g) ? ngoaiGoiY(t, loai, Number(g.cp_min)) || ngoaiGoiY(t, loai, Number(g.cp_max)) : ngoaiGoiY(t, loai, Number(g.chuan));
+}
 function ngoaiGoiY(t, loai, v){
   if (v == null || isNaN(v)) return false;
   const [a, b] = goiY(t, loai);
@@ -263,7 +291,8 @@ function goiYChu(t, loai){
   return 'Gợi ý HPDC ' + (a != null ? soVi(a) : '…') + ' – ' + (b != null ? soVi(b) : '…') + (t.don_vi ? ' ' + t.don_vi : '');
 }
 function batBuoc(t, loai){ return loai === 'kem' ? t.bat_buoc_kem : t.bat_buoc_nhom; }
-function choPhep(t, v){
+function choPhep(t, v, g){
+  if (coKhoang(g)) return Number(g.cp_min) === Number(g.cp_max) ? 'Đúng ' + soVi(g.cp_min) : soVi(g.cp_min) + ' – ' + soVi(g.cp_max);
   if (v == null || isNaN(v)) return '';
   const n = Number(t.nguong_pct ?? 5), d = Math.abs(v) * n / 100;
   return soVi(v - d) + ' – ' + soVi(v + d) + ' (±' + soVi(n) + '%)';
@@ -366,7 +395,7 @@ function giaTriTho(t, p){   // chữ thô (chưa esc)
   if (t.kieu === 'chon_nvl') return p.ma_nvl || '';
   if (!g) return '';
   if (t.kieu === 'co_khong') return g.gia_tri_chu === 'co' ? 'Có' : g.gia_tri_chu === 'khong' ? 'Không' : '';
-  if (t.kieu === 'so') return soVi(g.chuan);
+  if (t.kieu === 'so') return chuanChu(g);
   return g.gia_tri_chu || '';
 }
 function giaTriXem(t, p){ return esc(giaTriTho(t, p)); }
@@ -378,12 +407,12 @@ function bangXem(p, loai){
       '<thead><tr><th>Thông số</th><th>Chuẩn</th><th>ĐV</th><th>Cho phép</th></tr></thead><tbody>' +
       ds.map(t => {
         const g = p.gt[t.ma_ts], v = g && t.kieu === 'so' ? Number(g.chuan) : null, gy = goiYChu(t, loai);
-        const ngoai = t.kieu === 'so' && g && g.chuan != null && ngoaiGoiY(t, loai, v);
+        const ngoai = t.kieu === 'so' && ngoaiGoiYG(t, loai, g);
         return '<tr><td><span class="ma">' + t.ma_ts + '</span>' + esc(t.ten) + (batBuoc(t, loai) ? ' <span class="bb">*</span>' : '') +
             (gy ? '<i class="i" data-gy="' + esc(gy) + '">i</i>' : '') + (g && g.ghi_chu ? '<small class="hint">' + esc(g.ghi_chu) + '</small>' : '') + '</td>' +
           '<td class="' + (t.kieu === 'so' ? 'so' : 'gt') + (ngoai ? ' ngoai' : '') + '"' + (ngoai ? ' title="' + esc(gy) + '"' : '') + '>' + (giaTriXem(t, p) || '<span style="color:var(--text-dim)">—</span>') + '</td>' +
           '<td>' + esc(t.don_vi || '') + '</td>' +
-          '<td class="cp">' + (t.kieu === 'so' && g && g.chuan != null ? esc(choPhep(t, v)) : '') + '</td></tr>';
+          '<td class="cp">' + (t.kieu === 'so' && coSo(g) ? esc(choPhep(t, v, g)) : '') + '</td></tr>';
       }).join('') + '</tbody></table></div></section>';
   }).join('') + '</div>';
 }
@@ -427,8 +456,9 @@ async function xacNhanXem(p){
   const tenTs = m => { const t = TS.find(x => x.ma_ts === m); return t ? t.ten : m; };
   const dong = x => {
     const td = new Map((x.lech || []).map(l => [l.ma_ts, l.td]));
-    const lech = Object.entries(x.gia_tri || {}).filter(([m, v]) => v !== 'dung' && p.gt[m] && p.gt[m].chuan != null && Number(v) !== Number(p.gt[m].chuan))
-      .map(([m, v]) => esc(tenTs(m)) + ' ' + esc(v) + ' <small>(chuẩn ' + esc(p.gt[m].chuan) + (td.has(m) ? ', <a href="diem-thay-doi.html?id=' + Number(td.get(m)) + '">TD-' + Number(td.get(m)) + '</a>' : '') + ')</small>');
+    const lech = Object.entries(x.gia_tri || {}).filter(([m, v]) => v !== 'dung' && coSo(p.gt[m]) &&
+        (coKhoang(p.gt[m]) ? !trongCP(null, p.gt[m], Number(v)) : Number(v) !== Number(p.gt[m].chuan)))
+      .map(([m, v]) => esc(tenTs(m)) + ' ' + esc(soVi(v)) + ' <small>(chuẩn ' + esc(chuanChu(p.gt[m])) + (td.has(m) ? ', <a href="diem-thay-doi.html?id=' + Number(td.get(m)) + '">TD-' + Number(td.get(m)) + '</a>' : '') + ')</small>');
     return '<li><b>' + esc(fmtTs(x.luc)) + '</b> · ' + esc(x.ma_may) + ' · ' + esc(x.nguoi_ten || '') +
       (lech.length ? '<br><span style="color:#B45309">Khác chuẩn: ' + lech.join('; ') + '</span>' : ' — <span style="color:#047857">đúng chuẩn</span>') + '</li>';
   };
@@ -614,7 +644,7 @@ function giaTriSua(t){
   const g = ed.gt[t.ma_ts];
   if (t.kieu === 'chon_nvl') return ed.ma_nvl || '';
   if (!g) return '';
-  return t.kieu === 'so' ? soVi(g.chuan) : (g.gia_tri_chu || '');
+  return t.kieu === 'so' ? (coKhoang(g) ? soVi(g.cp_min) + ' ~ ' + soVi(g.cp_max) : soVi(g.chuan)) : (g.gia_tri_chu || '');
 }
 function bangSua(loai){
   return Object.keys(NHOM).map(nh => {
@@ -625,7 +655,7 @@ function bangSua(loai){
       ds.map(t => {
         const gy = goiYChu(t, loai), val = giaTriSua(t);
         let o;
-        if (t.kieu === 'so') o = '<input class="so" data-ts="' + t.ma_ts + '" inputmode="decimal" value="' + esc(val) + '">';
+        if (t.kieu === 'so') o = '<input class="so" data-ts="' + t.ma_ts + '" value="' + esc(val) + '" placeholder="a ~ b">';
         else if (t.kieu === 'co_khong') o = '<select data-ts="' + t.ma_ts + '"' + (TS.some(x => x.phu_thuoc === t.ma_ts) ? ' data-pt="1"' : '') + '><option value="">—</option><option value="co"' + (val === 'co' ? ' selected' : '') + '>Có</option><option value="khong"' + (val === 'khong' ? ' selected' : '') + '>Không</option></select>';
         else if (t.kieu === 'chon_nvl') o = '<select data-ts="' + t.ma_ts + '"><option value="">—</option>' + NVL.map(n => '<option value="' + esc(n.ma_nvl) + '"' + (n.ma_nvl === val ? ' selected' : '') + '>' + esc(n.ma_nvl) + (n.ten_nvl ? ' · ' + esc(n.ten_nvl) : '') + '</option>').join('') +
           (val && !NVL.some(n => n.ma_nvl === val) ? '<option selected>' + esc(val) + '</option>' : '') + '</select>';
@@ -636,11 +666,11 @@ function bangSua(loai){
   }).join('');
 }
 function toMau(i, loai){
-  const t = TS.find(x => x.ma_ts === i.dataset.ts), v = docSo(i.value);
+  const t = TS.find(x => x.ma_ts === i.dataset.ts), k = docKhoang(i.value);
   const cp = document.querySelector('[data-cp="' + t.ma_ts + '"]');
-  i.classList.toggle('ngoai', v != null && !isNaN(v) && ngoaiGoiY(t, loai, v));
-  i.title = i.classList.contains('ngoai') ? goiYChu(t, loai) : '';
-  if (cp) cp.textContent = v != null && !isNaN(v) ? choPhep(t, v) : (isNaN(v) ? 'không phải số' : '');
+  i.classList.toggle('ngoai', !k.loi && ngoaiGoiYG(t, loai, k));
+  i.title = i.classList.contains('ngoai') ? goiYChu(t, loai) : 'Ghi khoảng a ~ b theo QCP, hoặc 1 số';
+  if (cp) cp.textContent = k.loi ? 'không phải số' : coSo(k) ? choPhep(t, k.chuan, k) : '';
 }
 // Đọc giá trị đang nhập trên form vào ed (giữ ghi chú cũ)
 function docForm(){
@@ -649,8 +679,8 @@ function docForm(){
   document.querySelectorAll('#eBang [data-ts]').forEach(el => {
     const t = TS.find(x => x.ma_ts === el.dataset.ts), cu = ed.gt[t.ma_ts] || {};
     if (t.kieu === 'chon_nvl') { ed.ma_nvl = el.value || null; return; }
-    const g = { ma_ts: t.ma_ts, ghi_chu: cu.ghi_chu || null, chuan: null, gia_tri_chu: null };
-    if (t.kieu === 'so') { const v = docSo(el.value); g.chuan = v == null ? null : v; if (isNaN(v)) g.loi = el.value; }
+    const g = { ma_ts: t.ma_ts, ghi_chu: cu.ghi_chu || null, chuan: null, cp_min: null, cp_max: null, gia_tri_chu: null };
+    if (t.kieu === 'so') { const k = docKhoang(el.value); if (k.loi) g.loi = k.loi; else Object.assign(g, k); }
     else g.gia_tri_chu = el.value.trim() || null;
     ed.gt[t.ma_ts] = g;
   });
@@ -660,11 +690,11 @@ async function luu(guiLuon){
   const p = ed;
   if (!p.ma_may || !p.ma_sp) return showMsg('Chọn Máy và Mã SP.', 'err');
   const sai = Object.values(p.gt).find(g => g.loi);
-  if (sai) return showMsg(sai.ma_ts + ': "' + sai.loi + '" không phải số.', 'err');
+  if (sai) return showMsg(sai.ma_ts + ': "' + sai.loi + '" không phải số (ghi 1 số hoặc a ~ b).', 'err');
   const gia = {};
   Object.values(p.gt).forEach(g => {
-    if (g.chuan == null && g.gia_tri_chu == null && !g.ghi_chu) return;
-    gia[g.ma_ts] = g.chuan != null ? { chuan: g.chuan, ghi_chu: g.ghi_chu } : { chu: g.gia_tri_chu, ghi_chu: g.ghi_chu };
+    if (!coSo(g) && g.gia_tri_chu == null && !g.ghi_chu) return;
+    gia[g.ma_ts] = coSo(g) ? { chuan: g.chuan, min: g.cp_min, max: g.cp_max, ghi_chu: g.ghi_chu } : { chu: g.gia_tri_chu, ghi_chu: g.ghi_chu };
   });
   const b1 = $('eLuu'), b2 = $('eGui'); b1.disabled = b2.disabled = true;
   try {
@@ -817,9 +847,9 @@ function inPhieu(p){
     if (!ds.length) return '';
     return '<table class="in-ts"><thead><tr class="nh"><th colspan="4">' + nh + ' · ' + esc(NHOM[nh]) + '</th></tr><tr><th>Thông số</th><th>Chuẩn</th><th>ĐV</th><th>Cho phép</th></tr></thead><tbody>' +
       ds.map(t => {
-        const g = p.gt[t.ma_ts], v = t.kieu === 'so' && g && g.chuan != null ? Number(g.chuan) : null;
+        const g = p.gt[t.ma_ts], cs = t.kieu === 'so' && coSo(g), v = cs ? Number(g.chuan) : null;
         return '<tr><td>' + t.ma_ts + ' ' + esc(t.ten) + (batBuoc(t, loai) ? ' *' : '') + (g && g.ghi_chu ? '<div class="in-ghi">' + esc(g.ghi_chu) + '</div>' : '') + '</td>' +
-          '<td class="r">' + giaTriXem(t, p) + '</td><td class="n">' + esc(t.don_vi || '') + '</td><td class="n">' + (v != null ? esc(choPhep(t, v).replace(/ \(.*\)$/, '')) : '') + '</td></tr>';
+          '<td class="r">' + giaTriXem(t, p) + '</td><td class="n">' + esc(t.don_vi || '') + '</td><td class="n">' + (cs ? esc(choPhep(t, v, g).replace(/ \(.*\)$/, '')) : '') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }).join('');
   const dc = DC_THEO_LOAI[loai].filter(l => p.dc[l]).map(l => LOAI_DC[l] + ': ' + p.dc[l]).join(' · ');
@@ -832,7 +862,7 @@ function inPhieu(p){
       (p.ly_do ? '<tr><th>Lý do</th><td colspan="3">' + esc(p.ly_do) + '</td></tr>' : '') + '</table>' +
     (p.trang_thai !== 'hieu_luc' ? '<div class="in-chua">BẢN ' + esc((TT[p.trang_thai] || '').toUpperCase()) + ' — KHÔNG DÙNG ĐỂ SẢN XUẤT</div>' : '') +
     '<div class="in-luoi">' + nhomHtml + '</div>' +
-    '<div class="in-ghi">* bắt buộc · Cho phép = Chuẩn ± ngưỡng (mặc định 5%)</div>' +
+    '<div class="in-ghi">* bắt buộc · Chuẩn a ~ b: cho phép trong khoảng; Chuẩn 1 số: ± ngưỡng (mặc định 5%)</div>' +
     '<div class="in-ky">' + ky('Lập', nb.lap) + ky('Kiểm tra', nb.kiem) + ky('Duyệt', nb.duyet) + '</div>' +
     '<div class="in-chan">In lúc ' + esc(fmtTs(new Date())) + ' · MES Toyotaki</div>';
   window.print();
@@ -864,10 +894,10 @@ async function xuatExcel(p){
   ];
   tsApDung(loai).forEach(t => {
     const g = p.gt[t.ma_ts];
-    const val = t.kieu === 'so' ? (g && g.chuan != null ? Number(g.chuan) : '') : giaTriTho(t, p);
+    const val = t.kieu === 'so' ? (coKhoang(g) ? soVi(g.cp_min) + ' ~ ' + soVi(g.cp_max) : g && g.chuan != null ? Number(g.chuan) : '') : giaTriTho(t, p);
     const pt = t.phu_thuoc ? TS.find(x => x.ma_ts === t.phu_thuoc) : null;
     r.push([t.ma_ts, NHOM[t.nhom], t.ten + (t.kieu === 'co_khong' ? ' (Có / Không)' : '') + (pt ? ' — khi ' + pt.ma_ts + ' = Có' : ''),
-      val, t.don_vi || '', t.kieu === 'so' && val !== '' ? choPhep(t, val) : '', goiYChu(t, loai).replace('Gợi ý HPDC ', ''),
+      val, t.don_vi || '', t.kieu === 'so' && val !== '' ? choPhep(t, g.chuan, g) : '', goiYChu(t, loai).replace('Gợi ý HPDC ', ''),
       batBuoc(t, loai) ? '*' : '', (g && g.ghi_chu) || '']);
   });
   r.push([]);
@@ -922,12 +952,12 @@ async function nhapExcel(file){
       else cb.push(ma + ': mã NVL "' + s + '" không có trong danh mục');
       continue;
     }
-    const g = { ma_ts: ma, ghi_chu: o.gc || null, chuan: null, gia_tri_chu: null };
+    const g = { ma_ts: ma, ghi_chu: o.gc || null, chuan: null, cp_min: null, cp_max: null, gia_tri_chu: null };
     if (t.kieu === 'so') {
       if (s !== '') {
-        const v = typeof o.v === 'number' ? o.v : docSo(s);
-        if (isNaN(v)) { cb.push(ma + ': "' + s + '" không phải số — bỏ qua'); continue; }
-        g.chuan = v;
+        const k = typeof o.v === 'number' ? { chuan: o.v, cp_min: null, cp_max: null } : docKhoang(s);
+        if (k.loi) { cb.push(ma + ': "' + s + '" không phải số / khoảng a ~ b — bỏ qua'); continue; }
+        Object.assign(g, k);
       }
     } else if (t.kieu === 'co_khong') {
       const l = s.toLowerCase();
@@ -935,7 +965,7 @@ async function nhapExcel(file){
       if (s && !g.gia_tri_chu) { cb.push(ma + ': "' + s + '" — ghi Có hoặc Không'); continue; }
     } else g.gia_tri_chu = s || null;
     ed.gt[ma] = g;
-    if (g.chuan != null || g.gia_tri_chu) n++;
+    if (coSo(g) || g.gia_tri_chu) n++;
   }
   DC_THEO_LOAI[loai].forEach(l => {
     if (!(l in dc)) return;

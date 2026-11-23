@@ -62,10 +62,14 @@
     ts.forEach(t => {
       if (t.nhom !== nhom) { nhom = t.nhom; html += '<div class="dkxn-g">' + esc(NHOM[nhom] || nhom) + '</div>'; }
       if (t.kieu === 'so') {
-        const c = Number(t.chuan), b = Math.abs(c) * Number(t.nguong ?? 5) / 100;
+        const c = Number(t.chuan), b = Math.abs(c) * Number(t.nguong ?? 5) / 100, kh = t.min != null && t.max != null;
         const td = (t.td || []).map(x => fmt(Number(x.gia_tri)));
+        const dv = t.don_vi ? ' ' + esc(t.don_vi) : '';
+        const moTa = !kh ? 'Chuẩn ' + fmt(c) + dv + ' · cho phép ' + fmt(c - b) + ' – ' + fmt(c + b)
+          : Number(t.min) === Number(t.max) ? 'Chuẩn đúng ' + fmt(Number(t.min)) + dv
+          : 'Cho phép ' + fmt(Number(t.min)) + ' – ' + fmt(Number(t.max)) + dv;
         html += '<div class="dkxn-r" data-ts="' + esc(t.ma_ts) + '" data-k="so"><div><div class="t">' + esc(t.ten) + '</div>' +
-          '<div class="m">Chuẩn ' + fmt(c) + (t.don_vi ? ' ' + esc(t.don_vi) : '') + ' · cho phép ' + fmt(c - b) + ' – ' + fmt(c + b) +
+          '<div class="m">' + moTa +
           (td.length ? ' · thay đổi đã duyệt: ' + td.join(', ') : '') + '</div><div class="ms"></div></div>' +
           '<input type="text" inputmode="decimal" placeholder="Đang cài"></div>';
       } else {
@@ -101,7 +105,8 @@
           if (v === null) { du = false; return; }
           const ng = Number(t.nguong ?? 5) / 100, trong = c => Math.abs(v - c) <= Math.abs(c) * ng + 1e-9;
           const c = Number(t.chuan);
-          if (trong(c)) r.classList.add('dat');
+          const trongPhieu = t.min != null && t.max != null ? v >= Number(t.min) - 1e-9 && v <= Number(t.max) + 1e-9 : trong(c);
+          if (trongPhieu) r.classList.add('dat');
           else if ((t.td || []).some(x => trong(Number(x.gia_tri)))) { r.classList.add('dat'); ms.textContent = 'Theo thay đổi đã duyệt'; }
           else { r.classList.add('lech'); ms.textContent = 'Ngoài khoảng — chỉnh máy'; du = false; lech++; }
         } else {
