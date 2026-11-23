@@ -585,9 +585,9 @@
             <div class="form-grid">
               <div><label for="dungcu-loai">Loại</label><select id="dungcu-loai" required></select></div>
               <div><label for="dungcu-dk">Đường kính Φ (mm)</label><input type="number" min="1" max="999" step="any" id="dungcu-dk" required placeholder="vd: 60"></div>
-              <div><label for="dungcu-ma">Mã</label><div class="gy-row"><input type="text" autocomplete="off" id="dungcu-ma" required placeholder="vd: DT-060-01"><button type="button" class="gy-btn" id="dungcu-goiy" title="Chọn Loại + nhập Φ rồi bấm">Gợi ý</button></div><div class="gy-note" id="dungcu-ma-note" hidden></div></div>
-              <div><label for="dungcu-ten">Tên</label><input type="text" autocomplete="off" id="dungcu-ten" required maxlength="80" placeholder="Tự điền theo loại + Φ"></div>
-              <div><label for="dungcu-dai">Chiều dài (mm)</label><input type="number" min="0" step="any" id="dungcu-dai" placeholder="ống liệu"></div>
+              <div><label for="dungcu-dai">Chiều dài (mm)</label><input type="number" min="1" max="9999" step="any" id="dungcu-dai" required placeholder="vd: 450"></div>
+              <div><label for="dungcu-ma">Mã</label><div class="gy-row"><input type="text" autocomplete="off" id="dungcu-ma" required placeholder="vd: OL-060-450-01"><button type="button" class="gy-btn" id="dungcu-goiy" title="Chọn Loại + nhập Φ, Dài rồi bấm">Gợi ý</button></div><div class="gy-note" id="dungcu-ma-note" hidden></div></div>
+              <div><label for="dungcu-ten">Tên</label><input type="text" autocomplete="off" id="dungcu-ten" required maxlength="80" placeholder="Tự điền theo loại + Φ × dài"></div>
               <div><label for="dungcu-tuoitho">Tuổi thọ dự kiến (lần bắn)</label><input type="number" min="0" step="1" id="dungcu-tuoitho"></div>
               <div><label for="dungcu-vl">Vật liệu</label><input type="text" autocomplete="off" id="dungcu-vl" maxlength="40" list="dungcu-vl-ds" placeholder="vd: SKD61"><datalist id="dungcu-vl-ds"><option value="SKD61"><option value="Đồng berili"><option value="H13"><option value="Gang chịu nhiệt"></datalist></div>
               <div><label for="dungcu-ncc">Nhà cung cấp</label><input type="text" autocomplete="off" id="dungcu-ncc" maxlength="60"></div>
@@ -747,16 +747,17 @@
       </div>
 
       <div class="qt-card" data-qt-pane="dungcu" hidden>
-        <div class="qt-cong-thuc">LOẠI-ĐƯỜNG KÍNH-STT</div>
+        <div class="qt-cong-thuc">LOẠI-ĐƯỜNG KÍNH-CHIỀU DÀI-STT</div>
         <div class="qt-phan">
           <div>LOẠI (2 chữ)</div><div>Nhôm: <code>DT</code> đầu típ · <code>OL</code> ống liệu &nbsp;·&nbsp; Kẽm: <code>PK</code> piston kẽm · <code>XM</code> xéc-măng · <code>CN</code> cổ ngỗng · <code>VP</code> vòi phun</div>
           <div>ĐƯỜNG KÍNH</div><div>Φ mm đủ 3 số: Φ60 → <code>060</code>, Φ100 → <code>100</code></div>
-          <div>STT (2 số)</div><div><code>01</code>, <code>02</code>… cùng loại + Φ nhưng khác kiểu (chiều dài, máy, bản vẽ)</div>
-          <div>Tên chuẩn</div><div>Loại + Φ: <code>Đầu típ Φ60</code>. Vật liệu, nhà cung cấp ghi ô riêng</div>
+          <div>CHIỀU DÀI</div><div>mm, ít nhất 3 số: 45 → <code>045</code>, 450 → <code>450</code>, 1200 → <code>1200</code></div>
+          <div>STT (2 số)</div><div><code>01</code>, <code>02</code>… cùng loại + Φ + dài nhưng khác kiểu (máy, bản vẽ, vật liệu)</div>
+          <div>Tên chuẩn</div><div>Loại + Φ × dài: <code>Ống liệu Φ60×450</code>. Vật liệu, nhà cung cấp ghi ô riêng</div>
         </div>
         <div class="qt-vd">
-          <div class="dung"><span class="nhan">Đúng</span><code>DT-060-01</code> <code>OL-060-02</code> <code>PK-055-01</code> <code>VP-012-01</code></div>
-          <div class="sai"><span class="nhan">Sai</span><code>DT-60-1</code> <code>Đầu típ 60</code> <code>OL060-01</code></div>
+          <div class="dung"><span class="nhan">Đúng</span><code>DT-060-045-01</code> <code>OL-060-450-01</code> <code>PK-055-120-01</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>DT-060-01</code> <code>OL-60-450-1</code> <code>OL060450</code></div>
           <div class="luu-y">Mã là kiểu dụng cụ, chưa phải từng cái. Tab Dụng cụ đúc có nút Gợi ý mã.</div>
         </div>
       </div>
@@ -1373,10 +1374,12 @@ initCatalog({
 });
 
 // ══ T318: Tab Dụng cụ đúc (duc_dung_cu) ═══════════════════════════════════
-// Mã <Loại>-<Φ 3 số>-<STT 2 số> (DB check). Ảnh: bucket su-co-duc, thư mục dung-cu/.
+// Mã <Loại>-<Φ 3 số>-<Dài 3–4 số>-<STT 2 số> (DB check, T332). Ảnh: bucket su-co-duc, thư mục dung-cu/.
 const DC_LOAI = [['DT', 'Đầu típ', 'Đúc nhôm'], ['OL', 'Ống liệu', 'Đúc nhôm'], ['PK', 'Piston kẽm', 'Đúc kẽm'],
   ['XM', 'Vòng xéc-măng', 'Đúc kẽm'], ['CN', 'Cổ ngỗng', 'Đúc kẽm'], ['VP', 'Vòi phun', 'Đúc kẽm']];
-const DC_RE = /^(DT|OL|PK|XM|CN|VP)-\d{3}-\d{2}$/;
+const DC_RE = /^(DT|OL|PK|XM|CN|VP)-\d{3}-\d{3,4}-\d{2}$/;
+const dcPhan = ma => { const p = String(ma).split('-'); return { dk: Number(p[1]), dai: Number(p[2]) }; };
+const dcPre = (loai, dk, dai) => loai + '-' + String(Math.round(dk)).padStart(3, '0') + '-' + String(Math.round(dai)).padStart(3, '0') + '-';
 const dcLoai = k => DC_LOAI.find(x => x[0] === k) || [k, k, ''];
 const dcVt = k => { const i = DC_LOAI.findIndex(x => x[0] === k); return i < 0 ? 99 : i; };
 let dcEditing = null, dcMayDs = [], dcAnh = [], dcMaySel = new Set();
@@ -1441,27 +1444,31 @@ function dcKiem(){
   const note = document.getElementById('dungcu-ma-note');
   if (!ma || ma === dcEditing) return GoiYMa.hien(note, null);
   if (catalogs.dungcu.rows().some(r => r.ma === ma)) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Mã đã có' });
-  if (!DC_RE.test(ma)) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Sai mẫu LOẠI-Φ 3 số-STT, VD DT-060-01' });
-  const loai = document.getElementById('dungcu-loai').value, dk = soHoacNull('dungcu-dk');
+  if (!DC_RE.test(ma)) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Sai mẫu LOẠI-Φ-DÀI-STT, VD OL-060-450-01' });
+  const loai = document.getElementById('dungcu-loai').value, dk = soHoacNull('dungcu-dk'), dai = soHoacNull('dungcu-dai');
   if (loai && ma.slice(0, 2) !== loai) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Mã phải bắt đầu ' + loai + '-' });
-  if (dk != null && Number(ma.slice(3, 6)) !== Math.round(dk)) return GoiYMa.hien(note, { muc: 'canh', text: '⚠ Φ trong mã khác ô Đường kính' });
+  const p = dcPhan(ma);
+  if (dk != null && p.dk !== Math.round(dk)) return GoiYMa.hien(note, { muc: 'canh', text: '⚠ Φ trong mã khác ô Đường kính' });
+  if (dai != null && p.dai !== Math.round(dai)) return GoiYMa.hien(note, { muc: 'canh', text: '⚠ Dài trong mã khác ô Chiều dài' });
   GoiYMa.hien(note, { muc: 'ok', text: '✓ Đúng mẫu' });
 }
 function dcGoiY(tuDong){
   if (dcEditing) return;
-  const loai = document.getElementById('dungcu-loai').value, dk = soHoacNull('dungcu-dk');
+  const loai = document.getElementById('dungcu-loai').value, dk = soHoacNull('dungcu-dk'), dai = soHoacNull('dungcu-dai');
   const note = document.getElementById('dungcu-ma-note');
-  if (!loai || dk == null || dk <= 0 || dk >= 1000) return tuDong ? null : GoiYMa.hien(note, { muc: 'canh', text: '⚠ Chọn Loại + nhập Φ trước' });
-  const pre = loai + '-' + String(Math.round(dk)).padStart(3, '0') + '-';
+  if (!loai || dk == null || dk < 0.5 || dk >= 999.5 || dai == null || dai < 0.5 || dai >= 9999.5)
+    return tuDong ? null : GoiYMa.hien(note, { muc: 'canh', text: '⚠ Chọn Loại + nhập Φ, Dài trước' });
+  const pre = dcPre(loai, dk, dai);
   const stt = Math.max(0, ...catalogs.dungcu.rows().filter(r => r.ma.startsWith(pre)).map(r => parseInt(r.ma.slice(pre.length), 10) || 0)) + 1;
   document.getElementById('dungcu-ma').value = pre + String(stt).padStart(2, '0');
   const ten = document.getElementById('dungcu-ten');
-  if (!ten.value.trim() || ten.dataset.tuDien === '1'){ ten.value = dcLoai(loai)[1] + ' Φ' + soVn(dk); ten.dataset.tuDien = '1'; }
+  if (!ten.value.trim() || ten.dataset.tuDien === '1'){ ten.value = dcLoai(loai)[1] + ' Φ' + soVn(dk) + '×' + soVn(dai); ten.dataset.tuDien = '1'; }
   dcKiem();
 }
 document.getElementById('dungcu-goiy').addEventListener('click', () => dcGoiY(false));
 document.getElementById('dungcu-loai').addEventListener('change', () => { dcVeMay(); dcGoiY(true); });
 document.getElementById('dungcu-dk').addEventListener('change', () => dcGoiY(true));
+document.getElementById('dungcu-dai').addEventListener('change', () => dcGoiY(true));
 document.getElementById('dungcu-ma').addEventListener('input', dcKiem);
 document.getElementById('dungcu-ten').addEventListener('input', e => { e.target.dataset.tuDien = ''; });
 function dcResetForm(){
@@ -1470,7 +1477,7 @@ function dcResetForm(){
   document.getElementById('dungcu-form').reset();
   document.getElementById('dungcu-ten').dataset.tuDien = '';
   document.getElementById('dungcu-hien').checked = true;
-  ['dungcu-ma', 'dungcu-loai', 'dungcu-dk'].forEach(id => { document.getElementById(id).disabled = false; });
+  ['dungcu-ma', 'dungcu-loai', 'dungcu-dk', 'dungcu-dai'].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById('dungcu-goiy').hidden = false;
   GoiYMa.hien(document.getElementById('dungcu-ma-note'), null);
   dcVeMay(); dcVeAnh();
@@ -1485,8 +1492,8 @@ function dcFillForm(r){
   g('dungcu-tuoitho', r.tuoi_tho_du_kien); g('dungcu-vl', r.vat_lieu); g('dungcu-ncc', r.nha_cung_cap); g('dungcu-ghichu', r.ghi_chu);
   document.getElementById('dungcu-ten').dataset.tuDien = '';
   document.getElementById('dungcu-hien').checked = r.hien !== false;
-  // Mã đã dùng trên phiếu thì không đổi → khoá Mã + Loại + Φ (Φ nằm trong mã).
-  ['dungcu-ma', 'dungcu-loai', 'dungcu-dk'].forEach(id => { document.getElementById(id).disabled = true; });
+  // Mã đã dùng trên phiếu thì không đổi → khoá Mã + Loại + Φ + Dài (nằm trong mã).
+  ['dungcu-ma', 'dungcu-loai', 'dungcu-dk', 'dungcu-dai'].forEach(id => { document.getElementById(id).disabled = true; });
   document.getElementById('dungcu-goiy').hidden = true;
   GoiYMa.hien(document.getElementById('dungcu-ma-note'), null);
   dcVeMay(); dcVeAnh();
@@ -1498,19 +1505,20 @@ document.getElementById('dungcu-form').addEventListener('submit', async (e) => {
   const loai = document.getElementById('dungcu-loai').value;
   const ma = document.getElementById('dungcu-ma').value.trim().toUpperCase();
   const ten = document.getElementById('dungcu-ten').value.trim().replace(/\s+/g, ' ');
-  const dk = soHoacNull('dungcu-dk');
-  if (!loai || !ma || !ten || dk == null) return showMsg('dungcu-msg', 'error', 'Nhập đủ Loại, Φ, Mã, Tên');
+  const dk = soHoacNull('dungcu-dk'), dai = soHoacNull('dungcu-dai');
+  if (!loai || !ma || !ten || dk == null || dai == null) return showMsg('dungcu-msg', 'error', 'Nhập đủ Loại, Φ, Dài, Mã, Tên');
   if (!dcEditing){
-    if (!DC_RE.test(ma)) return showMsg('dungcu-msg', 'error', 'Mã sai mẫu, VD DT-060-01');
+    if (!DC_RE.test(ma)) return showMsg('dungcu-msg', 'error', 'Mã sai mẫu, VD OL-060-450-01');
     if (ma.slice(0, 2) !== loai) return showMsg('dungcu-msg', 'error', 'Mã phải bắt đầu ' + loai + '-');
     if (catalogs.dungcu.rows().some(r => r.ma === ma)) return showMsg('dungcu-msg', 'error', 'Mã ' + ma + ' đã có');
-    if (Number(ma.slice(3, 6)) !== Math.round(dk) && !confirm('Φ trong mã (' + ma.slice(3, 6) + ') khác ô Đường kính (' + soVn(dk) + '). Vẫn lưu?')) return;
+    const p = dcPhan(ma);
+    if (p.dk !== Math.round(dk) || p.dai !== Math.round(dai)) return showMsg('dungcu-msg', 'error', 'Φ/Dài trong mã khác ô nhập — bấm Gợi ý');
   }
   const may = dcMayDs.map(m => m.ma_may).filter(m => dcMaySel.has(m));
   if (!may.length) return showMsg('dungcu-msg', 'error', 'Chọn ít nhất 1 máy dùng được');
   const tt = soHoacNull('dungcu-tuoitho');
   const payload = {
-    ten, duong_kinh: dk, chieu_dai: soHoacNull('dungcu-dai'),
+    ten, duong_kinh: dk, chieu_dai: dai,
     vat_lieu: document.getElementById('dungcu-vl').value.trim() || null,
     nha_cung_cap: document.getElementById('dungcu-ncc').value.trim() || null,
     may_dung: may, tuoi_tho_du_kien: tt != null ? Math.round(tt) : null, anh: dcAnh,
