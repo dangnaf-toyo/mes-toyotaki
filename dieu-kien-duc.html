@@ -416,6 +416,26 @@ function anhTepXem(p){
     (t ? '<div class="tep" style="margin-top:8px">' + t + '</div>' : '') + '</section>';
 }
 function tenTep(u){ try { return decodeURIComponent(u.split('/').pop()).replace(/^[a-z0-9]+_[a-z0-9]{4}_/, ''); } catch (e) { return u; } }
+// T324: các lần trưởng ca xác nhận ĐK đúc khi lên khuôn
+async function xacNhanXem(p){
+  if (!['hieu_luc', 'het_hieu_luc'].includes(p.trang_thai)) return '';
+  const { data, error } = await sb.from('duc_dk_xac_nhan').select('id,ma_may,luc,nguoi_ten,gia_tri,dung_cu,lech')
+    .eq('id_phieu', p.id).order('luc', { ascending: false }).range(0, 99);
+  if (error) return '';
+  const ds = data || [];
+  const tenTs = m => { const t = TS.find(x => x.ma_ts === m); return t ? t.ten : m; };
+  const dong = x => {
+    const td = new Map((x.lech || []).map(l => [l.ma_ts, l.td]));
+    const lech = Object.entries(x.gia_tri || {}).filter(([m, v]) => v !== 'dung' && p.gt[m] && p.gt[m].chuan != null && Number(v) !== Number(p.gt[m].chuan))
+      .map(([m, v]) => esc(tenTs(m)) + ' ' + esc(v) + ' <small>(chuẩn ' + esc(p.gt[m].chuan) + (td.has(m) ? ', <a href="diem-thay-doi.html?id=' + Number(td.get(m)) + '">TD-' + Number(td.get(m)) + '</a>' : '') + ')</small>');
+    return '<li><b>' + esc(fmtTs(x.luc)) + '</b> · ' + esc(x.ma_may) + ' · ' + esc(x.nguoi_ten || '') +
+      (lech.length ? '<br><span style="color:#B45309">Khác chuẩn: ' + lech.join('; ') + '</span>' : ' — <span style="color:#047857">đúng chuẩn</span>') + '</li>';
+  };
+  return '<section class="card"><details><summary>Lần xác nhận khi lên khuôn (' + ds.length + (ds.length === 100 ? '+' : '') + ')</summary>' +
+    (ds.length ? '<ul class="ls" style="margin-top:6px">' + ds.map(dong).join('') + '</ul>' : '<div class="hint" style="margin-top:6px">Chưa có lần nào.</div>') +
+    '</details></section>';
+}
+
 async function veXem(id){
   const v = $('vPhieu');
   v.innerHTML = '<section class="card"><div class="empty">Đang tải…</div></section>';
@@ -460,7 +480,7 @@ async function veXem(id){
       (p.ly_do ? '<div style="margin-top:8px"><b>Lý do ban hành:</b> ' + esc(p.ly_do) + '</div>' : '') +
     '</section>' +
     '<section class="card"><div class="card-title">Dụng cụ</div>' + dcXem(p, loai) + '</section>' +
-    bangXem(p, loai) + anhTepXem(p) +
+    bangXem(p, loai) + anhTepXem(p) + (await xacNhanXem(p)) +
     '<section class="card"><details><summary>Lịch sử (' + (p.lich_su || []).length + ')</summary><ul class="ls" style="margin-top:6px">' +
       (p.lich_su || []).slice().reverse().map(e => '<li><b>' + esc(LS_TEN[e.viec] || e.viec) + '</b> · ' + esc(e.nguoi || '') + ' <small>' + esc(fmtTs(e.luc)) + '</small>' + (e.ghi_chu ? '<br><small>' + esc(e.ghi_chu) + '</small>' : '') + '</li>').join('') +
     '</ul></details></section>';

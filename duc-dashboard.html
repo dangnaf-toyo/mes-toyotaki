@@ -967,6 +967,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <script src="shared/su-co-mau.js?v=T302"></script>
 <script src="shared/thay-doi.js?v=T323"></script>
 <script src="shared/dk-duc.js?v=T322"></script>
+<script src="shared/dk-xac-nhan.js?v=T324"></script>
 <script src="shared/navbar.js?v=T320"></script>
 <script>
 /* ============================================================================
@@ -3241,7 +3242,8 @@ async function submitKhsxBatch(){
   // T127: khuôn còn vấn đề lần SX trước → xác nhận đã nắm thông tin trước khi nạp (bỏ qua máy bị Huỷ).
   const boQua = [];
   for (const it of items) {
-    if (it.soKhuon && !(await KhuonNamVanDe.damBao(it.soKhuon, it.maMay))) { it.boQua = true; boQua.push(it.maMay + ': chưa xác nhận đã nắm vấn đề khuôn ' + it.soKhuon); }
+    if (it.soKhuon && !(await KhuonNamVanDe.damBao(it.soKhuon, it.maMay))) { it.boQua = true; boQua.push(it.maMay + ': chưa xác nhận đã nắm vấn đề khuôn ' + it.soKhuon); continue; }
+    if (!(await DkXacNhan.damBao(it.maMay, it.sug.ma_sp))) { it.boQua = true; boQua.push(it.maMay + ': chưa xác nhận ĐK đúc ' + it.sug.ma_sp); }   // T324
   }
   const btn = document.getElementById('kb-btn-save');
   btn.disabled = true;
@@ -3324,6 +3326,14 @@ async function openPlanModal(maMay, idDong){
   modal.classList.add('open');
 }
 
+// T324: xác nhận ĐK đúc cho mã SP chính + mã B/C (khuôn nhiều SP)
+async function dkXacNhanNhieu(maMay, maSp, tienTo){
+  const ds = [maSp];
+  if (tienTo) ['b', 'c'].forEach(k => { const v = (document.getElementById(tienTo + '-ma-sp-' + k)?.value || '').trim(); if (v) ds.push(v); });
+  for (const s of ds) { if (!(await DkXacNhan.damBao(maMay, s))) return false; }
+  return true;
+}
+
 async function submitPlan(){
   const maSp = document.getElementById('mp-ma-sp').value.trim();
   const khCa = Number(document.getElementById('mp-kh-ca').value);
@@ -3334,6 +3344,7 @@ async function submitPlan(){
   if (!kiemTraKhuonBd(soKhuon)) return;
   // T127: lên khuôn còn vấn đề lần SX trước → trưởng ca phải xác nhận đã nắm thông tin.
   if (!(await KhuonNamVanDe.damBao(soKhuon, state.currentTarget.ma_may))) return;
+  if (!(await dkXacNhanNhieu(state.currentTarget.ma_may, maSp, document.getElementById('mp-pair-toggle').checked ? 'mp' : null))) return;   // T324
 
   if (document.getElementById('mp-pair-toggle').checked) return submitPairedPlan(maSp, khCa, soKhuon);
 
@@ -3841,6 +3852,7 @@ async function submitChangeProduct(){
   if (!soKhuon) return showToast('Chưa chọn số khuôn', true);
   if (!kiemTraKhuonBd(soKhuon)) return;
   if (!(await KhuonNamVanDe.damBao(soKhuon, state.currentTarget.ma_may))) return;   // T127
+  if (!(await dkXacNhanNhieu(state.currentTarget.ma_may, newMaSp, document.getElementById('cp-pair-toggle').checked ? 'cp' : null))) return;   // T324
 
   if (state.currentTarget.isPairOut) {
     return submitGroupChangeProduct(newMaSp, khCa, gioBatDau, soKhuon, true);
