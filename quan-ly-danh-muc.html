@@ -106,6 +106,15 @@
 
   /* Lưới phân quyền tài liệu (T62) */
   /* Tab Quy tắc đặt tên */
+  .dc-may{display:flex;flex-wrap:wrap;gap:6px;}
+  .dc-may label{display:flex;align-items:center;gap:5px;font-weight:400;color:var(--text);border:1px solid var(--border);border-radius:14px;padding:4px 10px;font-size:12.5px;cursor:pointer;}
+  .dc-may input{width:auto;}
+  .dc-anh{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;}
+  .dc-anh:empty{display:none;}
+  .dc-anh .t{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg-sunken);}
+  .dc-anh img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;}
+  .dc-anh .x{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;padding:0;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:22px;}
+  .dc-nho{width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle;}
   .qt-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
   .qt-nav button{padding:6px 12px;border:1px solid var(--border-strong);border-radius:16px;background:var(--bg-panel);color:var(--text);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;}
   .qt-nav button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -146,6 +155,8 @@
       <button class="tab-btn" data-tab="bom">BOM</button>
       <button class="tab-btn" data-tab="suco">Sự cố Đúc</button>
       <button class="tab-btn" data-tab="thaydoi">Thay đổi Đúc</button>
+      <button class="tab-btn" data-tab="dkts">Thông số ĐK đúc</button>
+      <button class="tab-btn" data-tab="dungcu">Dụng cụ đúc</button>
       <button class="tab-btn" data-tab="taillieu">Phân quyền tài liệu</button>
       <button class="tab-btn" data-tab="quytac">Quy tắc đặt tên</button>
     </div>
@@ -490,6 +501,110 @@
       </div>
     </section>
 
+    <!-- ── T318: Tab Thông số ĐK đúc (duc_dk_thong_so) ── -->
+    <section id="tab-dkts" class="tab-pane" style="display:none">
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="dkts-search" placeholder="Lọc nhanh trong bảng…" autocomplete="off">
+        <select class="list-filter" id="dkts-filt-nhom"></select>
+        <select class="list-filter" id="dkts-filt-ap_dung"></select>
+        <select class="list-filter" id="dkts-filt-hien"></select>
+        <button type="button" class="btn-reset" id="dkts-clear">Xoá lọc</button>
+        <span class="list-count" id="dkts-count"></span>
+        <span class="muted" title="Danh sách thông số trên phiếu điều kiện đúc. Gợi ý Nhôm / Kẽm chỉ để cảnh báo (tô vàng), không chặn. ★ = bắt buộc khi gửi phiếu. Ngưỡng ±%: trưởng ca tự chỉnh trong ± ngưỡng so với Chuẩn của phiếu. Bỏ tick Đang dùng để ẩn." style="cursor:help">ⓘ</span>
+        <button type="button" class="btn-add" id="dkts-add">＋ Thêm mới</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="dkts-table" style="display:none">
+            <thead id="dkts-thead"></thead>
+            <tbody id="dkts-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="dkts-empty" style="display:none">Chưa có thông số nào.</div>
+      </div>
+
+      <div class="modal-overlay" id="dkts-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="dkts-form-title">Thêm thông số</h2>
+          <div class="msg" id="dkts-msg"></div>
+          <form id="dkts-form">
+            <div class="form-grid">
+              <div><label for="dkts-nhom">Nhóm</label><select id="dkts-nhom" required></select></div>
+              <div><label for="dkts-ma">Mã</label><input type="text" autocomplete="off" id="dkts-ma" required maxlength="6" placeholder="Tự điền theo nhóm"></div>
+              <div style="grid-column:1/-1"><label for="dkts-ten">Tên thông số</label><input type="text" autocomplete="off" id="dkts-ten" required maxlength="100" placeholder="vd: Tốc độ pha 2 (nhanh)"></div>
+              <div><label for="dkts-kieu">Kiểu nhập</label><select id="dkts-kieu"><option value="so">Số</option><option value="chu">Chữ</option><option value="co_khong">Có / Không</option><option value="chon_nvl">Chọn NVL</option></select></div>
+              <div><label for="dkts-donvi">Đơn vị</label><input type="text" autocomplete="off" id="dkts-donvi" maxlength="12" placeholder="vd: m/s"></div>
+              <div><label for="dkts-apdung">Dùng cho</label><select id="dkts-apdung"><option value="ca_hai">Nhôm + Kẽm</option><option value="nhom">Chỉ Nhôm</option><option value="kem">Chỉ Kẽm</option></select></div>
+              <div><label for="dkts-thutu">Thứ tự</label><input type="number" min="0" step="1" id="dkts-thutu"></div>
+              <div class="dkts-so"><label>Gợi ý Nhôm (thấp – cao)</label><div class="gy-row"><input type="number" step="any" id="dkts-nmin" placeholder="thấp"><input type="number" step="any" id="dkts-nmax" placeholder="cao"></div></div>
+              <div class="dkts-so"><label>Gợi ý Kẽm (thấp – cao)</label><div class="gy-row"><input type="number" step="any" id="dkts-kmin" placeholder="thấp"><input type="number" step="any" id="dkts-kmax" placeholder="cao"></div></div>
+              <div><label for="dkts-goiychu">Gợi ý chữ</label><input type="text" autocomplete="off" id="dkts-goiychu" maxlength="40" placeholder="vd: Theo SP"></div>
+              <div class="dkts-so"><label for="dkts-nguong">Ngưỡng tự chỉnh ±%</label><input type="number" min="0" max="100" step="0.1" id="dkts-nguong"></div>
+              <div><label for="dkts-phuthuoc">Chỉ bắt buộc khi</label><select id="dkts-phuthuoc"></select></div>
+              <div><label for="dkts-td">Mục Thay đổi Đúc</label><select id="dkts-td"></select></div>
+              <div style="grid-column:1/-1;display:flex;gap:18px;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text)"><input type="checkbox" id="dkts-bbn" style="width:auto"> ★ Bắt buộc Nhôm</label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text)"><input type="checkbox" id="dkts-bbk" style="width:auto"> ★ Bắt buộc Kẽm</label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text)"><input type="checkbox" id="dkts-hien" style="width:auto" checked> Đang dùng</label>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit" id="dkts-submit">Thêm thông số</button></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── T318: Tab Dụng cụ đúc (duc_dung_cu) ── -->
+    <section id="tab-dungcu" class="tab-pane" style="display:none">
+      <div class="pane-toolbar">
+        <input type="search" class="list-search" id="dungcu-search" placeholder="Lọc nhanh trong bảng…" autocomplete="off">
+        <select class="list-filter" id="dungcu-filt-loai"></select>
+        <select class="list-filter" id="dungcu-filt-hien"></select>
+        <button type="button" class="btn-reset" id="dungcu-clear">Xoá lọc</button>
+        <span class="list-count" id="dungcu-count"></span>
+        <span class="muted" title="Mã = kiểu dụng cụ (loại + đường kính + kiểu), chưa phải từng cái. Phiếu điều kiện đúc chọn mã ở đây: đầu típ và ống liệu phải cùng Φ với Cỡ piston, và máy của phiếu phải nằm trong Máy dùng được." style="cursor:help">ⓘ</span>
+        <button type="button" class="btn-add" id="dungcu-add">＋ Thêm mới</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="dungcu-table" style="display:none">
+            <thead id="dungcu-thead"></thead>
+            <tbody id="dungcu-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="dungcu-empty" style="display:none">Chưa có dụng cụ nào.</div>
+      </div>
+
+      <div class="modal-overlay" id="dungcu-modal">
+        <div class="modal">
+          <button type="button" class="modal-close" data-close-modal aria-label="Đóng">✕</button>
+          <h2 id="dungcu-form-title">Thêm dụng cụ</h2>
+          <div class="msg" id="dungcu-msg"></div>
+          <form id="dungcu-form">
+            <div class="form-grid">
+              <div><label for="dungcu-loai">Loại</label><select id="dungcu-loai" required></select></div>
+              <div><label for="dungcu-dk">Đường kính Φ (mm)</label><input type="number" min="1" max="999" step="any" id="dungcu-dk" required placeholder="vd: 60"></div>
+              <div><label for="dungcu-ma">Mã</label><div class="gy-row"><input type="text" autocomplete="off" id="dungcu-ma" required placeholder="vd: DT-060-01"><button type="button" class="gy-btn" id="dungcu-goiy" title="Chọn Loại + nhập Φ rồi bấm">Gợi ý</button></div><div class="gy-note" id="dungcu-ma-note" hidden></div></div>
+              <div><label for="dungcu-ten">Tên</label><input type="text" autocomplete="off" id="dungcu-ten" required maxlength="80" placeholder="Tự điền theo loại + Φ"></div>
+              <div><label for="dungcu-dai">Chiều dài (mm)</label><input type="number" min="0" step="any" id="dungcu-dai" placeholder="ống liệu"></div>
+              <div><label for="dungcu-tuoitho">Tuổi thọ dự kiến (lần bắn)</label><input type="number" min="0" step="1" id="dungcu-tuoitho"></div>
+              <div><label for="dungcu-vl">Vật liệu</label><input type="text" autocomplete="off" id="dungcu-vl" maxlength="40" list="dungcu-vl-ds" placeholder="vd: SKD61"><datalist id="dungcu-vl-ds"><option value="SKD61"><option value="Đồng berili"><option value="H13"><option value="Gang chịu nhiệt"></datalist></div>
+              <div><label for="dungcu-ncc">Nhà cung cấp</label><input type="text" autocomplete="off" id="dungcu-ncc" maxlength="60"></div>
+              <div style="grid-column:1/-1"><label>Máy dùng được</label><div class="dc-may" id="dungcu-may"></div></div>
+              <div style="grid-column:1/-1"><label>Ảnh / bản vẽ</label><div class="dc-anh" id="dungcu-anh"></div>
+                <input type="file" id="dungcu-file" accept="image/*" multiple hidden>
+                <button type="button" class="gy-btn" id="dungcu-them-anh" style="padding:6px 10px;margin-top:6px">＋ Ảnh</button>
+              </div>
+              <div style="grid-column:1/-1"><label for="dungcu-ghichu">Ghi chú</label><input type="text" autocomplete="off" id="dungcu-ghichu" maxlength="200"></div>
+              <div><label style="display:flex;align-items:center;gap:8px;font-weight:400;color:var(--text)"><input type="checkbox" id="dungcu-hien" style="width:auto" checked> Đang dùng</label></div>
+            </div>
+            <div class="form-actions"><button type="submit" id="dungcu-submit">Thêm dụng cụ</button></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <section id="tab-taillieu" class="tab-pane" style="display:none">
       <p class="muted" style="margin-bottom:12px">Hàng = loại tài liệu, cột = bộ phận. Tick "Ghi" hoặc "Tải gốc" sẽ tự tick kèm "Đọc" (không thể bật Ghi/Tải gốc mà tắt Đọc).</p>
       <div class="card">
@@ -513,6 +628,7 @@
         <button type="button" data-qt="bom">BOM</button>
         <button type="button" data-qt="tag">Tag No</button>
         <button type="button" data-qt="dao">Dao cụ</button>
+        <button type="button" data-qt="dungcu">Dụng cụ đúc</button>
       </div>
 
       <div class="qt-card" data-qt-pane="may">
@@ -629,6 +745,21 @@
           <div class="luu-y">Trang Kho dao cụ có nút Gợi ý mã. Mã đã có phiếu thì không đổi.</div>
         </div>
       </div>
+
+      <div class="qt-card" data-qt-pane="dungcu" hidden>
+        <div class="qt-cong-thuc">LOẠI-ĐƯỜNG KÍNH-STT</div>
+        <div class="qt-phan">
+          <div>LOẠI (2 chữ)</div><div>Nhôm: <code>DT</code> đầu típ · <code>OL</code> ống liệu &nbsp;·&nbsp; Kẽm: <code>PK</code> piston kẽm · <code>XM</code> xéc-măng · <code>CN</code> cổ ngỗng · <code>VP</code> vòi phun</div>
+          <div>ĐƯỜNG KÍNH</div><div>Φ mm đủ 3 số: Φ60 → <code>060</code>, Φ100 → <code>100</code></div>
+          <div>STT (2 số)</div><div><code>01</code>, <code>02</code>… cùng loại + Φ nhưng khác kiểu (chiều dài, máy, bản vẽ)</div>
+          <div>Tên chuẩn</div><div>Loại + Φ: <code>Đầu típ Φ60</code>. Vật liệu, nhà cung cấp ghi ô riêng</div>
+        </div>
+        <div class="qt-vd">
+          <div class="dung"><span class="nhan">Đúng</span><code>DT-060-01</code> <code>OL-060-02</code> <code>PK-055-01</code> <code>VP-012-01</code></div>
+          <div class="sai"><span class="nhan">Sai</span><code>DT-60-1</code> <code>Đầu típ 60</code> <code>OL060-01</code></div>
+          <div class="luu-y">Mã là kiểu dụng cụ, chưa phải từng cái. Tab Dụng cụ đúc có nút Gợi ý mã.</div>
+        </div>
+      </div>
     </section>
   </div>
 </div>
@@ -682,7 +813,7 @@ document.querySelectorAll('#qt-nav button').forEach(b => b.addEventListener('cli
 let tabTruoc = 'may';
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (btn.dataset.tab === 'quytac') qtChon(tabTruoc);
+    if (btn.dataset.tab === 'quytac') qtChon(tabTruoc === 'dkts' ? 'dungcu' : tabTruoc);
     else tabTruoc = btn.dataset.tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
@@ -783,12 +914,14 @@ function initCatalog(cfg){
     table.style.display = 'table'; empty.style.display = 'none';
     tbody.innerHTML = rows.map(r =>
       '<tr>' + cfg.columns.map(c => `<td>${c.render(r)}</td>`).join('') +
-      '<td class="row-actions"><button type="button" class="edit">Sửa</button><button type="button" class="del">Xoá</button></td></tr>'
+      '<td class="row-actions"><button type="button" class="edit">Sửa</button>' +
+      (cfg.canDelete && !cfg.canDelete() ? '' : '<button type="button" class="del">Xoá</button>') + '</td></tr>'
     ).join('');
     [...tbody.children].forEach((tr, i) => {
       const r = rows[i];
       tr.querySelector('.edit').addEventListener('click', () => { cfg.fillForm(r); openModal(cfg.id + '-modal'); });
-      tr.querySelector('.del').addEventListener('click', async () => {
+      const delBtn = tr.querySelector('.del');
+      if (delBtn) delBtn.addEventListener('click', async () => {
         if (!confirm('Xoá "' + cfg.pk(r) + '"?')) return;
         const { error } = await cfg.remove(r);
         if (error) return alert('Lỗi xoá: ' + error.message + (String(error.message).includes('foreign key') ? ' (đang được tham chiếu ở dữ liệu khác, không xoá được)' : ''));
@@ -1084,6 +1217,344 @@ initCatalog({
     { k: 'ipqc', label: 'IPQC', sortable: true, sortVal: r => !!r.can_ipqc, text: r => r.can_ipqc ? 'ipqc' : '', render: r => r.tu_chon ? '<span class="muted">Tự chọn</span>' : (r.can_ipqc ? '✔' : DASH) },
     { k: 'xac_nhan', label: 'Nội dung xác nhận', text: r => (r.xac_nhan || []).join(' '), render: r => (r.xac_nhan || []).length ? '<span style="font-size:12px">' + r.xac_nhan.map(escapeHtml).join('<br>') + '</span>' : DASH },
     { k: 'updated_at', label: 'Sửa lần cuối', sortable: true, sortVal: r => r.updated_at || '', text: r => r.nguoi_sua || '', render: r => '<span style="font-size:12px">' + (r.updated_at ? new Date(r.updated_at).toLocaleDateString('vi-VN') : '') + (r.nguoi_sua ? '<br>' + escapeHtml(r.nguoi_sua) : '') + '</span>' },
+  ],
+});
+
+// ══ T318: Tab Thông số ĐK đúc (duc_dk_thong_so) ═══════════════════════════
+// Ghi: admin + người phụ trách bộ phận Kỹ thuật (RLS duc_dk_la_ky_thuat). Xoá: chỉ admin.
+let laAdmin = false;
+const DK_NHOM = [['VL', 'Vật liệu & rót'], ['PE', 'Phun ép'], ['NT', 'Nhiệt độ & thời gian'], ['PT', 'Phụ trợ']];
+const DK_KIEU = { so: 'Số', chu: 'Chữ', co_khong: 'Có / Không', chon_nvl: 'Chọn NVL' };
+const DK_AP = { ca_hai: 'Nhôm + Kẽm', nhom: 'Nhôm', kem: 'Kẽm' };
+const dkNhomTen = k => (DK_NHOM.find(x => x[0] === k) || [k, k])[1];
+const dkNhomVt = k => { const i = DK_NHOM.findIndex(x => x[0] === k); return i < 0 ? 99 : i; };
+const soVn = v => v == null || v === '' ? '' : String(Number(v)).replace('.', ',');
+const soHoacNull = id => { const s = document.getElementById(id).value.trim(); return s === '' ? null : Number(s); };
+let dktsEditing = null, dkTdMau = [];
+document.getElementById('dkts-nhom').innerHTML = '<option value="">-- Chọn nhóm --</option>' + DK_NHOM.map(x => `<option value="${x[0]}">${x[0]} — ${escapeHtml(x[1])}</option>`).join('');
+function dkGoiY(r, loai){   // 'nhom' | 'kem' → chuỗi hiển thị gợi ý
+  if (r.ap_dung !== 'ca_hai' && r.ap_dung !== loai) return DASH;
+  const lo = r['goi_y_' + loai + '_min'], hi = r['goi_y_' + loai + '_max'];
+  const bb = r['bat_buoc_' + loai] ? '<b style="color:var(--alarm-fg)">★</b> ' : '';
+  let s = lo != null && hi != null ? soVn(lo) + ' – ' + soVn(hi) : lo != null ? '≥ ' + soVn(lo) : hi != null ? '≤ ' + soVn(hi) : '';
+  if (!s) s = r.goi_y_chu ? '<span class="muted">' + escapeHtml(r.goi_y_chu) + '</span>' : '';
+  return bb + (s || (bb ? '' : DASH));
+}
+function dktsKieu(){
+  const so = document.getElementById('dkts-kieu').value === 'so';
+  document.querySelectorAll('#dkts-form .dkts-so').forEach(d => { d.style.display = so ? '' : 'none'; });
+  const ap = document.getElementById('dkts-apdung').value;
+  ['nmin', 'nmax'].forEach(k => { document.getElementById('dkts-' + k).disabled = ap === 'kem'; });
+  ['kmin', 'kmax'].forEach(k => { document.getElementById('dkts-' + k).disabled = ap === 'nhom'; });
+  document.getElementById('dkts-bbn').disabled = ap === 'kem';
+  document.getElementById('dkts-bbk').disabled = ap === 'nhom';
+}
+document.getElementById('dkts-kieu').addEventListener('change', dktsKieu);
+document.getElementById('dkts-apdung').addEventListener('change', dktsKieu);
+function dktsChonPhu(){   // ô "Chỉ bắt buộc khi" = thông số Có/Không khác
+  const ds = catalogs.dkts.rows().filter(r => r.kieu === 'co_khong' && r.ma_ts !== dktsEditing).sort((a, b) => cmp(a.ma_ts, b.ma_ts));
+  document.getElementById('dkts-phuthuoc').innerHTML = '<option value="">Luôn luôn</option>' +
+    ds.map(r => `<option value="${r.ma_ts}">${r.ma_ts} ${escapeHtml(r.ten)} = Có</option>`).join('');
+  document.getElementById('dkts-td').innerHTML = '<option value="">Không nối</option>' +
+    dkTdMau.map(r => `<option value="${escapeHtml(r.ma)}">${escapeHtml(r.ma)} — ${escapeHtml(r.ten)}</option>`).join('');
+}
+function dktsResetForm(){
+  dktsEditing = null;
+  clearMsg('dkts-msg');
+  document.getElementById('dkts-form').reset();
+  dktsChonPhu();
+  document.getElementById('dkts-nguong').value = 5;
+  document.getElementById('dkts-hien').checked = true;
+  document.getElementById('dkts-ma').disabled = false;
+  document.getElementById('dkts-nhom').disabled = false;
+  dktsKieu();
+  document.getElementById('dkts-form-title').textContent = 'Thêm thông số';
+  document.getElementById('dkts-submit').textContent = 'Thêm thông số';
+}
+function dktsFillForm(r){
+  dktsEditing = r.ma_ts;
+  clearMsg('dkts-msg');
+  dktsChonPhu();
+  const g = (id, v) => { document.getElementById(id).value = v ?? ''; };
+  g('dkts-nhom', r.nhom); g('dkts-ma', r.ma_ts); g('dkts-ten', r.ten); g('dkts-kieu', r.kieu); g('dkts-donvi', r.don_vi);
+  g('dkts-apdung', r.ap_dung); g('dkts-thutu', r.thu_tu); g('dkts-nmin', r.goi_y_nhom_min); g('dkts-nmax', r.goi_y_nhom_max);
+  g('dkts-kmin', r.goi_y_kem_min); g('dkts-kmax', r.goi_y_kem_max); g('dkts-goiychu', r.goi_y_chu); g('dkts-nguong', r.nguong_pct);
+  g('dkts-phuthuoc', r.phu_thuoc); g('dkts-td', r.ma_muc_td);
+  document.getElementById('dkts-bbn').checked = !!r.bat_buoc_nhom;
+  document.getElementById('dkts-bbk').checked = !!r.bat_buoc_kem;
+  document.getElementById('dkts-hien').checked = r.hien !== false;
+  document.getElementById('dkts-ma').disabled = true;
+  document.getElementById('dkts-nhom').disabled = true;
+  dktsKieu();
+  document.getElementById('dkts-form-title').textContent = 'Sửa thông số: ' + r.ma_ts;
+  document.getElementById('dkts-submit').textContent = 'Lưu thay đổi';
+}
+document.getElementById('dkts-nhom').addEventListener('change', e => {
+  if (dktsEditing) return;
+  const k = e.target.value; if (!k) return;
+  const cung = catalogs.dkts.rows().filter(r => r.nhom === k);
+  const so = Math.max(0, ...cung.filter(r => /^\d+$/.test(r.ma_ts.slice(2))).map(r => parseInt(r.ma_ts.slice(2), 10))) + 1;
+  document.getElementById('dkts-ma').value = k + String(so).padStart(2, '0');
+  document.getElementById('dkts-thutu').value = Math.max(0, ...cung.map(r => r.thu_tu || 0)) + 1;
+});
+document.getElementById('dkts-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nhom = document.getElementById('dkts-nhom').value;
+  const ma = document.getElementById('dkts-ma').value.trim().toUpperCase();
+  const ten = document.getElementById('dkts-ten').value.trim().replace(/\s+/g, ' ');
+  const kieu = document.getElementById('dkts-kieu').value;
+  const ap = document.getElementById('dkts-apdung').value;
+  if (!nhom || !ma || !ten) return showMsg('dkts-msg', 'error', 'Nhập đủ Nhóm, Mã, Tên');
+  if (!dktsEditing && !new RegExp('^' + nhom + '\\d{2}$').test(ma)) return showMsg('dkts-msg', 'error', 'Mã phải dạng ' + nhom + '01, ' + nhom + '02…');
+  const trung = catalogs.dkts.rows().find(r => r.ma_ts !== dktsEditing && r.ten.toLowerCase() === ten.toLowerCase());
+  if (trung) return showMsg('dkts-msg', 'error', 'Tên này đã có: ' + trung.ma_ts);
+  const so = kieu === 'so';
+  const nmin = so && ap !== 'kem' ? soHoacNull('dkts-nmin') : null, nmax = so && ap !== 'kem' ? soHoacNull('dkts-nmax') : null;
+  const kmin = so && ap !== 'nhom' ? soHoacNull('dkts-kmin') : null, kmax = so && ap !== 'nhom' ? soHoacNull('dkts-kmax') : null;
+  if (nmin != null && nmax != null && nmin > nmax) return showMsg('dkts-msg', 'error', 'Gợi ý Nhôm: thấp phải ≤ cao');
+  if (kmin != null && kmax != null && kmin > kmax) return showMsg('dkts-msg', 'error', 'Gợi ý Kẽm: thấp phải ≤ cao');
+  const nguong = so ? soHoacNull('dkts-nguong') : null;
+  if (so && (nguong == null || nguong < 0 || nguong > 100)) return showMsg('dkts-msg', 'error', 'Ngưỡng % từ 0 đến 100');
+  const ttRaw = document.getElementById('dkts-thutu').value.trim();
+  const payload = {
+    ten, kieu, ap_dung: ap, don_vi: document.getElementById('dkts-donvi').value.trim() || null,
+    thu_tu: ttRaw ? parseInt(ttRaw, 10) : 0,
+    goi_y_nhom_min: nmin, goi_y_nhom_max: nmax, goi_y_kem_min: kmin, goi_y_kem_max: kmax,
+    goi_y_chu: document.getElementById('dkts-goiychu').value.trim() || null,
+    nguong_pct: so ? nguong : 5,
+    bat_buoc_nhom: ap !== 'kem' && document.getElementById('dkts-bbn').checked,
+    bat_buoc_kem: ap !== 'nhom' && document.getElementById('dkts-bbk').checked,
+    phu_thuoc: document.getElementById('dkts-phuthuoc').value || null,
+    ma_muc_td: document.getElementById('dkts-td').value || null,
+    hien: document.getElementById('dkts-hien').checked,
+  };
+  let error;
+  if (dktsEditing) ({ error } = await sb.from('duc_dk_thong_so').update(payload).eq('ma_ts', dktsEditing));
+  else ({ error } = await sb.from('duc_dk_thong_so').insert({ ma_ts: ma, nhom, ...payload }));
+  if (error) return showMsg('dkts-msg', 'error', 'Lỗi: ' + error.message + (/duplicate key/.test(error.message) ? ' (mã đã có)' : /row-level security/.test(error.message) ? ' (chỉ admin + Kỹ thuật được sửa)' : ''));
+  toast(dktsEditing ? 'Đã lưu ' + ma : 'Đã thêm ' + ma);
+  catalogs.dkts.close();
+  catalogs.dkts.reload();
+});
+initCatalog({
+  id: 'dkts',
+  emptyText: 'Chưa có thông số nào.',
+  fetch: async () => {
+    const [ts, td] = await Promise.all([
+      sb.from('duc_dk_thong_so').select('*'),
+      sb.from('duc_thay_doi_mau').select('ma, ten, nhom, thu_tu').order('ma'),
+    ]);
+    dkTdMau = td.data || [];
+    return ts;
+  },
+  pk: r => r.ma_ts + ' — ' + r.ten,
+  resetForm: dktsResetForm,
+  fillForm: dktsFillForm,
+  canDelete: () => laAdmin,
+  remove: r => sb.from('duc_dk_thong_so').delete().eq('ma_ts', r.ma_ts),
+  filters: [
+    { k: 'nhom', label: 'Nhóm', valOf: r => r.nhom, fmt: v => v + ' — ' + dkNhomTen(v) },
+    { k: 'ap_dung', label: 'Dùng cho', valOf: r => r.ap_dung, fmt: v => DK_AP[v] || v },
+    { k: 'hien', label: 'Trạng thái', valOf: r => r.hien === false ? 'Đã ẩn' : 'Đang dùng' },
+  ],
+  columns: [
+    { k: 'ma_ts', label: 'Mã', sortable: true, sortVal: r => dkNhomVt(r.nhom) * 1000 + (r.thu_tu || 0), text: r => r.ma_ts, render: r => escapeHtml(r.ma_ts) },
+    { k: 'ten', label: 'Thông số', sortable: true, sortVal: r => r.ten, text: r => r.ten + ' ' + dkNhomTen(r.nhom),
+      render: r => '<b>' + escapeHtml(r.ten) + '</b>' + (r.don_vi ? ' <span class="muted">(' + escapeHtml(r.don_vi) + ')</span>' : '') +
+        (r.kieu !== 'so' ? ' <span class="muted">· ' + DK_KIEU[r.kieu] + '</span>' : '') +
+        (r.phu_thuoc ? '<br><span class="muted">khi ' + escapeHtml(r.phu_thuoc) + ' = Có</span>' : '') +
+        (r.hien === false ? ' <span class="muted">(đã ẩn)</span>' : '') },
+    { k: 'nhom_gy', label: 'Nhôm', text: () => '', render: r => '<span style="white-space:nowrap">' + dkGoiY(r, 'nhom') + '</span>' },
+    { k: 'kem_gy', label: 'Kẽm', text: () => '', render: r => '<span style="white-space:nowrap">' + dkGoiY(r, 'kem') + '</span>' },
+    { k: 'nguong_pct', label: '±%', sortable: true, sortVal: r => r.kieu === 'so' ? Number(r.nguong_pct) : -1, text: () => '', render: r => r.kieu === 'so' ? soVn(r.nguong_pct) : DASH },
+    { k: 'ma_muc_td', label: 'Thay đổi', sortable: true, sortVal: r => r.ma_muc_td || '', text: r => r.ma_muc_td || '', render: r => r.ma_muc_td ? escapeHtml(r.ma_muc_td) : DASH },
+    { k: 'updated_at', label: 'Sửa lần cuối', sortable: true, sortVal: r => r.updated_at || '', text: () => '', render: r => '<span style="font-size:12px">' + (r.updated_at ? new Date(r.updated_at).toLocaleDateString('vi-VN') : '') + '</span>' },
+  ],
+});
+
+// ══ T318: Tab Dụng cụ đúc (duc_dung_cu) ═══════════════════════════════════
+// Mã <Loại>-<Φ 3 số>-<STT 2 số> (DB check). Ảnh: bucket su-co-duc, thư mục dung-cu/.
+const DC_LOAI = [['DT', 'Đầu típ', 'Đúc nhôm'], ['OL', 'Ống liệu', 'Đúc nhôm'], ['PK', 'Piston kẽm', 'Đúc kẽm'],
+  ['XM', 'Vòng xéc-măng', 'Đúc kẽm'], ['CN', 'Cổ ngỗng', 'Đúc kẽm'], ['VP', 'Vòi phun', 'Đúc kẽm']];
+const DC_RE = /^(DT|OL|PK|XM|CN|VP)-\d{3}-\d{2}$/;
+const dcLoai = k => DC_LOAI.find(x => x[0] === k) || [k, k, ''];
+const dcVt = k => { const i = DC_LOAI.findIndex(x => x[0] === k); return i < 0 ? 99 : i; };
+let dcEditing = null, dcMayDs = [], dcAnh = [], dcMaySel = new Set();
+document.getElementById('dungcu-loai').innerHTML = '<option value="">-- Chọn loại --</option>' +
+  DC_LOAI.map(x => `<option value="${x[0]}">${x[0]} — ${escapeHtml(x[1])} (${x[2] === 'Đúc nhôm' ? 'Nhôm' : 'Kẽm'})</option>`).join('');
+function dcVeMay(){
+  const loai = document.getElementById('dungcu-loai').value;
+  const lm = loai ? dcLoai(loai)[2] : '';
+  const ds = dcMayDs.filter(m => !lm || m.loai_may === lm || dcMaySel.has(m.ma_may));
+  const box = document.getElementById('dungcu-may');
+  box.innerHTML = ds.length ? ds.map(m => `<label><input type="checkbox" value="${escapeHtml(m.ma_may)}"${dcMaySel.has(m.ma_may) ? ' checked' : ''}> ${escapeHtml(m.ma_may)}</label>`).join('')
+    : '<span class="muted">Chọn Loại trước</span>';
+  box.querySelectorAll('input').forEach(i => i.addEventListener('change', () => { i.checked ? dcMaySel.add(i.value) : dcMaySel.delete(i.value); }));
+}
+function dcVeAnh(){
+  const box = document.getElementById('dungcu-anh');
+  box.innerHTML = dcAnh.map((u, i) => `<div class="t"><img src="${escapeHtml(u)}" alt="" data-i="${i}"><button type="button" class="x" data-i="${i}" aria-label="Bỏ ảnh">✕</button></div>`).join('');
+  box.querySelectorAll('img').forEach(im => im.addEventListener('click', () => window.open(dcAnh[im.dataset.i], '_blank')));
+  box.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => { dcAnh.splice(+b.dataset.i, 1); dcVeAnh(); }));
+}
+function dcNenAnh(file){   // giống shared/su-co-anh.js: JPEG ≤1280px, chất lượng 0,82
+  return new Promise((resolve, reject) => {
+    const rd = new FileReader();
+    rd.onerror = reject;
+    rd.onload = ev => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(b => b ? resolve(b) : reject(new Error('Không nén được ảnh')), 'image/jpeg', 0.82);
+      };
+      img.src = ev.target.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+document.getElementById('dungcu-them-anh').addEventListener('click', () => document.getElementById('dungcu-file').click());
+document.getElementById('dungcu-file').addEventListener('change', async (e) => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  if (dcAnh.length + files.length > 10) return showMsg('dungcu-msg', 'error', 'Tối đa 10 ảnh');
+  const btn = document.getElementById('dungcu-them-anh');
+  btn.disabled = true; btn.textContent = 'Đang tải…';
+  try {
+    const thuMuc = (document.getElementById('dungcu-ma').value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'moi');
+    for (const f of files){
+      const blob = await dcNenAnh(f);
+      const path = 'dung-cu/' + thuMuc + '/' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6) + '.jpg';
+      const { error } = await sb.storage.from('su-co-duc').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+      if (error) throw new Error(error.message);
+      dcAnh.push(sb.storage.from('su-co-duc').getPublicUrl(path).data.publicUrl);
+    }
+    dcVeAnh();
+  } catch (err) { showMsg('dungcu-msg', 'error', 'Lỗi tải ảnh: ' + err.message); }
+  btn.disabled = false; btn.textContent = '＋ Ảnh';
+});
+function dcKiem(){
+  const ma = document.getElementById('dungcu-ma').value.trim().toUpperCase();
+  const note = document.getElementById('dungcu-ma-note');
+  if (!ma || ma === dcEditing) return GoiYMa.hien(note, null);
+  if (catalogs.dungcu.rows().some(r => r.ma === ma)) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Mã đã có' });
+  if (!DC_RE.test(ma)) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Sai mẫu LOẠI-Φ 3 số-STT, VD DT-060-01' });
+  const loai = document.getElementById('dungcu-loai').value, dk = soHoacNull('dungcu-dk');
+  if (loai && ma.slice(0, 2) !== loai) return GoiYMa.hien(note, { muc: 'loi', text: '⛔ Mã phải bắt đầu ' + loai + '-' });
+  if (dk != null && Number(ma.slice(3, 6)) !== Math.round(dk)) return GoiYMa.hien(note, { muc: 'canh', text: '⚠ Φ trong mã khác ô Đường kính' });
+  GoiYMa.hien(note, { muc: 'ok', text: '✓ Đúng mẫu' });
+}
+function dcGoiY(tuDong){
+  if (dcEditing) return;
+  const loai = document.getElementById('dungcu-loai').value, dk = soHoacNull('dungcu-dk');
+  const note = document.getElementById('dungcu-ma-note');
+  if (!loai || dk == null || dk <= 0 || dk >= 1000) return tuDong ? null : GoiYMa.hien(note, { muc: 'canh', text: '⚠ Chọn Loại + nhập Φ trước' });
+  const pre = loai + '-' + String(Math.round(dk)).padStart(3, '0') + '-';
+  const stt = Math.max(0, ...catalogs.dungcu.rows().filter(r => r.ma.startsWith(pre)).map(r => parseInt(r.ma.slice(pre.length), 10) || 0)) + 1;
+  document.getElementById('dungcu-ma').value = pre + String(stt).padStart(2, '0');
+  const ten = document.getElementById('dungcu-ten');
+  if (!ten.value.trim() || ten.dataset.tuDien === '1'){ ten.value = dcLoai(loai)[1] + ' Φ' + soVn(dk); ten.dataset.tuDien = '1'; }
+  dcKiem();
+}
+document.getElementById('dungcu-goiy').addEventListener('click', () => dcGoiY(false));
+document.getElementById('dungcu-loai').addEventListener('change', () => { dcVeMay(); dcGoiY(true); });
+document.getElementById('dungcu-dk').addEventListener('change', () => dcGoiY(true));
+document.getElementById('dungcu-ma').addEventListener('input', dcKiem);
+document.getElementById('dungcu-ten').addEventListener('input', e => { e.target.dataset.tuDien = ''; });
+function dcResetForm(){
+  dcEditing = null; dcAnh = []; dcMaySel = new Set();
+  clearMsg('dungcu-msg');
+  document.getElementById('dungcu-form').reset();
+  document.getElementById('dungcu-ten').dataset.tuDien = '';
+  document.getElementById('dungcu-hien').checked = true;
+  ['dungcu-ma', 'dungcu-loai', 'dungcu-dk'].forEach(id => { document.getElementById(id).disabled = false; });
+  document.getElementById('dungcu-goiy').hidden = false;
+  GoiYMa.hien(document.getElementById('dungcu-ma-note'), null);
+  dcVeMay(); dcVeAnh();
+  document.getElementById('dungcu-form-title').textContent = 'Thêm dụng cụ';
+  document.getElementById('dungcu-submit').textContent = 'Thêm dụng cụ';
+}
+function dcFillForm(r){
+  dcEditing = r.ma; dcAnh = (r.anh || []).slice(); dcMaySel = new Set(r.may_dung || []);
+  clearMsg('dungcu-msg');
+  const g = (id, v) => { document.getElementById(id).value = v ?? ''; };
+  g('dungcu-loai', r.loai); g('dungcu-dk', r.duong_kinh); g('dungcu-ma', r.ma); g('dungcu-ten', r.ten); g('dungcu-dai', r.chieu_dai);
+  g('dungcu-tuoitho', r.tuoi_tho_du_kien); g('dungcu-vl', r.vat_lieu); g('dungcu-ncc', r.nha_cung_cap); g('dungcu-ghichu', r.ghi_chu);
+  document.getElementById('dungcu-ten').dataset.tuDien = '';
+  document.getElementById('dungcu-hien').checked = r.hien !== false;
+  // Mã đã dùng trên phiếu thì không đổi → khoá Mã + Loại + Φ (Φ nằm trong mã).
+  ['dungcu-ma', 'dungcu-loai', 'dungcu-dk'].forEach(id => { document.getElementById(id).disabled = true; });
+  document.getElementById('dungcu-goiy').hidden = true;
+  GoiYMa.hien(document.getElementById('dungcu-ma-note'), null);
+  dcVeMay(); dcVeAnh();
+  document.getElementById('dungcu-form-title').textContent = 'Sửa dụng cụ: ' + r.ma;
+  document.getElementById('dungcu-submit').textContent = 'Lưu thay đổi';
+}
+document.getElementById('dungcu-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const loai = document.getElementById('dungcu-loai').value;
+  const ma = document.getElementById('dungcu-ma').value.trim().toUpperCase();
+  const ten = document.getElementById('dungcu-ten').value.trim().replace(/\s+/g, ' ');
+  const dk = soHoacNull('dungcu-dk');
+  if (!loai || !ma || !ten || dk == null) return showMsg('dungcu-msg', 'error', 'Nhập đủ Loại, Φ, Mã, Tên');
+  if (!dcEditing){
+    if (!DC_RE.test(ma)) return showMsg('dungcu-msg', 'error', 'Mã sai mẫu, VD DT-060-01');
+    if (ma.slice(0, 2) !== loai) return showMsg('dungcu-msg', 'error', 'Mã phải bắt đầu ' + loai + '-');
+    if (catalogs.dungcu.rows().some(r => r.ma === ma)) return showMsg('dungcu-msg', 'error', 'Mã ' + ma + ' đã có');
+    if (Number(ma.slice(3, 6)) !== Math.round(dk) && !confirm('Φ trong mã (' + ma.slice(3, 6) + ') khác ô Đường kính (' + soVn(dk) + '). Vẫn lưu?')) return;
+  }
+  const may = dcMayDs.map(m => m.ma_may).filter(m => dcMaySel.has(m));
+  if (!may.length) return showMsg('dungcu-msg', 'error', 'Chọn ít nhất 1 máy dùng được');
+  const tt = soHoacNull('dungcu-tuoitho');
+  const payload = {
+    ten, duong_kinh: dk, chieu_dai: soHoacNull('dungcu-dai'),
+    vat_lieu: document.getElementById('dungcu-vl').value.trim() || null,
+    nha_cung_cap: document.getElementById('dungcu-ncc').value.trim() || null,
+    may_dung: may, tuoi_tho_du_kien: tt != null ? Math.round(tt) : null, anh: dcAnh,
+    ghi_chu: document.getElementById('dungcu-ghichu').value.trim() || null,
+    hien: document.getElementById('dungcu-hien').checked,
+  };
+  let error;
+  if (dcEditing) ({ error } = await sb.from('duc_dung_cu').update(payload).eq('ma', dcEditing));
+  else ({ error } = await sb.from('duc_dung_cu').insert({ ma, loai, ...payload }));
+  if (error) return showMsg('dungcu-msg', 'error', 'Lỗi: ' + error.message + (/duplicate key/.test(error.message) ? ' (mã đã có)' : /row-level security/.test(error.message) ? ' (chỉ admin + Kỹ thuật được sửa)' : ''));
+  toast(dcEditing ? 'Đã lưu ' + ma : 'Đã thêm ' + ma);
+  catalogs.dungcu.close();
+  catalogs.dungcu.reload();
+});
+initCatalog({
+  id: 'dungcu',
+  emptyText: 'Chưa có dụng cụ nào. Bấm ＋ Thêm mới.',
+  fetch: async () => {
+    const [dc, may] = await Promise.all([
+      sb.from('duc_dung_cu').select('*'),
+      sb.from('master_machines').select('ma_may, loai_may').in('loai_may', ['Đúc nhôm', 'Đúc kẽm']),
+    ]);
+    dcMayDs = (may.data || []).sort((a, b) => cmp(a.loai_may, b.loai_may) || cmp(a.ma_may, b.ma_may));
+    return dc;
+  },
+  pk: r => r.ma + ' — ' + r.ten,
+  resetForm: dcResetForm,
+  fillForm: dcFillForm,
+  canDelete: () => laAdmin,
+  remove: r => sb.from('duc_dung_cu').delete().eq('ma', r.ma),
+  filters: [
+    { k: 'loai', label: 'Loại', valOf: r => r.loai, fmt: v => v + ' — ' + dcLoai(v)[1] },
+    { k: 'hien', label: 'Trạng thái', valOf: r => r.hien === false ? 'Đã ẩn' : 'Đang dùng' },
+  ],
+  columns: [
+    { k: 'anh', label: 'Ảnh', text: () => '', render: r => (r.anh || []).length ? `<a href="${escapeHtml(r.anh[0])}" target="_blank" rel="noopener"><img class="dc-nho" src="${escapeHtml(r.anh[0])}" alt="" loading="lazy"></a>` + (r.anh.length > 1 ? ' <span class="muted">+' + (r.anh.length - 1) + '</span>' : '') : DASH },
+    { k: 'ma', label: 'Mã', sortable: true, sortVal: r => dcVt(r.loai) + r.ma, text: r => r.ma, render: r => '<b>' + escapeHtml(r.ma) + '</b>' },
+    { k: 'ten', label: 'Tên', sortable: true, sortVal: r => r.ten, text: r => r.ten + ' ' + dcLoai(r.loai)[1] + ' ' + (r.vat_lieu || '') + ' ' + (r.nha_cung_cap || ''),
+      render: r => escapeHtml(r.ten) + (r.hien === false ? ' <span class="muted">(đã ẩn)</span>' : '') + (r.ghi_chu ? '<br><span class="muted">' + escapeHtml(r.ghi_chu) + '</span>' : '') },
+    { k: 'duong_kinh', label: 'Φ', sortable: true, sortVal: r => Number(r.duong_kinh) || 0, text: () => '', render: r => soVn(r.duong_kinh) },
+    { k: 'chieu_dai', label: 'Dài', sortable: true, sortVal: r => Number(r.chieu_dai) || 0, text: () => '', render: r => r.chieu_dai != null ? soVn(r.chieu_dai) : DASH },
+    { k: 'vat_lieu', label: 'Vật liệu / NCC', text: () => '', render: r => [r.vat_lieu, r.nha_cung_cap].filter(Boolean).map(escapeHtml).join('<br>') || DASH },
+    { k: 'may_dung', label: 'Máy dùng được', text: r => (r.may_dung || []).join(' '), render: r => (r.may_dung || []).length ? '<span style="font-size:12px">' + escapeHtml(r.may_dung.join(', ')) + '</span>' : DASH },
+    { k: 'tuoi_tho_du_kien', label: 'Tuổi thọ', sortable: true, sortVal: r => r.tuoi_tho_du_kien || 0, text: () => '', render: r => r.tuoi_tho_du_kien ? Number(r.tuoi_tho_du_kien).toLocaleString('vi-VN') : DASH },
   ],
 });
 
@@ -1450,8 +1921,23 @@ async function main(){
     gate.innerHTML = '<div class="msg error" style="display:block">Không kiểm tra được quyền: ' + error.message + '</div>';
     return;
   }
-  if (!myRole || myRole.role !== 'admin'){
-    gate.innerHTML = '<div class="msg error" style="display:block">Bạn không có quyền admin để vào trang này.</div>';
+  laAdmin = !!myRole && myRole.role === 'admin';
+  if (!laAdmin){
+    // T318: người phụ trách bộ phận Kỹ thuật vào được 2 tab điều kiện đúc (+ Quy tắc đặt tên).
+    const { data: kt } = await sb.rpc('duc_dk_la_ky_thuat');
+    if (!kt){
+      gate.innerHTML = '<div class="msg error" style="display:block">Bạn không có quyền admin để vào trang này.</div>';
+      return;
+    }
+    const cho = ['dkts', 'dungcu', 'quytac'];
+    document.querySelectorAll('.tab-btn').forEach(b => { if (!cho.includes(b.dataset.tab)) b.remove(); });
+    const t = new URLSearchParams(location.search).get('tab');
+    tabTruoc = 'dungcu';
+    document.querySelector('.tab-btn[data-tab="' + (cho.includes(t) ? t : 'dkts') + '"]').click();
+    document.getElementById('adminArea').style.display = 'block';
+    document.getElementById('adminTabs').style.display = 'flex';
+    catalogs.dkts.reload();
+    catalogs.dungcu.reload();
     return;
   }
   document.getElementById('adminArea').style.display = 'block';
@@ -1464,6 +1950,8 @@ async function main(){
   catalogs.ns.reload();
   catalogs.suco.reload();
   catalogs.thaydoi.reload();
+  catalogs.dkts.reload();
+  catalogs.dungcu.reload();
   KhuonDs.mount(document.getElementById('khuon-ds'), { admin: true, userName: (await MesAuth.getCurrentUserIdentity()) || '' });
   loadDocPermissions();
 }
