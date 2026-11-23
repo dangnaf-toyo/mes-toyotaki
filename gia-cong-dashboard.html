@@ -302,6 +302,7 @@
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">Làm mới</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa" title="Báo cáo ca, kết ca và khoá số liệu">Kết ca</button>
+  <button type="button" class="btn btn-ghost" id="btnChiaXe" title="Xe Bavia chuyển nguyên: chia ra thùng, dán tem in sẵn">Chia xe</button>
   <a class="btn btn-ghost" href="ipqc-gia-cong.html">IPQC</a>
   <a class="btn btn-ghost" href="cong-doan-dashboard.html?cd=C%E1%BA%AFt+vi%E1%BB%81n" title="Cắt viền chưa có danh mục máy — vẫn dùng màn cũ">Cắt viền</a>
   <div class="header-clock">
@@ -433,6 +434,22 @@
     <div class="acts">
       <button class="mbtn ghost" type="button" data-close>Huỷ</button>
       <button class="mbtn" type="button" id="dmoSave">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- T338: chia xe Bavia chuyển nguyên ra thùng -->
+<div class="modal-bg" id="xeModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="xeTitle">
+    <h4 id="xeTitle" style="display:flex;align-items:center;gap:8px">Chia xe <button class="info-btn" type="button" data-info="xeInfo" title="Cách làm">ⓘ</button></h4>
+    <div class="info-txt" id="xeInfo" hidden>Quét tem xe (tem Đúc) → quét từng tem thùng in sẵn. Mỗi tem trừ đúng SL trên tem. Xe còn ít hơn SL tem thì ghi thùng lẻ.</div>
+    <label class="f"><span id="xeLab">Quét tem xe</span><input id="xeScan" type="text" autocomplete="off" placeholder="Quét QR…"></label>
+    <div id="xeBody"></div>
+    <div class="err" id="xeErr"></div>
+    <div class="acts">
+      <button class="mbtn ghost" type="button" id="xeMoi">Xe khác</button>
+      <span class="sp"></span>
+      <button class="mbtn ghost" type="button" data-close>Đóng</button>
     </div>
   </div>
 </div>
@@ -962,6 +979,65 @@ document.addEventListener('keydown', e => {
   if (!$('#xnModal').hidden) { $('#xnHuy').click(); return; }
   closeModals();
 });
+/* ── T338: Chia xe (Bavia chuyển nguyên xe) ─────────────────────────────── */
+let xeCur = null, xeBusy = false;
+function veXe(okMsg) {
+  $('#xeLab').textContent = xeCur ? 'Quét tem thùng in sẵn' : 'Quét tem xe';
+  $('#xeMoi').hidden = !xeCur;
+  if (!xeCur) { $('#xeBody').innerHTML = ''; return; }
+  const T = xeCur.thung || [];
+  $('#xeBody').innerHTML =
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline">' +
+      '<div><div class="sub">Xe</div><b class="mono">' + esc(xeCur.xe) + '</b></div>' +
+      '<div><div class="sub">Mã</div><b class="mono">' + esc(xeCur.ma_sp) + '</b></div>' +
+      '<div><div class="sub">Còn trên xe</div><b style="font-size:20px">' + fmt(xeCur.con) + '</b> / ' + fmt(xeCur.sl_xe) + '</div>' +
+      '<div><div class="sub">Đã chia</div><b>' + T.length + '</b> thùng</div></div>' +
+    (okMsg ? '<div class="flash ok" style="margin:6px 0 0">' + okMsg + '</div>' : '') +
+    (Number(xeCur.con) <= 0 ? '<div class="flash ok" style="margin:6px 0 0">Xe đã chia hết.</div>' : '') +
+    (T.length ? '<div class="tbl" style="margin-top:6px"><table class="t" style="min-width:0"><thead><tr><th>Tem thùng</th><th style="text-align:right">SL</th></tr></thead><tbody>' +
+      T.map(x => '<tr><td class="mono">' + esc(x.tag_no) + '</td><td style="text-align:right">' + fmt(x.so_luong) + '</td></tr>').join('') + '</tbody></table></div>' : '');
+}
+function moChiaXe() {
+  xeCur = null; $('#xeErr').textContent = ''; veXe();
+  $('#xeModal').hidden = false;
+  setTimeout(() => $('#xeScan').focus(), 50);
+}
+async function quetXe(raw) {
+  const tag = parseTagNo(raw);
+  if (!tag || xeBusy) return;
+  xeBusy = true; $('#xeErr').textContent = '';
+  try {
+    if (!xeCur || !/^TP/.test(tag)) {
+      xeCur = await rpc('gc_chia_xe', { p_tag_xe: tag, p_tag_thung: null, p_cho_le: false });
+      veXe();
+    } else {
+      let r;
+      try {
+        r = await rpc('gc_chia_xe', { p_tag_xe: xeCur.xe, p_tag_thung: tag, p_cho_le: false });
+      } catch (e) {
+        if (!(e.data && e.data.le)) throw e;
+        if (!(await hoiXacNhan('Xe còn ' + fmt(e.data.con) + ' pcs, ít hơn SL tem ' + fmt(e.data.sl_tem) + '.\nGhi tem ' + tag + ' là thùng lẻ ' + fmt(e.data.con) + ' pcs?', { nutOk: 'Thùng lẻ' }))) return;
+        r = await rpc('gc_chia_xe', { p_tag_xe: xeCur.xe, p_tag_thung: tag, p_cho_le: true });
+      }
+      xeCur = r;
+      veXe('Tem <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs');
+    }
+  } catch (e) { $('#xeErr').textContent = errText(e); }
+  finally { xeBusy = false; const i = $('#xeScan'); i.value = ''; i.focus(); }
+}
+$('#btnChiaXe').onclick = moChiaXe;
+$('#xeMoi').onclick = () => { xeCur = null; $('#xeErr').textContent = ''; veXe(); $('#xeScan').focus(); };
+// Đầu đọc QR gõ nhiều trường (mỗi trường 1 Enter) → lấy giá trị ở Enter đầu, gộp các Enter liền nhau.
+let xeBuf = '', xeTimer = null;
+$('#xeScan').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const v = $('#xeScan').value; $('#xeScan').value = '';
+  if (!xeBuf) xeBuf = v;
+  clearTimeout(xeTimer);
+  xeTimer = setTimeout(() => { const x = xeBuf; xeBuf = ''; quetXe(x); }, 120);
+});
+
 function closeModals() { document.querySelectorAll('.modal-bg').forEach(x => { if (x.id !== 'camModal' && x.id !== 'xnModal') x.hidden = true; }); }
 document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if (e.target === bg || e.target.hasAttribute('data-close')) { if (bg.id === 'xnModal') $('#xnHuy').click(); else if (bg.id !== 'camModal') bg.hidden = true; } }));
 function moMayModal(m) {
