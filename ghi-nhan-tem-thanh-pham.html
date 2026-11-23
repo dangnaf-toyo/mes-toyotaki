@@ -845,7 +845,7 @@ let busyNguon = false;
 async function khaiBaoNguon(raw){
   var tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) { showMsg('Chưa có Tag No để khai báo.', 'err', 4000); return; }
-  if (/^TP/i.test(tagNo)) { showMsg('Tem thành phẩm không dùng làm nguồn được — hãy đọc đúng tem của công đoạn ĐÚC.', 'err', 6000); beep(false); return; }
+  if (/^(TP|GC)/i.test(tagNo)) { showMsg('Tem thành phẩm không dùng làm nguồn được — hãy đọc đúng tem của công đoạn ĐÚC.', 'err', 6000); beep(false); return; }
   if (busyNguon) return;
   busyNguon = true;
   showMsg('⏳ Đang khai báo ' + tagNo + '…', 'wait');
@@ -1249,7 +1249,7 @@ function routeScan(raw){
   const tagNo = String(raw || '').split('>')[0].replace(/\s+/g, '');
   if (!tagNo) return;
   if (isKanban()) ghiNhanKanban(tagNo);
-  else if (/^TP/i.test(tagNo)) ghiNhan(tagNo);
+  else if (/^(TP|GC)/i.test(tagNo)) ghiNhan(tagNo);   // T342: GC = tem Gia Công → server báo quét ở Chia xe
   else khaiBaoNguon(tagNo);
 }
 
