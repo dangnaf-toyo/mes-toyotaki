@@ -16,6 +16,7 @@
   T321 Bước 5: Lần mới (duc_dk_lan_moi → mở sửa nháp) · So sánh ?ss=A&voi=B (tô dòng khác) · In A4 dọc (#vIn + @media print, ô ký 3 bước)
   · Excel: xuất 1 phiếu (SheetJS, tải khi cần) — file xuất cũng là mẫu nhập; Nhập Excel ở form Lập/Sửa → điền form, bấm Lưu = nháp.
   Mẫu Excel: cột A = mã thông số (VL01…) / loại dụng cụ (DT, OL…) / nhãn "Máy", "Mã SP", "Lý do ban hành"; Chuẩn cột D, Ghi chú cột I, mã dụng cụ cột C.
+  T323 Bước 7: phiếu hiệu lực → chuẩn ±5% của Điểm thay đổi (duc_thay_doi_chuan nguồn phieu_dk); thay đổi đã duyệt → can_cap_nhat + dải vàng.
 -->
 <style>
 :root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);--shadow-lg:0 12px 32px rgba(15,23,42,0.16);}
@@ -212,7 +213,7 @@ const NHOM = { VL: 'Vật liệu & rót', PE: 'Phun ép', NT: 'Nhiệt độ & t
 const LOAI_DC = { DT: 'Đầu típ', OL: 'Ống liệu', PK: 'Piston kẽm', XM: 'Xéc-măng', CN: 'Cổ ngỗng', VP: 'Vòi phun' };
 const DC_THEO_LOAI = { nhom: ['DT', 'OL'], kem: ['PK', 'VP', 'XM', 'CN'] };
 const DC_BB = { nhom: ['DT', 'OL'], kem: ['PK', 'VP'] };
-const LS_TEN = { lap: 'Lập', sua: 'Sửa', gui: 'Gửi', kiem_dong_y: 'Kiểm tra đồng ý', kiem_tra_lai: 'Kiểm tra trả lại', duyet_dong_y: 'Duyệt', duyet_tra_lai: 'Duyệt trả lại', het_hieu_luc: 'Hết hiệu lực', lan_moi: 'Lần mới' };
+const LS_TEN = { lap: 'Lập', sua: 'Sửa', gui: 'Gửi', kiem_dong_y: 'Kiểm tra đồng ý', kiem_tra_lai: 'Kiểm tra trả lại', duyet_dong_y: 'Duyệt', duyet_tra_lai: 'Duyệt trả lại', het_hieu_luc: 'Hết hiệu lực', lan_moi: 'Lần mới', can_cap_nhat: 'Cần cập nhật' };
 
 let TS = [], DC = [], MAY = [], SP = new Map(), NVL = [], DS = [], quyen = {}, uid = null;
 let ed = null;   // phiếu đang sửa
@@ -293,7 +294,7 @@ async function taiChung(){
   $('hLap').hidden = !quyen.lap;
 }
 async function taiDs(){
-  const r = await sbTaiHet(() => sb.from('duc_dk_phieu').select('id,ma_sp,ma_may,lan,trang_thai,hieu_luc_tu,lap_luc,nguoi_lap,lich_su,cho_tu').order('id', { ascending: false }));
+  const r = await sbTaiHet(() => sb.from('duc_dk_phieu').select('id,ma_sp,ma_may,lan,trang_thai,hieu_luc_tu,lap_luc,nguoi_lap,lich_su,cho_tu,can_cap_nhat').order('id', { ascending: false }));
   if (r.error) throw new Error(r.error.message);
   DS = r.data || [];
 }
@@ -337,7 +338,7 @@ function veDs(){
       '<td class="nw"><b>' + esc(p.ma_may) + '</b></td>' +
       '<td class="nw">' + esc(p.ma_sp) + '<small>' + esc(SP.get(p.ma_sp) || '') + '</small></td>' +
       '<td>' + (p.lan || '') + '</td>' +
-      '<td>' + ttHtml(p.trang_thai) + (p.ao && quyen.lap ? ' <small>Bấm để lập</small>' : '') + (!p.ao && toiCho(p) ? '<small class="toi">Chờ bạn</small>' : '') + '</td>' +
+      '<td>' + ttHtml(p.trang_thai) + (p.ao && quyen.lap ? ' <small>Bấm để lập</small>' : '') + (!p.ao && toiCho(p) ? '<small class="toi">Chờ bạn</small>' : '') + (p.can_cap_nhat && p.trang_thai === 'hieu_luc' ? '<small class="toi">Cần cập nhật</small>' : '') + '</td>' +
       '<td class="hide-m nw">' + esc(fmtNgay(p.hieu_luc_tu)) + '</td>' +
       '<td class="hide-m">' + esc(p.ao ? '' : nguoiLap(p)) + '</td></tr>';
   }).join('');
@@ -439,6 +440,12 @@ async function veXem(id){
     hop = '<div class="hop vang"><span class="t">Bạn là người lập — không tự ' + (choKiem ? 'kiểm tra' : 'duyệt') + '.</span></div>';
   const tra = p.trang_thai === 'nhap' ? lsCuoi(p, ['kiem_tra_lai', 'duyet_tra_lai', 'gui']) : null;
   if (tra && tra.viec !== 'gui') hop += '<div class="hop do"><span class="t">↩ ' + esc(LS_TEN[tra.viec]) + ' — ' + esc(tra.nguoi || '') + ' ' + esc(fmtTs(tra.luc)) + (tra.ghi_chu ? ': ' + esc(tra.ghi_chu) : '') + '</span></div>';
+  if (p.trang_thai === 'hieu_luc' && p.can_cap_nhat) {   // T323: thay đổi đã duyệt chưa đưa vào phiếu
+    const tu = p.hieu_luc_tu ? new Date(p.hieu_luc_tu).getTime() : 0;
+    const ds = (p.lich_su || []).filter(e => e.viec === 'can_cap_nhat' && new Date(e.luc).getTime() >= tu);
+    hop += '<div class="hop vang"><span class="t">⚠ Có thay đổi đã duyệt chưa đưa vào phiếu' + (quyen.lap && !mo ? ' — bấm Lần mới để cập nhật' : '') + '</span><ul>' +
+      ds.map(e => '<li>' + (e.td ? '<a href="diem-thay-doi.html?id=' + Number(e.td) + '">' : '') + esc(e.ghi_chu || '') + (e.td ? '</a>' : '') + ' <small>' + esc(fmtTs(e.luc)) + '</small></li>').join('') + '</ul></div>';
+  }
   if (p.trang_thai === 'nhap') {
     const { data: th } = await sb.rpc('duc_dk_kiem_thieu', { p_id: p.id });
     if (th && th.length) hop += '<div class="hop vang"><span class="t">Còn thiếu / sai trước khi Gửi (' + th.length + ')</span><ul>' + th.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';

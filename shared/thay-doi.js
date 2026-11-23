@@ -187,21 +187,43 @@
     if (!ds.length) return bao('Chưa có danh mục thay đổi (chưa chạy SQL T307?).', true);
 
     // Giá trị chuẩn + giá trị "Sau" lần gần nhất (tự điền ô Trước)
-    const [chuanRes, cuRes] = await Promise.all([
-      sb.from('duc_thay_doi_chuan').select('ma_muc,gia_tri').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp),
-      sb.from('duc_thay_doi').select('chi_tiet,trang_thai').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp)
+    // T323: chuẩn nguồn 'phieu_dk' = Chuẩn của phiếu ĐK đúc hiệu lực → ô Trước lấy từ phiếu (trừ khi đã có thay đổi sau lúc phiếu hiệu lực)
+    const [chuanRes, cuRes, dkRes] = await Promise.all([
+      sb.from('duc_thay_doi_chuan').select('ma_muc,gia_tri,nguon').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp),
+      sb.from('duc_thay_doi').select('chi_tiet,trang_thai,thoi_diem_ap_dung,thoi_diem_ghi').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp)
         .in('trang_thai', ['cho_ipqc', 'ok', 'ng', 'ghi_nhan', 'khong_kiem']).order('id', { ascending: false }).limit(60),
+      sb.from('duc_dk_phieu').select('id,lan,hieu_luc_tu,ma_nvl').eq('ma_may', row.ma_may).eq('ma_sp', row.ma_sp).eq('trang_thai', 'hieu_luc').maybeSingle(),
     ]);
-    const chuan = {}; (chuanRes.data || []).forEach(c => { chuan[c.ma_muc] = Number(c.gia_tri); });
+    const chuan = {}, tuPhieu = {};
+    (chuanRes.data || []).forEach(c => { chuan[c.ma_muc] = Number(c.gia_tri); if (c.nguon === 'phieu_dk') tuPhieu[c.ma_muc] = true; });
+    const dk = dkRes.data || null, dkTu = dk && dk.hieu_luc_tu ? new Date(dk.hieu_luc_tu).getTime() : 0;
     const ganNhat = {};
-    (cuRes.data || []).forEach(p => (p.chi_tiet || []).forEach(e => { if (!(e.ma in ganNhat) && e.sau != null) ganNhat[e.ma] = e.sau; }));
+    (cuRes.data || []).forEach(p => {
+      if (dkTu && new Date(p.thoi_diem_ap_dung || p.thoi_diem_ghi).getTime() < dkTu) return;   // trước phiếu → bỏ
+      (p.chi_tiet || []).forEach(e => { if (!(e.ma in ganNhat) && e.sau != null) ganNhat[e.ma] = e.sau; });
+    });
+    const dkChu = {};   // mục kiểu chữ: giá trị trên phiếu (VD D13 ← NT09, V03 ← NVL)
+    if (dk) {
+      const [g, t] = await Promise.all([
+        sb.from('duc_dk_gia_tri').select('ma_ts,chuan,gia_tri_chu').eq('id_phieu', dk.id),
+        sb.from('duc_dk_thong_so').select('ma_ts,ma_muc_td,kieu,don_vi,thu_tu').not('ma_muc_td', 'is', null).order('thu_tu'),
+      ]);
+      const gt = {}; (g.data || []).forEach(x => { gt[x.ma_ts] = x; });
+      (t.data || []).forEach(x => {
+        const v = x.kieu === 'chon_nvl' ? dk.ma_nvl : !gt[x.ma_ts] ? null
+          : x.kieu === 'co_khong' ? (gt[x.ma_ts].gia_tri_chu === 'co' ? 'Có' : gt[x.ma_ts].gia_tri_chu === 'khong' ? 'Không' : null)
+          : x.kieu === 'so' ? (gt[x.ma_ts].chuan != null ? soVi(gt[x.ma_ts].chuan) + (x.don_vi ? ' ' + x.don_vi : '') : null)
+          : gt[x.ma_ts].gia_tri_chu;
+        if (v) (dkChu[x.ma_muc_td] = dkChu[x.ma_muc_td] || []).push(v);
+      });
+    }
 
     const st = { nhom: 'dieu_kien', chon: [], lyDo: '', maLoi: '', anh: [] };
     const byMa = {}; ds.forEach(m => { byMa[m.ma] = m; });
     const demLoi = window.LoiChung ? null : napLoiChung();
 
     const d = taoHop(
-      '<div class="hd"><b>Thay đổi</b><span class="sub">' + esc(row.ma_may) + ' · ' + esc(row.ma_sp) + (row.so_khuon ? ' · ' + esc(row.so_khuon) : '') + ' · ' + esc(row.ca || '') + '</span>' +
+      '<div class="hd"><b>Thay đổi</b><span class="sub">' + esc(row.ma_may) + ' · ' + esc(row.ma_sp) + (row.so_khuon ? ' · ' + esc(row.so_khuon) : '') + ' · ' + esc(row.ca || '') + (dk ? ' · 📋 ĐK lần ' + dk.lan : '') + '</span>' +
         '<button class="x" type="button" title="Đóng">✕</button></div>' +
       '<div class="bd"><div class="nhom"></div><div class="ds"></div><div class="chon"></div>' +
         '<label class="l">Lý do *</label><div class="dong"><select class="lydo"><option value="">— Chọn lý do —</option>' +
@@ -259,7 +281,7 @@
         const c = st.chon[Number(el.dataset.i)], m = byMa[c.ma], r = tinh(c);
         const kq = el.querySelector('.kq');
         let t = '';
-        if (r.pct != null) t = (r.pct > 0 ? '±' : '') + soVi(r.pct) + '% so với chuẩn' + ((m.ma in chuan) ? ' ' + soVi(chuan[m.ma]) : '') + ' · ';
+        if (r.pct != null) t = (r.pct > 0 ? '±' : '') + soVi(r.pct) + '% so với ' + (tuPhieu[m.ma] ? 'ĐK đúc' : 'chuẩn') + ((m.ma in chuan) ? ' ' + soVi(chuan[m.ma]) : '') + ' · ';
         kq.className = 'kq ' + (r.duyet ? 'duyet' : 'tu');
         kq.textContent = t + (r.duyet ? '⏳ ' + DUYET[r.duyet] + ' duyệt' : '✓ Trưởng ca tự chỉnh');
         if (r.duyet) duyet.add(r.duyet);
@@ -291,7 +313,8 @@
         if (i >= 0) st.chon.splice(i, 1);
         else {
           const m = byMa[ma];
-          const truoc = ma in ganNhat ? ganNhat[ma] : (ma in chuan ? chuan[ma] : '');
+          const truoc = ma in ganNhat ? ganNhat[ma] : (ma in chuan ? chuan[ma]
+            : (m.kieu_nhap !== 'so' && dkChu[ma] ? dkChu[ma].join(' · ') : ''));
           st.chon.push({ ma, truoc: m.kieu_nhap === 'so' ? soVi(truoc) : (truoc || ''), sau: '', can_ipqc: false, nguoi_duyet: 'khong' });
         }
         veNhom(); veChon(); return;
