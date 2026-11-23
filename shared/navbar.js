@@ -119,7 +119,7 @@
       // T137: 1 mục "Tổ khuôn" — các trang con hiện dải tab (SUB_TABS bên dưới).
       { label: 'Tổ khuôn', href: 'bao-duong-khuon-tuan.html', subTabs: 'to_khuon' },
       // T329: Điều kiện đúc bỏ khỏi menu — mở bằng nút "ĐK đúc" ở Bảng điều khiển Đúc.
-      { label: 'Dụng cụ đúc', href: 'dung-cu-duc.html' },   // T325
+      // T330: Dụng cụ đúc bỏ khỏi menu — mở bằng nút "Dụng cụ" ở Bảng điều khiển Đúc.
       // T246: Chuyển công đoạn + Đóng gói Pallet = 1 mục, 2 tab.
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html', subTabs: 'chuyen_dong_goi' },
     ] },
