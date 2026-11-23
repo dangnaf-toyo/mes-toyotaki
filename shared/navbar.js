@@ -120,6 +120,7 @@
       // T137: 1 mục "Tổ khuôn" — các trang con hiện dải tab (SUB_TABS bên dưới).
       { label: 'Tổ khuôn', href: 'bao-duong-khuon-tuan.html', subTabs: 'to_khuon' },
       { label: 'Điều kiện đúc', href: 'dieu-kien-duc.html' },   // T320
+      { label: 'Dụng cụ đúc', href: 'dung-cu-duc.html' },   // T325
       // T246: Chuyển công đoạn + Đóng gói Pallet = 1 mục, 2 tab.
       { label: 'Chuyển công đoạn / Đóng gói', href: 'chuyencongdoan.html', subTabs: 'chuyen_dong_goi' },
     ] },
@@ -162,6 +163,7 @@
     'index.html': { icon: '🏠', title: 'Trang chủ MES', desc: 'Chọn chức năng bạn muốn sử dụng', noTitleBar: true },
     'duc-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển Đúc', desc: 'Kế hoạch, sản lượng, sự cố, khuôn theo ca', noTitleBar: true },
     'dieu-kien-duc.html': { icon: '⚙', title: 'Điều kiện đúc', desc: 'Phiếu điều kiện đúc theo Mã SP × Máy: lập, kiểm tra, duyệt', noTitleBar: true },   // T320
+    'dung-cu-duc.html': { icon: '🔩', title: 'Dụng cụ đúc', desc: 'Từng cái đầu típ, ống liệu, piston: đang lắp máy nào, đã bắn bao nhiêu', noTitleBar: true },   // T325
     'diem-thay-doi.html': { icon: '±', title: 'Điểm thay đổi Đúc', desc: 'Thay đổi chủ động: duyệt, IPQC sau thay đổi, lịch sử', noTitleBar: true },   // T307
     'mobile.html': { icon: '📱', title: 'Nhập liệu di động — Đúc', desc: 'Bản rút gọn cho điện thoại, 1 máy/màn hình' },
     'ipqc.html': { icon: '🔎', title: 'IPQC Đúc', desc: 'Hàng đợi điểm kiểm, nộp kết quả kèm ảnh', noTitleBar: true },
