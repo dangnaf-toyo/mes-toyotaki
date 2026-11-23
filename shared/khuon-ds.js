@@ -66,6 +66,12 @@
 .kds-dlg .fg input,.kds-dlg .fg select,.kds-dlg .fg textarea{border:1.5px solid var(--border-strong);border-radius:6px;padding:8px 9px;font-size:13.5px;font-family:inherit;width:100%;color:var(--text);background:#fff}
 .kds-dlg .fg textarea{min-height:60px;resize:vertical}
 .kds-dlg .fg .sub{font-size:11px;color:var(--text-muted)}
+.kds-dlg .ho-row{display:grid;grid-template-columns:1fr 64px 32px;gap:6px;align-items:center}
+.kds-dlg .ho-row input{text-align:center}
+.kds-dlg .ho-x{border:1px solid var(--border);background:#fff;border-radius:6px;height:34px;cursor:pointer;color:var(--text-muted)}
+.kds-dlg .ho-hd{display:grid;grid-template-columns:1fr 64px 32px;gap:6px;font-size:11px;color:var(--text-muted)}
+.kds-dlg .ho-add{align-self:flex-start}
+.kds .ho-sp{white-space:nowrap}
 .kds-dlg .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kds-dlg .tt-opts,.kds-dlg .ut-list{display:flex;flex-direction:column;gap:6px}
 .kds-dlg label.tt-opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;margin:0;font-weight:400;color:var(--text);font-size:13px}
@@ -106,7 +112,11 @@
   <div class="bd">
     <div class="hint" style="background:var(--bg-sunken);border-radius:6px;padding:8px 10px">Để trống ô nào thì giữ nguyên giá trị hiện tại của ô đó. Dùng khi cần khai báo baseline hoặc sửa ngưỡng riêng cho khuôn này.</div>
     <div class="fg"><label>Mã khuôn *</label><div class="gy-row"><input data-f="ma-khuon" placeholder="VD: OUT #3"><button type="button" class="gy-btn" data-act="ma-goiy" title="Chọn Mã sản phẩm (có thể gõ số khắc, VD 4) rồi bấm">Gợi ý</button></div><div class="gy-note" data-f="ma-khuon-note" hidden></div><div class="sub" data-f="ma-khuon-hint"></div></div>
-    <div class="fg"><label>Mã sản phẩm <span data-f="sp-req">*</span></label><select data-f="ma-sp"></select><div class="sub">Mỗi khuôn đúc đúng 1 mã SP cố định.</div></div>
+    <div class="fg"><label>Mã sản phẩm <span data-f="sp-req">*</span> <span title="1 shot ra nhiều mã: bấm + Mã, ghi số SP mỗi mã ra trên 1 shot. Chỉ để khai báo, sản lượng vẫn tính theo Cavity của SP.">ⓘ</span></label>
+      <div class="ho-hd"><span>Mã SP</span><span>SP/shot</span><span></span></div>
+      <div class="ho-row"><select data-f="ma-sp"></select><input type="number" data-f="sp-shot-0" min="1" max="99" step="1"><span></span></div>
+      <div data-f="ho-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      <button type="button" class="kb ol sm ho-add" data-act="ho-add">+ Mã</button></div>
     <div class="row2">
       <div class="fg"><label>Tổng shot lũy kế</label><input type="number" data-f="tong-shot" min="0" step="1" placeholder="Để trống nếu giữ nguyên"></div>
       <div class="fg"><label>Shot từ lần BD gần nhất</label><input type="number" data-f="shot-since" min="0" step="1" placeholder="Để trống nếu giữ nguyên"></div>
@@ -194,7 +204,7 @@
   function mount(el, opt){
     injectCss();
     const admin = !!opt.admin;
-    let molds = [], issues = [], products = [];
+    let molds = [], issues = [], products = [], hoMap = {};
     let kFilter = 'all', ttFilter = 'all', q = '';
     let cur = null, utSp = '', utDs = [];
 
@@ -232,10 +242,11 @@
     }
 
     async function load(){
-      const [m, i, p] = await Promise.all([
+      const [m, i, p, h] = await Promise.all([
         sb.from('duc_shot_khuon').select('*'),
         (typeof sbTaiHet === 'function' ? sbTaiHet(() => sb.from('duc_van_de_khuon').select('ma_khuon,trang_thai').order('id_van_de')) : sb.from('duc_van_de_khuon').select('ma_khuon,trang_thai')), // trang cũ còn cache supabase-client.js bản trước
-        admin ? sb.from('master_products').select('ma_sp,ten_sp').order('ma_sp') : Promise.resolve({ data: [] }),
+        admin ? sb.from('master_products').select('ma_sp,ten_sp,cavity').order('ma_sp') : Promise.resolve({ data: [] }),
+        sb.from('duc_khuon_ho').select('ma_khuon,ma_sp,thu_tu,so_sp_shot').order('thu_tu'),
       ]);
       if (m.error) return showMsg('Lỗi tải khuôn: ' + m.error.message, 'err', 6000);
       molds = (m.data || []).filter(x => x.ma_khuon).map(normMold).sort((a, b) =>
@@ -243,6 +254,9 @@
         (ST_PRIO[a.trang_thai_khuon] - ST_PRIO[b.trang_thai_khuon]) || naturalCompare(a.ma_khuon, b.ma_khuon));
       issues = i.data || [];
       products = (p.data || []).filter(x => x.ma_sp);
+      // T333: khuôn 1 shot ra nhiều mã (chỉ khai báo).
+      hoMap = {};
+      (h.data || []).forEach(x => { (hoMap[String(x.ma_khuon).trim()] ||= []).push(x); });
       render();
       if (opt.onLoaded) opt.onLoaded({ molds, issues });
     }
@@ -264,7 +278,7 @@
       const spDangSx = {};
       molds.forEach(m => { if (m.tinh_trang === 'dang_sx' && m.ma_sp) spDangSx[m.ma_sp] = (spDangSx[m.ma_sp] || 0) + 1; });
       const list = scope.filter(m => (kFilter === 'all' || m.trang_thai_khuon === kFilter) &&
-        (!q || m.ma_khuon.toLowerCase().includes(q) || m.ten_sp_gan_nhat.toLowerCase().includes(q)));
+        (!q || m.ma_khuon.toLowerCase().includes(q) || m.ten_sp_gan_nhat.toLowerCase().includes(q) || (hoMap[m.ma_khuon] || []).some(x => x.ma_sp.toLowerCase().includes(q))));
       const tb = $('tb');
       if (!list.length) {
         tb.innerHTML = '<tr><td colspan="11" class="empty">' + (molds.length ? 'Không có khuôn khớp bộ lọc'
@@ -283,7 +297,7 @@
         const nhieuKhuon = m.tinh_trang === 'dang_sx' && m.ma_sp && (spDangSx[m.ma_sp] || 0) >= 2;
         const mk = escapeHtml(m.ma_khuon);
         return '<tr class="' + (m.tinh_trang === 'dang_sx' ? '' : 'inactive') + '"><td class="mk">' + mk +
-          (m.uu_tien && m.tinh_trang === 'dang_sx' ? '<span class="ut" title="Thứ tự ưu tiên trong mã ' + escapeHtml(m.ma_sp) + '">ưu tiên ' + m.uu_tien + '</span>' : '') + '</td><td>' + ttCell + '</td><td>' + escapeHtml(m.ten_sp_gan_nhat || '—') + '</td>' +
+          (m.uu_tien && m.tinh_trang === 'dang_sx' ? '<span class="ut" title="Thứ tự ưu tiên trong mã ' + escapeHtml(m.ma_sp) + '">ưu tiên ' + m.uu_tien + '</span>' : '') + '</td><td>' + ttCell + '</td><td>' + spCell(m) + '</td>' +
           '<td class="num">' + fmtNum(m.tong_shot_luy_ke) + '</td>' +
           '<td class="num">' + fmtNum(m.shots_since_maintenance) + '<div class="bar"><i style="width:' + pct + '%;background:' +
             ({ ok: 'var(--run-fg)', soon: 'var(--warn-fg)', due: 'var(--alarm-fg)', renew: '#9F1239' }[cls] || 'var(--text-dim)') + '"></i></div></td>' +
@@ -300,6 +314,19 @@
       }).join('');
     }
 
+    function spCell(m){
+      const ho = hoMap[m.ma_khuon] || [];
+      if (ho.length < 2) return escapeHtml(m.ten_sp_gan_nhat || '—') + (ho[0] && ho[0].so_sp_shot ? ' <small>×' + ho[0].so_sp_shot + '</small>' : '');
+      return ho.map(x => '<div class="ho-sp">' + escapeHtml(x.ma_sp) + (x.so_sp_shot ? ' <small>×' + x.so_sp_shot + '</small>' : '') + '</div>').join('');
+    }
+    function spOpts(){ return '<option value="">— Chọn mã SP —</option>' + products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp + ' — ' + (p.ten_sp || '')) + '</option>').join(''); }
+    function cavCua(ma){ const p = products.find(x => x.ma_sp === ma); return p && p.cavity ? Math.round(p.cavity) : ''; }
+    function themHo(ma, so){
+      const r = document.createElement('div'); r.className = 'ho-row';
+      r.innerHTML = '<select data-ho="sp">' + spOpts() + '</select><input type="number" data-ho="so" min="1" max="99" step="1"><button type="button" class="ho-x" data-act="ho-x" title="Bỏ mã">✕</button>';
+      r.querySelector('select').value = ma || ''; r.querySelector('input').value = so || '';
+      f('ho-list').appendChild(r);
+    }
     // ── Khai báo / sửa / đổi mã / xoá khuôn ──────────────────────────────────
     function openCfg(maKhuon){
       const m = maKhuon ? molds.find(x => x.ma_khuon === maKhuon) : null;
@@ -310,8 +337,12 @@
       f('ma-khuon-hint').textContent = m
         ? 'Đổi mã ở đây = đổi tên khuôn — chỉ áp dụng cho trạm đang chạy và kế hoạch tuần hiện tại/tương lai, không sửa lại lịch sử (log bảo dưỡng, vấn đề khuôn, hàng NG, tem đã in).' : '';
       const sel = f('ma-sp');
-      sel.innerHTML = '<option value="">— Chọn mã SP —</option>' + products.map(p => '<option value="' + escapeHtml(p.ma_sp) + '">' + escapeHtml(p.ma_sp + ' — ' + (p.ten_sp || '')) + '</option>').join('');
-      sel.value = m ? m.ma_sp : '';
+      sel.innerHTML = spOpts();
+      const ho = m ? (hoMap[m.ma_khuon] || []) : [];
+      sel.value = ho.length ? ho[0].ma_sp : (m ? m.ma_sp : '');
+      f('sp-shot-0').value = ho.length ? (ho[0].so_sp_shot || '') : '';
+      f('ho-list').innerHTML = '';
+      ho.slice(1).forEach(x => themHo(x.ma_sp, x.so_sp_shot));
       f('sp-req').hidden = !!m;
       f('tong-shot').value = m ? m.tong_shot_luy_ke : '';
       f('shot-since').value = m ? m.shots_since_maintenance : '';
@@ -345,6 +376,15 @@
       if (!cur && window.GoiYMa && GoiYMa.khuonKiem(maMoi, molds).muc === 'loi') return showMsg('Mã khuôn ' + maMoi + ' đã có', 'err');
       const maSp = f('ma-sp').value.trim();
       if (!cur && !maSp) return showMsg('Khuôn mới cần khai báo mã sản phẩm', 'err');
+      // T333: danh sách mã ra cùng 1 shot.
+      const ds = [{ ma_sp: maSp, so_sp_shot: numOrNull(f('sp-shot-0').value) }];
+      f('ho-list').querySelectorAll('.ho-row').forEach(r => ds.push({ ma_sp: r.querySelector('[data-ho="sp"]').value, so_sp_shot: numOrNull(r.querySelector('[data-ho="so"]').value) }));
+      if (ds.length > 1 && ds.some(x => !x.ma_sp)) return showMsg('Chọn đủ mã SP cho từng dòng', 'err');
+      if (new Set(ds.map(x => x.ma_sp)).size < ds.length) return showMsg('Trùng mã SP', 'err');
+      if (ds.some(x => x.so_sp_shot != null && !(Number.isInteger(x.so_sp_shot) && x.so_sp_shot >= 1 && x.so_sp_shot <= 99))) return showMsg('SP/shot phải là số nguyên 1–99', 'err');
+      if (ds.length > 1 && ds.some(x => x.so_sp_shot == null)) return showMsg('Nhập SP/shot cho từng mã', 'err');
+      const coHo = ds.length > 1 || (!!ds[0].ma_sp && ds[0].so_sp_shot != null);
+      const daCoHo = cur && (hoMap[cur.ma_khuon] || []).length > 0;
       btn.disabled = true;
       try {
         // Đổi tên TRƯỚC nếu mã bị sửa (khuôn mới thì duc_configure_mold tự tạo đúng mã).
@@ -363,6 +403,7 @@
           p_ghi_chu: f('ghi-chu').value.trim() || null,
           p_user: opt.userName,
         });
+        if (coHo || daCoHo) await rpcWrite('duc_khuon_ho_luu', { p_ma_khuon: ma, p_ds: coHo ? ds : [], p_ma_khuon_cu: cur && cur.ma_khuon !== ma ? cur.ma_khuon : null });
         closeDlg();
         showMsg('✓ Đã lưu khuôn ' + d.ma_khuon, 'ok');
         await load();
@@ -482,13 +523,16 @@
         if (!b) return;
         if (b.dataset.act === 'cfg-save') return saveCfg(b);
         if (b.dataset.act === 'ma-goiy') return goiYMa(false);
+        if (b.dataset.act === 'ho-add') return themHo('', '');
+        if (b.dataset.act === 'ho-x') return b.closest('.ho-row').remove();
         if (b.dataset.act === 'cfg-del') return deleteCfg();
         if (b.dataset.act === 'ut-save') return saveUt(b);
         if (b.dataset.act === 'tt-save') return saveTt(b);
       });
       document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDlg(); });
       f('ma-khuon').addEventListener('input', () => kiemMa());
-      f('ma-sp').addEventListener('change', () => { goiYMa(true); kiemMa(); });
+      f('ma-sp').addEventListener('change', () => { goiYMa(true); kiemMa(); if (!f('sp-shot-0').value) f('sp-shot-0').value = cavCua(f('ma-sp').value); });
+      f('ho-list').addEventListener('change', e => { const sel = e.target.closest('[data-ho="sp"]'); if (!sel) return; const o = sel.parentNode.querySelector('[data-ho="so"]'); if (!o.value) o.value = cavCua(sel.value); });
     }
 
     load();
