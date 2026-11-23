@@ -302,7 +302,7 @@
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">Làm mới</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa" title="Báo cáo ca, kết ca và khoá số liệu">Kết ca</button>
-  <button type="button" class="btn btn-ghost" id="btnChiaXe" title="Xe Bavia chuyển nguyên: chia ra thùng, dán tem in sẵn">Chia xe</button>
+  <button type="button" class="btn btn-ghost" id="btnChiaXe" title="Xe đã gia công xong: chia ra thùng, dán tem in sẵn">Chia xe</button>
   <a class="btn btn-ghost" href="ipqc-gia-cong.html">IPQC</a>
   <a class="btn btn-ghost" href="cong-doan-dashboard.html?cd=C%E1%BA%AFt+vi%E1%BB%81n" title="Cắt viền chưa có danh mục máy — vẫn dùng màn cũ">Cắt viền</a>
   <div class="header-clock">
@@ -442,7 +442,7 @@
 <div class="modal-bg" id="xeModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="xeTitle">
     <h4 id="xeTitle" style="display:flex;align-items:center;gap:8px">Chia xe <button class="info-btn" type="button" data-info="xeInfo" title="Cách làm">ⓘ</button></h4>
-    <div class="info-txt" id="xeInfo" hidden>Quét tem xe (tem Đúc) → quét từng tem thùng in sẵn. Mỗi tem trừ đúng SL trên tem. Xe còn ít hơn SL tem thì ghi thùng lẻ.</div>
+    <div class="info-txt" id="xeInfo" hidden>Làm cả xe ở máy, bấm Xong bước cuối → quét từng tem thùng in sẵn. Mỗi thùng lấy SL/thùng Gia Công trong danh mục; thùng cuối thiếu tự thành thùng lẻ.</div>
     <label class="f"><span id="xeLab">Quét tem xe</span><input id="xeScan" type="text" autocomplete="off" placeholder="Quét QR…"></label>
     <div id="xeBody"></div>
     <div class="err" id="xeErr"></div>
@@ -878,10 +878,12 @@ function wireWs(m) {
     const id = Number(b.dataset.ktest), tra = Number((document.querySelector('[data-tra="' + id + '"]') || {}).value || 0);
     lam(() => rpc('gc_test_ket_thuc', { p_id: id, p_sl_tra_lai: tra }), r => '✓ Kết thúc test: trả lại ' + fmt(r.tra_lai) + ', huỷ ' + fmt(r.huy));
   });
-  document.querySelectorAll('[data-xong]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-xong]').forEach(b => b.onclick = async () => {
     const id = Number(b.dataset.xong);
-    lam(() => rpc('gc_xong', { p_id_tram: t.id_tram, p_id_buoc: id }),
-      r => '✓ Xong thùng ' + esc(r.tag_no) + ': ra ' + fmt(r.sl_ra) + ' pcs' + (r.buoc_cuoi ? ' — hoàn tất Gia công, chuyển công đoạn sau.' : ' — xong bước ' + r.buoc + '/' + r.tong_buoc + ', chờ bước tiếp theo.'));
+    let r0 = null;
+    await lam(() => rpc('gc_xong', { p_id_tram: t.id_tram, p_id_buoc: id }).then(r => (r0 = r)),
+      r => '✓ Xong ' + (r.chia_xe ? 'xe ' : 'thùng ') + esc(r.tag_no) + ': ra ' + fmt(r.sl_ra) + ' pcs' + (r.chia_xe ? ' — chia thùng.' : r.buoc_cuoi ? ' — hoàn tất Gia công, chuyển công đoạn sau.' : ' — xong bước ' + r.buoc + '/' + r.tong_buoc + ', chờ bước tiếp theo.'));
+    if (r0 && r0.chia_xe) moChiaXe(r0.tag_no);   // T340: xe xong bước cuối → chia thùng
   });
   document.querySelectorAll('[data-bo]').forEach(b => b.onclick = async () => {
     if (!(await hoiXacNhan('Bỏ thùng này khỏi máy (quét nhầm)?\nNG / test đã ghi vẫn giữ.', { nutOk: 'Bỏ', nguyHiem: true }))) return;
@@ -984,22 +986,36 @@ let xeCur = null, xeBusy = false;
 function veXe(okMsg) {
   $('#xeLab').textContent = xeCur ? 'Quét tem thùng in sẵn' : 'Quét tem xe';
   $('#xeMoi').hidden = !xeCur;
-  if (!xeCur) { $('#xeBody').innerHTML = ''; return; }
+  if (!xeCur) { veXeCho(); return; }
   const T = xeCur.thung || [];
   $('#xeBody').innerHTML =
     '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline">' +
       '<div><div class="sub">Xe</div><b class="mono">' + esc(xeCur.xe) + '</b></div>' +
       '<div><div class="sub">Mã</div><b class="mono">' + esc(xeCur.ma_sp) + '</b></div>' +
       '<div><div class="sub">Còn trên xe</div><b style="font-size:20px">' + fmt(xeCur.con) + '</b> / ' + fmt(xeCur.sl_xe) + '</div>' +
+      '<div><div class="sub">SL/thùng</div><b>' + (xeCur.sl_thung ? fmt(xeCur.sl_thung) : '<span style="color:var(--alarm-fg)">Chưa khai</span>') + '</b></div>' +
       '<div><div class="sub">Đã chia</div><b>' + T.length + '</b> thùng</div></div>' +
     (okMsg ? '<div class="flash ok" style="margin:6px 0 0">' + okMsg + '</div>' : '') +
     (Number(xeCur.con) <= 0 ? '<div class="flash ok" style="margin:6px 0 0">Xe đã chia hết.</div>' : '') +
     (T.length ? '<div class="tbl" style="margin-top:6px"><table class="t" style="min-width:0"><thead><tr><th>Tem thùng</th><th style="text-align:right">SL</th></tr></thead><tbody>' +
       T.map(x => '<tr><td class="mono">' + esc(x.tag_no) + '</td><td style="text-align:right">' + fmt(x.so_luong) + '</td></tr>').join('') + '</tbody></table></div>' : '');
 }
-function moChiaXe() {
+// T340: xe đã gia công xong, chưa chia hết
+async function veXeCho() {
+  $('#xeBody').innerHTML = '';
+  let ds = [];
+  try { ds = await rpc('gc_xe_cho_chia', {}); } catch (e) { return; }
+  if (xeCur) return;
+  $('#xeBody').innerHTML = ds.length
+    ? '<div class="sub" style="margin-top:4px">Xe chờ chia</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' +
+      ds.map(x => '<button type="button" class="chip acc" data-xecho="' + esc(x.xe) + '">' + esc(x.xe) + ' · ' + esc(x.ma_sp) + ' · ' + fmt(x.con) + '</button>').join('') + '</div>'
+    : '<div class="empty-box">Không có xe chờ chia.</div>';
+  document.querySelectorAll('[data-xecho]').forEach(b => b.onclick = () => quetXe(b.dataset.xecho));
+}
+function moChiaXe(tagXe) {
   xeCur = null; $('#xeErr').textContent = ''; veXe();
   $('#xeModal').hidden = false;
+  if (tagXe) quetXe(tagXe);
   setTimeout(() => $('#xeScan').focus(), 50);
 }
 async function quetXe(raw) {
@@ -1011,21 +1027,14 @@ async function quetXe(raw) {
       xeCur = await rpc('gc_chia_xe', { p_tag_xe: tag, p_tag_thung: null, p_cho_le: false });
       veXe();
     } else {
-      let r;
-      try {
-        r = await rpc('gc_chia_xe', { p_tag_xe: xeCur.xe, p_tag_thung: tag, p_cho_le: false });
-      } catch (e) {
-        if (!(e.data && e.data.le)) throw e;
-        if (!(await hoiXacNhan('Xe còn ' + fmt(e.data.con) + ' pcs, ít hơn SL tem ' + fmt(e.data.sl_tem) + '.\nGhi tem ' + tag + ' là thùng lẻ ' + fmt(e.data.con) + ' pcs?', { nutOk: 'Thùng lẻ' }))) return;
-        r = await rpc('gc_chia_xe', { p_tag_xe: xeCur.xe, p_tag_thung: tag, p_cho_le: true });
-      }
+      const r = await rpc('gc_chia_xe', { p_tag_xe: xeCur.xe, p_tag_thung: tag, p_cho_le: false });
       xeCur = r;
-      veXe('Tem <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs');
+      veXe('Tem <b>' + esc(r.tag_no) + '</b> · ' + fmt(r.so_luong) + ' pcs' + (r.le ? ' (thùng lẻ)' : ''));
     }
   } catch (e) { $('#xeErr').textContent = errText(e); }
   finally { xeBusy = false; const i = $('#xeScan'); i.value = ''; i.focus(); }
 }
-$('#btnChiaXe').onclick = moChiaXe;
+$('#btnChiaXe').onclick = () => moChiaXe();
 $('#xeMoi').onclick = () => { xeCur = null; $('#xeErr').textContent = ''; veXe(); $('#xeScan').focus(); };
 // Đầu đọc QR gõ nhiều trường (mỗi trường 1 Enter) → lấy giá trị ở Enter đầu, gộp các Enter liền nhau.
 let xeBuf = '', xeTimer = null;
