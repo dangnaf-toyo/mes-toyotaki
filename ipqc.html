@@ -271,6 +271,7 @@ button{cursor:pointer;font-family:inherit}
     <summary class="ii-title" style="cursor:pointer">Lịch sử sự cố</summary>
     <div id="ck-su-co-lich-su-body" style="margin-top:.5rem"></div>
   </details>
+  <div class="hint hidden" id="ck-dk-xn" style="font-size:12px;color:#1D4ED8;margin:4px 0"></div>
   <div class="incident-info vdt hidden" id="ck-vd-truoc"></div>
   <div class="incident-info vdt hidden" id="ck-thay-doi"></div>   <!-- T307: thay đổi chủ động cần xác nhận -->
   <button class="pdf-btn hidden" id="ck-pdf-btn">Tiêu chuẩn (PDF)</button>
@@ -871,6 +872,7 @@ async function openCheck(idCheckpoint, maSpChon){
   if (cp.id_su_co_goc) { lichSu.open = true; SuCoLichSu.mount(document.getElementById('ck-su-co-lich-su-body'), cp.id_su_co_goc); }
   else if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
   loadVdTruoc(cp);   // T127
+  hienDkXacNhan(cp);   // T324
   if (window.ThayDoi) ThayDoi.ipqcMount(document.getElementById('ck-thay-doi'), cp.id_checkpoint).catch(() => {});   // T307
 
   showScreen('scr-check');
@@ -956,6 +958,21 @@ function fillIncidentInfo(idSuCo, loai, gioPhatSinh, vanDe, xuLy, damNhiem){
 // (IpqcText.gon bỏ ghi chú), trả lời 1 lần cho cả nhóm. Server kiểm lại (trigger
 // trg_duc_ipqc_vd_kiem_tra) và áp dụng khi lưu kết quả.
 const VD_KQ = { khong_tai_phat: '✅ Không tái phát', tai_phat_cb: '⚠ Tái phát — cho SX tiếp', tai_phat_ng: '⛔ Tái phát — NG dừng SX', chua_kiem: '⏸ Chưa kiểm được' };
+// T324: lần kiểm lên khuôn → 1 dòng "ĐK đúc: đã xác nhận <giờ> · <người>"
+async function hienDkXacNhan(cp){
+  const el = document.getElementById('ck-dk-xn');
+  el.classList.add('hidden'); el.textContent = '';
+  if (!cp || cp.loai_kiem !== 'doi_khuon' || !cp.ma_may || !cp.ma_sp) return;
+  const tu = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { data } = await sb.from('duc_dk_xac_nhan').select('luc,nguoi_ten,id_phieu').eq('ma_may', cp.ma_may)
+    .eq('ma_sp', String(cp.ma_sp).toUpperCase()).gte('luc', tu).order('luc', { ascending: false }).limit(1);
+  if (state.current?.id_checkpoint !== cp.id_checkpoint || !data || !data.length) return;
+  const x = data[0], d = new Date(x.luc), p2 = n => String(n).padStart(2, '0');
+  el.innerHTML = '📋 ĐK đúc: đã xác nhận ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ' ' + p2(d.getDate()) + '/' + p2(d.getMonth() + 1) +
+    ' · ' + escapeHtml(x.nguoi_ten || '') + ' <a href="dieu-kien-duc.html?id=' + Number(x.id_phieu) + '" target="_blank" rel="noopener">Xem</a>';
+  el.classList.remove('hidden');
+}
+
 async function loadVdTruoc(cp){
   const box = document.getElementById('ck-vd-truoc');
   box.classList.add('hidden'); box.innerHTML = '';
