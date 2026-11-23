@@ -464,6 +464,7 @@
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js?v=T320"></script>
 <script src="shared/loi-chung.js?v=T265"></script>
+<script src="shared/su-co-mau.js?v=T336"></script>
 <script>
 /* ── Danh mục cố định ─────────────────────────────────────────────────────── */
 // Lý do dừng: bộ mã Đúc, đổi mục khuôn cho CNC (user chốt 03/11/2026). bp = bộ phận xử lý gợi ý.
@@ -482,6 +483,8 @@ const LOAI_DUNG = [
   { code: 'E2', name: 'Vệ sinh theo KH', group: 'E — Theo kế hoạch', bp: 'Tổ Gia công' },
   { code: 'E3', name: 'Kiểm kê định kỳ', group: 'E — Theo kế hoạch', bp: 'Tổ Gia công' },
 ];
+// T336: nút chọn Vấn đề / Xử lý dừng máy — bảng gc_su_co_mau (shared/su-co-mau.js, như Đúc).
+const SCM_GC = { bang: 'gc_su_co_mau', nhieu: { B1: 1, B2: 1 } };
 const BO_PHAN_XU_LY = ['Thiết bị', 'Tổ Gia công', 'QC', 'Kế hoạch', 'Kỹ thuật'];
 // Tên lỗi NG tại Gia công — danh sách TẠM, user sửa sau.
 // T265: tên lỗi NG lấy từ danh mục lỗi chung (shared/loi-chung.js), vd "G01 Sai kích thước gia công".
@@ -703,7 +706,7 @@ function renderWs() {
       (stopForm ? '<div class="frm">' +
           '<label>Giờ chạy lại<input id="scGio" type="datetime-local" value="' + toLocalInput(new Date()) + '"></label>' +
           '<label>Người xử lý<input id="scNguoi" list="dsTaiKhoan" autocomplete="off" placeholder="Ai xử lý"></label>' +
-          '<label class="full">Nội dung xử lý<input id="scNoiDung" type="text" autocomplete="off" placeholder="Đã làm gì để máy chạy lại"></label>' +
+          '<label class="full">Nội dung xử lý<textarea id="scNoiDung" rows="2" placeholder="Chọn ở trên hoặc tự gõ"></textarea></label>' +
           '<div class="acts"><button class="tiny" type="button" id="scHuyForm">Thôi</button><button class="tiny go" type="button" id="scLuu">Máy chạy lại</button></div></div>'
         : '<div class="frm"><div class="acts"><button class="tiny" type="button" id="scHuy" title="Huỷ lần dừng báo nhầm">Báo nhầm</button><button class="tiny go" type="button" id="scMo"' + (khoa ? ' disabled' : '') + '>Máy chạy lại…</button></div></div>') +
       '</div>';
@@ -823,6 +826,7 @@ function wireWs(m) {
   on('#btnSuaMay', () => moMayModal(m));
   on('#btnDung', () => moDungModal(m));
   on('#scMo', () => { stopForm = true; renderWs(); });
+  if ($('#scNoiDung')) { const s0 = suCoMo(m); if (s0) SuCoMau.gan(Object.assign({ loai: s0.loai_su_co, vanDe: null, xuLy: $('#scNoiDung'), vanDeText: s0.van_de }, SCM_GC)); }   // T336
   on('#scHuyForm', () => { stopForm = false; renderWs(); });
   on('#scHuy', async () => {
     const s = suCoMo(m); if (!s || !(await hoiXacNhan('Huỷ lần dừng này (báo nhầm)?', { nutOk: 'Huỷ lần dừng', nguyHiem: true }))) return;
@@ -1000,6 +1004,7 @@ function moDungModal(m) {
   $('#dmLoai').onchange = () => { const o = $('#dmLoai').selectedOptions[0]; if (o && o.dataset.bp) $('#dmBoPhan').value = o.dataset.bp; };
   $('#dmGio').value = toLocalInput(new Date());
   $('#dmVanDe').value = ''; $('#dmErr').textContent = '';
+  SuCoMau.gan(Object.assign({ loai: $('#dmLoai'), vanDe: $('#dmVanDe'), xuLy: null }, SCM_GC));   // T336
   $('#dungModal').hidden = false;
 }
 $('#dmSave').onclick = async () => {
