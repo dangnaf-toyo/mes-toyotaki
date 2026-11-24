@@ -740,7 +740,7 @@ function renderWs() {
   // Thùng đang làm
   const DL = m.dang_lam || [];
   h += '<div class="sec-t">Thùng đang làm <span class="chip mute">' + DL.length + '</span> <button class="info-btn" type="button" data-info="dlInfo" title="Cách làm">ⓘ</button></div>' +
-    '<div class="info-txt" id="dlInfo" hidden>Quét tem nhận từ công đoạn trước (Đúc / Bavia…) khi bắt đầu làm — hệ thống tự ghi nhận chuyển sang Gia công. NG / test khai trên thùng đang làm; làm xong bấm <b>Xong</b>: SL ra = số còn trên tem.</div>';
+    '<div class="info-txt" id="dlInfo" hidden>Quét tem xe khi bắt đầu làm. Đầy 1 thùng → quét tem <b>GC</b> vào cùng ô (lấy xe vào trước). Làm hết xe bấm <b>Xong</b>; hàng lẻ đóng cùng xe sau. Bất thường bấm <b>Dừng</b> + lý do.</div>';
   if (!DL.length) h += '<div class="empty-box">' + (t ? 'Chưa có thùng nào.' : 'Không có thùng dở.') + '</div>';
   else {
     h += '<div class="boxes-list">' + DL.map((b, i) => {
@@ -748,13 +748,13 @@ function renderWs() {
       const testTong = (b.test || []).reduce((s2, x) => s2 + Number(x.so_luong) - Number(x.sl_tra_lai || 0), 0);
       const lamDuoc = t && !khoa && b.id_tram && t.ma_sp === b.ma_sp;
       return '<div class="bx ' + (i === 0 ? 'first' : '') + '">' +
-        '<div class="tg">' + esc(b.tag_no) + (tdThung(m) === b ? ' <span class="chip warn">⚑ Thùng đầu</span>' : '') + ' <span class="chip acc">Bước ' + b.buoc + '/' + b.tong_buoc + '</span>' + (Number(b.ng) ? '<span class="chip bad">NG ' + fmt(b.ng) + '</span>' : '') + (testTong ? '<span class="chip warn">Test ' + fmt(testTong) + '</span>' : '') + '</div>' +
+        '<div class="tg">' + esc(b.tag_no) + (tdThung(m) === b ? ' <span class="chip warn">⚑ Thùng đầu</span>' : '') + ' <span class="chip acc">Bước ' + b.buoc + '/' + b.tong_buoc + '</span>' + (Number(b.ng) ? '<span class="chip bad">NG ' + fmt(b.ng) + '</span>' : '') + (testTong ? '<span class="chip warn">Test ' + fmt(testTong) + '</span>' : '') + (Number(b.sl_dong) ? '<span class="chip ok">' + b.so_thung + ' thùng · ' + fmt(b.sl_dong) + '</span>' : '') + '</div>' +
         '<div class="qty">' + fmt(con) + '<small> / ' + fmt(b.sl_vao) + '</small></div>' +
         '<div class="meta">Bắt đầu ' + hm(b.bat_dau) + ' ' + dmy(b.bat_dau) + (b.lot ? ' · Lô ' + esc(b.lot) : '') + (b.may_duc ? ' · Đúc ' + esc(b.may_duc) : '') + (b.ngay_duc ? ' ' + dmy(b.ngay_duc) : '') + (b.so_khuon ? ' · Khuôn ' + esc(b.so_khuon) : '') + '</div><div></div>' +
         testMo.map(x => '<div class="test-row">Đang test <b>' + fmt(x.so_luong) + '</b> · ' + esc(x.muc_dich) + ' · ' + esc(x.nguoi_test) + ' · ' + hm(x.thoi_diem) +
           (khoa ? '' : ' <span style="flex:1"></span>Trả lại <input type="number" min="0" max="' + x.so_luong + '" value="0" data-tra="' + x.id + '"> <button class="tiny test" type="button" data-ktest="' + x.id + '">Kết thúc test</button>') + '</div>').join('') +
         (lamDuoc ? '<div class="acts"><button class="tiny bad" type="button" data-ng="' + b.id + '">NG</button><button class="tiny test" type="button" data-test="' + b.id + '">Test</button>' +
-          '<button class="tiny" type="button" data-bo="' + b.id + '" title="Quét nhầm">Bỏ</button><span class="sp"></span><button class="tiny go" type="button" data-xong="' + b.id + '">Xong · ra ' + fmt(con) + '</button></div>' : '') +
+          (Number(b.sl_dong) ? '' : '<button class="tiny" type="button" data-bo="' + b.id + '" title="Quét nhầm">Bỏ</button>') + '<button class="tiny bad" type="button" data-dung="' + b.id + '" title="Không làm tiếp được">Dừng</button><span class="sp"></span><button class="tiny go" type="button" data-xong="' + b.id + '">Xong · ra ' + fmt(con + Number(b.sl_dong || 0)) + '</button></div>' : '') +
         (ngOpen === b.id ? ngForm(b) : '') + (testOpen === b.id ? testForm(b) : '') +
       '</div>';
     }).join('') + '</div>';
@@ -882,12 +882,18 @@ function wireWs(m) {
     const id = Number(b.dataset.xong);
     let r0 = null;
     await lam(() => rpc('gc_xong', { p_id_tram: t.id_tram, p_id_buoc: id }).then(r => (r0 = r)),
-      r => '✓ Xong ' + (r.chia_xe ? 'xe ' : 'thùng ') + esc(r.tag_no) + ': ra ' + fmt(r.sl_ra) + ' pcs' + (r.chia_xe ? ' — chia thùng.' : r.buoc_cuoi ? ' — hoàn tất Gia công, chuyển công đoạn sau.' : ' — xong bước ' + r.buoc + '/' + r.tong_buoc + ', chờ bước tiếp theo.'));
+      r => '✓ Xong ' + esc(r.tag_no) + ': ra ' + fmt(r.sl_ra) + ' pcs' + (r.chia_xe ? ' — chia thùng.' : r.buoc_cuoi ? (Number(r.con) > 0 && Number(r.sl_dong) > 0 ? ' — lẻ ' + fmt(r.con) + ' pcs đóng cùng xe sau.' : ' — hoàn tất Gia công.') : ' — xong bước ' + r.buoc + '/' + r.tong_buoc + ', chờ bước tiếp theo.'));
     if (r0 && r0.chia_xe) moChiaXe(r0.tag_no);   // T340: xe xong bước cuối → chia thùng
   });
   document.querySelectorAll('[data-bo]').forEach(b => b.onclick = async () => {
     if (!(await hoiXacNhan('Bỏ thùng này khỏi máy (quét nhầm)?\nNG / test đã ghi vẫn giữ.', { nutOk: 'Bỏ', nguyHiem: true }))) return;
     lam(() => rpc('gc_bo_tem', { p_id_buoc: Number(b.dataset.bo) }), () => 'Đã bỏ thùng khỏi máy.');
+  });
+  document.querySelectorAll('[data-dung]').forEach(b => b.onclick = async () => {   // T343
+    const lyDo = await hoiXacNhan('Dừng làm xe này?\nPhần đã đóng thùng vẫn giữ, phần còn lại quét lại để làm tiếp.', { nutOk: 'Dừng', nguyHiem: true, nhap: true, goiY: 'Lý do (bắt buộc)' });
+    if (!lyDo) return;
+    lam(() => rpc('gc_dung_xe', { p_id_tram: t.id_tram, p_id_buoc: Number(b.dataset.dung), p_ly_do: lyDo }),
+      r => 'Đã dừng xe ' + esc(r.tag_no) + (Number(r.sl_dong) ? ' — đã đóng ' + fmt(r.sl_dong) : '') + ' · còn ' + fmt(r.con) + ' pcs trên tem.');
   });
   document.querySelectorAll('[data-huyxong]').forEach(b => b.onclick = async () => {
     if (!(await hoiXacNhan('Huỷ "Xong" của thùng này?\nThùng quay lại đang làm.', { nutOk: 'Huỷ xong', nguyHiem: true }))) return;
@@ -899,7 +905,8 @@ async function quetMa(raw) {
   const m = curMay(), tag = parseTagNo(raw);
   if (!m || !m.tram || !tag) return;
   await lam(() => rpc('gc_quet', { p_id_tram: m.tram.id_tram, p_tag: tag }),
-    r => '✓ ' + esc(r.tag_no) + ' (' + fmt(r.so_luong) + ' pcs) bắt đầu làm ở ' + esc(m.ma_may) + ' — bước ' + r.buoc + '/' + r.tong_buoc + (r.tu_nhan ? ' · tự nhận từ ' + esc(r.tu_cong_doan) + ' sang Gia công' : ''));
+    r => r.dong_thung ? '✓ Thùng ' + esc(r.tag_no) + ': ' + fmt(r.so_luong) + ' pcs ← ' + r.tu.map(x => esc(x.xe) + ' (' + fmt(x.so_luong) + ')').join(' + ') :   // T343
+      '✓ ' + esc(r.tag_no) + ' (' + fmt(r.so_luong) + ' pcs) bắt đầu làm ở ' + esc(m.ma_may) + ' — bước ' + r.buoc + '/' + r.tong_buoc + (r.tu_nhan ? ' · tự nhận từ ' + esc(r.tu_cong_doan) + ' sang Gia công' : ''));
 }
 
 function renderSide() {
