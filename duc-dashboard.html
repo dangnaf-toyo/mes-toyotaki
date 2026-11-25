@@ -386,7 +386,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     <div class="stat"><span class="stat-label">Phút dừng</span><span class="stat-value alarm" id="sm-phut">—</span><span class="stat-sub" id="sm-phut-sub">—</span></div>
     <div class="stat"><span class="stat-label">Tổn thất</span><span class="stat-value alarm" id="sm-loss">—</span><span class="stat-sub" id="sm-loss-sub">—</span></div>
     <div class="stat"><span class="stat-label">Đang chạy</span><span class="stat-value run" id="sm-running">—</span><span class="stat-sub" id="sm-running-sub">—</span></div>
-    <div class="stat" id="sm-dap-box" style="display:none" title="Máy Dập tính riêng, không cộng vào KH/TT Đúc. Chờ dập = đã đúc OK − đã dập"><span class="stat-label">Dập</span><span class="stat-value" id="sm-dap">—</span><span class="stat-sub" id="sm-dap-sub">—</span></div>   <!-- T346 -->
+    <div class="stat" id="sm-dap-box" style="display:none" title="Chờ dập = đã đúc OK − đã dập"><span class="stat-label">Chờ dập</span><span class="stat-value" id="sm-dap">—</span><span class="stat-sub" id="sm-dap-sub">—</span></div>   <!-- T346 -->
   </section>
 
   <div class="table-wrap">
@@ -2799,14 +2799,14 @@ async function taiChoDap(){
 function veDap(){
   const box = document.getElementById('sm-dap-box');
   if (!box) return;
-  const dap = state.rows.filter(r => r.ma_sp && r.kh_ca && laMayDap(r.ma_may));
+  // T348: bỏ sản lượng Dập ca hiện tại, chỉ còn Chờ dập
   const cho = (choDapCache || []).filter(x => Number(x.cho_dap) !== 0);
-  if (!dap.length && !cho.length) { box.style.display = 'none'; return; }
+  if (!cho.length) { box.style.display = 'none'; return; }
   box.style.display = '';
-  document.getElementById('sm-dap').textContent = fmtNum(dap.reduce((s, r) => s + (Number(r.tt_ca) || 0), 0)) + ' / ' + fmtNum(dap.reduce((s, r) => s + (Number(r.kh_ca) || 0), 0));
-  document.getElementById('sm-dap-sub').textContent = cho.length
-    ? 'Chờ dập ' + cho.map(x => (cho.length > 1 ? x.ma_sp + ' ' : '') + fmtNum(x.cho_dap)).join(', ')
-    : 'TT / KH ca';
+  document.getElementById('sm-dap').textContent = fmtNum(cho.reduce((s, x) => s + (Number(x.cho_dap) || 0), 0));
+  document.getElementById('sm-dap-sub').textContent = cho.length > 1
+    ? cho.map(x => x.ma_sp + ' ' + fmtNum(x.cho_dap)).join(', ')
+    : (cho[0].ma_sp || '');
 }
 
 function updateSummary(){
