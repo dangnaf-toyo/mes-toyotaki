@@ -93,6 +93,7 @@ const base = legacy.slice(start, end);
       return route.fulfill({ body: fs.readFileSync(file), contentType: type });
     });
     await page.goto("https://mes.test/iqc.html");
+    await page.locator('#iqcNewTab').click();
     await page.waitForFunction(() => document.querySelector('#qc02-products option[value="[NVL] AL-01"]'));
     const catalog = await page.locator("#qc02-products option").evaluateAll((es) => es.map((e) => e.value));
     assert.equal(catalog.length, new Set(catalog).size);

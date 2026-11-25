@@ -621,8 +621,8 @@ const IqcChemicalEntry = (() => {
     el("productCode").value = IqcMaterialCatalog.display(item);
     el("productName").value = record.productName;
     el("lotNo").value = record.lotNo;
-    el("iqcChemDate").value = record.inspectionDate;
-    contextDate = record.inspectionDate;
+    el("iqcChemDate").value = record.inspectionDate || today();
+    contextDate = el("iqcChemDate").value;
     el("iqcChemShift").value = record.shift;
     el("iqcChemSupplier").value = record.supplier;
     el("iqcChemStandardLink").href =
@@ -647,7 +647,8 @@ const IqcChemicalEntry = (() => {
     el("iqcChemStandard").textContent = standard
       ? "Đã lưu theo " + record.materialCode + " · " + record.grade + " · Revision " + standard.phien_ban
       : "Báo cáo chưa có tiêu chuẩn";
-    renderRows();
+    if (!record.chemical) await loadStandard();
+    else renderRows();
     await fileLink(el("iqcChemFileLink"), fileMeta);
     showPage("iqc");
     section.scrollIntoView({ block: "start" });

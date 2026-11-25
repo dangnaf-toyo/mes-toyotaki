@@ -156,6 +156,7 @@ function backend() {
       });
     });
     await page.goto("https://mes.test/iqc.html");
+    await page.locator('#iqcNewTab').click();
     await page.waitForFunction(
       () => typeof IqcWorkspace !== "undefined" && IqcWorkspace.getSnapshot()?.lots.length === 1,
     );
@@ -190,8 +191,6 @@ function backend() {
     await page.locator("#lotNo").fill("TEST-LOT");
     await page.locator("#lotQty").fill("50");
     await page.locator("#inspector").fill("SX01_Nguyễn Sản Xuất");
-    await page.locator("#receivedDate").fill("2026-10-27T09:00");
-    await page.evaluate(() => confirmDate("receivedDate", "receivedConfirm"));
     await page.locator("#saveBtn").click();
     await page.waitForFunction(() => sb.tables.iqc_lots.length === 2);
     const saved = await page.evaluate(() => sb.tables.iqc_lots[1]);
@@ -241,8 +240,10 @@ function backend() {
     assert.match(await page.locator("#iqcRates").textContent(), /50.00%/);
     console.log("PASS edit and completion reread update dashboard counts, supplier, scope and 50% rates");
     await page.locator("#tabIqc").click();
+    assert.equal(await page.locator('#iqcLotList').isVisible(),true);
+    await page.locator('#iqcNewTab').click();
     await page.screenshot({ path: ".review/iqc-compact-entry.png", fullPage: true });
-    assert.equal(await page.locator("#formSection").evaluate((e) => e.parentElement.firstElementChild === e), true);
+    assert.equal(await page.locator("#formSection").isVisible(), true);
     assert.equal(await page.locator(".iqc-report-list[open]").count(), 0);
     await page.locator("details:has(#lotTable) > summary").click();
     await page.locator("#iqcFilterScope").selectOption("In");
