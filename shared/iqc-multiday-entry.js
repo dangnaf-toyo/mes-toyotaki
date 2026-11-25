@@ -27,6 +27,7 @@
   $id('inspectionType').closest('.field').querySelector('label').textContent='Hình thức kiểm';
   if(!$id('inspectionType').value)$id('inspectionType').value='Kiểm tra 100%';
 
+  $id('aqlField').classList.add('iqc-hide-received');
   $id('sampleQty').closest('.field').classList.add('iqc-hide-received');
   for(const id of ['resultField','okQtyField','ngQtyField','okPctField','ngPctField'])$id(id).classList.add('iqc-hide-received');
   const chemistryHistory=document.createElement('details');chemistryHistory.innerHTML='<summary>Lịch sử kết quả phân tích của LOT</summary><div></div>';
@@ -71,7 +72,7 @@
     try{return await startPromise;}catch(e){if(epoch===startEpoch){startId=null;startPromise=null;}throw e;}
   }
   section.addEventListener('focusin',e=>{if(IqcChemicalEntry.isChemical()||editRound||!e.target.matches('#iqcMultiChecked,#iqcMultiOk,#iqcMultiNg,#iqcMultiRows input'))return;ensureStarted().catch(err=>{$id('iqcMultiStatus').textContent='Không bắt đầu được lần kiểm: '+(err.message||err);});});
-  form.addEventListener('input',e=>{if(!IqcChemicalEntry.isChemical() && !['iqcMultiDefectSearch','iqcMultiLot'].includes(e.target.id))dirtyVisual=true;});
+  form.addEventListener('input',e=>{if(!IqcChemicalEntry.isChemical() && !['iqcMultiDefectSearch','iqcMultiLot','iqcAqlLevel','iqcAqlValue','iqcAqlMode'].includes(e.target.id))dirtyVisual=true;});
   const text = (tag, value) => { const n=document.createElement(tag); n.textContent=value; return n; };
   const field = (label, cls, type='text') => { const l=text('label',label), i=document.createElement('input'); i.className=cls;i.type=type;if(type==='number'){i.min='1';i.step='1';} l.append(i);return l; };
   function addDefect(row={}) {
@@ -144,10 +145,10 @@
   }
   const oldGet=IqcApi.getDashboardData.bind(IqcApi);
   IqcApi.getDashboardData=async()=>{
-    const [d,rr,dr,pr]=await Promise.all([oldGet(),sbTaiHet(()=>sb.from('iqc_lan_kiem').select('*').order('id')),sbTaiHet(()=>sb.from('iqc_lan_kiem_loi').select('*').order('id')),sbTaiHet(()=>sb.from('iqc_aql_ke_hoach').select('*').order('lot_id'))]);
-    if(rr.error||dr.error||pr.error)throw rr.error||dr.error||pr.error;
+    const [d,rr,dr,pr,cr]=await Promise.all([oldGet(),sbTaiHet(()=>sb.from('iqc_lan_kiem').select('*').order('id')),sbTaiHet(()=>sb.from('iqc_lan_kiem_loi').select('*').order('id')),sbTaiHet(()=>sb.from('iqc_aql_ke_hoach').select('*').order('lot_id')),sbTaiHet(()=>sb.from('iqc_aql_lua_chon').select('*').order('lot_id'))]);
+    if(rr.error||dr.error||pr.error||cr.error)throw rr.error||dr.error||pr.error||cr.error;
     lots=d.lots;rounds=rr.data||[];defects=dr.data||[];plans=pr.data||[];
-    for(const lot of lots){ lot.multiPlan=plans.find(p=>String(p.lot_id)===String(lot.id))||null; const related=rounds.filter(r=>String(r.lot_id)===String(lot.id)); if(related.length){const t=IqcInspectionTotals.summarize(lot.lotQty,related.map(r=>({id:r.id,checked:r.so_kiem,ok:r.so_ok,ng:r.so_ng})),{paused:lot.multiPaused});const oldNg=related.some(r=>r.loai==='so_du_cu'&&r.ket_luan_cu==='NG');Object.assign(lot,{multi:t,okQty:t.ok,ngQty:t.ng,status:t.progress==='Đã kiểm hết'?'Đã kiểm tra':'Đang kiểm tra',result:lot.multiConclusion||(oldNg?'NG':'')});} }
+    for(const lot of lots){ lot.multiChoice=(cr.data||[]).find(c=>String(c.lot_id)===String(lot.id))||null;if(lot.multiChoice)lot.aql=lot.multiChoice.aql; lot.multiPlan=plans.find(p=>String(p.lot_id)===String(lot.id))||null; const related=rounds.filter(r=>String(r.lot_id)===String(lot.id)); if(related.length){const t=IqcInspectionTotals.summarize(lot.lotQty,related.map(r=>({id:r.id,checked:r.so_kiem,ok:r.so_ok,ng:r.so_ng})),{paused:lot.multiPaused});const oldNg=related.some(r=>r.loai==='so_du_cu'&&r.ket_luan_cu==='NG');Object.assign(lot,{multi:t,okQty:t.ok,ngQty:t.ng,status:t.progress==='Đã kiểm hết'?'Đã kiểm tra':'Đang kiểm tra',result:lot.multiConclusion||(oldNg?'NG':'')});} }
     populateLots();if(selectedLot){selectedLot=lots.find(x=>String(x.id)===String(selectedLot.id))||selectedLot;renderHistory();}
     return d;
   };
