@@ -40,9 +40,16 @@ function backend() {
         },
       };
     },
-    rpc: async (name) => ({ data: name === "iqc_nvl_danh_muc"
-      ? { san_pham: tables.master_products.map((p) => ({ code: p.ma_sp, name: p.ten_sp })), nvl: [] }
-      : [{ username: "TK01", full_name: "Lê Văn Kho", role: "kho_nvl" }], error: null }),
+    rpc: async (name, args = {}) => {
+      if (name === "iqc_luu_lan_kiem" && !args.p_lot_id && !args.p_lan) {
+        const row = { id: 'new-' + tables.iqc_lots.length, created_at: new Date().toISOString(), status: 'Chưa lấy hàng', ...args.p_lot };
+        tables.iqc_lots.push(row);
+        return { data: { lot_id: row.id }, error: null };
+      }
+      return { data: name === "iqc_nvl_danh_muc"
+        ? { san_pham: tables.master_products.map((p) => ({ code: p.ma_sp, name: p.ten_sp })), nvl: [] }
+        : [{ username: "TK01", full_name: "Lê Văn Kho", role: "kho_nvl" }], error: null };
+    },
     from(table) {
       let filters = [],
         range = [0, 999],
