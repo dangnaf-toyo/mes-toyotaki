@@ -104,7 +104,8 @@
 
     // ---- Ca hiện tại: tổng ----
     var caTT = 0, caKH = 0, caKHNow = 0, caNG = 0;
-    machines.forEach(function (m) { if (m.kh) { caTT += m.tt; caKH += m.kh; caKHNow += m.khNow; caNG += m.ng || 0; } });
+    // T346: máy "Dập …" tính riêng, không cộng vào sản lượng ca Đúc
+    machines.forEach(function (m) { if (m.kh && !/^dập\s/i.test(String(m.may || '').trim())) { caTT += m.tt; caKH += m.kh; caKHNow += m.khNow; caNG += m.ng || 0; } });
     var pace = caKHNow > 0 ? caTT / caKHNow : null;
     var duBao = ca && ca.frac >= 0.08 && ca.trangThai !== 'chua' ? Math.round(caTT / ca.frac) : null;
 
