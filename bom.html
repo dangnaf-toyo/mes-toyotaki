@@ -659,11 +659,13 @@
         $("btnNap").style.display = perm.lap ? "" : "none";
         await loadNvlRows(materials);
         renderMacs();
-        selSp = products[0] || null;
+        // ?sp=<mã>&v=<id phiên bản>: mở thẳng từ thông báo chuông (T347)
+        const qsp = new URLSearchParams(location.search);
+        selSp = products.find((x) => x.ma_sp === qsp.get("sp")) || products[0] || null;
         renderProducts();
-        await selectProduct(selSp?.ma_sp);
+        await selectProduct(selSp?.ma_sp, Number(qsp.get("v")) || undefined);
         renderSummary();
-        const t = new URLSearchParams(location.search).get("tab");
+        const t = qsp.get("tab");
         if (t) document.querySelector('.tab[data-tab="' + t + '"]')?.click();
       }
 
