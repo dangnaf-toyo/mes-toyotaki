@@ -1,0 +1,20 @@
+﻿/* Per-LOT sampling choices. Plans are only read from QC-approved configurations. */
+window.IqcAqlSelection = (() => {
+  const panel=document.createElement('section');panel.id='iqcAqlSelection';panel.className='section';panel.hidden=true;
+  panel.innerHTML=`<h3>Kế hoạch lấy mẫu</h3><div class="iqc-multi-grid"><label>Cấp kiểm<select id="iqcAqlLevel"><option value="">Chọn cấp kiểm</option><option value="I">General I</option><option value="II">General II</option><option value="III">General III</option><option>S-1</option><option>S-2</option><option>S-3</option><option>S-4</option></select></label><label>Mức AQL<select id="iqcAqlValue"><option value="">Chọn AQL</option></select></label><label>Chế độ<select id="iqcAqlMode"><option value="">Chọn chế độ</option><option>Normal</option><option>Tightened</option><option>Reduced</option></select></label></div><p id="iqcAqlPreview" role="status">Chưa có bảng AQL</p><button type="button" id="iqcAqlChoose" class="button btn-secondary">Lưu lựa chọn</button>`;
+  document.getElementById('iqcMultiProgress').after(panel);
+  const el=id=>document.getElementById(id);let active=null,configs=[],previous=null,epoch=0;
+  function options(){const v=el('iqcAqlValue').value,values=new Set(['0.10','0.25','0.40','0.65','1.0','1.5','2.5','4.0','6.5',...configs.filter(c=>c.da_duyet).map(c=>c.aql)]);if(previous?.aql)values.add(previous.aql);el('iqcAqlValue').replaceChildren(new Option('Chọn AQL',''),...[...values].sort((a,b)=>Number(a)-Number(b)).map(x=>new Option(x,x)));el('iqcAqlValue').value=v||previous?.aql||'';}
+  function preview(){const l=el('iqcAqlLevel').value,a=el('iqcAqlValue').value,m=el('iqcAqlMode').value,found=configs.filter(c=>c.da_duyet&&c.cap_do===l&&c.aql===a&&c.phuong_an===m);const c=found.length===1?found[0]:null;
+    const p=c&&IqcAqlPlan.resolve({approved:true,version:c.phien_ban,source:c.nguon,level:c.cap_do,aql:c.aql,method:c.phuong_an,groups:[active.productCode],lotRanges:c.bang?.lotRanges,plans:c.bang?.plans},active.productCode,Number(active.lotQty));
+    el('iqcAqlPreview').textContent=p?`Mã ${p.code} · Mẫu ${p.sample} · Ac ${p.ac} / Re ${p.re} · ${p.source} · ${p.version}`:'Chưa có bảng AQL';}
+  async function show(lot){const id=++epoch;active=lot;panel.hidden=!lot||lot.inspectionType!=='Kiểm tra AQL';if(panel.hidden)return;
+    el('iqcAqlPreview').textContent='Đang tải…';
+    try{const [c,s]=await Promise.all([sbTaiHet(()=>sb.from('iqc_aql_cau_hinh').select('*').order('id')),sbTaiHet(()=>sb.from('iqc_aql_lua_chon').select('*').eq('lot_id',lot.id).order('lot_id'))]);if(id!==epoch)return;if(c.error||s.error)throw c.error||s.error;
+      configs=(c.data||[]).filter(x=>Array.isArray(x.san_pham)&&x.san_pham.includes(lot.productCode));previous=(s.data||[])[0]||null;
+      el('iqcAqlLevel').value=previous?.cap_do||'';el('iqcAqlMode').value=previous?.che_do||'';el('iqcAqlValue').value='';options();preview();
+    }catch(e){if(id===epoch)el('iqcAqlPreview').textContent='Không tải được cấu hình AQL: '+(e.message||e);}}
+  for(const id of ['iqcAqlLevel','iqcAqlValue','iqcAqlMode'])el(id).addEventListener('change',()=>{if(active)preview();});
+  el('iqcAqlChoose').onclick=async()=>{if(!active)return;const b=el('iqcAqlChoose');try{const cap=el('iqcAqlLevel').value,aql=el('iqcAqlValue').value,mode=el('iqcAqlMode').value;if(!cap||!aql||!mode)throw Error('Chọn cấp kiểm, mức AQL và chế độ.');let reason=null;const data=IqcMultiEntry.getData();const hasHistory=data.rounds.some(x=>String(x.lot_id)===String(active.id))||data.plans.some(x=>String(x.lot_id)===String(active.id));if((previous&&(previous.cap_do!==cap||previous.aql!==aql||previous.che_do!==mode))||(!previous&&hasHistory)){reason=prompt('Lý do thay đổi kế hoạch:');if(reason===null)return;}b.disabled=true;const fresh=await IqcApi.getLot(active.id);const r=await sb.rpc('iqc_chon_aql',{p_id:fresh.id,p_cap_do:cap,p_aql:aql,p_che_do:mode,p_ly_do:reason,p_updated_at:fresh.updatedAt});if(r.error)throw r.error;previous=r.data;await loadDashboard();await show(active);}catch(e){el('iqcAqlPreview').textContent=e.message||String(e);}finally{b.disabled=false;}};
+  return {show};
+})();

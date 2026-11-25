@@ -6,7 +6,7 @@
   dialog.innerHTML=`<form id="iqcAqlConfigForm"><h3>Cấu hình AQL theo nhóm</h3>
     <label>Nhóm sản phẩm <input name="group" required></label><label>Mã sản phẩm/NVL trong nhóm, cách nhau bởi dấu phẩy <textarea name="products" required></textarea></label>
     <label>Tiêu chuẩn và phiên bản <input name="source" required></label><label>Phiên bản cấu hình <input name="version" required></label>
-    <label>Mức kiểm <input name="level" required></label><label>AQL <input name="aql" required></label><label>Phương án <input name="method" required></label>
+    <label>Mức kiểm <input name="level" required></label><label>AQL <input name="aql" required></label><label>Chế độ <select name="method" required><option value="">Chọn chế độ</option><option>Normal</option><option>Tightened</option><option>Reduced</option></select></label>
     <label>Khoảng LOT: mỗi dòng Từ, Đến, Mã chữ (để trống Đến nếu không giới hạn)<textarea name="ranges" required placeholder="1, 100, A"></textarea></label>
     <label>Bảng mẫu: mỗi dòng Mã chữ, Cỡ mẫu, Ac, Re; chuyển mã: Mã chữ, →, Mã đích<textarea name="plans" required placeholder="A, 10, 0, 1"></textarea></label>
     <p id="iqcAqlConfigError" role="status"></p><button type="submit" class="button btn-primary">Duyệt cấu hình</button> <button type="button" id="iqcAqlConfigClose" class="button btn-secondary">Hủy</button></form>`;
