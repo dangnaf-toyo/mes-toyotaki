@@ -354,7 +354,8 @@ const base = legacy.slice(start, end);
     await page.locator("#iqcChemRows [data-measure]").fill("10.5");
     await page.locator("#iqcChemConfirmed").check();
     await page.locator("#saveBtn").click();
-    await page.waitForFunction(() => document.querySelector("#iqcChemStatus").textContent.includes("Đã lưu báo cáo"));
+    await page.waitForFunction(() => document.querySelector("#iqcChemStatus").textContent.includes("Đã lưu báo cáo"),null,{timeout:8000})
+      .catch(async e => { console.error('CHEM_STATUS',await page.locator('#iqcChemStatus').textContent(),'INVALID',await page.locator('#lotForm :invalid').evaluateAll(es=>es.map(x=>x.id))); throw e; });
     assert.equal(await page.evaluate((id) => sb.saved.lots.find((x) => x.id === id).result, pendingId), "OK");
     assert.equal(await page.evaluate(() => sb.saved.lots.filter((x) => x.lot_no === "CHEM-NO-TC").length), 1);
     console.log(
