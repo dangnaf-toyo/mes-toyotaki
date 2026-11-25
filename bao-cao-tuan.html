@@ -393,9 +393,11 @@ async function loadPeriod(mode, refDate){
 
   let bcc = bccRes.data || [];
   const suco = sucoRes.data || [];
-  let lssx = lssxRes.data || [];
+  // T346: máy "Dập …" (vd Dập KFM) tính riêng — không cộng vào sản lượng Đúc (tránh FCC-KFM-01 bị tính 2 lần)
+  const laMayDap = m => /^dập\s/i.test(String(m || '').trim());
+  let lssx = (lssxRes.data || []).filter(r => !laMayDap(r.ma_may));
   const khsx = khsxRes.data || [];
-  let cht = chtRes.data || [];
+  let cht = (chtRes.data || []).filter(r => !laMayDap(r.ma_may));
   // tránh đếm trùng: chỉ lấy phần Ca đang chạy dở HÔM NAY (ca chưa có bản ghi kết ca)
   const closedCaToday = new Set(bcc.filter(r => r.ngay === todayISO).map(r => r.ca));
   cht = cht.filter(r => !closedCaToday.has(r.ca));
