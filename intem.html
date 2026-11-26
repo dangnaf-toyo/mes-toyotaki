@@ -1998,8 +1998,38 @@ window.addEventListener("unhandledrejection", (e) => {
   err("Lỗi JS (promise): " + m);
 });
 
+// T365: ?in=TAG1,TAG2 (từ Bảng điều khiển Bavia, nút Tách) → in thẳng các tem, mỗi tem 1 trang A6.
+async function inTheoUrl(){
+  var ds = String(PREFILL.in || '').split(',').map(function(x){ return x.trim().toUpperCase(); }).filter(Boolean);
+  if (!ds.length) return false;
+  const { data, error } = await sb.from('duc_tem').select('*').in('tag_no', ds);
+  if (error) { err('Lỗi tải tem: ' + error.message); return true; }
+  var rows = ds.map(function(t){ return (data || []).find(function(r){ return r.tag_no === t; }); }).filter(Boolean);
+  if (!rows.length) { err('Không tìm thấy tem ' + ds.join(', ')); return true; }
+  var pages = rows.map(function(r){
+    var p = String(r.ngay || '').split('-');
+    var ngay = p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(r.ngay || '');
+    var d = { ok: true, tagNo: r.tag_no, qr: r.tag_no, ngay: ngay, tenSP: r.ten_sp, maSP: r.ma_sp,
+      soLuong: r.so_luong, lotNo: r.lot || ngay, soKhuon: r.so_khuon || '', nguyenLieu: r.nguyen_lieu || '',
+      mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || '', ghiChu: r.ghi_chu || '', loaiSP: loaiSpFromTagNo(r.tag_no) };
+    return '<div class="pg" style="background:' + (d.loaiSP === 'phattrien' ? '#000' : '#fff') + '">' + buildLabelSvg(d) + '</div>';
+  }).join('');
+  var css = '@page{size:105mm 148mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{background:#fff}'
+    + '.pg{width:105mm;height:148mm;page-break-after:always;break-after:page}.pg:last-child{page-break-after:auto;break-after:auto}'
+    + 'svg{display:block;width:105mm;height:148mm}'
+    + '.pbtn{position:fixed;bottom:14px;right:14px;background:#C87941;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:bold;cursor:pointer}'
+    + '@media print{.pbtn{display:none}}';
+  document.open();
+  document.write('<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>In tem con</title><style>' + css + '</style></head><body>'
+    + pages + '<button class="pbtn" onclick="window.print()">In ngay</button>'
+    + '<script>setTimeout(function(){window.print();},200);<\/script></body></html>');
+  document.close();
+  return true;
+}
+
 (async function init(){
   try {
+    if (PREFILL && PREFILL.in && await inTheoUrl()) return;
     await loadMaster();
     document.getElementById("lotNo").value = getTodayString();
     document.getElementById("loading").style.display="none";
