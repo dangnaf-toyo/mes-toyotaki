@@ -1023,14 +1023,20 @@ document.addEventListener('click', async e => {
     if (!(so >= 1 && so <= 20) || !Number.isInteger(so)) { setFlash('bad', 'Số tem từ 1 đến 20.'); renderWs(); return; }
     const k = tachKiem(), bu = $('#tachBu') && $('#tachBu').value ? Number($('#tachBu').value) : null;
     if (k.loi) { setFlash('bad', 'Tem ' + esc(n.tag_no) + ': ' + esc(k.loi) + '.'); renderWs(); return; }
+    if (busy) return;
+    // T371: mở cửa sổ in NGAY lúc bấm (mở sau await bị trình duyệt chặn) → tách xong chuyển sang trang in
+    let w = null; try { w = window.open('', '_blank'); if (w) w.document.write('<p style="font:14px sans-serif;padding:16px">Đang tách tem…</p>'); } catch (e) { w = null; }
+    let daIn = false;
     await chay(async () => {
       const r = await goi('bavia_tach_tem', { p_id_tram: l.id_tram, p_id: Number(n.id), p_sl: sl, p_so_tem: so, p_id_bu: bu });
       const ds = r.tem_con || [];
+      if (w && !w.closed && ds.length) { w.location.href = 'intem.html?in=' + encodeURIComponent(ds.join(',')); daIn = true; }
       tachOpen = null;
       setFlash('ok', 'Đã tách <b>' + ds.map(esc).join(', ') + '</b> (' + fmt(r.so_luong) + ' pcs/tem) từ ' + esc(r.tem_me) + (r.tem_bu ? ' + ' + fmt(r.lay_bu) + ' từ ' + esc(r.tem_bu) : '') +
-        '. <button class="tiny xe" type="button" data-intach="' + esc(ds.join(',')) + '">In tem</button> Quét tem con ở Chuyển công đoạn → ' + esc(r.buoc_sau || '') + '.');
+        '. <button class="tiny xe" type="button" data-intach="' + esc(ds.join(',')) + '">In lại</button> Quét tem con ở Chuyển công đoạn → ' + esc(r.buoc_sau || '') + '.');
       await taiLai();
     });
+    if (w && !daIn && !w.closed) w.close();
     return;
   }
   if (t.dataset.xehuy) {
