@@ -306,6 +306,7 @@
                   <th class="sortable" data-nvl-key="name">Tên NVL</th>
                   <th class="sortable" data-nvl-key="nhom">Nhóm</th>
                   <th class="sortable" data-nvl-key="mac">Mác</th>
+                  <th class="sortable" data-nvl-key="dvt">ĐVT</th>
                   <th class="sortable" data-nvl-key="supplier">Nhà cung cấp</th>
                   <th class="sortable" data-nvl-key="code">Mã NVL NCC</th>
                   <th class="sortable" data-nvl-key="customer">Khách hàng sử dụng</th>
@@ -338,6 +339,7 @@
                   </select>
                 </div>
                 <div><label for="nvl-mac">Mác vật liệu (kim loại)</label><select id="nvl-mac"></select></div>
+                <div><label for="nvl-dvt">Đơn vị tính</label><select id="nvl-dvt"><option value="kg">kg</option><option value="pcs">pcs</option></select></div>
                 <div><label for="nvl-supplier">Nhà cung cấp</label><input id="nvl-supplier" /></div>
                 <div><label for="nvl-code">Mã NVL NCC</label><input id="nvl-code" /></div>
                 <div><label for="nvl-customer">Khách hàng sử dụng</label><input id="nvl-customer" /></div>
@@ -643,7 +645,7 @@
         const [p, b, m, mc] = await Promise.all([
           sb.from("master_products").select("ma_sp,ten_sp,nguyen_lieu,quy_trinh_cong_doan,cavity,so_khuon").order("ma_sp"),
           sbTaiHet(() => sb.from("bom_versions").select(BOM_SELECT).order("id")),
-          sb.from("nvl_materials").select("ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham,nhom_vat_tu,ma_mac").order("ma_nvl"),
+          sb.from("nvl_materials").select("ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham,nhom_vat_tu,ma_mac,dvt").order("ma_nvl"),
           sb.from("vat_lieu_mac").select("*").order("thu_tu"),
         ]);
         const err = p.error || b.error || m.error || mc.error;
@@ -731,7 +733,7 @@
       async function loadNvlRows(initialRows) {
         let data = initialRows;
         if (!data || (await importLegacyNvlRows(data))) {
-          const q = await sb.from("nvl_materials").select("ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham,nhom_vat_tu,ma_mac").order("ma_nvl");
+          const q = await sb.from("nvl_materials").select("ma_nvl,ten_nvl,nha_cung_cap,ma_nvl_ncc,khach_hang,san_pham,nhom_vat_tu,ma_mac,dvt").order("ma_nvl");
           if (q.error) return showPageErr("Không tải được danh mục nguyên vật liệu.", q.error);
           data = q.data || [];
         }
@@ -746,6 +748,7 @@
           nhomKey: r.nhom_vat_tu || "khac",
           nhom: NHOM[r.nhom_vat_tu] || "",
           mac: r.ma_mac || "",
+          dvt: r.dvt || "kg",
         }));
         renderNvlTable();
       }
@@ -763,7 +766,7 @@
           .map(
             ({ row, index }) =>
               "<tr>" +
-              [row.toyotakiCode, row.name, row.nhom, row.mac, row.supplier, row.code, row.customer, row.product]
+              [row.toyotakiCode, row.name, row.nhom, row.mac, row.dvt, row.supplier, row.code, row.customer, row.product]
                 .map((v) => "<td>" + (v ? esc(v) : '<span class="nil">—</span>') + "</td>")
                 .join("") +
               '<td class="row-actions">' +
@@ -835,6 +838,7 @@
         $("nvl-nhom").value = row.nhomKey;
         syncMacField();
         $("nvl-mac").value = row.mac;
+        $("nvl-dvt").value = row.dvt;
         openModal("nvl-modal");
       }
       const nvlModal = $("nvl-modal");
@@ -897,6 +901,7 @@
           p_san_pham: $("nvl-product").value.trim(),
           p_nhom_vat_tu: row.nhom,
           p_ma_mac: row.mac || null,
+          p_dvt: $("nvl-dvt").value,
         });
         btn.disabled = false;
         if (error || data?.ok === false) {

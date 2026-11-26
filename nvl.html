@@ -705,7 +705,7 @@ async function loadAllData() {
   setSyncStatus('loading', '⏳ Đang đồng bộ...');
   try {
     const [mat, op, plan, tx, st, cur] = await Promise.all([
-      sb.from('nvl_materials').select('ma_nvl,ten_nvl,ma_tem_ncc').order('ma_nvl'),
+      sb.from('nvl_materials').select('ma_nvl,ten_nvl,ma_tem_ncc,dvt').order('ma_nvl'),
       sb.from('nvl_ton_dau_ky').select('*'),
       sbTaiHet(() => sb.from('nvl_ke_hoach_ngay').select('*').order('ngay').order('ma_nvl')),
       sb.from('nvl_giao_dich').select('*').order('ngay', { ascending: false }).order('sheet_row', { ascending: false }).limit(TX_FETCH_LIMIT),
@@ -1705,6 +1705,8 @@ function getFormValuesForTem() {
   };
 }
 function onTemMaterialChange() {
+  const m = DB.materials.find(x => x.ma_nvl === $('temMaterial').value);
+  $('temUnit').value = (m && m.dvt) || 'kg';   // T360: ĐVT mặc định theo danh mục NVL
   const form = getFormValuesForTem();
   $('temName').value = form.tenNVL;
   rerenderTemQtyTable();
@@ -1895,7 +1897,8 @@ function resetTemForm() {
   $('temDate').value = todayISO();
   $('temCount').value = '1';
   $('temNote').value = '';
-  $('temUnit').value = 'kg';
+  const mDv = DB.materials.find(x => x.ma_nvl === $('temMaterial').value);
+  $('temUnit').value = (mDv && mDv.dvt) || 'kg';
   $('temDefaultQty').value = '';
   rerenderTemQtyTable();
 }
