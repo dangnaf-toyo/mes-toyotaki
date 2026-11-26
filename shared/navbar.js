@@ -189,6 +189,7 @@
     'checksheet-bao-duong-khuon.html': { icon: '📋', title: 'Check sheet bảo dưỡng khuôn', desc: 'Ghi kết quả bảo dưỡng từng khuôn theo hạng mục', noTitleBar: true },
     'khsx-tuan.html': { icon: '📅', title: 'Kế hoạch sản xuất tuần', desc: 'Đúc / Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC — 1 màn hình, chuyển tab', noTitleBar: true },
     'phieu-cap-nvl.html': { icon: '📝', title: 'Phiếu cấp NVL', desc: 'Đề nghị cấp NVL: Thống kê lập, QL bộ phận xác nhận, kho cấp, GĐ hành chính duyệt', noTitleBar: true },
+    'xnt-nvl.html': { icon: '📊', title: 'Xuất nhập tồn NVL', desc: 'Báo cáo tồn đầu, nhập, xuất, tồn cuối từng mã NVL theo khoảng ngày', noTitleBar: true },
     'nvl.html': { icon: '🧪', title: 'Kho NVL', desc: 'Theo dõi tồn, in tem QR, quét nhập/xuất', noTitleBar: true },
     'dao-cu.html': { icon: '🔪', title: 'Kho dao cụ', desc: 'Dao cụ Gia công: danh mục, tồn Mới / Đang dùng / NG, phiếu nhập xuất', noTitleBar: true },
     'intem.html': { icon: '🏷️', title: 'In tem', desc: 'Tạo/tra cứu tem Đúc, chỉ thị Kanban, tem thành phẩm', noTitleBar: true },
