@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xuất nhập tồn NVL — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  xnt-nvl.html — T361: Báo cáo Xuất – Nhập – Tồn kho NVL theo khoảng ngày.
+  Chỉ ĐỌC (nvl_materials, nvl_ton_dau_ky, nvl_giao_dich — đều public read), tính ngay trên trình duyệt:
+    Tồn tại đầu ngày d = Tồn đầu kỳ (kiểm kê, ngày D0) + Σ(Nhập − Xuất) của D0 ≤ ngày < d
+                         (nếu d < D0 thì tính lùi: − Σ(Nhập − Xuất) của d ≤ ngày < D0).
+    Tồn đầu = tồn đầu ngày "Từ"; Tồn cuối = Tồn đầu + Nhập − Xuất trong kỳ.
+  Mã chưa khai Tồn đầu kỳ (vd mã pcs) → chỉ hiện Nhập/Xuất, tồn để "—" (giống Kho NVL).
+  Bấm 1 dòng → sổ chi tiết giao dịch trong kỳ ngay dưới dòng. Nút Excel xuất bảng tổng + chi tiết.
+  Mở thẳng: ?tu=yyyy-mm-dd&den=yyyy-mm-dd
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:8px 14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:11px;color:#94A3B8;font-weight:500}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;outline:none;max-width:150px;color-scheme:dark}
+.sp{flex:1}
+.btn{border:none;border-radius:5px;padding:6px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn-ghost{background:transparent;border:1px solid #475569;color:#F1F5F9}
+.btn-ghost:hover{background:#334155}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.info-btn{border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:18px;padding:0}
+.info-txt{font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:6px;padding:8px 10px;margin-bottom:8px}
+.ttl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ttl h2{font-size:15px}
+.ttl .ky{font-size:12px;color:var(--text-muted)}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{border-collapse:collapse;width:100%;font-size:12px;table-layout:fixed;min-width:900px}
+th,td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;white-space:nowrap;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:11px;font-weight:700}
+td.num,th.num{text-align:right}
+td.num{font-family:'JetBrains Mono',monospace}
+td.ma{font-family:'JetBrains Mono',monospace;font-weight:600}
+td.c,th.c{text-align:center}
+td.dim{color:var(--text-dim)}
+.nhap{color:var(--run-fg)}
+.xuat{color:var(--alarm-fg)}
+.am{color:var(--alarm-fg);font-weight:700}
+tr.r{cursor:pointer}
+tr.r:hover td{background:var(--bg-sunken)}
+tr.r.mo td{background:#EFF6FF}
+tr.r td.ma::before{content:'▸ ';color:var(--text-dim);font-weight:400}
+tr.r.mo td.ma::before{content:'▾ '}
+tr.tong td{font-weight:700;background:var(--bg-sunken);border-top:2px solid var(--border-strong)}
+tr.ct td{background:#FAFBFC;padding:0}
+.ct-box{padding:6px 10px 10px 28px}
+.ct-box table{min-width:0;font-size:11.5px;background:#fff;border:1px solid var(--border);border-radius:6px}
+.ct-box th{font-size:11px}
+.ct-box td.gc{white-space:normal;overflow-wrap:anywhere}
+.ct-rong{padding:10px;color:var(--text-dim);font-size:12px}
+.empty-row td{text-align:center;color:var(--text-dim);padding:24px}
+#msg{margin:0 0 6px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.nut-ky{display:flex;gap:4px}
+.nut-ky button{background:#334155;border:1px solid #475569;color:#F1F5F9;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;cursor:pointer}
+.nut-ky button:hover{background:#475569}
+@media (max-width:640px){ .brand .co{display:none} .header-input{max-width:128px} }
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{background:#fff;padding:0}
+  header,.mnb-bar,#mesTbg,.no-print{display:none!important}
+  .card{border:none;box-shadow:none;padding:0}
+  .tbl-wrap{overflow:visible;border:none}
+  table{min-width:0}
+}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Xuất nhập tồn NVL</div>
+    </div>
+    <div class="header-group">
+      <span class="header-label">Từ</span>
+      <input type="date" id="fTu" class="header-input">
+    </div>
+    <div class="header-group">
+      <span class="header-label">Đến</span>
+      <input type="date" id="fDen" class="header-input">
+    </div>
+    <div class="nut-ky">
+      <button type="button" data-ky="nay">Tháng này</button>
+      <button type="button" data-ky="truoc">Tháng trước</button>
+    </div>
+    <span class="sp"></span>
+    <a class="btn btn-ghost" href="nvl.html">Kho NVL</a>
+    <button type="button" class="btn btn-ghost" id="btnIn">In</button>
+    <button type="button" class="btn" id="btnExcel" disabled>Excel</button>
+  </header>
+
+  <div class="card">
+    <div class="ttl">
+      <h2>Xuất – Nhập – Tồn</h2>
+      <span class="ky" id="kyTxt"></span>
+      <button type="button" class="info-btn no-print" data-info="iCach" title="Cách tính">ⓘ</button>
+    </div>
+    <div class="info-txt no-print" id="iCach" hidden>Tồn đầu = tồn kiểm kê đầu kỳ (Kho NVL → Thiết lập → Tồn đầu kỳ) cộng/trừ Nhập − Xuất đến trước ngày "Từ".<br>Tồn cuối = Tồn đầu + Nhập − Xuất trong kỳ.<br>Mã chưa khai tồn đầu kỳ: chỉ có Nhập/Xuất, tồn để "—".<br>Bấm 1 dòng để xem từng lần nhập/xuất.</div>
+    <div class="tbl-wrap">
+      <table id="tbl">
+        <colgroup><col style="width:150px"><col><col style="width:52px"><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:70px"></colgroup>
+        <thead><tr>
+          <th>Mã NVL</th><th>Tên NVL</th><th class="c">ĐVT</th>
+          <th class="num">Tồn đầu</th><th class="num">Nhập</th><th class="num">Xuất</th><th class="num">Tồn cuối</th><th class="num">Lượt</th>
+        </tr></thead>
+        <tbody id="tb"><tr class="empty-row"><td colspan="8">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js?v=T361"></script>
+<script>
+const $ = id => document.getElementById(id);
+let NVL = [], DK = {}, KQ = [], GD_KY = {};
+const moMa = new Set();
+
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function so(n){ return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
+function soO(n, cls){ const v = Number(n) || 0; return v ? '<span class="' + (cls || '') + '">' + so(v) + '</span>' : '<span style="color:var(--text-dim)">0</span>'; }
+function soTon(n){ if (n == null) return '<span style="color:var(--text-dim)">—</span>'; return '<span class="' + (n < 0 ? 'am' : '') + '">' + so(n) + '</span>'; }
+function ngayVN(d){ return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); }
+function fNgay(s){ if (!s) return ''; const [y, m, d] = s.slice(0, 10).split('-'); return d + '/' + m + '/' + y; }
+function baoLoi(e){ $('msg').textContent = MesLoi.gon(e); $('msg').className = 'err'; }
+function ngayDauThang(y, m){ return y + '-' + String(m).padStart(2, '0') + '-01'; }
+function ngayCuoiThang(y, m){ return ngayVN(Date.UTC(y, m, 0, 5)); }
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-info]'); if (!b) return;
+  const x = $(b.dataset.info); if (x) x.hidden = !x.hidden;
+});
+
+function datKy(loai){
+  const [y, m] = ngayVN(new Date()).split('-').map(Number);
+  if (loai === 'nay'){ $('fTu').value = ngayDauThang(y, m); $('fDen').value = ngayVN(new Date()); }
+  else { const yy = m === 1 ? y - 1 : y, mm = m === 1 ? 12 : m - 1; $('fTu').value = ngayDauThang(yy, mm); $('fDen').value = ngayCuoiThang(yy, mm); }
+  tai();
+}
+
+async function tai(){
+  const tu = $('fTu').value, den = $('fDen').value;
+  $('msg').className = ''; $('msg').style.display = '';
+  if (!tu || !den) return;
+  if (tu > den){ $('tb').innerHTML = '<tr class="empty-row"><td colspan="8">Ngày "Từ" phải trước ngày "Đến".</td></tr>'; return; }
+  history.replaceState(null, '', '?tu=' + tu + '&den=' + den);
+  $('kyTxt').textContent = fNgay(tu) + ' → ' + fNgay(den);
+  $('tb').innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải…</td></tr>';
+  $('btnExcel').disabled = true;
+
+  // Cần giao dịch từ min(Từ, ngày đầu kỳ sớm nhất) để tính tồn đầu; tới max(Đến, ngày đầu kỳ muộn nhất) để tính lùi.
+  const dks = Object.values(DK).map(d => d.ngay_dau_ky).filter(Boolean);
+  const lo = dks.reduce((a, b) => b < a ? b : a, tu);
+  const hi = dks.reduce((a, b) => b > a ? b : a, den);
+  const r = await sbTaiHet(() => sb.from('nvl_giao_dich')
+    .select('sheet_row,ngay,loai,ma_nvl,so_luong_kg,bo_phan_nhan,ghi_chu,ts_goc,phieu_cap_id')
+    .gte('ngay', lo).lte('ngay', hi).order('sheet_row'));
+  if (r.error){ baoLoi(r.error); $('tb').innerHTML = '<tr class="empty-row"><td colspan="8">Không tải được dữ liệu.</td></tr>'; return; }
+  tinh(r.data, tu, den);
+}
+
+function tinh(gd, tu, den){
+  const bang = {}; GD_KY = {};
+  const lay = ma => bang[ma] || (bang[ma] = { truoc: 0, nhap: 0, xuat: 0, luot: 0 });
+  gd.forEach(g => {
+    const sl = Number(g.so_luong_kg) || 0, net = g.loai === 'IN' ? sl : -sl;
+    const b = lay(g.ma_nvl), dk = DK[g.ma_nvl];
+    if (g.ngay >= tu && g.ngay <= den){
+      if (g.loai === 'IN') b.nhap += sl; else b.xuat += sl;
+      b.luot++;
+      (GD_KY[g.ma_nvl] || (GD_KY[g.ma_nvl] = [])).push(g);
+    }
+    // Điều chỉnh từ tồn kiểm kê (đầu ngày D0) về đầu ngày "Từ"
+    if (dk && dk.ngay_dau_ky){
+      if (g.ngay >= dk.ngay_dau_ky && g.ngay < tu) b.truoc += net;
+      else if (g.ngay >= tu && g.ngay < dk.ngay_dau_ky) b.truoc -= net;
+    }
+  });
+  const ten = {}; NVL.forEach(n => ten[n.ma_nvl] = n);
+  const ds = new Set([...Object.keys(DK), ...Object.keys(GD_KY)]);
+  KQ = [...ds].sort().map(ma => {
+    const b = bang[ma] || { truoc: 0, nhap: 0, xuat: 0, luot: 0 }, dk = DK[ma], n = ten[ma] || {};
+    const dau = dk ? Number(dk.ton_dau_ky_kg || 0) + b.truoc : null;
+    return { ma, ten: n.ten_nvl || '', dvt: n.dvt || 'kg', dau, nhap: b.nhap, xuat: b.xuat,
+             cuoi: dau == null ? null : dau + b.nhap - b.xuat, luot: b.luot };
+  });
+  (Object.values(GD_KY)).forEach(a => a.sort((x, y) => (x.ngay + (x.ts_goc || '')).localeCompare(y.ngay + (y.ts_goc || '')) || x.sheet_row - y.sheet_row));
+  ve();
+  $('btnExcel').disabled = !KQ.length;
+}
+
+function ve(){
+  if (!KQ.length){ $('tb').innerHTML = '<tr class="empty-row"><td colspan="8">Không có mã NVL nào có tồn hoặc giao dịch trong kỳ.</td></tr>'; return; }
+  let h = '';
+  KQ.forEach(k => {
+    const mo = moMa.has(k.ma);
+    h += '<tr class="r' + (mo ? ' mo' : '') + '" data-ma="' + esc(k.ma) + '">'
+      + '<td class="ma">' + esc(k.ma) + '</td><td title="' + esc(k.ten) + '">' + esc(k.ten) + '</td><td class="c">' + esc(k.dvt) + '</td>'
+      + '<td class="num">' + soTon(k.dau) + '</td><td class="num">' + soO(k.nhap, 'nhap') + '</td><td class="num">' + soO(k.xuat, 'xuat') + '</td>'
+      + '<td class="num">' + soTon(k.cuoi) + '</td><td class="num dim">' + (k.luot || '') + '</td></tr>';
+    if (mo) h += veCt(k.ma);
+  });
+  // Dòng tổng theo từng ĐVT (không cộng kg với pcs)
+  ['kg', 'pcs'].forEach(u => {
+    const a = KQ.filter(k => k.dvt === u); if (a.length < 2) return;
+    const coTon = a.filter(k => k.dau != null);
+    const t = f => a.reduce((s, k) => s + (Number(k[f]) || 0), 0);
+    h += '<tr class="tong"><td>Tổng ' + u + '</td><td></td><td class="c">' + u + '</td>'
+      + '<td class="num">' + (coTon.length ? so(coTon.reduce((s, k) => s + k.dau, 0)) : '—') + '</td>'
+      + '<td class="num">' + so(t('nhap')) + '</td><td class="num">' + so(t('xuat')) + '</td>'
+      + '<td class="num">' + (coTon.length ? so(coTon.reduce((s, k) => s + k.cuoi, 0)) : '—') + '</td>'
+      + '<td class="num">' + (t('luot') || '') + '</td></tr>';
+  });
+  $('tb').innerHTML = h;
+}
+
+function veCt(ma){
+  const a = GD_KY[ma] || [];
+  if (!a.length) return '<tr class="ct"><td colspan="8"><div class="ct-rong">Không có nhập/xuất trong kỳ.</div></td></tr>';
+  let r = '<tr class="ct"><td colspan="8"><div class="ct-box"><table><colgroup><col style="width:90px"><col style="width:56px"><col style="width:100px"><col style="width:120px"><col></colgroup>'
+    + '<thead><tr><th>Ngày</th><th>Loại</th><th class="num">Số lượng</th><th>Bộ phận</th><th>Ghi chú</th></tr></thead><tbody>';
+  a.forEach(g => {
+    const vao = g.loai === 'IN';
+    r += '<tr><td>' + fNgay(g.ngay) + '</td><td class="' + (vao ? 'nhap' : 'xuat') + '">' + (vao ? 'Nhập' : 'Xuất') + '</td>'
+      + '<td class="num">' + so(g.so_luong_kg) + '</td><td>' + esc(g.bo_phan_nhan || '') + '</td>'
+      + '<td class="gc">' + esc(g.ghi_chu || '') + '</td></tr>';
+  });
+  return r + '</tbody></table></div></td></tr>';
+}
+
+$('tb').addEventListener('click', e => {
+  const tr = e.target.closest('tr.r'); if (!tr) return;
+  const ma = tr.dataset.ma; moMa.has(ma) ? moMa.delete(ma) : moMa.add(ma); ve();
+});
+
+function napXlsx(){
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, loi) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = ok; s.onerror = () => loi(new Error('Không tải được thư viện Excel, kiểm tra mạng.'));
+    document.head.appendChild(s);
+  });
+}
+
+async function xuatExcel(){
+  try { await napXlsx(); } catch (e){ return alert('❌ ' + e.message); }
+  const tu = $('fTu').value, den = $('fDen').value;
+  const tong = [['BÁO CÁO XUẤT – NHẬP – TỒN NGUYÊN VẬT LIỆU'], ['Từ ' + fNgay(tu) + ' đến ' + fNgay(den)], [],
+    ['Mã NVL', 'Tên NVL', 'ĐVT', 'Tồn đầu', 'Nhập', 'Xuất', 'Tồn cuối', 'Số lượt']];
+  KQ.forEach(k => tong.push([k.ma, k.ten, k.dvt, k.dau == null ? '' : +k.dau.toFixed(3), +k.nhap.toFixed(3), +k.xuat.toFixed(3), k.cuoi == null ? '' : +k.cuoi.toFixed(3), k.luot]));
+  const ct = [['Ngày', 'Mã NVL', 'Tên NVL', 'ĐVT', 'Loại', 'Số lượng', 'Bộ phận', 'Ghi chú']];
+  KQ.forEach(k => (GD_KY[k.ma] || []).forEach(g => ct.push([fNgay(g.ngay), k.ma, k.ten, k.dvt, g.loai === 'IN' ? 'Nhập' : 'Xuất', Number(g.so_luong_kg) || 0, g.bo_phan_nhan || '', g.ghi_chu || ''])));
+  const wb = XLSX.utils.book_new();
+  const s1 = XLSX.utils.aoa_to_sheet(tong); s1['!cols'] = [{ wch: 16 }, { wch: 34 }, { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 8 }];
+  const s2 = XLSX.utils.aoa_to_sheet(ct); s2['!cols'] = [{ wch: 11 }, { wch: 16 }, { wch: 30 }, { wch: 6 }, { wch: 7 }, { wch: 12 }, { wch: 14 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(wb, s1, 'Tong hop');
+  XLSX.utils.book_append_sheet(wb, s2, 'Chi tiet');
+  XLSX.writeFile(wb, 'XNT_NVL_' + tu + '_' + den + '.xlsx');
+}
+
+(async function(){
+  const [n, d] = await Promise.all([
+    sb.from('nvl_materials').select('ma_nvl,ten_nvl,dvt').order('ma_nvl'),
+    sb.from('nvl_ton_dau_ky').select('ma_nvl,ngay_dau_ky,ton_dau_ky_kg'),
+  ]);
+  if (n.error || d.error){ baoLoi(n.error || d.error); $('tb').innerHTML = '<tr class="empty-row"><td colspan="8">Không tải được dữ liệu.</td></tr>'; return; }
+  NVL = n.data || [];
+  (d.data || []).forEach(r => DK[r.ma_nvl] = r);
+
+  const sp = new URL(location.href).searchParams;
+  const [y, m] = ngayVN(new Date()).split('-').map(Number);
+  $('fTu').value = sp.get('tu') || ngayDauThang(y, m);
+  $('fDen').value = sp.get('den') || ngayVN(new Date());
+  $('fTu').addEventListener('change', tai);
+  $('fDen').addEventListener('change', tai);
+  document.querySelectorAll('[data-ky]').forEach(b => b.onclick = () => datKy(b.dataset.ky));
+  $('btnExcel').onclick = xuatExcel;
+  $('btnIn').onclick = () => window.print();
+  tai();
+})();
+</script>
+</body>
+</html>
