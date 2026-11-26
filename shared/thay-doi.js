@@ -12,7 +12,7 @@
 
   const NHOM = { dieu_kien: 'Điều kiện', khuon: 'Khuôn', may: 'Máy', vat_lieu: 'NVL', khac: 'Khác' };
   const NHOM_DAY = { dieu_kien: 'Điều kiện đúc', khuon: 'Khuôn', may: 'Máy', vat_lieu: 'Vật liệu', khac: 'Người & khác' };
-  const DUYET = { khong: 'Không cần', ky_thuat: 'Kỹ thuật', thiet_bi: 'Thiết bị', to_truong_khuon: 'Tổ trưởng khuôn', qlbp_duc: 'QLBP Đúc', qa: 'QA' };
+  const DUYET = { khong: 'Không cần', ky_thuat: 'Kỹ thuật', thiet_bi: 'Thiết bị', to_truong_khuon: 'Tổ trưởng khuôn', qlbp_duc: 'QLBP Đúc', qa: 'QC' };
   const LY_DO = ['Khắc phục lỗi', 'Ổn định chất lượng', 'Tăng năng suất', 'Theo yêu cầu kỹ thuật', 'Theo yêu cầu khách', 'Thử nghiệm'];
   const TT = {
     cho_duyet: '⏳ Chờ duyệt', cho_ap_dung: '✋ Chờ chỉnh', cho_ipqc: '⚠ Chờ IPQC', ok: '✅ OK', ng: '⛔ NG',
