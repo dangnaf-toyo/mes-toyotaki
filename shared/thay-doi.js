@@ -182,7 +182,7 @@
     const row = typeof opt.layDong === 'function' ? opt.layDong(idDong) : null;
     if (!row || !row.ma_sp) return bao('Máy chưa chạy mã nào.', true);
     await taiQuyen();
-    if (!quyen.ghi) return bao('⛔ Chỉ trưởng ca hoặc admin được ghi phiếu thay đổi.', true);
+    if (!quyen.ghi) return bao('⛔ Chỉ trưởng ca, kỹ thuật đúc hoặc admin được ghi phiếu thay đổi.', true);
     const ds = await taiMau();
     if (!ds.length) return bao('Chưa có danh mục thay đổi (chưa chạy SQL T307?).', true);
 
