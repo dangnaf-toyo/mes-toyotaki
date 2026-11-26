@@ -138,6 +138,7 @@
       { label: 'Kho dao cụ', href: 'dao-cu.html' },   // T272
       { label: 'Kho thành phẩm', href: 'kho-thanh-pham.html' },
       { label: 'Truy xuất nguồn gốc', href: 'truy-xuat-nguon-goc.html' },
+      { label: 'Lịch sử quét tem', href: 'lich-su-quet-tem.html' },   // T350
     ] },
     { label: 'QMS · Tài liệu', items: [
       { label: 'Tài liệu kỹ thuật', href: 'tai-lieu-danh-muc.html' },
@@ -176,6 +177,7 @@
     'oqc.html': { icon: '📦', title: 'Đóng gói Pallet', desc: 'Quét tem, gom pallet, đóng gói — dùng cho mọi công đoạn cuối trước nhập kho', noTitleBar: true },
     'kho-thanh-pham.html': { icon: '🏬', title: 'Kho thành phẩm', desc: 'Nhập kho / Xuất hàng bằng QR', noTitleBar: true },
     'truy-xuat-nguon-goc.html': { icon: '🔍', title: 'Truy xuất nguồn gốc', desc: 'Phả hệ tem: tách/gộp xuyên công đoạn', noTitleBar: true },
+    'lich-su-quet-tem.html': { icon: '🕒', title: 'Lịch sử quét tem', desc: 'Giờ quét tem trong ngày — mọi công đoạn', noTitleBar: true },
     'tra-cuu-tem.html': { icon: '🏷️', title: 'Tra cứu tem đã in', desc: 'Danh sách tem — lọc theo ngày in/máy/mã SP', noTitleBar: true },
     'cong-doan-bao-cao-ca.html': { icon: '📋', title: 'Báo cáo cuối ca công đoạn', desc: 'Bavia / Gia công / Cắt viền / Đánh bóng Kẽm / Sơn / OQC', noTitleBar: true },
     'cong-doan-dashboard.html': { icon: '🏭', title: 'Bảng điều khiển công đoạn', desc: 'Trạm/line/máy, sản lượng OK/NG real-time', noTitleBar: true },

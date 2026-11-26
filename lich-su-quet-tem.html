@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lịch sử quét tem — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  lich-su-quet-tem.html — T350: mọi lượt quét tem trong 1 ngày (giờ VN), mọi
+  công đoạn, xếp theo giờ. Gộp 2 nguồn (chỉ đọc, RLS đọc công khai sẵn có):
+   1) cd_chuyen_cong_doan_log — công đoạn NHẬN quét tem khi chuyển công đoạn
+      (giờ = thoi_gian_chuyen, người = nguoi_nhan, Từ = cong_doan_giao).
+   2) duc_tem có tram_cong_doan — tem thành phẩm quét GHI NHẬN tại công đoạn
+      (ghi-nhan-tem-thanh-pham.html; giờ = ngay_gio_ghi_nhan, người = nguoi_tt).
+      Tem Đúc (tram_cong_doan null) không tính: ngay_gio_ghi_nhan của tem Đúc
+      là giờ SX thực tế, không phải lượt quét.
+  Lọc cột dùng bang-dai.js (navbar tự nạp). Bấm Tag No → truy-xuat-nguon-goc.
+  Mở thẳng: lich-su-quet-tem.html?ngay=YYYY-MM-DD&cd=<công đoạn>
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px 14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:11px;color:#94A3B8;font-weight:500}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none;max-width:170px}
+.btn{border:none;border-radius:5px;padding:6px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn:hover{background:var(--accent-hover)}
+.btn-hd{background:transparent;border:1px solid #475569;color:#F1F5F9;padding:4px 9px}
+.btn-hd:hover{background:#334155}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.tong{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text-muted)}
+.tong b{color:var(--text);font-size:15px;font-family:'JetBrains Mono',monospace}
+.info-btn{border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:18px;padding:0}
+.info-txt{flex-basis:100%;font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:6px;padding:8px 10px}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;white-space:nowrap}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:11px;font-weight:700}
+td.num,th.num{text-align:right}
+td.num{font-family:'JetBrains Mono',monospace}
+td.gio{font-family:'JetBrains Mono',monospace;font-weight:700}
+tr:hover td{background:var(--bg-sunken)}
+.empty-row td{text-align:center;color:var(--text-dim);padding:24px}
+.tag{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--accent);text-decoration:none}
+.tag:hover{text-decoration:underline}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px}
+.b-nhan{background:#EFF6FF;color:var(--accent)}
+.b-gn{background:var(--run-bg);color:var(--run-fg)}
+.b-cho{background:var(--warn-bg);color:var(--warn-fg)}
+.b-tc{background:var(--alarm-bg);color:var(--alarm-fg)}
+#msg{margin:0 0 6px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+@media (max-width:600px){ .header-select,.header-input{max-width:140px} .brand .co{display:none} }
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Lịch sử quét tem</div>
+    </div>
+    <div class="header-group">
+      <button type="button" class="btn btn-hd" id="btnTruoc" title="Ngày trước">◀</button>
+      <input type="date" id="fNgay" class="header-input">
+      <button type="button" class="btn btn-hd" id="btnSau" title="Ngày sau">▶</button>
+    </div>
+    <div class="header-group">
+      <span class="header-label">Công đoạn</span>
+      <select id="fCd" class="header-select"><option value="">Tất cả</option></select>
+    </div>
+    <div class="header-group">
+      <span class="header-label">Loại</span>
+      <select id="fLoai" class="header-select">
+        <option value="">Tất cả</option>
+        <option value="nhan">Nhận</option>
+        <option value="gn">Ghi nhận</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="tong" id="tong">Đang tải…</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Giờ quét</th><th>Công đoạn</th><th>Loại</th><th>Từ</th><th>Tag No</th>
+            <th>Mã SP</th><th>Tên SP</th><th class="num">Số lượng</th><th>Người quét</th><th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr class="empty-row"><td colspan="10">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js?v=T350"></script>
+<script>
+let tatCa = [];   // mọi lượt quét của ngày đang xem (đã gộp 2 nguồn)
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function fmtGio(iso){
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh' });
+}
+function ngayVN(d){ return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); }
+function congNgay(s, n){ const d = new Date(s + 'T12:00:00+07:00'); d.setDate(d.getDate() + n); return ngayVN(d); }
+function showMsg(text){ const el = document.getElementById('msg'); el.textContent = text; el.className = 'err'; }
+
+async function taiNgay(){
+  const ngay = document.getElementById('fNgay').value;
+  if (!ngay) return;
+  document.getElementById('msg').className = '';
+  document.getElementById('tbody').innerHTML = '<tr class="empty-row"><td colspan="10">Đang tải…</td></tr>';
+  document.getElementById('tong').textContent = 'Đang tải…';
+  const tu = ngay + 'T00:00:00+07:00', den = congNgay(ngay, 1) + 'T00:00:00+07:00';
+  const url = new URL(location.href); url.searchParams.set('ngay', ngay); history.replaceState(null, '', url);
+
+  const [chuyenR, gnR] = await Promise.all([
+    sbTaiHet(() => sb.from('cd_chuyen_cong_doan_log')
+      .select('id_phieu,thoi_gian_chuyen,tag_no,ma_sp,ten_sp,sl_thuc_chuyen,cong_doan_giao,cong_doan_nhan,nguoi_nhan,trang_thai_xac_nhan')
+      .gte('thoi_gian_chuyen', tu).lt('thoi_gian_chuyen', den)
+      .order('id_phieu')),
+    sbTaiHet(() => sb.from('duc_tem')
+      .select('tag_no,ma_sp,ten_sp,so_luong,so_luong_tt,tram_cong_doan,ngay_gio_ghi_nhan,nguoi_tt,trang_thai')
+      .not('tram_cong_doan', 'is', null)
+      .gte('ngay_gio_ghi_nhan', tu).lt('ngay_gio_ghi_nhan', den)
+      .order('tag_no')),
+  ]);
+  if (chuyenR.error || gnR.error){ showMsg('Lỗi tải: ' + (chuyenR.error || gnR.error).message); return; }
+
+  tatCa = [
+    ...(chuyenR.data || []).map(r => ({
+      gio: r.thoi_gian_chuyen, cd: r.cong_doan_nhan || '—', loai: 'nhan', tu: r.cong_doan_giao || '—',
+      tag: r.tag_no, ma_sp: r.ma_sp, ten_sp: r.ten_sp, sl: r.sl_thuc_chuyen, nguoi: r.nguoi_nhan,
+      tt: r.trang_thai_xac_nhan || '',
+    })),
+    // Cùng 1 lượt quét có thể ghi CẢ 2 nơi (vd Bavia đóng thùng: tem mới có
+    // tram_cong_doan + log Bavia→Bavia cùng thời điểm) → bỏ bản ghi nhận trùng.
+    ...(gnR.data || []).filter(r => !(chuyenR.data || []).some(c => c.tag_no === r.tag_no
+        && new Date(c.thoi_gian_chuyen).getTime() === new Date(r.ngay_gio_ghi_nhan).getTime())).map(r => ({
+      gio: r.ngay_gio_ghi_nhan, cd: r.tram_cong_doan, loai: 'gn', tu: '',
+      tag: r.tag_no, ma_sp: r.ma_sp, ten_sp: r.ten_sp, sl: r.so_luong_tt ?? r.so_luong, nguoi: r.nguoi_tt,
+      tt: r.trang_thai || '',
+    })),
+  ].sort((a, b) => new Date(a.gio) - new Date(b.gio));
+
+  // Ô chọn công đoạn: chỉ những công đoạn có lượt quét trong ngày (giữ lựa chọn cũ nếu còn).
+  const sel = document.getElementById('fCd');
+  const giu = sel.value || new URL(location.href).searchParams.get('cd') || '';
+  const dsCd = [...new Set(tatCa.map(r => r.cd))].sort((a, b) => a.localeCompare(b, 'vi'));
+  if (giu && !dsCd.includes(giu)) dsCd.unshift(giu);
+  sel.innerHTML = '<option value="">Tất cả</option>' + dsCd.map(c => '<option>' + escapeHtml(c) + '</option>').join('');
+  sel.value = giu;
+  ve();
+}
+
+function badgeTT(r){
+  if (r.loai === 'gn') return escapeHtml(r.tt || '—');
+  if (/^Chờ/.test(r.tt)) return '<span class="badge b-cho">Chờ xác nhận</span>';
+  if (/chối/i.test(r.tt)) return '<span class="badge b-tc">Từ chối</span>';
+  return escapeHtml(r.tt || '—');
+}
+
+function ve(){
+  const cd = document.getElementById('fCd').value;
+  const loai = document.getElementById('fLoai').value;
+  const url = new URL(location.href);
+  if (cd) url.searchParams.set('cd', cd); else url.searchParams.delete('cd');
+  history.replaceState(null, '', url);
+
+  const ds = tatCa.filter(r => (!cd || r.cd === cd) && (!loai || r.loai === loai));
+  const tbody = document.getElementById('tbody');
+  if (!ds.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Không có lượt quét nào.</td></tr>';
+  } else {
+    tbody.innerHTML = ds.map(r => `
+      <tr>
+        <td class="gio">${fmtGio(r.gio)}</td>
+        <td>${escapeHtml(r.cd)}</td>
+        <td>${r.loai === 'nhan' ? '<span class="badge b-nhan">Nhận</span>' : '<span class="badge b-gn">Ghi nhận</span>'}</td>
+        <td>${escapeHtml(r.tu) || '—'}</td>
+        <td><a class="tag" href="truy-xuat-nguon-goc.html?tag=${encodeURIComponent(r.tag)}" target="_blank" rel="noopener">${escapeHtml(r.tag)}</a></td>
+        <td>${escapeHtml(r.ma_sp) || '—'}</td>
+        <td>${escapeHtml(r.ten_sp) || '—'}</td>
+        <td class="num">${fmtNum(r.sl)}</td>
+        <td>${escapeHtml(r.nguoi) || '—'}</td>
+        <td>${badgeTT(r)}</td>
+      </tr>`).join('');
+  }
+  const tongSl = ds.reduce((s, r) => s + (Number(r.sl) || 0), 0);
+  const soTem = new Set(ds.map(r => r.tag)).size;
+  document.getElementById('tong').innerHTML =
+    '<span>Lượt quét <b>' + fmtNum(ds.length) + '</b></span>' +
+    '<span>Số tem <b>' + fmtNum(soTem) + '</b></span>' +
+    '<span>Tổng SL <b>' + fmtNum(tongSl) + '</b></span>' +
+    (ds.length ? '<span>Đầu <b>' + fmtGio(ds[0].gio) + '</b> · Cuối <b>' + fmtGio(ds[ds.length - 1].gio) + '</b></span>' : '') +
+    '<button type="button" class="info-btn" id="btnInfo" title="Giải thích">ⓘ</button>' +
+    '<div class="info-txt" id="infoTxt" hidden>Nhận = công đoạn nhận quét tem khi chuyển công đoạn. Ghi nhận = quét tem thành phẩm tại công đoạn. Bấm Tag No để xem nguồn gốc tem.</div>';
+  document.getElementById('btnInfo').onclick = () => { const t = document.getElementById('infoTxt'); t.hidden = !t.hidden; };
+}
+
+const fNgay = document.getElementById('fNgay');
+fNgay.value = new URL(location.href).searchParams.get('ngay') || ngayVN(new Date());
+fNgay.addEventListener('change', taiNgay);
+document.getElementById('btnTruoc').onclick = () => { fNgay.value = congNgay(fNgay.value, -1); taiNgay(); };
+document.getElementById('btnSau').onclick = () => { fNgay.value = congNgay(fNgay.value, 1); taiNgay(); };
+document.getElementById('fCd').addEventListener('change', ve);
+document.getElementById('fLoai').addEventListener('change', ve);
+taiNgay();
+</script>
+</body>
+</html>
