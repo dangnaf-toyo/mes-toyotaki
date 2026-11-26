@@ -282,7 +282,7 @@ const IqcChemicalEntry = (() => {
     const list = el("qc02-products");
     if (list) IqcMaterialCatalog.options(list);
     catalogStatus.textContent = c.available
-      ? "Mã sản phẩm và mã NVL dùng chung danh mục MES/BOM. Mã NVL có nhãn [NVL]."
+      ? ""
       : "Chưa tải được danh mục NVL BOM; danh sách sản phẩm hiện tại vẫn sử dụng được.";
   }
   async function select() {

@@ -6,9 +6,9 @@
   section.className = 'section';
   section.innerHTML = `<h3>Kiểm tra LOT</h3>
     <label>LOT đang kiểm <select id="iqcMultiLot"><option value="">LOT mới</option></select></label>
-    <p id="iqcMultiProgress">LOT mới</p>
-    <div class="iqc-multi-grid"><label>Thời gian bắt đầu <input id="iqcMultiStart" readonly></label><label>Thời gian hoàn thành <input id="iqcMultiEnd" readonly></label><input id="iqcMultiDate" type="hidden">
-    <label>SL kiểm <input id="iqcMultiChecked" type="number" min="1" step="1"></label>
+    <p id="iqcMultiProgress">LOT mới</p><p id="iqcLotStartedAt" class="help"></p>
+    <div class="iqc-multi-grid"><label>Bắt đầu lần này <input id="iqcMultiStart" type="datetime-local" step="1"></label><label>Hoàn thành LOT <input id="iqcMultiEnd" type="datetime-local" step="1"></label><input id="iqcMultiDate" type="hidden">
+    <label>SL kiểm lần này <input id="iqcMultiChecked" type="number" min="1" step="1"></label>
     <label>OK <input id="iqcMultiOk" type="number" min="0" step="1" value="0"></label>
     <label>NG <input id="iqcMultiNg" type="number" min="0" step="1" value="0"></label></div>
     <h3>Lỗi IQC</h3><input id="iqcMultiDefectSearch" type="search" placeholder="Tìm lỗi IQC"><p id="iqcMultiCatalogStatus" class="help"></p><datalist id="iqcMultiDefects"></datalist><div class="iqc-multi-head"><b>Tên lỗi</b><b>Chi tiết / vị trí</b><b>Nhóm</b><b>SL lỗi</b></div><div id="iqcMultiRows"></div>
@@ -23,6 +23,7 @@
   for(const id of ['pickupDate','completionDate'])$id(id).closest('.field').classList.add('iqc-hide-received');
   $id('inspector').required=false;
   $id('inspector').closest('.field').querySelector('label').textContent='Người kiểm (khi kiểm)';
+  $id('inspectionType').closest('.field').after($id('location').closest('.field'));
   $id('inspectionType').required=false;
   $id('inspectionType').closest('.field').querySelector('label').textContent='Hình thức kiểm';
   if(!$id('inspectionType').value)$id('inspectionType').value='Kiểm tra 100%';
@@ -63,24 +64,25 @@
   let startId=null,startPromise=null,startEpoch=0,dirtyVisual=false;
   const today = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Bangkok'}).format(new Date());
   const displayTime = value => value ? new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value)) : 'Chưa xác định';
+  const timeInput=value=>value?new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value)).replace(' ','T'):'';
   function resetStart(){startEpoch++;startId=null;startPromise=null;$id('iqcMultiStart').value='';$id('iqcMultiEnd').value='';}
   async function ensureStarted(){
     if(editRound)return;
     if(startPromise)return startPromise;
     const epoch=startEpoch,id=crypto.randomUUID(),lotId=selectedLot?.id||null;startId=id;
-    startPromise=(async()=>{const r=await sb.rpc('iqc_bat_dau_lan_kiem',{p_id:id,p_lot_id:lotId});if(r.error)throw r.error;if(epoch!==startEpoch)throw Error('LOT đã thay đổi; bắt đầu lại lần kiểm.');$id('iqcMultiStart').value=displayTime(r.data.bat_dau_luc);return id;})();
+    startPromise=(async()=>{const r=await sb.rpc('iqc_bat_dau_lan_kiem',{p_id:id,p_lot_id:lotId});if(r.error)throw r.error;if(epoch!==startEpoch)throw Error('LOT đã thay đổi; bắt đầu lại lần kiểm.');if(!$id('iqcMultiStart').value)$id('iqcMultiStart').value=timeInput(r.data.bat_dau_luc);return id;})();
     try{return await startPromise;}catch(e){if(epoch===startEpoch){startId=null;startPromise=null;}throw e;}
   }
-  section.addEventListener('focusin',e=>{if(IqcChemicalEntry.isChemical()||editRound||!e.target.matches('#iqcMultiChecked,#iqcMultiOk,#iqcMultiNg,#iqcMultiRows input'))return;ensureStarted().catch(err=>{$id('iqcMultiStatus').textContent='Không bắt đầu được lần kiểm: '+(err.message||err);});});
+  section.addEventListener('focusin',e=>{if(IqcChemicalEntry.isChemical()||editRound||!e.target.matches('#iqcMultiStart,#iqcMultiChecked,#iqcMultiOk,#iqcMultiNg,#iqcMultiRows input'))return;ensureStarted().catch(err=>{$id('iqcMultiStatus').textContent='Không bắt đầu được lần kiểm: '+(err.message||err);});});
   form.addEventListener('input',e=>{if(!IqcChemicalEntry.isChemical() && !['iqcMultiDefectSearch','iqcMultiLot','iqcAqlLevel','iqcAqlValue','iqcAqlMode'].includes(e.target.id))dirtyVisual=true;});
   const text = (tag, value) => { const n=document.createElement(tag); n.textContent=value; return n; };
   const field = (label, cls, type='text') => { const l=text('label',label), i=document.createElement('input'); i.className=cls;i.type=type;if(type==='number'){i.min='1';i.step='1';} l.append(i);return l; };
   function addDefect(row={}) {
     const div=document.createElement('div');div.className='iqc-multi-row';
-    const name=field('Tên lỗi','name'), detail=field('Chi tiết','detail'), group=field('Nhóm','group'), qty=field('Số lượng','qty','number');
+    const name=field('Tên lỗi','name'), detail=field('Chi tiết','detail'), group=text('label','Nhóm'), qty=field('Số lượng','qty','number');const groupInput=document.createElement('select');groupInput.className='group';groupInput.append(new Option('—',''),...[...new Set(catalog.map(c=>c.defect_group).filter(Boolean))].map(x=>new Option(x,x)));if(row.nhom_loi&&![...groupInput.options].some(o=>o.value===row.nhom_loi))groupInput.add(new Option(row.nhom_loi,row.nhom_loi));groupInput.value=row.nhom_loi||'';group.append(groupInput);
     name.querySelector('input').setAttribute('list','iqcMultiDefects');
-    for(const [el,value] of [[name,row.ten_loi],[detail,row.chi_tiet],[group,row.nhom_loi],[qty,row.so_luong]]) el.querySelector('input').value=value ?? '';
-    if(row.catalog){div.dataset.catalog='1';name.querySelector('input').readOnly=true;group.querySelector('input').readOnly=true;qty.querySelector('input').min='0';qty.querySelector('input').value=row.so_luong??0;}
+    for(const [el,value] of [[name,row.ten_loi],[detail,row.chi_tiet],[qty,row.so_luong]]) el.querySelector('input').value=value ?? '';
+    if(row.catalog){div.dataset.catalog='1';div.dataset.code=row.code||'';if(row.code){const badge=text('span',row.code);badge.className='iqc-defect-code';name.prepend(badge);}name.querySelector('input').readOnly=true;qty.querySelector('input').min='0';qty.querySelector('input').value=row.so_luong??0;}
     const del=text('button','Xóa');del.type='button';del.className='button btn-secondary';del.onclick=()=>div.remove();
     if(row.catalog)del.hidden=true;
     div.append(name,detail,group,qty,del);$id('iqcMultiRows').append(div);
@@ -90,18 +92,21 @@
   function resetDefects(saved=[]) {
     $id('iqcMultiRows').replaceChildren();
     const rest=[...saved];
-    for(const c of catalog){const i=rest.findIndex(x=>x.ten_loi===c.label && (x.nhom_loi||'')===(c.defect_group||''));const previous=i>=0?rest.splice(i,1)[0]:{};addDefect({ten_loi:c.label,nhom_loi:c.defect_group,so_luong:0,...previous,catalog:true});}
-    rest.forEach(addDefect);
+    for(const c of catalog){const i=rest.findIndex(x=>x.ten_loi===c.label && (x.nhom_loi||'')===(c.defect_group||''));const previous=i>=0?rest.splice(i,1)[0]:{};addDefect({ten_loi:c.label,nhom_loi:c.defect_group,so_luong:0,...previous,code:c.ma_loi||c.code||'',catalog:true});}
+    rest.forEach(addDefect);filterDefects();
   }
-  $id('iqcMultiDefectSearch').addEventListener('input',()=>{const q=$id('iqcMultiDefectSearch').value.toLocaleLowerCase('vi');for(const row of $id('iqcMultiRows').children)row.hidden=!!q&&!row.querySelector('.name').value.toLocaleLowerCase('vi').includes(q);});
+  function filterDefects(){const q=$id('iqcMultiDefectSearch').value.trim().toLocaleLowerCase('vi');for(const row of $id('iqcMultiRows').children){const name=((row.dataset.code||'')+' '+row.querySelector('.name').value).toLocaleLowerCase('vi'),active=Number(row.querySelector('.qty').value)>0||!!row.querySelector('.detail').value.trim();row.hidden=row.dataset.catalog==='1'&&!active&&(!q||!name.includes(q));}}
+  $id('iqcMultiDefectSearch').addEventListener('input',filterDefects);
+  $id('iqcMultiRows').addEventListener('input',filterDefects);
+
   async function loadDefectCatalog(){
-    const r=await sbTaiHet(()=>sb.from('quality_defect_catalog').select('label,defect_group').contains('processes',['IQC']).eq('is_active',true).order('sort_order').order('label'));
+    const r=await sbTaiHet(()=>sb.from('quality_defect_catalog').select('code,ma_loi,label,defect_group').contains('processes',['IQC']).eq('is_active',true).order('sort_order').order('label'));
     if(r.error)throw r.error;
     const map=new Map();for(const x of r.data||[]){const label=String(x.label||'').trim();if(!label)continue;const key=(label+'|'+(x.defect_group||'')).toLocaleLowerCase('vi');if(!map.has(key))map.set(key,{...x,label});}
     catalog=[...map.values()];$id('iqcMultiDefects').replaceChildren(...catalog.map(x=>new Option(x.label,x.label)));
     $id('iqcMultiCatalogStatus').textContent=catalog.length?'Danh mục lỗi IQC · '+catalog.length+' loại':'Chưa có lỗi IQC trong danh mục MES.';
     if(!$id('iqcMultiRows').children.length)resetDefects();
-    else for(const c of catalog){const found=[...$id('iqcMultiRows').children].some(row=>row.querySelector('.name').value.trim()===c.label&&row.querySelector('.group').value.trim()===(c.defect_group||''));if(!found)addDefect({ten_loi:c.label,nhom_loi:c.defect_group,so_luong:0,catalog:true});}
+    else for(const c of catalog){const found=[...$id('iqcMultiRows').children].some(row=>row.querySelector('.name').value.trim()===c.label&&row.querySelector('.group').value.trim()===(c.defect_group||''));if(!found)addDefect({ten_loi:c.label,nhom_loi:c.defect_group,so_luong:0,code:c.ma_loi||c.code||'',catalog:true});}filterDefects();
   }
   function totals(lot) {
     const list=rounds.filter(r=>String(r.lot_id)===String(lot.id));
@@ -113,9 +118,10 @@
   }
   function renderHistory() {
     const target=$id('iqcMultiHistory');target.replaceChildren();
-    if(!selectedLot){$id('iqcMultiProgress').textContent='LOT mới';return;}
+    if(!selectedLot){$id('iqcMultiProgress').textContent='LOT mới';$id('iqcLotStartedAt').textContent='';return;}
+    const firstStart=rounds.filter(r=>String(r.lot_id)===String(selectedLot.id)&&r.bat_dau_luc).map(r=>r.bat_dau_luc).sort()[0];$id('iqcLotStartedAt').textContent=firstStart?'Bắt đầu LOT: '+displayTime(firstStart):'';
     const t=totals(selectedLot);
-    $id('iqcMultiProgress').textContent=t.checked===null?'Số đã kiểm của LOT cũ chưa xác định. Không tự suy từ cỡ mẫu.':`Tổng ${t.total} · Đã kiểm ${t.checked} · OK ${t.ok} · NG ${t.ng} · Còn ${t.remaining} · ${t.progress}`;
+    $id('iqcMultiProgress').textContent=t.checked===null?'Số đã kiểm của LOT cũ chưa xác định. Không tự suy từ cỡ mẫu.':`Tổng ${t.total} · Đã kiểm ${t.checked} · OK ${t.ok} · NG ${t.ng} · Còn ${t.remaining} · Lỗi ${t.checked?((t.ng/t.checked)*100).toFixed(2):'0.00'}% · ${t.progress}`;
     if(selectedLot.inspectionType==='Kiểm tra AQL'){const p=plans.find(x=>String(x.lot_id)===String(selectedLot.id));$id('iqcMultiProgress').textContent+=p?` · Level ${p.cap_do} / AQL ${p.aql} · Mẫu ${p.mau_yeu_cau} · Ac ${p.ac} / Re ${p.re} · ${t.checked===null?'Chưa xác định':t.checked===Number(p.mau_yeu_cau)?'Đủ mẫu':t.checked>Number(p.mau_yeu_cau)?'Vượt mẫu — cần đối soát':'Chưa đủ mẫu'}`:' · Chưa có kế hoạch lấy mẫu';}
     target.append(text('h4','Lịch sử lần kiểm'));
     const history=rounds.filter(x=>String(x.lot_id)===String(selectedLot.id)).sort((a,b)=>(a.ngay_kiem||'').localeCompare(b.ngay_kiem||'')||a.id-b.id);
@@ -126,7 +132,7 @@
       const line=document.createElement('p');line.textContent=`${r.loai==='so_du_cu'?'Tổng lịch sử cũ':displayTime(r.bat_dau_luc)+' → '+displayTime(r.ket_thuc_luc)+' · '+r.nguoi_kiem} · Kiểm ${r.so_kiem} · OK ${r.so_ok} · NG ${r.so_ng} `;
       if(r.loai==='so_du_cu'){target.append(line);continue;}
       const edit=text('button','Sửa');edit.type='button';edit.onclick=()=>{
-        resetStart();editRound=r;$id('iqcMultiDate').value=r.ngay_kiem;$id('inspector').value=r.nguoi_kiem;$id('iqcMultiStart').value=displayTime(r.bat_dau_luc);$id('iqcMultiEnd').value=displayTime(r.ket_thuc_luc);
+        resetStart();editRound=r;$id('iqcMultiDate').value=r.ngay_kiem;$id('inspector').value=r.nguoi_kiem;$id('iqcMultiStart').value=timeInput(r.bat_dau_luc);$id('iqcMultiEnd').value='';
         $id('iqcMultiChecked').value=r.so_kiem;$id('iqcMultiOk').value=r.so_ok;$id('iqcMultiNg').value=r.so_ng;
         resetDefects(defects.filter(d=>String(d.lan_kiem_id)===String(r.id)));requestId=crypto.randomUUID();$id('iqcMultiStatus').textContent='Đang sửa lần kiểm '+r.id;
       };line.append(edit);
@@ -188,7 +194,9 @@
       if(rows.some(r=>!r.ten_loi||!Number.isSafeInteger(r.so_luong)||r.so_luong<1))throw Error('Nhập tên và số lượng cho từng lỗi.');
       const date=$id('iqcMultiDate').value,inspector=$id('inspector').value.trim();if(!createOnly&&(!date||!inspector))throw Error('Nhập người kiểm.');
       const people=inspector?await Qc02Data.employees():[];const person=people.find(p=>p.code+'_'+p.name===inspector);if(inspector&&!person)throw Error('Chọn người kiểm từ danh mục nhân sự.');
-      const lan=createOnly?null:{ngay_kiem:date,nguoi_kiem:inspector,so_kiem:amount.checked,so_ok:amount.ok,so_ng:amount.ng,loi:rows};
+      const start=$id('iqcMultiStart').value,end=$id('iqcMultiEnd').value;if(start&&end&&end<start)throw Error('Thời gian hoàn thành không được trước thời gian bắt đầu.');
+      let timeReason=null;if(editRound&&((start&&Date.parse(start+'+07:00')!==Date.parse(editRound.bat_dau_luc))||(end&&Date.parse(end+'+07:00')!==Date.parse(editRound.ket_thuc_luc)))){timeReason=prompt('Lý do sửa thời gian:');if(timeReason===null)return;if(!timeReason.trim())throw Error('Nhập lý do sửa thời gian.');}
+      const lan=createOnly?null:{ngay_kiem:date,nguoi_kiem:inspector,so_kiem:amount.checked,so_ok:amount.ok,so_ng:amount.ng,loi:rows,...(start?{bat_dau_luc:start+'+07:00'}:{}),...(end?{ket_thuc_luc:end+'+07:00'}:{}),...(timeReason?{ly_do_thoi_gian:timeReason}:{})};
       if(lan&&!editRound)lan.bat_dau_id=await ensureStarted();
       let result;
       saving=true;$id('saveBtn').disabled=true;
