@@ -841,7 +841,7 @@ function renderWs() {
           '<td class="mono" style="font-weight:500;font-size:11.5px">' + (b.nguon || []).map(s => esc(s.tag_no) + ' (' + fmt(s.so_luong_lay) + ')').join(', ') + '</td>' +
           '<td>' + esc(b.nguoi_lam || '') + '</td><td>' + esc(b.nguoi_kiem || '') + '</td>' +
           '<td>' + (b.dang === 1 ? '<button class="tiny" type="button" data-in="' + esc(b.tag_tp) + '">In lại</button>'
-            : b.dang === 3 ? '<span class="chip flow">Tem con → ' + esc(nextStep(l)) + '</span> <button class="tiny" type="button" data-intach="' + esc(b.tag_tp) + '">In</button>' + (!khoa ? ' <button class="tiny" type="button" data-xehuy="' + esc(b.tag_tp) + '" title="Tách nhầm: trả SL về tem mẹ">Huỷ</button>' : '')
+            : b.dang === 3 ? '<span class="chip flow">Tem con → ' + esc(nextStep(l)) + '</span> <button class="tiny" type="button" data-intach="' + esc(b.tag_tp) + '">In</button>'
             : '<span class="chip flow">' + esc(nextStep(l)) + '</span>') + '</td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty-box">Chưa có thùng nào trong ca.</div>') + '</div>' +
 
@@ -1029,15 +1029,6 @@ document.addEventListener('click', async e => {
       await taiLai();
     });
     if (w && !daIn && !w.closed) w.close();
-    return;
-  }
-  if (t.dataset.xehuy) {
-    if (!(await hoiXacNhan('Huỷ tem ' + t.dataset.xehuy + '?\nSL trả về tem mẹ, trừ sản lượng.', { nutOk: 'Huỷ tem', nguyHiem: true }))) return;
-    await chay(async () => {
-      const r = await goi('bavia_tach_tem_huy', { p_id_tram: l.id_tram, p_tag: t.dataset.xehuy });
-      setFlash('warn', 'Đã huỷ tem <b>' + esc(r.tag_no) + '</b>' + (r.tem_me ? ', trả ' + fmt(r.so_luong) + ' pcs về ' + esc(r.tem_me) : '') + '.');
-      await taiLai();
-    });
     return;
   }
   if (t.dataset.rm) {
