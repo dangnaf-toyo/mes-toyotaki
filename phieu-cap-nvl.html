@@ -258,7 +258,7 @@ function tongDv(ds, truong){
   const t = {}; ds.forEach(x => { const u = x.dvt || 'kg'; t[u] = (t[u] || 0) + Number(x[truong] || 0); });
   return ['kg', 'pcs'].filter(u => u in t).map(u => kg(t[u]) + ' ' + u).join(' · ') || '0';
 }
-let DVT_PCS = new Set();   // mã từng lập phiếu theo pcs → lần sau tự chọn pcs
+let DVT = {};   // T360: ĐVT mặc định theo danh mục NVL
 function ngayVN(d){ return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); }
 function fNgay(s){ if (!s) return ''; const [y, m, d] = s.slice(0, 10).split('-'); return d + '/' + m + '/' + y; }
 function fGio(iso){ return iso ? new Date(iso).toLocaleString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
@@ -410,7 +410,7 @@ function chonPicker(i){
   const tr = pkTr, n = pkDs[i]; dongPicker();
   if (!tr || !n) return;
   tr.querySelector('.c-ma').value = n.ma_nvl;
-  tr.querySelector('.c-dvt').value = DVT_PCS.has(n.ma_nvl) ? 'pcs' : 'kg'; tr._doiMa();
+  tr.querySelector('.c-dvt').value = DVT[n.ma_nvl] || 'kg'; tr._doiMa();
   tr.querySelector('.c-sl').focus();
 }
 function ganPicker(){
@@ -563,17 +563,16 @@ $('dAct').addEventListener('click', async e => {
 (async function(){
   const session = await MesAuth.getSession();
   if (!session){ $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">Đăng nhập để xem phiếu.</td></tr>'; return; }
-  const [q, n, t, u] = await Promise.all([
+  const [q, n, t] = await Promise.all([
     sb.rpc('nvl_pdc_quyen'),
-    sb.from('nvl_materials').select('ma_nvl,ten_nvl').order('ma_nvl'),
+    sb.from('nvl_materials').select('ma_nvl,ten_nvl,dvt').order('ma_nvl'),
     sb.from('nvl_v_ton_hien_tai').select('ma_nvl,ton_hien_tai_kg'),
-    sb.from('nvl_phieu_cap_dong').select('ma_nvl').eq('dvt', 'pcs').limit(1000),
   ]);
   if (q.error){ $('msg').textContent = MesLoi.gon(q.error); $('msg').className = 'err'; return; }
   Q = Object.assign(Q, q.data || {}); Q.qlbp = Q.qlbp || [];
   NVL = n.data || [];
   (t.data || []).forEach(r => TON[r.ma_nvl] = Number(r.ton_hien_tai_kg || 0));
-  DVT_PCS = new Set((u.data || []).map(r => r.ma_nvl));
+  NVL.forEach(r => DVT[r.ma_nvl] = r.dvt || 'kg');
 
   $('fThang').value = new URL(location.href).searchParams.get('thang') || ngayVN(new Date()).slice(0, 7);
   $('fThang').addEventListener('change', taiDs);
