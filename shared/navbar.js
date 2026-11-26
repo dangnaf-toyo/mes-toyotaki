@@ -135,7 +135,6 @@
     ] },
     { label: 'Kho & Truy xuất', items: [
       { label: 'Kho NVL', href: 'nvl.html' },
-      { label: 'Phiếu cấp NVL', href: 'phieu-cap-nvl.html' },   // T352
       { label: 'Kho dao cụ', href: 'dao-cu.html' },   // T272
       { label: 'Kho thành phẩm', href: 'kho-thanh-pham.html' },
       { label: 'Truy xuất nguồn gốc', href: 'truy-xuat-nguon-goc.html' },
