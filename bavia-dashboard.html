@@ -169,6 +169,7 @@
   .ng-form .note{flex:1 1 160px;}
   .tach-form{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--run-bg,#ECFDF5);border:1px solid var(--run-fg);border-radius:7px;padding:6px 8px;font-size:12.5px;font-weight:600;}
   .tach-form input{width:78px;border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:var(--mono);font-size:12.5px;font-weight:600;min-height:30px;}
+  .tach-form select{max-width:190px;border:1.5px solid var(--border-strong);border-radius:6px;padding:4px 6px;font-family:var(--mono);font-size:12px;font-weight:600;min-height:30px;background:var(--surface,#fff);color:inherit;}
   .test-form{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:7px;padding:8px;}
   .test-form label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;display:flex;flex-direction:column;gap:3px;min-width:0;}
   .test-form select,.test-form input{width:100%;text-transform:none;letter-spacing:0;}
@@ -697,17 +698,33 @@ function ngForm(n, i) {
     '<button class="tiny" type="button" data-cancel>Huỷ</button></div></div>';
 }
 // T365: tách tem con từ tem Đúc đang làm (xong 1 xe con).
+// T368: Ghép — tem cuối lấy phần lẻ của tem này + phần thiếu từ tem khác cùng Line.
 function tachForm(l, n, i) {
-  const sl = Math.min(Number(n.con) || 0, Number(l.info.sl_thung) || Number(n.con) || 0);
-  return '<div class="tach-form" data-con="' + n.con + '"><span>SL/tem</span><input id="tachSl" type="number" min="1" max="' + n.con + '" value="' + sl + '" aria-label="Số lượng mỗi tem con">' +
+  const con = Number(n.con) || 0, thung = Number(l.info.sl_thung) || 0;
+  const khac = (l.nguon || []).filter((x, j) => j !== i && Number(x.con) > 0);
+  const ghep = khac.length && thung > 0 && con < thung;
+  const sl = ghep ? thung : Math.min(con, thung || con);
+  return '<div class="tach-form" data-con="' + con + '"><span>SL/tem</span><input id="tachSl" type="number" min="1" value="' + sl + '" aria-label="Số lượng mỗi tem con">' +
     '<span>× Số tem</span><input id="tachSo" type="number" min="1" max="20" value="1" aria-label="Số tem con">' +
+    (khac.length ? '<span>Ghép</span><select id="tachBu" aria-label="Tem bù cho tem cuối"><option value="">Không</option>' +
+      khac.map((x, j) => '<option value="' + x.id + '" data-con="' + x.con + '"' + (ghep && j === 0 ? ' selected' : '') + '>' +
+        esc(x.tag_no) + ' (' + fmt(x.con) + ')</option>').join('') + '</select>' : '') +
     '<span class="ng-sum" id="tachSum"></span><span class="sp"></span>' +
     '<button class="tiny xe" type="button" data-tachsave="' + i + '">Tách · In</button><button class="tiny" type="button" data-cancel>Huỷ</button></div>';
 }
+// Kiểm SL tách (+ ghép). Trả về lỗi hoặc '' và phần lấy từ tem bù.
+function tachKiem() {
+  const f = document.querySelector('.tach-form'); if (!f) return { loi: '' };
+  const sl = Number($('#tachSl').value) || 0, so = Number($('#tachSo').value) || 0, tong = sl * so, con = Number(f.dataset.con) || 0;
+  const b = $('#tachBu'), o = b && b.value ? b.selectedOptions[0] : null, conBu = o ? Number(o.dataset.con) || 0 : 0;
+  if (!o) return { tong, can: 0, loi: tong > con ? 'chỉ còn ' + fmt(con) : '' };
+  const can = tong - con;
+  return { tong, can, loi: can <= 0 ? 'đủ, không cần ghép' : can >= sl ? 'chỉ ghép tem cuối (tối đa ' + (Math.floor(con / sl) + 1) + ' tem)' : can > conBu ? 'tem ghép chỉ còn ' + fmt(conBu) : '' };
+}
 function tachTong() {
-  const f = document.querySelector('.tach-form'); if (!f) return;
-  const tong = (Number($('#tachSl').value) || 0) * (Number($('#tachSo').value) || 0), con = Number(f.dataset.con) || 0;
-  $('#tachSum').textContent = '= ' + fmt(tong) + ' / còn ' + fmt(con) + (tong > con ? ' — vượt' : '');
+  if (!document.querySelector('.tach-form')) return;
+  const k = tachKiem();
+  $('#tachSum').textContent = '= ' + fmt(k.tong) + (k.can > 0 && !k.loi ? ' · ghép ' + fmt(k.can) : '') + (k.loi ? ' — ' + k.loi : '');
 }
 // Mở màn In tem với các tem con (in A6 như tem Đúc).
 function inTemCon(tags) { window.open('intem.html?in=' + encodeURIComponent(tags.join(',')), '_blank'); }
@@ -1004,12 +1021,13 @@ document.addEventListener('click', async e => {
     const sl = Number($('#tachSl').value), so = Number($('#tachSo').value);
     if (!(sl > 0) || !Number.isInteger(sl)) { setFlash('bad', 'SL mỗi tem phải là số nguyên > 0.'); renderWs(); return; }
     if (!(so >= 1 && so <= 20) || !Number.isInteger(so)) { setFlash('bad', 'Số tem từ 1 đến 20.'); renderWs(); return; }
-    if (sl * so > Number(n.con)) { setFlash('bad', 'Tem ' + esc(n.tag_no) + ' chỉ còn ' + fmt(n.con) + ' pcs.'); renderWs(); return; }
+    const k = tachKiem(), bu = $('#tachBu') && $('#tachBu').value ? Number($('#tachBu').value) : null;
+    if (k.loi) { setFlash('bad', 'Tem ' + esc(n.tag_no) + ': ' + esc(k.loi) + '.'); renderWs(); return; }
     await chay(async () => {
-      const r = await goi('bavia_tach_tem', { p_id_tram: l.id_tram, p_id: Number(n.id), p_sl: sl, p_so_tem: so });
+      const r = await goi('bavia_tach_tem', { p_id_tram: l.id_tram, p_id: Number(n.id), p_sl: sl, p_so_tem: so, p_id_bu: bu });
       const ds = r.tem_con || [];
       tachOpen = null;
-      setFlash('ok', 'Đã tách <b>' + ds.map(esc).join(', ') + '</b> (' + fmt(r.so_luong) + ' pcs/tem) từ ' + esc(r.tem_me) +
+      setFlash('ok', 'Đã tách <b>' + ds.map(esc).join(', ') + '</b> (' + fmt(r.so_luong) + ' pcs/tem) từ ' + esc(r.tem_me) + (r.tem_bu ? ' + ' + fmt(r.lay_bu) + ' từ ' + esc(r.tem_bu) : '') +
         '. <button class="tiny xe" type="button" data-intach="' + esc(ds.join(',')) + '">In tem</button> Quét tem con ở Chuyển công đoạn → ' + esc(r.buoc_sau || '') + '.');
       await taiLai();
     });

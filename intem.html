@@ -1930,7 +1930,7 @@ function buildLabelSvg(d){
     {lbl:"Ca Bavia", val:d.bavia.ca},
     {lbl:"Người làm", val:d.bavia.nguoiLam},
     {lbl:"Người kiểm", val:d.bavia.nguoiKiem},
-    {lbl:"Đúc (truy xuất)", val:d.mayDuc + " · " + d.lotNo}
+    {lbl:d.bavia.ghep ? "Đúc (ghép)" : "Đúc (truy xuất)", val:d.bavia.ghep || (d.mayDuc + " · " + d.lotNo)}
   ];
   var logoX=4, logoY=4, logoW=8, logoH=7.2;
   var titleX=logoX+logoW+3, titleY=9.6, titleSize=6.2;
@@ -1954,7 +1954,8 @@ function buildLabelSvg(d){
     if (vLen > 26) valSize -= 0.5;
     if (vLen > 40) valSize -= 0.5;
     svg += '<text x="5" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+lblSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.lbl)+'</text>';
-    svg += '<text x="27" y="'+y.toFixed(2)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
+    var fit = vLen * valSize * 0.56 > (W - 31) ? ' textLength="'+(W - 31)+'" lengthAdjust="spacingAndGlyphs"' : ''; // T368: dòng dài (tem ghép) co vừa khung
+    svg += '<text x="27" y="'+y.toFixed(2)+'"'+fit+' font-family="Arial,Helvetica,sans-serif" font-size="'+valSize+'" font-weight="bold" fill="'+fg+'">'+svgEsc(r.val)+'</text>';
   });
   if (dark){
     // Viền trắng quanh QR khi nền tem là đen — giữ vùng yên tĩnh (quiet zone)
@@ -2022,6 +2023,17 @@ async function inTheoUrl(){
   // T367: tem con tách ở Bavia → in thông tin công đoạn Bavia (line, ca, người làm, người kiểm)
   const bv = await sb.from('bavia_thung').select('tag_tp,ten_line,ngay,ca,nguoi_lam,nguoi_kiem').eq('dang', 3).in('tag_tp', ds);
   var bvMap = {}; (bv.data || []).forEach(function(b){ bvMap[b.tag_tp] = b; });
+  // T368: tem ghép (phần lẻ tem A + phần bù tem B) → in nguồn Đúc của cả 2 tem
+  const gn = await sb.from('cd_tem_nguon').select('tag_no_moi,tag_no_nguon,so_luong_lay').in('tag_no_moi', ds);
+  var ghepMap = {}, ghepSrc = {};
+  if ((gn.data || []).length) {
+    const tc = await sb.from('duc_tem_tach').select('tag_no_con,tag_no_cha,so_luong_con').in('tag_no_con', ds);
+    var dsNguon = (gn.data || []).map(function(x){ return x.tag_no_nguon; });
+    const tn = await sb.from('duc_tem').select('tag_no,may_duc_chi_thi,lot,ngay').in('tag_no', dsNguon);
+    (tn.data || []).forEach(function(t){ ghepSrc[t.tag_no] = t; });
+    (tc.data || []).forEach(function(x){ ghepMap[x.tag_no_con] = { a: x.so_luong_con, b: [] }; });
+    (gn.data || []).forEach(function(x){ (ghepMap[x.tag_no_moi] = ghepMap[x.tag_no_moi] || { a: null, b: [] }).b.push(x); });
+  }
   function ngayVN(s){ var p = String(s || '').split('-'); return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(s || ''); }
   var pages = rows.map(function(r){
     var ngay = ngayVN(r.ngay);
@@ -2030,6 +2042,10 @@ async function inTheoUrl(){
       mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || '', ghiChu: r.ghi_chu || '', loaiSP: loaiSpFromTagNo(r.tag_no) };
     var b = bvMap[r.tag_no];
     if (b) d.bavia = { line: b.ten_line, ca: b.ca + ' ' + ngayVN(b.ngay), nguoiLam: b.nguoi_lam || '', nguoiKiem: b.nguoi_kiem || '' };
+    var gp = ghepMap[r.tag_no];
+    if (b && gp && gp.b.length) d.bavia.ghep = [(d.mayDuc || '') + ' · ' + d.lotNo + ' (' + gp.a + ')'].concat(gp.b.map(function(x){
+      var s = ghepSrc[x.tag_no_nguon] || {}; return (s.may_duc_chi_thi || '') + ' · ' + (s.lot || ngayVN(s.ngay)) + ' (' + x.so_luong_lay + ')';
+    })).join(' + ');
     return '<div class="pg" style="background:' + (d.loaiSP === 'phattrien' ? '#000' : '#fff') + '">' + buildLabelSvg(d) + '</div>';
   }).join('');
   var css = '@page{size:105mm 148mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{background:#fff}'
