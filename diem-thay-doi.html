@@ -116,7 +116,7 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 <script src="shared/supabase-client.js"></script>
 <script src="shared/navbar.js?v=T352"></script>
 <script src="shared/qc02-view.js"></script>
-<script src="shared/thay-doi.js?v=T351"></script>
+<script src="shared/thay-doi.js?v=T354"></script>
 <script>
 const P = new URLSearchParams(location.search);
 let all = [], openId = null, mot = null, quyen = { ghi: false, duyet: [] };
@@ -181,7 +181,7 @@ function locDs(){
     if (tt === 'khan' && !p.khan) return false;
     if (tt && tt !== 'mo' && tt !== 'khan' && p.trang_thai !== tt) return false;
     if (q) {
-      const s = [ThayDoi.tomTat(p.chi_tiet), (p.chi_tiet || []).map(e => e.ma).join(' '), p.ma_sp, p.so_khuon, p.nguoi_ghi, p.ly_do, p.ghi_chu, 'TD-' + p.id].join(' ').toLowerCase();
+      const s = [ThayDoi.tomTat(p.chi_tiet), (p.chi_tiet || []).map(e => e.ma).join(' '), p.ma_sp, p.so_khuon, p.nguoi_ghi, p.ly_do, p.ghi_chu, 'TD-' + p.id, p.ma_so].join(' ').toLowerCase();
       if (!s.includes(q)) return false;
     }
     return true;
@@ -196,7 +196,7 @@ function chiTietHtml(p){
   const duyet = (p.da_duyet || []).map(d => '<li>' + (d.dong_y ? '✅ ' : '⛔ ') + esc(ThayDoi.DUYET[d.nhom] || d.nhom) + ' — ' + esc(d.nguoi || '') + ' ' + esc(fmtTs(d.luc)) +
     (d.ghi_chu ? ': ' + esc(d.ghi_chu) : '') + '</li>').join('');
   const cho = dangChoDuyet(p) ? choDuyet(p).map(g => '<li>⏳ Chờ ' + esc(ThayDoi.DUYET[g] || g) + '</li>').join('') : '';
-  const xn = (p.xac_nhan_kq || []).map(x => '<li class="' + (x.dat ? 'dat' : 'kdat') + '">' + (x.dat ? 'Đạt' : 'Không đạt') + ' — ' + esc(String(x.muc || '').replace(/^Thay đổi TD-\d+: /, '')) + '</li>').join('');
+  const xn = (p.xac_nhan_kq || []).map(x => '<li class="' + (x.dat ? 'dat' : 'kdat') + '">' + (x.dat ? 'Đạt' : 'Không đạt') + ' — ' + esc(String(x.muc || '').replace(/^Thay đổi TD-[\w-]+: /, '')) + '</li>').join('');
   const xnCan = [...new Set((p.chi_tiet || []).flatMap(e => e.xac_nhan || []))];
   const anh = (p.anh_urls || []).map(u => '<img src="' + esc(u) + '" alt="" loading="lazy" data-anh="' + esc(u) + '">').join('');
   const nut = toiDuyet(p)
@@ -204,7 +204,7 @@ function chiTietHtml(p){
         '<button type="button" class="btn btn-do" data-khong="' + p.id + '">Không duyệt</button><button type="button" class="btn btn-ok" data-duyet="' + p.id + '">Duyệt</button></div>'
     : '';
   return nut + '<div class="ct-grid" style="margin-top:' + (nut ? '10px' : '0') + '">' +
-    '<div><h4>TD-' + p.id + ' · ' + esc(p.ma_may) + ' · ' + esc(p.ma_sp || '') + (p.so_khuon ? ' · ' + esc(p.so_khuon) : '') + '</h4><table>' + rows + '</table></div>' +
+    '<div><h4>' + esc(ThayDoi.maSo(p)) + ' · ' + esc(p.ma_may) + ' · ' + esc(p.ma_sp || '') + (p.so_khuon ? ' · ' + esc(p.so_khuon) : '') + '</h4><table>' + rows + '</table></div>' +
     '<div><h4>Thông tin</h4><ul>' +
       '<li>Ghi: ' + esc(fmtTs(p.thoi_diem_ghi)) + ' · ' + esc(p.nguoi_ghi || '') + ' · ' + esc(p.ca || '') + '</li>' +
       '<li>Lý do: ' + esc(p.ly_do || '') + (p.ma_loi ? ' · ' + esc(p.ma_loi) : '') + '</li>' +
@@ -227,7 +227,7 @@ function ve(){
   if (!ds.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">Không có phiếu thay đổi nào.</td></tr>'; return; }
   tb.innerHTML = ds.map(p =>
     '<tr class="row' + (openId === p.id ? ' open' : '') + '" data-id="' + p.id + '">' +
-      '<td class="nw">' + esc(fmtTs(p.thoi_diem_ghi)) + '<small>TD-' + p.id + '</small></td>' +
+      '<td class="nw">' + esc(fmtTs(p.thoi_diem_ghi)) + '<small>' + esc(ThayDoi.maSo(p)) + '</small></td>' +
       '<td class="nw"><b>' + esc(p.ma_may) + '</b></td>' +
       '<td class="nw">' + esc(p.ma_sp || '') + (p.so_khuon ? '<small>' + esc(p.so_khuon) + '</small>' : '') + '</td>' +
       '<td>' + esc(ThayDoi.tomTat(p.chi_tiet)) + '</td>' +
@@ -243,15 +243,15 @@ function veMot(){
   const p = all.find(x => x.id === mot) ;
   if (!p) { c.hidden = true; return; }
   c.hidden = false;
-  c.innerHTML = '<div class="card-title">Phiếu TD-' + p.id + ' ' + ttHtml(p) + '</div>' + chiTietHtml(p);
+  c.innerHTML = '<div class="card-title">Phiếu ' + esc(ThayDoi.maSo(p)) + ' ' + ttHtml(p) + '</div>' + chiTietHtml(p);
 }
 
 async function duyet(id, dongY){
   const p = all.find(x => x.id === id);
-  const nd = (p ? p.ma_may + ' · ' + ThayDoi.tomTat(p.chi_tiet) : 'TD-' + id);
+  const nd = (p ? p.ma_may + ' · ' + ThayDoi.tomTat(p.chi_tiet) : ThayDoi.maSo({ id }));
   const gc = await hoiGhiChuDuyet(nd, dongY
-    ? { tieuDe: 'Duyệt thay đổi TD-' + id, nutOk: 'Duyệt' }
-    : { tieuDe: 'Không duyệt TD-' + id, nutOk: 'Không duyệt', nguyHiem: true, batBuoc: true, goiY: 'Lý do không duyệt (bắt buộc)' });
+    ? { tieuDe: 'Duyệt ' + ThayDoi.maSo(p || { id }), nutOk: 'Duyệt' }
+    : { tieuDe: 'Không duyệt ' + ThayDoi.maSo(p || { id }), nutOk: 'Không duyệt', nguyHiem: true, batBuoc: true, goiY: 'Lý do không duyệt (bắt buộc)' });
   if (gc == null) return;
   const { data, error } = await sb.rpc('duc_td_duyet', { p_id: id, p_dong_y: dongY, p_ghi_chu: gc || null });
   if (error) return showMsg('⛔ ' + error.message, 'err');

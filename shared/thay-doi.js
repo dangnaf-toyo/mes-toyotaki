@@ -123,9 +123,10 @@
     } catch (e) { quyen = { ghi: false, duyet: [], huy_moi: false }; }
     return quyen;
   }
+  const maSo = p => (p && p.ma_so) || ('TD-' + (p && p.id));
   async function taiMo() {
     const { data, error } = await sb.from('duc_thay_doi')
-      .select('id,ma_may,ma_sp,id_dong,trang_thai,chi_tiet,khan,can_duyet,da_duyet,ket_qua_duyet,thoi_diem_ghi,nguoi_ghi,nguoi_ghi_id,ly_do,ca')
+      .select('id,ma_so,ma_may,ma_sp,id_dong,trang_thai,chi_tiet,khan,can_duyet,da_duyet,ket_qua_duyet,thoi_diem_ghi,nguoi_ghi,nguoi_ghi_id,ly_do,ca')
       .in('trang_thai', MO).order('id').limit(500);
     if (error) { console.warn('duc_thay_doi:', error.message); return false; }
     const cu = JSON.stringify(mo.map(p => [p.id, p.trang_thai]));
@@ -419,9 +420,9 @@
         if (error) throw new Error(loiRpc(error));
         d.close();
         const tt = data && data.trang_thai;
-        bao(tt === 'cho_duyet' ? '⏳ Đã gửi duyệt TD-' + data.id + ' — chỉnh máy sau khi được duyệt.'
-          : tt === 'cho_ipqc' ? '✓ Đã ghi TD-' + data.id + (data.khan ? ' (khẩn)' : '') + ' — IPQC sẽ kiểm sau thay đổi.'
-          : '✓ Đã ghi nhận TD-' + data.id + '.');
+        bao(tt === 'cho_duyet' ? '⏳ Đã gửi duyệt ' + maSo(data) + ' — chỉnh máy sau khi được duyệt.'
+          : tt === 'cho_ipqc' ? '✓ Đã ghi ' + maSo(data) + (data.khan ? ' (khẩn)' : '') + ' — IPQC sẽ kiểm sau thay đổi.'
+          : '✓ Đã ghi nhận ' + maSo(data) + '.');
         await lamMoi(true);
       } catch (e) {
         bao('⛔ ' + e.message, true);
@@ -455,7 +456,7 @@
     const coTheHuy = quyen && (quyen.huy_moi || (p.nguoi_ghi_id && quyen.uid === p.nguoi_ghi_id));
     const choDuyet = (p.can_duyet || []).filter(g => !(p.da_duyet || []).some(x => x.nhom === g && x.dong_y));
     const duocDuyet = quyen && (p.trang_thai === 'cho_duyet' || (p.khan && !p.ket_qua_duyet)) && choDuyet.some(g => (quyen.duyet || []).includes(g));
-    return '<div class="the"><div class="h"><span class="id">TD-' + p.id + '</span><span class="td-b ' + p.trang_thai + '">' + TT[p.trang_thai] + '</span>' +
+    return '<div class="the"><div class="h"><span class="id">' + esc(maSo(p)) + '</span><span class="td-b ' + p.trang_thai + '">' + TT[p.trang_thai] + '</span>' +
         (p.khan ? '<span class="td-b cho_ipqc">⚡ Khẩn' + (p.ket_qua_duyet ? '' : ' · chờ duyệt bù') + '</span>' : '') + '</div>' +
       '<div>' + esc(tomTat(p.chi_tiet)) + '</div>' +
       '<div class="m">' + esc(gio(p.thoi_diem_ghi)) + ' · ' + esc(p.nguoi_ghi || '') + ' · ' + esc(p.ly_do || '') +
@@ -495,12 +496,12 @@
         await lamMoi(true); ve();
       } else if (bh) {
         const lyDo = window.hoiGhiChuDuyet
-          ? await hoiGhiChuDuyet('Huỷ phiếu TD-' + bh.dataset.huy + ' (ghi nhầm / không làm nữa).', { tieuDe: 'Huỷ phiếu', nutOk: 'Huỷ phiếu', nguyHiem: true, batBuoc: true, goiY: 'Lý do huỷ (bắt buộc)' })
+          ? await hoiGhiChuDuyet('Huỷ phiếu ' + maSo(mo.find(x => x.id === Number(bh.dataset.huy)) || { id: bh.dataset.huy }) + ' (ghi nhầm / không làm nữa).', { tieuDe: 'Huỷ phiếu', nutOk: 'Huỷ phiếu', nguyHiem: true, batBuoc: true, goiY: 'Lý do huỷ (bắt buộc)' })
           : prompt('Lý do huỷ phiếu:');
         if (!lyDo) return;
         const { error } = await sb.rpc('duc_td_huy', { p_id: Number(bh.dataset.huy), p_ly_do: lyDo });
         if (error) return bao('⛔ ' + loiRpc(error), true);
-        bao('Đã huỷ phiếu TD-' + bh.dataset.huy + '.');
+        bao('Đã huỷ phiếu.');
         await lamMoi(true); ve();
       }
     });
@@ -513,7 +514,7 @@
     ip = null;
     box.classList.add('hidden'); box.innerHTML = '';
     if (!idCheckpoint || String(idCheckpoint).startsWith('virtual:')) return;
-    const { data, error } = await sb.from('duc_thay_doi').select('id,chi_tiet,ly_do,nguoi_ghi,thoi_diem_ap_dung,khan')
+    const { data, error } = await sb.from('duc_thay_doi').select('id,ma_so,chi_tiet,ly_do,nguoi_ghi,thoi_diem_ap_dung,khan')
       .eq('id_checkpoint', idCheckpoint).eq('trang_thai', 'cho_ipqc').order('id');
     if (error || !data || !data.length) return;
     ip = {
@@ -522,7 +523,7 @@
         let muc = [];
         (p.chi_tiet || []).forEach(e => (e.xac_nhan || []).forEach(t => { if (!muc.some(x => x.t === t)) muc.push({ t, dat: null }); }));
         if (!muc.length) muc = [{ t: 'Kiểm SP sau thay đổi', dat: null }];
-        return { id: p.id, tom: tomTat(p.chi_tiet), meta: [gio(p.thoi_diem_ap_dung), p.nguoi_ghi, p.ly_do].filter(Boolean).join(' · '), khan: p.khan, muc };
+        return { id: p.id, ma: maSo(p), tom: tomTat(p.chi_tiet), meta: [gio(p.thoi_diem_ap_dung), p.nguoi_ghi, p.ly_do].filter(Boolean).join(' · '), khan: p.khan, muc };
       }),
     };
     box.addEventListener('click', ipqcClick);
@@ -540,7 +541,7 @@
     if (!ip) return;
     ip.box.innerHTML = '<div class="ii-title">🔄 Thay đổi — xác nhận từng nội dung</div>' +
       '<div class="td-ipqc">' + ip.ds.map((p, i) =>
-        '<div class="p"><div class="tt"><b>TD-' + p.id + (p.khan ? ' ⚡ khẩn' : '') + ':</b> ' + esc(p.tom) + (p.meta ? '<br><span style="color:#64748B">' + esc(p.meta) + '</span>' : '') + '</div>' +
+        '<div class="p"><div class="tt"><b>' + esc(p.ma) + (p.khan ? ' ⚡ khẩn' : '') + ':</b> ' + esc(p.tom) + (p.meta ? '<br><span style="color:#64748B">' + esc(p.meta) + '</span>' : '') + '</div>' +
         p.muc.map((m, j) => '<div class="xn' + (ip.need && m.dat == null ? ' need' : '') + '"><span>' + esc(m.t) + '</span>' +
           '<button type="button" class="d' + (m.dat === true ? ' on' : '') + '" data-p="' + i + '" data-m="' + j + '" data-v="1">Đạt</button>' +
           '<button type="button" class="k' + (m.dat === false ? ' on' : '') + '" data-p="' + i + '" data-m="' + j + '" data-v="0">Không đạt</button></div>').join('') +
@@ -558,12 +559,12 @@
   function ipqcChecklist() {
     if (!ip) return [];
     const out = [];
-    ip.ds.forEach(p => p.muc.forEach(m => out.push({ code: 'thay_doi', td_id: String(p.id), muc: 'Thay đổi TD-' + p.id + ': ' + m.t, dat: m.dat === true })));
+    ip.ds.forEach(p => p.muc.forEach(m => out.push({ code: 'thay_doi', td_id: String(p.id), muc: 'Thay đổi ' + p.ma + ': ' + m.t, dat: m.dat === true })));
     return out;
   }
 
   window.ThayDoi = {
-    batDau, badge, nut, moGhi, xemMay, lamMoi: () => lamMoi(true), tomTat, taiMau, taiQuyen,
+    batDau, badge, nut, moGhi, xemMay, lamMoi: () => lamMoi(true), tomTat, maSo, taiMau, taiQuyen,
     ipqcMount, ipqcKiemTra, ipqcChecklist,
     NHOM, NHOM_DAY, DUYET, LY_DO, TT, MO,
     get mo() { return mo; }, get quyen() { return quyen; },
