@@ -363,7 +363,7 @@ function themDong(d){
     '<td><input type="hidden" class="c-ma"><button type="button" class="in pk-btn"><span class="pk-v"></span><span class="pk-car">▼</span></button></td>' +
     '<td class="c-ten tw"></td><td class="num c-ton"></td>' +
     '<td><input type="number" class="in c-sl" min="0" step="0.1" inputmode="decimal"></td>' +
-    '<td><select class="in c-dvt"><option>kg</option><option>pcs</option></select></td>' +
+    '<td><input type="hidden" class="c-dvt"><span class="c-dvt-t"></span></td>' +
     '<td><input type="text" class="in c-md" autocomplete="off"></td>' +
     '<td class="stt"><button type="button" class="btn btn-outline btn-sm c-xoa" title="Xoá dòng">✕</button></td>';
   $('tbForm').appendChild(tr);
@@ -372,11 +372,11 @@ function themDong(d){
     const n = NVL.find(x => x.ma_nvl === sel.value);
     nhan.textContent = sel.value || '— Chọn —'; nhan.classList.toggle('trong', !sel.value);
     tr.querySelector('.c-ten').textContent = n ? n.ten_nvl : '';
+    const dv = sel.value ? (DVT[sel.value] || 'kg') : 'kg';   // T362: ĐVT cố định theo danh mục NVL
+    tr.querySelector('.c-dvt').value = dv; tr.querySelector('.c-dvt-t').textContent = sel.value ? dv : '';
     tr.querySelector('.c-ton').textContent = sel.value && tr.querySelector('.c-dvt').value === 'kg' ? kg(TON[sel.value]) : '';
   };
-  tr.querySelector('.c-dvt').onchange = tr._doiMa;
   tr.querySelector('.pk-btn').onclick = () => pkTr === tr ? dongPicker() : moPicker(tr);
-  tr.querySelector('.c-dvt').value = d.dvt || 'kg';
   sel.value = d.ma_nvl || ''; tr._doiMa();
   tr.querySelector('.c-sl').value = d.sl_de_nghi ?? '';
   tr.querySelector('.c-md').value = d.muc_dich || '';
@@ -410,7 +410,7 @@ function chonPicker(i){
   const tr = pkTr, n = pkDs[i]; dongPicker();
   if (!tr || !n) return;
   tr.querySelector('.c-ma').value = n.ma_nvl;
-  tr.querySelector('.c-dvt').value = DVT[n.ma_nvl] || 'kg'; tr._doiMa();
+  tr._doiMa();
   tr.querySelector('.c-sl').focus();
 }
 function ganPicker(){
