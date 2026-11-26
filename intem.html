@@ -1919,6 +1919,19 @@ function buildLabelSvg(d){
     {lbl:"Máy đúc", val:d.mayDuc},
     {lbl:"Ghi chú", val:d.ghiChu}
   ];
+  // T367: tem con tách ở Bavia — trạng thái Đã làm Bavia, thông tin của công đoạn Bavia
+  if (d.bavia) rows = [
+    {lbl:"Mã sản phẩm", val:d.maSP, big:true},
+    {lbl:"Tên sản phẩm", val:d.tenSP, big:true},
+    {lbl:"Tag No", val:d.tagNo},
+    {lbl:"Số lượng", val:d.soLuong},
+    {lbl:"Trạng thái", val:"Đã làm Bavia"},
+    {lbl:"Line Bavia", val:d.bavia.line},
+    {lbl:"Ca Bavia", val:d.bavia.ca},
+    {lbl:"Người làm", val:d.bavia.nguoiLam},
+    {lbl:"Người kiểm", val:d.bavia.nguoiKiem},
+    {lbl:"Đúc (truy xuất)", val:d.mayDuc + " · " + d.lotNo}
+  ];
   var logoX=4, logoY=4, logoW=8, logoH=7.2;
   var titleX=logoX+logoW+3, titleY=9.6, titleSize=6.2;
   var dividerY=13.5;
@@ -1931,7 +1944,7 @@ function buildLabelSvg(d){
   svg += '<rect x="0" y="0" width="'+PW+'" height="'+PH+'" fill="'+bg+'"/>';
   svg += '<g transform="translate('+offX.toFixed(3)+','+offY.toFixed(3)+') scale('+scale.toFixed(4)+')">';
   svg += '<image x="'+logoX+'" y="'+logoY+'" width="'+logoW+'" height="'+logoH+'" href="'+logoUri+'"/>';
-  svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="'+fg+'">TEM SẢN PHẨM'+(dark ? ' — ĐANG PHÁT TRIỂN' : '')+'</text>';
+  svg += '<text x="'+titleX+'" y="'+titleY+'" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="'+titleSize+'" font-weight="bold" fill="'+fg+'">'+(d.bavia ? 'TEM BAVIA' : 'TEM SẢN PHẨM')+(dark ? ' — ĐANG PHÁT TRIỂN' : '')+'</text>';
   svg += '<line x1="4" y1="'+dividerY+'" x2="'+(W-4)+'" y2="'+dividerY+'" stroke="'+fg+'" stroke-width="0.3"/>';
   rows.forEach(function(r, i){
     var y = rowStartY + i*rowH;
@@ -2006,12 +2019,17 @@ async function inTheoUrl(){
   if (error) { err('Lỗi tải tem: ' + error.message); return true; }
   var rows = ds.map(function(t){ return (data || []).find(function(r){ return r.tag_no === t; }); }).filter(Boolean);
   if (!rows.length) { err('Không tìm thấy tem ' + ds.join(', ')); return true; }
+  // T367: tem con tách ở Bavia → in thông tin công đoạn Bavia (line, ca, người làm, người kiểm)
+  const bv = await sb.from('bavia_thung').select('tag_tp,ten_line,ngay,ca,nguoi_lam,nguoi_kiem').eq('dang', 3).in('tag_tp', ds);
+  var bvMap = {}; (bv.data || []).forEach(function(b){ bvMap[b.tag_tp] = b; });
+  function ngayVN(s){ var p = String(s || '').split('-'); return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(s || ''); }
   var pages = rows.map(function(r){
-    var p = String(r.ngay || '').split('-');
-    var ngay = p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(r.ngay || '');
+    var ngay = ngayVN(r.ngay);
     var d = { ok: true, tagNo: r.tag_no, qr: r.tag_no, ngay: ngay, tenSP: r.ten_sp, maSP: r.ma_sp,
       soLuong: r.so_luong, lotNo: r.lot || ngay, soKhuon: r.so_khuon || '', nguyenLieu: r.nguyen_lieu || '',
       mayDuc: r.may_duc_chi_thi, nguoiTT: r.nguoi_tt || '', ghiChu: r.ghi_chu || '', loaiSP: loaiSpFromTagNo(r.tag_no) };
+    var b = bvMap[r.tag_no];
+    if (b) d.bavia = { line: b.ten_line, ca: b.ca + ' ' + ngayVN(b.ngay), nguoiLam: b.nguoi_lam || '', nguoiKiem: b.nguoi_kiem || '' };
     return '<div class="pg" style="background:' + (d.loaiSP === 'phattrien' ? '#000' : '#fff') + '">' + buildLabelSvg(d) + '</div>';
   }).join('');
   var css = '@page{size:105mm 148mm;margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{background:#fff}'
