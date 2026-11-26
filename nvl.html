@@ -335,7 +335,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
   <div id="qr-input" class="tab-content">
     <div class="section">
       <div class="section-title">Quét QR nhập/xuất pallet <button class="info-btn" type="button" data-info="iQuyTrinh" title="Quy trình">ⓘ</button></div>
-      <div class="info-txt" id="iQuyTrinh" hidden>1. Chọn Nhập/Xuất → 2. Quét QR liên tiếp các pallet → 3. Bấm "Ghi nhận tất cả".<br><b>FIFO:</b> khi xuất, hệ thống cảnh báo nếu còn pallet cũ hơn cùng mã chưa xuất.</div>
+      <div class="info-txt" id="iQuyTrinh" hidden>1. Chọn Nhập/Xuất → 2. Quét QR liên tiếp các pallet → 3. Bấm "Ghi nhận tất cả".<br><b>FIFO:</b> khi xuất, hệ thống cảnh báo nếu còn pallet cũ hơn cùng mã chưa xuất.<br><b>Tem NCC</b> (vd Astemo): quét thẳng QR của NCC, không cần in tem — lần Nhập đầu tự tạo tem theo mã thùng (T…), lấy số lượng + lot trên tem. Mã hàng trên tem phải khai ở Danh mục → Mã tem NCC.</div>
 
       <div class="form-row">
         <div class="form-group">
@@ -572,11 +572,13 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
       <div class="form-row">
         <div class="form-group"><label>Mã NVL</label><div class="gy-row"><input type="text" autocomplete="off" id="newMaCode" placeholder="VD: K-NHN-12-001"><button type="button" class="gy-btn" id="newMaGoiY" title="Nhập Tên NVL rồi bấm">Gợi ý</button></div><div class="gy-note" id="newMaNote" hidden></div></div>
         <div class="form-group"><label>Tên NVL</label><input type="text" autocomplete="off" id="newMaName" placeholder="VD: Nhôm ADC12 Daikin"></div>
+        <div class="form-group"><label>Mã tem NCC <button class="info-btn" type="button" data-info="iMaTemNcc" title="Là gì">ⓘ</button></label><input type="text" autocomplete="off" id="newMaTemNcc" placeholder="VD: 008-D39-121-2"></div>
       </div>
+      <div class="info-txt" id="iMaTemNcc" hidden>Mã hàng in trên tem QR của nhà cung cấp (dòng Part number). Khai thì quét thẳng tem NCC để nhập/xuất, <b>không cần in tem</b>. Để trống nếu NVL không có tem QR của NCC.</div>
       <div class="btn-group" style="margin-top: 0;"><button class="btn-primary" id="btnUpsertMaterial">Thêm / cập nhật</button></div>
       <div class="table-scroll">
         <table class="data-table">
-          <thead><tr><th>Mã NVL</th><th>Tên NVL</th><th>Tồn Hiện Tại (kg)</th><th>Hành Động</th></tr></thead>
+          <thead><tr><th>Mã NVL</th><th>Tên NVL</th><th>Mã tem NCC</th><th>Tồn Hiện Tại (kg)</th><th>Hành Động</th></tr></thead>
           <tbody id="materialsTable"></tbody>
         </table>
       </div>
@@ -701,7 +703,7 @@ async function loadAllData() {
   setSyncStatus('loading', '⏳ Đang đồng bộ...');
   try {
     const [mat, op, plan, tx, st, cur] = await Promise.all([
-      sb.from('nvl_materials').select('ma_nvl,ten_nvl').order('ma_nvl'),
+      sb.from('nvl_materials').select('ma_nvl,ten_nvl,ma_tem_ncc').order('ma_nvl'),
       sb.from('nvl_ton_dau_ky').select('*'),
       sbTaiHet(() => sb.from('nvl_ke_hoach_ngay').select('*').order('ngay').order('ma_nvl')),
       sb.from('nvl_giao_dich').select('*').order('ngay', { ascending: false }).order('sheet_row', { ascending: false }).limit(TX_FETCH_LIMIT),
@@ -956,7 +958,26 @@ let currentPlanWarnings = [];
 
 function focusQRInput() { $('qrScanInput').focus(); }
 
+// T353: QR tem nhà cung cấp (Astemo): ";T2606300002826;1;008-D39-121-2;;PCS;700.00;20260706;0001-01-01;0"
+// = ;mã thùng;?;mã hàng NCC;;đơn vị;số lượng;lot;ngày đóng;? — mã thùng dùng làm Tag No.
+function parseNccQR(rawText) {
+  const p = String(rawText).split(';').map(s => s.trim());
+  if (p.length < 8 || !/^T\d{6,}$/i.test(p[1]) || !p[3]) return null;
+  const dv = (p[5] || '').toLowerCase();
+  return { tagNo: p[1].toUpperCase(), partNo: p[3].toUpperCase(), donVi: (dv === 'kg' ? 'kg' : 'pcs'), soLuong: p[6], lot: p[7] || '' };
+}
+function nccMaterial(partNo) {
+  const k = String(partNo || '').trim().toUpperCase();
+  return DB.materials.find(m => m.ma_tem_ncc && m.ma_tem_ncc.trim().toUpperCase() === k) || null;
+}
+
 function parseQRContent(rawText) {
+  const ncc = parseNccQR(rawText);
+  if (ncc) {
+    const m = nccMaterial(ncc.partNo);
+    return { tagNo: ncc.tagNo, material: m ? m.ma_nvl : ncc.partNo, tenNVL: m ? m.ten_nvl : '', ngayNhap: '',
+             soLuong: num(ncc.soLuong), donVi: ncc.donVi, fromQR: true, ncc: ncc };
+  }
   // T270: tem mới QR = Tag No; tem cũ TYK-… QR dạng Tag>Mã>Tên>Ngày>SL>ĐV vẫn đọc được.
   const parts = String(rawText).split('>').map(p => p.trim());
   parts[0] = parts[0].toUpperCase();
@@ -978,7 +999,7 @@ function addPalletToCart(rawText, fromCamera) {
   playBeep(1000, 80);
   scanCart.push(parsed.fromQR
     ? { tagNo: parsed.tagNo, material: parsed.material, tenNVL: parsed.tenNVL, ngayNhap: parsed.ngayNhap,
-        soLuong: parsed.soLuong, donVi: parsed.donVi, validationStatus: 'pending' }
+        soLuong: parsed.soLuong, donVi: parsed.donVi, ncc: parsed.ncc || null, validationStatus: 'pending' }
     : { tagNo: parsed.tagNo, material: '?', tenNVL: '(đang tải...)', ngayNhap: '?',
         soLuong: 0, donVi: '?', validationStatus: 'pending' });
   renderCart();
@@ -1012,6 +1033,23 @@ async function validatePalletAsync(cartIdx) {
 
     if (!scanCart[cartIdx] || scanCart[cartIdx].tagNo !== item.tagNo) return; // đã bị xoá khỏi giỏ
 
+    // T353: tem NCC chưa có trong hệ thống — NHẬP lần đầu sẽ tự tạo tem theo mã thùng NCC
+    if (!temRes.error && !temRes.data && item.ncc) {
+      const m = nccMaterial(item.ncc.partNo);
+      if (txType !== 'IN') {
+        scanCart[cartIdx].validationStatus = 'error';
+        scanCart[cartIdx].errorMsg = 'Tem NCC chưa nhập kho — quét ở chế độ Nhập trước';
+      } else if (!m) {
+        scanCart[cartIdx].validationStatus = 'error';
+        scanCart[cartIdx].errorMsg = 'Mã NCC ' + item.ncc.partNo + ' chưa gán mã NVL (Danh mục → Mã tem NCC)';
+      } else if (!(num(item.ncc.soLuong) > 0)) {
+        scanCart[cartIdx].validationStatus = 'error';
+        scanCart[cartIdx].errorMsg = 'Số lượng trên tem không hợp lệ';
+      } else {
+        Object.assign(scanCart[cartIdx], { material: m.ma_nvl, tenNVL: m.ten_nvl || m.ma_nvl, ngayNhap: todayISO(), validationStatus: 'ok' });
+      }
+      renderCart(); return;
+    }
     if (temRes.error || !temRes.data) {
       scanCart[cartIdx].validationStatus = 'error';
       scanCart[cartIdx].errorMsg = temRes.error ? temRes.error.message : ('Không tìm thấy tem: ' + item.tagNo);
@@ -1238,7 +1276,7 @@ async function submitCartTransaction() {
   try {
     const res = await sb.rpc('nvl_process_multi_transaction', {
       p_loai: txType,
-      p_items: validItems.map(x => ({ tagNo: x.tagNo, ghiChu: '' })),
+      p_items: validItems.map(x => x.ncc ? { tagNo: x.tagNo, ghiChu: '', ncc: x.ncc } : { tagNo: x.tagNo, ghiChu: '' }),
       p_user: user,
       p_bo_phan: boPhan || null,
       p_phieu_cap: phieuCap ? phieuCap.id : null
@@ -1565,7 +1603,7 @@ function renderMaterialsTable() {
   const tbody = $('materialsTable');
   tbody.innerHTML = '';
   if (!DB.materials.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--gray);">Chưa có mã NVL nào</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray);">Chưa có mã NVL nào</td></tr>';
     return;
   }
   DB.materials.forEach(m => {
@@ -1574,8 +1612,9 @@ function renderMaterialsTable() {
     row.innerHTML =
       '<td><strong>' + esc(m.ma_nvl) + '</strong></td>' +
       '<td>' + esc(m.ten_nvl || '') + '</td>' +
+      '<td style="font-family:monospace;">' + esc(m.ma_tem_ncc || '') + '</td>' +
       '<td>' + (hasOpening ? fmtKg(getCurrentStock(m.ma_nvl)) : '<span style="color:var(--danger);font-size:.8rem;">chưa khai tồn đầu kỳ</span>') + '</td>' +
-      '<td><button class="btn-secondary" style="padding:.35rem .7rem;font-size:.8rem;" onclick="editMaterial(\'' + esc(m.ma_nvl) + '\')">Sửa tên</button></td>';
+      '<td><button class="btn-secondary" style="padding:.35rem .7rem;font-size:.8rem;" onclick="editMaterial(\'' + esc(m.ma_nvl) + '\')">Sửa</button></td>';
     tbody.appendChild(row);
   });
 }
@@ -1583,6 +1622,7 @@ function editMaterial(code) {
   const m = DB.materials.find(x => x.ma_nvl === code);
   $('newMaCode').value = code;
   $('newMaName').value = m ? (m.ten_nvl || '') : '';
+  $('newMaTemNcc').value = m ? (m.ma_tem_ncc || '') : '';
   $('newMaName').focus();
   nvlKiemMa();
 }
@@ -1607,9 +1647,11 @@ async function upsertMaterial() {
   const ma = $('newMaCode').value.trim();
   const ten = $('newMaName').value.trim();
   if (!ma) { alert('Nhập mã NVL'); return; }
+  const temNcc = $('newMaTemNcc').value.trim().toUpperCase();
   const exists = DB.materials.find(x => x.ma_nvl === ma);
-  const verb = exists ? 'Cập nhật tên mã' : 'THÊM MÃ MỚI';
-  if (!confirm(verb + ' "' + ma + '" → "' + (ten || ma) + '"?')) return;
+  const doiNcc = temNcc !== String((exists && exists.ma_tem_ncc) || '').toUpperCase();
+  const verb = exists ? 'Cập nhật mã' : 'THÊM MÃ MỚI';
+  if (!confirm(verb + ' "' + ma + '" → "' + (ten || ma) + '"' + (doiNcc ? '\nMã tem NCC: ' + (temNcc || '(bỏ trống)') : '') + '?')) return;
   const user = await requireLoginOrRedirect();
   if (user === null) return;
   showLoading(true);
@@ -1617,7 +1659,12 @@ async function upsertMaterial() {
     const res = await sb.rpc('nvl_upsert_material', { p_ma_nvl: ma, p_ten_nvl: ten || ma, p_user: user });
     const err = rpcError(res);
     if (err) throw new Error(err);
-    $('newMaCode').value = ''; $('newMaName').value = ''; GoiYMa.hien($('newMaNote'), null);
+    if (doiNcc) {
+      const r2 = await sb.rpc('nvl_set_ma_tem_ncc', { p_ma_nvl: ma, p_ma_tem_ncc: temNcc });
+      const e2 = rpcError(r2);
+      if (e2) throw new Error(e2);
+    }
+    $('newMaCode').value = ''; $('newMaName').value = ''; $('newMaTemNcc').value = ''; GoiYMa.hien($('newMaNote'), null);
     await loadAllData();
     alert('✓ Đã lưu mã ' + ma + (exists ? '' : '.\n\nNhớ vào Thiết lập → Tồn đầu kỳ khai tồn cho mã này.'));
   } catch (e) { alert('Lỗi: ' + e.message); }
