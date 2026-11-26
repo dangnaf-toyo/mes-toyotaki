@@ -74,6 +74,10 @@ function backend() {
           filters.push((r) => r[k] === v);
           return q;
         },
+        overlaps(k, values) {
+          filters.push((r) => Array.isArray(r[k]) && r[k].some((x) => values.includes(x)));
+          return q;
+        },
         gte(k, v) {
           filters.push((r) => r[k] >= v);
           return q;
