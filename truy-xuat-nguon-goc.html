@@ -140,6 +140,15 @@ ul.tree li{margin:6px 0;font-size:12.5px}
 .mm-r .k{color:var(--text-muted);flex-shrink:0}
 .mm-r .v{font-weight:600;text-align:right;word-break:break-word}
 .mm-miss{color:var(--text-dim);font-style:italic}
+.mm-gd{width:100%;border-collapse:collapse;margin-top:3px;font-size:11px;table-layout:fixed}
+.mm-gd th{color:var(--text-muted);font-weight:500;text-align:right;padding:1px 2px;width:44px}
+.mm-gd th:first-child{width:auto}
+.mm-gd th:first-child,.mm-gd td:first-child{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mm-gd td{text-align:right;padding:1px 2px;border-top:1px dashed var(--border);font-weight:600}
+.mm-gd td.okc{color:#047857}
+.mm-gd td.ngc{color:#B91C1C}
+.mm-gd td.z{color:var(--text-muted);font-weight:400}
+.mm-gd tr.me td{text-align:left;font-weight:500;color:var(--text-muted);padding-top:3px;border-top:1px solid var(--border)}
 .mm-cvs{margin-top:4px;padding-top:3px;border-top:1px solid var(--border)}
 /* T312: dao trên máy Gia công lúc thùng Xong */
 .mm-dao{font-size:11px;line-height:1.4;padding:2px 0 0}
@@ -259,11 +268,24 @@ async function search(raw){
   edges.forEach(e => { allTags.add(e.tu); allTags.add(e.den); });
 
   const otherTags = [...allTags].filter(t => t !== tagNo);
-  const [{ data: temList }, { data: locList }, { data: nodeHist }] = await Promise.all([
+  const [{ data: temList }, { data: locList }, { data: nodeHist }, { data: ngList }] = await Promise.all([
     sb.from('duc_tem').select('*').in('tag_no', [...allTags]),
     sb.from('cd_v_vi_tri_hien_tai').select('tag_no,vi_tri_hien_tai').in('tag_no', [...allTags]),
     otherTags.length ? sb.from('cd_chuyen_cong_doan_log').select('*').in('tag_no', otherTags).order('thoi_gian_chuyen') : Promise.resolve({ data: [] }),
+    sb.from('cd_ng_khai_bao').select('tag_no,cong_doan,loai_ng,so_luong,ngay_gio').in('tag_no', [...allTags]).order('ngay_gio'),
   ]);
+  // T370: NG khai báo theo tem + số vào từ tem nguồn (tách/gộp) để tính SL/OK/NG từng công đoạn.
+  ngTheoTem = {};
+  (ngList || []).forEach(n => { (ngTheoTem[n.tag_no] = ngTheoTem[n.tag_no] || []).push(n); });
+  canhVao = {}; chaCua = {};
+  const daCanh = new Set();
+  edges.forEach(e => {
+    const k = e.tu + '|' + e.den;
+    if (daCanh.has(k)) return;
+    daCanh.add(k);
+    canhVao[e.den] = (canhVao[e.den] || 0) + (Number(e.so_luong) || 0);
+    (chaCua[e.den] = chaCua[e.den] || []).push(e.tu);
+  });
   // Lịch sử chuyển công đoạn của từng tem cha/con trong cây (giao/nhận ở tem nguồn).
   const tagHist = {};
   (nodeHist || []).forEach(r => { (tagHist[r.tag_no] = tagHist[r.tag_no] || []).push(r); });
@@ -419,6 +441,61 @@ function chuyenHtml(r){
     ' ' + fmtNum(r.sl_thuc_chuyen) + (r.thoi_gian_chuyen ? '<br>' + escapeHtml(fmtNgan(r.thoi_gian_chuyen)) : '') +
     (nhan ? ' <span class="st ' + cls + '">' + escapeHtml(nhan) + '</span>' : '') + '</summary>' + histItemHtml(r) + '</details>';
 }
+/* T370: SL / OK / NG của tem ở từng công đoạn tem đã đi qua.
+   - Công đoạn tạo tem: SL = tổng nhận từ tem nguồn (tách/gộp), tem gốc = SL thực tế đúc.
+   - Mỗi lần nhận chuyển công đoạn (không tính bị từ chối): SL = SL thực chuyển.
+   - NG = NG khai báo trên tem tại công đoạn đó (lần nhận gần nhất trước lúc khai báo).
+   - OK = SL − NG; công đoạn đang làm (cuối cùng) trừ thêm số còn trên tem. */
+let ngTheoTem = {}, canhVao = {}, chaCua = {};
+function chuanCd(s){ return String(s || '').trim().toLowerCase(); }
+function giaiDoanTem(tag, ctx){
+  const info = ctx.tagInfo[tag];
+  if (!info) return [];
+  const sl0 = canhVao[tag] != null ? canhVao[tag] : (info.so_luong_tt != null ? Number(info.so_luong_tt) : null);
+  const ds = [{ cd: congDoanTem(info), luc: info.ngay_gio_ghi_nhan || info.ngay_gio_in, sl: sl0, ng: 0, loai: {}, goc: true }];
+  (ctx.tagHist[tag] || []).filter(r => !/từ chối/i.test(r.trang_thai_xac_nhan || ''))
+    .forEach(r => ds.push({ cd: r.cong_doan_nhan, luc: r.thoi_gian_chuyen, sl: Number(r.sl_thuc_chuyen) || 0, ng: 0, loai: {} }));
+  (ngTheoTem[tag] || []).forEach(n => {
+    const k = chuanCd(n.cong_doan), sl = Number(n.so_luong) || 0;
+    let g = null;
+    ds.forEach(d => { if (chuanCd(d.cd) === k && (!g || !n.ngay_gio || !d.luc || new Date(d.luc) <= new Date(n.ngay_gio))) g = d; });
+    if (!g){ g = { cd: n.cong_doan, luc: n.ngay_gio, sl: null, ng: 0, loai: {} }; ds.push(g); }
+    g.ng += sl;
+    const l = n.loai_ng || 'Khác';
+    g.loai[l] = (g.loai[l] || 0) + sl;
+  });
+  const dau = ds.shift();
+  ds.sort((a, b) => new Date(a.luc || 0) - new Date(b.luc || 0));
+  ds.unshift(dau);
+  const cuoi = ds[ds.length - 1];
+  ds.forEach(d => {
+    if (d.sl == null){ d.ok = null; return; }
+    const con = (d === cuoi && !d.goc) ? Math.max(Number(info.so_luong) || 0, 0) : 0;
+    d.ok = Math.max(d.sl - d.ng - con, 0);
+  });
+  return ds;
+}
+function gdRows(ds){
+  return ds.map(d => {
+    const loai = Object.entries(d.loai).map(([k, v]) => k + ': ' + fmtNum(v)).join('\n');
+    return '<tr><td style="color:' + mauCongDoan(d.cd) + '">' + escapeHtml(d.cd) + '</td>' +
+      '<td>' + (d.sl == null ? '—' : fmtNum(d.sl)) + '</td>' +
+      '<td class="okc">' + (d.ok == null ? '—' : fmtNum(d.ok)) + '</td>' +
+      '<td class="' + (d.ng ? 'ngc' : 'z') + '"' + (loai ? ' title="' + escapeHtml(loai) + '"' : '') + '>' + fmtNum(d.ng) + '</td></tr>';
+  }).join('');
+}
+function gdHtml(tag, ctx){
+  const ds = giaiDoanTem(tag, ctx);
+  if (!ds.length) return '';
+  let h = '<table class="mm-gd"><tr><th>CĐ</th><th>SL</th><th>OK</th><th>NG</th></tr>' + gdRows(ds);
+  // Tem con: hiện thêm SL/OK/NG của tem mẹ.
+  (chaCua[tag] || []).forEach(me => {
+    const dm = giaiDoanTem(me, ctx);
+    if (!dm.length) return;
+    h += '<tr class="me"><td colspan="4">Tem mẹ ' + escapeHtml(me) + '</td></tr>' + gdRows(dm);
+  });
+  return h + '</table>';
+}
 function mmRow(k, v, raw){ return '<div class="mm-r"><span class="k">' + escapeHtml(k) + '</span><span class="v">' + (raw ? v : escapeHtml(v)) + '</span></div>'; }
 
 // ctx: { edges(nguoc), tagInfo, tagLoc, tagHist, root, rootInfo, gRoot }
@@ -462,7 +539,7 @@ function mmNode(tag, ctx, opts){
   return '<div class="mm-n' + (isRoot ? ' root' : '') + '" style="--cd:' + mauCongDoan(cd) + '">' +
     '<div class="mm-h"><span class="mm-cd">' + escapeHtml(cd) + '</span><span class="mm-sl">còn ' + fmtNum(info.so_luong) + '</span></div>' +
     '<div class="mm-tag"><span class="tag-chip">' + escapeHtml(tag) + '</span></div>' +
-    rows.join('') + (cv ? '<div class="mm-cvs">' + cv + '</div>' : '') + '</div>';
+    rows.join('') + gdHtml(tag, ctx) + (cv ? '<div class="mm-cvs">' + cv + '</div>' : '') + '</div>';
 }
 function mmEdge(e, ctx, hienChuyen){
   const lbl = e.loai === 'tach' ? '✂ Tách' : '📦 Gộp';
