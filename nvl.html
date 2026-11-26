@@ -345,6 +345,10 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
             <option value="IN">NHẬP KHO</option>
           </select>
         </div>
+        <div class="form-group" id="cartPhieuWrap">
+          <label>Theo phiếu</label>
+          <select id="cartPhieu" class="sel-phieu-cap"><option value="">— Không —</option></select>
+        </div>
         <div class="form-group" id="cartBoPhanWrap">
           <label>Xuất cho bộ phận</label>
           <select id="cartBoPhan" class="sel-bo-phan"><option value="">— Chọn —</option></select>
@@ -410,6 +414,9 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
         <div class="form-group"><label>Ngày</label><input type="date" id="manNgay"></div>
         <div class="form-group"><label>Loại</label>
           <select id="manLoai"><option value="IN">NHẬP</option><option value="OUT">XUẤT</option></select>
+        </div>
+        <div class="form-group" id="manPhieuWrap" hidden><label>Theo phiếu</label>
+          <select id="manPhieu" class="sel-phieu-cap"><option value="">— Không —</option></select>
         </div>
         <div class="form-group" id="manBoPhanWrap" hidden><label>Xuất cho bộ phận</label>
           <select id="manBoPhan" class="sel-bo-phan"><option value="">— Chọn —</option></select>
@@ -623,7 +630,7 @@ button { padding: 0.7rem 1.4rem; border: none; border-radius: 5px; font-size: 0.
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js?v=T169"></script>
-<script src="shared/navbar.js?v=T350"></script>
+<script src="shared/navbar.js?v=T352"></script>
 <script src="shared/goi-y-ma.js?v=T258"></script>
 <script>
 /* ==========================================================================
@@ -1200,6 +1207,11 @@ async function submitCartTransaction() {
   const typeText = txType === 'IN' ? 'NHẬP' : 'XUẤT';
   const boPhan = txType === 'OUT' ? $('cartBoPhan').value : '';
   if (txType === 'OUT' && !boPhan) { alert('Chọn bộ phận nhận trước khi xuất kho'); $('cartBoPhan').focus(); return; }
+  const phieuCap = txType === 'OUT' ? phieuCapChon('cartPhieu') : null;   // T352
+  if (phieuCap) {
+    const ngoai = validItems.filter(x => !phieuCap.ma.includes(x.material));
+    if (ngoai.length) { alert('❌ Mã ' + [...new Set(ngoai.map(x => x.material))].join(', ') + ' không có trong phiếu ' + phieuCap.so_phieu); return; }
+  }
   const fifoWarns = validItems.filter(x => x.validationStatus === 'fifo-warn').length;
 
   let msg = 'Sẽ ' + typeText + ' kho ' + validItems.length + ' pallet.';
@@ -1213,6 +1225,7 @@ async function submitCartTransaction() {
     });
   }
   if (boPhan) msg += '\n\nXuất cho bộ phận: ' + boPhan;
+  if (txType === 'OUT') msg += phieuCap ? '\nTheo phiếu: ' + phieuCap.so_phieu : '\n\n⚠️ Xuất KHÔNG theo phiếu đề nghị cấp NVL.';
   if (errorItems.length) msg += '\n\n(' + errorItems.length + ' pallet lỗi sẽ bị bỏ qua)';
   msg += '\n\nTiếp tục?';
   if (!confirm(msg)) return;
@@ -1227,7 +1240,8 @@ async function submitCartTransaction() {
       p_loai: txType,
       p_items: validItems.map(x => ({ tagNo: x.tagNo, ghiChu: '' })),
       p_user: user,
-      p_bo_phan: boPhan || null
+      p_bo_phan: boPhan || null,
+      p_phieu_cap: phieuCap ? phieuCap.id : null
     });
     const errMsg = rpcError(res);
     if (errMsg) {
@@ -1287,7 +1301,10 @@ async function submitManualTransaction() {
   if (!ma) { alert('Chọn mã NVL'); return; }
   if (sl <= 0) { alert('Khối lượng phải > 0'); return; }
   if (loai === 'OUT' && !boPhan) { alert('Chọn bộ phận nhận khi xuất kho'); $('manBoPhan').focus(); return; }
-  if (!confirm('Ghi giao dịch ' + (loai === 'IN' ? 'NHẬP' : 'XUẤT') + ' ' + fmtKg(sl, 3) + ' kg mã ' + ma + ' ngày ' + ngay + (boPhan ? ' cho ' + boPhan : '') + '?')) return;
+  const phieuCap = loai === 'OUT' ? phieuCapChon('manPhieu') : null;   // T352
+  if (phieuCap && !phieuCap.ma.includes(ma)) { alert('❌ Mã ' + ma + ' không có trong phiếu ' + phieuCap.so_phieu); return; }
+  if (!confirm('Ghi giao dịch ' + (loai === 'IN' ? 'NHẬP' : 'XUẤT') + ' ' + fmtKg(sl, 3) + ' kg mã ' + ma + ' ngày ' + ngay + (boPhan ? ' cho ' + boPhan : '') +
+    (loai === 'OUT' ? (phieuCap ? ' theo phiếu ' + phieuCap.so_phieu : '\n\n⚠️ Xuất KHÔNG theo phiếu đề nghị cấp NVL.') : '') + '?')) return;
 
   const user = await requireLoginOrRedirect();
   if (user === null) return;
@@ -1295,7 +1312,8 @@ async function submitManualTransaction() {
   try {
     const res = await sb.rpc('nvl_add_transaction', {
       p_ngay: ngay, p_loai: loai, p_ma_nvl: ma, p_so_luong_kg: sl, p_ghi_chu: ghiChu, p_user: user,
-      p_bo_phan: boPhan || null
+      p_bo_phan: boPhan || null,
+      p_phieu_cap: phieuCap ? phieuCap.id : null
     });
     const err = rpcError(res);
     if (err) throw new Error(err);
@@ -2087,9 +2105,30 @@ $('cartTxType').addEventListener('change', () => {
 $('manLoai').addEventListener('change', capNhatOBoPhan);
 // T264: xuất kho bắt buộc chọn bộ phận nhận (danh sách bộ phận ở Giao việc — cv_bo_phan)
 function capNhatOBoPhan() {
-  $('cartBoPhanWrap').hidden = $('cartTxType').value !== 'OUT';
-  $('manBoPhanWrap').hidden = $('manLoai').value !== 'OUT';
+  $('cartBoPhanWrap').hidden = $('cartPhieuWrap').hidden = $('cartTxType').value !== 'OUT';
+  $('manBoPhanWrap').hidden = $('manPhieuWrap').hidden = $('manLoai').value !== 'OUT';
 }
+// T352: phiếu đề nghị cấp NVL đã QL bộ phận xác nhận, kho chưa đóng → chọn khi xuất.
+let PHIEU_CAP = [];
+const PDC_BO_PHAN_KHO = { 'Đúc': 'Đúc', 'Bavia': 'Bavia – Đánh bóng', 'Đánh bóng Kẽm': 'Bavia – Đánh bóng',
+  'Gia Công': 'Gia công – Sơn', 'Sơn': 'Gia công – Sơn', 'Cắt viền': 'Gia công – Sơn', 'Thiết bị': 'Thiết bị',
+  'QA': 'Chất lượng (QC)', 'OQC': 'Chất lượng (QC)' };
+async function napPhieuCap() {
+  const { data, error } = await sb.from('nvl_phieu_cap').select('id,so_phieu,bo_phan,nvl_phieu_cap_dong(ma_nvl)')
+    .eq('trang_thai', 'da_xac_nhan').is('kho_luc', null).order('id', { ascending: false }).limit(200);
+  if (error) { console.warn('Không tải được phiếu cấp NVL:', error.message); return; }
+  PHIEU_CAP = (data || []).map(p => ({ id: p.id, so_phieu: p.so_phieu, bo_phan: p.bo_phan, ma: (p.nvl_phieu_cap_dong || []).map(d => d.ma_nvl) }));
+  const html = '<option value="">— Không —</option>' + PHIEU_CAP.map(p => '<option value="' + p.id + '">' + esc(p.so_phieu + ' · ' + p.bo_phan) + '</option>').join('');
+  document.querySelectorAll('.sel-phieu-cap').forEach(sel => {
+    const prev = sel.value; sel.innerHTML = html;
+    if (prev && PHIEU_CAP.some(p => String(p.id) === prev)) sel.value = prev;
+  });
+}
+function phieuCapChon(selId) { const v = $(selId).value; return v ? PHIEU_CAP.find(p => String(p.id) === v) || null : null; }
+[['cartPhieu', 'cartBoPhan'], ['manPhieu', 'manBoPhan']].forEach(([ph, bp]) => $(ph).addEventListener('change', () => {
+  const p = phieuCapChon(ph); const ten = p && PDC_BO_PHAN_KHO[p.bo_phan];
+  if (ten && [...$(bp).options].some(o => o.value === ten)) $(bp).value = ten;
+}));
 async function napBoPhan() {
   const { data, error } = await sb.from('cv_bo_phan').select('ten,thu_tu').order('thu_tu');
   if (error) { console.warn('Không tải được danh sách bộ phận:', error.message); return; }
@@ -2144,6 +2183,7 @@ function startClock() {
   startClock();
   capNhatOBoPhan();
   napBoPhan();
+  napPhieuCap();   // T352
   await loadAllData();
   rerenderTemQtyTable();
   renderCart();

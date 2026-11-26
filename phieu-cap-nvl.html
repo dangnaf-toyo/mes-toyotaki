@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phiếu cấp NVL — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  phieu-cap-nvl.html — T352: Phiếu đề nghị cấp NVL.
+  Luồng: Thống kê lập (nvl_pdc_luu) → Quản lý bộ phận đúng bộ phận xác nhận / trả lại (nvl_pdc_qlbp)
+  → Kho được xuất ngay (nvl.html chọn phiếu khi xuất, giao dịch ghi phieu_cap_id)
+  → Thủ kho xác nhận số thực cấp (nvl_pdc_kho); GĐ hành chính duyệt bổ sung (nvl_pdc_gdhc).
+  Mở thẳng: ?id=<id> (chi tiết), ?moi=1 (lập phiếu).
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px 14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:11px;color:#94A3B8;font-weight:500}
+.header-select,.header-input{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;outline:none;max-width:170px}
+.sp{flex:1}
+.btn{border:none;border-radius:5px;padding:6px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn:hover{background:var(--accent-hover)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn-outline{background:#fff;color:var(--text);border:1px solid var(--border-strong)}
+.btn-outline:hover{background:var(--bg-sunken)}
+.btn-ok{background:var(--run-fg)}
+.btn-danger{background:var(--alarm-fg)}
+.btn-sm{padding:3px 9px;font-size:12px}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.info-btn{border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:18px;padding:0}
+.info-txt{font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:6px;padding:8px 10px;margin-top:8px}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;white-space:nowrap}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:11px;font-weight:700}
+td.num,th.num{text-align:right}
+td.num{font-family:'JetBrains Mono',monospace}
+td.tw{white-space:normal;min-width:160px}
+#tbList tr{cursor:pointer}
+#tbList tr:hover td{background:var(--bg-sunken)}
+.empty-row td{text-align:center;color:var(--text-dim);padding:24px}
+.so{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px}
+.b-cho{background:var(--warn-bg);color:var(--warn-fg)}
+.b-ok{background:var(--run-bg);color:var(--run-fg)}
+.b-tl{background:var(--alarm-bg);color:var(--alarm-fg)}
+.b-xam{background:var(--bg-sunken);color:var(--text-muted)}
+.b-xanh{background:#EFF6FF;color:var(--accent)}
+.ttl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ttl h2{font-size:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px;margin-bottom:10px}
+.f label{display:block;font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:3px}
+.f .v{font-weight:600}
+input.in,select.in{width:100%;border:1px solid var(--border-strong);border-radius:5px;padding:5px 8px;font-family:inherit;font-size:13px;background:#fff}
+td input.in,td select.in{min-width:90px}
+.ky{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.ky>div{border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;min-height:74px}
+.ky .t{font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase}
+.ky .n{font-weight:700;margin-top:6px}
+.ky .g{font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.ky .cho{color:var(--text-dim);margin-top:10px}
+.act{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
+.act input.in{max-width:320px}
+.note{margin-top:8px;padding:8px 10px;border-radius:6px;font-size:12px}
+.note.tl{background:var(--alarm-bg);color:var(--alarm-fg)}
+.note.xam{background:var(--bg-sunken);color:var(--text-muted)}
+.ton{font-size:11px;color:var(--text-muted)}
+.print-title{display:none}
+#msg{margin:0 0 6px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+#ovXn{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:6100;padding:16px}
+#ovXn[hidden]{display:none}
+#ovXn .dlg{background:#fff;border-radius:8px;width:min(420px,100%)}
+#ovXn .xn-nd{padding:16px;font-size:14px;line-height:1.5;white-space:pre-line}
+#ovXn .foot{display:flex;justify-content:flex-end;gap:6px;padding:0 16px 14px}
+@media (max-width:640px){ .brand .co{display:none} .ky{grid-template-columns:repeat(2,1fr)} .header-select,.header-input{max-width:130px} }
+@media print{
+  @page{size:A4;margin:12mm}
+  body{background:#fff;padding:0}
+  body *{visibility:hidden}
+  #vChiTiet,#vChiTiet *{visibility:visible}
+  #vChiTiet{position:absolute;left:0;top:0;width:100%;border:none;box-shadow:none}
+  .no-print{display:none!important}
+  .print-title{display:block;text-align:center;font-size:16px;font-weight:700;margin-bottom:10px}
+  th,td{white-space:normal}
+}
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title">Phiếu cấp NVL</div>
+    </div>
+    <div class="header-group">
+      <span class="header-label">Tháng</span>
+      <input type="month" id="fThang" class="header-input">
+    </div>
+    <div class="header-group">
+      <span class="header-label">Trạng thái</span>
+      <select id="fTT" class="header-select">
+        <option value="">Tất cả</option>
+        <option value="cho_toi">Chờ tôi</option>
+        <option value="cho_qlbp">Chờ QL bộ phận</option>
+        <option value="cho_kho">Chờ kho</option>
+        <option value="cho_gdhc">Chờ GĐ duyệt</option>
+        <option value="xong">Hoàn tất</option>
+        <option value="tra_lai">Trả lại</option>
+        <option value="huy">Huỷ</option>
+      </select>
+    </div>
+    <span class="sp"></span>
+    <button type="button" class="btn" id="btnLap" hidden>Lập phiếu</button>
+  </header>
+
+  <!-- Danh sách -->
+  <div class="card" id="vDs">
+    <div class="ttl">
+      <h2>Danh sách phiếu</h2>
+      <button type="button" class="info-btn" data-info="iLuong" title="Giải thích">ⓘ</button>
+    </div>
+    <div class="info-txt" id="iLuong" hidden>Thống kê lập → Quản lý bộ phận xác nhận → Kho được xuất ngay (chọn phiếu khi xuất ở Kho NVL) → Thủ kho xác nhận số thực cấp. Giám đốc hành chính duyệt bổ sung sau khi Quản lý bộ phận xác nhận.</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Số phiếu</th><th>Ngày</th><th>Bộ phận</th><th class="num">Số mã</th><th class="num">Đề nghị (kg)</th>
+          <th>Người lập</th><th>Trạng thái</th>
+        </tr></thead>
+        <tbody id="tbList"><tr class="empty-row"><td colspan="7">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Lập / sửa -->
+  <div class="card" id="vForm" hidden>
+    <div class="ttl"><h2 id="fTitle">Lập phiếu</h2></div>
+    <div class="grid">
+      <div class="f"><label>Ngày</label><input type="date" class="in" id="iNgay"></div>
+      <div class="f"><label>Bộ phận yêu cầu</label><select class="in" id="iBoPhan"></select></div>
+      <div class="f" style="grid-column:span 2"><label>Ghi chú</label><input type="text" class="in" id="iGhiChu" autocomplete="off"></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Mã NVL</th><th>Tên NVL</th><th class="num">Tồn (kg)</th><th class="num">Đề nghị (kg)</th><th>Mục đích cấp</th><th></th></tr></thead>
+        <tbody id="tbForm"></tbody>
+      </table>
+    </div>
+    <div class="act">
+      <button type="button" class="btn btn-outline btn-sm" id="btnThemDong">+ Dòng</button>
+      <span class="sp"></span>
+      <button type="button" class="btn btn-outline" id="btnHuyForm">Huỷ</button>
+      <button type="button" class="btn" id="btnLuu">Gửi</button>
+    </div>
+  </div>
+
+  <!-- Chi tiết -->
+  <div class="card" id="vChiTiet" hidden>
+    <div class="print-title">PHIẾU ĐỀ NGHỊ CẤP NGUYÊN VẬT LIỆU</div>
+    <div class="ttl">
+      <h2>Phiếu <span class="so" id="dSo"></span></h2>
+      <span id="dTT"></span>
+      <span class="sp"></span>
+      <button type="button" class="btn btn-outline btn-sm no-print" id="btnIn">In</button>
+      <button type="button" class="btn btn-outline btn-sm no-print" id="btnDong">Đóng</button>
+    </div>
+    <div class="grid">
+      <div class="f"><label>Ngày</label><div class="v" id="dNgay"></div></div>
+      <div class="f"><label>Bộ phận yêu cầu</label><div class="v" id="dBoPhan"></div></div>
+      <div class="f" style="grid-column:span 2"><label>Ghi chú</label><div class="v" id="dGhiChu"></div></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Mã NVL</th><th>Tên NVL</th><th class="num">Đề nghị (kg)</th><th>Mục đích cấp</th><th class="num">Đã xuất (kg)</th><th class="num">Thực cấp (kg)</th></tr></thead>
+        <tbody id="tbChiTiet"></tbody>
+      </table>
+    </div>
+    <div id="dNote"></div>
+    <div class="ky">
+      <div><div class="t">Người lập</div><div id="kLap"></div></div>
+      <div><div class="t">QL bộ phận</div><div id="kQlbp"></div></div>
+      <div><div class="t">Thủ kho</div><div id="kKho"></div></div>
+      <div><div class="t">GĐ hành chính</div><div id="kGdhc"></div></div>
+    </div>
+    <div class="act no-print" id="dAct"></div>
+  </div>
+</div>
+
+<div id="ovXn" hidden>
+  <div class="dlg" role="dialog" aria-modal="true">
+    <div class="xn-nd" id="xnNd"></div>
+    <div class="foot">
+      <button type="button" class="btn btn-outline" id="xnHuy">Huỷ</button>
+      <button type="button" class="btn" id="xnOk">Đồng ý</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js?v=T352"></script>
+<script>
+const BO_PHAN = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Kỹ thuật', 'QA', 'Thiết bị'];
+let Q = { lap: false, admin: false, qlbp: [], kho: false, gdhc: false, uid: null };
+let NVL = [], TON = {}, DS = [], CT = null, CT_DONG = [], CT_XUAT = {}, suaId = null;
+
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function kg(n){ return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
+function ngayVN(d){ return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); }
+function fNgay(s){ if (!s) return ''; const [y, m, d] = s.slice(0, 10).split('-'); return d + '/' + m + '/' + y; }
+function fGio(iso){ return iso ? new Date(iso).toLocaleString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
+function baoLoi(e){ const m = MesLoi.gon(e); alert(/^[⛔❌🔒]/u.test(m) ? m : '❌ ' + m); }
+function baoOk(m){ alert(m); }
+function hoiXacNhan(noiDung, o){
+  o = o || {};
+  return new Promise(res => {
+    const w = $('ovXn'), ok = $('xnOk'), huy = $('xnHuy');
+    $('xnNd').textContent = noiDung;
+    ok.textContent = o.nutOk || 'Đồng ý';
+    ok.className = 'btn' + (o.nguyHiem ? ' btn-danger' : '');
+    const xong = v => { w.hidden = true; ok.onclick = huy.onclick = w.onclick = document.onkeydown = null; res(v); };
+    ok.onclick = () => xong(true); huy.onclick = () => xong(false);
+    w.onclick = e => { if (e.target === w) xong(false); };
+    document.onkeydown = e => { if (e.key === 'Escape') xong(false); };
+    w.hidden = false; setTimeout(() => ok.focus(), 30);
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-info]'); if (!b) return;
+  const x = $(b.dataset.info); if (x) x.hidden = !x.hidden;
+});
+
+// Trạng thái hiển thị + phiếu đang chờ ai
+function choGi(p){
+  if (p.trang_thai !== 'da_xac_nhan') return [p.trang_thai];
+  const c = [];
+  if (!p.kho_luc) c.push('cho_kho');
+  if (!p.gdhc_luc) c.push('cho_gdhc');
+  return c.length ? c : ['xong'];
+}
+function badge(p){
+  if (p.trang_thai === 'huy') return '<span class="badge b-xam">Huỷ</span>';
+  if (p.trang_thai === 'tra_lai') return '<span class="badge b-tl">Trả lại</span>';
+  if (p.trang_thai === 'cho_qlbp') return '<span class="badge b-cho">Chờ QL bộ phận</span>';
+  const c = choGi(p);
+  if (c[0] === 'xong') return p.gdhc_ket_qua === 'khong_duyet'
+    ? '<span class="badge b-tl">GĐ không duyệt</span>' : '<span class="badge b-ok">✓ Hoàn tất</span>';
+  return c.map(x => x === 'cho_kho' ? '<span class="badge b-xanh">Chờ kho</span>' : '<span class="badge b-cho">Chờ GĐ duyệt</span>').join(' ');
+}
+function choToi(p){
+  const c = choGi(p);
+  return (c.includes('cho_qlbp') && Q.qlbp.includes(p.bo_phan))
+      || (c.includes('cho_kho') && Q.kho) || (c.includes('cho_gdhc') && Q.gdhc)
+      || (c.includes('tra_lai') && p.nguoi_lap === Q.uid);
+}
+
+// ── Danh sách ────────────────────────────────────────────────────────────────
+async function taiDs(){
+  const th = $('fThang').value; if (!th) return;
+  const [y, m] = th.split('-').map(Number);
+  const den = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+  $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải…</td></tr>';
+  const r = await sbTaiHet(() => sb.from('nvl_phieu_cap')
+    .select('*, nvl_phieu_cap_dong(sl_de_nghi)')
+    .gte('ngay', th + '-01').lt('ngay', den).order('ngay', { ascending: false }).order('id', { ascending: false }));
+  if (r.error){ $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">' + esc(MesLoi.gon(r.error)) + '</td></tr>'; return; }
+  DS = r.data || [];
+  veDs();
+}
+function veDs(){
+  const tt = $('fTT').value;
+  const ds = DS.filter(p => !tt || (tt === 'cho_toi' ? choToi(p) : choGi(p).includes(tt)));
+  $('tbList').innerHTML = ds.length ? ds.map(p => {
+    const d = p.nvl_phieu_cap_dong || [];
+    return '<tr data-id="' + p.id + '"><td class="so">' + esc(p.so_phieu) + '</td><td>' + fNgay(p.ngay) + '</td><td>' + esc(p.bo_phan) +
+      '</td><td class="num">' + d.length + '</td><td class="num">' + kg(d.reduce((s, x) => s + Number(x.sl_de_nghi || 0), 0)) +
+      '</td><td>' + esc(p.ten_lap) + '</td><td>' + badge(p) + '</td></tr>';
+  }).join('') : '<tr class="empty-row"><td colspan="7">Không có phiếu.</td></tr>';
+}
+
+// ── Chuyển màn ───────────────────────────────────────────────────────────────
+function hien(v){
+  $('vDs').hidden = v !== 'ds'; $('vForm').hidden = v !== 'form'; $('vChiTiet').hidden = v !== 'ct';
+  $('btnLap').hidden = !(Q.lap && v === 'ds');
+}
+function datUrl(k, v){
+  const u = new URL(location.href); ['id', 'moi'].forEach(x => u.searchParams.delete(x));
+  if (k) u.searchParams.set(k, v);
+  history.replaceState(null, '', u);
+}
+function veDsMan(){ datUrl(); hien('ds'); taiDs(); }
+
+// ── Lập / sửa ────────────────────────────────────────────────────────────────
+function moForm(p, dong){
+  suaId = p ? p.id : null;
+  $('fTitle').textContent = p ? 'Sửa phiếu ' + p.so_phieu : 'Lập phiếu';
+  $('iNgay').value = p ? p.ngay : ngayVN(new Date());
+  $('iBoPhan').innerHTML = '<option value="">— Chọn —</option>' + BO_PHAN.map(b => '<option>' + esc(b) + '</option>').join('');
+  $('iBoPhan').value = p ? p.bo_phan : '';
+  $('iGhiChu').value = p ? (p.ghi_chu || '') : '';
+  $('tbForm').innerHTML = '';
+  (dong && dong.length ? dong : [{}]).forEach(themDong);
+  datUrl(p ? 'id' : 'moi', p ? p.id : 1);
+  hien('form');
+}
+function themDong(d){
+  d = d || {};
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td class="stt"></td>' +
+    '<td><select class="in c-ma"><option value="">— Chọn —</option>' + NVL.map(n => '<option value="' + esc(n.ma_nvl) + '">' + esc(n.ma_nvl) + '</option>').join('') + '</select></td>' +
+    '<td class="c-ten tw"></td><td class="num c-ton"></td>' +
+    '<td><input type="number" class="in c-sl" min="0" step="0.1" style="width:100px"></td>' +
+    '<td><input type="text" class="in c-md" autocomplete="off" style="min-width:180px"></td>' +
+    '<td><button type="button" class="btn btn-outline btn-sm c-xoa" title="Xoá dòng">✕</button></td>';
+  $('tbForm').appendChild(tr);
+  const sel = tr.querySelector('.c-ma');
+  const doiMa = () => {
+    const n = NVL.find(x => x.ma_nvl === sel.value);
+    tr.querySelector('.c-ten').textContent = n ? n.ten_nvl : '';
+    tr.querySelector('.c-ton').textContent = sel.value ? kg(TON[sel.value]) : '';
+  };
+  sel.onchange = doiMa;
+  sel.value = d.ma_nvl || ''; doiMa();
+  tr.querySelector('.c-sl').value = d.sl_de_nghi ?? '';
+  tr.querySelector('.c-md').value = d.muc_dich || '';
+  tr.querySelector('.c-xoa').onclick = () => { tr.remove(); danhStt(); };
+  danhStt();
+}
+function danhStt(){ [...$('tbForm').rows].forEach((r, i) => r.querySelector('.stt').textContent = i + 1); }
+async function luu(){
+  const dong = [...$('tbForm').rows].map(r => ({
+    ma_nvl: r.querySelector('.c-ma').value, sl_de_nghi: Number(r.querySelector('.c-sl').value),
+    muc_dich: r.querySelector('.c-md').value.trim(),
+  })).filter(d => d.ma_nvl || d.sl_de_nghi || d.muc_dich);
+  if (!$('iBoPhan').value) return baoLoi('Chọn bộ phận yêu cầu.');
+  if (!dong.length) return baoLoi('Phiếu chưa có dòng NVL nào.');
+  for (const d of dong){
+    if (!d.ma_nvl) return baoLoi('Chọn mã NVL cho mọi dòng.');
+    if (!(d.sl_de_nghi > 0)) return baoLoi('Số lượng đề nghị mã ' + d.ma_nvl + ' phải > 0.');
+    if (!d.muc_dich) return baoLoi('Nhập mục đích cấp cho mã ' + d.ma_nvl + '.');
+  }
+  $('btnLuu').disabled = true;
+  const { data, error } = await sb.rpc('nvl_pdc_luu', {
+    p_id: suaId, p_ngay: $('iNgay').value || null, p_bo_phan: $('iBoPhan').value, p_ghi_chu: $('iGhiChu').value, p_dong: dong });
+  $('btnLuu').disabled = false;
+  if (error) return baoLoi(error);
+  baoOk('✓ Đã gửi Quản lý bộ phận xác nhận');
+  moChiTiet(data);
+}
+
+// ── Chi tiết ─────────────────────────────────────────────────────────────────
+async function moChiTiet(id){
+  datUrl('id', id); hien('ct');
+  $('tbChiTiet').innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải…</td></tr>';
+  const [p, d, x] = await Promise.all([
+    sb.from('nvl_phieu_cap').select('*').eq('id', id).maybeSingle(),
+    sb.from('nvl_phieu_cap_dong').select('*').eq('phieu_id', id).order('stt'),
+    sb.from('nvl_giao_dich').select('ma_nvl,loai,so_luong_kg').eq('phieu_cap_id', id).limit(1000),
+  ]);
+  const err = p.error || d.error || x.error;
+  if (err || !p.data){ baoLoi(err || 'Không tìm thấy phiếu.'); return veDsMan(); }
+  CT = p.data; CT_DONG = d.data || []; CT_XUAT = {};
+  (x.data || []).forEach(g => { if (g.loai === 'OUT') CT_XUAT[g.ma_nvl] = (CT_XUAT[g.ma_nvl] || 0) + Number(g.so_luong_kg || 0); });
+  veChiTiet();
+}
+function oKy(ten, luc, choTxt){
+  return ten ? '<div class="n">' + esc(ten) + '</div><div class="g">' + fGio(luc) + '</div>' : '<div class="cho">' + (choTxt || '—') + '</div>';
+}
+function veChiTiet(){
+  const p = CT, c = choGi(p);
+  const khoNhap = c.includes('cho_kho') && Q.kho;
+  const tenNvl = m => (NVL.find(n => n.ma_nvl === m) || {}).ten_nvl || '';
+  $('dSo').textContent = p.so_phieu; $('dTT').innerHTML = badge(p);
+  $('dNgay').textContent = fNgay(p.ngay); $('dBoPhan').textContent = p.bo_phan; $('dGhiChu').textContent = p.ghi_chu || '—';
+  $('tbChiTiet').innerHTML = CT_DONG.map((d, i) => {
+    const xuat = CT_XUAT[d.ma_nvl] || 0;
+    const tc = khoNhap
+      ? '<input type="number" class="in c-tc" data-id="' + d.id + '" min="0" step="0.1" style="width:100px" value="' + (Math.round(xuat * 100) / 100) + '">'
+      : (d.sl_thuc_cap == null ? '—' : kg(d.sl_thuc_cap));
+    return '<tr><td>' + (i + 1) + '</td><td>' + esc(d.ma_nvl) + '</td><td class="tw">' + esc(tenNvl(d.ma_nvl)) +
+      '</td><td class="num">' + kg(d.sl_de_nghi) + '</td><td class="tw">' + esc(d.muc_dich) +
+      '</td><td class="num">' + (xuat ? kg(xuat) : '—') + '</td><td class="num">' + tc + '</td></tr>';
+  }).join('');
+
+  let note = '';
+  if (p.trang_thai === 'tra_lai' && p.ly_do_tra_lai) note += '<div class="note tl">Trả lại: ' + esc(p.ly_do_tra_lai) + '</div>';
+  if (p.gdhc_y_kien) note += '<div class="note ' + (p.gdhc_ket_qua === 'khong_duyet' ? 'tl' : 'xam') + '">GĐ hành chính: ' + esc(p.gdhc_y_kien) + '</div>';
+  if (p.kho_ghi_chu) note += '<div class="note xam">Kho: ' + esc(p.kho_ghi_chu) + '</div>';
+  $('dNote').innerHTML = note;
+
+  $('kLap').innerHTML = oKy(p.ten_lap, p.lap_luc);
+  $('kQlbp').innerHTML = oKy(p.qlbp_ten, p.qlbp_luc, p.trang_thai === 'cho_qlbp' ? 'Chờ xác nhận' : '');
+  $('kKho').innerHTML = oKy(p.kho_ten, p.kho_luc, c.includes('cho_kho') ? 'Chờ cấp' : '');
+  $('kGdhc').innerHTML = oKy(p.gdhc_ten ? p.gdhc_ten + (p.gdhc_ket_qua === 'khong_duyet' ? ' ❌' : ' ✓') : '', p.gdhc_luc,
+    c.includes('cho_gdhc') ? 'Chờ duyệt' : '');
+
+  // Nút theo quyền + trạng thái
+  const a = [];
+  const laNguoiLap = p.nguoi_lap === Q.uid || Q.admin;
+  if (['cho_qlbp', 'tra_lai'].includes(p.trang_thai) && laNguoiLap && Q.lap){
+    a.push('<button type="button" class="btn btn-outline" data-a="sua">Sửa</button>');
+    a.push('<button type="button" class="btn btn-outline" data-a="huy">Huỷ phiếu</button>');
+  }
+  if (p.trang_thai === 'cho_qlbp' && Q.qlbp.includes(p.bo_phan)){
+    a.push('<input type="text" class="in" id="aLyDo" placeholder="Lý do trả lại" autocomplete="off">');
+    a.push('<button type="button" class="btn btn-outline" data-a="tra">Trả lại</button>');
+    a.push('<button type="button" class="btn btn-ok" data-a="xn">Xác nhận</button>');
+  }
+  if (khoNhap){
+    a.push('<input type="text" class="in" id="aKhoGc" placeholder="Ghi chú kho" autocomplete="off">');
+    a.push('<button type="button" class="btn btn-ok" data-a="kho">Đã cấp</button>');
+  }
+  if (c.includes('cho_gdhc') && Q.gdhc){
+    a.push('<input type="text" class="in" id="aYKien" placeholder="Ý kiến" autocomplete="off">');
+    a.push('<button type="button" class="btn btn-outline" data-a="kd">Không duyệt</button>');
+    a.push('<button type="button" class="btn btn-ok" data-a="duyet">Duyệt</button>');
+  }
+  $('dAct').innerHTML = a.join('');
+}
+async function goi(ham, args, okMsg){
+  const { error } = await sb.rpc(ham, args);
+  if (error) return baoLoi(error);
+  baoOk(okMsg);
+  moChiTiet(CT.id);
+}
+$('dAct').addEventListener('click', async e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const p = CT, act = b.dataset.a;
+  if (act === 'sua') return moForm(p, CT_DONG);
+  if (act === 'huy'){
+    if (!await hoiXacNhan('Huỷ phiếu ' + p.so_phieu + '?', { nutOk: 'Huỷ phiếu', nguyHiem: true })) return;
+    return goi('nvl_pdc_huy', { p_id: p.id }, '✓ Đã huỷ phiếu');
+  }
+  if (act === 'xn') return goi('nvl_pdc_qlbp', { p_id: p.id, p_dong_y: true, p_ly_do: null }, '✓ Đã xác nhận — kho được xuất');
+  if (act === 'tra'){
+    const ly = $('aLyDo').value.trim();
+    if (!ly){ $('aLyDo').focus(); return baoLoi('Nhập lý do trả lại.'); }
+    return goi('nvl_pdc_qlbp', { p_id: p.id, p_dong_y: false, p_ly_do: ly }, '✓ Đã trả lại người lập');
+  }
+  if (act === 'kho'){
+    const dong = [...document.querySelectorAll('.c-tc')].map(i => ({ id: Number(i.dataset.id), sl_thuc_cap: Number(i.value || 0) }));
+    if (dong.some(d => !(d.sl_thuc_cap >= 0))) return baoLoi('Số thực cấp không hợp lệ.');
+    const tong = dong.reduce((s, d) => s + d.sl_thuc_cap, 0);
+    if (!await hoiXacNhan('Xác nhận đã cấp ' + kg(tong) + ' kg theo phiếu ' + p.so_phieu + '?\nSau khi xác nhận không xuất thêm theo phiếu này được.', { nutOk: 'Đã cấp' })) return;
+    return goi('nvl_pdc_kho', { p_id: p.id, p_dong: dong, p_ghi_chu: $('aKhoGc').value }, '✓ Đã xác nhận cấp');
+  }
+  if (act === 'duyet') return goi('nvl_pdc_gdhc', { p_id: p.id, p_duyet: true, p_y_kien: $('aYKien').value }, '✓ Đã duyệt');
+  if (act === 'kd'){
+    const yk = $('aYKien').value.trim();
+    if (!yk){ $('aYKien').focus(); return baoLoi('Nhập ý kiến khi không duyệt.'); }
+    return goi('nvl_pdc_gdhc', { p_id: p.id, p_duyet: false, p_y_kien: yk }, '✓ Đã ghi không duyệt');
+  }
+});
+
+// ── Khởi động ────────────────────────────────────────────────────────────────
+(async function(){
+  const session = await MesAuth.getSession();
+  if (!session){ $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">Đăng nhập để xem phiếu.</td></tr>'; return; }
+  const [q, n, t] = await Promise.all([
+    sb.rpc('nvl_pdc_quyen'),
+    sb.from('nvl_materials').select('ma_nvl,ten_nvl').order('ma_nvl'),
+    sb.from('nvl_v_ton_hien_tai').select('ma_nvl,ton_hien_tai_kg'),
+  ]);
+  if (q.error){ $('msg').textContent = MesLoi.gon(q.error); $('msg').className = 'err'; return; }
+  Q = Object.assign(Q, q.data || {}); Q.qlbp = Q.qlbp || [];
+  NVL = n.data || [];
+  (t.data || []).forEach(r => TON[r.ma_nvl] = Number(r.ton_hien_tai_kg || 0));
+
+  $('fThang').value = new URL(location.href).searchParams.get('thang') || ngayVN(new Date()).slice(0, 7);
+  $('fThang').addEventListener('change', taiDs);
+  $('fTT').addEventListener('change', veDs);
+  if (Q.qlbp.length || Q.kho || Q.gdhc) $('fTT').value = 'cho_toi';
+  $('tbList').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) moChiTiet(Number(tr.dataset.id)); });
+  $('btnLap').onclick = () => moForm(null);
+  $('btnThemDong').onclick = () => themDong();
+  $('btnLuu').onclick = luu;
+  $('btnHuyForm').onclick = () => suaId ? moChiTiet(suaId) : veDsMan();
+  $('btnDong').onclick = veDsMan;
+  $('btnIn').onclick = () => window.print();
+
+  const sp = new URL(location.href).searchParams;
+  if (sp.get('id')) moChiTiet(Number(sp.get('id')));
+  else if (sp.get('moi') && Q.lap) moForm(null);
+  else veDsMan();
+})();
+</script>
+</body>
+</html>
