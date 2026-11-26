@@ -161,9 +161,9 @@ td input.in,td select.in{min-width:0}
     <div class="info-txt" id="iLuong" hidden>Thống kê lập → Quản lý bộ phận xác nhận → Kho được xuất ngay (chọn phiếu khi xuất ở Kho NVL) → Thủ kho xác nhận số thực cấp. Giám đốc hành chính duyệt bổ sung sau khi Quản lý bộ phận xác nhận.</div>
     <div class="tbl-wrap">
       <table id="tblList" class="fx">
-        <colgroup><col style="width:120px"><col style="width:92px"><col><col style="width:64px"><col style="width:104px"><col style="width:22%"><col style="width:150px"></colgroup>
+        <colgroup><col style="width:120px"><col style="width:92px"><col><col style="width:64px"><col style="width:140px"><col style="width:20%"><col style="width:150px"></colgroup>
         <thead><tr>
-          <th>Số phiếu</th><th>Ngày</th><th>Bộ phận</th><th class="num">Số mã</th><th class="num">Đề nghị (kg)</th>
+          <th>Số phiếu</th><th>Ngày</th><th>Bộ phận</th><th class="num">Số mã</th><th class="num">Đề nghị</th>
           <th>Người lập</th><th>Trạng thái</th>
         </tr></thead>
         <tbody id="tbList"><tr class="empty-row"><td colspan="7">Đang tải…</td></tr></tbody>
@@ -181,8 +181,8 @@ td input.in,td select.in{min-width:0}
     </div>
     <div class="tbl-wrap">
       <table id="tblForm" class="fx">
-        <colgroup><col style="width:36px"><col style="width:170px"><col><col style="width:90px"><col style="width:110px"><col style="width:240px"><col style="width:46px"></colgroup>
-        <thead><tr><th class="stt">#</th><th>Mã NVL</th><th>Tên NVL</th><th class="num">Tồn (kg)</th><th class="num">Đề nghị (kg)</th><th>Mục đích cấp</th><th></th></tr></thead>
+        <colgroup><col style="width:36px"><col style="width:170px"><col><col style="width:90px"><col style="width:110px"><col style="width:76px"><col style="width:240px"><col style="width:46px"></colgroup>
+        <thead><tr><th class="stt">#</th><th>Mã NVL</th><th>Tên NVL</th><th class="num">Tồn (kg)</th><th class="num">Đề nghị</th><th>ĐVT</th><th>Mục đích cấp</th><th></th></tr></thead>
         <tbody id="tbForm"></tbody>
       </table>
     </div>
@@ -211,8 +211,8 @@ td input.in,td select.in{min-width:0}
     </div>
     <div class="tbl-wrap">
       <table id="tblCt" class="fx">
-        <colgroup><col style="width:36px"><col style="width:140px"><col><col style="width:96px"><col style="width:26%"><col style="width:92px"><col style="width:110px"></colgroup>
-        <thead><tr><th class="stt">#</th><th>Mã NVL</th><th>Tên NVL</th><th class="num">Đề nghị (kg)</th><th>Mục đích cấp</th><th class="num">Đã xuất (kg)</th><th class="num">Thực cấp (kg)</th></tr></thead>
+        <colgroup><col style="width:36px"><col style="width:140px"><col><col style="width:96px"><col style="width:56px"><col style="width:24%"><col style="width:92px"><col style="width:110px"></colgroup>
+        <thead><tr><th class="stt">#</th><th>Mã NVL</th><th>Tên NVL</th><th class="num">Đề nghị</th><th>ĐVT</th><th>Mục đích cấp</th><th class="num">Đã xuất (kg)</th><th class="num">Thực cấp</th></tr></thead>
         <tbody id="tbChiTiet"></tbody>
       </table>
     </div>
@@ -253,6 +253,12 @@ let NVL = [], TON = {}, DS = [], CT = null, CT_DONG = [], CT_XUAT = {}, suaId = 
 const $ = id => document.getElementById(id);
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function kg(n){ return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
+// Tổng theo đơn vị tính: "12,5 kg · 300 pcs"
+function tongDv(ds, truong){
+  const t = {}; ds.forEach(x => { const u = x.dvt || 'kg'; t[u] = (t[u] || 0) + Number(x[truong] || 0); });
+  return ['kg', 'pcs'].filter(u => u in t).map(u => kg(t[u]) + ' ' + u).join(' · ') || '0';
+}
+let DVT_PCS = new Set();   // mã từng lập phiếu theo pcs → lần sau tự chọn pcs
 function ngayVN(d){ return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }); }
 function fNgay(s){ if (!s) return ''; const [y, m, d] = s.slice(0, 10).split('-'); return d + '/' + m + '/' + y; }
 function fGio(iso){ return iso ? new Date(iso).toLocaleString('vi-VN', { hour12: false, timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
@@ -308,7 +314,7 @@ async function taiDs(){
   const den = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
   $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải…</td></tr>';
   const r = await sbTaiHet(() => sb.from('nvl_phieu_cap')
-    .select('*, nvl_phieu_cap_dong(sl_de_nghi)')
+    .select('*, nvl_phieu_cap_dong(sl_de_nghi,dvt)')
     .gte('ngay', th + '-01').lt('ngay', den).order('ngay', { ascending: false }).order('id', { ascending: false }));
   if (r.error){ $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">' + esc(MesLoi.gon(r.error)) + '</td></tr>'; return; }
   DS = r.data || [];
@@ -320,7 +326,7 @@ function veDs(){
   $('tbList').innerHTML = ds.length ? ds.map(p => {
     const d = p.nvl_phieu_cap_dong || [];
     return '<tr data-id="' + p.id + '"><td class="so">' + esc(p.so_phieu) + '</td><td>' + fNgay(p.ngay) + '</td><td title="' + esc(p.bo_phan) + '">' + esc(p.bo_phan) +
-      '</td><td class="num">' + d.length + '</td><td class="num">' + kg(d.reduce((s, x) => s + Number(x.sl_de_nghi || 0), 0)) +
+      '</td><td class="num">' + d.length + '</td><td class="num">' + tongDv(d, 'sl_de_nghi') +
       '</td><td title="' + esc(p.ten_lap) + '">' + esc(p.ten_lap) + '</td><td>' + badge(p) + '</td></tr>';
   }).join('') : '<tr class="empty-row"><td colspan="7">Không có phiếu.</td></tr>';
 }
@@ -357,6 +363,7 @@ function themDong(d){
     '<td><input type="hidden" class="c-ma"><button type="button" class="in pk-btn"><span class="pk-v"></span><span class="pk-car">▼</span></button></td>' +
     '<td class="c-ten tw"></td><td class="num c-ton"></td>' +
     '<td><input type="number" class="in c-sl" min="0" step="0.1" inputmode="decimal"></td>' +
+    '<td><select class="in c-dvt"><option>kg</option><option>pcs</option></select></td>' +
     '<td><input type="text" class="in c-md" autocomplete="off"></td>' +
     '<td class="stt"><button type="button" class="btn btn-outline btn-sm c-xoa" title="Xoá dòng">✕</button></td>';
   $('tbForm').appendChild(tr);
@@ -365,9 +372,11 @@ function themDong(d){
     const n = NVL.find(x => x.ma_nvl === sel.value);
     nhan.textContent = sel.value || '— Chọn —'; nhan.classList.toggle('trong', !sel.value);
     tr.querySelector('.c-ten').textContent = n ? n.ten_nvl : '';
-    tr.querySelector('.c-ton').textContent = sel.value ? kg(TON[sel.value]) : '';
+    tr.querySelector('.c-ton').textContent = sel.value && tr.querySelector('.c-dvt').value === 'kg' ? kg(TON[sel.value]) : '';
   };
+  tr.querySelector('.c-dvt').onchange = tr._doiMa;
   tr.querySelector('.pk-btn').onclick = () => pkTr === tr ? dongPicker() : moPicker(tr);
+  tr.querySelector('.c-dvt').value = d.dvt || 'kg';
   sel.value = d.ma_nvl || ''; tr._doiMa();
   tr.querySelector('.c-sl').value = d.sl_de_nghi ?? '';
   tr.querySelector('.c-md').value = d.muc_dich || '';
@@ -400,7 +409,8 @@ function veDsPicker(){
 function chonPicker(i){
   const tr = pkTr, n = pkDs[i]; dongPicker();
   if (!tr || !n) return;
-  tr.querySelector('.c-ma').value = n.ma_nvl; tr._doiMa();
+  tr.querySelector('.c-ma').value = n.ma_nvl;
+  tr.querySelector('.c-dvt').value = DVT_PCS.has(n.ma_nvl) ? 'pcs' : 'kg'; tr._doiMa();
   tr.querySelector('.c-sl').focus();
 }
 function ganPicker(){
@@ -425,7 +435,7 @@ function danhStt(){ [...$('tbForm').rows].forEach((r, i) => r.querySelector('.st
 async function luu(){
   const dong = [...$('tbForm').rows].map(r => ({
     ma_nvl: r.querySelector('.c-ma').value, sl_de_nghi: Number(r.querySelector('.c-sl').value),
-    muc_dich: r.querySelector('.c-md').value.trim(),
+    muc_dich: r.querySelector('.c-md').value.trim(), dvt: r.querySelector('.c-dvt').value,
   })).filter(d => d.ma_nvl || d.sl_de_nghi || d.muc_dich);
   if (!$('iBoPhan').value) return baoLoi('Chọn bộ phận yêu cầu.');
   if (!dong.length) return baoLoi('Phiếu chưa có dòng NVL nào.');
@@ -446,7 +456,7 @@ async function luu(){
 // ── Chi tiết ─────────────────────────────────────────────────────────────────
 async function moChiTiet(id){
   datUrl('id', id); hien('ct');
-  $('tbChiTiet').innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải…</td></tr>';
+  $('tbChiTiet').innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải…</td></tr>';
   const [p, d, x] = await Promise.all([
     sb.from('nvl_phieu_cap').select('*').eq('id', id).maybeSingle(),
     sb.from('nvl_phieu_cap_dong').select('*').eq('phieu_id', id).order('stt'),
@@ -470,10 +480,10 @@ function veChiTiet(){
   $('tbChiTiet').innerHTML = CT_DONG.map((d, i) => {
     const xuat = CT_XUAT[d.ma_nvl] || 0;
     const tc = khoNhap
-      ? '<input type="number" class="in c-tc" data-id="' + d.id + '" min="0" step="0.1" value="' + (Math.round(xuat * 100) / 100) + '">'
+      ? '<input type="number" class="in c-tc" data-id="' + d.id + '" data-ma="' + esc(d.ma_nvl) + '" data-dvt="' + esc(d.dvt || 'kg') + '" min="0" step="0.1" value="' + ((d.dvt || 'kg') === 'kg' ? Math.round(xuat * 100) / 100 : '') + '">'
       : (d.sl_thuc_cap == null ? '—' : kg(d.sl_thuc_cap));
     return '<tr><td class="stt">' + (i + 1) + '</td><td class="ma" title="' + esc(d.ma_nvl) + '">' + esc(d.ma_nvl) + '</td><td class="tw">' + esc(tenNvl(d.ma_nvl)) +
-      '</td><td class="num">' + kg(d.sl_de_nghi) + '</td><td class="tw">' + esc(d.muc_dich) +
+      '</td><td class="num">' + kg(d.sl_de_nghi) + '</td><td>' + esc(d.dvt || 'kg') + '</td><td class="tw">' + esc(d.muc_dich) +
       '</td><td class="num">' + (xuat ? kg(xuat) : '—') + '</td><td class="num">' + tc + '</td></tr>';
   }).join('');
 
@@ -533,11 +543,13 @@ $('dAct').addEventListener('click', async e => {
     return goi('nvl_pdc_qlbp', { p_id: p.id, p_dong_y: false, p_ly_do: ly }, '✓ Đã trả lại người lập');
   }
   if (act === 'kho'){
-    const dong = [...document.querySelectorAll('.c-tc')].map(i => ({ id: Number(i.dataset.id), sl_thuc_cap: Number(i.value || 0) }));
+    const o = [...document.querySelectorAll('.c-tc')];
+    const trong = o.find(i => i.value.trim() === '');
+    if (trong){ trong.focus(); return baoLoi('Nhập số thực cấp mã ' + trong.dataset.ma + '.'); }
+    const dong = o.map(i => ({ id: Number(i.dataset.id), sl_thuc_cap: Number(i.value), dvt: i.dataset.dvt }));
     if (dong.some(d => !(d.sl_thuc_cap >= 0))) return baoLoi('Số thực cấp không hợp lệ.');
-    const tong = dong.reduce((s, d) => s + d.sl_thuc_cap, 0);
-    if (!await hoiXacNhan('Xác nhận đã cấp ' + kg(tong) + ' kg theo phiếu ' + p.so_phieu + '?\nSau khi xác nhận không xuất thêm theo phiếu này được.', { nutOk: 'Đã cấp' })) return;
-    return goi('nvl_pdc_kho', { p_id: p.id, p_dong: dong, p_ghi_chu: $('aKhoGc').value }, '✓ Đã xác nhận cấp');
+    if (!await hoiXacNhan('Xác nhận đã cấp ' + tongDv(dong, 'sl_thuc_cap') + ' theo phiếu ' + p.so_phieu + '?\nSau khi xác nhận không xuất thêm theo phiếu này được.', { nutOk: 'Đã cấp' })) return;
+    return goi('nvl_pdc_kho', { p_id: p.id, p_dong: dong.map(d => ({ id: d.id, sl_thuc_cap: d.sl_thuc_cap })), p_ghi_chu: $('aKhoGc').value }, '✓ Đã xác nhận cấp');
   }
   if (act === 'duyet') return goi('nvl_pdc_gdhc', { p_id: p.id, p_duyet: true, p_y_kien: $('aYKien').value }, '✓ Đã duyệt');
   if (act === 'kd'){
@@ -551,15 +563,17 @@ $('dAct').addEventListener('click', async e => {
 (async function(){
   const session = await MesAuth.getSession();
   if (!session){ $('tbList').innerHTML = '<tr class="empty-row"><td colspan="7">Đăng nhập để xem phiếu.</td></tr>'; return; }
-  const [q, n, t] = await Promise.all([
+  const [q, n, t, u] = await Promise.all([
     sb.rpc('nvl_pdc_quyen'),
     sb.from('nvl_materials').select('ma_nvl,ten_nvl').order('ma_nvl'),
     sb.from('nvl_v_ton_hien_tai').select('ma_nvl,ton_hien_tai_kg'),
+    sb.from('nvl_phieu_cap_dong').select('ma_nvl').eq('dvt', 'pcs').limit(1000),
   ]);
   if (q.error){ $('msg').textContent = MesLoi.gon(q.error); $('msg').className = 'err'; return; }
   Q = Object.assign(Q, q.data || {}); Q.qlbp = Q.qlbp || [];
   NVL = n.data || [];
   (t.data || []).forEach(r => TON[r.ma_nvl] = Number(r.ton_hien_tai_kg || 0));
+  DVT_PCS = new Set((u.data || []).map(r => r.ma_nvl));
 
   $('fThang').value = new URL(location.href).searchParams.get('thang') || ngayVN(new Date()).slice(0, 7);
   $('fThang').addEventListener('change', taiDs);
