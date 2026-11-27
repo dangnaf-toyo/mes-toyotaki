@@ -199,11 +199,29 @@ async function searchReport(){
   document.getElementById('reportWrap').scrollIntoView({ behavior: 'smooth' });
 }
 
+// T383: ô "Dừng không rõ" (phút) theo máy — chỉ có ở báo cáo kết ca từ 27/11/2026
+const DKR_GIAI_THICH = 'Dừng không rõ = Giờ ca (đã trừ nghỉ) − Giờ chạy theo CT [(OK+NG)/cav + shot nóng] − Phút sự cố đã nhập';
+function oDungKhongRo(x, rowspan){
+  const rs = rowspan > 1 ? ' rowspan="' + rowspan + '"' : '';
+  if (!x || x.phut_khong_ro == null) return '<td class="num"' + rs + ' title="Thiếu CT/cavity">—</td>';
+  const v = Number(x.phut_khong_ro) || 0;
+  const tip = 'Ca ' + x.phut_ca + "' − chạy " + x.phut_chay + "' − sự cố " + x.phut_su_co + "'";
+  const st = v >= 30 ? ' style="color:#B91C1C;font-weight:700"' : '';
+  return '<td class="num"' + rs + st + ' title="' + tip + '">' + fmtNum(v) + "'</td>";
+}
+
 function renderReport(s, lichSuRows, incidents){
+  const coDkr = Array.isArray(s.dung_khong_ro);
+  const dkrMap = {};
+  (s.dung_khong_ro || []).forEach(x => { dkrMap[x.ma_may] = x; });
+  const soDongMay = {}, daInMay = {};
+  lichSuRows.forEach(r => { soDongMay[r.ma_may] = (soDongMay[r.ma_may] || 0) + 1; });
   const rowsHTML = lichSuRows.slice()
     .sort((a, b) => naturalCompare(a.ma_may, b.ma_may))
     .map(r => {
       const pct = r.kh_ca > 0 ? Math.round(r.tt_ca / r.kh_ca * 100) : 0;
+      let dkrTd = '';
+      if (coDkr && !daInMay[r.ma_may]) { daInMay[r.ma_may] = true; dkrTd = oDungKhongRo(dkrMap[r.ma_may], soDongMay[r.ma_may]); }
       return '<tr>' +
         '<td>' + escapeHtml(r.ma_may) + '</td>' +
         '<td>' + escapeHtml(r.ma_sp) + '<br><span style="color:#64748B">' + escapeHtml(r.ten_sp || '') + '</span></td>' +
@@ -211,6 +229,7 @@ function renderReport(s, lichSuRows, incidents){
         '<td class="num">' + fmtNum(r.tt_ca) + '</td>' +
         '<td class="num">' + pct + '%</td>' +
         '<td class="num">' + fmtNum(r.so_luong_ng) + '</td>' +
+        dkrTd +
       '</tr>';
     }).join('');
 
@@ -261,8 +280,10 @@ function renderReport(s, lichSuRows, incidents){
 
     '<h2>1. Sản lượng từng máy</h2>' +
     '<table><thead><tr><th>Máy</th><th>Sản phẩm</th><th class="num">KH ca</th><th class="num">TT ca</th>' +
-      '<th class="num">%HT</th><th class="num">NG</th></tr></thead>' +
-      '<tbody>' + (rowsHTML || '<tr><td colspan="6" style="color:#64748B;font-style:italic">Không có dữ liệu.</td></tr>') + '</tbody></table>' +
+      '<th class="num">%HT</th><th class="num">NG</th>' +
+      (coDkr ? '<th class="num" title="' + DKR_GIAI_THICH + '">Dừng không rõ</th>' : '') + '</tr></thead>' +
+      '<tbody>' + (rowsHTML || '<tr><td colspan="7" style="color:#64748B;font-style:italic">Không có dữ liệu.</td></tr>') + '</tbody></table>' +
+    (coDkr ? '<div style="font-size:10px;color:#64748B;margin-top:3px">' + DKR_GIAI_THICH + '</div>' : '') +
     '<div class="data-limit">OEE, shot nóng khuôn, số khuôn, phân loại NG theo từng máy chỉ có tại thời điểm kết ca — không lưu lại được.</div>' +
 
     '<h2>2. Sự cố trong ca</h2>' +

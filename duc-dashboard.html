@@ -5157,6 +5157,16 @@ function exportReportPdf(filename, sourceElId){
   xuatPdfTuPhanTu(el, filename).then(hideOverlay).catch(e => { hideOverlay(); onError(e); });
 }
 
+// T383: ô "Dừng không rõ" (phút) — ≥ 30' tô đỏ để soi ca nhập thiếu sự cố
+const DKR_GIAI_THICH = 'Dừng không rõ = Giờ ca (đã trừ nghỉ) − Giờ chạy theo CT [(OK+NG)/cav + shot nóng] − Phút sự cố đã nhập';
+function oDungKhongRo(x, rowspan){
+  const rs = rowspan > 1 ? ' rowspan="' + rowspan + '"' : '';
+  if (!x || x.phut_khong_ro == null) return '<td class="num"' + rs + ' title="Thiếu CT/cavity">—</td>';
+  const v = Number(x.phut_khong_ro) || 0;
+  const tip = 'Ca ' + x.phut_ca + "' − chạy " + x.phut_chay + "' − sự cố " + x.phut_su_co + "'";
+  const st = v >= 30 ? ' style="color:#B91C1C;font-weight:700"' : '';
+  return '<td class="num"' + rs + st + ' title="' + tip + '">' + fmtNum(v) + "'</td>";
+}
 function renderShiftReport(d, snap){
   const s = d.summary || {};
   const oeeByIdDong = {};
@@ -5165,9 +5175,17 @@ function renderShiftReport(d, snap){
   const planRows = snap.rows.filter(r => r.ma_sp && r.kh_ca != null)
     .sort((a, b) => naturalCompare(a.ma_may, b.ma_may) || ((a._rowIndex||0) - (b._rowIndex||0)));
 
+  // T383: phút dừng không rõ lý do theo MÁY — gộp ô cho các dòng cùng máy
+  const dkrMap = {};
+  (d.dung_khong_ro || []).forEach(x => { dkrMap[x.ma_may] = x; });
+  const soDongMay = {};
+  planRows.forEach(r => { soDongMay[r.ma_may] = (soDongMay[r.ma_may] || 0) + 1; });
+  const daInMay = {};
   const rowsHTML = planRows.map(r => {
     const oee = oeeByIdDong[r.id_dong] || {};
     const pct = r.kh_ca > 0 ? Math.round(r.tt_ca / r.kh_ca * 100) : 0;
+    let dkrTd = '';
+    if (!daInMay[r.ma_may]) { daInMay[r.ma_may] = true; dkrTd = oDungKhongRo(dkrMap[r.ma_may], soDongMay[r.ma_may]); }
     return '<tr>' +
       '<td>' + escapeHtml(r.ma_may) + '</td>' +
       '<td>' + escapeHtml(r.ma_sp) + '<br><span style="color:#64748B">' + escapeHtml(r.ten_sp || '') + '</span></td>' +
@@ -5182,6 +5200,7 @@ function renderShiftReport(d, snap){
       '<td class="num">' + (oee.availability != null ? fmtPct(oee.availability) : '—') + '</td>' +
       '<td class="num">' + (oee.performance != null ? fmtPct(oee.performance) : '—') + '</td>' +
       '<td class="num">' + (oee.quality != null ? fmtPct(oee.quality) : '—') + '</td>' +
+      dkrTd +
     '</tr>';
   }).join('');
 
@@ -5245,8 +5264,10 @@ function renderShiftReport(d, snap){
       '<h2>1. Sản lượng &amp; OEE từng máy</h2>' +
       '<table><thead><tr><th>Máy</th><th>Sản phẩm</th><th>Khuôn</th><th class="num">KH ca</th><th class="num">TT ca</th>' +
         '<th class="num">%HT</th><th class="num">NG</th><th>Phân loại NG</th><th class="num">Shot nóng</th>' +
-        '<th class="num">OEE</th><th class="num">A</th><th class="num">P</th><th class="num">Q</th></tr></thead>' +
-        '<tbody>' + (rowsHTML || '<tr><td colspan="13" style="color:#64748B;font-style:italic">Không có máy nào có kế hoạch.</td></tr>') + '</tbody></table>' +
+        '<th class="num">OEE</th><th class="num">A</th><th class="num">P</th><th class="num">Q</th>' +
+        '<th class="num" title="' + DKR_GIAI_THICH + '">Dừng không rõ</th></tr></thead>' +
+        '<tbody>' + (rowsHTML || '<tr><td colspan="14" style="color:#64748B;font-style:italic">Không có máy nào có kế hoạch.</td></tr>') + '</tbody></table>' +
+      '<div style="font-size:10px;color:#64748B;margin-top:3px">' + DKR_GIAI_THICH + '</div>' +
 
       '<h2>2. Sự cố đã xử lý trong ca</h2>' +
       '<table><thead><tr><th>Máy</th><th>SP</th><th>Loại sự cố</th><th>Từ → Đến</th><th class="num">Phút</th><th>Vấn đề</th><th>Xử lý</th></tr></thead>' +
