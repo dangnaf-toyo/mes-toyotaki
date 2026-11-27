@@ -360,6 +360,24 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .rpt table{page-break-inside:auto}
   .rpt tr{page-break-inside:avoid}
 }
+/* T389: đầu ca số máy chạy lệch KH tuần → khung đỏ chặn màn hình */
+.kmc-ov{position:fixed;inset:0;z-index:7000;background:rgba(127,29,29,.82);display:flex;align-items:center;justify-content:center;padding:16px}
+.kmc-box{background:var(--bg-panel);border:4px solid var(--alarm-stripe);border-radius:14px;width:100%;max-width:560px;max-height:calc(100vh - 32px);overflow:auto;padding:20px;box-shadow:var(--shadow-lg);color:var(--text)}
+.kmc-tit{background:var(--alarm-stripe);color:#fff;font-size:24px;font-weight:800;text-align:center;border-radius:8px;padding:12px 8px;line-height:1.25}
+.kmc-ca{text-align:center;color:var(--text-muted);font-size:14px;margin:10px 0 6px}
+.kmc-so{display:flex;gap:10px;margin:8px 0 12px}
+.kmc-so>div{flex:1;text-align:center;background:var(--alarm-bg);border-radius:8px;padding:8px}
+.kmc-so b{display:block;font-size:40px;color:var(--alarm-fg);line-height:1.1}
+.kmc-so span{font-size:13px;color:var(--text-muted)}
+.kmc-ds{font-size:15px;line-height:1.6;margin-bottom:10px}
+.kmc-ds b{color:var(--alarm-fg)}
+.kmc-box textarea{width:100%;box-sizing:border-box;min-height:56px;font:inherit;font-size:14px;border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px}
+.kmc-ack{display:flex;gap:8px;align-items:center;font-weight:700;font-size:15px;margin:10px 0;cursor:pointer}
+.kmc-ack input{width:20px;height:20px}
+.kmc-btn{width:100%;font-size:18px;font-weight:800;padding:12px;border:0;border-radius:8px;background:var(--alarm-fg);color:#fff;cursor:pointer}
+.kmc-btn:disabled{opacity:.45;cursor:not-allowed}
+.kmc-cho{text-align:center;font-weight:700;color:var(--alarm-fg);margin-top:10px}
+.kmc-an{display:block;margin:8px auto 0;background:none;border:0;color:var(--text-muted);text-decoration:underline;cursor:pointer;font-size:13px}
 </style>
 </head>
 <body>
@@ -1997,6 +2015,7 @@ async function loadShiftState(showLoader){
     loadKanbanProgress();
     updateLiveStatus('');
     startPolling();
+    kiemMayDauCa_(true);   // T389
     batDauThayDoi();   // T307
     if (window.DkDuc) DkDuc.batDau(renderTable);   // T322
   } catch (e) {
@@ -2226,6 +2245,7 @@ function startPolling(){
       renderOpsWarnings();
       loadKanbanProgress();
       updateLiveStatus('');
+      kiemMayDauCa_();   // T389
     } catch (e) {
       updateLiveStatus('Mất kết nối');
     }
@@ -5453,6 +5473,123 @@ async function submitWeeklyReport(){
     showToast('✓ Đã tổng hợp báo cáo tuần ' + tuanSx + ' (' + list.length + ' mã SP)');
   } catch (e) { btn.disabled = false; onError(e); }
 }
+
+// =============================================================================
+// T389: ĐẦU CA KIỂM SỐ MÁY — 5 phút sau khi ca trước kết ca, so máy có dòng ở
+// ca mới với máy có KH ngày đó (KHSX tuần, trừ ca nghỉ). Lệch → khung đỏ chặn
+// màn hình đến khi Trưởng ca xác nhận (bảng duc_kiem_may_ca). Khớp → tự ghi
+// khop = true, không hỏi lại trong ca.
+// =============================================================================
+const KMC_NGUOI_XAC_NHAN = ['truong_ca', 'admin', 'quan_ly_bo_phan', 'qlsx_truong_phong'];
+const kmc = { xong: {}, dangKiem: false, luc: 0, anDen: 0, ctx: null };
+
+function kmcCaKeTiep_(ngayStr, ca, pa){
+  const dsCa = Object.keys(CONFIG.SHIFT_PLANS[pa] || {});
+  const i = dsCa.indexOf(ca);
+  if (i < 0) return null;
+  if (i + 1 < dsCa.length) return { ngay: ngayStr, ca: dsCa[i + 1] };
+  const d = new Date(ngayStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return { ngay: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), ca: dsCa[0] };
+}
+
+function kmcAn_(){ document.getElementById('kmc-overlay').style.display = 'none'; }
+
+async function kiemMayDauCa_(batBuoc){
+  if (kmc.dangKiem) return;
+  if (!batBuoc && Date.now() - kmc.luc < 55000) return;
+  kmc.dangKiem = true; kmc.luc = Date.now();
+  try {
+    const { data: bc, error: e0 } = await sb.from('duc_bao_cao_ca').select('ngay,ca,phuong_an_ca,thoi_diem_ket_ca')
+      .not('thoi_diem_ket_ca', 'is', null).order('thoi_diem_ket_ca', { ascending: false }).limit(1);
+    if (e0) throw e0;
+    const last = bc && bc[0];
+    if (!last) return kmcAn_();
+    const tuLuc = new Date(last.thoi_diem_ket_ca).getTime() + 5 * 60000;
+    if (Date.now() < tuLuc || Date.now() > tuLuc + 14 * 3600000) return kmcAn_();
+    const next = kmcCaKeTiep_(last.ngay, last.ca, last.phuong_an_ca);
+    if (!next) return kmcAn_();
+    const khoa = next.ngay + '|' + next.ca;
+    if (kmc.xong[khoa]) return kmcAn_();
+    const { data: xn, error: e1 } = await sb.from('duc_kiem_may_ca').select('ngay').eq('ngay', next.ngay).eq('ca', next.ca).maybeSingle();
+    if (e1) throw e1;
+    if (xn) { kmc.xong[khoa] = true; return kmcAn_(); }
+    const { data: dong, error: e2 } = await sb.from('duc_ca_hien_tai').select('ma_may,ma_sp').eq('ngay', next.ngay).eq('ca', next.ca);
+    if (e2) throw e2;
+    const mayChay = [...new Set((dong || []).filter(r => r.ma_sp).map(r => r.ma_may))];
+    const lech = await soSanhMayVoiKhsxTuan_(next.ngay, next.ca, last.phuong_an_ca, mayChay);
+    if (!lech) return;   // lỗi mạng — giữ nguyên trạng thái, lần sau kiểm lại
+    kmc.ctx = { ngay: next.ngay, ca: next.ca, pa: last.phuong_an_ca, khoa, lech };
+    if (!lech.thieu.length && !lech.thua.length) {
+      try { await rpcWrite('duc_kiem_may_ca_luu', kmcThamSo_(true, '')); kmc.xong[khoa] = true; } catch (e) { /* chưa đăng nhập */ }
+      return kmcAn_();
+    }
+    kmcHien_();
+  } catch (e) {
+    console.error('kiemMayDauCa_ lỗi:', e);
+  } finally { kmc.dangKiem = false; }
+}
+
+function kmcThamSo_(khop, ghiChu){
+  const c = kmc.ctx;
+  return { p_ngay: c.ngay, p_ca: c.ca, p_phuong_an_ca: c.pa, p_so_kh: c.lech.soKh, p_so_chay: c.lech.soChay,
+    p_thieu: c.lech.thieu, p_thua: c.lech.thua, p_khop: khop, p_ghi_chu: ghiChu, p_nguoi: state.user || '' };
+}
+
+function kmcHien_(){
+  if (Date.now() < kmc.anDen) return;
+  const c = kmc.ctx, l = c.lech;
+  const [y, m, d] = c.ngay.split('-');
+  document.getElementById('kmc-ca').textContent = c.ca + ' ' + d + '/' + m + '/' + y;
+  document.getElementById('kmc-kh').textContent = l.soKh;
+  document.getElementById('kmc-chay').textContent = l.soChay;
+  document.getElementById('kmc-ds').innerHTML =
+    (l.thieu.length ? '• <b>Có KH, không chạy:</b> ' + l.thieu.map(escapeHtml).join(', ') + '<br>' : '') +
+    (l.thua.length ? '• <b>Chạy, không có KH:</b> ' + l.thua.map(escapeHtml).join(', ') : '');
+  const duocXn = KMC_NGUOI_XAC_NHAN.includes(state.myRole);
+  document.getElementById('kmc-form').style.display = duocXn ? '' : 'none';
+  document.getElementById('kmc-cho').style.display = duocXn ? 'none' : '';
+  const ov = document.getElementById('kmc-overlay');
+  if (ov.style.display !== 'flex') {
+    document.getElementById('kmc-ack').checked = false;
+    document.getElementById('kmc-btn').disabled = true;
+    ov.style.display = 'flex';
+  }
+}
+
+async function kmcXacNhan_(){
+  const btn = document.getElementById('kmc-btn');
+  if (!kmc.ctx || !document.getElementById('kmc-ack').checked) return;
+  if (!(await ensureAuth())) return;
+  btn.disabled = true;
+  try {
+    await rpcWrite('duc_kiem_may_ca_luu', kmcThamSo_(false, document.getElementById('kmc-ghi-chu').value));
+    kmc.xong[kmc.ctx.khoa] = true;
+    document.getElementById('kmc-ghi-chu').value = '';
+    kmcAn_();
+    showToast('✓ Đã xác nhận số máy chạy ' + kmc.ctx.ca);
+  } catch (e) { btn.disabled = false; onError(e); }
+}
 </script>
+
+<div id="kmc-overlay" class="kmc-ov" style="display:none" role="alertdialog" aria-modal="true">
+  <div class="kmc-box">
+    <div class="kmc-tit">⚠ SỐ MÁY CHẠY<br>KHÔNG KHỚP KẾ HOẠCH</div>
+    <div class="kmc-ca" id="kmc-ca"></div>
+    <div class="kmc-so">
+      <div><b id="kmc-kh">0</b><span>Máy có KH</span></div>
+      <div><b id="kmc-chay">0</b><span>Máy đang chạy</span></div>
+    </div>
+    <div class="kmc-ds" id="kmc-ds"></div>
+    <div id="kmc-form">
+      <textarea id="kmc-ghi-chu" placeholder="Ghi chú (nếu có)"></textarea>
+      <label class="kmc-ack"><input type="checkbox" id="kmc-ack" onchange="document.getElementById('kmc-btn').disabled=!this.checked">Trưởng ca đã kiểm tra</label>
+      <button type="button" class="kmc-btn" id="kmc-btn" onclick="kmcXacNhan_()" disabled>Xác nhận</button>
+    </div>
+    <div class="kmc-cho" id="kmc-cho" style="display:none">⏳ Chờ Trưởng ca xác nhận
+      <button type="button" class="kmc-an" onclick="kmc.anDen=Date.now()+10*60000;kmcAn_()">Ẩn 10 phút</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
