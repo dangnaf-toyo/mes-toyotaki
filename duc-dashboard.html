@@ -2319,6 +2319,42 @@ async function giaoQc(idDong, idSuCo){
   } catch (e) { onError(e); }
 }
 
+// T384: F1 do IPQC mở — Trưởng ca xác nhận nội dung bất thường + cử người đảm nhiệm.
+async function xacNhanF1(idDong, idSuCo){
+  const s = timSuCoMo(idDong, idSuCo);
+  if (!s) return showToast('Không tìm thấy sự cố đang mở — tải lại trang', true);
+  if (!(await ensureAuth())) return;
+  let o = null;
+  const vanDe = await hoiGhiChuDuyet((s.open_id_su_co || '') + ' · ' + s.ma_may + ' — IPQC báo:', {
+    tieuDe: 'Xác nhận bất thường', goiY: 'Nội dung bất thường (bắt buộc)', batBuoc: true, nutOk: 'Xác nhận',
+    giaTri: s.open_van_de || '',
+    them: (d, ta) => {
+      const ok = d.querySelector('.ok');
+      const w = document.createElement('div');
+      w.style.marginTop = '10px';
+      w.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:4px">Người đảm nhiệm *</div>' +
+        '<input list="dl-personnel" placeholder="Họ tên người xử lý" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #CBD5E1;border-radius:8px;font:inherit">';
+      ta.after(w);
+      o = w.querySelector('input');
+      const kiem = () => { ok.disabled = !ta.value.trim() || !o.value.trim(); };
+      ta.addEventListener('input', kiem); o.addEventListener('input', kiem); kiem();
+    } });
+  if (vanDe == null) return;
+  const damNhiem = o ? o.value.trim() : '';
+  if (!damNhiem) return showToast('Nhập người đảm nhiệm', true);
+  showOverlay('Đang lưu...');
+  try {
+    await rpcWrite('duc_edit_open_incident_x', {
+      p_id_dong: idDong, p_id_su_co: idSuCo || null, p_loai: null, p_gio_phat_sinh: null,
+      p_van_de: vanDe, p_noi_dung_xu_ly: null, p_dam_nhiem: damNhiem, p_user: state.user,
+    });
+    hideOverlay();
+    showToast('✓ Đã xác nhận — ' + damNhiem + ' xử lý');
+    addPersonnelToDatalist(damNhiem);
+    loadShiftState(false);
+  } catch (e) { onError(e); }
+}
+
 // ── T232: điều kiện đóng từng sự cố (duc_su_co_dieu_kien_dong) ───────────────
 // buoc: duoc_dong | can_thiep | giao_qc | cho_ipqc | giao_lai | xu_ly_lai. Chưa đăng nhập /
 // RPC lỗi → {} = giao diện như cũ (server vẫn chặn khi bấm Xong).
@@ -2343,7 +2379,9 @@ function xongChuaDu(s){
 const CT_NGUOI_DUYET = { 1: 'Tổ trưởng khuôn', 2: 'QLBP Đúc', 3: 'GĐ SX' };
 function buocSuCo(s){
   const coCt = canCt(s), coQc = canIpqc(s.open_loai_su_co) && !!s.open_id_su_co;
+  const laF1 = String(s.open_loai_su_co || '').slice(0, 2).toUpperCase() === 'F1';   // T384
   const steps = coCt ? [['duyet', 'Duyệt khuôn'], ['xu_ly', 'Xử lý']] : [['xu_ly', 'Xử lý']];
+  if (laF1) steps.unshift(['xac_nhan', 'Xác nhận']);
   if (coQc) steps.push(['giao', 'Giao QC'], ['ipqc', 'IPQC']);
   steps.push(['xong', 'Xong']);
   const dk = (state.dieuKien || {})[s.open_id_su_co] || null;
@@ -2379,10 +2417,13 @@ function buocSuCo(s){
     if (coQc) { k = 'xong'; ai = 'Trưởng ca'; viec = 'IPQC ' + (dk && dk.ket_qua_ipqc === 'OK' ? 'OK' : 'đạt') + ' → bấm ✓ Xong'; cls = 'xong'; }
     else viec = 'xử lý xong → bấm ✓ Xong';
   }
+  // T384: F1 do IPQC mở — Trưởng ca xác nhận bất thường + cử người (đảm nhiệm trống = chưa xác nhận). Chỉ nhắc, không chặn.
+  const k0 = k;
+  if (laF1 && !nguoiXl) { k = 'xac_nhan'; ai = 'Trưởng ca'; viec = 'xác nhận bất thường, cử người xử lý'; cls = 'duyet'; tu = null; loi = false; }
   if (loi) cls = 'loi';
   const idx = steps.findIndex(x => x[0] === k);
   const nhom = ai === xl ? 'Xử lý' : ai;   // dải tóm tắt: người xử lý gom chung 1 nhóm
-  return { steps, idx, k, buoc, ai, nhom, viec, cls, tu, nguoiXl, coCt, coQc, g, c, dk };
+  return { steps, idx, k, k0, buoc, ai, nhom, viec, cls, tu, nguoiXl, coCt, coQc, g, c, dk };
 }
 function buocSuCoHTML(s, b, args){
   const dots = b.steps.map((st, i) => {
@@ -2403,8 +2444,10 @@ function buocSuCoHTML(s, b, args){
 // Nút cho đúng bước đang làm (các bước khác xem ở thanh bước).
 function nutBuocHTML(s, b, args){
   let h = '';
-  if (b.k === 'duyet') h += ctHTML(s, args);
-  else if (b.k === 'xu_ly' && b.coQc && (b.buoc === 'giao_qc' || b.buoc === 'giao_lai'))
+  if (b.k === 'xac_nhan') h += '<button class="btn-giao-qc" title="Xác nhận nội dung IPQC báo + cử người xử lý" onclick=\'xacNhanF1(' + args + ')\'>Xác nhận</button>';
+  const k = b.k === 'xac_nhan' ? b.k0 : b.k;   // T384: chỉ nhắc — vẫn hiện nút bước kế
+  if (k === 'duyet') h += ctHTML(s, args);
+  else if (k === 'xu_ly' && b.coQc && (b.buoc === 'giao_qc' || b.buoc === 'giao_lai'))
     h += '<button class="btn-giao-qc" title="Xử lý xong, đã lấy mẫu — giao IPQC kiểm" onclick=\'giaoQc(' + args + ')\'>' + (b.g ? 'Giao lại' : 'Giao QC') + '</button>';
   return h;
 }
