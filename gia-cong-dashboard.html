@@ -82,6 +82,10 @@
   .grp:last-child{margin-bottom:0;}
   .grp-t{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:0 2px 6px;color:var(--text-muted);display:flex;gap:8px;align-items:center;}
   .grp-t .cnt{font-family:var(--mono);color:var(--text-dim);}
+  .grp.dc{border:1.5px dashed var(--accent);border-radius:8px;padding:6px;background:var(--accent-soft);}
+  .grp.dc .grp-t{color:var(--accent);}
+  .dc-box{font-size:12.5px;background:var(--accent-soft);border:1px solid #BBD5EE;color:var(--accent);border-radius:8px;padding:9px 11px;margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:600;}
+  .ng-may{max-width:110px;}
   .tiles{display:flex;flex-direction:column;gap:6px;}
   .tile{display:block;width:100%;text-align:left;background:var(--bg-panel);border:1.5px solid var(--border);border-left-width:5px;border-radius:8px;padding:7px 9px;color:var(--text);min-width:0;}
   .tile:hover{border-color:var(--border-strong);}
@@ -311,6 +315,7 @@
   </div>
   <button type="button" class="btn btn-ghost" id="btnReload" title="Tải lại dữ liệu">Làm mới</button>
   <button type="button" class="btn btn-ghost" id="btnKetCa" title="Báo cáo ca, kết ca và khoá số liệu">Kết ca</button>
+  <a class="btn btn-ghost" href="gc-day-chuyen.html" title="Khai báo máy chạy dây chuyền (luân chuyển 1-1, quét tem ở máy cuối)">Dây chuyền</a>
   <a class="btn btn-ghost" href="ipqc-gia-cong.html">IPQC</a>
   <a class="btn btn-ghost" href="cong-doan-dashboard.html?cd=C%E1%BA%AFt+vi%E1%BB%81n" title="Cắt viền chưa có danh mục máy — vẫn dùng màn cũ">Cắt viền</a>
   <div class="header-clock">
@@ -565,6 +570,14 @@ function caTruoc(ngay, ca) {
 const MAY = () => (D && D.may) || [];
 const curMay = () => MAY().find(m => m.ma_may === sel) || null;
 const suCoMo = m => (m.su_co || []).find(s => !s.gio_tro_lai) || null;
+// T395: dây chuyền (bật) chứa máy; dcChay = đang chạy kiểu dây chuyền với mã máy đang mở
+const dcCua = ma => ((D && D.day_chuyen) || []).find(c => c.bat && (c.ds_may || []).includes(ma)) || null;
+function dcChay(m) {
+  const c = dcCua(m.ma_may), t = m.tram;
+  if (!c || !t) return null;
+  return !(c.ds_ma_sp || []).length || c.ds_ma_sp.includes(t.ma_sp) ? c : null;
+}
+const dcCuoi = c => c.ds_may[c.ds_may.length - 1];
 const slMay = m => (m.xong || []).reduce((s, b) => s + Number(b.sl_ra || 0), 0);
 const okCd = m => Number((m.tram && m.tram.so_luong_ok) || 0);
 const ngMay = m => Number((m.tram && m.tram.so_luong_ng) || 0);
@@ -580,6 +593,8 @@ function phutDungCa(m) {
 function trangThai(m) {
   if (suCoMo(m)) return 'stop';
   if (!m.tram) return 'off';
+  const c = dcChay(m);   // T395: máy giữa dây chuyền chạy theo máy cuối
+  if (c && dcCuoi(c) !== m.ma_may) { const L = MAY().find(x => x.ma_may === dcCuoi(c)); return L && (L.dang_lam || []).length ? 'run' : 'wait'; }
   return (m.dang_lam || []).length ? 'run' : 'wait';
 }
 const ST_TEXT = { run: 'Đang chạy', wait: 'Chờ hàng', stop: 'Dừng', off: 'Chưa mở' };
@@ -662,10 +677,18 @@ function renderTiles() {
   const ngoai = (D && D.tram_ngoai_danh_muc) || [];
   // T271: bên trái = máy đã mở (hoặc còn thùng dở / đang dừng); máy chưa mở gom gọn ở cuối.
   const coMo = m => m.tram || (m.dang_lam || []).length || suCoMo(m);
-  const mo = M.filter(coMo), chua = M.filter(m => !coMo(m));
+  const moAll = M.filter(coMo), chua = M.filter(m => !coMo(m));
+  const DCS = ((D && D.day_chuyen) || []).filter(c => c.bat && c.ds_may.some(x => moAll.some(m => m.ma_may === x)));
+  const trongDc = new Set(DCS.flatMap(c => c.ds_may));
+  const mo = moAll.filter(m => !trongDc.has(m.ma_may));
   const openOff = chua.some(m => m.ma_may === sel) || !mo.length;
   $('#tiles').innerHTML = (M.length ? '' : '<div class="empty-box">Chưa có máy nào trong danh mục (Quản lý danh mục → Máy-Line, bộ phận "Gia công - Sơn").</div>') +
-    (M.length && !mo.length ? '<div class="empty-box">Chưa mở máy nào trong ca.</div>' : '') +
+    (M.length && !moAll.length ? '<div class="empty-box">Chưa mở máy nào trong ca.</div>' : '') +
+    DCS.map(c => {   // T395
+      const ds = c.ds_may.map(x => M.find(m => m.ma_may === x)).filter(Boolean);
+      const chay = ds.filter(m => trangThai(m) === 'run').length;
+      return '<div class="grp dc"><div class="grp-t">⛓ ' + esc(c.ten) + ' <span class="cnt">' + chay + '/' + ds.length + ' chạy</span></div><div class="tiles">' + ds.map(tileHtml).join('') + '</div></div>';
+    }).join('') +
     NHOM.map(g => {
       const ds = mo.filter(g.f);
       if (!ds.length) return '';
@@ -700,7 +723,7 @@ function renderWs() {
     h += '<div class="l2">Mã <span class="mono">' + esc(t.ma_sp) + '</span>' + (t.ten_sp ? ' · ' + esc(t.ten_sp) : '') + (p && p.ten_khach_hang ? ' · ' + esc(p.ten_khach_hang) : '') + '</div>' +
       '<div class="l2">Người đứng máy: ' + (t.nguoi_thao_tac ? '<b>' + esc(t.nguoi_thao_tac) + '</b>' : '<b style="color:var(--alarm-fg)">chưa gán</b>') +
       ' · KH ca <span class="mono">' + (t.kh_ca ? fmt(t.kh_ca) : '—') + '</span> · SL máy <span class="mono">' + fmt(slMay(m)) + '</span> · OK công đoạn <span class="mono">' + fmt(okCd(m)) + '</span> · NG <span class="mono">' + fmt(ngMay(m)) + '</span></div>' +
-      routeHtml(t.ma_sp);
+      routeHtml(t.ma_sp) + (dcChay(m) ? '<div class="route">⛓ ' + esc(dcChay(m).ten) + ': ' + dcChay(m).ds_may.map(x => '<span class="' + (x === m.ma_may ? 'cur' : '') + '">' + esc(x) + '</span>').join('<i>→</i>') + '</div>' : '');
   } else {
     h += '<div class="l2">Chưa mở trong ca · Làm được: ' + ((m.ma_sp_dung || []).length ? '<span class="mono">' + esc(m.ma_sp_dung.join(', ')) + '</span>' : '<b style="color:var(--alarm-fg)">chưa khai mã nào</b>') + '</div>';
   }
@@ -718,11 +741,15 @@ function renderWs() {
           '<label>Người xử lý<input id="scNguoi" list="dsTaiKhoan" autocomplete="off" placeholder="Ai xử lý"></label>' +
           '<label class="full">Nội dung xử lý<textarea id="scNoiDung" rows="2" placeholder="Chọn ở trên hoặc tự gõ"></textarea></label>' +
           '<div class="acts"><button class="tiny" type="button" id="scHuyForm">Thôi</button><button class="tiny go" type="button" id="scLuu">Máy chạy lại</button></div></div>'
+        : s.dc_goc ? '<div class="m"><b>⛓ Dừng theo dây chuyền</b> — bấm "Máy chạy lại" ở máy gây dừng.</div>'
         : '<div class="frm"><div class="acts"><button class="tiny" type="button" id="scHuy" title="Huỷ lần dừng báo nhầm">Báo nhầm</button><button class="tiny go" type="button" id="scMo"' + (khoa ? ' disabled' : '') + '>Máy chạy lại…</button></div></div>') +
       '</div>';
   }
 
-  if (t && !khoa) {
+  const dcM = dcChay(m);   // T395
+  if (t && !khoa && dcM && dcCuoi(dcM) !== m.ma_may) {
+    h += '<div class="dc-box">⛓ Máy trong dây chuyền ' + esc(dcM.ten) + ' — quét tem ở máy cuối <button class="tiny" type="button" data-toimay="' + esc(dcCuoi(dcM)) + '">' + esc(dcCuoi(dcM)) + '</button></div>';
+  } else if (t && !khoa) {
     h += '<div class="scan"><div class="ic">▦</div><input id="scan" type="text" autocomplete="off" placeholder="Quét tem thùng khi bắt đầu làm (hoặc gõ Tag No + Enter)"><button class="cam" type="button" id="btnCam" title="Quét bằng camera">📷</button></div>' ;
   } else if (khoa) {
     h += '<div class="flash warn">Ca đã kết — chỉ xem.</div>';
@@ -741,7 +768,7 @@ function renderWs() {
       const testTong = (b.test || []).reduce((s2, x) => s2 + Number(x.so_luong) - Number(x.sl_tra_lai || 0), 0);
       const lamDuoc = t && !khoa && b.id_tram && t.ma_sp === b.ma_sp;
       return '<div class="bx ' + (i === 0 ? 'first' : '') + '">' +
-        '<div class="tg">' + esc(b.tag_no) + (tdThung(m) === b ? ' <span class="chip warn">⚑ Thùng đầu</span>' : '') + ' <span class="chip acc">Bước ' + b.buoc + '/' + b.tong_buoc + '</span>' + (Number(b.ng) ? '<span class="chip bad">NG ' + fmt(b.ng) + '</span>' : '') + (testTong ? '<span class="chip warn">Test ' + fmt(testTong) + '</span>' : '') + (Number(b.sl_dong) ? '<span class="chip ok">' + b.so_thung + ' thùng · ' + fmt(b.sl_dong) + '</span>' : '') + '</div>' +
+        '<div class="tg">' + esc(b.tag_no) + (tdThung(m) === b ? ' <span class="chip warn">⚑ Thùng đầu</span>' : '') + ' <span class="chip acc">Bước ' + (b.dc_may ? (b.buoc - b.dc_may.length + 1) + '–' : '') + b.buoc + '/' + b.tong_buoc + '</span>' + (b.dc_ten ? '<span class="chip acc">⛓ ' + esc(b.dc_ten) + '</span>' : '') + (Number(b.ng) ? '<span class="chip bad">NG ' + fmt(b.ng) + '</span>' : '') + (testTong ? '<span class="chip warn">Test ' + fmt(testTong) + '</span>' : '') + (Number(b.sl_dong) ? '<span class="chip ok">' + b.so_thung + ' thùng · ' + fmt(b.sl_dong) + '</span>' : '') + '</div>' +
         '<div class="qty">' + fmt(con) + '<small> / ' + fmt(b.sl_vao) + '</small></div>' +
         '<div class="meta">Bắt đầu ' + hm(b.bat_dau) + ' ' + dmy(b.bat_dau) + (b.lot ? ' · Lô ' + esc(b.lot) : '') + (b.may_duc ? ' · Đúc ' + esc(b.may_duc) : '') + (b.ngay_duc ? ' ' + dmy(b.ngay_duc) : '') + (b.so_khuon ? ' · Khuôn ' + esc(b.so_khuon) : '') + '</div><div></div>' +
         testMo.map(x => '<div class="test-row">Đang test <b>' + fmt(x.so_luong) + '</b> · ' + esc(x.muc_dich) + ' · ' + esc(x.nguoi_test) + ' · ' + hm(x.thoi_diem) +
@@ -761,7 +788,7 @@ function renderWs() {
     h += '<div class="sec-t">Đã xong trong ca <span class="chip mute">' + X.length + ' thùng · ' + fmt(slMay(m)) + ' pcs</span></div><div class="tbl"><table class="t"><thead><tr><th>Giờ</th><th>Tag No</th><th>Bước</th><th style="text-align:right">Vào</th><th style="text-align:right">NG</th><th style="text-align:right">Test</th><th style="text-align:right">Ra</th><th>Người</th><th></th></tr></thead><tbody>' +
       X.map(b => '<tr><td class="mono">' + hm(b.xong_luc) + '</td><td class="mono"><b>' + esc(b.tag_no) + '</b>' + (tdThung(m) === b ? ' <span class="chip warn">⚑ Thùng đầu</span>' : '') + '</td><td>' + b.buoc + '/' + b.tong_buoc + (b.buoc >= b.tong_buoc ? ' <span class="chip ok">cuối</span>' : '') + '</td>' +
         '<td class="n">' + fmt(b.sl_vao) + '</td><td class="n" style="color:var(--alarm-fg)">' + (Number(b.ng) ? fmt(b.ng) : '') + '</td><td class="n" style="color:var(--warn-fg)">' + (Number(b.test) ? fmt(b.test) : '') + '</td><td class="n">' + fmt(b.sl_ra) + '</td><td>' + esc(b.nguoi_lam || '') + '</td>' +
-        '<td>' + (khoa ? '' : '<button class="tiny" type="button" data-huyxong="' + b.id + '" title="Bấm Xong nhầm">Huỷ xong</button>') + '</td></tr>').join('') +
+        '<td>' + (b.dc_chinh ? '<span class="chip acc" title="Ghi theo dây chuyền khi máy cuối bấm Xong">⛓</span>' : khoa ? '' : '<button class="tiny" type="button" data-huyxong="' + b.id + '" title="Bấm Xong nhầm">Huỷ xong</button>') + '</td></tr>').join('') +
       '</tbody></table></div>';
   }
 
@@ -786,12 +813,14 @@ function renderWs() {
   wireWs(m); wireDao(m);
 }
 
+let ngMayDs = null;   // T395: máy trong dây chuyền của thùng đang ghi NG
 function ngRowHtml() {
-  return '<div class="row ng-line"><select class="ng-loai">' + LoiChung.ds('GIA_CONG').map(x => '<option>' + esc(x.nhan) + '</option>').join('') + '</select>' +
+  return '<div class="row ng-line">' + (ngMayDs ? '<select class="ng-may" title="Máy gây lỗi">' + ngMayDs.map((x, i) => '<option' + (i === ngMayDs.length - 1 ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select>' : '') + '<select class="ng-loai">' + LoiChung.ds('GIA_CONG').map(x => '<option>' + esc(x.nhan) + '</option>').join('') + '</select>' +
     '<input class="ng-note note" type="text" placeholder="Ghi rõ nguyên nhân" hidden>' +
     '<input class="ng-qty" type="number" min="1" value="1"><button class="tiny" type="button" data-ngdel>✕</button></div>';
 }
 function ngForm(b) {
+  ngMayDs = b.dc_may && b.dc_may.length > 1 ? b.dc_may : null;
   return '<div class="sub-form ng" data-con="' + b.con + '"><div id="ngRows">' + ngRowHtml() + '</div>' +
     '<div class="row"><button class="tiny" type="button" id="ngAdd">Thêm dòng</button><span class="sum" id="ngSum"></span><span class="sp"></span>' +
     '<button class="tiny bad" type="button" id="ngSave">Ghi NG</button><button class="tiny" type="button" data-cancel>Huỷ</button></div></div>';
@@ -850,6 +879,7 @@ function wireWs(m) {
   const sc = $('#scan');
   if (sc) sc.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const v = sc.value; sc.value = ''; quetMa(v); } });
   on('#btnCam', moCam);
+  document.querySelectorAll('[data-toimay]').forEach(b => b.onclick = () => { sel = b.dataset.toimay; lsSet('gcdb_may', sel); flash = null; renderTiles(); renderWs(); const s = $('#scan'); if (s) s.focus(); });   // T395
   document.querySelectorAll('[data-ng]').forEach(b => b.onclick = () => { ngOpen = Number(b.dataset.ng); testOpen = null; renderWs(); wireNgRows(); });
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => { testOpen = Number(b.dataset.test); ngOpen = null; renderWs(); });
   document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => { ngOpen = testOpen = null; renderWs(); });
@@ -857,7 +887,7 @@ function wireWs(m) {
     wireNgRows();
     on('#ngAdd', () => { $('#ngRows').insertAdjacentHTML('beforeend', ngRowHtml()); wireNgRows(); });
     on('#ngSave', () => {
-      const ds = [...document.querySelectorAll('#ngRows .ng-line')].map(r => ({ loai: r.querySelector('.ng-loai').value, ghi_chu: r.querySelector('.ng-note').value, so_luong: String(r.querySelector('.ng-qty').value || '') }));
+      const ds = [...document.querySelectorAll('#ngRows .ng-line')].map(r => ({ may: r.querySelector('.ng-may') ? r.querySelector('.ng-may').value : null, loai: r.querySelector('.ng-loai').value, ghi_chu: r.querySelector('.ng-note').value, so_luong: String(r.querySelector('.ng-qty').value || '') }));
       const id = ngOpen;
       lam(() => rpc('gc_ng_nhieu', { p_id_tram: t.id_tram, p_id_buoc: id, p_ds: ds }), r => { ngOpen = null; return '✓ Đã ghi NG ' + fmt(r.tong) + ' pcs — tem còn ' + fmt(r.so_luong_con_lai); });
     });
@@ -898,7 +928,7 @@ async function quetMa(raw) {
   if (!m || !m.tram || !tag) return;
   await lam(() => rpc('gc_quet', { p_id_tram: m.tram.id_tram, p_tag: tag }),
     r => r.dong_thung ? '✓ Thùng ' + esc(r.tag_no) + ': ' + fmt(r.so_luong) + ' pcs ← ' + r.tu.map(x => esc(x.xe) + ' (' + fmt(x.so_luong) + ')').join(' + ') :   // T343
-      '✓ ' + esc(r.tag_no) + ' (' + fmt(r.so_luong) + ' pcs) bắt đầu làm ở ' + esc(m.ma_may) + ' — bước ' + r.buoc + '/' + r.tong_buoc + (r.tu_nhan ? ' · tự nhận từ ' + esc(r.tu_cong_doan) + ' sang Gia công' : ''));
+      '✓ ' + esc(r.tag_no) + ' (' + fmt(r.so_luong) + ' pcs) bắt đầu làm ở ' + (r.day_chuyen ? 'dây chuyền ' + esc(r.day_chuyen) : esc(m.ma_may)) + ' — bước ' + r.buoc + '/' + r.tong_buoc + (r.tu_nhan ? ' · tự nhận từ ' + esc(r.tu_cong_doan) + ' sang Gia công' : ''));
 }
 
 function renderSide() {
@@ -1006,9 +1036,10 @@ function moMayModal(m) {
 $('#mmSave').onclick = async () => {
   $('#mmErr').textContent = '';
   try {
-    await rpc('gc_may_luu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ma_may: mayEditing, p_ma_sp: $('#mmMa').value, p_kh_ca: Number($('#mmKh').value) || 0, p_nguoi: $('#mmNguoi').value });
+    const rm = await rpc('gc_may_luu', { p_ngay: $('#fNgay').value, p_ca: $('#fCa').value, p_ma_may: mayEditing, p_ma_sp: $('#mmMa').value, p_kh_ca: Number($('#mmKh').value) || 0, p_nguoi: $('#mmNguoi').value });
     lsSet('gcdb_nguoi_' + mayEditing, $('#mmNguoi').value);
-    $('#mayModal').hidden = true; sel = mayEditing; setFlash('ok', '✓ Đã lưu ' + esc(mayEditing) + '. Quét tem thùng để bắt đầu làm.');
+    $('#mayModal').hidden = true; sel = mayEditing; setFlash('ok', '✓ Đã lưu ' + esc(mayEditing) + (rm.day_chuyen ? ' + các máy dây chuyền ' + esc(rm.day_chuyen) : '') + '. Quét tem thùng để bắt đầu làm.');
+    if (rm.canh_bao && rm.canh_bao.length && window.mesBaoLoi) mesBaoLoi('Dây chuyền ' + rm.day_chuyen + ' — chưa mở được: ' + rm.canh_bao.join('; '));
     await taiLai(); const s = $('#scan'); if (s) s.focus();
   } catch (e) { $('#mmErr').textContent = errText(e); }
 };
@@ -1029,8 +1060,8 @@ $('#dmSave').onclick = async () => {
   const m = curMay(); $('#dmErr').textContent = '';
   try {
     const g = $('#dmGio').value;
-    await rpc('gc_su_co_mo', { p_id_tram: m.tram.id_tram, p_loai: $('#dmLoai').value, p_bo_phan: $('#dmBoPhan').value, p_van_de: $('#dmVanDe').value, p_gio_phat_sinh: g ? new Date(g).toISOString() : null });
-    $('#dungModal').hidden = true; setFlash('warn', '⛔ ' + esc(m.ma_may) + ' đang dừng. Khi chạy lại bấm "Máy chạy lại…".');
+    const rs = await rpc('gc_su_co_mo', { p_id_tram: m.tram.id_tram, p_loai: $('#dmLoai').value, p_bo_phan: $('#dmBoPhan').value, p_van_de: $('#dmVanDe').value, p_gio_phat_sinh: g ? new Date(g).toISOString() : null });
+    $('#dungModal').hidden = true; setFlash('warn', '⛔ ' + esc(m.ma_may) + ' đang dừng' + (rs.so_may_kem ? ' — dây chuyền ' + esc(rs.day_chuyen) + ' dừng theo ' + rs.so_may_kem + ' máy' : '') + '. Khi chạy lại bấm "Máy chạy lại…".');
     await taiLai();
   } catch (e) { $('#dmErr').textContent = errText(e); }
 };
