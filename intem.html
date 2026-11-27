@@ -56,10 +56,6 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .hdr p{font-size:11px;color:var(--text-dim);margin-top:2px}
 .auth-info{font-size:11px;color:var(--text-muted)}
 .auth-info a{color:var(--accent);text-decoration:none;font-weight:600}
-.tabs-wrap{display:flex;gap:8px;width:100%;max-width:500px;margin-bottom:14px}
-.tab-btn{flex:1;padding:11px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg-panel);
-  color:var(--text-muted);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
-.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .card{background:var(--bg-panel);border-radius:14px;border:1px solid var(--border);
   box-shadow:var(--shadow-sm);
   padding:24px 20px;width:100%;max-width:500px;margin-bottom:14px}
@@ -133,6 +129,27 @@ textarea{resize:vertical;min-height:48px}
 .nk-sk.in{background:#DCFCE7;color:#166534}.nk-sk.sua{background:#FEF3C7;color:#92400E}
 .nk-sk.xoa{background:#FEE2E2;color:#B91C1C}.nk-sk.cap_nhat{background:#E0E7FF;color:#3730A3}
 .nk-dim{color:var(--text-muted)}
+/* T375: chọn loại tem (màu theo công đoạn) + khung thông tin tự lấy + ⓘ */
+.cd-duc{--c:#0F5FA5}.cd-bv{--c:#B45309}.cd-gc{--c:#7C3AED}.cd-tp{--c:#047857}.cd-tc{--c:#475569}
+.chon-loai{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:500px;margin-bottom:14px}
+.o-loai{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:16px 14px;min-height:84px;border:1px solid var(--border);border-left:6px solid var(--c);border-radius:12px;background:var(--bg-panel);cursor:pointer;font-family:inherit;text-align:left;box-shadow:var(--shadow-sm)}
+.o-loai b{font-size:17px;color:var(--c)}
+.o-loai span{font-size:12px;color:var(--text-muted);font-weight:600}
+.o-loai:hover{box-shadow:var(--shadow-md)}
+.o-loai.full,.o-phu{grid-column:1/-1}
+.o-phu{padding:12px;border:1.5px dashed var(--border-strong);border-radius:10px;background:transparent;color:var(--text-muted);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+.dang-chon{display:flex;align-items:center;gap:12px;width:100%;max-width:500px;margin-bottom:10px}
+.lui{border:1px solid var(--border);background:var(--bg-panel);border-radius:8px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;color:var(--text);flex:none}
+.nhan-loai{font-weight:700;font-size:15px;color:var(--c);border-left:4px solid var(--c);padding-left:8px}
+#mainWrap .card{border-top:3px solid var(--c,var(--border))}
+.tu-lay{background:var(--bg-sunken);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text-muted);flex-direction:row;flex-wrap:wrap;gap:4px 14px}
+.tu-lay:empty{display:none}
+.tu-lay b{color:var(--text);font-weight:600}
+.tu-lay .canh{color:var(--alarm-fg);font-weight:700}
+.an{display:none!important}
+.card-ttl{display:flex;align-items:center;gap:4px}
+.ii{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:15px;margin-left:auto;padding:0 4px;font-family:inherit}
+.ii-txt{font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:8px;padding:8px 10px;margin:-8px 0 12px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -154,43 +171,37 @@ textarea{resize:vertical;min-height:48px}
 </div>
 
 <div id="mainWrap" style="display:none;width:100%;max-width:500px">
-  <div class="tabs-wrap">
-    <button type="button" class="tab-btn active" id="tabBtnPrint">In tem</button>
-    <button type="button" class="tab-btn" id="tabBtnSearch">Tra cứu Tem</button>
-    <button type="button" class="tab-btn" id="tabBtnKanban">Chỉ thị SX</button>
-    <button type="button" class="tab-btn" id="tabBtnTp">Tem thành phẩm</button>
+  <!-- T375: bỏ 4 tab — mở màn chọn LOẠI TEM trước (ô màu theo công đoạn), nhớ lựa chọn lần sau. -->
+  <div id="chonLoai" class="chon-loai">
+    <button type="button" class="o-loai cd-duc" data-loai="print"><b>Đúc</b><span>In ngay · 1 tem</span></button>
+    <button type="button" class="o-loai cd-duc" data-loai="kanban"><b>Đúc</b><span>Theo KH · cả lô</span></button>
+    <button type="button" class="o-loai cd-bv" data-loai="bavia"><b>Bavia</b><span>Theo KH tuần</span></button>
+    <button type="button" class="o-loai cd-gc" data-loai="gc"><b>Gia Công</b><span>Tem GC</span></button>
+    <button type="button" class="o-loai cd-tp full" data-loai="tp"><b>Thành phẩm</b><span>Đánh bóng Kẽm · OQC</span></button>
+    <button type="button" class="o-phu" data-loai="search">Tra cứu · sửa tem đã in</button>
+  </div>
+  <div id="dangChon" class="dang-chon" style="display:none">
+    <button type="button" class="lui" onclick="veChonLoai()">‹ Đổi loại tem</button>
+    <span class="nhan-loai" id="dangChonTen"></span>
   </div>
 
-  <!-- ============ TAB: In Tem (tạo tem mới) ============ -->
-  <div id="panelPrint">
+  <!-- ============ Đúc · In ngay (tạo 1 tem) ============ -->
+  <div id="panelPrint" style="display:none">
     <div class="card">
-      <div class="card-ttl">Thông tin tem mới</div>
       <div class="grid">
-        <div class="fg">
+        <div class="fg full">
           <label class="req" for="maSP">Mã sản phẩm</label>
           <select id="maSP" onchange="onMaChange('')"></select>
         </div>
+        <div class="fg full tu-lay" id="tl_print"></div>
         <div class="fg full" id="kanbanOnlyWarn" style="display:none;background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;border-radius:6px;padding:8px 12px;font-size:13px"></div>
-        <div class="fg">
+        <div class="fg an">
           <label for="tenSP">Tên sản phẩm</label>
-          <input id="tenSP" type="text" placeholder="Tự điền theo mã" disabled>
+          <input id="tenSP" type="text" disabled>
         </div>
-        <div class="fg">
-          <label class="req" for="soLuong">Số lượng / thùng</label>
-          <input id="soLuong" type="number" placeholder="Pcs" min="1">
-        </div>
-        <div class="fg">
-          <label for="lotNo">Ngày sản xuất</label>
-          <input id="lotNo" type="date">
-        </div>
-        <div class="fg">
-          <label for="soKhuon">Số khuôn</label>
-          <div class="chip-row" id="soKhuon-chips"></div>
-          <input id="soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
-        </div>
-        <div class="fg">
+        <div class="fg an">
           <label for="nguyenLieu">Nguyên liệu</label>
-          <input id="nguyenLieu" type="text" placeholder="Tự điền theo mã SP" disabled>
+          <input id="nguyenLieu" type="text" disabled>
         </div>
         <div class="fg">
           <label class="req" for="mayDuc">Máy đúc</label>
@@ -200,65 +211,78 @@ textarea{resize:vertical;min-height:48px}
           <label class="req" for="nguoiTT">Người thao tác</label>
           <select id="nguoiTT"></select>
         </div>
+        <div class="fg">
+          <label class="req" for="soLuong">Số lượng / thùng</label>
+          <input id="soLuong" type="number" placeholder="Pcs" min="1">
+        </div>
+        <div class="fg">
+          <label for="lotNo">Ngày sản xuất</label>
+          <input id="lotNo" type="date">
+        </div>
+        <div class="fg full">
+          <label for="soKhuon">Số khuôn</label>
+          <div class="chip-row" id="soKhuon-chips"></div>
+          <input id="soKhuon" type="text" placeholder="Chọn mã SP trước">
+        </div>
+        <div class="fg full">
+          <label class="req" for="loaiSP">Chủng loại</label>
+          <select id="loaiSP">
+            <option value="hangloat" selected>Hàng loạt</option>
+            <option value="phattrien">Đang phát triển (tem nền đen)</option>
+          </select>
+        </div>
         <div class="fg full">
           <label for="ghiChu">Ghi chú</label>
           <textarea id="ghiChu" placeholder="VD: Đúc mẫu"></textarea>
         </div>
-        <div class="fg full">
-          <label class="req" for="loaiSP">Chủng loại sản phẩm</label>
-          <select id="loaiSP">
-            <option value="hangloat" selected>Sản phẩm sản xuất hàng loạt</option>
-            <option value="phattrien">Sản phẩm đang phát triển (in tem nền đen)</option>
-          </select>
-        </div>
       </div>
       <div class="btns">
-        <button class="btn btn-s" onclick="clearAll()">Xoá</button>
-        <button class="btn btn-p" id="btnIn" onclick="inTem()">In tem</button>
+        <button class="btn btn-s" type="button" onclick="clearAll()">Làm lại</button>
+        <button class="btn btn-p" id="btnIn" type="button" onclick="inTem()">In tem</button>
       </div>
     </div>
   </div>
 
-  <!-- ============ TAB: Chỉ thị SX (Kanban) ============ -->
+  <!-- ============ Đúc · Theo KH (lô tem chỉ thị Kanban) ============ -->
   <div id="panelKanban" style="display:none">
     <div class="card">
-      <div class="card-ttl">Tạo lô tem chỉ thị sản xuất (Kanban)</div>
       <div class="grid">
         <div class="fg">
           <label class="req" for="k_mayDuc">Máy đúc</label>
           <select id="k_mayDuc" onchange="onKanbanKhsx()"></select>
         </div>
         <div class="fg">
-          <label class="req" for="k_maSP">Mã sản phẩm</label>
-          <select id="k_maSP" onchange="onKanbanMaChange()"></select>
-        </div>
-        <div class="fg">
-          <label for="k_tenSP">Tên sản phẩm</label>
-          <input id="k_tenSP" type="text" placeholder="Tự điền theo mã" disabled>
-        </div>
-        <div class="fg">
-          <label for="k_nguyenLieu">Nguyên liệu</label>
-          <input id="k_nguyenLieu" type="text" placeholder="Tự điền theo mã SP" disabled>
-        </div>
-        <div class="fg">
-          <label for="k_soKhuon">Số khuôn</label>
-          <div class="chip-row" id="k_soKhuon-chips"></div>
-          <input id="k_soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
-        </div>
-        <div class="fg">
           <label class="req" for="k_ngay">Ngày chỉ thị</label>
           <input id="k_ngay" type="date" onchange="onKanbanKhsx()">
         </div>
-        <div class="fg">
-          <label for="k_slChuan">Số lượng / thùng (theo danh mục)</label>
-          <input id="k_slChuan" type="text" placeholder="Chọn mã SP — tự lấy theo danh mục" disabled>
+        <div class="fg full">
+          <label class="req" for="k_maSP">Mã sản phẩm</label>
+          <select id="k_maSP" onchange="onKanbanMaChange()"></select>
+        </div>
+        <div class="fg full tu-lay" id="tl_kanban"></div>
+        <div class="fg an">
+          <label for="k_tenSP">Tên sản phẩm</label>
+          <input id="k_tenSP" type="text" disabled>
+        </div>
+        <div class="fg an">
+          <label for="k_nguyenLieu">Nguyên liệu</label>
+          <input id="k_nguyenLieu" type="text" disabled>
+        </div>
+        <div class="fg an">
+          <label for="k_slChuan">SL / thùng</label>
+          <input id="k_slChuan" type="text" disabled>
+        </div>
+        <div class="fg full">
+          <label for="k_soKhuon">Số khuôn</label>
+          <div class="chip-row" id="k_soKhuon-chips"></div>
+          <input id="k_soKhuon" type="text" placeholder="Chọn mã SP trước">
         </div>
         <div class="fg">
           <label class="req" for="k_soThung">Số thùng</label>
-          <input id="k_soThung" type="number" placeholder="Số tem cần in" min="1" oninput="onKanbanRecalc()">
+          <input id="k_soThung" type="number" placeholder="Số tem" min="1" oninput="onKanbanRecalc()">
         </div>
         <div class="fg">
-          <label for="k_slThungCuoi">SL thùng cuối (nếu lẻ)</label>
+          <label for="k_slThungCuoi">SL thùng cuối</label>
           <input id="k_slThungCuoi" type="number" placeholder="Bỏ trống nếu đều nhau" min="1">
         </div>
         <div class="fg full">
@@ -266,83 +290,29 @@ textarea{resize:vertical;min-height:48px}
         </div>
       </div>
       <div class="btns">
-        <button class="btn btn-s" type="button" onclick="clearKanban()">Xoá</button>
-        <button class="btn btn-p" id="k_btnTao" type="button" onclick="taoLoKanban()">Tạo lô &amp; in</button>
+        <button class="btn btn-s" type="button" onclick="clearKanban()">Làm lại</button>
+        <button class="btn btn-p" id="k_btnTao" type="button" onclick="taoLoKanban()">In tem</button>
       </div>
     </div>
 
     <div class="card" id="k_batchCard" style="display:none">
-      <div class="card-ttl">Lô vừa tạo — <span id="k_batchLo"></span></div>
+      <div class="card-ttl">Lô vừa tạo — <span id="k_batchLo"></span><button type="button" class="ii" onclick="batII(this)">ⓘ</button></div>
+      <div class="ii-txt" hidden>Tem ở trạng thái <b>Chờ sản xuất</b>. Chỉ cộng sản lượng khi quét QR ở màn "Ghi nhận thùng (Kanban)".</div>
       <div id="k_batchList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
       <div class="btns">
         <button class="btn btn-p" type="button" onclick="printKanbanBatch()">In lại cả lô</button>
       </div>
-      <div class="empty-hint" style="text-align:left;padding-top:8px">Tem chỉ thị ở trạng thái <b>Chờ sản xuất</b> — chỉ cộng vào sản lượng khi người thao tác quét QR ghi nhận tại màn hình "Ghi nhận thùng (Kanban)".</div>
     </div>
   </div>
 
-  <!-- ============ TAB: Tem Thành Phẩm ============ -->
+  <!-- ============ Bavia / Gia Công / Thành phẩm (dùng chung form lô tem thành phẩm) ============ -->
   <div id="panelTp" style="display:none">
-    <div class="card">
-      <div class="card-ttl">In trước lô tem thành phẩm</div>
-      <div class="grid">
-        <div class="fg">
-          <label class="req" for="tp_congDoan">Công đoạn</label>
-          <select id="tp_congDoan" onchange="onTpCongDoanChange()"></select>
-        </div>
-        <div class="fg">
-          <label class="req" for="tp_maSP">Mã sản phẩm</label>
-          <select id="tp_maSP" onchange="onTpMaChange()"></select>
-        </div>
-        <div class="fg">
-          <label for="tp_tenSP">Tên sản phẩm</label>
-          <input id="tp_tenSP" type="text" placeholder="Tự điền theo mã" disabled>
-        </div>
-        <div class="fg">
-          <label for="tp_khachHang">Khách hàng</label>
-          <input id="tp_khachHang" type="text" placeholder="Tự điền theo mã (Mã KH — Tên KH)" disabled>
-        </div>
-        <div class="fg">
-          <label for="tp_maSpKh">Mã SP tại khách hàng</label>
-          <input id="tp_maSpKh" type="text" placeholder="Tự điền theo mã" disabled>
-        </div>
-        <div class="fg">
-          <label class="req" for="tp_ngay">Ngày sản xuất</label>
-          <input id="tp_ngay" type="date" onchange="onTpKhsx()">
-        </div>
-        <div class="fg">
-          <label for="tp_slChuan">SL / thùng (theo danh mục SP)</label>
-          <input id="tp_slChuan" type="text" disabled>
-        </div>
-        <div class="fg">
-          <label class="req" for="tp_soThung">Số thùng</label>
-          <input id="tp_soThung" type="number" placeholder="Số tem cần in" min="1">
-          <div class="empty-hint" id="tp_khsxHint" style="padding-top:4px"></div>
-        </div>
-        <div class="fg">
-          <label for="tp_slThungCuoi">SL thùng cuối (nếu lẻ)</label>
-          <input id="tp_slThungCuoi" type="number" placeholder="Bỏ trống nếu đều nhau" min="1">
-        </div>
-      </div>
-      <div class="btns">
-        <button class="btn btn-s" type="button" onclick="clearTp()">Xoá</button>
-        <button class="btn btn-p" id="tp_btnTao" type="button" onclick="taoLoTemThanhPham()">Tạo lô &amp; in</button>
-      </div>
-    </div>
-
-    <div class="card" id="tp_batchCard" style="display:none">
-      <div class="card-ttl">Lô vừa tạo — <span id="tp_batchLo"></span></div>
-      <div id="tp_batchList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
-      <div class="btns">
-        <button class="btn btn-p" type="button" onclick="printTpBatch()">In lại cả lô</button>
-      </div>
-      <div class="empty-hint" style="text-align:left;padding-top:8px">Tem thành phẩm ở trạng thái <b>Chờ đóng gói</b> — người kiểm chỉ quét QR ở màn hình "Ghi nhận thùng thành phẩm" khi thùng đầy, lúc đó mới chọn người kiểm tra (ghi nhận ngày giờ kiểm), hệ thống tự trừ nguồn từ tem Đúc đang có mặt tại công đoạn.</div>
-    </div>
-
     <!-- T147: in tem thùng Bavia (Dạng 2 — mã còn Gia Công / Sơn sau Bavia) nhiều mã 1 lần theo KHSX tuần.
-         Dùng lại mẫu tem thành phẩm 100×70 (A4 8 tem/tờ) + cd_tao_lo_tem_thanh_pham như form ở trên. -->
-    <div class="card" id="bvCard">
-      <div class="card-ttl">In tem thùng Bavia theo KHSX tuần (mã chuyển Gia Công / Sơn)</div>
+         Dùng lại mẫu tem thành phẩm 100×70 (A4 8 tem/tờ) + cd_tao_lo_tem_thanh_pham như form bên dưới. -->
+    <div class="card" id="bvCard" style="display:none">
+      <div class="card-ttl">Theo KH tuần<button type="button" class="ii" onclick="batII(this)">ⓘ</button></div>
+      <div class="ii-txt" hidden>Số tem đề xuất = số thùng theo KH trừ tem in sẵn chưa dùng. Tem không khoá theo ngày.
+        Tem chỉ có hiệu lực khi tổ Bavia quét ở Bảng điều khiển Bavia. Mã sau Bavia là OQC / Nhập kho in tem lúc đóng thùng, không in ở đây.</div>
       <div class="grid">
         <div class="fg">
           <label for="bv_khoang">Kế hoạch</label>
@@ -359,16 +329,74 @@ textarea{resize:vertical;min-height:48px}
           <th style="text-align:right">Cần thùng</th><th style="text-align:right">Tem còn</th><th style="text-align:right">Số tem in</th></tr></thead>
         <tbody id="bv_rows"></tbody>
       </table></div>
-      <div class="empty-hint" style="text-align:left">Số tem in đề xuất = số thùng theo KH trừ tem đã in chưa dùng. Tem không khoá theo ngày: dùng chưa hết thì hôm sau dùng tiếp.
-        Tem chỉ có hiệu lực khi tổ Bavia quét ở Bảng điều khiển Bavia. Mã đóng gói xuất hàng (sau Bavia là OQC / Nhập kho) in tem lúc đóng thùng, không in ở đây.</div>
       <div class="btns">
         <button class="btn btn-s" type="button" onclick="taiBvTp()">↻ Tải lại</button>
+        <button class="btn btn-s" type="button" id="bv_btnNgoaiKh" onclick="moNgoaiKh()">+ Mã ngoài KH</button>
         <button class="btn btn-p" id="bv_btnIn" type="button" onclick="inBvTp()">In tem đã chọn</button>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-ttl">Tem thùng Bavia in sẵn chưa dùng</div>
+    <div class="card" id="tpFormCard">
+      <div class="card-ttl" id="tpFormTtl" style="display:none"></div>
+      <div class="grid">
+        <div class="fg full" id="tp_cdWrap">
+          <label class="req" for="tp_congDoan">Công đoạn</label>
+          <select id="tp_congDoan" onchange="onTpCongDoanChange()"></select>
+        </div>
+        <div class="fg full">
+          <label class="req" for="tp_maSP">Mã sản phẩm</label>
+          <select id="tp_maSP" onchange="onTpMaChange()"></select>
+        </div>
+        <div class="fg full tu-lay" id="tl_tp"></div>
+        <div class="fg an">
+          <label for="tp_tenSP">Tên sản phẩm</label>
+          <input id="tp_tenSP" type="text" disabled>
+        </div>
+        <div class="fg an">
+          <label for="tp_khachHang">Khách hàng</label>
+          <input id="tp_khachHang" type="text" disabled>
+        </div>
+        <div class="fg an">
+          <label for="tp_maSpKh">Mã SP tại khách hàng</label>
+          <input id="tp_maSpKh" type="text" disabled>
+        </div>
+        <div class="fg an">
+          <label for="tp_slChuan">SL / thùng</label>
+          <input id="tp_slChuan" type="text" disabled>
+        </div>
+        <div class="fg full">
+          <label class="req" for="tp_ngay">Ngày sản xuất</label>
+          <input id="tp_ngay" type="date" onchange="onTpKhsx()">
+        </div>
+        <div class="fg">
+          <label class="req" for="tp_soThung">Số thùng</label>
+          <input id="tp_soThung" type="number" placeholder="Số tem" min="1">
+        </div>
+        <div class="fg">
+          <label for="tp_slThungCuoi">SL thùng cuối</label>
+          <input id="tp_slThungCuoi" type="number" placeholder="Bỏ trống nếu đều nhau" min="1">
+        </div>
+        <div class="fg full">
+          <div class="empty-hint" id="tp_khsxHint" style="text-align:left;padding-top:2px"></div>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn btn-s" type="button" onclick="clearTp()">Làm lại</button>
+        <button class="btn btn-p" id="tp_btnTao" type="button" onclick="taoLoTemThanhPham()">In tem</button>
+      </div>
+    </div>
+
+    <div class="card" id="tp_batchCard" style="display:none">
+      <div class="card-ttl">Lô vừa tạo — <span id="tp_batchLo"></span><button type="button" class="ii" onclick="batII(this)">ⓘ</button></div>
+      <div class="ii-txt" hidden>Tem ở trạng thái <b>Chờ đóng gói</b>. Khi thùng đầy, quét QR ở màn "Ghi nhận thùng thành phẩm" và chọn người kiểm; hệ thống tự trừ nguồn từ tem Đúc đang có ở công đoạn.</div>
+      <div id="tp_batchList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+      <div class="btns">
+        <button class="btn btn-p" type="button" onclick="printTpBatch()">In lại cả lô</button>
+      </div>
+    </div>
+
+    <div class="card" id="bvLoCard" style="display:none">
+      <div class="card-ttl">Tem in sẵn chưa dùng</div>
       <div class="nk-wrap"><table class="nk-table">
         <thead><tr><th>Lô in</th><th>Lúc in</th><th>Mã SP</th><th>Tag No</th><th style="text-align:right">Chưa dùng</th><th></th></tr></thead>
         <tbody id="bv_lo"></tbody>
@@ -577,25 +605,114 @@ function mondayOf(dateStr){
 // =============================================================================
 // TABS
 // =============================================================================
-function switchTab(tab){
-  var tabs = ['print', 'search', 'kanban', 'tp'];
-  if (tabs.indexOf(tab) < 0) tab = 'print';
-  document.getElementById('tabBtnPrint').classList.toggle('active', tab === 'print');
-  document.getElementById('tabBtnSearch').classList.toggle('active', tab === 'search');
-  document.getElementById('tabBtnKanban').classList.toggle('active', tab === 'kanban');
-  document.getElementById('tabBtnTp').classList.toggle('active', tab === 'tp');
-  document.getElementById('panelPrint').style.display = tab === 'print' ? 'block' : 'none';
-  document.getElementById('panelSearch').style.display = tab === 'search' ? 'block' : 'none';
-  document.getElementById('panelKanban').style.display = tab === 'kanban' ? 'block' : 'none';
-  document.getElementById('panelTp').style.display = tab === 'tp' ? 'block' : 'none';
-  if (tab !== 'search') { stopCamera(); }
-  if (tab === 'tp') taiBvTp();
+// T375: thay 4 tab bằng màn chọn LOẠI TEM. loai: print | kanban | bavia | gc | tp | search.
+// 'tp' cũ (link ?tab=tp từ Bảng điều khiển Bavia) → 'bavia'. Lựa chọn nhớ ở localStorage.
+var LOAI_TEM = {
+  print:  { ten: 'Đúc · In ngay',     cls: 'cd-duc', panel: 'panelPrint' },
+  kanban: { ten: 'Đúc · Theo KH',     cls: 'cd-duc', panel: 'panelKanban' },
+  bavia:  { ten: 'Bavia · Theo KH tuần', cls: 'cd-bv', panel: 'panelTp', cd: ['Bavia'] },
+  gc:     { ten: 'Gia Công · Tem GC', cls: 'cd-gc', panel: 'panelTp', cd: ['Gia Công'] },
+  tp:     { ten: 'Thành phẩm',        cls: 'cd-tp', panel: 'panelTp', cd: ['Đánh bóng Kẽm', 'OQC'] },
+  search: { ten: 'Tra cứu tem',       cls: 'cd-tc', panel: 'panelSearch' },
+};
+var loaiDangChon = '';
+function switchTab(loai){ chonLoai(loai); }
+function chonLoai(loai, khongNho){
+  var L = LOAI_TEM[loai]; if (!L) return veChonLoai();
+  var doiCd = loaiDangChon !== loai;
+  loaiDangChon = loai;
+  if (!khongNho) { try { localStorage.setItem('intem_loai', loai); } catch (e) {} }
+  var wrap = document.getElementById('mainWrap');
+  Object.keys(LOAI_TEM).forEach(function(k){ wrap.classList.remove(LOAI_TEM[k].cls); });
+  wrap.classList.add(L.cls);
+  document.getElementById('chonLoai').style.display = 'none';
+  document.getElementById('dangChon').style.display = 'flex';
+  var nh = document.getElementById('dangChonTen');
+  nh.textContent = L.ten; nh.className = 'nhan-loai ' + L.cls;
+  ['panelPrint', 'panelKanban', 'panelTp', 'panelSearch'].forEach(function(p){
+    document.getElementById(p).style.display = p === L.panel ? 'block' : 'none';
+  });
+  if (loai !== 'search') stopCamera();
+  if (L.panel === 'panelTp') datCheDoTp(loai, doiCd);
+  capNhatTuLay();
+  window.scrollTo(0, 0);
 }
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('tabBtnPrint').addEventListener('click', () => switchTab('print'));
-  document.getElementById('tabBtnSearch').addEventListener('click', () => switchTab('search'));
-  document.getElementById('tabBtnKanban').addEventListener('click', () => switchTab('kanban'));
-  document.getElementById('tabBtnTp').addEventListener('click', () => switchTab('tp'));
+function veChonLoai(){
+  loaiDangChon = '';
+  try { localStorage.removeItem('intem_loai'); } catch (e) {}
+  stopCamera();
+  ['panelPrint', 'panelKanban', 'panelTp', 'panelSearch', 'dangChon'].forEach(function(p){ document.getElementById(p).style.display = 'none'; });
+  document.getElementById('chonLoai').style.display = 'grid';
+  document.getElementById('msg').style.display = 'none';
+}
+document.addEventListener('DOMContentLoaded', function(){
+  [].forEach.call(document.querySelectorAll('#chonLoai [data-loai]'), function(b){
+    b.addEventListener('click', function(){ chonLoai(b.dataset.loai); });
+  });
+});
+
+// Bavia: bảng theo KH tuần + tem in sẵn chưa dùng; form lô tem chỉ mở khi bấm "+ Mã ngoài KH".
+// Gia Công: form khoá công đoạn "Gia Công". Thành phẩm: chọn Đánh bóng Kẽm / OQC.
+function datCheDoTp(loai, doiCd){
+  var L = LOAI_TEM[loai], bv = loai === 'bavia';
+  document.getElementById('bvCard').style.display = bv ? 'block' : 'none';
+  document.getElementById('bvLoCard').style.display = bv ? 'block' : 'none';
+  document.getElementById('tpFormCard').style.display = bv ? 'none' : 'block';
+  var ttl = document.getElementById('tpFormTtl');
+  ttl.textContent = 'Mã ngoài KH'; ttl.style.display = bv ? 'flex' : 'none';
+  if (doiCd) {
+    document.getElementById('tp_batchCard').style.display = 'none';
+    var sel = document.getElementById('tp_congDoan');
+    var cu = sel.value;
+    sel.innerHTML = (L.cd.length > 1 ? '<option value="">-- Chọn công đoạn --</option>' : '')
+      + L.cd.map(function(cd){ return '<option value="' + cd + '">' + cd + '</option>'; }).join('');
+    sel.value = L.cd.indexOf(cu) >= 0 ? cu : (L.cd.length === 1 ? L.cd[0] : '');
+    document.getElementById('tp_cdWrap').classList.toggle('an', L.cd.length === 1);
+    onTpCongDoanChange();
+  }
+  if (bv) taiBvTp();
+}
+function moNgoaiKh(){
+  var c = document.getElementById('tpFormCard');
+  var mo = c.style.display === 'none';
+  c.style.display = mo ? 'block' : 'none';
+  if (mo) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function batII(btn){
+  var t = btn.closest('.card-ttl').nextElementSibling;
+  if (t && t.classList.contains('ii-txt')) t.hidden = !t.hidden;
+}
+
+// Khung "tự lấy theo danh mục" — đọc từ các ô ẩn (JS cũ vẫn ghi vào đó).
+function escTl(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return '&#' + c.charCodeAt(0) + ';'; }); }
+function tlMuc(nhan, v){ return v ? '<span>' + nhan + ': <b>' + escTl(v) + '</b></span>' : ''; }
+function capNhatTuLay(){ try { veTuLay(); } catch (e) {} }
+function veTuLay(){
+  var v = function(id){ var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
+  document.getElementById('tl_print').innerHTML = v('maSP')
+    ? tlMuc('Tên', v('tenSP')) + tlMuc('Nguyên liệu', v('nguyenLieu')) : '';
+  document.getElementById('tl_kanban').innerHTML = v('k_maSP')
+    ? tlMuc('Tên', v('k_tenSP')) + tlMuc('Nguyên liệu', v('k_nguyenLieu'))
+      + (v('k_slChuan') ? tlMuc('SL/thùng', v('k_slChuan')) : '<span class="canh">⚠ Chưa khai SL đóng gói chuẩn</span>') : '';
+  var tpSl = tpSlThung();
+  document.getElementById('tl_tp').innerHTML = v('tp_maSP')
+    ? tlMuc('Tên', v('tp_tenSP')) + tlMuc('Khách hàng', v('tp_khachHang')) + tlMuc('Mã KH', v('tp_maSpKh'))
+      + (tpSl > 0 ? tlMuc('SL/thùng', fmtInt(tpSl) + ' pcs') : (v('tp_congDoan') ? '<span class="canh">⚠ Chưa khai SL/thùng ' + escTl(v('tp_congDoan')) + '</span>' : '')) : '';
+  capNhatNutIn();
+}
+function nhanNutIn(idSoThung){
+  var n = Math.round(Number(document.getElementById(idSoThung).value) || 0);
+  return n > 0 ? 'In ' + n + ' tem' : 'In tem';
+}
+function capNhatNutIn(){
+  [['k_btnTao', 'k_soThung'], ['tp_btnTao', 'tp_soThung']].forEach(function(p){
+    var b = document.getElementById(p[0]);
+    if (b && !b.disabled) b.textContent = nhanNutIn(p[1]);
+  });
+}
+// Mọi thay đổi trên form (chọn, gõ, bấm Làm lại) → vẽ lại khung tự lấy + nhãn nút, sau khi handler cũ chạy xong.
+['change', 'input', 'click'].forEach(function(ev){
+  document.addEventListener(ev, function(){ setTimeout(capNhatTuLay, 0); });
 });
 
 // =============================================================================
@@ -661,7 +778,7 @@ function updateKanbanOnly(item){
   var el = document.getElementById("kanbanOnlyWarn");
   el.style.display = on ? "block" : "none";
   el.innerHTML = on ? "⛔ Mã <b>" + String(item.ma).replace(/[&<>"]/g, function(c){ return "&#" + c.charCodeAt(0) + ";"; }) + "</b> chỉ thị sản xuất bằng <b>Kanban</b> — không in tem thủ công. "
-    + "Tạo lô ở tab <a href=\"#\" onclick=\"switchTab('kanban');return false\">📋 Chỉ thị SX</a>, sản lượng ghi nhận khi quét QR tem chỉ thị." : "";
+    + "In ở <a href=\"#\" onclick=\"switchTab('kanban');return false\">Đúc · Theo KH</a>." : "";
   document.getElementById("btnIn").disabled = on;
 }
 
@@ -1199,6 +1316,7 @@ async function onKanbanKhsx(){
     + (goiY ? ('   →   gợi ý ' + goiY + ' thùng') : '');
   if (goiY && !document.getElementById('k_soThung').value) document.getElementById('k_soThung').value = goiY;
   onKanbanRecalc();
+  capNhatTuLay();
 }
 
 // Số lượng / thùng hiện hành = theo danh mục của mã SP đang chọn (không nhập tay).
@@ -1260,7 +1378,7 @@ async function taoLoKanban(){
       p_sl_thung_cuoi: slCuoi ? Number(slCuoi) : null,
       p_so_khuon: soKhuon || null, p_nguyen_lieu: nguyenLieu || null, p_nguoi: nguoi,
     });
-    btn.disabled = false; btn.textContent = 'Tạo lô & in';
+    btn.disabled = false; btn.textContent = nhanNutIn('k_soThung');
     if (res.error) return err('Lỗi server: ' + res.error.message);
     var data = res.data;
     if (!data || !data.ok) return err(data && data.error ? data.error : 'Tạo lô thất bại');
@@ -1269,7 +1387,7 @@ async function taoLoKanban(){
     showMsg('✅ Đã tạo ' + data.so_tem + ' tem (lô ' + data.id_lo_chi_thi + ') — đang mở cửa sổ in…', 'ok', 6000);
     printKanbanBatch();
   } catch (e) {
-    btn.disabled = false; btn.textContent = 'Tạo lô & in';
+    btn.disabled = false; btn.textContent = nhanNutIn('k_soThung');
     err('Lỗi: ' + (e && e.message ? e.message : e));
   }
 }
@@ -1482,6 +1600,7 @@ async function onTpKhsx(){
   hintEl.textContent = 'KH ' + cd + ' ngày ' + ngay.split('-').reverse().join('/') + ': ' + fmtInt(khNgay) + ' pcs'
     + (goiY ? ('   →   gợi ý ' + goiY + ' thùng') : '');
   if (goiY && !document.getElementById('tp_soThung').value) document.getElementById('tp_soThung').value = goiY;
+  capNhatTuLay();
 }
 
 function tpSlThung(){
@@ -1498,6 +1617,9 @@ function clearTp(){
   document.getElementById('tp_khsxHint').textContent = '';
   document.getElementById('tp_batchCard').style.display = 'none';
   document.getElementById('msg').style.display = 'none';
+  // T375: Gia Công / Bavia khoá 1 công đoạn → giữ lại sau khi làm trống form.
+  var L = LOAI_TEM[loaiDangChon];
+  if (L && L.cd && L.cd.length === 1) document.getElementById('tp_congDoan').value = L.cd[0];
 }
 
 async function taoLoTemThanhPham(){
@@ -1527,7 +1649,7 @@ async function taoLoTemThanhPham(){
       p_sl_thung_cuoi: slCuoi ? Number(slCuoi) : null,
       p_nguoi: nguoi,
     });
-    btn.disabled = false; btn.textContent = '🏷️ Tạo lô & in';
+    btn.disabled = false; btn.textContent = nhanNutIn('tp_soThung');
     if (res.error) return err('Lỗi server: ' + res.error.message);
     var data = res.data;
     if (!data || !data.ok) return err(data && data.error ? data.error : 'Tạo lô thất bại');
@@ -1536,7 +1658,7 @@ async function taoLoTemThanhPham(){
     showMsg('✅ Đã tạo ' + data.so_tem + ' tem (lô ' + data.id_lo_chi_thi + ') — đang mở cửa sổ in…', 'ok', 6000);
     printTpBatch();
   } catch (e) {
-    btn.disabled = false; btn.textContent = '🏷️ Tạo lô & in';
+    btn.disabled = false; btn.textContent = nhanNutIn('tp_soThung');
     err('Lỗi: ' + (e && e.message ? e.message : e));
   }
 }
@@ -2069,12 +2191,15 @@ async function inTheoUrl(){
     document.getElementById("loading").style.display="none";
     applyPrefill();
     document.getElementById("mainWrap").style.display="block";
-    // ?tagNo=... (từ tra-cuu-tem.html "Xem chi tiết") → mở luôn tab Tra cứu,
-    // điền sẵn Tag No và tìm ngay.
-    // ?tab=tp (link từ Bảng điều khiển Bavia) → mở tab Tem Thành Phẩm.
-    if (new URLSearchParams(location.search).get('tab') === 'tp') switchTab('tp');
+    // T375: chọn sẵn loại tem — ?tagNo= (từ tra-cuu-tem.html) → Tra cứu; ?tab=tp (Bảng điều khiển
+    // Bavia) → Bavia; ?maSP= (từ ĐK Đúc) → Đúc · In ngay; còn lại mở loại đã chọn lần trước.
+    var nhoLoai = ''; try { nhoLoai = localStorage.getItem('intem_loai') || ''; } catch (e) {}
+    if (PREFILL && PREFILL.tagNo) chonLoai('search', true);
+    else if (PREFILL && PREFILL.tab === 'tp') chonLoai('bavia', true);
+    else if (PREFILL && PREFILL.maSP) chonLoai('print', true);
+    else if (LOAI_TEM[nhoLoai]) chonLoai(nhoLoai, true);
+    else veChonLoai();
     if (PREFILL && PREFILL.tagNo) {
-      switchTab('search');
       document.getElementById("searchTag").value = PREFILL.tagNo;
       findTem();
     }
