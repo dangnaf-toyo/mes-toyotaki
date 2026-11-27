@@ -609,7 +609,7 @@ async function loadQueue(){
     if (pErr) console.warn('duc_ipqc_phien_dang_kiem:', pErr.message);
     const pMap = {}; (phien || []).forEach(p => { pMap[p.checkpoint_id] = p; });
     deduped.forEach(cp => { cp.phien = pMap[cp.id_checkpoint] || null; });
-  } catch (e) { console.warn('duc_ipqc_phien_dang_kiem:', e.message); }
+  } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được phiên IPQC đang kiểm: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.warn('duc_ipqc_phien_dang_kiem:', e.message); }
 
   const queue = deduped
     .sort((a, b) => {

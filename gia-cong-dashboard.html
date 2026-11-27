@@ -1451,7 +1451,7 @@ function tick() {
   sel = new URLSearchParams(location.search).get('may') || lsGet('gcdb_may', null);   // T310: chuông dao mở thẳng máy
   $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; reasons = {}; ngOpen = testOpen = null; stopForm = false; taiLai(); };
   $('#btnReload').onclick = () => { flash = null; taiLai(); };
-  try { await taiDanhMuc(); } catch (e) { console.error(e); }
+  try { await taiDanhMuc(); } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được danh mục (Gia công): ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.error(e); }
   try {
     const { data: ss } = await sb.auth.getSession();
     const { data: u } = await sb.from('user_roles').select('role').eq('user_id', ss.session.user.id).maybeSingle();

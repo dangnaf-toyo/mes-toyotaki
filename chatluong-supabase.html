@@ -1274,7 +1274,7 @@ async function loadData(){
     try {
       const nhom = await fetchSupabaseTable('cl_nhom_khach_hang', 'ma_nhom,ten_hien_thi,thu_tu');
       if (nhom && nhom.length) NHOM_KH_DS = nhom.sort((a, b) => a.thu_tu - b.thu_tu);
-    } catch (e) { console.warn('Không đọc được cl_nhom_khach_hang — dùng tên mặc định', e); }
+    } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được nhóm khách hàng — đang dùng tên mặc định: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.warn('Không đọc được cl_nhom_khach_hang — dùng tên mặc định', e); }
     const data = buildDataModel(Object.assign({}, core, extra));
     renderDashboard(data);
     const missingExtra = extraSettled.filter(r => r.status !== 'fulfilled').length;
