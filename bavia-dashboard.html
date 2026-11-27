@@ -158,6 +158,7 @@
   .tiny:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
   .tiny.bad{color:var(--alarm-fg);border-color:var(--alarm-bd);}
   .tiny.test{color:var(--warn-fg);border-color:var(--warn-bd);}
+  .tiny.ok{color:var(--run-fg);background:var(--run-bg);border-color:var(--run-bd);font-weight:700;}
   .tiny.xe{color:#fff;background:var(--run-fg);border-color:var(--run-fg);font-weight:700;}
   .ng-form{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;background:var(--alarm-bg);border:1px solid var(--alarm-bd);border-radius:7px;padding:6px 8px;}
   .ng-form select,.ng-form input,.test-form select,.test-form input,.ret-form input{border:1.5px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--text);min-height:30px;}
@@ -667,7 +668,8 @@ function srcList(l) {
       '<div class="qty">' + fmt(con) + '<small> / ' + fmt(n.sl_khai_bao) + '</small></div>' +
       '<div class="meta">Đúc ' + esc(n.may || '?') + ' · ' + dmy(n.ngay_duc) + (n.so_khuon ? ' · khuôn ' + esc(n.so_khuon) : '') + '</div>' +
       '<div class="acts">' + (!het && !khoa ? '<button class="tiny bad" type="button" data-ng="' + i + '">NG</button><button class="tiny test" type="button" data-test="' + i + '">Test</button>' +
-          (l.info && l.info.dang === 2 ? '<button class="tiny xe" type="button" data-tach="' + i + '" title="Xong 1 xe con: tạo tem con từ tem này">Tách</button>' : '') : '') +
+          (l.info && l.info.dang === 2 ? '<button class="tiny xe" type="button" data-tach="' + i + '" title="Xong 1 xe con: tạo tem con từ tem này">Tách</button>' +
+            '<button class="tiny ok" type="button" data-xongxe="' + i + '" title="Làm xong cả xe, hàng để lại trên xe">Xong xe</button>' : '') : '') +
         (!khoa ? '<button class="tiny" type="button" data-rm="' + n.id + '" title="Bỏ khai báo (quét nhầm / chuyển Line khác)">Bỏ</button>' : '') + '</div>' +
       '<div class="bar"><i style="width:' + (n.sl_khai_bao ? Math.max(0, con) / n.sl_khai_bao * 100 : 0) + '%"></i></div>' +
       (ngOpen === i ? ngForm(n, i) : '') + (testOpen === i ? testForm(n, i) : '') + (tachOpen === i ? tachForm(l, n, i) : '') +
@@ -841,6 +843,8 @@ function renderWs() {
           '<td class="mono" style="font-weight:500;font-size:11.5px">' + (b.nguon || []).map(s => esc(s.tag_no) + ' (' + fmt(s.so_luong_lay) + ')').join(', ') + '</td>' +
           '<td>' + esc(b.nguoi_lam || '') + '</td><td>' + esc(b.nguoi_kiem || '') + '</td>' +
           '<td>' + (b.dang === 1 ? '<button class="tiny" type="button" data-in="' + esc(b.tag_tp) + '">In lại</button>'
+            : b.dang === 3 && !/-[A-Z]$/.test(b.tag_tp) ? '<span class="chip flow">Xong xe → ' + esc(nextStep(l)) + '</span>' +
+              (D.ket_ca ? '' : ' <button class="tiny" type="button" data-xehuy="' + esc(b.tag_tp) + '">Huỷ</button>')
             : b.dang === 3 ? '<span class="chip flow">Tem con → ' + esc(nextStep(l)) + '</span> <button class="tiny" type="button" data-intach="' + esc(b.tag_tp) + '">In</button>'
             : '<span class="chip flow">' + esc(nextStep(l)) + '</span>') + '</td></tr>').join('') +
         '</tbody></table></div>' : '<div class="empty-box">Chưa có thùng nào trong ca.</div>') + '</div>' +
@@ -1029,6 +1033,26 @@ document.addEventListener('click', async e => {
       await taiLai();
     });
     if (w && !daIn && !w.closed) w.close();
+    return;
+  }
+  // T378: Xong xe — làm xong cả xe, hàng để lại trên xe; quét tem xe ở Chuyển công đoạn
+  if (t.dataset.xongxe !== undefined) {
+    const n = (l.nguon || [])[Number(t.dataset.xongxe)]; if (!n) return;
+    if (!(await hoiXacNhan('Xe ' + n.tag_no + ' xong (' + fmt(n.con) + ' pcs)?', { nutOk: 'Xong xe' }))) return;
+    await chay(async () => {
+      const r = await goi('bavia_xong_xe', { p_id_tram: l.id_tram, p_id: Number(n.id) });
+      setFlash('ok', 'Xe <b>' + esc(r.tag_no) + '</b> xong (' + fmt(r.so_luong) + ' pcs). Quét tem xe ở Chuyển công đoạn → ' + esc(r.buoc_sau || nextStep(l)) + '.');
+      await taiLai();
+    });
+    return;
+  }
+  if (t.dataset.xehuy) {
+    if (!(await hoiXacNhan('Huỷ Xong xe ' + t.dataset.xehuy + '?', { nutOk: 'Huỷ Xong xe', nguyHiem: true }))) return;
+    await chay(async () => {
+      const r = await goi('bavia_xong_xe_huy', { p_id_tram: l.id_tram, p_tag: t.dataset.xehuy });
+      setFlash('warn', 'Đã huỷ Xong xe <b>' + esc(r.tag_no) + '</b>, tem trở lại danh sách đang dùng.');
+      await taiLai();
+    });
     return;
   }
   if (t.dataset.rm) {
