@@ -32,7 +32,7 @@ const Qc02Data = (() => {
       if (error) throw error;
       accounts = data || [];
     }
-    catch (e) { console.warn('Không đọc được tài khoản; dùng danh mục nhân sự hiện có:', e.message); }
+    catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không đọc được tài khoản — dùng danh mục nhân sự hiện có: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.warn('Không đọc được tài khoản; dùng danh mục nhân sự hiện có:', e.message); }
     for (const r of accounts.filter(active)) {
       const code = String(r.username || r.user_id || '').trim();
       if (!code) continue;
@@ -69,7 +69,7 @@ const Qc02Data = (() => {
     async function refresh() {
       const current = ++request;
       try { const rows=await employees(roles); if(current===request)populate(list, rows, employeeValue, r => r.name); }
-      catch (e) { console.error('Không tải được danh mục nhân sự QC', e); }
+      catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được danh mục nhân sự QC: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.error('Không tải được danh mục nhân sự QC', e); }
     }
     ids.forEach(id => {
       const input = document.getElementById(id);

@@ -512,7 +512,7 @@ button.link-btn:hover{background:var(--bg-sunken);border-color:var(--accent);tex
 <script src="shared/navbar.js?v=T392"></script>
 <script src="shared/mes-qc-fields.js"></script>
 <script src="shared/qc02-view.js?v=qc-sessions-20261019"></script>
-<script src="shared/qc02-data.js?v=T183"></script>
+<script src="shared/qc02-data.js?v=T393"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared/ipqc-gc-standard.js?v=20261106-signed-copy"></script>
 <script src="shared/ipqc-spc.js?v=T213"></script>
@@ -1052,7 +1052,7 @@ async function searchHistory(){
   state.suCoPhutDungMap = buildSuCoPhutDungMap(state.suCoLog);
 
   let giaoMap = {};
-  try { giaoMap = await taiMocGiaoQc(data); } catch (e) { console.error('Không tải được mốc giao QC', e); }
+  try { giaoMap = await taiMocGiaoQc(data); } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được mốc giao QC: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.error('Không tải được mốc giao QC', e); }
   const list = data.map(r => mapIpqcDoneRow(r, giaoMap));
   if (!state.dynamicFiltersLoaded) { populateDynamicFilterOptions(list); state.dynamicFiltersLoaded = true; }
   renderHistory(list);

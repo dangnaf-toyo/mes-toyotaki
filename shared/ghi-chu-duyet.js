@@ -40,7 +40,7 @@
       if (o.nguyHiem) ok.classList.add('xau');
       const kiem = () => { ok.disabled = !!o.batBuoc && !ta.value.trim(); };
       ta.addEventListener('input', kiem); kiem();
-      if (typeof o.them === 'function') { try { o.them(d, ta); } catch (e) { console.warn('hoiGhiChuDuyet.them:', e); } }   // T302: chèn thêm nút chọn
+      if (typeof o.them === 'function') { try { o.them(d, ta); } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Lỗi chương trình ở hộp duyệt: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.warn('hoiGhiChuDuyet.them:', e); } }   // T302: chèn thêm nút chọn
       let xong = false;
       const dong = (v) => { if (xong) return; xong = true; try { d.close(); } catch (e) {} d.remove(); res(v); };
       ok.onclick = () => { if (!ok.disabled) dong(ta.value.trim()); };

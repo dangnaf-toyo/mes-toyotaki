@@ -2937,7 +2937,7 @@ async function taiChoDap(){
     const { data, error } = await sb.rpc('duc_cho_dap');
     if (error) throw error;
     choDapCache = data || [];
-  } catch (e) { console.warn('T346: không tải được chờ dập', e); }
+  } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được số Chờ dập: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.warn('T346: không tải được chờ dập', e); }
   veDap();
 }
 function veDap(){
@@ -4901,7 +4901,7 @@ async function endShift(){
           ' (máy đang chạy ' + escapeHtml(t.dang_chay || '—') + ')').join('<br>') +
         (moCoi.length > 8 ? '<br>… và ' + (moCoi.length - 8) + ' tem nữa' : '');
     }
-  } catch (e) { console.error('duc_tem_mo_coi_ca lỗi:', e); }
+  } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không kiểm tra được tem in lệch mã máy: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.error('duc_tem_mo_coi_ca lỗi:', e); }
 
   const list = document.getElementById('es-machine-list');
   list.innerHTML = '';

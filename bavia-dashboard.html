@@ -533,7 +533,7 @@ async function layCaMo() {
   try {
     const { data, error } = await sb.rpc('bavia_ca_dang_mo');
     if (!error && data && data.ca) { caMo = data; return caMo; }
-  } catch (e) { console.error(e); }
+  } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được ca đang mở (Bavia) — tạm theo giờ hiện tại: ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.error(e); }
   if (!caMo) caMo = goiYNgayCa();
   return caMo;
 }
@@ -1465,7 +1465,7 @@ function tick() {
   $('#fNgay').onchange = $('#fCa').onchange = () => { flash = null; reasons = {}; ngOpen = testOpen = retOpen = tachOpen = null; caTuChon = !laCaMo(); taiLai(); };
   $('#fTruongCa').onchange = () => lsSet('bvdb_truong_ca', $('#fTruongCa').value);
   $('#btnReload').onclick = () => { flash = null; taiLai(); };
-  try { await taiDanhMuc(); } catch (e) { console.error(e); }
+  try { await taiDanhMuc(); } catch (e) { if (window.mesBaoLoi) mesBaoLoi('Không tải được danh mục (Bavia): ' + (typeof MesLoi !== 'undefined' ? MesLoi.gon(e) : (e && e.message) || e), { tuDong: true }); /* T393 */ console.error(e); }
   try {
     const { data: ss } = await sb.auth.getSession();
     const { data: u } = await sb.from('user_roles').select('role').eq('user_id', ss.session.user.id).maybeSingle();
