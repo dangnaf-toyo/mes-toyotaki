@@ -2380,6 +2380,7 @@ const CT_NGUOI_DUYET = { 1: 'Tổ trưởng khuôn', 2: 'QLBP Đúc', 3: 'GĐ SX
 function buocSuCo(s){
   const coCt = canCt(s), coQc = canIpqc(s.open_loai_su_co) && !!s.open_id_su_co;
   const laF1 = String(s.open_loai_su_co || '').slice(0, 2).toUpperCase() === 'F1';   // T384
+  const laNhanLuc = String(s.open_loai_su_co || '').slice(0, 1).toUpperCase() === 'D';   // T386: D1/D2 — chỉ Trưởng ca bấm Xong
   const steps = coCt ? [['duyet', 'Duyệt khuôn'], ['xu_ly', 'Xử lý']] : [['xu_ly', 'Xử lý']];
   if (laF1) steps.unshift(['xac_nhan', 'Xác nhận']);
   if (coQc) steps.push(['giao', 'Giao QC'], ['ipqc', 'IPQC']);
@@ -2415,6 +2416,7 @@ function buocSuCo(s){
     tu = dk && dk.cho_tu ? dk.cho_tu : (g ? g.thoi_diem : null);
   } else if (buoc === 'duoc_dong') {
     if (coQc) { k = 'xong'; ai = 'Trưởng ca'; viec = 'IPQC ' + (dk && dk.ket_qua_ipqc === 'OK' ? 'OK' : 'đạt') + ' → bấm ✓ Xong'; cls = 'xong'; }
+    else if (laNhanLuc) { k = 'xong'; ai = 'Trưởng ca'; viec = 'đủ người → bấm ✓ Xong'; cls = 'xong'; }   // T386: D1/D2 không có người xử lý
     else viec = 'xử lý xong → bấm ✓ Xong';
   }
   // T384: F1 do IPQC mở — Trưởng ca xác nhận bất thường + cử người (đảm nhiệm trống = chưa xác nhận). Chỉ nhắc, không chặn.
