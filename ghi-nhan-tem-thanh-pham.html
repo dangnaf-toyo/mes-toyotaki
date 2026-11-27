@@ -229,6 +229,8 @@ header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 1
 .tiny{border:1px solid var(--border-strong);background:var(--bg-panel);color:var(--text-muted);border-radius:6px;padding:3px 9px;font-size:11.5px;font-weight:700;min-height:28px}
 .tiny.bad{color:var(--alarm-fg);border-color:var(--alarm-bd)}
 .tiny.bad:hover{background:var(--alarm-bg)}
+.tiny.ok{color:var(--ok-fg);border-color:var(--ok-bd)}
+.tiny.ok:hover{background:var(--ok-bg)}
 .ng-form{display:none;margin-top:7px;padding:6px 8px;border-radius:7px;background:var(--alarm-bg);border:1px solid var(--alarm-bd)}
 .ng-form.show{display:flex;flex-direction:column;gap:6px}
 .ng-form .ng-row{display:flex;gap:6px;flex-wrap:wrap}
@@ -915,6 +917,7 @@ async function loadNguonList(){
   // tiếp qua bavia_sua_hang (cong-doan-dashboard.html) — khác với "⚠ Báo NG"
   // (cd_khai_bao_ng) là phế ngay, trừ thẳng không tạo tem.
   const isBavia = document.getElementById('congDoan').value === 'Bavia';
+  const isDbk = document.getElementById('congDoan').value === 'Đánh bóng Kẽm';
   box.innerHTML = rows.map((r, i) =>
     '<div class="nguon-item-wrap' + (i === 0 ? ' first' : '') + '" data-tag-no="' + escapeHtml(r.tag_no) + '">' +
     '<div class="nguon-item">' +
@@ -924,6 +927,7 @@ async function loadNguonList(){
         '<div class="n-con">' + fmtNum(r.so_luong) + ' <small style="font-size:11px;color:var(--text-dim);font-weight:500">pcs</small></div>' +
         '<button type="button" class="tiny bad" data-act="ng-toggle">NG</button>' +
         (isBavia ? '<button type="button" class="tiny bad" data-act="ng-sua-toggle">NG cần sửa</button>' : '') +
+        (isDbk ? '<button type="button" class="tiny ok" data-act="xong-xe" title="Xe đã đánh bóng xong, hàng để lại trên xe">Xong xe</button>' : '') +
         '<button type="button" class="tiny" data-act="bo-nguon" title="Bỏ tem khỏi danh sách đang dùng (số còn lại giữ nguyên trên tem)">Bỏ</button>' +
       '</div>' +
     '</div>' +
@@ -1040,7 +1044,21 @@ document.getElementById('nguonList').addEventListener('click', (e) => {
   else if (act === 'ng-sua-toggle') toggleNgSuaForm(wrap);
   else if (act === 'ng-sua-submit') submitNgSua(wrap);
   else if (act === 'bo-nguon') boNguon(wrap);
+  else if (act === 'xong-xe') xongXe(wrap);
 });
+
+// ── T377: Xong xe — tem xe đánh bóng xong, hàng để lại trên xe ───────────────
+async function xongXe(wrap){
+  const tagNo = wrap.getAttribute('data-tag-no');
+  if (!confirm('Xe ' + tagNo + ' đã xong?\nSau đó quét tem ở Chuyển công đoạn để chuyển tiếp.')) return;
+  const congDoan = document.getElementById('congDoan').value;
+  const { data, error } = await sb.rpc('cd_xong_xe', { p_tag_no: tagNo, p_cong_doan: congDoan, p_nguoi: myIdentity });
+  if (error) { showMsg('Lỗi hệ thống: ' + error.message, 'err', 6000); return; }
+  if (!data || data.ok === false) { showMsg((data && data.error) || 'Không xác nhận được', 'err', 6000); return; }
+  showMsg('✓ Xe ' + tagNo + ' đã xong (' + fmtNum(data.so_luong) + ' pcs)', 'ok', 3000);
+  await loadNguonList();
+  focusScan();
+}
 
 // ── T252 (R17): Bỏ tem nguồn khỏi danh sách đang dùng ─────────────────────────
 async function boNguon(wrap){
