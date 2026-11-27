@@ -6,7 +6,7 @@
   section.className = 'section';
   section.innerHTML = `<h3>Kiểm tra LOT</h3>
     <label>LOT đang kiểm <select id="iqcMultiLot"><option value="">LOT mới</option></select></label>
-    <p id="iqcMultiProgress">LOT mới</p><p id="iqcLotStartedAt" class="help"></p>
+    <p id="iqcMultiProgress">LOT mới</p><p id="iqcLotStartedAt" class="help"></p><p id="iqcMultiSummary" class="iqc-multi-summary"></p>
     <div class="iqc-multi-grid"><label>Bắt đầu lần này <input id="iqcMultiStart" type="datetime-local" step="1"></label><label>Hoàn thành LOT <input id="iqcMultiEnd" type="datetime-local" step="1"></label><input id="iqcMultiDate" type="hidden">
     <label>SL kiểm lần này <input id="iqcMultiChecked" type="number" min="1" step="1"></label>
     <label>OK <input id="iqcMultiOk" type="number" min="0" step="1" value="0"></label>
@@ -87,23 +87,34 @@
   function catalogDefect(c, row={}) {
     const div=document.createElement('div');div.className='iqc-catalog-defect';div.dataset.catalog='1';div.dataset.code=c.ma_loi||c.code||'';div.dataset.group=c.defect_group||'';
     const name=input('name'),detailButton=text('button','Chi tiết'),qty=input('qty','number'),detail=text('div',''),detailInput=input('detail');
-    name.readOnly=true;name.value=`${div.dataset.code ? div.dataset.code+' · ' : ''}${c.label}`;qty.value=row.so_luong??0;detailInput.value=row.chi_tiet??'';detailInput.placeholder='Chi tiết / vị trí';detail.className='iqc-catalog-detail';detail.hidden=true;detail.append(detailInput);
+    const code=div.dataset.code,label=String(c.label||'').replace(new RegExp('^'+code.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*[-–—:·]?\\s*','i'),'');div.dataset.label=label;name.readOnly=true;name.value=`${code ? code+' ' : ''}${label}`;qty.value=row.so_luong??0;detailInput.value=row.chi_tiet??'';detailInput.placeholder='Chi tiết / vị trí';detail.className='iqc-catalog-detail';detail.hidden=true;detail.append(detailInput);
     detailButton.type='button';detailButton.className='button btn-secondary btn-small';detailButton.setAttribute('aria-expanded','false');detailButton.onclick=()=>{detail.hidden=!detail.hidden;detailButton.setAttribute('aria-expanded',String(!detail.hidden));if(!detail.hidden)detailInput.focus();};
     if(detailInput.value){detail.hidden=false;detailButton.setAttribute('aria-expanded','true');}
     div.append(name,detailButton,qty,detail);return div;
   }
   $id('iqcMultiAdd').onclick=()=>addOtherDefect();
   function readDefects() {
-    const known=[...$id('iqcMultiRows').querySelectorAll('.iqc-catalog-defect')].map(row=>({ma_loi:row.dataset.code||null,ten_loi:row.querySelector('.name').value.replace(/^.*? · /,''),chi_tiet:row.querySelector('.detail').value.trim(),nhom_loi:row.dataset.group||null,so_luong:Number(row.querySelector('.qty').value)})).filter(x=>x.so_luong!==0||x.chi_tiet);
+    const known=[...$id('iqcMultiRows').querySelectorAll('.iqc-catalog-defect')].map(row=>({ma_loi:row.dataset.code||null,ten_loi:row.dataset.label,chi_tiet:row.querySelector('.detail').value.trim(),nhom_loi:row.dataset.group||null,so_luong:Number(row.querySelector('.qty').value)})).filter(x=>x.so_luong!==0||x.chi_tiet);
     const others=[...$id('iqcMultiOtherRows').children].map(row=>({ma_loi:null,ten_loi:row.querySelector('.name').value.trim(),chi_tiet:row.querySelector('.detail').value.trim(),nhom_loi:'Lỗi khác',so_luong:Number(row.querySelector('.qty').value)})).filter(x=>x.ten_loi||x.chi_tiet||x.so_luong);
     return [...known,...others];
   }
+  function refreshDefectFeedback(){
+    for(const row of $id('iqcMultiRows').querySelectorAll('.iqc-catalog-defect'))row.classList.toggle('has-ng',Number(row.querySelector('.qty').value)>0);
+    for(const row of $id('iqcMultiOtherRows').children)row.classList.toggle('has-ng',Number(row.querySelector('.qty').value)>0);
+    const defectsTotal=readDefects().reduce((sum,d)=>sum+(Number(d.so_luong)||0),0),lotQty=Number(selectedLot?.lotQty||$id('lotQty').value)||0;
+    const thisChecked=Number($id('iqcMultiChecked').value)||0,thisOk=Number($id('iqcMultiOk').value)||0,thisNg=Number($id('iqcMultiNg').value)||0;
+    let checked=thisChecked,ok=thisOk,ng=thisNg;if(selectedLot){const t=totals(selectedLot);if(t.checked!=null){checked=t.checked+thisChecked;ok=t.ok+thisOk;ng=t.ng+thisNg;}}
+    const remaining=Math.max(0,lotQty-checked),pct=(x)=>checked?((x/checked)*100).toFixed(1)+'%':'—';
+    $id('iqcMultiSummary').textContent=`LOT ${lotQty||'—'} · Đã kiểm ${checked} · Còn ${lotQty?remaining:'—'} · OK ${ok} (${pct(ok)}) · NG ${ng} (${pct(ng)}) · Lỗi ${defectsTotal}`;
+  }
+  $id('iqcMultiRows').addEventListener('input',refreshDefectFeedback);$id('iqcMultiOtherRows').addEventListener('input',refreshDefectFeedback);
+  for(const id of ['iqcMultiChecked','iqcMultiOk','iqcMultiNg','lotQty'])$id(id).addEventListener('input',refreshDefectFeedback);
   function resetDefects(saved=[]) {
     $id('iqcMultiRows').replaceChildren();$id('iqcMultiOtherRows').replaceChildren();
     const rest=[...saved], groups=new Map();
     for(const c of catalog){const group=c.defect_group||'Khác';if(!groups.has(group)){const box=document.createElement('section'),heading=text('h4',group);box.className='iqc-defect-group';box.append(heading);groups.set(group,{box,heading,count:0});$id('iqcMultiRows').append(box);}const g=groups.get(group),code=c.ma_loi||c.code||'',i=rest.findIndex(x=>(x.ma_loi||'')===code||(x.ten_loi===c.label&&(x.nhom_loi||'')===group)),previous=i>=0?rest.splice(i,1)[0]:{};g.box.append(catalogDefect(c,previous));g.count++;}
     for(const g of groups.values())g.heading.textContent=`${g.heading.textContent} (${g.count})`;
-    rest.forEach(addOtherDefect);filterDefects();
+    rest.forEach(addOtherDefect);filterDefects();refreshDefectFeedback();
   }
   function filterDefects(){const q=$id('iqcMultiDefectSearch').value.trim().toLocaleLowerCase('vi');for(const group of $id('iqcMultiRows').children){let visible=0;for(const row of group.querySelectorAll('.iqc-catalog-defect')){const name=(row.dataset.code+' '+row.querySelector('.name').value).toLocaleLowerCase('vi');row.hidden=!!q&&!name.includes(q);if(!row.hidden)visible++;}group.hidden=!visible;}}
   $id('iqcMultiDefectSearch').addEventListener('input',filterDefects);
@@ -112,7 +123,7 @@
     const r=await sbTaiHet(()=>sb.from('quality_defect_catalog').select('code,ma_loi,label,defect_group').overlaps('processes',['IQC','OQC','OQC_SON']).eq('is_active',true).order('sort_order').order('label'));
     if(r.error)throw r.error;
     const map=new Map();for(const x of r.data||[]){const label=String(x.label||'').trim();if(!label)continue;const key=(label+'|'+(x.defect_group||'')).toLocaleLowerCase('vi');if(!map.has(key))map.set(key,{...x,label});}
-    catalog=[...map.values()];$id('iqcMultiDefects').replaceChildren(...catalog.map(x=>new Option(x.label,x.label)));
+    catalog=[...map.values()].sort((a,b)=>String(a.ma_loi||a.code||'').localeCompare(String(b.ma_loi||b.code||''),'vi',{numeric:true,sensitivity:'base'}));$id('iqcMultiDefects').replaceChildren(...catalog.map(x=>new Option(x.label,x.label)));
     $id('iqcMultiCatalogStatus').textContent=catalog.length?`Danh mục lỗi dùng chung OQC/IQC · ${catalog.length} mã`:'Chưa có lỗi trong danh mục dùng chung.';
     if(!$id('iqcMultiRows').children.length)resetDefects();
     else resetDefects(readDefects());
@@ -127,10 +138,11 @@
   }
   function renderHistory() {
     const target=$id('iqcMultiHistory');target.replaceChildren();
-    if(!selectedLot){$id('iqcMultiProgress').textContent='LOT mới';$id('iqcLotStartedAt').textContent='';return;}
+    if(!selectedLot){$id('iqcMultiProgress').textContent='LOT mới';$id('iqcLotStartedAt').textContent='';refreshDefectFeedback();return;}
     const firstStart=rounds.filter(r=>String(r.lot_id)===String(selectedLot.id)&&r.bat_dau_luc).map(r=>r.bat_dau_luc).sort()[0];$id('iqcLotStartedAt').textContent=firstStart?'Bắt đầu LOT: '+displayTime(firstStart):'';
     const t=totals(selectedLot);
     $id('iqcMultiProgress').textContent=t.checked===null?'Số đã kiểm của LOT cũ chưa xác định. Không tự suy từ cỡ mẫu.':`Tổng ${t.total} · Đã kiểm ${t.checked} · OK ${t.ok} · NG ${t.ng} · Còn ${t.remaining} · Lỗi ${t.checked?((t.ng/t.checked)*100).toFixed(2):'0.00'}% · ${t.progress}`;
+    refreshDefectFeedback();
     if(selectedLot.inspectionType==='Kiểm tra AQL'){const p=plans.find(x=>String(x.lot_id)===String(selectedLot.id));$id('iqcMultiProgress').textContent+=p?` · Level ${p.cap_do} / AQL ${p.aql} · Mẫu ${p.mau_yeu_cau} · Ac ${p.ac} / Re ${p.re} · ${t.checked===null?'Chưa xác định':t.checked===Number(p.mau_yeu_cau)?'Đủ mẫu':t.checked>Number(p.mau_yeu_cau)?'Vượt mẫu — cần đối soát':'Chưa đủ mẫu'}`:' · Chưa có kế hoạch lấy mẫu';}
     target.append(text('h4','Lịch sử lần kiểm'));
     const history=rounds.filter(x=>String(x.lot_id)===String(selectedLot.id)).sort((a,b)=>(a.ngay_kiem||'').localeCompare(b.ngay_kiem||'')||a.id-b.id);
