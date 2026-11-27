@@ -368,7 +368,6 @@
     document.body.appendChild(mask);
     const close = () => { mask.remove(); if (opts.onClose) opts.onClose(); };
     mask.querySelector('.kct-dlg-h button').onclick = close;
-    mask.addEventListener('click', e => { if (e.target === mask) close(); });
     return mount(mask.querySelector('.kct-dlg-b'), opts);
   }
 

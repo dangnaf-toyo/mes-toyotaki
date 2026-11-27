@@ -484,7 +484,6 @@ body{padding-top:var(--navbar-h)}
       '</div>';
     document.body.appendChild(pwMask);
     document.getElementById('mnbPwCancel').addEventListener('click', closeChangePasswordModal);
-    pwMask.addEventListener('click', (e) => { if (e.target === pwMask) closeChangePasswordModal(); });
     document.getElementById('mnbPwSubmit').addEventListener('click', submitChangePassword);
 
     // Vẽ menu + gắn sự kiện click NGAY — không đợi mạng/đăng nhập, để menu

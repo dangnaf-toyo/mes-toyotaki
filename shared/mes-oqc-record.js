@@ -310,9 +310,6 @@ const MesOqcRecord = (() => {
     if (typeof d.close === "function") d.close();
     else d.removeAttribute("open");
   };
-  byId("oqcRecordDialog").addEventListener("click", (event) => {
-    if (event.target === event.currentTarget) byId("oqcRecordClose").click();
-  });
   exportExcel = function () {
     const out = dataRows.map((r) => {
       const values = {
