@@ -40,7 +40,7 @@ const IpqcGiaCong = (() => {
     results = [],
     rowLimit = 100,
     dashboardSerial = 0;
-  function notify(text, error = false) {
+  function notify(text, error = false) { if (window.mesBaoLoi && (error)) mesBaoLoi(text); /* T391 */
     $("gcMessage").textContent = text;
     $("gcMessage").className = "notice " + (error ? "bad" : "good");
     $("gcErrorDetails").hidden = true;

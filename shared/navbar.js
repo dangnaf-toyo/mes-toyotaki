@@ -32,6 +32,76 @@
   // T255 (X.1): hộp alert của trình duyệt → thông báo góc màn hình (không chặn thao tác) cho MỌI trang có navbar.
   // Trang đã tự thay alert (vd ipqc-approval.html) thì giữ bản của trang. hộp confirm giữ nguyên (xoá/kết ca/không hoàn tác).
   // Tin có ⛔ hoặc dài thì không tự tắt — bấm × để đóng. Tin hiện ngay trước khi tải lại/chuyển trang được mang sang trang sau.
+  // T391: MỌI thông báo lỗi → cửa sổ lỗi giữa màn hình, phải bấm "Đã hiểu" mới đóng (không tự tắt).
+  //   window.mesBaoLoi(text)  — mở cửa sổ (lỗi đến liên tiếp gom vào 1 cửa sổ, bỏ trùng)
+  //   window.mesLaLoi(text)   — đoán chuỗi có phải lỗi không (dùng cho alert / toast không có cờ lỗi)
+  // Chặn Enter/Esc 0,8 giây đầu để súng quét mã (gửi Enter) không lỡ tay đóng; đóng xong trả con trỏ về ô đang nhập.
+  const LOI_RE = /⛔|❌|lỗi|không (được|thể|có quyền|tải được|lưu được)|thất bại|chưa (chọn|nhập|có)|vui lòng|cần /i;
+  window.mesLaLoi = (s) => { s = String(s ?? ''); return !/^\s*(✅|✓|ℹ)/.test(s) && LOI_RE.test(s); };
+  if (!window.mesBaoLoi) {
+    const KEY_LOI = 'mesBaoLoiGoc';
+    let dlg = null, ds = [], moLuc = 0, truoc = null, boQua = 0;
+    const ve = () => {
+      if (dlg) return dlg;
+      const st = document.createElement('style');
+      st.textContent =
+        '#mesLoiDlg{border:0;border-radius:10px;padding:0;width:min(440px,calc(100vw - 32px));box-shadow:0 16px 48px rgba(0,0,0,.35);font:14px/1.5 Inter,system-ui,sans-serif;color:#14181F;background:#fff}' +
+        '#mesLoiDlg::backdrop{background:rgba(15,23,42,.55)}' +
+        '#mesLoiDlg .hd{background:#DC2626;color:#fff;font-weight:700;font-size:16px;padding:12px 16px}' +
+        '#mesLoiDlg .nd{padding:14px 16px;max-height:60vh;overflow:auto;white-space:pre-line;word-break:break-word;font-weight:500}' +
+        '#mesLoiDlg .nd p{margin:0}#mesLoiDlg .nd p+p{margin-top:10px;padding-top:10px;border-top:1px solid #E5E7EB}' +
+        '#mesLoiDlg .ft{padding:0 16px 14px;text-align:right}' +
+        '#mesLoiDlg .ft button{background:#DC2626;color:#fff;border:0;border-radius:6px;padding:9px 22px;font:600 15px Inter,system-ui,sans-serif;cursor:pointer;min-width:110px}' +
+        '@media print{#mesLoiDlg{display:none}}';
+      document.head.appendChild(st);
+      dlg = document.createElement('dialog');
+      dlg.id = 'mesLoiDlg'; dlg.setAttribute('role', 'alertdialog');
+      dlg.innerHTML = '<div class="hd">⛔ Lỗi</div><div class="nd"></div><div class="ft"><button type="button">Đã hiểu</button></div>';
+      const som = () => Date.now() - moLuc < 800;
+      dlg.querySelector('button').onclick = () => { if (!som()) dlg.close(); };
+      dlg.addEventListener('cancel', (e) => { if (som()) e.preventDefault(); });
+      dlg.addEventListener('keydown', (e) => { if (som() && (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape')) e.preventDefault(); });
+      dlg.addEventListener('close', () => {
+        if (boQua) { boQua--; return; } // sự kiện close đến sau (bất đồng bộ) khi đóng/mở lại để lên trên cùng
+        ds = [];
+        const o = truoc; truoc = null;
+        if (o && o.isConnected && typeof o.focus === 'function') { try { o.focus(); } catch (e) {} }
+      });
+      document.body.appendChild(dlg);
+      return dlg;
+    };
+    window.mesBaoLoi = function (msg) {
+      const s = String(msg ?? '').replace(/^\s*(Lỗi:\s*)+/i, '').trim();
+      if (!s) return;
+      if (!document.body) { document.addEventListener('DOMContentLoaded', () => window.mesBaoLoi(s), { once: true }); return; }
+      const d = ve();
+      if (ds.some(x => x.s === s)) return;
+      ds.push({ s, luc: Date.now() });
+      while (ds.length > 5) ds.shift();
+      const nd = d.querySelector('.nd');
+      nd.innerHTML = '';
+      ds.forEach(x => { const p = document.createElement('p'); p.textContent = x.s; nd.appendChild(p); });
+      // Có hộp khác mở sau (vd hộp sửa) → đóng/mở lại để cửa sổ lỗi nằm trên cùng.
+      const tren = [...document.querySelectorAll('dialog[open]')].pop();
+      if (d.open && tren !== d) { boQua++; d.close(); }
+      if (!d.open) {
+        if (!truoc) truoc = document.activeElement;
+        try { d.showModal(); } catch (e) { d.setAttribute('open', ''); }
+        moLuc = Date.now();
+        d.querySelector('button').focus();
+      }
+    };
+    // Lỗi hiện ngay trước khi tải lại/chuyển trang → mở lại ở trang sau.
+    window.addEventListener('pagehide', () => {
+      const con = ds.filter(x => Date.now() - x.luc < 3000).map(x => x.s);
+      try { if (con.length) sessionStorage.setItem(KEY_LOI, JSON.stringify(con)); } catch (e) {}
+    });
+    try {
+      const cu = JSON.parse(sessionStorage.getItem(KEY_LOI) || '[]');
+      sessionStorage.removeItem(KEY_LOI);
+      cu.forEach(window.mesBaoLoi);
+    } catch (e) {}
+  }
   if (/\[native code\]/.test(String(window.alert))) {
     const KEY = 'mesThongBaoGoc';
     let hop = null, giuLai = [];
@@ -55,7 +125,9 @@
       const s = String(msg ?? '').trim();
       if (!s) return;
       if (!document.body) { document.addEventListener('DOMContentLoaded', () => hien(s), { once: true }); return; }
-      const loi = /⛔|❌|lỗi|không (được|thể|có quyền)|thất bại|chưa (chọn|nhập|có)|vui lòng|cần /i.test(s);
+      // T391: tin lỗi → cửa sổ lỗi phải bấm "Đã hiểu"; tin khác vẫn hiện góc màn hình.
+      if (window.mesLaLoi(s)) { window.mesBaoLoi(s); return; }
+      const loi = false;
       const ok = !loi && /✅|✓|đã (lưu|gửi|xoá|xóa|cập nhật|tạo|duyệt|ghi)|thành công/i.test(s);
       const dinh = s.includes('⛔') || s.length > 160;
       const t = document.createElement('div');

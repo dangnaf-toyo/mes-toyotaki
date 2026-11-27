@@ -124,7 +124,7 @@ dialog.hop::backdrop{background:rgba(15,23,42,.45)}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="shared/supabase-client.js"></script>
-<script src="shared/navbar.js?v=T390"></script>
+<script src="shared/navbar.js?v=T391"></script>
 <script>
 const LOAI = { DT: 'Đầu típ', OL: 'Ống liệu', PK: 'Piston kẽm', XM: 'Xéc-măng', CN: 'Cổ ngỗng', VP: 'Vòi phun' };
 const LOAI_MAY = { nhom: ['DT', 'OL'], kem: ['PK', 'VP', 'XM', 'CN'] };
@@ -136,7 +136,7 @@ function pad(n){ return String(n).padStart(2, '0'); }
 function fmtTs(ts){ if (!ts) return ''; const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); }
 const so = v => Math.round(Number(v) || 0).toLocaleString('vi-VN');
 let msgT = null;
-function showMsg(t, cls){ const el = $('msg'); el.textContent = t; el.className = cls || 'ok'; clearTimeout(msgT); msgT = setTimeout(() => { el.className = ''; }, cls === 'err' ? 7000 : 4500); }
+function showMsg(t, cls){ if (window.mesBaoLoi && (/^(err|error)$/.test(cls))) mesBaoLoi(t); /* T391 */ const el = $('msg'); el.textContent = t; el.className = cls || 'ok'; clearTimeout(msgT); msgT = setTimeout(() => { el.className = ''; }, cls === 'err' ? 7000 : 4500); }
 window.showToast = (t, loi) => showMsg(t, loi ? 'err' : 'ok');
 function loaiMay(ma){ const m = MAY.find(x => x.ma_may === ma); return m && m.loai_may === 'Đúc kẽm' ? 'kem' : 'nhom'; }
 function pctCua(c){ return Number(c.tuoi_tho_du_kien) > 0 ? Math.floor(Number(c.shot_tong) * 100 / Number(c.tuoi_tho_du_kien)) : null; }

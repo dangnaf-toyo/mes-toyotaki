@@ -220,7 +220,7 @@
     let host = null, msgEl = document.querySelector('.kds-msg');
     if (!msgEl) { msgEl = document.createElement('div'); msgEl.className = 'kds-msg'; document.body.appendChild(msgEl); }
     let msgTimer = null;
-    function showMsg(text, cls, ms){
+    function showMsg(text, cls, ms){ if (window.mesBaoLoi && (/^(err|error)$/.test(cls))) mesBaoLoi(text); /* T391 */
       msgEl.textContent = text; msgEl.className = 'kds-msg ' + cls;
       clearTimeout(msgTimer);
       msgTimer = setTimeout(() => { msgEl.className = 'kds-msg'; }, ms || 3500);
