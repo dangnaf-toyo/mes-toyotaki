@@ -117,8 +117,6 @@ a.btn{text-decoration:none}
   clamp(155px, 132.14px + 2.232vw, 175px)
   clamp(90px, 67.14px + 2.232vw, 110px)
   clamp(130px, 107.14px + 2.232vw, 150px)
-  clamp(58px, 46.57px + 1.116vw, 68px)
-  clamp(58px, 46.57px + 1.116vw, 68px)
   clamp(52px, 42.86px + 0.893vw, 60px)
   clamp(54px, 42.57px + 1.116vw, 64px)
   clamp(78px, 64.29px + 1.34vw, 90px)
@@ -126,7 +124,7 @@ a.btn{text-decoration:none}
   minmax(140px, 1fr)
   clamp(128px, 97.14px + 3.013vw, 155px)
   clamp(38px, 33.43px + 0.446vw, 42px);
-  min-width:1170px;align-items:stretch;border-bottom:1px solid var(--border)}
+  min-width:1040px;align-items:stretch;border-bottom:1px solid var(--border)}
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
@@ -425,10 +423,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div>Sản phẩm</div>
       <div>Khuôn</div>
       <div>Sản lượng ca/tuần</div>
-      <div style="text-align:center" title="Số đọc shot counter máy đầu ca (tự carry từ ca trước nếu có)">Shot đầu</div>
-      <div style="text-align:center" title="Số đọc shot counter máy hiện tại/cuối ca">Shot cuối</div>
       <div style="text-align:center" title="Số shot hao phí đầu ca để làm nóng khuôn">Shot nóng</div>
-      <div style="text-align:center" title="Số pcs không đạt chất lượng — tự tính nếu đã nhập đủ Shot đầu/cuối và SP có cavity">NG</div>
+      <div style="text-align:center" title="Số pcs NG — trưởng ca nhập tay">NG</div>
       <div title="Mã lỗi NG, VD 6F;4E">Phân loại NG</div>
       <div>Nhân sự</div>
       <div>Sự cố đang mở</div>
@@ -480,7 +476,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       </label>
       <div id="mp-pair-block" style="display:none;border:1px dashed var(--border-strong);border-radius:6px;padding:10px;margin-top:6px">
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
-          Mã SP/KH ca ở phía trên là <b>SP A</b>. Nhập thêm <b>SP B</b> bên dưới — Shot đầu/cuối/nóng sẽ dùng chung, NG tính riêng theo cavity từng mã.
+          Mã SP/KH ca ở phía trên là <b>SP A</b>. Nhập thêm <b>SP B</b> bên dưới — Shot nóng dùng chung, NG nhập riêng từng mã.
         </div>
         <div class="field">
           <label>Mã sản phẩm B <span class="req">*</span></label>
@@ -749,8 +745,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div id="es-review-section" style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:#FFFBEB">
         <div style="font-weight:600;color:var(--text);font-size:12px;margin-bottom:6px">📊 Xác nhận số liệu ca (bắt buộc)</div>
         <div style="color:var(--text-muted);font-size:11px;margin-bottom:6px">
-          Kiểm tra lại <b>Shot đầu ca</b> / <b>Shot cuối ca</b> (nếu đã nhập sẵn trên dashboard trong ca thì chỉ cần xác nhận) — NG sẽ <b>tự tính</b>:
-          NG = (Shot cuối − Shot đầu − Shot nóng máy) × Cavity − TT ca. SP chưa khai báo cavity thì nhập NG tay như trước.
+          Kiểm tra <b>Shot nóng</b> và <b>NG</b> từng máy (nhập tay).
         </div>
         <div id="es-review-list" style="max-height:200px;overflow-y:auto"></div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 8px;background:#FEF3C7;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">
@@ -2587,17 +2582,10 @@ function renderTable(){
         } catch (e) { /* setSelectionRange không hỗ trợ với input[type=number] ở 1 số trình duyệt */ }
       }
     }
-    _recomputeNgPreview(idDong, rowEl, 'ci');
-  });
-
-  document.querySelectorAll('.row[data-id-dong] .ci-shot-cuoi').forEach(el => {
-    const idDong = el.dataset.idDong;
-    if (!inFlightInputs[idDong]) _recomputeNgPreview(idDong, el.closest('.row'), 'ci');
   });
 
   Object.keys(rowsByMachine).forEach(m => {
     if (rowsByMachine[m].length > 1) {
-      _wireShotChain(rowsByMachine[m], tbody, 'ci', (idDong, el) => scheduleUpdateShiftInputs(idDong, el));
       _wireShotMirror(rowsByMachine[m], tbody, 'ci');
     }
   });
@@ -2698,10 +2686,6 @@ function makeRowHTML(row, stateClass, isActive){
 
   const idDongJson = JSON.stringify(row.id_dong);
   const idDongAttr = escapeHtml(row.id_dong);
-  const shotDauVal = (row.so_shot_dau_ca != null) ? row.so_shot_dau_ca : '';
-  const shotCuoiVal = (row.so_shot_cuoi_ca != null) ? row.so_shot_cuoi_ca : '';
-  const shotDauHTML = '<input type="number" class="ci-shot-dau" min="0" step="1" value="' + shotDauVal + '" placeholder="—" data-id-dong="' + idDongAttr + '" oninput=\'scheduleUpdateShiftInputs(' + idDongJson + ', this)\'>';
-  const shotCuoiHTML = '<input type="number" class="ci-shot-cuoi" min="0" step="1" value="' + shotCuoiVal + '" placeholder="—" data-id-dong="' + idDongAttr + '" oninput=\'scheduleUpdateShiftInputs(' + idDongJson + ', this)\'>';
   const shotHTML = '<input type="number" class="ci-shot" min="0" step="1" value="' + (row.so_shot_nong_khuon || 0) + '" data-id-dong="' + idDongAttr + '" oninput=\'scheduleUpdateShiftInputs(' + idDongJson + ', this)\'>';
   const ngHTML = '<input type="number" class="ci-ng" min="0" step="1" value="' + (row.so_luong_ng || 0) + '" data-id-dong="' + idDongAttr + '" data-ma-sp="' + escapeHtml(row.ma_sp) + '" oninput=\'scheduleUpdateShiftInputs(' + idDongJson + ', this)\'>';
   const loiNgHTML = '<input type="text" autocomplete="off" class="ci-loi-ng" value="' + escapeHtml(row.phan_loai_ng || '') + '" placeholder="VD 6 D04; 4 T04" data-id-dong="' + idDongAttr + '" oninput=\'scheduleUpdateShiftInputs(' + idDongJson + ', this)\'>';
@@ -2773,8 +2757,6 @@ function makeRowHTML(row, stateClass, isActive){
       '<div class="col-product">' + productHTML + '</div>' +
       '<div class="col-mold">' + moldColHTML + '</div>' +
       '<div class="col-prod">' + numbersHTML + '</div>' +
-      '<div class="col-shot-dau">' + shotDauHTML + '</div>' +
-      '<div class="col-shot-cuoi">' + shotCuoiHTML + '</div>' +
       '<div class="col-shot">' + shotHTML + '</div>' +
       '<div class="col-ng">' + ngHTML + '</div>' +
       '<div class="col-loi-ng">' + loiNgHTML + '</div>' +
@@ -2814,8 +2796,6 @@ function makeNoPlanRowHTML(maMay){
       '<div class="col-product empty">Không có kế hoạch</div>' +
       '<div class="col-mold"><span class="no-plan-note">—</span></div>' +
       '<div class="col-prod"><span class="no-plan-note">—</span></div>' +
-      '<div class="col-shot-dau"><span class="no-plan-input-dash">—</span></div>' +
-      '<div class="col-shot-cuoi"><span class="no-plan-input-dash">—</span></div>' +
       '<div class="col-shot"><span class="no-plan-input-dash">—</span></div>' +
       '<div class="col-ng"><span class="no-plan-input-dash">—</span></div>' +
       '<div class="col-loi-ng"><span class="no-plan-input-dash">—</span></div>' +
@@ -4289,10 +4269,6 @@ function scheduleUpdateShiftInputs(idDong, el){
   const inputs = row.querySelectorAll('.ci-shot-dau, .ci-shot-cuoi, .ci-shot, .ci-ng, .ci-loi-ng');
   inputs.forEach(i => { i.classList.remove('saved', 'err'); i.classList.add('saving'); });
 
-  if (el && (el.classList.contains('ci-shot-dau') || el.classList.contains('ci-shot-cuoi') || el.classList.contains('ci-shot'))) {
-    _recomputeNgPreview(idDong, row, 'ci');
-  }
-
   if (shiftInputDebounceMap.has(idDong)) clearTimeout(shiftInputDebounceMap.get(idDong));
   shiftInputDebounceMap.set(idDong, setTimeout(() => {
     shiftInputDebounceMap.delete(idDong);
@@ -4325,8 +4301,8 @@ async function saveShiftInputs(idDong){
     p_so_shot_nong_khuon: Number(shotEl.value) || 0,
     p_so_luong_ng: Number(ngEl.value) || 0,
     p_phan_loai_ng: loiEl.value || '',
-    p_so_shot_dau_ca: dauEl ? numOrNull(dauEl.value) : null,
-    p_so_shot_cuoi_ca: cuoiEl ? numOrNull(cuoiEl.value) : null,
+    p_so_shot_dau_ca: null,   // T382: bỏ shot đầu/cuối, NG nhập tay
+    p_so_shot_cuoi_ca: null,
     p_user: state.user,
   };
 
@@ -4376,36 +4352,6 @@ function _applyShiftInputsToState(idDong, params, d){
 }
 
 /**
- * Chain 2 CHIỀU giữa Shot cuối ca của đoạn trước và Shot đầu ca của đoạn sau
- * (cùng máy) — đây là CÙNG 1 số đọc counter vật lý, không reset khi đổi SP.
- */
-function _wireShotChain(rows, scopeEl, prefix, onChange){
-  const sorted = rows.slice().sort((a, b) => (a._rowIndex || 0) - (b._rowIndex || 0));
-  for (let i = 1; i < sorted.length; i++) {
-    const prevId = sorted[i - 1].id_dong;
-    const curId = sorted[i].id_dong;
-    // Cặp khuôn kép dùng mirror (_wireShotMirror), KHÔNG chain nối tiếp.
-    if ((sorted[i - 1].nhom_khuon && sorted[i - 1].nhom_khuon === sorted[i].nhom_khuon) || sorted[i - 1].khuon_kep_voi === curId || sorted[i].khuon_kep_voi === prevId) continue;
-    const prevCuoiEl = scopeEl.querySelector('.' + prefix + '-shot-cuoi[data-id-dong="' + CSS.escape(prevId) + '"]');
-    const curDauEl = scopeEl.querySelector('.' + prefix + '-shot-dau[data-id-dong="' + CSS.escape(curId) + '"]');
-    if (!prevCuoiEl || !curDauEl) continue;
-
-    prevCuoiEl.addEventListener('input', () => {
-      if (curDauEl.value === prevCuoiEl.value) return;
-      curDauEl.value = prevCuoiEl.value;
-      _recomputeNgPreview(curId, scopeEl, prefix);
-      onChange(curId, curDauEl);
-    });
-    curDauEl.addEventListener('input', () => {
-      if (prevCuoiEl.value === curDauEl.value) return;
-      prevCuoiEl.value = curDauEl.value;
-      _recomputeNgPreview(prevId, scopeEl, prefix);
-      onChange(prevId, prevCuoiEl);
-    });
-  }
-}
-
-/**
  * Mirror Shot đầu/cuối/nóng giữa 2 dòng của 1 cặp KHUÔN KÉP — cùng 1 shot vật
  * lý ra 2 SP nên copy thẳng. Server cũng tự mirror khi lưu (duc_update_shift_inputs),
  * mirror ở client chỉ để phản hồi tức thì.
@@ -4420,58 +4366,16 @@ function _wireShotMirror(rows, scopeEl, prefix){
       const key = [r.id_dong, sib.id_dong].sort().join('|');
       if (wired.has(key)) return;
       wired.add(key);
-      ['shot-dau', 'shot-cuoi', 'shot'].forEach(field => {
+      ['shot'].forEach(field => {
         const selfEl = scopeEl.querySelector('.' + prefix + '-' + field + '[data-id-dong="' + CSS.escape(r.id_dong) + '"]');
         const sibEl = scopeEl.querySelector('.' + prefix + '-' + field + '[data-id-dong="' + CSS.escape(sib.id_dong) + '"]');
         if (!selfEl || !sibEl) return;
         selfEl.addEventListener('input', () => {
           if (sibEl.value !== selfEl.value) sibEl.value = selfEl.value;
-          _recomputeNgPreview(sib.id_dong, scopeEl, prefix);
         });
       });
     });
   });
-}
-
-/**
- * Preview NG ngay trên client: NG = (shot cuối − shot đầu − shot nóng) × cavity − TT ca.
- * Chỉ là preview — server (duc_update_shift_inputs) vẫn tự tính lại và validate.
- */
-function _recomputeNgPreview(idDong, scopeEl, prefix){
-  prefix = prefix || 'esr';
-  const q = cls => scopeEl.querySelector('.' + prefix + '-' + cls + '[data-id-dong="' + CSS.escape(idDong) + '"]');
-  const dauEl = q('shot-dau'), cuoiEl = q('shot-cuoi'), shotEl = q('shot'), ngEl = q('ng');
-  if (!dauEl || !cuoiEl || !shotEl || !ngEl) return;
-
-  const dau = dauEl.value === '' ? null : Number(dauEl.value);
-  const cuoi = cuoiEl.value === '' ? null : Number(cuoiEl.value);
-  const shot = Number(shotEl.value) || 0;
-  const cavity = state.cavityMap[ngEl.dataset.maSp];
-  const row = state.rows.find(r => r.id_dong === idDong);
-  const ttCa = row ? (Number(row.tt_ca) || 0) : 0;
-
-  if (dau == null || cuoi == null || !cavity) {
-    ngEl.readOnly = false; ngEl.style.background = '';
-    ngEl.title = cavity ? '' : 'Sản phẩm chưa khai báo số cavity — nhập NG thủ công';
-    return;
-  }
-  if (cuoi < dau) {
-    ngEl.readOnly = false; ngEl.title = '⚠ Shot cuối ca phải ≥ shot đầu ca';
-    return;
-  }
-  const shotChayThat = cuoi - dau - shot;
-  if (shotChayThat < 0) {
-    ngEl.readOnly = false;
-    ngEl.title = '⚠ Shot nóng máy lớn hơn tổng shot chạy trong ca (' + fmtNum(cuoi - dau) + ')';
-    return;
-  }
-  const ng = Math.round(shotChayThat * cavity - ttCa);
-  ngEl.value = Math.max(0, ng);
-  ngEl.readOnly = true;
-  ngEl.style.background = 'var(--bg-sunken)';
-  ngEl.title = 'Tự tính: (' + fmtNum(cuoi) + ' − ' + fmtNum(dau) + ' − ' + fmtNum(shot) + ') × ' + cavity +
-    ' cavity − ' + fmtNum(ttCa) + ' OK' + (ng < 0 ? ' → ÂM (' + ng + ') — kiểm tra lại số liệu trước khi kết ca!' : '');
-  ngEl.style.color = ng < 0 ? '#B91C1C' : '';
 }
 
 // =============================================================================
@@ -5067,10 +4971,10 @@ function _populateEndShiftReview(rowsWithPlan){
   wrap.style.display = '';
   cb.checked = false; capNhatNutKetCa_();
 
-  const cols = '1fr 62px 62px 60px 64px 90px';
+  const cols = '1fr 60px 64px 90px';
   const header = document.createElement('div');
   header.style.cssText = 'display:grid;grid-template-columns:' + cols + ';gap:6px;padding:4px 8px;background:var(--bg-sunken);border-radius:4px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em';
-  header.innerHTML = '<div>Máy — SP (TT ca)</div><div style="text-align:center">Shot đầu</div><div style="text-align:center">Shot cuối</div><div style="text-align:center">Shot nóng</div><div style="text-align:center">NG</div><div>Phân loại NG</div>';
+  header.innerHTML = '<div>Máy — SP (TT ca)</div><div style="text-align:center">Shot nóng</div><div style="text-align:center">NG</div><div>Phân loại NG</div>';
   list.appendChild(header);
 
   const byMachine = {};
@@ -5098,10 +5002,7 @@ function _populateEndShiftReview(rowsWithPlan){
         '<div><b>' + escapeHtml(r.ma_may) + '</b> — <span style="font-family:\'JetBrains Mono\',monospace;font-size:11px">' + escapeHtml(r.ma_sp) + '</span>' + segNote +
           '<span style="color:var(--text-muted);font-size:11px"> · TT ' + fmtNum(r.tt_ca) + '</span>' +
           (warnShot ? '<span title="Chưa nhập shot nóng máy — có thể là 0 nếu máy đã nóng sẵn từ trước" style="color:#B45309;font-weight:700;margin-left:4px">⚠</span>' : '') +
-          (!cavity ? '<div style="color:#B45309;font-size:11px;margin-top:1px">⚠ SP chưa có cavity — NG phải nhập tay</div>' : '') +
         '</div>' +
-        '<input type="number" min="0" step="1" value="' + dauVal + '" placeholder="—" class="esr-shot-dau" data-id-dong="' + idAttr + '" style="' + inputCss + '">' +
-        '<input type="number" min="0" step="1" value="' + cuoiVal + '" placeholder="—" class="esr-shot-cuoi" data-id-dong="' + idAttr + '" style="' + inputCss + '">' +
         '<input type="number" min="0" step="1" value="' + (r.so_shot_nong_khuon || 0) + '" class="esr-shot" data-id-dong="' + idAttr + '" style="' + inputCss + '">' +
         '<input type="number" min="0" step="1" value="' + (r.so_luong_ng || 0) + '" class="esr-ng" data-id-dong="' + idAttr + '" data-ma-sp="' + escapeHtml(r.ma_sp) + '" style="' + inputCss + '">' +
         '<input type="text" autocomplete="off" placeholder="VD 6 D04; 4 T04" value="' + escapeHtml(r.phan_loai_ng || '') + '" class="esr-loi" data-id-dong="' + idAttr + '" style="padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:11px;width:100%;box-sizing:border-box">';
@@ -5111,22 +5012,13 @@ function _populateEndShiftReview(rowsWithPlan){
 
   machineNames.forEach(m => {
     if (byMachine[m].length > 1) {
-      _wireShotChain(byMachine[m], list, 'esr', idDong => scheduleUpdateShiftInputsFromReview(idDong, list));
       _wireShotMirror(byMachine[m], list, 'esr');
     }
   });
 
-  list.querySelectorAll('.esr-shot-dau, .esr-shot-cuoi, .esr-shot').forEach(el => {
-    el.addEventListener('input', () => {
-      const idDong = el.dataset.idDong;
-      _recomputeNgPreview(idDong, list);
-      scheduleUpdateShiftInputsFromReview(idDong, list);
-    });
-  });
-  list.querySelectorAll('.esr-ng, .esr-loi').forEach(el => {
+  list.querySelectorAll('.esr-shot, .esr-ng, .esr-loi').forEach(el => {
     el.addEventListener('input', () => scheduleUpdateShiftInputsFromReview(el.dataset.idDong, list));
   });
-  list.querySelectorAll('.esr-shot-cuoi').forEach(el => _recomputeNgPreview(el.dataset.idDong, list));
 }
 
 function scheduleUpdateShiftInputsFromReview(idDong, listEl){
@@ -5150,8 +5042,8 @@ function scheduleUpdateShiftInputsFromReview(idDong, listEl){
       p_so_shot_nong_khuon: Number(shotEl.value) || 0,
       p_so_luong_ng: Number(ngEl.value) || 0,
       p_phan_loai_ng: loiEl.value || '',
-      p_so_shot_dau_ca: numOrNull(dauEl.value),
-      p_so_shot_cuoi_ca: numOrNull(cuoiEl.value),
+      p_so_shot_dau_ca: null,   // T382
+      p_so_shot_cuoi_ca: null,
       p_user: state.user,
     };
     try {
