@@ -349,11 +349,7 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
 <div class="screen" id="scr-shot">
   <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Shot &amp; NG</div></div>
   <div class="form-wrap">
-    <div class="field-row">
-      <div class="field"><label>Shot đầu ca</label><input type="number" id="sh-dau" placeholder="—" oninput="recomputeShotMobile()"></div>
-      <div class="field"><label>Shot cuối ca</label><input type="number" id="sh-cuoi" placeholder="—" oninput="recomputeShotMobile()"></div>
-    </div>
-    <div class="field"><label>Shot nóng máy</label><input type="number" id="sh-nong" min="0" oninput="recomputeShotMobile()"></div>
+    <div class="field"><label>Shot nóng máy</label><input type="number" id="sh-nong" min="0"></div>
     <div class="field"><label>NG</label><input type="number" id="sh-ng" min="0"></div>
     <div class="form-hint" id="sh-hint"></div>
     <div class="field"><label>Phân loại NG</label><input type="text" autocomplete="off" id="sh-loi" placeholder="VD 6 D04; 4 T04"></div>
@@ -1552,36 +1548,12 @@ async function submitChangeProductMobile(){
 async function openShotScreen(){
   if (!(await ensureAuth())) return;
   const row = state.rows.find(r => r.id_dong === state.currentIdDong);
-  document.getElementById('sh-dau').value = (row && row.so_shot_dau_ca != null) ? row.so_shot_dau_ca : '';
-  document.getElementById('sh-cuoi').value = (row && row.so_shot_cuoi_ca != null) ? row.so_shot_cuoi_ca : '';
   document.getElementById('sh-nong').value = row ? (row.so_shot_nong_khuon || 0) : 0;
   document.getElementById('sh-ng').value = row ? (row.so_luong_ng || 0) : 0;
   document.getElementById('sh-loi').value = row ? (row.phan_loai_ng || '') : '';
   document.getElementById('sh-ng').readOnly = false;
   document.getElementById('sh-ng').classList.remove('ng-auto');
-  recomputeShotMobile();
   showScreen('scr-shot');
-}
-function recomputeShotMobile(){
-  const row = state.rows.find(r => r.id_dong === state.currentIdDong);
-  const dauEl = document.getElementById('sh-dau'), cuoiEl = document.getElementById('sh-cuoi'),
-        nongEl = document.getElementById('sh-nong'), ngEl = document.getElementById('sh-ng'), hint = document.getElementById('sh-hint');
-  const dau = dauEl.value === '' ? null : Number(dauEl.value);
-  const cuoi = cuoiEl.value === '' ? null : Number(cuoiEl.value);
-  const nong = Number(nongEl.value) || 0;
-  const cavity = row ? state.cavityMap[row.ma_sp] : null;
-  const ttCa = row ? (row.tt_ca || 0) : 0;
-
-  ngEl.readOnly = false; ngEl.classList.remove('ng-auto');
-  if (dau == null || cuoi == null) { hint.textContent = ''; return; }
-  if (!cavity) { hint.textContent = 'Chưa có cavity — nhập NG tay.'; return; }
-  if (cuoi < dau) { hint.textContent = 'Shot cuối phải ≥ Shot đầu.'; return; }
-  const chay = cuoi - dau - nong;
-  if (chay < 0) { hint.textContent = 'Shot nóng > tổng shot (' + fmtNum(cuoi-dau) + ').'; return; }
-  const ng = Math.round(chay * cavity - ttCa);
-  ngEl.value = Math.max(0, ng);
-  ngEl.readOnly = true; ngEl.classList.add('ng-auto');
-  hint.textContent = '(' + fmtNum(cuoi) + ' − ' + fmtNum(dau) + ' − ' + fmtNum(nong) + ') × ' + cavity + ' − ' + fmtNum(ttCa) + (ng < 0 ? ' → âm, kiểm tra lại' : '');
 }
 async function submitShotMobile(){
   if (!(await ensureAuth())) return;
@@ -1590,8 +1562,8 @@ async function submitShotMobile(){
     p_so_shot_nong_khuon: Number(document.getElementById('sh-nong').value) || 0,
     p_so_luong_ng: Number(document.getElementById('sh-ng').value) || 0,
     p_phan_loai_ng: document.getElementById('sh-loi').value || '',
-    p_so_shot_dau_ca: document.getElementById('sh-dau').value === '' ? null : Number(document.getElementById('sh-dau').value),
-    p_so_shot_cuoi_ca: document.getElementById('sh-cuoi').value === '' ? null : Number(document.getElementById('sh-cuoi').value),
+    p_so_shot_dau_ca: null,   // T382: NG nhập tay
+    p_so_shot_cuoi_ca: null,
     p_user: state.user,
   };
   showOverlay('Đang lưu...');
@@ -1655,16 +1627,12 @@ async function openEndShiftScreen(){
         </div>
         <div class="es-grid">
           <div class="field"><label>KH ca mới</label><input type="number" id="es-kh-${idx}" min="0" value="${r.kh_ca||0}"></div>
-          <div class="field"><label>Shot nóng</label><input type="number" id="es-nong-${idx}" min="0" value="${r.so_shot_nong_khuon||0}" oninput="recomputeEsNg(${idx})"></div>
-          <div class="field"><label>Shot đầu</label><input type="number" id="es-dau-${idx}" placeholder="—" value="${r.so_shot_dau_ca!=null?r.so_shot_dau_ca:''}" oninput="recomputeEsNg(${idx})"></div>
-          <div class="field"><label>Shot cuối</label><input type="number" id="es-cuoi-${idx}" placeholder="—" value="${r.so_shot_cuoi_ca!=null?r.so_shot_cuoi_ca:''}" oninput="recomputeEsNg(${idx})"></div>
+          <div class="field"><label>Shot nóng</label><input type="number" id="es-nong-${idx}" min="0" value="${r.so_shot_nong_khuon||0}"></div>
           <div class="field"><label>NG</label><input type="number" id="es-ng-${idx}" min="0" value="${r.so_luong_ng||0}"></div>
           <div class="field"><label>Phân loại NG</label><input type="text" autocomplete="off" id="es-loi-${idx}" value="${escapeHtml(r.phan_loai_ng||'')}"></div>
         </div>
-        ${!cavity ? '<div class="form-hint" style="margin-top:8px">Chưa có cavity — NG nhập tay</div>' : ''}
       </div>`;
     }).join('');
-    activeRows.forEach((r, idx) => recomputeEsNg(idx));
   }
 
   const openCount = activeRows.filter(r => r.open_gio_phat_sinh).length;
@@ -1673,21 +1641,6 @@ async function openEndShiftScreen(){
     : '';
   document.getElementById('es-comment').value = '';
   showScreen('scr-endshift');
-}
-function recomputeEsNg(idx){
-  const r = state.endShiftRows[idx];
-  const dauEl = document.getElementById('es-dau-'+idx), cuoiEl = document.getElementById('es-cuoi-'+idx),
-        nongEl = document.getElementById('es-nong-'+idx), ngEl = document.getElementById('es-ng-'+idx);
-  const dau = dauEl.value === '' ? null : Number(dauEl.value);
-  const cuoi = cuoiEl.value === '' ? null : Number(cuoiEl.value);
-  const nong = Number(nongEl.value) || 0;
-  const cavity = state.cavityMap[r.ma_sp];
-  ngEl.readOnly = false; ngEl.classList.remove('ng-auto');
-  if (dau == null || cuoi == null || !cavity || cuoi < dau) return;
-  const chay = cuoi - dau - nong;
-  if (chay < 0) return;
-  ngEl.value = Math.max(0, Math.round(chay * cavity - (r.tt_ca||0)));
-  ngEl.readOnly = true; ngEl.classList.add('ng-auto');
 }
 async function submitEndShiftMobile(){
   const truongCa = document.getElementById('sel-truong-ca').value;
@@ -1704,8 +1657,8 @@ async function submitEndShiftMobile(){
         p_so_shot_nong_khuon: Number(document.getElementById('es-nong-'+idx).value) || 0,
         p_so_luong_ng: Number(document.getElementById('es-ng-'+idx).value) || 0,
         p_phan_loai_ng: document.getElementById('es-loi-'+idx).value || '',
-        p_so_shot_dau_ca: document.getElementById('es-dau-'+idx).value === '' ? null : Number(document.getElementById('es-dau-'+idx).value),
-        p_so_shot_cuoi_ca: document.getElementById('es-cuoi-'+idx).value === '' ? null : Number(document.getElementById('es-cuoi-'+idx).value),
+        p_so_shot_dau_ca: null,   // T382
+        p_so_shot_cuoi_ca: null,
         p_user: state.user,
       };
       await rpcWrite('duc_update_shift_inputs', params);
