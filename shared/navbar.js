@@ -670,9 +670,35 @@ body{padding-top:var(--navbar-h)}
     }
   }
 
+  // T390: màn hiển thị tự tải lại cả trang mỗi 10 phút (để lấy bản mới, tránh treo màn cũ).
+  // Bỏ qua lần đó khi: có hộp thoại đang mở, đang gõ ô nhập, vừa thao tác < 2 phút, tab đang ẩn.
+  const TU_TAI_LAI_MAN = ['duc-dashboard.html', 'bavia-dashboard.html', 'gia-cong-dashboard.html', 'index.html'];
+  const TU_TAI_LAI_MS = 10 * 60000, NGHI_THAO_TAC_MS = 2 * 60000;
+  function batTuTaiLai() {
+    if (!TU_TAI_LAI_MAN.includes(currentFile())) return;
+    const batDau = Date.now();
+    let lanCuoiThaoTac = 0;
+    ['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(ev =>
+      document.addEventListener(ev, () => { lanCuoiThaoTac = Date.now(); }, { passive: true, capture: true }));
+    const dangHienThi = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    function coTheTaiLai() {
+      if (document.visibilityState !== 'visible') return false;
+      if (Date.now() - batDau < TU_TAI_LAI_MS) return false;
+      if (Date.now() - lanCuoiThaoTac < NGHI_THAO_TAC_MS) return false;
+      const a = document.activeElement;
+      if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return false;
+      const hop = document.querySelectorAll('dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"], .modal-mask, .modal-bg, .modal, .mnb-pw-mask');
+      for (const el of hop) if (dangHienThi(el)) return false;
+      return true;
+    }
+    setInterval(() => { if (coTheTaiLai()) location.reload(); }, 30000);
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', batTuTaiLai);
   } else {
     init();
+    batTuTaiLai();
   }
 })();
