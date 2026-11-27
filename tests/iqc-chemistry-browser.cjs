@@ -2,7 +2,7 @@ const fs = require("node:fs"),
   path = require("node:path"),
   assert = require("node:assert/strict");
 const { chromium } = require(process.env.MES_PLAYWRIGHT_PATH || "playwright"),
-  XLSX = require("../.review/xlsx.cjs");
+  XLSX = require(process.env.MES_XLSX_PATH || "../.review/xlsx.cjs");
 const { extendChemistry } = require("./iqc-chemistry-fixture.cjs");
 const legacy = fs.readFileSync("tests/iqc-workspace-browser.cjs", "utf8");
 const start = legacy.indexOf("function backend()"),
@@ -73,7 +73,7 @@ const base = legacy.slice(start, end);
           cut = pkg.indexOf("/"),
           name = pkg.slice(0, cut).replace(/@[^@]+$/, "");
         if (pkg.startsWith("@tesseract.js-data/")) file = path.resolve(".review/ocr-models/eng.traineddata");
-        else if (pkg.startsWith("xlsx@")) file = path.resolve(".review/xlsx.cjs");
+        else if (pkg.startsWith("xlsx@")) file = path.resolve(process.env.MES_XLSX_PATH || ".review/xlsx.cjs");
         else file = path.resolve(process.env.MES_IQC_REVIEW_TOOLS || ".review/tools/node_modules", name, pkg.slice(cut + 1));
       } else return route.fulfill({ body: "", contentType: "application/javascript" });
       if (!file || !fs.existsSync(file)) return route.fulfill({ status: 404, body: "Missing fixture" });
@@ -93,6 +93,7 @@ const base = legacy.slice(start, end);
       return route.fulfill({ body: fs.readFileSync(file), contentType: type });
     });
     await page.goto("https://mes.test/iqc.html");
+    await page.locator('#iqcNewTab').click();
     await page.waitForFunction(() => document.querySelector('#qc02-products option[value="[NVL] AL-01"]'));
     const catalog = await page.locator("#qc02-products option").evaluateAll((es) => es.map((e) => e.value));
     assert.equal(catalog.length, new Set(catalog).size);
@@ -354,7 +355,8 @@ const base = legacy.slice(start, end);
     await page.locator("#iqcChemRows [data-measure]").fill("10.5");
     await page.locator("#iqcChemConfirmed").check();
     await page.locator("#saveBtn").click();
-    await page.waitForFunction(() => document.querySelector("#iqcChemStatus").textContent.includes("Đã lưu báo cáo"));
+    await page.waitForFunction(() => document.querySelector("#iqcChemStatus").textContent.includes("Đã lưu báo cáo"),null,{timeout:8000})
+      .catch(async e => { console.error('CHEM_STATUS',await page.locator('#iqcChemStatus').textContent(),'INVALID',await page.locator('#lotForm :invalid').evaluateAll(es=>es.map(x=>x.id))); throw e; });
     assert.equal(await page.evaluate((id) => sb.saved.lots.find((x) => x.id === id).result, pendingId), "OK");
     assert.equal(await page.evaluate(() => sb.saved.lots.filter((x) => x.lot_no === "CHEM-NO-TC").length), 1);
     console.log(

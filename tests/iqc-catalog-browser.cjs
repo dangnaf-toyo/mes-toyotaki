@@ -18,7 +18,7 @@ const base = legacy.slice(legacy.indexOf('function backend()'), legacy.indexOf('
       return route.fulfill({ body: fs.readFileSync(f), contentType: f.endsWith('.js') ? 'application/javascript' : f.endsWith('.css') ? 'text/css' : 'text/html' });
     });
     await page.goto('https://mes.test/iqc.html');
-    await page.waitForSelector('#iqcMaterialStatus');
+    await page.locator('#iqcNewTab').click();
     await page.waitForFunction(() => [...document.querySelectorAll('#qc02-products option')].some(o => o.textContent.includes('SUP-AL') && o.textContent.includes('Kim loại mã A')));
     const code = page.locator('#productCode');
     await code.fill('product-unique');
