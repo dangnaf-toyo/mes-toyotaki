@@ -105,7 +105,7 @@
       '.tcd .loi{margin-top:8px;padding:7px 10px;border-radius:8px;background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;font-weight:600;font-size:12.5px}';
     document.head.appendChild(st);
   }
-  function msg(el, text, kind) { el.innerHTML = text ? '<div class="msg ' + (kind || 'ok') + '">' + esc(text) + '</div>' : ''; }
+  function msg(el, text, kind) { if (window.mesBaoLoi && (text && kind === 'err')) mesBaoLoi(text); /* T391 */ el.innerHTML = text ? '<div class="msg ' + (kind || 'ok') + '">' + esc(text) + '</div>' : ''; }
   async function nguoi() { try { return (await MesAuth.getCurrentUserIdentity()) || ''; } catch (e) { return ''; } }
   function ngayVN(ts) { return ts ? new Date(ts).toLocaleString('vi-VN', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
   function soVN(v) { if (v === null || v === undefined) return ''; const s = String(v).trim().replace(/^[ØøФф⌀]\s*/, '').replace(',', '.'); return s; }

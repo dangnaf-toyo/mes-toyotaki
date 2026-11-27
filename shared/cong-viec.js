@@ -217,6 +217,7 @@
 
   function toast(msg, kind) {
     if (kind === 'err') msg = String(msg || '').replace(/(permission denied|JWT|Failed to fetch|NetworkError|Load failed|does not exist|PGRST\d+)[^\n]*/i, m => loiDeHieu(m));
+    if (kind === 'err' && window.mesBaoLoi) return mesBaoLoi(msg); // T391
     let el = document.getElementById('cvToast');
     if (!el) { el = document.createElement('div'); el.id = 'cvToast'; el.className = 'cv-toast'; document.body.appendChild(el); }
     el.textContent = msg;
