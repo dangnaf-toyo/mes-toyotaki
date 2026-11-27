@@ -512,7 +512,7 @@
     });
     if (admin) {
       host.addEventListener('click', e => {
-        if (e.target.classList.contains('kds-mask') || e.target.closest('[data-close]')) return closeDlg();
+        if (e.target.closest('[data-close]')) return closeDlg();
         const mv = e.target.closest('button[data-ut-mv]');
         if (mv) {
           const i = Number(mv.dataset.i), j = i + Number(mv.dataset.utMv);
