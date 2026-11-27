@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="vi" spellcheck="false">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tồn theo công đoạn — TOYOTAKI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"></noscript>
+<!--
+  ton-cong-doan.html — T374: tồn từng mã SP ở từng công đoạn (chỉ đọc, tính
+  trên trình duyệt, không có hàm SQL riêng).
+  Nguồn: duc_tem (so_luong = SL còn trên tem) + cd_v_vi_tri_hien_tai (công
+  đoạn nhận cuối cùng khi quét chuyển công đoạn).
+  Quy tắc vị trí 1 tem (so_luong > 0):
+   - Tem thùng TP…/GC…: chỉ tính khi trang_thai = 'Đã đóng gói TP' (đã quét
+     ghi nhận; tem mới in chưa quét không tính) — vị trí = log, không có log
+     thì tram_cong_doan.
+   - Tem Đúc / tem con: bỏ 'Chờ sản xuất' (in trước, chưa đúc) — vị trí = log,
+     không có log thì 'Đã làm Bavia' (tem con tách ở Bavia, T365/T367) → Bavia,
+     còn lại → Đúc.
+   - Vị trí 'Xuất hàng' = đã xuất, không phải tồn.
+  Tem mẹ đã trừ phần tách cho tem con nên không cộng trùng.
+  Lọc tuổi tem (ngày = thoi_diem_san_xuat, chưa có thì ngay_gio_in), mặc định
+  14 ngày: trên prod còn hàng nghìn tem Đúc từ tháng 7 chưa từng quét chuyển
+  công đoạn → nếu tính hết cột Đúc bị phóng đại.
+  Bấm ô số / mã SP → danh sách tem ngay trên trang (?ma=&cd=), nút ◀ quay lại.
+  Mở thẳng: ton-cong-doan.html?ngay=14|7|30|60|0&ma=<mã>&cd=<công đoạn>
+-->
+<style>
+:root{--bg-page:#EEF1F5;--bg-panel:#FFFFFF;--bg-sunken:#F5F7FA;--bg-header:#1E293B;--border:#D9DFE5;--border-strong:#B8C1CC;--text:#0F172A;--text-muted:#64748B;--text-dim:#94A3B8;--accent:#0F5FA5;--accent-hover:#0A4681;--run-fg:#047857;--run-bg:#ECFDF5;--warn-fg:#B45309;--warn-bg:#FFFBEB;--alarm-fg:#B91C1C;--alarm-bg:#FEF2F2;--shadow-sm:0 1px 2px rgba(15,23,42,0.04);}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg-page);min-height:100vh;color:var(--text);font-size:13px;line-height:1.35;-webkit-font-smoothing:antialiased}
+body{padding:6px 6px 60px}
+.wrap{margin:6px 0 0;display:flex;flex-direction:column;gap:6px}
+header{background:var(--bg-header);color:#F1F5F9;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px 14px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2}
+.brand .co{font-size:11px;letter-spacing:.08em;color:#94A3B8;text-transform:uppercase;font-weight:500}
+.brand .title{font-size:14px;font-weight:700;color:#FFF}
+.header-group{display:flex;align-items:center;gap:6px}
+.header-label{font-size:11px;color:#94A3B8;font-weight:500}
+.header-select{background:#334155;color:#F1F5F9;border:1px solid #475569;border-radius:5px;padding:4px 8px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;outline:none;max-width:170px}
+.btn{border:none;border-radius:5px;padding:6px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn:hover{background:var(--accent-hover)}
+.btn-hd{background:transparent;border:1px solid #475569;color:#F1F5F9;padding:4px 9px}
+.btn-hd:hover{background:#334155}
+.card{background:var(--bg-panel);border-radius:8px;box-shadow:var(--shadow-sm);border:1px solid var(--border);padding:12px 14px}
+.tong{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text-muted)}
+.tong b{color:var(--text);font-size:15px;font-family:'JetBrains Mono',monospace}
+.info-btn{border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:18px;padding:0}
+.info-txt{flex-basis:100%;font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:6px;padding:8px 10px;line-height:1.5}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;white-space:nowrap}
+th{background:var(--bg-sunken);color:var(--text-muted);font-size:11px;font-weight:700}
+td.num,th.num{text-align:right}
+td.num{font-family:'JetBrains Mono',monospace}
+tr:hover td{background:var(--bg-sunken)}
+tr.tong-dong td{background:#F8FAFC;font-weight:700;border-bottom:2px solid var(--border-strong)}
+td.ten{max-width:220px;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted)}
+td.o{cursor:pointer;color:var(--accent);font-weight:700}
+td.o:hover{text-decoration:underline}
+td.o.cu{color:var(--warn-fg)}
+td.rong{color:var(--text-dim)}
+td.tc{font-weight:700}
+.empty-row td{text-align:center;color:var(--text-dim);padding:24px}
+.tag,.ma{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--accent);text-decoration:none;cursor:pointer}
+.tag:hover,.ma:hover{text-decoration:underline}
+.cu-txt{color:var(--warn-fg);font-weight:700}
+#msg{margin:0 0 6px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
+.err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+@media (max-width:600px){ .header-select{max-width:140px} .brand .co{display:none} td.ten{max-width:120px} }
+</style>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<div class="wrap">
+  <header>
+    <button type="button" class="btn btn-hd" id="btnLui" title="Quay lại" hidden>◀</button>
+    <div class="brand">
+      <div class="co">Toyotaki</div>
+      <div class="title" id="tieuDe">Tồn theo công đoạn</div>
+    </div>
+    <div class="header-group">
+      <span class="header-label">Tem trong</span>
+      <select id="fNgay" class="header-select">
+        <option value="7">7 ngày</option>
+        <option value="14" selected>14 ngày</option>
+        <option value="30">30 ngày</option>
+        <option value="60">60 ngày</option>
+        <option value="0">Tất cả</option>
+      </select>
+    </div>
+    <button type="button" class="btn btn-hd" id="btnTai" title="Tải lại">⟳</button>
+  </header>
+
+  <div class="card">
+    <div class="tong" id="tong">Đang tải…</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"><tr class="empty-row"><td>Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="shared/supabase-client.js"></script>
+<script src="shared/navbar.js?v=T374"></script>
+<script>
+const THU_TU = ['Đúc', 'Bavia', 'Gia Công', 'Cắt viền', 'Đánh bóng Kẽm', 'Sơn', 'OQC', 'Nhập kho'];
+const NHAN = { 'Nhập kho': 'Kho TP' };
+const NGAY_CU = 7;   // tem nằm ở 1 công đoạn quá số ngày này → tô cam
+let tem = [];        // mọi tem đang tồn: { tag, ma, ten, cd, sl, tt, ngay }
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+function fmtNgay(iso){ return iso ? new Date(iso).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }) : '—'; }
+function tuoi(iso){ return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null; }
+function nhanCd(cd){ return NHAN[cd] || cd; }
+function showMsg(text){ const el = document.getElementById('msg'); el.textContent = text; el.className = 'err'; }
+function thamSo(){ return new URL(location.href).searchParams; }
+function datThamSo(o){
+  const url = new URL(location.href);
+  Object.entries(o).forEach(([k, v]) => { if (v === null || v === '') url.searchParams.delete(k); else url.searchParams.set(k, v); });
+  history.pushState(null, '', url);
+}
+
+async function tai(){
+  document.getElementById('msg').className = '';
+  document.getElementById('tong').textContent = 'Đang tải…';
+  const soNgay = Number(document.getElementById('fNgay').value);
+  const tuNgay = soNgay ? new Date(Date.now() - soNgay * 86400000).toISOString() : null;
+
+  const [temR, viTriR] = await Promise.all([
+    sbTaiHet(() => {
+      let q = sb.from('duc_tem')
+        .select('tag_no,ma_sp,ten_sp,so_luong,trang_thai,tram_cong_doan,thoi_diem_san_xuat,ngay_gio_in')
+        .gt('so_luong', 0);
+      if (tuNgay) q = q.or(`thoi_diem_san_xuat.gte.${tuNgay},and(thoi_diem_san_xuat.is.null,ngay_gio_in.gte.${tuNgay})`);
+      return q.order('tag_no');
+    }),
+    sbTaiHet(() => sb.from('cd_v_vi_tri_hien_tai').select('tag_no,vi_tri_hien_tai').order('tag_no')),
+  ]);
+  if (temR.error || viTriR.error){ showMsg('Lỗi tải: ' + (temR.error || viTriR.error).message); return; }
+
+  const viTri = {};
+  (viTriR.data || []).forEach(v => { viTri[v.tag_no] = v.vi_tri_hien_tai; });
+
+  tem = [];
+  (temR.data || []).forEach(t => {
+    const laThung = /^(TP|GC)/.test(t.tag_no);
+    if (laThung ? t.trang_thai !== 'Đã đóng gói TP' : t.trang_thai === 'Chờ sản xuất') return;
+    let cd = viTri[t.tag_no];
+    if (!cd) cd = laThung ? (t.tram_cong_doan || 'Không rõ') : (t.trang_thai === 'Đã làm Bavia' ? 'Bavia' : 'Đúc');
+    if (cd === 'Xuất hàng') return;
+    tem.push({ tag: t.tag_no, ma: t.ma_sp || '—', ten: t.ten_sp || '', cd, sl: Number(t.so_luong) || 0,
+      tt: t.trang_thai || '', ngay: t.thoi_diem_san_xuat || t.ngay_gio_in });
+  });
+  ve();
+}
+
+function dsCongDoan(ds){
+  const co = new Set(ds.map(t => t.cd));
+  return THU_TU.filter(c => co.has(c)).concat([...co].filter(c => !THU_TU.includes(c)).sort());
+}
+
+function ve(){
+  const p = thamSo();
+  const ma = p.get('ma'), cd = p.get('cd');
+  document.getElementById('btnLui').hidden = !(ma || cd);
+  if (ma || cd) veChiTiet(ma, cd); else veTongHop();
+}
+
+function veTongHop(){
+  document.getElementById('tieuDe').textContent = 'Tồn theo công đoạn';
+  const cds = dsCongDoan(tem);
+  const theoMa = {};
+  tem.forEach(t => {
+    const m = theoMa[t.ma] || (theoMa[t.ma] = { ma: t.ma, ten: t.ten, tong: 0, o: {} });
+    if (!m.ten && t.ten) m.ten = t.ten;
+    const o = m.o[t.cd] || (m.o[t.cd] = { sl: 0, n: 0, cu: null });
+    o.sl += t.sl; o.n++; m.tong += t.sl;
+    if (t.ngay && (!o.cu || t.ngay < o.cu)) o.cu = t.ngay;
+  });
+  const dong = Object.values(theoMa).sort((a, b) => b.tong - a.tong);
+
+  document.getElementById('thead').innerHTML = '<tr><th>Mã SP</th><th>Tên SP</th>' +
+    cds.map(c => '<th class="num">' + escapeHtml(nhanCd(c)) + '</th>').join('') + '<th class="num">Tổng</th></tr>';
+
+  const tbody = document.getElementById('tbody');
+  if (!dong.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="' + (cds.length + 3) + '">Không có tem nào đang tồn.</td></tr>';
+  } else {
+    const tongCd = {};
+    tem.forEach(t => { tongCd[t.cd] = (tongCd[t.cd] || 0) + t.sl; });
+    const tongTat = tem.reduce((s, t) => s + t.sl, 0);
+    tbody.innerHTML =
+      '<tr class="tong-dong"><td>Tổng</td><td></td>' +
+      cds.map(c => '<td class="num o" data-cd="' + escapeHtml(c) + '">' + fmtNum(tongCd[c]) + '</td>').join('') +
+      '<td class="num tc">' + fmtNum(tongTat) + '</td></tr>' +
+      dong.map(m => '<tr><td><a class="ma" data-ma="' + escapeHtml(m.ma) + '">' + escapeHtml(m.ma) + '</a></td>' +
+        '<td class="ten" title="' + escapeHtml(m.ten) + '">' + escapeHtml(m.ten) + '</td>' +
+        cds.map(c => {
+          const o = m.o[c];
+          if (!o) return '<td class="num rong">·</td>';
+          const t = tuoi(o.cu);
+          return '<td class="num o' + (t !== null && t > NGAY_CU ? ' cu' : '') + '" data-ma="' + escapeHtml(m.ma) + '" data-cd="' + escapeHtml(c) +
+            '" title="' + o.n + ' tem' + (t !== null ? ' · cũ nhất ' + t + ' ngày' : '') + '">' + fmtNum(o.sl) + '</td>';
+        }).join('') +
+        '<td class="num tc">' + fmtNum(m.tong) + '</td></tr>').join('');
+  }
+
+  document.getElementById('tong').innerHTML =
+    '<span>Mã SP <b>' + fmtNum(dong.length) + '</b></span>' +
+    '<span>Số tem <b>' + fmtNum(tem.length) + '</b></span>' +
+    '<span>Tổng SL <b>' + fmtNum(tem.reduce((s, t) => s + t.sl, 0)) + '</b></span>' +
+    '<button type="button" class="info-btn" id="btnInfo" title="Giải thích">ⓘ</button>' +
+    '<div class="info-txt" id="infoTxt" hidden>Số lượng còn trên tem, đặt ở công đoạn đã quét nhận tem gần nhất. Tem Đúc chưa quét chuyển công đoạn vẫn tính ở Đúc. Tem thùng mới in chưa quét ghi nhận và hàng đã xuất thì không tính.<br>' +
+    'Ô màu cam: có tem nằm quá ' + NGAY_CU + ' ngày. Giữ chuột trên ô để xem số tem. Bấm ô hoặc mã SP để xem danh sách tem.</div>';
+  ganInfo();
+}
+
+function veChiTiet(ma, cd){
+  document.getElementById('tieuDe').textContent = [ma, cd ? nhanCd(cd) : ''].filter(Boolean).join(' · ');
+  const ds = tem.filter(t => (!ma || t.ma === ma) && (!cd || t.cd === cd))
+    .sort((a, b) => (THU_TU.indexOf(a.cd) - THU_TU.indexOf(b.cd)) || String(a.ngay).localeCompare(String(b.ngay)));
+  document.getElementById('thead').innerHTML = '<tr><th>Tag No</th><th>Mã SP</th><th>Công đoạn</th><th>Trạng thái</th>' +
+    '<th class="num">SL còn</th><th>Ngày SX</th><th class="num">Số ngày</th></tr>';
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = ds.length ? ds.map(t => {
+    const n = tuoi(t.ngay);
+    return '<tr><td><a class="tag" href="truy-xuat-nguon-goc.html?tag=' + encodeURIComponent(t.tag) + '" target="_blank" rel="noopener">' + escapeHtml(t.tag) + '</a></td>' +
+      '<td>' + escapeHtml(t.ma) + '</td><td>' + escapeHtml(nhanCd(t.cd)) + '</td><td>' + escapeHtml(t.tt) + '</td>' +
+      '<td class="num">' + fmtNum(t.sl) + '</td><td>' + fmtNgay(t.ngay) + '</td>' +
+      '<td class="num' + (n !== null && n > NGAY_CU ? ' cu-txt' : '') + '">' + (n ?? '—') + '</td></tr>';
+  }).join('') : '<tr class="empty-row"><td colspan="7">Không có tem nào.</td></tr>';
+  document.getElementById('tong').innerHTML =
+    '<span>Số tem <b>' + fmtNum(ds.length) + '</b></span>' +
+    '<span>Tổng SL <b>' + fmtNum(ds.reduce((s, t) => s + t.sl, 0)) + '</b></span>' +
+    '<button type="button" class="info-btn" id="btnInfo" title="Giải thích">ⓘ</button>' +
+    '<div class="info-txt" id="infoTxt" hidden>Bấm Tag No để xem nguồn gốc tem. Số ngày tính từ lúc sản xuất (chưa có thì từ lúc in tem).</div>';
+  ganInfo();
+}
+
+function ganInfo(){ document.getElementById('btnInfo').onclick = () => { const t = document.getElementById('infoTxt'); t.hidden = !t.hidden; }; }
+
+document.getElementById('tbody').addEventListener('click', e => {
+  const el = e.target.closest('[data-ma],[data-cd]');
+  if (!el) return;
+  datThamSo({ ma: el.dataset.ma || null, cd: el.dataset.cd || null });
+  ve(); window.scrollTo(0, 0);
+});
+document.getElementById('btnLui').onclick = () => { datThamSo({ ma: null, cd: null }); ve(); };
+window.addEventListener('popstate', ve);
+
+const fNgay = document.getElementById('fNgay');
+const ngayUrl = thamSo().get('ngay');
+if (ngayUrl !== null && [...fNgay.options].some(o => o.value === ngayUrl)) fNgay.value = ngayUrl;
+fNgay.addEventListener('change', () => {
+  const url = new URL(location.href); url.searchParams.set('ngay', fNgay.value); history.replaceState(history.state, '', url);
+  tai();
+});
+document.getElementById('btnTai').onclick = tai;
+tai();
+</script>
+</body>
+</html>
