@@ -40,7 +40,10 @@
   window.mesLaLoi = (s) => { s = String(s ?? ''); return !/^\s*(✅|✓|ℹ)/.test(s) && LOI_RE.test(s); };
   if (!window.mesBaoLoi) {
     const KEY_LOI = 'mesBaoLoiGoc';
-    let dlg = null, ds = [], moLuc = 0, truoc = null, boQua = 0;
+    let dlg = null, ds = [], moLuc = 0, truoc = null, boQua = 0, dangRoi = false;
+    const ganDay = new Map(); // nội dung (đã chuẩn hoá) → lúc hiện gần nhất, để lỗi tự phát hiện không bật lại liên tục
+    const chuan = (x) => String(x).replace(/[❌⛔⚠️🔒️\s]+/gu, ' ').replace(/^\s*(Lỗi:\s*)+/i, '').trim().toLowerCase();
+    window.addEventListener('beforeunload', () => { dangRoi = true; setTimeout(() => { dangRoi = false; }, 4000); });
     const ve = () => {
       if (dlg) return dlg;
       const st = document.createElement('style');
@@ -70,13 +73,21 @@
       document.body.appendChild(dlg);
       return dlg;
     };
-    window.mesBaoLoi = function (msg) {
+    // o.tuDong = lỗi tự phát hiện (chữ lỗi hiện trên trang / lỗi chương trình): bỏ qua nếu cùng nội dung đã hiện trong 3 phút
+    // hoặc trang đang tải lại / chuyển trang.
+    window.mesBaoLoi = function (msg, o) {
       const s = String(msg ?? '').replace(/^\s*(Lỗi:\s*)+/i, '').trim();
       if (!s) return;
-      if (!document.body) { document.addEventListener('DOMContentLoaded', () => window.mesBaoLoi(s), { once: true }); return; }
+      const tuDong = !!(o && o.tuDong);
+      if (tuDong && dangRoi) return;
+      if (!document.body) { document.addEventListener('DOMContentLoaded', () => window.mesBaoLoi(s, o), { once: true }); return; }
+      const k = chuan(s), luc = ganDay.get(k);
+      if (tuDong && luc && Date.now() - luc < 180000) return;
+      ganDay.set(k, Date.now());
+      if (ganDay.size > 200) ganDay.delete(ganDay.keys().next().value);
       const d = ve();
-      if (ds.some(x => x.s === s)) return;
-      ds.push({ s, luc: Date.now() });
+      if (ds.some(x => chuan(x.s) === k)) return;
+      ds.push({ s, luc: Date.now(), tuDong });
       while (ds.length > 5) ds.shift();
       const nd = d.querySelector('.nd');
       nd.innerHTML = '';
@@ -93,7 +104,7 @@
     };
     // Lỗi hiện ngay trước khi tải lại/chuyển trang → mở lại ở trang sau.
     window.addEventListener('pagehide', () => {
-      const con = ds.filter(x => Date.now() - x.luc < 3000).map(x => x.s);
+      const con = ds.filter(x => !x.tuDong && Date.now() - x.luc < 3000).map(x => x.s);
       try { if (con.length) sessionStorage.setItem(KEY_LOI, JSON.stringify(con)); } catch (e) {}
     });
     try {
@@ -101,6 +112,69 @@
       sessionStorage.removeItem(KEY_LOI);
       cu.forEach(window.mesBaoLoi);
     } catch (e) {}
+  }
+  // T392: lỗi ghi thẳng ra trang (không qua hàm báo lỗi) cũng phải bật cửa sổ xác nhận. Theo dõi thay đổi trên trang:
+  //   • chữ mới hiện bắt đầu bằng "Lỗi:" / "Lỗi tải|lưu|kết nối…" / "Không tải|lưu|tra… được" / "Có lỗi" / "Thất bại"
+  //     (có thể kèm ❌ ⛔ phía trước; huy hiệu trạng thái kiểu "⛔ Đang dừng", "❌ NG" KHÔNG tính)
+  //   • chữ mới trong khung lỗi của trang: id kết thúc "Err", role="alert", #errBox #page-err #dlgLoi #xl-loi #gy-loi #rpWhy
+  // Bỏ qua nút, ô chọn, nhãn, tiêu đề cột, ô nhập, phần đang ẩn, và vùng có data-khong-bao-loi. Cùng nội dung chỉ bật lại sau 3 phút.
+  // Lỗi chương trình (lỗi JS / promise không bắt) cũng báo bằng cửa sổ này.
+  if (!window.mesTheoDoiLoi && window.MutationObserver) {
+    window.mesTheoDoiLoi = true;
+    const PRE = /^\s*(?:[❌⛔⚠🔒]\uFE0F?\s*)*(?:Lỗi(?:\s*:|\s+(?:tải|lưu|kết nối|nhập|xuất|tính|đọc|ghi|gửi|in|tra|mở|xoá|xóa|cập nhật|tạo|hệ thống|máy chủ|chương trình|không xác định|thư viện|JS)\b)|Không\s+(?:tải|lưu|tra|kiểm tra|mở|in|gửi|xoá|xóa|cập nhật|tạo|đọc|ghi|nhập|xuất|lấy|chuyển|duyệt|kết nối|đóng|thêm|sửa|tìm|tính)\s+(?:được|đc)|Có lỗi|Thất bại)/iu;
+    const ID_LOI = /Err$|^(errBox|page-err|dlgLoi|xl-loi|gy-loi|rpWhy)$/;
+    const BO = 'button,option,select,label,th,input,textarea,script,style,title,svg,canvas,[contenteditable],[data-khong-bao-loi],#mesLoiDlg,#mesTbg';
+    const NOI = /^(B|STRONG|I|EM|SPAN|SMALL|A|CODE|U|MARK)$/;
+    const laKhung = (el) => el && el.nodeType === 1 && ((el.id && ID_LOI.test(el.id)) || el.getAttribute('role') === 'alert');
+    const cho = new Set(); let hen = 0;
+    const them = (el) => { if (el) { cho.add(el); if (!hen) hen = setTimeout(xet, 60); } };
+    const thanhKhoi = (el) => { while (el && NOI.test(el.tagName) && el.parentElement && el.parentElement !== document.body && (el.parentElement.textContent || '').length < 600) el = el.parentElement; return el; };
+    const hienThi = (el) => { try { return el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : el.getClientRects().length > 0; } catch (e) { return true; } };
+    function xet() {
+      hen = 0;
+      const ds = [...cho]; cho.clear();
+      for (const el of ds) {
+        if (!el.isConnected || el.closest(BO) || !hienThi(el)) continue;
+        const t = (el.innerText || el.textContent || '').trim();
+        if (!t) continue;
+        window.mesBaoLoi(t.length > 500 ? t.slice(0, 500) + '…' : t, { tuDong: true });
+      }
+    }
+    const xetChu = (n) => { if (PRE.test(n.data || '')) them(thanhKhoi(n.parentElement)); };
+    const xetNut = (n) => {
+      if (n.nodeType === 3) return xetChu(n);
+      if (n.nodeType !== 1 || n.matches(BO)) return;
+      if (laKhung(n)) them(n);
+      if (n.querySelectorAll) n.querySelectorAll('[id$="Err"],[role="alert"],#errBox,#page-err,#dlgLoi,#xl-loi,#gy-loi,#rpWhy').forEach(x => { if ((x.textContent || '').trim()) them(x); });
+      const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT);
+      let c, dem = 0;
+      while ((c = w.nextNode()) && dem++ < 5000) xetChu(c);
+    };
+    const bat = () => {
+      new MutationObserver((ms) => {
+        for (const m of ms) {
+          if (m.type === 'characterData') { xetChu(m.target); const k = m.target.parentElement && m.target.parentElement.closest('[id],[role]'); if (laKhung(k)) them(k); continue; }
+          if (laKhung(m.target) && m.addedNodes.length) them(m.target);
+          else { const k = m.target.closest && m.target.closest('[id$="Err"],[role="alert"],#errBox,#page-err,#dlgLoi,#xl-loi,#gy-loi,#rpWhy'); if (k && m.addedNodes.length) them(k); }
+          m.addedNodes.forEach(xetNut);
+        }
+      }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    };
+    if (document.body) bat(); else document.addEventListener('DOMContentLoaded', bat, { once: true });
+    const BO_QUA_LOI = /ResizeObserver|Extension context|chrome-extension|moz-extension|^Script error\.?$|NotAllowedError|AbortError|The play\(\) request|user didn't interact/i;
+    const gonLoi = (r) => { try { return typeof MesLoi !== 'undefined' ? MesLoi.gon(r) : (r && r.message) || String(r); } catch (e) { return String(r); } };
+    window.addEventListener('unhandledrejection', (e) => {
+      const r = e.reason; if (r == null) return;
+      const m = gonLoi(r);
+      if ((r && (r.name === 'AbortError' || r.name === 'NotAllowedError')) || BO_QUA_LOI.test(m)) return;
+      window.mesBaoLoi('Lỗi hệ thống: ' + m, { tuDong: true });
+    });
+    window.addEventListener('error', (e) => {
+      const m = e.message || '';
+      if (!m || BO_QUA_LOI.test(m)) return;
+      if (e.filename && !/^file:/i.test(e.filename) && e.filename.indexOf(location.host) < 0) return; // chỉ lỗi từ mã của MES
+      window.mesBaoLoi('Lỗi chương trình: ' + m + ' — tải lại trang (F5), nếu còn lỗi báo quản trị viên.', { tuDong: true });
+    });
   }
   if (/\[native code\]/.test(String(window.alert))) {
     const KEY = 'mesThongBaoGoc';
