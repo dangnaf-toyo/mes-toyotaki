@@ -57,6 +57,10 @@ tr:hover td{background:var(--bg-sunken)}
 .load-more-wrap{text-align:center;margin-top:16px}
 #msg{margin:0 0 6px;padding:11px 14px;border-radius:8px;font-size:13px;font-weight:600;display:none}
 .err{background:var(--alarm-bg);color:var(--alarm-fg);border:1px solid #FCA5A5;display:block!important}
+.tim-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tim-bar input{flex:1 1 160px;min-width:0;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:13px}
+.tim-bar input:focus{outline:none;border-color:var(--accent)}
+.tim-bar a.btn{text-decoration:none;display:inline-block}
 </style>
 </head>
 <body>
@@ -89,6 +93,14 @@ tr:hover td{background:var(--bg-sunken)}
       <div class="time" id="hdrClockTime"></div>
     </div>
   </header>
+
+  <!-- T375: mở thẳng 1 tem (gõ/quét) → trang chi tiết intem.html (sửa · in lại · tách · xoá); nhật ký sửa/xoá. -->
+  <div class="card tim-bar">
+    <input type="text" id="tTag" placeholder="Tag No" autocomplete="off">
+    <button type="button" class="btn" id="btnMoTem">Mở tem</button>
+    <a class="btn btn-outline" href="intem.html?xem=chitiet&amp;quet=1">Quét QR</a>
+    <a class="btn btn-outline" href="intem.html?xem=nhatky">Nhật ký sửa / xoá</a>
+  </div>
 
   <div class="card">
     <div class="result-count" id="resultCount">Đang tải…</div>
@@ -232,7 +244,7 @@ function renderRows(){
         : (r.ngay_gio_in ? fmtDateTimeVN(r.ngay_gio_in) + ' <span style="color:var(--text-muted);font-size:11px">(giờ in)</span>' : '—')}</td>
       <td>${escapeHtml(r.nguoi_tt) || '—'}</td>
       <td><span class="badge${r.trang_thai === 'Đã xuất' ? ' xuat' : ''}">${escapeHtml(r.trang_thai || '—')}</span></td>
-      <td><a href="intem.html?tagNo=${encodeURIComponent(r.tag_no)}" target="_blank" rel="noopener"><button type="button" class="btn-outline btn" style="padding:5px 9px;font-size:11.5px">Chi tiết</button></a></td>
+      <td><a href="intem.html?tagNo=${encodeURIComponent(r.tag_no)}"><button type="button" class="btn-outline btn" style="padding:5px 9px;font-size:11.5px">Chi tiết</button></a></td>
     </tr>`).join('');
 }
 
@@ -244,6 +256,13 @@ document.getElementById('btnXoaLoc').addEventListener('click', () => {
   loadFirstPage();
 });
 document.getElementById('btnLoadMore').addEventListener('click', () => loadMore(false));
+function moTem(){
+  const t = document.getElementById('tTag').value.trim();
+  if (!t) { document.getElementById('tTag').focus(); return; }
+  location.href = 'intem.html?tagNo=' + encodeURIComponent(t);
+}
+document.getElementById('btnMoTem').addEventListener('click', moTem);
+document.getElementById('tTag').addEventListener('keydown', e => { if (e.key === 'Enter') moTem(); });
 
 startHeaderClock();
 loadFilterLists();

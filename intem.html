@@ -147,6 +147,9 @@ textarea{resize:vertical;min-height:48px}
 .tu-lay b{color:var(--text);font-weight:600}
 .tu-lay .canh{color:var(--alarm-fg);font-weight:700}
 .an{display:none!important}
+a.o-phu{display:block;text-align:center;text-decoration:none}
+.btn-d{background:var(--alarm-bg);color:var(--alarm-fg);border:1.5px solid #FCA5A5}
+.btn-d:hover{background:#FEE2E2}
 .card-ttl{display:flex;align-items:center;gap:4px}
 .ii{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:15px;margin-left:auto;padding:0 4px;font-family:inherit}
 .ii-txt{font-size:12px;color:var(--text-muted);background:var(--bg-sunken);border-radius:8px;padding:8px 10px;margin:-8px 0 12px;line-height:1.45}
@@ -178,10 +181,10 @@ textarea{resize:vertical;min-height:48px}
     <button type="button" class="o-loai cd-bv" data-loai="bavia"><b>Bavia</b><span>Theo KH tuần</span></button>
     <button type="button" class="o-loai cd-gc" data-loai="gc"><b>Gia Công</b><span>Tem GC</span></button>
     <button type="button" class="o-loai cd-tp full" data-loai="tp"><b>Thành phẩm</b><span>Đánh bóng Kẽm · OQC</span></button>
-    <button type="button" class="o-phu" data-loai="search">Tra cứu · sửa tem đã in</button>
+    <a class="o-phu" href="tra-cuu-tem.html">Tra cứu · sửa tem đã in ›</a>
   </div>
   <div id="dangChon" class="dang-chon" style="display:none">
-    <button type="button" class="lui" onclick="veChonLoai()">‹ Đổi loại tem</button>
+    <button type="button" class="lui" id="btnLui" onclick="veChonLoai()">‹ Đổi loại tem</button>
     <span class="nhan-loai" id="dangChonTen"></span>
   </div>
 
@@ -406,28 +409,29 @@ textarea{resize:vertical;min-height:48px}
 
   <!-- ============ TAB: Tra cứu Tem ============ -->
   <div id="panelSearch" style="display:none">
-    <div class="card">
-      <div class="card-ttl">Tra cứu theo Tag No</div>
+    <div class="card" id="timTemCard">
+      <div class="card-ttl">Tìm tem<button type="button" class="ii" onclick="batII(this)">ⓘ</button></div>
+      <div class="ii-txt" hidden>Gõ Tag No (hoặc dùng đầu đọc QR rời) rồi Enter. Bấm Quét QR để dùng camera — tự nhận mã, không cần chụp.</div>
       <div class="fg">
         <label for="searchTag">Tag No</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="searchTag" type="text" placeholder="Gõ Tag No hoặc dùng đầu đọc QR rời rồi Enter">
+          <input id="searchTag" type="text" placeholder="Tag No">
           <button class="btn btn-s" type="button" style="flex:none;padding:8px 14px" onclick="findTem()">Tìm</button>
         </div>
       </div>
       <button class="scan-btn" type="button" id="btnScanSearch">Quét QR trên tem</button>
       <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none">
-      <div class="empty-hint" id="scanEmptyHint">Hướng camera vào mã QR trên tem — hệ thống tự nhận diện và tra cứu, không cần bấm chụp.</div>
     </div>
 
     <div class="card" id="searchResultCard" style="display:none">
-      <div class="card-ttl">Thông tin tem tìm thấy</div>
+      <div class="card-ttl">Thông tin tem</div>
       <div class="grid">
-        <div class="fg">
+        <div class="fg full">
           <label class="req" for="s_maSP">Mã sản phẩm</label>
           <select id="s_maSP" onchange="onMaChange('s_')"></select>
         </div>
-        <div class="fg">
+        <div class="fg full tu-lay" id="tl_search"></div>
+        <div class="fg an">
           <label for="s_tenSP">Tên sản phẩm</label>
           <input id="s_tenSP" type="text" disabled>
         </div>
@@ -448,7 +452,7 @@ textarea{resize:vertical;min-height:48px}
           <div class="chip-row" id="s_soKhuon-chips"></div>
           <input id="s_soKhuon" type="text" placeholder="Chọn mã SP trước để gợi ý khuôn">
         </div>
-        <div class="fg">
+        <div class="fg an">
           <label for="s_nguyenLieu">Nguyên liệu</label>
           <input id="s_nguyenLieu" type="text" disabled>
         </div>
@@ -465,31 +469,31 @@ textarea{resize:vertical;min-height:48px}
           <textarea id="s_ghiChu"></textarea>
         </div>
         <div class="fg full">
-          <label for="s_loaiSP">Chủng loại sản phẩm (áp dụng khi In lại)</label>
+          <label for="s_loaiSP">Chủng loại (khi In lại)</label>
           <select id="s_loaiSP">
-            <option value="hangloat">Sản phẩm sản xuất hàng loạt</option>
-            <option value="phattrien">Sản phẩm đang phát triển (in tem nền đen)</option>
+            <option value="hangloat">Hàng loạt</option>
+            <option value="phattrien">Đang phát triển (tem nền đen)</option>
           </select>
         </div>
         <div class="fg full">
-          <label class="req" for="s_lyDo">Lý do sửa / xoá tem</label>
-          <input id="s_lyDo" type="text" placeholder="Bắt buộc khi Lưu thay đổi hoặc Xoá tem — VD: nhập nhầm số lượng, in trùng...">
+          <label class="req" for="s_lyDo">Lý do sửa / xoá</label>
+          <input id="s_lyDo" type="text" placeholder="Bắt buộc khi Lưu / Xoá — VD: nhầm số lượng">
         </div>
       </div>
       <div class="khoa-hint" id="s_khoa" style="display:none"></div>
       <div class="btns">
-        <button class="btn btn-s" type="button" onclick="saveTemEdit()">Lưu</button>
+        <button class="btn btn-p" type="button" onclick="saveTemEdit()">Lưu</button>
         <button class="btn btn-s" type="button" onclick="reprintTem()">In lại</button>
-        <button class="btn btn-s" type="button" onclick="deleteTem()">Xoá tem</button>
-        <button class="btn btn-s" type="button" id="btnHoanTacTach" style="display:none" onclick="hoanTacTachTem()">↩ Hoàn tác tách (gộp về tem cha)</button>
+        <button class="btn btn-s" type="button" id="btnHoanTacTach" style="display:none" onclick="hoanTacTachTem()">↩ Gộp về tem cha</button>
+        <button class="btn btn-d" type="button" onclick="deleteTem()">Xoá tem</button>
       </div>
     </div>
 
     <div class="card" id="tachTemCard" style="display:none">
-      <div class="card-ttl">Tách tem (chia sọt)</div>
+      <div class="card-ttl">Tách tem</div>
       <div class="grid">
         <div class="fg">
-          <label class="req" for="tachSoLuong">Số lượng tách ra tem con</label>
+          <label class="req" for="tachSoLuong">SL tách ra tem con</label>
           <input id="tachSoLuong" type="number" placeholder="Pcs" min="1">
         </div>
         <div class="fg">
@@ -498,7 +502,7 @@ textarea{resize:vertical;min-height:48px}
         </div>
       </div>
       <div class="btns">
-        <button class="btn btn-p" type="button" onclick="tachTem()">Tách tem & in tem con</button>
+        <button class="btn btn-s" type="button" onclick="tachTem()">Tách · In tem con</button>
       </div>
       <div class="empty-hint" id="tachHistoryHint" style="text-align:left;padding-top:10px"></div>
     </div>
@@ -508,7 +512,7 @@ textarea{resize:vertical;min-height:48px}
       <div id="lichSuTemBody"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="nhatKyCard">
       <div class="card-ttl">Nhật ký sửa / xoá tem</div>
       <div class="grid">
         <div class="fg">
@@ -533,7 +537,7 @@ textarea{resize:vertical;min-height:48px}
         </div>
       </div>
       <div class="btns">
-        <button class="btn btn-s" type="button" onclick="loadNhatKy()">Xem nhật ký</button>
+        <button class="btn btn-p" type="button" onclick="loadNhatKy()">Xem</button>
       </div>
       <div id="nhatKyBody"></div>
     </div>
@@ -613,7 +617,8 @@ var LOAI_TEM = {
   bavia:  { ten: 'Bavia · Theo KH tuần', cls: 'cd-bv', panel: 'panelTp', cd: ['Bavia'] },
   gc:     { ten: 'Gia Công · Tem GC', cls: 'cd-gc', panel: 'panelTp', cd: ['Gia Công'] },
   tp:     { ten: 'Thành phẩm',        cls: 'cd-tp', panel: 'panelTp', cd: ['Đánh bóng Kẽm', 'OQC'] },
-  search: { ten: 'Tra cứu tem',       cls: 'cd-tc', panel: 'panelSearch' },
+  search: { ten: 'Chi tiết tem',      cls: 'cd-tc', panel: 'panelSearch' },
+  nhatky: { ten: 'Nhật ký sửa / xoá', cls: 'cd-tc', panel: 'panelSearch' },
 };
 var loaiDangChon = '';
 function switchTab(loai){ chonLoai(loai); }
@@ -621,7 +626,17 @@ function chonLoai(loai, khongNho){
   var L = LOAI_TEM[loai]; if (!L) return veChonLoai();
   var doiCd = loaiDangChon !== loai;
   loaiDangChon = loai;
-  if (!khongNho) { try { localStorage.setItem('intem_loai', loai); } catch (e) {} }
+  var traCuu = L.panel === 'panelSearch';   // T375 đợt 2: tra cứu = trang chi tiết của tra-cuu-tem.html
+  if (!khongNho && !traCuu) { try { localStorage.setItem('intem_loai', loai); } catch (e) {} }
+  var lui = document.getElementById('btnLui');
+  lui.textContent = traCuu ? '‹ Danh sách tem' : '‹ Đổi loại tem';
+  lui.onclick = traCuu ? function(){ location.href = 'tra-cuu-tem.html'; } : veChonLoai;
+  if (traCuu) {
+    var nk = loai === 'nhatky';
+    document.getElementById('timTemCard').style.display = nk ? 'none' : 'block';
+    if (nk) ['searchResultCard', 'tachTemCard', 'lichSuTemCard'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+    document.getElementById('nhatKyCard').style.display = nk ? 'block' : 'none';
+  }
   var wrap = document.getElementById('mainWrap');
   Object.keys(LOAI_TEM).forEach(function(k){ wrap.classList.remove(LOAI_TEM[k].cls); });
   wrap.classList.add(L.cls);
@@ -689,6 +704,8 @@ function tlMuc(nhan, v){ return v ? '<span>' + nhan + ': <b>' + escTl(v) + '</b>
 function capNhatTuLay(){ try { veTuLay(); } catch (e) {} }
 function veTuLay(){
   var v = function(id){ var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
+  document.getElementById('tl_search').innerHTML = v('s_maSP')
+    ? tlMuc('Tên', v('s_tenSP')) + tlMuc('Nguyên liệu', v('s_nguyenLieu')) : '';
   document.getElementById('tl_print').innerHTML = v('maSP')
     ? tlMuc('Tên', v('tenSP')) + tlMuc('Nguyên liệu', v('nguyenLieu')) : '';
   document.getElementById('tl_kanban').innerHTML = v('k_maSP')
@@ -879,6 +896,7 @@ function fillFormFromTem(t){
   document.getElementById("s_loaiSP").value = t.loaiSP || "hangloat";
   document.getElementById("searchResultCard").style.display = "block";
   document.getElementById("tachTemCard").style.display = "block";
+  capNhatTuLay();
 }
 
 async function findTem(){
@@ -2197,7 +2215,12 @@ async function inTheoUrl(){
     if (PREFILL && PREFILL.tagNo) chonLoai('search', true);
     else if (PREFILL && PREFILL.tab === 'tp') chonLoai('bavia', true);
     else if (PREFILL && PREFILL.maSP) chonLoai('print', true);
-    else if (LOAI_TEM[nhoLoai]) chonLoai(nhoLoai, true);
+    else if (PREFILL && PREFILL.xem === 'nhatky') chonLoai('nhatky', true);
+    else if (PREFILL && PREFILL.xem === 'chitiet') {
+      chonLoai('search', true);
+      if (PREFILL.quet === '1') openCameraForSearch(); else document.getElementById('searchTag').focus();
+    }
+    else if (LOAI_TEM[nhoLoai] && LOAI_TEM[nhoLoai].panel !== 'panelSearch') chonLoai(nhoLoai, true);
     else veChonLoai();
     if (PREFILL && PREFILL.tagNo) {
       document.getElementById("searchTag").value = PREFILL.tagNo;
