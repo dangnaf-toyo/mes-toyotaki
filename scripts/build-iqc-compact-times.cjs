@@ -1,4 +1,4 @@
-﻿const fs=require('fs');const src=fs.readFileSync('supabase/migration_iqc_progressive_staging.sql','utf8').replace(/\r\n/g,'\n');
+﻿const fs=require('fs');const src=fs.readFileSync('supabase/migration_iqc_progressive.sql','utf8').replace(/\r\n/g,'\n');
 function fn(name){let i=src.indexOf(`create or replace function public.${name}(`),j=src.indexOf('\nend $$;',i);if(i<0||j<0)throw Error(name);return src.slice(i,j+8)}
 function rep(s,a,b){if(!s.includes(a))throw Error('missing '+a);return s.replace(a,b)}
 let save=fn('iqc_luu_lan_kiem');save=rep(save,'draft iqc_lan_kiem_nhap%rowtype;', 'draft iqc_lan_kiem_nhap%rowtype; start_at timestamptz; end_at timestamptz; target bigint;');
@@ -28,4 +28,4 @@ const newEdit=` start_at:=coalesce(nullif(p_lan->>'bat_dau_luc','')::timestamptz
  update iqc_lan_kiem set ngay_kiem=case when start_at is distinct from oldrow.bat_dau_luc then (start_at at time zone 'Asia/Ho_Chi_Minh')::date else oldrow.ngay_kiem end,bat_dau_luc=start_at,ket_thuc_luc=end_at,nguoi_kiem=trim(p_lan->>'nguoi_kiem'),so_kiem=checked,so_ok=ok,so_ng=ng,sua_luc=clock_timestamp() where id=p_id returning * into newrow;`;
 edit=rep(edit,oldEdit,newEdit);
 edit=rep(edit,"to_jsonb(newrow)||jsonb_build_object('loi',p_lan->'loi')","to_jsonb(newrow)||jsonb_build_object('loi',p_lan->'loi','ly_do_thoi_gian',p_lan->>'ly_do_thoi_gian')");
-fs.writeFileSync('supabase/migration_iqc_compact_times_staging.sql',`-- STAGING ONLY. Does not update historical LOT or inspection rows.\nbegin;\n${save}\n\n${edit}\nnotify pgrst,'reload schema';\ncommit;\n`);
+fs.writeFileSync('supabase/migration_iqc_compact_times.sql',`-- STAGING ONLY. Does not update historical LOT or inspection rows.\nbegin;\n${save}\n\n${edit}\nnotify pgrst,'reload schema';\ncommit;\n`);

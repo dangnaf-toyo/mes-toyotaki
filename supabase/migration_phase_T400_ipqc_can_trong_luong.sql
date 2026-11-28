@@ -1,5 +1,5 @@
 -- T400: dụng cụ Cân trọng lượng cho bảng tuần kiểm Đúc và Gia công.
--- Chạy sau T186, T187 và T232. Chưa triển khai trên STAGING hoặc PRODUCTION.
+-- Chạy sau T186, T187 và T232. Đã chạy STAGING + PRODUCTION 28/11/2026.
 begin;
 
 create or replace function public.ipqc_kiem_tra_dung_cu()

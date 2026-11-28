@@ -1,8 +1,5 @@
--- STAGING only. Adds an immutable catalog-code snapshot to each new IQC round defect.
+-- IQC (4/5, chạy theo thứ tự multiday → progressive → aql_selection → compact_times → oqc_defect_catalog). Chỉ thêm cột/bảng/hàm, không sửa LOT cũ. Đã chạy STAGING + PRODUCTION 28/11/2026. Chỉ chạy 1 lần.
 begin;
-alter table public.iqc_lan_kiem_loi add column if not exists ma_loi text;
-create index if not exists iqc_lan_kiem_loi_ma_loi_idx on public.iqc_lan_kiem_loi(ma_loi);
-
 create or replace function public.iqc_luu_lan_kiem(p_lot_id bigint,p_lot jsonb,p_lan jsonb,p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare l iqc_lots%rowtype; x jsonb; r iqc_lan_kiem%rowtype; old_request iqc_lan_kiem_yeu_cau%rowtype;
@@ -73,8 +70,8 @@ begin
   perform set_config('iqc.quality_lot','',true);
  end if;
  for x in select value from jsonb_array_elements(p_lan->'loi') loop
-  insert into iqc_lan_kiem_loi(lan_kiem_id,ma_loi,ten_loi,nhom_loi,chi_tiet,so_luong)
-  values(r.id,nullif(trim(coalesce(x->>'ma_loi',x->>'code')),''),trim(x->>'ten_loi'),nullif(trim(x->>'nhom_loi'),''),nullif(trim(x->>'chi_tiet'),''),(x->>'so_luong')::bigint);
+  insert into iqc_lan_kiem_loi(lan_kiem_id,ten_loi,nhom_loi,chi_tiet,so_luong)
+  values(r.id,trim(x->>'ten_loi'),nullif(trim(x->>'nhom_loi'),''),nullif(trim(x->>'chi_tiet'),''),(x->>'so_luong')::bigint);
  end loop;
  perform iqc_tinh_tong_lot(l.id);
  answer:=jsonb_build_object('lot_id',l.id,'lan_kiem_id',r.id);
@@ -127,8 +124,8 @@ begin
  end if;
  delete from iqc_lan_kiem_loi where lan_kiem_id=p_id;
  for x in select value from jsonb_array_elements(p_lan->'loi') loop
-  insert into iqc_lan_kiem_loi(lan_kiem_id,ma_loi,ten_loi,nhom_loi,chi_tiet,so_luong)
-  values(p_id,nullif(trim(coalesce(x->>'ma_loi',x->>'code')),''),trim(x->>'ten_loi'),nullif(trim(x->>'nhom_loi'),''),nullif(trim(x->>'chi_tiet'),''),(x->>'so_luong')::bigint);
+  insert into iqc_lan_kiem_loi(lan_kiem_id,ten_loi,nhom_loi,chi_tiet,so_luong)
+  values(p_id,trim(x->>'ten_loi'),nullif(trim(x->>'nhom_loi'),''),nullif(trim(x->>'chi_tiet'),''),(x->>'so_luong')::bigint);
  end loop;
  perform iqc_tinh_tong_lot(l.id);
  answer:=jsonb_build_object('lot_id',l.id,'lan_kiem_id',p_id,'sua_luc',newrow.sua_luc);

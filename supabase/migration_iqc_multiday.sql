@@ -1,4 +1,4 @@
--- Staging only. Additive draft: no legacy LOT or defect rows are changed.
+-- IQC (1/5, chạy theo thứ tự multiday → progressive → aql_selection → compact_times → oqc_defect_catalog). Chỉ thêm cột/bảng/hàm, không sửa LOT cũ. Đã chạy STAGING + PRODUCTION 28/11/2026. Chỉ chạy 1 lần.
 begin;
 alter table public.iqc_lots add column iqc_tam_dung boolean not null default false;
 alter table public.iqc_lots add column iqc_quan_ly_nhieu_lan boolean not null default false;

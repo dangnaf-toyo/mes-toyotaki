@@ -1,6 +1,6 @@
 // Derive the few replacement functions from the deployed IQC migration.
 const fs = require('node:fs');
-const src = fs.readFileSync('supabase/migration_iqc_multiday_staging.sql','utf8').replace(/\r\n/g,'\n');
+const src = fs.readFileSync('supabase/migration_iqc_multiday.sql','utf8').replace(/\r\n/g,'\n');
 function fn(name){const i=src.indexOf(`create or replace function public.${name}(`);const j=src.indexOf('\nend $$;',i);if(i<0||j<0)throw Error('Missing '+name);return src.slice(i,j+8);}
 function replaceOnce(s,a,b){if(!s.includes(a))throw Error('Missing source: '+a);return s.replace(a,b);}
 let sql=`-- Staging only. Existing LOTs and inspection history remain unchanged.
@@ -192,4 +192,4 @@ notify pgrst,'reload schema';
 commit;
 `;
 sql=sql.replace('-- Require a recorded management decision.', () => fs.readFileSync('supabase/iqc_aql_configuration_fragment.sql','utf8').replace(/^\uFEFF/,'')+'\nalter table public.iqc_aql_ke_hoach add column phien_ban text, add column ma_chu text, add column cau_hinh_id bigint references public.iqc_aql_cau_hinh(id);\n-- Require a recorded management decision.');
-fs.writeFileSync('supabase/migration_iqc_progressive_staging.sql',sql);
+fs.writeFileSync('supabase/migration_iqc_progressive.sql',sql);

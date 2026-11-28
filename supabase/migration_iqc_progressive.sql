@@ -1,4 +1,4 @@
--- Staging only. Existing LOTs and inspection history remain unchanged.
+-- IQC (2/5, chạy theo thứ tự multiday → progressive → aql_selection → compact_times → oqc_defect_catalog). Chỉ thêm cột/bảng/hàm, không sửa LOT cũ. Đã chạy STAGING + PRODUCTION 28/11/2026. Chỉ chạy 1 lần.
 begin;
 alter table public.iqc_lan_kiem add column bat_dau_luc timestamptz, add column ket_thuc_luc timestamptz;
 alter table public.iqc_lots add column iqc_khoi_luong_hoa_hoc numeric, add column iqc_don_vi_hoa_hoc text;
