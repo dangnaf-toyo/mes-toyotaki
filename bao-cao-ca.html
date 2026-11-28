@@ -22,7 +22,8 @@
     này chỉ có trong lúc kết ca (RPC tính xong rồi trả về, không ghi lại).
     Vì vậy bảng "Sản lượng từng máy" ở đây CHỈ có Máy/SP/KH/TT/%HT/NG.
   - Mục "Chuyển tiếp sang ca sau" cũng chỉ có tại thời điểm kết ca, không
-    lưu lại — không hiện được ở đây.
+    lưu lại — không hiện được ở đây. (Riêng sự cố chuyển tiếp: lưu ở
+    duc_bao_cao_ca.su_co_chuyen_tiep từ T397, hiện trong bảng sự cố.)
   - Ngược lại, KPI tổng ca (duc_bao_cao_ca) và toàn bộ sự cố (duc_su_co_log)
     đầy đủ 100% như báo cáo gốc.
 -->
@@ -149,7 +150,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="shared/xuat-pdf.js?v=T397"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/navbar.js?v=T392"></script>
@@ -233,8 +236,9 @@ function renderReport(s, lichSuRows, incidents){
       '</tr>';
     }).join('');
 
-  const incHTML = incidents.length === 0
-    ? '<tr><td colspan="7" style="color:#64748B;font-style:italic">Không có sự cố nào trong ca.</td></tr>'
+  const chuyenTiepHTML = dongSuCoChuyenTiep(s.su_co_chuyen_tiep);   // T397
+  const incHTML = (incidents.length === 0
+    ? (chuyenTiepHTML ? '' : '<tr><td colspan="7" style="color:#64748B;font-style:italic">Không có sự cố nào trong ca.</td></tr>')
     : incidents.slice().sort((a,b) => new Date(a.gio_phat_sinh) - new Date(b.gio_phat_sinh)).map(i => {
         const st = new Date(i.gio_phat_sinh), en = i.gio_tro_lai ? new Date(i.gio_tro_lai) : null;
         return '<tr>' +
@@ -246,7 +250,7 @@ function renderReport(s, lichSuRows, incidents){
           '<td>' + escapeHtml(IpqcText.gon(i.van_de) || '—') + '</td>' +
           '<td>' + escapeHtml(i.noi_dung_xu_ly || '—') + '</td>' +
         '</tr>';
-      }).join('');
+      }).join('')) + chuyenTiepHTML;
 
   const html =
     '<h1>BÁO CÁO KẾT CA — BỘ PHẬN ĐÚC</h1>' +
@@ -298,37 +302,30 @@ function renderReport(s, lichSuRows, incidents){
 }
 
 let lastReportName = 'BaoCaoKetCa.pdf';
-// Xuất PDF bằng html2pdf (html2canvas chụp ảnh rồi cắt trang). Không chụp thẳng
-// phần tử đang hiển thị: nó nằm trong khung cuộn (modal) / trang đã cuộn xuống →
-// ảnh bị lệch theo khoảng cuộn, phần cuối báo cáo bị cắt, các trang sau trắng.
-// Chép ra 1 khung riêng ở đầu trang, rộng cố định, không cuộn; không cắt ngang dòng bảng.
-async function xuatPdfTuPhanTu(el, filename){
-  const box = document.createElement('div');
-  box.style.cssText = 'position:absolute;left:0;top:0;width:780px;background:#fff;z-index:-1;padding:0;margin:0';
-  const clone = el.cloneNode(true);
-  clone.removeAttribute('id');
-  clone.style.cssText += ';display:block;max-height:none;overflow:visible;height:auto';
-  box.appendChild(clone);
-  document.body.appendChild(box);
-  const sx = window.scrollX, sy = window.scrollY;
-  window.scrollTo(0, 0);
-  try {
-    await html2pdf().set({
-      filename: filename,
-      margin: 10,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.kpi', 'h1', 'h2'] },
-    }).from(clone).save();
-  } finally {
-    box.remove();
-    window.scrollTo(sx, sy);
-  }
-}
+// T397: xuất PDF qua shared/xuat-pdf.js (tự cắt trang A4) — html2pdf 0.10.1 hay mất trang 2.
 function exportReportPdf(){
-  xuatPdfTuPhanTu(document.getElementById('reportBody'), lastReportName)
+  xuatPdfNhieuTrang(document.getElementById('reportBody'), lastReportName)
     .catch(e => showSearchMsg('error', 'Lỗi xuất PDF: ' + e.message));
+}
+
+// T397: sự cố còn mở lúc kết ca → chuyển tiếp ca sau (duc_bao_cao_ca.su_co_chuyen_tiep,
+// chỉ có ở báo cáo kết ca từ 28/11/2026). Giống hàm cùng tên ở duc-dashboard.html.
+function dongSuCoChuyenTiep(list){
+  const hm = t => { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  return (list || []).map(i => {
+    const ps = new Date(i.gio_phat_sinh), tu = new Date(i.tinh_tu || i.gio_phat_sinh);
+    const tuCaTruoc = ps < tu;
+    return '<tr style="background:#FFF7ED">' +
+      '<td>' + escapeHtml(i.ma_may) + '</td>' +
+      '<td>' + escapeHtml(i.ma_sp || '—') + '</td>' +
+      '<td>' + escapeHtml(i.loai_su_co || '—') + '<br><b style="color:#B45309">→ Chuyển ca sau</b></td>' +
+      '<td>' + hm(tu) + ' → ' + hm(i.den) + ' (kết ca)' +
+        (tuCaTruoc ? '<br><span style="color:#64748B">phát sinh ' + hm(ps) + ' ' + pad(ps.getDate()) + '/' + pad(ps.getMonth() + 1) + '</span>' : '') + '</td>' +
+      '<td class="num">' + fmtNum(i.phut) + "'</td>" +
+      '<td>' + escapeHtml(IpqcText.gon(i.van_de) || '—') + '</td>' +
+      '<td>' + escapeHtml(i.noi_dung_xu_ly || 'Đang xử lý') + '</td>' +
+    '</tr>';
+  }).join('');
 }
 
 function tickClock(){
