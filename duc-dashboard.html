@@ -566,9 +566,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <select id="ma-loai"></select>
       </div>
       <div class="field-row">
-        <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="ma-gio-phat-sinh"></div>
-        <div class="field"><label>Đảm nhiệm</label><input list="dl-personnel" id="ma-dam-nhiem"></div>
+        <div class="field" id="ma-gio-wrap"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="ma-gio-phat-sinh"></div>
+        <div class="field" id="ma-phut-wrap" style="display:none"><label>Số phút ảnh hưởng <span class="req">*</span></label><input type="number" id="ma-phut" min="1" max="720" step="1" inputmode="numeric"></div>
+        <div class="field"><label>Đảm nhiệm <span class="req" id="ma-dn-req" style="display:none">*</span></label><input list="dl-personnel" id="ma-dam-nhiem"></div>
       </div>
+      <div id="ma-phut-note" style="display:none;font-size:11px;color:var(--text-muted);margin:-4px 0 8px">ⓘ Máy vẫn chạy, CT chậm — nhập tổng phút bị mất. Ghi là xong ngay.</div>
       <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="ma-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
       <div class="field"><label>Nội dung xử lý <span class="req">*</span></label><textarea id="ma-xu-ly" placeholder="Cách xử lý đang thực hiện"></textarea></div>
       <div class="field" id="ma-ct-wrap" style="display:none">
@@ -584,7 +586,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <span class="hint">Bản ghi chỉ lưu vĩnh viễn khi có "Giờ trở lại"</span>
       <div class="modal-actions">
         <button class="btn-outline" onclick="closeModal()">Huỷ</button>
-        <button class="btn btn-primary" onclick="submitAddIncident()">Ghi nhận đang xử lý</button>
+        <button class="btn btn-primary" id="ma-submit" onclick="submitAddIncident()">Ghi nhận đang xử lý</button>
       </div>
     </div>
   </div>
@@ -963,7 +965,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <label>Loại sự cố <span class="req">*</span></label>
         <select id="ei-loai"></select>
       </div>
-      <div class="field-row">
+      <div class="field-row" id="ei-gio-row">
         <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="ei-gio-phat-sinh"></div>
         <div class="field" id="ei-gio-tro-lai-wrap">
           <label>Giờ trở lại <span class="req">*</span></label>
@@ -971,7 +973,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         </div>
       </div>
       <div class="field-row">
-        <div class="field"><label>TG dừng (tự tính)</label><input type="text" autocomplete="off" id="ei-phut-calc" disabled style="background:var(--bg-sunken);color:var(--alarm-fg);font-weight:600"></div>
+        <div class="field" id="ei-phut-calc-wrap"><label>TG dừng (tự tính)</label><input type="text" autocomplete="off" id="ei-phut-calc" disabled style="background:var(--bg-sunken);color:var(--alarm-fg);font-weight:600"></div>
+        <div class="field" id="ei-phut-wrap" style="display:none"><label>Số phút ảnh hưởng <span class="req">*</span></label><input type="number" id="ei-phut" min="1" max="720" step="1" inputmode="numeric"></div>
         <div class="field"><label>Đảm nhiệm</label><input list="dl-personnel" id="ei-dam-nhiem"></div>
       </div>
       <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="ei-van-de" placeholder="Mô tả ngắn gọn vấn đề"></textarea></div>
@@ -2805,8 +2808,10 @@ function makeRowHTML(row, stateClass, isActive){
     : '<div class="chips">' + inc.map(i => {
         const start = new Date(i.gio_phat_sinh);
         const end = new Date(i.gio_tro_lai);
-        const title = hienLoai(i.loai_su_co) + '\n' + pad(start.getHours()) + ':' + pad(start.getMinutes()) + ' → ' +
-          pad(end.getHours()) + ':' + pad(end.getMinutes()) + ' — ' + i.thoi_gian_dung_phut + "'\n" +
+        const title = hienLoai(i.loai_su_co) + '\n' + (i.nhap_theo_phut
+            ? 'CT chậm — ' + i.thoi_gian_dung_phut + "' ảnh hưởng (ghi lúc " + pad(start.getHours()) + ':' + pad(start.getMinutes()) + ")\n"
+            : pad(start.getHours()) + ':' + pad(start.getMinutes()) + ' → ' +
+              pad(end.getHours()) + ':' + pad(end.getMinutes()) + ' — ' + i.thoi_gian_dung_phut + "'\n") +
           IpqcText.gon(i.van_de) + '\nXử lý: ' + (i.noi_dung_xu_ly || '') + '\n\n(Click để chỉnh sửa)';
         const shortCode = (i.loai_su_co || '').split(' ')[0];
         const shortName = IpqcText.gon(i.van_de).substring(0, 8) || 'Sự cố';
@@ -3647,6 +3652,8 @@ async function openAddIncidentModal(idDong){
   document.getElementById('ma-xu-ly').value = '';
   SuCoMau.gan({ loai: document.getElementById('ma-loai'), vanDe: document.getElementById('ma-van-de'), xuLy: document.getElementById('ma-xu-ly') });  // T302
   document.getElementById('ma-dam-nhiem').value = '';
+  document.getElementById('ma-phut').value = '';
+  maTheoPhutCapNhat();
   document.getElementById('modal-add').classList.add('open');
   maCtReset();
   anhSuCo.add = await mountAnhSuCo('ma-anh', 'truoc', null, false);
@@ -3681,12 +3688,51 @@ async function maCtCapNhat(){
   }
 }
 document.getElementById('ma-loai').addEventListener('change', maCtCapNhat);
+// T401: D2 (đào tạo / người mới) — máy vẫn chạy nhưng CT chậm → nhập số phút ảnh hưởng thay giờ từ…đến.
+const LOAI_NHAP_PHUT = ['D2'];
+const laNhapPhut = v => LOAI_NHAP_PHUT.includes(String(v || '').trim().slice(0, 2).toUpperCase());
+function maTheoPhutCapNhat(){
+  const p = laNhapPhut(document.getElementById('ma-loai').value);
+  document.getElementById('ma-gio-wrap').style.display = p ? 'none' : '';
+  document.getElementById('ma-phut-wrap').style.display = p ? '' : 'none';
+  document.getElementById('ma-phut-note').style.display = p ? '' : 'none';
+  document.getElementById('ma-dn-req').style.display = p ? '' : 'none';
+  document.getElementById('ma-submit').textContent = p ? 'Ghi nhận' : 'Ghi nhận đang xử lý';
+}
+document.getElementById('ma-loai').addEventListener('change', maTheoPhutCapNhat);
+async function submitAddTheoPhut(loai){
+  const phut = Math.round(Number(document.getElementById('ma-phut').value));
+  if (!(phut >= 1 && phut <= 720)) return showToast('Nhập số phút ảnh hưởng (1–720)', true);
+  const vanDe = document.getElementById('ma-van-de').value.trim(), xuLy = document.getElementById('ma-xu-ly').value.trim();
+  const damNhiem = document.getElementById('ma-dam-nhiem').value.trim();
+  if (!vanDe) return showToast('Nhập vấn đề', true);
+  if (!xuLy) return showToast('Nhập nội dung xử lý', true);
+  if (!damNhiem) { showToast('Nhập người đảm nhiệm', true); document.getElementById('ma-dam-nhiem').focus(); return; }
+  if (!(await ensureAuthOnSubmit('modal-add'))) return;
+  showOverlay('Đang ghi nhận...');
+  try {
+    const d = await rpcWrite('duc_su_co_theo_phut', {
+      p_id_dong: state.currentTarget.id_dong, p_loai: loai, p_phut: phut,
+      p_van_de: vanDe, p_noi_dung_xu_ly: xuLy, p_dam_nhiem: damNhiem,
+      p_truong_ca: document.getElementById('sel-truong-ca').value || '', p_user: state.user,
+    });
+    hideOverlay(); closeModal();
+    showToast('✓ Đã ghi ' + phut + ' phút ảnh hưởng');
+    if (anhSuCo.add && anhSuCo.add.hasPending() && d && d.id_su_co) {
+      try { await SuCoAnh.uploadPending(anhSuCo.add, d.id_su_co); }
+      catch (e) { showToast('Đã ghi nhưng chưa lưu được ảnh: ' + e.message, true); }
+    }
+    addPersonnelToDatalist(damNhiem);
+    loadShiftState(false);
+  } catch (e) { onError(e); }
+}
 document.getElementById('ma-ct-co').addEventListener('change', maCtCapNhat);
 
 async function submitAddIncident(){
   const loai = document.getElementById('ma-loai').value;
   const gioPS = document.getElementById('ma-gio-phat-sinh').value;
   if (!loai) return showToast('Chọn loại sự cố', true);
+  if (laNhapPhut(loai)) return submitAddTheoPhut(loai);   // T401
   if (!gioPS) return showToast('Nhập giờ phát sinh', true);
   if (!document.getElementById('ma-van-de').value.trim()) return showToast('Nhập vấn đề', true);  // T305
   if (!document.getElementById('ma-xu-ly').value.trim()) return showToast('Nhập nội dung xử lý', true);
@@ -3782,6 +3828,7 @@ async function submitBulkIncident(){
   const gioPS = document.getElementById('bi-gio-phat-sinh').value;
   if (idDongList.length === 0) return showToast('Chọn ít nhất 1 máy', true);
   if (!loai) return showToast('Chọn loại sự cố', true);
+  if (laNhapPhut(loai)) return showToast('D2 nhập theo số phút — ghi ở từng máy (+ Thêm sự cố)', true);   // T401
   if (!gioPS) return showToast('Nhập giờ phát sinh', true);
   if (!document.getElementById('bi-van-de').value.trim()) return showToast('Nhập vấn đề', true);  // T305
   if (!document.getElementById('bi-xu-ly').value.trim()) return showToast('Nhập nội dung xử lý', true);
@@ -4195,6 +4242,14 @@ function _updateEiPhutCalc(){
   el.style.color = '';
 }
 
+// T401: bản ghi nhập theo phút (D2) — sửa số phút, không có giờ từ…đến.
+function eiTheoPhut(on, phut){
+  document.getElementById('ei-gio-row').style.display = on ? 'none' : '';
+  document.getElementById('ei-phut-calc-wrap').style.display = on ? 'none' : '';
+  document.getElementById('ei-phut-wrap').style.display = on ? '' : 'none';
+  document.getElementById('ei-phut').value = on ? Math.round(Number(phut) || 0) : '';
+}
+
 async function openEditIncidentModal(idBanGhi){
   const incident = state.incidents.find(i => i.id_ban_ghi === idBanGhi);
   if (!incident) return showToast('Không tìm thấy bản ghi sự cố', true);
@@ -4218,6 +4273,7 @@ async function openEditIncidentModal(idBanGhi){
   document.getElementById('ei-ghi-chu').value = ghiChuUser;
 
   _updateEiPhutCalc();
+  eiTheoPhut(!!incident.nhap_theo_phut, incident.thoi_gian_dung_phut);   // T401
   document.getElementById('ei-hint').textContent = 'Sửa xong bấm Lưu — chip sẽ có badge ✎ và audit log';
   document.getElementById('modal-edit-incident').classList.add('open');
   await mountAnhSuCo('ei-anh-truoc', 'truoc', incident.id_su_co, true);
@@ -4246,6 +4302,7 @@ async function openEditOpenIncidentModal(idDong, idSuCo){
   SuCoMau.gan({ loai: document.getElementById('ei-loai'), vanDe: document.getElementById('ei-van-de'), xuLy: document.getElementById('ei-xu-ly') });  // T302
   document.getElementById('ei-dam-nhiem').value = row.open_dam_nhiem || '';
   document.getElementById('ei-ghi-chu').value = '';
+  eiTheoPhut(false);   // T401
 
   document.getElementById('ei-hint').textContent = 'Sự cố đang mở — sửa loại/giờ/mô tả để đúng thông tin trước khi bấm ✓ Xong';
   document.getElementById('modal-edit-incident').classList.add('open');
@@ -4266,6 +4323,27 @@ async function submitEditIncident(){
   const damNhiem = document.getElementById('ei-dam-nhiem').value.trim();
   if (!vanDe) return showToast('Nhập vấn đề', true);  // T305
   if (!xuLy) return showToast('Nhập nội dung xử lý', true);
+
+  const incTP = t.mode === 'closed' && (state.incidents.find(i => i.id_ban_ghi === t.id_ban_ghi) || {}).nhap_theo_phut;
+  if (incTP) {   // T401: bản ghi nhập theo phút
+    const phut = Math.round(Number(document.getElementById('ei-phut').value));
+    if (!(phut >= 1 && phut <= 720)) return showToast('Nhập số phút ảnh hưởng (1–720)', true);
+    if (!(await ensureAuthOnSubmit('modal-edit-incident'))) return;
+    showOverlay('Đang lưu chỉnh sửa...');
+    try {
+      await rpcWrite('duc_edit_incident', {
+        p_id_ban_ghi: t.id_ban_ghi, p_loai_su_co: loai, p_gio_phat_sinh: null, p_gio_tro_lai: null,
+        p_van_de: vanDe, p_noi_dung_xu_ly: xuLy, p_dam_nhiem: damNhiem,
+        p_ghi_chu: document.getElementById('ei-ghi-chu').value.trim(), p_user: state.user,
+      });
+      await rpcWrite('duc_su_co_sua_phut', { p_id_ban_ghi: t.id_ban_ghi, p_phut: phut, p_user: state.user });
+      hideOverlay(); closeModal();
+      showToast('✓ Đã lưu chỉnh sửa sự cố');
+      addPersonnelToDatalist(damNhiem);
+      loadShiftState(false);
+    } catch (e) { onError(e); }
+    return;
+  }
 
   if (t.mode === 'closed') {
     const gioTL = document.getElementById('ei-gio-tro-lai').value;
