@@ -1001,7 +1001,9 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 <div id="print-root"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="shared/xuat-pdf.js?v=T397"></script>
 <script src="shared/supabase-client.js?v=T169"></script>
 <script src="shared/ipqc-text.js"></script>
 <script src="shared/khuon-nam-van-de.js"></script>
@@ -5188,38 +5190,32 @@ async function submitEndShift(){
 // Dữ liệu lấy từ duc_end_shift: {summary, oee_rows, mold_update, carry_over,
 // history_rows} + snapshot dòng/sự cố chụp ngay trước khi gọi RPC.
 // =============================================================================
-// Xuất PDF bằng html2pdf (html2canvas chụp ảnh rồi cắt trang). Không chụp thẳng
-// phần tử đang hiển thị: nó nằm trong khung cuộn (modal) / trang đã cuộn xuống →
-// ảnh bị lệch theo khoảng cuộn, phần cuối báo cáo bị cắt, các trang sau trắng.
-// Chép ra 1 khung riêng ở đầu trang, rộng cố định, không cuộn; không cắt ngang dòng bảng.
-async function xuatPdfTuPhanTu(el, filename){
-  const box = document.createElement('div');
-  box.style.cssText = 'position:absolute;left:0;top:0;width:780px;background:#fff;z-index:-1;padding:0;margin:0';
-  const clone = el.cloneNode(true);
-  clone.removeAttribute('id');
-  clone.style.cssText += ';display:block;max-height:none;overflow:visible;height:auto';
-  box.appendChild(clone);
-  document.body.appendChild(box);
-  const sx = window.scrollX, sy = window.scrollY;
-  window.scrollTo(0, 0);
-  try {
-    await html2pdf().set({
-      filename: filename,
-      margin: 10,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.kpi', 'h1', 'h2'] },
-    }).from(clone).save();
-  } finally {
-    box.remove();
-    window.scrollTo(sx, sy);
-  }
-}
+// T397: xuất PDF qua shared/xuat-pdf.js (tự cắt trang A4) — html2pdf 0.10.1 hay mất trang 2.
 function exportReportPdf(filename, sourceElId){
   const el = document.getElementById(sourceElId || 'report-preview');
   showOverlay('Đang xuất PDF...');
-  xuatPdfTuPhanTu(el, filename).then(hideOverlay).catch(e => { hideOverlay(); onError(e); });
+  xuatPdfNhieuTrang(el, filename).then(hideOverlay).catch(e => { hideOverlay(); onError(e); });
+}
+
+// T397: sự cố còn mở lúc kết ca → chuyển tiếp ca sau; phút tính từ lúc phát sinh
+// (hoặc đầu ca nếu đã chuyển từ ca trước) đến khi kết ca. bao-cao-ca.html có bản giống.
+function dongSuCoChuyenTiep(list, hienLoaiFn){
+  const hm = t => { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  return (list || []).map(i => {
+    const ps = new Date(i.gio_phat_sinh), tu = new Date(i.tinh_tu || i.gio_phat_sinh);
+    const tuCaTruoc = ps < tu;
+    return '<tr style="background:#FFF7ED">' +
+      '<td>' + escapeHtml(i.ma_may) + '</td>' +
+      '<td>' + escapeHtml(i.ma_sp || '—') + '</td>' +
+      '<td>' + escapeHtml((hienLoaiFn ? hienLoaiFn(i.loai_su_co) : i.loai_su_co) || '—') +
+        '<br><b style="color:#B45309">→ Chuyển ca sau</b></td>' +
+      '<td>' + hm(tu) + ' → ' + hm(i.den) + ' (kết ca)' +
+        (tuCaTruoc ? '<br><span style="color:#64748B">phát sinh ' + hm(ps) + ' ' + pad(ps.getDate()) + '/' + pad(ps.getMonth() + 1) + '</span>' : '') + '</td>' +
+      '<td class="num">' + fmtNum(i.phut) + "'</td>" +
+      '<td>' + escapeHtml(IpqcText.gon(i.van_de) || '—') + '</td>' +
+      '<td>' + escapeHtml(i.noi_dung_xu_ly || 'Đang xử lý') + '</td>' +
+    '</tr>';
+  }).join('');
 }
 
 // T383: ô "Dừng không rõ" (phút) — ≥ 30' tô đỏ để soi ca nhập thiếu sự cố
@@ -5269,8 +5265,9 @@ function renderShiftReport(d, snap){
     '</tr>';
   }).join('');
 
-  const incHTML = snap.incidents.length === 0
-    ? '<tr><td colspan="7" style="color:#64748B;font-style:italic">Không có sự cố nào được đóng trong ca.</td></tr>'
+  const chuyenTiepHTML = dongSuCoChuyenTiep(d.su_co_chuyen_tiep, hienLoai);   // T397
+  const incHTML = (snap.incidents.length === 0
+    ? (chuyenTiepHTML ? '' : '<tr><td colspan="7" style="color:#64748B;font-style:italic">Không có sự cố nào trong ca.</td></tr>')
     : snap.incidents.slice().sort((a,b) => new Date(a.gio_phat_sinh) - new Date(b.gio_phat_sinh)).map(i => {
         const st = new Date(i.gio_phat_sinh), en = new Date(i.gio_tro_lai);
         return '<tr>' +
@@ -5282,9 +5279,9 @@ function renderShiftReport(d, snap){
           '<td>' + escapeHtml(IpqcText.gon(i.van_de) || '—') + '</td>' +
           '<td>' + escapeHtml(i.noi_dung_xu_ly || '—') + '</td>' +
         '</tr>';
-      }).join('');
+      }).join('')) + chuyenTiepHTML;
 
-  const carried = (d.carry_over && d.carry_over.carried) || [];
+  const carried =(d.carry_over && d.carry_over.carried) || [];
   const carriedHTML = carried.length === 0
     ? '<div style="color:#64748B;font-style:italic;font-size:11px">Không có máy nào chuyển tiếp sang ca sau.</div>'
     : '<div style="font-size:11px">' + carried.map(c =>
@@ -5334,7 +5331,7 @@ function renderShiftReport(d, snap){
         '<tbody>' + (rowsHTML || '<tr><td colspan="14" style="color:#64748B;font-style:italic">Không có máy nào có kế hoạch.</td></tr>') + '</tbody></table>' +
       '<div style="font-size:10px;color:#64748B;margin-top:3px">' + DKR_GIAI_THICH + '</div>' +
 
-      '<h2>2. Sự cố đã xử lý trong ca</h2>' +
+      '<h2>2. Sự cố trong ca</h2>' +
       '<table><thead><tr><th>Máy</th><th>SP</th><th>Loại sự cố</th><th>Từ → Đến</th><th class="num">Phút</th><th>Vấn đề</th><th>Xử lý</th></tr></thead>' +
         '<tbody>' + incHTML + '</tbody></table>' +
 
