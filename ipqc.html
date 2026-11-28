@@ -550,6 +550,8 @@ async function loadQueue(){
         id_checkpoint: r.id_checkpoint, id_dong: r.id_dong, ma_may: r.ma_may, ma_sp: r.ma_sp,
         ngay: r.ngay, ca: r.ca, loai_kiem: r.loai_kiem, thoi_diem_tao: r.thoi_diem_tao,
         id_su_co_goc: r.id_su_co_goc, phut_da_troi: phutDaTroi, virtual: false,
+        // T399: check point chung cho nhiều sự cố (cùng máy + mã) — sự cố gốc + sự cố gộp thêm.
+        ds_su_co: [r.id_su_co_goc].concat(r.id_su_co_kem || []).filter(Boolean),
       }, ipqcDueInfo(r.loai_kiem, phutDaTroi));
     });
   const fromDinhKy = (dinhKyRes.data || [])
@@ -572,12 +574,13 @@ async function loadQueue(){
   const priorityOf = cp => PRIORITY[cp.loai_kiem] != null ? PRIORITY[cp.loai_kiem] : 2;
 
   // T180: sản xuất đã bấm "Hoàn thành mẫu & giao QC" cho sự cố gốc chưa (lần gần nhất).
-  const idsGoc = [...new Set(fromCheckpoints.filter(cp => cp.loai_kiem !== 'dinh_ky' && cp.id_su_co_goc).map(cp => cp.id_su_co_goc))];
+  const coSuCo = cp => cp.loai_kiem !== 'dinh_ky' && cp.ds_su_co.length;
+  const idsGoc = [...new Set(fromCheckpoints.filter(coSuCo).flatMap(cp => cp.ds_su_co))];
   if (idsGoc.length) {
     const { data: giao, error: gErr } = await sb.from('duc_su_co_giao_qc').select('id_su_co,thoi_diem').in('id_su_co', idsGoc).order('thoi_diem');
     if (gErr) console.warn('duc_su_co_giao_qc:', gErr.message);
     const gMap = {}; (giao || []).forEach(g => { gMap[g.id_su_co] = g.thoi_diem; });
-    fromCheckpoints.forEach(cp => { if (cp.loai_kiem !== 'dinh_ky' && cp.id_su_co_goc) cp.giao_qc = gMap[cp.id_su_co_goc] || null; });
+    fromCheckpoints.forEach(cp => { if (coSuCo(cp)) cp.giao_ds = cp.ds_su_co.map(id => gMap[id] || null); });
   }
 
   // 1 máy (id_dong) có thể đến hạn nhiều loại kiểm cùng lúc. "Định kỳ" chỉ
@@ -680,6 +683,20 @@ function renderQueue(){
   }
 }
 
+// T399: " · SC-A 📦 Đã giao mẫu 20:50 + SC-B ⏳ SX chưa giao mẫu" — 1 check point có thể chung nhiều sự cố.
+function suCoTagHtml(cp){
+  const ds = cp.ds_su_co || [];
+  if (!ds.length) return '';
+  const nhieu = ds.length > 1;
+  return ' · ' + ds.map((id, i) => {
+    const g = cp.giao_ds ? cp.giao_ds[i] : undefined;
+    const tt = g === undefined ? ''
+      : g ? ' <b style="color:#2563EB">📦 ' + (nhieu ? '' : 'Đã giao mẫu ') + new Date(g).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) + '</b>'
+          : ' <span style="color:#B45309">⏳ ' + (nhieu ? 'chưa giao' : 'SX chưa giao mẫu') + '</span>';
+    return escapeHtml(id) + tt;
+  }).join(' + ');
+}
+
 function queueCardHtml(cp){
   const lvl = cp.da_den_han ? levelForMinutes(cp.phut_da_troi) : 'upcoming';
   // Thống nhất cách đếm cho cả 3 loại: luôn hiện "đã trôi qua bao lâu kể từ
@@ -698,9 +715,7 @@ function queueCardHtml(cp){
       <div class="qcard-main">
         <div class="qcard-may">${escapeHtml(cp.ma_may)}</div>
         ${spHtml}
-        <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.kh ? ' · theo KHSX (chưa có KH ca)' : ''}${cp.da_den_han ? '' : ' · sắp tới'}${cp.id_su_co_goc ? ' · ' + escapeHtml(cp.id_su_co_goc) : ''}${cp.giao_qc !== undefined ? (cp.giao_qc
-          ? ' · <b style="color:#2563EB">📦 Đã giao mẫu ' + new Date(cp.giao_qc).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) + '</b>'
-          : ' · <span style="color:#B45309">⏳ SX chưa giao mẫu</span>') : ''}</div>
+        <div class="loai-tag">${escapeHtml(LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem)}${cp.kh ? ' · theo KHSX (chưa có KH ca)' : ''}${cp.da_den_han ? '' : ' · sắp tới'}${suCoTagHtml(cp)}</div>
       </div>
       <div style="text-align:right">
         <div class="qcard-time ${lvl === 'ok' ? '' : lvl}" title="Đã chờ ${cp.phut_da_troi} phút">${timeLabel}</div>
@@ -861,15 +876,25 @@ async function openCheck(idCheckpoint, maSpChon){
 
 
   document.getElementById('ck-may').textContent = cp.ma_may;
-  document.getElementById('ck-loai').textContent = LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem;
+  const dsSuCo = cp.ds_su_co || [];
+  document.getElementById('ck-loai').textContent = (LOAI_LABEL[cp.loai_kiem] || cp.loai_kiem) +
+    (dsSuCo.length > 1 ? ' · ' + dsSuCo.join(' + ') : '');
   document.getElementById('ck-ma-sp').textContent = cp.ma_sp;
   document.getElementById('ck-meta').textContent = 'Chờ đã ' + MesQcUi.thoiLuong(cp.phut_da_troi) + ' — ' + (cp.ca || 'Theo KHSX, trưởng ca chưa nhập KH ca') + ', ' + (cp.ngay ? new Date(cp.ngay).toLocaleDateString('vi-VN') : '');
 
   document.getElementById('ck-incident-info').classList.add('hidden');
   // T122: có mã sự cố gốc → hiện toàn bộ lịch sử sự cố (thay khung tóm tắt cũ).
   const lichSu = document.getElementById('ck-su-co-lich-su');
-  lichSu.classList.toggle('hidden', !cp.id_su_co_goc);
-  if (cp.id_su_co_goc) { lichSu.open = true; SuCoLichSu.mount(document.getElementById('ck-su-co-lich-su-body'), cp.id_su_co_goc); }
+  lichSu.classList.toggle('hidden', !dsSuCo.length);
+  const lsBody = document.getElementById('ck-su-co-lich-su-body');
+  if (dsSuCo.length === 1) { lichSu.open = true; SuCoLichSu.mount(lsBody, dsSuCo[0]); }
+  else if (dsSuCo.length > 1) {
+    // T399: check point chung — lịch sử từng sự cố.
+    lichSu.open = true;
+    lsBody.innerHTML = dsSuCo.map((id, i) =>
+      '<div style="font-weight:700;margin:' + (i ? '12px' : '0') + ' 0 4px">Sự cố ' + (i + 1) + ': ' + escapeHtml(id) + '</div><div data-ls-i="' + i + '"></div>').join('');
+    dsSuCo.forEach((id, i) => SuCoLichSu.mount(lsBody.querySelector('[data-ls-i="' + i + '"]'), id));
+  }
   else if (cp.loai_kiem === 'sau_su_co') loadIncidentInfo(cp.id_dong);
   loadVdTruoc(cp);   // T127
   hienDkXacNhan(cp);   // T324
