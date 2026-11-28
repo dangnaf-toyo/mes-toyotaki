@@ -15,7 +15,7 @@
   - Bảng mã SP × 12 tháng (forecast_san_luong), sửa trực tiếp / dán từ Excel,
     lưu hàng loạt qua RPC forecast_luu (log forecast_san_luong_log).
     Quyền sửa: admin, ke_hoach, qlsx_truong_phong, giam_doc_sx. Phải đăng nhập mới xem.
-  - "Giờ máy đúc": shot = SL / cavity, giờ = shot × cycle_time_s / 3600 (master_products)
+  - "Giờ máy đúc": shot = SL / cavity, giờ = SL × cycle_time_s (giây/SP) / 3600 (master_products)
     -> giờ máy cần mỗi tháng, quy ra số máy theo "giờ chạy/máy/tháng" nhập tay.
   - "Tuổi thọ khuôn": shot còn lại = Σ(nguong_lam_moi − tong_shot_luy_ke) các khuôn
     còn dùng của SP (duc_shot_khuon, tình trạng dang_sx/moi_chua_sx), trừ dần theo
@@ -551,7 +551,8 @@ function renderTt(){
 
 // ── Giờ máy đúc ───────────────────────────────────────────────────────────────
 function shotsOf(p, sl){ return p.cavity > 0 ? sl / p.cavity : 0; }
-function hoursOf(p, sl){ return p.cycle_time_s > 0 ? shotsOf(p, sl) * p.cycle_time_s / 3600 : 0; }
+// T398: cycle_time_s = giây/SẢN PHẨM → giờ = SL × CT (không chia cavity).
+function hoursOf(p, sl){ return p.cycle_time_s > 0 ? sl * p.cycle_time_s / 3600 : 0; }
 function renderMay(){
   const months = [...Array(12)].map((_, i) => i + 1);
   const rows = products.map(p => {

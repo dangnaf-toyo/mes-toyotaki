@@ -1743,8 +1743,8 @@ function onShiftContextChange(){
 // song 2 mã trong 2 ca):
 //   1) Năng lực ca của máy = tổng KH ngày của máy (KHSX tuần) / số ca trong
 //      ngày (nangLucCaTheoKhNgay_). Chỉ khi không có KH ngày mới dự phòng
-//      bằng nangLucCa_(mã) = floor(phút ca × 60 / cycle_time_s) × cavity (lý
-//      thuyết 100% hiệu suất — cao gấp ~2 lần thực tế, không dùng làm chính).
+//      bằng nangLucCa_(mã) = floor(phút ca × 60 / cycle_time_s) (CT là giây/
+//      sản phẩm — T398; lý thuyết 100% hiệu suất, không dùng làm chính).
 //   2) Với mỗi máy có ≥2 mã KH ngày > 0: soi dữ liệu thực tế ĐÃ CHẠY trong
 //      ngày (duc_ca_hien_tai) để tìm mã đang chạy dở (dòng row_seq lớn nhất)
 //      — nếu lũy kế thực tế của mã đó CHƯA đạt KH ngày → tự động tiếp tục
@@ -1769,14 +1769,15 @@ function nangLucCa_(maSp, phuongAnCa, ca){
   const cavity = state.cavityMap[maSp];
   const shiftMin = getShiftMinutes_(phuongAnCa, ca);
   if (!cycleTime || !cavity || !shiftMin) return null;   // thiếu dữ liệu — không tính được, để caller fallback
-  return Math.floor((shiftMin * 60) / cycleTime) * cavity;
+  // T398: cycle_time_s = giây/SẢN PHẨM (đã gồm cavity) → không nhân cavity nữa.
+  return Math.floor((shiftMin * 60) / cycleTime);
 }
 
 // Năng lực 1 ca của MÁY theo KHSX tuần = tổng KH ngày của máy đó (mọi mã)
 // / số ca làm việc của máy ngày đó (T134: khai báo ở KHSX tuần, mặc định = số
 // ca của phương án ca). KH ngày do bộ phận kế hoạch lập đã tính theo năng lực
-// thật của máy, còn nangLucCa_() (CT × cavity, hiệu suất 100%) cao gấp ~2 lần
-// thực tế (đối chiếu lịch sử: sản lượng thực ≈ 40-50% lý thuyết) — bug DC 6
+// thật của máy, còn nangLucCa_() (hiệu suất 100%; trước T398 nhân thêm cavity
+// nên cao gấp ~2 lần thực tế) — bug DC 6
 // 24/09: KH ngày EXE-PLT-01 = 4200 bị dồn hết vào 1 ca vì "năng lực" 4500.
 function nangLucCaTheoKhNgay_(khNgayMay, phuongAnCa, soCaMay){
   if (!(khNgayMay > 0)) return null;
