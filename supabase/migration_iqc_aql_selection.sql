@@ -1,4 +1,4 @@
-﻿-- STAGING ONLY. Existing LOTs and plans are not rewritten.
+-- IQC (3/5, chạy theo thứ tự multiday → progressive → aql_selection → compact_times → oqc_defect_catalog). Chỉ thêm cột/bảng/hàm, không sửa LOT cũ. Đã chạy STAGING + PRODUCTION 28/11/2026. Chỉ chạy 1 lần.
 begin;
 create table public.iqc_aql_lua_chon (
  lot_id bigint primary key references public.iqc_lots(id), cap_do text not null, aql text not null, che_do text not null,
