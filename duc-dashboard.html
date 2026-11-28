@@ -376,8 +376,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .kmc-ack input{width:20px;height:20px}
 .kmc-btn{width:100%;font-size:18px;font-weight:800;padding:12px;border:0;border-radius:8px;background:var(--alarm-fg);color:#fff;cursor:pointer}
 .kmc-btn:disabled{opacity:.45;cursor:not-allowed}
-.kmc-cho{text-align:center;font-weight:700;color:var(--alarm-fg);margin-top:10px}
-.kmc-an{display:block;margin:8px auto 0;background:none;border:0;color:var(--text-muted);text-decoration:underline;cursor:pointer;font-size:13px}
 </style>
 </head>
 <body>
@@ -5482,8 +5480,7 @@ async function submitWeeklyReport(){
 // màn hình đến khi Trưởng ca xác nhận (bảng duc_kiem_may_ca). Khớp → tự ghi
 // khop = true, không hỏi lại trong ca.
 // =============================================================================
-const KMC_NGUOI_XAC_NHAN = ['truong_ca', 'admin', 'quan_ly_bo_phan', 'qlsx_truong_phong'];
-const kmc = { xong: {}, dangKiem: false, luc: 0, anDen: 0, ctx: null };
+const kmc = { xong: {}, dangKiem: false, luc: 0, ctx: null };
 
 function kmcCaKeTiep_(ngayStr, ca, pa){
   const dsCa = Object.keys(CONFIG.SHIFT_PLANS[pa] || {});
@@ -5539,7 +5536,7 @@ function kmcThamSo_(khop, ghiChu){
 }
 
 function kmcHien_(){
-  if (Date.now() < kmc.anDen) return;
+  if (state.myRole !== 'truong_ca') return kmcAn_();   // T396: chỉ tài khoản Trưởng ca thấy khung
   const c = kmc.ctx, l = c.lech;
   const [y, m, d] = c.ngay.split('-');
   document.getElementById('kmc-ca').textContent = c.ca + ' ' + d + '/' + m + '/' + y;
@@ -5548,9 +5545,6 @@ function kmcHien_(){
   document.getElementById('kmc-ds').innerHTML =
     (l.thieu.length ? '• <b>Có KH, không chạy:</b> ' + l.thieu.map(escapeHtml).join(', ') + '<br>' : '') +
     (l.thua.length ? '• <b>Chạy, không có KH:</b> ' + l.thua.map(escapeHtml).join(', ') : '');
-  const duocXn = KMC_NGUOI_XAC_NHAN.includes(state.myRole);
-  document.getElementById('kmc-form').style.display = duocXn ? '' : 'none';
-  document.getElementById('kmc-cho').style.display = duocXn ? 'none' : '';
   const ov = document.getElementById('kmc-overlay');
   if (ov.style.display !== 'flex') {
     document.getElementById('kmc-ack').checked = false;
@@ -5587,9 +5581,6 @@ async function kmcXacNhan_(){
       <textarea id="kmc-ghi-chu" placeholder="Ghi chú (nếu có)"></textarea>
       <label class="kmc-ack"><input type="checkbox" id="kmc-ack" onchange="document.getElementById('kmc-btn').disabled=!this.checked">Trưởng ca đã kiểm tra</label>
       <button type="button" class="kmc-btn" id="kmc-btn" onclick="kmcXacNhan_()" disabled>Xác nhận</button>
-    </div>
-    <div class="kmc-cho" id="kmc-cho" style="display:none">⏳ Chờ Trưởng ca xác nhận
-      <button type="button" class="kmc-an" onclick="kmc.anDen=Date.now()+10*60000;kmcAn_()">Ẩn 10 phút</button>
     </div>
   </div>
 </div>
