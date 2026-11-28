@@ -40,9 +40,16 @@ function backend() {
         },
       };
     },
-    rpc: async (name) => ({ data: name === "iqc_nvl_danh_muc"
-      ? { san_pham: tables.master_products.map((p) => ({ code: p.ma_sp, name: p.ten_sp })), nvl: [] }
-      : [{ username: "TK01", full_name: "Lê Văn Kho", role: "kho_nvl" }], error: null }),
+    rpc: async (name, args = {}) => {
+      if (name === "iqc_luu_lan_kiem" && !args.p_lot_id && !args.p_lan) {
+        const row = { id: 'new-' + tables.iqc_lots.length, created_at: new Date().toISOString(), status: 'Chưa lấy hàng', ...args.p_lot };
+        tables.iqc_lots.push(row);
+        return { data: { lot_id: row.id }, error: null };
+      }
+      return { data: name === "iqc_nvl_danh_muc"
+        ? { san_pham: tables.master_products.map((p) => ({ code: p.ma_sp, name: p.ten_sp })), nvl: [] }
+        : [{ username: "TK01", full_name: "Lê Văn Kho", role: "kho_nvl" }], error: null };
+    },
     from(table) {
       let filters = [],
         range = [0, 999],
@@ -65,6 +72,10 @@ function backend() {
         },
         eq(k, v) {
           filters.push((r) => r[k] === v);
+          return q;
+        },
+        overlaps(k, values) {
+          filters.push((r) => Array.isArray(r[k]) && r[k].some((x) => values.includes(x)));
           return q;
         },
         gte(k, v) {
@@ -149,6 +160,7 @@ function backend() {
       });
     });
     await page.goto("https://mes.test/iqc.html");
+    await page.locator('#iqcNewTab').click();
     await page.waitForFunction(
       () => typeof IqcWorkspace !== "undefined" && IqcWorkspace.getSnapshot()?.lots.length === 1,
     );
@@ -183,8 +195,6 @@ function backend() {
     await page.locator("#lotNo").fill("TEST-LOT");
     await page.locator("#lotQty").fill("50");
     await page.locator("#inspector").fill("SX01_Nguyễn Sản Xuất");
-    await page.locator("#receivedDate").fill("2026-10-27T09:00");
-    await page.evaluate(() => confirmDate("receivedDate", "receivedConfirm"));
     await page.locator("#saveBtn").click();
     await page.waitForFunction(() => sb.tables.iqc_lots.length === 2);
     const saved = await page.evaluate(() => sb.tables.iqc_lots[1]);
@@ -234,8 +244,10 @@ function backend() {
     assert.match(await page.locator("#iqcRates").textContent(), /50.00%/);
     console.log("PASS edit and completion reread update dashboard counts, supplier, scope and 50% rates");
     await page.locator("#tabIqc").click();
+    assert.equal(await page.locator('#iqcLotList').isVisible(),true);
+    await page.locator('#iqcNewTab').click();
     await page.screenshot({ path: ".review/iqc-compact-entry.png", fullPage: true });
-    assert.equal(await page.locator("#formSection").evaluate((e) => e.parentElement.firstElementChild === e), true);
+    assert.equal(await page.locator("#formSection").isVisible(), true);
     assert.equal(await page.locator(".iqc-report-list[open]").count(), 0);
     await page.locator("details:has(#lotTable) > summary").click();
     await page.locator("#iqcFilterScope").selectOption("In");

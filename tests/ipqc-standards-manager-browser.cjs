@@ -19,8 +19,16 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     sb.tables.ipqc_btk[0].tai_lieu_goc={path:'u1/old.pdf',name:'old.pdf'};
     sb.tables.ipqc_btk[0].ban_ve_vi_tri=[{no:1,x:20,y:30}];
     sb.tables.ipqc_btk_muc.forEach(row=>row.phuong_phap='CMM point');
+    sb.tables.ipqc_btk.push({id:10,ma_sp:'PART',phien_ban:'A',cong_doan:'duc',dang_dung:true,trang_thai:'da_duyet',so_mau:2});
+    sb.tables.ipqc_btk_muc.push({...sb.tables.ipqc_btk_muc[0],id:10,id_btk:10,muc_no:1,no_hien_thi:'1',thu_tu_hien_thi:1});
     sb.tables.ipqc_gc_tieu_chuan_lich_su=[{id:1,id_btk:1,thoi_diem:'2026-01-01',du_lieu:{tieu_chuan:{phien_ban:'A',ma_ban_ve:'DWG'},muc:[{}]}}];
     const rpc=sb.rpc.bind(sb);sb.rpc=async(name,args)=>{
+      if(name==='ipqc_duc_luu_bang_tuan_kiem'){
+        sb.calls.push({name,args});const p=args.p_data;
+        const id=11;sb.tables.ipqc_btk.push({...sb.tables.ipqc_btk.find(row=>row.id===10),...p,id,trang_thai:'cho_kiem_tra',dang_dung:false});
+        sb.tables.ipqc_btk_muc.push(...p.muc.map(row=>({...row,id_btk:id})));
+        return {data:{ok:true,id,phien_ban:p.phien_ban}};
+      }
       if(name!=='ipqc_gc_luu_tieu_chuan')return rpc(name,args);
       sb.calls.push({name,args});const p=args.p_data;
       if(window.failNextStandard){window.failNextStandard=false;return {error:{message:'Temporary save failure'}};}
@@ -65,6 +73,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     assert.equal(new URL(page.url()).pathname, "/qc-manager.html");
     await root.locator("[data-f=phien_ban]").fill("B");
     await root.locator("[data-f=noi_dung_sua_doi]").fill("Revise in shared manager");
+    await root.locator('[data-c=dung_cu]').first().selectOption('Cân trọng lượng');
     await root.locator("[data-c=usl]").first().fill("20.04");
     await root.locator("[data-c=usl]").first().dispatchEvent("change");
     await root.locator('[data-sao-chep="0"]').click();
@@ -86,7 +95,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     await page.waitForFunction(()=>document.querySelector('#btk-root [data-msg]').textContent.includes('Temporary save failure'));
     assert.equal(await root.locator('[data-luu]').isEnabled(),true);
     await root.locator("[data-luu]").click();
-    await page.waitForFunction(() => sb.tables.ipqc_btk.length === 2);
+    await page.waitForFunction(() => sb.tables.ipqc_btk.some(row => row.id === 2));
     await page.waitForFunction(() => document.querySelector("#btk-root [data-f=phien_ban]")?.value === "B");
     const payload = await page.evaluate(
       () => sb.calls.find((c) => c.name === "ipqc_gc_luu_tieu_chuan").args.p_data,
@@ -97,6 +106,12 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     assert.equal(payload.ban_ve_vi_tri[0].x, 20);
     assert.equal(payload.muc[0].phuong_phap, "CMM point");
     assert.equal(payload.muc[0].don_vi, "mm");
+    assert.equal(payload.muc[0].dung_cu, 'Cân trọng lượng');
+    assert.equal(await root.locator('[data-c=dung_cu]').first().inputValue(), 'Cân trọng lượng');
+    await root.locator('[data-pb]').selectOption('1');
+    await page.waitForFunction(() => document.querySelector('#btk-root [data-c=dung_cu]')?.value === 'CMM');
+    await root.locator('[data-pb]').selectOption('2');
+    await page.waitForFunction(() => document.querySelector('#btk-root [data-c=dung_cu]')?.value === 'Cân trọng lượng');
     assert.equal(
       before,
       await page.evaluate(() =>
@@ -109,6 +124,22 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
       document.querySelector("#btk-root [data-sidettl]").textContent.includes("Đúc"),
     );
     assert.equal(await root.locator("[data-f=ma_ban_ve]").count(), 0);
+    await page.goto('https://mes.test/qc-manager.html?tab=tieuchuan&cd=duc&type=btk&ma=PART&version=10');
+    const tool = root.locator('[data-c=dung_cu]').first();
+    await tool.waitFor();
+    assert.equal(await tool.inputValue(), 'CMM');
+    await root.locator('[data-sua]').click();
+    await root.locator('[data-f=phien_ban]').fill('B');
+    await root.locator('[data-f=noi_dung_sua_doi]').fill('Bổ sung cân trọng lượng');
+    await tool.selectOption('Cân trọng lượng');
+    await root.locator('[data-luu]').click();
+    await page.waitForFunction(() => sb.tables.ipqc_btk_muc.some(row => row.id_btk === 11 && row.dung_cu === 'Cân trọng lượng'));
+    await page.waitForFunction(() => document.querySelector('#btk-root [data-c=dung_cu]')?.value === 'Cân trọng lượng');
+    await root.locator('[data-pb]').selectOption('10');
+    await page.waitForFunction(() => document.querySelector('#btk-root [data-c=dung_cu]')?.value === 'CMM');
+    await root.locator('[data-pb]').selectOption('11');
+    await page.waitForFunction(() => document.querySelector('#btk-root [data-c=dung_cu]')?.value === 'Cân trọng lượng');
+    assert.equal(await page.evaluate(() => sb.tables.ipqc_btk_muc.find(row => row.id_btk === 10).dung_cu), 'CMM');
     await page.goto("https://mes.test/ipqc-gia-cong.html?standard=PART&version=1");
     await page.waitForURL("**/qc-manager.html?**");
     assert.equal(new URL(page.url()).searchParams.get("version"), "1");
@@ -126,7 +157,7 @@ const { backend } = require("./ipqc-gc-fixture.cjs");
     await page.waitForFunction(() => document.querySelectorAll("#gcMeasureRows [data-result]").length === 6);
     assert.deepEqual(errors, []);
     console.log(
-      "PASS shared standards manager: GC metadata/limits/samples, revision review, private original, history, copy/paste, explicit confirmation, original data unchanged, casting separation, legacy links and measurement revision",
+      "PASS shared standards manager: casting and machining weighing select/edit/save/reload, revision history, drawing, limits, copy/paste and legacy links",
     );
     await context.close();
   } finally {
