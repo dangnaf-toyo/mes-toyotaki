@@ -146,8 +146,12 @@
       ph.nguoi_kiem, ngHtml(ph.checklist_json) + dong('', ph.ghi_chu), false, anhQc(ph));
 
     // Vấn đề: bản mới nhất (đã sửa), chỉ hiện 1 lần ở mốc phát sinh.
-    const evPs = add(goc.gio_phat_sinh || moDl.gio_phat_sinh, 'do', '🚨 Phát sinh', nkMo ? nkMo.nguoi : '',
-      dong('', gonIpqc(cuoi.van_de || moDl.van_de || goc.van_de)));
+    // T401: D2 nhập theo phút — máy vẫn chạy, CT chậm; chỉ 1 mốc ghi nhận, không có "Chạy lại".
+    const theoPhut = !!goc.nhap_theo_phut;
+    const evPs = add(goc.gio_phat_sinh || moDl.gio_phat_sinh, theoPhut ? 'cam' : 'do',
+      theoPhut ? '🐢 CT chậm · ' + Math.round(goc.phut || 0) + 'p ảnh hưởng' : '🚨 Phát sinh', nkMo ? nkMo.nguoi : '',
+      dong('', gonIpqc(cuoi.van_de || moDl.van_de || goc.van_de)) +
+      (theoPhut ? dong('', sach(goc.noi_dung_xu_ly)) + dong('Đảm nhiệm', goc.dam_nhiem) + dong('Ghi chú', goc.ghi_chu) : ''));
 
     const evXl = [];
     nk.filter(k => k.su_kien === 'giao_qc').forEach(k => evXl.push(add(k.thoi_diem, 'lam',
@@ -222,7 +226,7 @@
       });
     });
 
-    if (xong && log.length) {
+    if (xong && log.length && !theoPhut) {
       const l = log[log.length - 1];
       const nkDong = nk.filter(k => k.su_kien === 'dong').pop();
       // Nội dung xử lý chỉ hiện khi khác nội dung tổ khuôn đã ghi.
@@ -249,6 +253,7 @@
     const phut = Math.round(log.reduce((s, l) => s + l.phut, 0) +
       (m && m.gio_phat_sinh ? Math.max(0, (Date.now() - new Date(m.gio_phat_sinh)) / 60000) : 0));
     const st = m ? '<span class="sclh-st dung">⛔ Đang dừng ' + phut + ' phút</span>'
+      : goc.nhap_theo_phut ? '<span class="sclh-st chay">🐢 CT chậm ' + phut + ' phút</span>'   // T401
       : '<span class="sclh-st chay">▶ Dừng ' + phut + ' phút</span>';
     let xl = null, cl = null;
     const giao = (d.nhat_ky || []).filter(k => k.su_kien === 'giao_qc').pop();

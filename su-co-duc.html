@@ -79,6 +79,7 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 .loai.A{background:#FEE2E2;color:#991B1B}.loai.B{background:#FEF3C7;color:#92400E}.loai.F{background:#EDE9FE;color:#5B21B6}
 .loai.C{background:#DBEAFE;color:#1E40AF}.loai.D{background:#E0F2FE;color:#075985}.loai.E{background:#DCFCE7;color:#166534}
 .mo{color:var(--alarm-fg);font-weight:700}
+.ctc{color:var(--warn-fg,#B45309);font-weight:700}
 .ct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
 .ct-grid h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:4px}
 .ct-grid p{white-space:pre-wrap}
@@ -156,7 +157,7 @@ table.ds{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
 <script src="shared/navbar.js?v=T392"></script>
 <script src="shared/su-co-anh.js"></script>
 <script src="shared/qc02-view.js"></script>
-<script src="shared/su-co-lich-su.js?v=T299"></script>
+<script src="shared/su-co-lich-su.js?v=T401"></script>
 <script>
 // Cùng danh mục với CONFIG.LOAI_SU_CO ở duc-dashboard.html.
 const LOAI = [
@@ -222,7 +223,7 @@ async function load(){
   try {
     const [log, mo, moThem] = await Promise.all([
       fetchAll(() => sb.from('duc_su_co_log')
-        .select('id_ban_ghi,id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,loai_su_co,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut,phut_xu_ly,phut_xac_nhan_cl,van_de,noi_dung_xu_ly,dam_nhiem,ghi_chu,truong_ca')
+        .select('id_ban_ghi,id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,loai_su_co,gio_phat_sinh,gio_tro_lai,thoi_gian_dung_phut,phut_xu_ly,phut_xac_nhan_cl,van_de,noi_dung_xu_ly,dam_nhiem,ghi_chu,truong_ca,nhap_theo_phut')
         .gte('ngay', tu).lte('ngay', den).order('gio_phat_sinh', { ascending: true })),
       sb.from('duc_ca_hien_tai')
         .select('id_dong,open_id_su_co,ngay,ca,ma_may,ma_sp,ten_sp,so_khuon,open_loai_su_co,open_gio_phat_sinh,open_van_de,open_noi_dung_xu_ly,open_dam_nhiem')
@@ -255,7 +256,7 @@ async function load(){
         map.set(k, { key: k, id_su_co: r.id_su_co || '', ngay: r.ngay, ca: r.ca, cas: [r.ca], ma_may: r.ma_may, ma_sps: [r.ma_sp].filter(Boolean), ten_sp: r.ten_sp,
           so_khuons: [r.so_khuon].filter(Boolean), loai_su_co: r.loai_su_co, ma: maLoai(r.loai_su_co), gio_phat_sinh: r.gio_phat_sinh, gio_tro_lai: r.gio_tro_lai,
           phut: Number(r.thoi_gian_dung_phut) || 0, phutCa: { [r.ngay + '|' + r.ca]: Number(r.thoi_gian_dung_phut) || 0 }, van_de: r.van_de, noi_dung_xu_ly: r.noi_dung_xu_ly, dam_nhiem: r.dam_nhiem,
-          ghi_chu: r.ghi_chu, truong_ca: r.truong_ca, dang_mo: false });
+          ghi_chu: r.ghi_chu, truong_ca: r.truong_ca, dang_mo: false, theo_phut: !!r.nhap_theo_phut });
       } else {
         // Vắt ca: cộng phút từng ca. Khuôn kép: nhiều dòng CÙNG ca (mỗi mã 1 dòng) → lấy max, không cộng.
         const kCa = r.ngay + '|' + r.ca, p = Number(r.thoi_gian_dung_phut) || 0;
@@ -439,7 +440,9 @@ function render(){
       '<td class="nw">' + r.ma_sps.map(escapeHtml).join('<br>') + '</td>' +
       '<td class="nw b">' + (r.so_khuons.map(escapeHtml).join('<br>') || '—') + '</td>' +
       '<td class="nw"><span class="loai ' + r.ma[0] + '" title="' + escapeHtml(r.loai_su_co) + '">' + r.ma + '</span><small>' + escapeHtml(TEN_LOAI[r.ma] || r.loai_su_co || '') + '</small></td>' +
-      '<td class="nw">' + fmtTs(r.gio_phat_sinh) + ' → ' + (r.dang_mo ? '<span class="mo">đang mở</span>' : fmtTs(r.gio_tro_lai) || '—') + '<small>' + escapeHtml(r.id_su_co) + '</small></td>' +
+      '<td class="nw">' + (r.theo_phut   // T401: D2 nhập theo phút — máy vẫn chạy, CT chậm
+          ? fmtTs(r.gio_phat_sinh) + ' · <span class="ctc" title="Máy vẫn chạy, CT chậm — nhập theo số phút">CT chậm</span>'
+          : fmtTs(r.gio_phat_sinh) + ' → ' + (r.dang_mo ? '<span class="mo">đang mở</span>' : fmtTs(r.gio_tro_lai) || '—')) + '<small>' + escapeHtml(r.id_su_co) + '</small></td>' +
       '<td class="n' + (r.dang_mo ? ' mo' : '') + '">' + fmtNum(Math.round(r.phut)) +
         (r.xl != null ? '<small title="Xử lý sự cố / Xác nhận chất lượng sau giao QC">XL ' + fmtNum(Math.round(r.xl)) + ' · CL ' + fmtNum(Math.round(r.cl)) + '</small>' : '') + '</td>' +
       '<td class="vd">' + escapeHtml(IpqcText.gon(r.van_de)) + '</td>' +
@@ -499,7 +502,7 @@ function xuatExcel(){
   const data = rows.map(r => ({
     'Mã sự cố': r.id_su_co, 'Ngày SX': fmtDM(r.ngay), 'Ca': r.cas.join(' + '), 'Máy': r.ma_may, 'Mã SP': r.ma_sps.join(', '), 'Tên SP': r.ten_sp || '',
     'Khuôn': r.so_khuons.join(', '), 'Mã loại': r.ma, 'Loại sự cố': TEN_LOAI[r.ma] || r.loai_su_co || '', 'Phát sinh': ts(r.gio_phat_sinh),
-    'Trở lại': r.dang_mo ? 'Đang mở' : ts(r.gio_tro_lai), 'Phút dừng': Math.round(r.phut),
+    'Trở lại': r.dang_mo ? 'Đang mở' : r.theo_phut ? 'CT chậm (nhập theo phút)' : ts(r.gio_tro_lai), 'Phút dừng': Math.round(r.phut),
     'Phút xử lý': r.xl != null ? Math.round(r.xl) : '', 'Phút xác nhận CL': r.cl != null ? Math.round(r.cl) : '', 'Vấn đề': r.van_de || '',
     'Nội dung xử lý': r.noi_dung_xu_ly || '', 'Đảm nhiệm': r.dam_nhiem || '', 'Ghi chú': r.ghi_chu || '', 'Trưởng ca': r.truong_ca || '',
   }));
