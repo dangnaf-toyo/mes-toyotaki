@@ -111,7 +111,7 @@ const IpqcGcEntry = (() => {
               "</td><td>" +
               E(m.hang_muc) +
               "<small>" +
-              E(m.don_vi || "") +
+              E([m.don_vi, m.dung_cu].filter(Boolean).join(" · ")) +
               "</small></td><td>" +
               E(m.danh_nghia ?? "—") +
               "</td><td>" +

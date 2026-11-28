@@ -22,7 +22,7 @@
     'Thước kẹp', 'CMM', 'OMM', 'Máy đo biên dạng', 'Máy đo độ nhám', 'Thước đo cao',
     'Thước lá', 'Máy phân tích nguyên vật liệu', 'Máy kiểm tra độ cứng',
     'Máy kiểm tra lực nén', 'Máy kiểm tra màu sắc', 'Máy đo độ dày sơn',
-    'Panme', 'JIG', 'Kiểm bằng mắt',
+    'Panme', 'JIG', 'Kiểm bằng mắt', 'Cân trọng lượng',
   ]);
   const COT_SAO_CHEP = Object.freeze([
     'hang_muc', 'kieu', 'danh_nghia', 'dung_sai_tren', 'dung_sai_duoi',

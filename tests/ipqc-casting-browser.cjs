@@ -34,6 +34,7 @@ const { chromium } = require(process.env.MES_PLAYWRIGHT_PATH || "playwright");
         dung_sai_duoi: 0.4,
       }));
       muc[1].no_hien_thi = "1-1";
+      muc[1].dung_cu = "Cân trọng lượng";
       const drafts = [];
       const draftItems = [];
       window.IS_PROD = false;
@@ -213,6 +214,7 @@ const { chromium } = require(process.env.MES_PLAYWRIGHT_PATH || "playwright");
     assert.equal(await page.locator("#charts [data-casting-history]").count(), 0);
     assert.match(await page.locator("[data-trai]").textContent(), /2 mẫu\/lần/);
     assert.match(await page.locator('#entry [data-it="2"] b').textContent(), /^1-1\./);
+    assert.match(await page.locator('#entry [data-it="2"] .sub').textContent(), /Cân trọng lượng/);
     await page.evaluate(async () => {
       const editor = await IpqcBtkQc.mountEditor(document.querySelector("#editor"), { congDoan: "duc" });
       await editor.mo("PART");
@@ -221,6 +223,7 @@ const { chromium } = require(process.env.MES_PLAYWRIGHT_PATH || "playwright");
     await editor.locator("[data-sua]").click();
     const no = editor.getByRole("textbox", { name: "NO", exact: true });
     await editor.locator('[data-f="noi_dung_sua_doi"]').fill("Điều chỉnh NO");
+    await editor.locator('[data-c=dung_cu]').first().selectOption('Cân trọng lượng');
     await no.nth(2).fill("1-2");
     await editor.locator('[data-sao-chep="2"]').click();
     await editor.locator("[data-dan-moi]").click();
@@ -242,6 +245,7 @@ const { chromium } = require(process.env.MES_PLAYWRIGHT_PATH || "playwright");
     await editor.locator('[data-duyet="kiem_tra"]').click();
     await editor.locator('[data-duyet="phe_duyet"]').click();
     await editor.getByText(/Đã phê duyệt — IPQC áp dụng/).waitFor();
+    assert.equal(await editor.locator('[data-c=dung_cu]').first().inputValue(), 'Cân trọng lượng');
     // Real browser mobile layout, keyboard inputs and add/delete interactions.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('#entry [data-select="2"]').check();
