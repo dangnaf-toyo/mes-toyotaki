@@ -1,23 +1,209 @@
-﻿/* Compact IQC layout; scoped to the IQC entry and LOT list. */
-.iqc-report{grid-template-columns:minmax(220px,18%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:5px;padding:4px 8px;min-height:0}
-#formSection>.section-header{display:none}
-.iqc-report #lotForm{display:contents}
-.iqc-report-top{grid-column:1/-1;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px 6px}
-.iqc-report-top .field:has(#productName){grid-column:span 1}
-.iqc-report-side{grid-column:1;grid-row:2;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;align-content:start;margin:0}
-.iqc-report-side>.field:has(#inspector),.iqc-report-side>.field:has(#inspectionType),.iqc-report-side>#aqlField,.iqc-report-side>#resultField,.iqc-report-side>.iqc-report-extra,.iqc-report-side>#iqc-form-standard{grid-column:1/-1}
-.iqc-report .field{gap:2px;min-width:0}.iqc-report input,.iqc-report select{min-width:0;min-height:30px;padding:4px 6px;font-size:12px}.iqc-report label{font-size:11px}
-.iqc-report .button{padding:5px 9px;font-size:12px}.iqc-report .iqc-rule{display:none}.iqc-report-extra{grid-column:1/-1}
-#iqcMultiEntry{grid-column:2;grid-row:2;align-self:start;min-width:0;margin:0;padding:4px 6px;border:0;box-shadow:none}#iqcMultiEntry h3{margin:1px 0 3px;font-size:13px}#iqcMultiProgress{margin:2px 0;font-size:11px}
-#iqcMultiEntry .iqc-multi-grid input[type=number]{width:90px}#iqcMultiEntry .iqc-multi-grid input[readonly]{width:165px}
-.iqc-lot-nav{margin:0!important}
-#iqcMultiDefectSearch{max-width:300px}.iqc-list-filters{display:flex;gap:8px;flex-wrap:wrap;margin:5px 0 10px}.iqc-list-filters label{font-size:12px;display:flex;flex-direction:column;gap:3px}.iqc-list-filters input,.iqc-list-filters select{min-height:30px}
-@media(max-width:1000px){.iqc-report{grid-template-columns:210px minmax(0,1fr)}.iqc-report-top{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media(max-width:650px){.iqc-report{display:flex;flex-direction:column;min-height:0}.iqc-report-top{grid-template-columns:repeat(2,minmax(0,1fr))}.iqc-report-side,#iqcMultiEntry{width:100%}.iqc-report-actions{position:sticky;bottom:0;background:var(--bg-panel)}.iqc-lot-nav{flex-wrap:wrap}.iqc-multi-grid label{max-width:100%}}
-#iqcMultiLot{max-width:360px} #iqcMultiCatalogStatus:empty{display:none}
-.iqc-multi-row label:has(.iqc-defect-code){display:flex;align-items:center;gap:4px}.iqc-defect-code{font-size:12px;white-space:nowrap}.iqc-multi-row label:has(.iqc-defect-code) .name{min-width:0}
-.iqc-catalog-defect.has-ng,.iqc-other-row.has-ng{background:#fff1f2;box-shadow:inset 3px 0 #dc2626}
-.iqc-catalog-defect.has-ng .qty,.iqc-other-row.has-ng .qty{border-color:#ef4444;color:#991b1b;font-weight:700}
-.iqc-multi-summary{margin:2px 0!important;padding:4px 6px;background:#f1f5f9;border-radius:4px;font-size:11px;line-height:1.25;font-variant-numeric:tabular-nums}
-.iqc-catalog-defect .name{font-size:12px!important}.iqc-catalog-defect button{font-size:10px!important}.iqc-catalog-defect .qty{font-size:11px!important}
-#iqcMaterialStatus:empty{display:none}
+﻿/* Visual IQC report. Chemical reports retain their own layout. */
+.iqc-report {
+  grid-template-rows: auto auto auto;
+  gap: 8px 12px;
+  padding: 8px;
+  min-height: 0;
+}
+
+.iqc-report:not(.iqc-is-chemical) {
+  grid-template-columns: minmax(204px, 20%) minmax(0, 1fr);
+}
+
+.iqc-report:not(.iqc-is-chemical) .iqc-report-top {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .95fr)
+    minmax(0, 1.3fr) minmax(0, 2fr) minmax(0, 1.05fr);
+  gap: 6px 8px;
+}
+
+.iqc-report:not(.iqc-is-chemical) .iqc-report-top .field:has(#productName) {
+  grid-column: auto;
+}
+
+.iqc-report-side {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 6px 8px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+}
+
+.iqc-report-side > .field:has(#inspectionType) {
+  grid-column: auto;
+}
+
+.iqc-report .field { gap: 2px; }
+.iqc-report input, .iqc-report select { min-height: 30px; }
+.iqc-report .iqc-rule { display: none; }
+
+.iqc-checks {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.iqc-checks select { width: 100%; }
+.iqc-round-quantities, .iqc-round-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 8px;
+}
+
+.iqc-round-quantities > :first-child { grid-column: 1 / -1; }
+
+.iqc-round-summary {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--bg-sunken);
+  border-radius: 5px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.iqc-round-summary > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 4px;
+}
+
+.iqc-round-summary dt { color: var(--text-muted); }
+.iqc-round-summary dd { margin: 0; font-weight: 700; }
+.iqc-checks .help { margin: 0; }
+.iqc-checks:not(:has(#iqcMultiLot option:checked:not([value=""]))) #iqcMultiProgress,
+#iqcLotStartedAt:empty, #iqcMultiStatus:empty, #iqcMultiCatalogStatus:empty { display: none; }
+
+#iqcMultiEntry {
+  grid-column: 2;
+  grid-row: 2;
+  container-type: inline-size;
+  min-width: 0;
+  align-self: start;
+}
+
+.iqc-defect-toolbar,
+.iqc-other-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.iqc-defect-toolbar { margin-bottom: 5px; }
+.iqc-defect-toolbar h3 { margin: 0; font-size: 14px; }
+.iqc-defect-toolbar input { flex: 0 1 250px; }
+.iqc-defect-toolbar .help { margin: 0; }
+
+.iqc-defect-catalog {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px 6px;
+}
+
+.iqc-defect-group { display: contents; }
+.iqc-defect-group[hidden] { display: none; }
+.iqc-defect-group > h4 {
+  grid-column: 1 / -1;
+  margin: 2px 0 1px;
+  padding: 2px 6px;
+  background: var(--bg-sunken);
+  font-size: 12px;
+}
+
+.iqc-catalog-defect {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 46px;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 1px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.iqc-catalog-defect[hidden] { display: none; }
+.iqc-catalog-defect input, .iqc-other-row input { width: 100%; min-width: 0; }
+
+.iqc-catalog-defect .name {
+  min-height: 24px;
+  padding: 2px 3px;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iqc-catalog-defect .button, .iqc-catalog-defect .qty {
+  min-height: 24px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.iqc-catalog-defect .qty { text-align: right; }
+.iqc-catalog-detail { grid-column: 1 / -1; padding-bottom: 3px; }
+.iqc-other-title { justify-content: space-between; }
+.iqc-other-title h4 { margin: 0; font-size: 12px; }
+.iqc-other-defects { margin-top: 5px; }
+.iqc-other-head, .iqc-other-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 70px auto;
+  gap: 5px;
+  align-items: center;
+}
+
+.iqc-other-head { font-size: 12px; color: var(--text-muted); margin: 4px 0; }
+.iqc-other-defects:not(:has(.iqc-other-row)) .iqc-other-head { display: none; }
+.iqc-other-row { margin-top: 3px; }
+
+.iqc-catalog-defect.has-ng, .iqc-other-row.has-ng {
+  background: #fff1f2;
+  box-shadow: inset 3px 0 #dc2626;
+}
+
+.iqc-catalog-defect.has-ng .qty, .iqc-other-row.has-ng .qty {
+  border-color: #ef4444;
+  color: #991b1b;
+  font-weight: 700;
+}
+
+.iqc-is-chemical #iqcMultiEntry, .iqc-report-defects { display: none !important; }
+.iqc-report-defects:has(#defectModal:not(.hidden)) { display: block !important; }
+.iqc-is-chemical .iqc-report-defects, .iqc-hide-received { display: none !important; }
+
+.iqc-report-actions { padding-top: 5px; z-index: 1; }
+.iqc-report-actions #saveBtn { min-height: 34px; }
+.iqc-lot-nav { margin: 0 !important; }
+.iqc-list-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 5px 0 10px; }
+.iqc-list-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.iqc-list-filters input, .iqc-list-filters select { min-height: 30px; }
+#iqcMaterialStatus:empty { display: none; }
+
+@container (max-width: 940px) {
+  .iqc-defect-catalog { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@container (max-width: 660px) {
+  .iqc-defect-catalog { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container (max-width: 450px) {
+  .iqc-defect-catalog { grid-template-columns: minmax(0, 1fr); }
+  .iqc-other-head { display: none; }
+  .iqc-other-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+@media (max-width: 1000px) {
+  .iqc-report:not(.iqc-is-chemical) .iqc-report-top {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .iqc-report:not(.iqc-is-chemical) .iqc-report-top {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .iqc-report-side { padding-right: 0; border-right: 0; }
+  .iqc-report-actions { justify-content: flex-start; }
+  .iqc-lot-nav { flex-wrap: wrap; }
+}

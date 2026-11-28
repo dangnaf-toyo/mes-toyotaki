@@ -1,23 +1,46 @@
 /* Entry and history for visual IQC inspections. Chemical IQC keeps its own form. */
 (() => {
   const $id = id => document.getElementById(id), form = $id('lotForm');
+  const side = form.querySelector('.iqc-report-side');
+  const checks = document.createElement('div');
+  checks.className = 'iqc-checks';
+  checks.innerHTML = `
+    <label class="field">LOT đang kiểm <select id="iqcMultiLot"><option value="">LOT mới</option></select></label>
+    <div class="iqc-round-times" hidden>
+      <label>Bắt đầu lần này <input id="iqcMultiStart" type="datetime-local" step="1"></label>
+      <label>Hoàn thành LOT <input id="iqcMultiEnd" type="datetime-local" step="1"></label>
+      <input id="iqcMultiDate" type="hidden">
+    </div>
+    <div class="iqc-round-quantities">
+      <label class="field">SL kiểm lần này <input id="iqcMultiChecked" type="number" min="1" step="1"></label>
+      <label class="field">OK <input id="iqcMultiOk" type="number" min="0" step="1" value="0"></label>
+      <label class="field">NG <input id="iqcMultiNg" type="number" min="0" step="1" value="0"></label>
+    </div>
+    <dl id="iqcMultiSummary" class="iqc-round-summary" aria-label="Tổng hợp LOT">
+      <div><dt>Đã kiểm</dt> <dd id="iqcTotalChecked">0</dd></div>
+      <div><dt>Còn lại</dt> <dd id="iqcTotalRemaining">—</dd></div>
+      <div><dt>OK</dt> <dd id="iqcTotalOk">0</dd></div>
+      <div><dt>NG</dt> <dd id="iqcTotalNg">0</dd></div>
+      <div><dt>% OK</dt> <dd id="iqcTotalOkRate">—</dd></div>
+      <div><dt>% NG</dt> <dd id="iqcTotalNgRate">—</dd></div>
+      <div><dt>Tổng lỗi</dt> <dd id="iqcTotalDefects">0</dd></div>
+    </dl>
+    <p id="iqcMultiProgress" class="help">LOT mới</p>
+    <p id="iqcLotStartedAt" class="help"></p>`;
+  side.querySelector('.iqc-report-extra').before(checks);
+
   const section = document.createElement('section');
   section.id = 'iqcMultiEntry';
-  section.className = 'section';
-  section.innerHTML = `<h3>Kiểm tra LOT</h3>
-    <label>LOT đang kiểm <select id="iqcMultiLot"><option value="">LOT mới</option></select></label>
-    <p id="iqcMultiProgress">LOT mới</p><p id="iqcLotStartedAt" class="help"></p><p id="iqcMultiSummary" class="iqc-multi-summary"></p>
-    <div class="iqc-multi-grid"><label>Bắt đầu lần này <input id="iqcMultiStart" type="datetime-local" step="1"></label><label>Hoàn thành LOT <input id="iqcMultiEnd" type="datetime-local" step="1"></label><input id="iqcMultiDate" type="hidden">
-    <label>SL kiểm lần này <input id="iqcMultiChecked" type="number" min="1" step="1"></label>
-    <label>OK <input id="iqcMultiOk" type="number" min="0" step="1" value="0"></label>
-    <label>NG <input id="iqcMultiNg" type="number" min="0" step="1" value="0"></label></div>
-    <h3>Lỗi IQC</h3><div class="iqc-defect-toolbar"><input id="iqcMultiDefectSearch" type="search" placeholder="Tìm mã hoặc tên lỗi"><span id="iqcMultiCatalogStatus" class="help"></span></div><datalist id="iqcMultiDefects"></datalist><div id="iqcMultiRows" class="iqc-defect-catalog"></div>
+  section.innerHTML = `
+    <div class="iqc-defect-toolbar">
+      <h3>Lỗi IQC</h3>
+      <input id="iqcMultiDefectSearch" type="search" aria-label="Tìm mã hoặc tên lỗi" placeholder="Tìm mã hoặc tên lỗi">
+      <span id="iqcMultiCatalogStatus" class="help"></span>
+    </div>
+    <datalist id="iqcMultiDefects"></datalist><div id="iqcMultiRows" class="iqc-defect-catalog"></div>
     <section class="iqc-other-defects"><div class="iqc-other-title"><h4>Lỗi khác</h4><button type="button" id="iqcMultiAdd" class="button btn-secondary">+ Thêm lỗi khác</button></div><div class="iqc-other-head"><b>Tên lỗi</b><b>Chi tiết</b><b>Số lượng</b><b></b></div><div id="iqcMultiOtherRows"></div></section>
     <div id="iqcMultiHistory"></div><p id="iqcMultiStatus" role="status"></p><button type="button" id="iqcMultiRetry" hidden>Tải lại LOT đã lưu</button>`;
-  form.querySelector('.iqc-report-side').after(section);
-  const style = document.createElement('style');
-  style.textContent = '#iqcMultiEntry{padding:3px 5px}#iqcMultiEntry>h3:first-child{display:none}.iqc-multi-grid{display:flex;gap:4px;flex-wrap:wrap;align-items:end}.iqc-multi-grid label{display:flex;flex-direction:column;gap:2px;font-size:10px}.iqc-multi-grid input{min-height:25px!important;padding:2px 4px!important}.iqc-multi-grid label:has(#iqcMultiChecked),.iqc-multi-grid label:has(#iqcMultiOk),.iqc-multi-grid label:has(#iqcMultiNg){display:flex}.iqc-multi-grid label:has(#iqcMultiStart),.iqc-multi-grid label:has(#iqcMultiEnd){display:none}.iqc-defect-toolbar{display:flex;align-items:center;gap:6px;margin-bottom:3px}.iqc-defect-toolbar input{max-width:220px;min-height:25px!important;padding:2px 5px!important}.iqc-defect-catalog{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 6px}.iqc-defect-group{display:contents}.iqc-defect-group>h4{grid-column:1/-1;margin:2px 0 0;padding:2px 5px;background:var(--bg-sunken,#f3f4f6);font-size:10px;line-height:16px}.iqc-catalog-defect{display:grid;grid-template-columns:minmax(0,1fr) auto 42px;gap:2px;align-items:center;height:23px;min-width:0;padding:0 3px;border-bottom:1px solid var(--border,#e5e7eb)}.iqc-catalog-defect input,.iqc-other-row input{min-width:0;width:100%}.iqc-catalog-defect .name{border:0;background:transparent;padding:1px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.iqc-catalog-defect button{padding:1px 3px!important;font-size:9px!important;min-height:20px}.iqc-catalog-defect .qty{min-height:20px!important;padding:1px 2px!important;font-size:10px!important;text-align:center}.iqc-catalog-detail{grid-column:1/-1}.iqc-catalog-detail[hidden]{display:none}.iqc-catalog-detail input{margin-top:3px}.iqc-other-defects{margin-top:4px}.iqc-other-title{display:flex;align-items:center;justify-content:space-between}.iqc-other-title h4{margin:0;font-size:11px}.iqc-other-head,.iqc-other-row{display:grid;grid-template-columns:minmax(90px,1fr) minmax(100px,2fr) 60px 40px;gap:3px;align-items:center}.iqc-other-head{font-size:9px;color:var(--text-muted);margin:2px 0}.iqc-other-row{margin:2px 0}.iqc-other-row input{min-height:23px!important;padding:2px 4px!important;font-size:10px!important}.iqc-is-chemical #iqcMultiEntry,.iqc-report-defects{display:none!important}.iqc-report-defects:has(#defectModal:not(.hidden)){display:block!important}.iqc-is-chemical .iqc-report-defects{display:none!important}.iqc-hide-received{display:none!important}@media(max-width:900px){.iqc-defect-catalog{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:700px){.iqc-defect-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}.iqc-other-head{display:none}.iqc-other-row{grid-template-columns:1fr 1fr}.iqc-other-row button{grid-column:2}.iqc-other-row input{min-height:30px}}';
-  document.head.append(style);
+  side.after(section);
   $id('receivedDate').required=false;
   $id('receivedDate').closest('.field').classList.add('iqc-hide-received');
   for(const id of ['pickupDate','completionDate'])$id(id).closest('.field').classList.add('iqc-hide-received');
@@ -73,7 +96,7 @@
     startPromise=(async()=>{const r=await sb.rpc('iqc_bat_dau_lan_kiem',{p_id:id,p_lot_id:lotId});if(r.error)throw r.error;if(epoch!==startEpoch)throw Error('LOT đã thay đổi; bắt đầu lại lần kiểm.');if(!$id('iqcMultiStart').value)$id('iqcMultiStart').value=timeInput(r.data.bat_dau_luc);return id;})();
     try{return await startPromise;}catch(e){if(epoch===startEpoch){startId=null;startPromise=null;}throw e;}
   }
-  section.addEventListener('focusin',e=>{if(IqcChemicalEntry.isChemical()||editRound||!e.target.matches('#iqcMultiStart,#iqcMultiChecked,#iqcMultiOk,#iqcMultiNg,#iqcMultiRows input,#iqcMultiOtherRows input'))return;ensureStarted().catch(err=>{$id('iqcMultiStatus').textContent='Không bắt đầu được lần kiểm: '+(err.message||err);});});
+  form.addEventListener('focusin',e=>{if(IqcChemicalEntry.isChemical()||editRound||!e.target.matches('#iqcMultiStart,#iqcMultiChecked,#iqcMultiOk,#iqcMultiNg,#iqcMultiRows input,#iqcMultiOtherRows input'))return;ensureStarted().catch(err=>{$id('iqcMultiStatus').textContent='Không bắt đầu được lần kiểm: '+(err.message||err);});});
   form.addEventListener('input',e=>{if(!IqcChemicalEntry.isChemical() && !['iqcMultiDefectSearch','iqcMultiLot','iqcAqlLevel','iqcAqlValue','iqcAqlMode'].includes(e.target.id))dirtyVisual=true;});
   const text = (tag, value) => { const n=document.createElement(tag); n.textContent=value; return n; };
   const input = (cls, type='text') => { const n=document.createElement('input');n.className=cls;n.type=type;if(type==='number'){n.min='0';n.step='1';}return n; };
@@ -81,13 +104,16 @@
     const div=document.createElement('div');div.className='iqc-other-row';
     const name=input('name'),detail=input('detail'),qty=input('qty','number'),del=text('button','Xóa');
     name.placeholder='Tên lỗi';detail.placeholder='Chi tiết';qty.placeholder='SL';qty.value=row.so_luong??'';name.value=row.ten_loi??'';detail.value=row.chi_tiet??'';
-    del.type='button';del.className='button btn-secondary';del.onclick=()=>{div.remove();dirtyVisual=true;};
+    del.type='button';del.className='button btn-secondary';del.onclick=()=>{div.remove();dirtyVisual=true;refreshDefectFeedback();};
     div.append(name,detail,qty,del);$id('iqcMultiOtherRows').append(div);return div;
   }
   function catalogDefect(c, row={}) {
     const div=document.createElement('div');div.className='iqc-catalog-defect';div.dataset.catalog='1';div.dataset.code=c.ma_loi||c.code||'';div.dataset.group=c.defect_group||'';
     const name=input('name'),detailButton=text('button','Chi tiết'),qty=input('qty','number'),detail=text('div',''),detailInput=input('detail');
     const code=div.dataset.code,label=String(c.label||'').replace(new RegExp('^'+code.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*[-–—:·]?\\s*','i'),'');div.dataset.label=label;name.readOnly=true;name.value=`${code ? code+' ' : ''}${label}`;qty.value=row.so_luong??0;detailInput.value=row.chi_tiet??'';detailInput.placeholder='Chi tiết / vị trí';detail.className='iqc-catalog-detail';detail.hidden=true;detail.append(detailInput);
+    name.title = name.value;
+    qty.setAttribute('aria-label', `Số lượng ${name.value}`);
+    detailInput.setAttribute('aria-label', `Chi tiết ${name.value}`);
     detailButton.type='button';detailButton.className='button btn-secondary btn-small';detailButton.setAttribute('aria-expanded','false');detailButton.onclick=()=>{detail.hidden=!detail.hidden;detailButton.setAttribute('aria-expanded',String(!detail.hidden));if(!detail.hidden)detailInput.focus();};
     if(detailInput.value){detail.hidden=false;detailButton.setAttribute('aria-expanded','true');}
     div.append(name,detailButton,qty,detail);return div;
@@ -103,9 +129,23 @@
     for(const row of $id('iqcMultiOtherRows').children)row.classList.toggle('has-ng',Number(row.querySelector('.qty').value)>0);
     const defectsTotal=readDefects().reduce((sum,d)=>sum+(Number(d.so_luong)||0),0),lotQty=Number(selectedLot?.lotQty||$id('lotQty').value)||0;
     const thisChecked=Number($id('iqcMultiChecked').value)||0,thisOk=Number($id('iqcMultiOk').value)||0,thisNg=Number($id('iqcMultiNg').value)||0;
-    let checked=thisChecked,ok=thisOk,ng=thisNg;if(selectedLot){const t=totals(selectedLot);if(t.checked!=null){checked=t.checked+thisChecked;ok=t.ok+thisOk;ng=t.ng+thisNg;}}
+    let checked=thisChecked,ok=thisOk,ng=thisNg;
+    if(selectedLot){
+      const t=totals(selectedLot);
+      if(t.checked!=null){
+        checked+=t.checked-Number(editRound?.so_kiem||0);
+        ok+=t.ok-Number(editRound?.so_ok||0);
+        ng+=t.ng-Number(editRound?.so_ng||0);
+      }
+    }
     const remaining=Math.max(0,lotQty-checked),pct=(x)=>checked?((x/checked)*100).toFixed(1)+'%':'—';
-    $id('iqcMultiSummary').textContent=`LOT ${lotQty||'—'} · Đã kiểm ${checked} · Còn ${lotQty?remaining:'—'} · OK ${ok} (${pct(ok)}) · NG ${ng} (${pct(ng)}) · Lỗi ${defectsTotal}`;
+    $id('iqcTotalChecked').textContent = checked;
+    $id('iqcTotalRemaining').textContent = lotQty ? remaining : '—';
+    $id('iqcTotalOk').textContent = ok;
+    $id('iqcTotalNg').textContent = ng;
+    $id('iqcTotalOkRate').textContent = pct(ok);
+    $id('iqcTotalNgRate').textContent = pct(ng);
+    $id('iqcTotalDefects').textContent = defectsTotal;
   }
   $id('iqcMultiRows').addEventListener('input',refreshDefectFeedback);$id('iqcMultiOtherRows').addEventListener('input',refreshDefectFeedback);
   for(const id of ['iqcMultiChecked','iqcMultiOk','iqcMultiNg','lotQty'])$id(id).addEventListener('input',refreshDefectFeedback);

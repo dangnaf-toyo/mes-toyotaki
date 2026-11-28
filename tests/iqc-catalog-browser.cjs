@@ -19,7 +19,6 @@ const base = legacy.slice(legacy.indexOf('function backend()'), legacy.indexOf('
     });
     await page.goto('https://mes.test/iqc.html');
     await page.locator('#iqcNewTab').click();
-    await page.waitForSelector('#iqcMaterialStatus');
     await page.waitForFunction(() => [...document.querySelectorAll('#qc02-products option')].some(o => o.textContent.includes('SUP-AL') && o.textContent.includes('Kim loại mã A')));
     const code = page.locator('#productCode');
     await code.fill('product-unique');

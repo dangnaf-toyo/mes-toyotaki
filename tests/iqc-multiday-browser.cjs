@@ -15,14 +15,73 @@ const base=legacy.slice(legacy.indexOf('function backend()'),legacy.indexOf('\n(
   assert.equal(await page.locator('#receivedDate').isVisible(),false);await page.locator('#supplier').selectOption('BRV');
   await page.locator('#productCode').fill('MULTI');await page.waitForFunction(()=>document.querySelector('#productName').value==='Model test');
   await page.locator('#lotNo').fill('LOT-100');await page.locator('#lotQty').fill('10000');await page.locator('#iqcScope').selectOption('Đúc');
-  await page.locator('#inspectionType').selectOption('Kiểm tra 100%');await page.waitForSelector('#iqcMultiRows [data-catalog="1"]',{state:'attached'});assert.equal(await page.locator('#iqcMultiRows [data-catalog="1"] .qty').first().inputValue(),'0');assert.equal(await page.locator('#iqcMultiRows .iqc-defect-group').count(),2);assert.match(await page.locator('#iqcMultiRows').textContent(),/NG ngoại quan \(41\)/);assert.equal(await page.locator('#iqcMultiRows [data-catalog="1"]').count(),44);assert.equal(await page.locator('#iqcMultiRows .iqc-catalog-defect').first().evaluate(e=>Math.round(e.getBoundingClientRect().height)),23);
-  await page.screenshot({path:'.review/iqc-one-screen-1366x768.png',fullPage:false});const bottom1366=await page.locator('#formSection').evaluate(e=>e.getBoundingClientRect().bottom);assert.ok(bottom1366<=768,'1366x768 form bottom is '+bottom1366);await page.setViewportSize({width:1920,height:1080});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'1920px viewport must not overflow horizontally');const bottom1920=await page.locator('#formSection').evaluate(e=>e.getBoundingClientRect().bottom);assert.ok(bottom1920<=1080,'1920x1080 form bottom is '+bottom1920);await page.screenshot({path:'.review/iqc-one-screen-1920x1080.png',fullPage:false});
+  await page.locator('#inspectionType').selectOption('Kiểm tra 100%');
+  await page.waitForSelector('#iqcMultiRows [data-catalog="1"]');
+  assert.equal(await page.locator('#iqcMultiRows [data-catalog="1"] .qty').first().inputValue(), '0');
+  assert.match(await page.locator('#iqcMultiRows').textContent(), /NG ngoại quan \(41\)/);
+  assert.match(await page.locator('#iqcMultiRows').textContent(), /NG kích thước \(3\)/);
+  for (const [width, height] of [[1366, 768], [1920, 1080]]) {
+    await page.setViewportSize({width, height});
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const layout = await page.evaluate(() => {
+      const bounds = (selector) => document.querySelector(selector).getBoundingClientRect();
+      return {
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        formBottom: bounds('#formSection').bottom,
+        sideRatio: bounds('.iqc-report-side').width / bounds('.iqc-report-top').width,
+        topUnused: bounds('.iqc-report-top').right - bounds('#lotQty').right,
+        aligned: Math.abs(bounds('.iqc-report-side').top - bounds('#iqcMultiEntry').top) <= 1,
+        columns: getComputedStyle(document.querySelector('#iqcMultiRows')).gridTemplateColumns.split(' ').length,
+        extraOpen: document.querySelector('.iqc-report-extra').open,
+      };
+    });
+    assert.equal(layout.overflow, false);
+    assert.ok(layout.formBottom <= height, `${width}×${height} form bottom ${layout.formBottom}`);
+    assert.ok(layout.sideRatio >= 0.18 && layout.sideRatio <= 0.22);
+    assert.ok(layout.topUnused <= 2);
+    assert.ok(layout.aligned);
+    assert.equal(layout.columns, 4);
+    assert.equal(layout.extraOpen, false);
+    assert.equal(await page.locator('#iqcMultiRows [data-catalog="1"]:visible').count(), 44);
+    await page.screenshot({path:`.review/iqc-one-screen-${width}x${height}.png`});
+  }
+  for (const [width, height, columns] of [[1180, 820, 3], [390, 844, 1]]) {
+    await page.setViewportSize({width, height});
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.equal(await page.locator('#iqcMultiRows').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), columns);
+  }
+  await page.setViewportSize({width:1366, height:768});
   await page.locator('#saveBtn').click();await page.waitForFunction(()=>sb.tables.iqc_lots.some(x=>x.lot_no==='LOT-100'));
   assert.equal(await page.evaluate(()=>sb.tables.iqc_lan_kiem.length),0);await page.waitForFunction(()=>document.querySelector('#iqcMultiProgress').textContent.includes('Chưa kiểm'));
   await page.locator('#inspector').fill('QC01_Trần QC');
   await page.locator('#iqcMultiChecked').fill('2000');await page.locator('#iqcMultiOk').fill('1980');await page.locator('#iqcMultiNg').fill('20');
   await page.waitForFunction(()=>document.querySelector('#iqcMultiStart').value.includes('T08:00'));
-  await page.locator('#iqcMultiDefectSearch').fill('D01');await page.locator('#iqcMultiRows [data-code="D01"] .qty').fill('20');assert.equal(await page.locator('#iqcMultiRows [data-code="D01"]').getAttribute('class'),'iqc-catalog-defect has-ng');assert.match(await page.locator('#iqcMultiSummary').textContent(),/Lỗi 20/);await page.locator('#iqcMultiRows [data-code="D01"] button').click();await page.locator('#iqcMultiRows [data-code="D01"] .detail').fill('Mặt A');await page.locator('#iqcMultiAdd').click();await page.locator('#iqcMultiOtherRows .name').last().fill('Lỗi khác');await page.locator('#iqcMultiOtherRows .qty').last().fill('3');assert.equal(await page.locator('#iqcMultiOtherRows .iqc-other-row').last().getAttribute('class'),'iqc-other-row has-ng');
+  await page.locator('#iqcMultiDefectSearch').fill('D01');
+  assert.equal(await page.locator('#iqcMultiRows [data-catalog="1"]:visible').count(), 1);
+  const defect = page.locator('#iqcMultiRows [data-code="D01"]');
+  await defect.locator('.qty').fill('20');
+  assert.match(await defect.getAttribute('class'), /has-ng/);
+  assert.equal(await page.locator('#iqcTotalDefects').textContent(), '20');
+  assert.equal(await page.locator('#iqcTotalChecked').textContent(), '2000');
+  assert.equal(await page.locator('#iqcTotalRemaining').textContent(), '8000');
+  assert.equal(await page.locator('#iqcTotalOkRate').textContent(), '99.0%');
+  assert.equal(await page.locator('#iqcTotalNgRate').textContent(), '1.0%');
+  await defect.locator('.qty').fill('0');
+  assert.doesNotMatch(await defect.getAttribute('class'), /has-ng/);
+  assert.equal(await page.locator('#iqcTotalDefects').textContent(), '0');
+  await defect.locator('.qty').fill('20');
+  await defect.getByRole('button', {name:'Chi tiết'}).click();
+  await defect.locator('.detail').fill('Mặt A');
+  await page.locator('#iqcMultiAdd').click();
+  await page.locator('#iqcMultiOtherRows .name').last().fill('Lỗi khác');
+  await page.locator('#iqcMultiOtherRows .qty').last().fill('3');
+  assert.match(await page.locator('#iqcMultiOtherRows .iqc-other-row').last().getAttribute('class'), /has-ng/);
+  assert.equal(await page.locator('#iqcTotalDefects').textContent(), '23');
+  await page.locator('#iqcMultiOtherRows .iqc-other-row').last().getByRole('button', {name:'Xóa'}).click();
+  assert.equal(await page.locator('#iqcTotalDefects').textContent(), '20');
+  await page.locator('#iqcMultiAdd').click();
+  await page.locator('#iqcMultiOtherRows .name').last().fill('Lỗi khác');
+  await page.locator('#iqcMultiOtherRows .qty').last().fill('3');
   await page.locator('#saveBtn').click();await page.waitForFunction(()=>sb.tables.iqc_lan_kiem.length===1);
   assert.equal(await page.evaluate(()=>sb.tables.iqc_lan_kiem_loi[0].ten_loi),'Xước');assert.equal(await page.evaluate(()=>sb.tables.iqc_lan_kiem_loi[0].ma_loi),'D01');assert.equal(await page.evaluate(()=>sb.tables.iqc_lan_kiem_loi.length),2);
   await page.waitForFunction(()=>document.querySelector('#iqcMultiProgress').textContent.includes('Đã kiểm 2000'));
@@ -34,7 +93,11 @@ const base=legacy.slice(legacy.indexOf('function backend()'),legacy.indexOf('\n(
   await page.screenshot({path:'.review/iqc-progressive-list.png',fullPage:true});
   await page.locator('#iqcLotRows button').filter({hasText:'Tiếp tục kiểm'}).click();
   assert.equal(await page.locator('#lotNo').evaluate(e=>e.readOnly),true);
-  await page.locator('#iqcMultiHistory button').first().click();await page.locator('#iqcMultiChecked').fill('1000');await page.locator('#iqcMultiOk').fill('990');await page.locator('#iqcMultiNg').fill('10');await page.locator('#saveBtn').click();
+  await page.locator('#iqcMultiHistory button').first().click();
+  assert.equal(await page.locator('#iqcTotalChecked').textContent(), '5000');
+  await page.locator('#iqcMultiChecked').fill('1000');await page.locator('#iqcMultiOk').fill('990');await page.locator('#iqcMultiNg').fill('10');
+  assert.equal(await page.locator('#iqcTotalChecked').textContent(), '4000');
+  await page.locator('#saveBtn').click();
   await page.waitForFunction(()=>document.querySelector('#iqcMultiProgress').textContent.includes('Đã kiểm 4000'));
   await page.evaluate(()=>showPage('stats'));await page.locator('#iqcMLot').fill('LOT-100');
   assert.equal(await page.locator('#iqcMultiTable tr').count(),1);assert.match(await page.locator('#iqcMultiTable').textContent(),/4000/);
