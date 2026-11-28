@@ -282,7 +282,9 @@ input[readonly].ng-auto{background:var(--bg-sunken);color:var(--text-muted)}
   <div class="appbar"><button class="back" onclick="showScreen('scr-detail')">←</button><div class="title">Báo sự cố</div></div>
   <div class="form-wrap">
     <div class="field"><label>Loại sự cố <span class="req">*</span></label><select id="in-loai"></select></div>
-    <div class="field"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="in-gio"></div>
+    <div class="field" id="in-gio-wrap"><label>Giờ phát sinh <span class="req">*</span></label><input type="datetime-local" id="in-gio"></div>
+    <div class="field" id="in-phut-wrap" style="display:none"><label>Số phút ảnh hưởng <span class="req">*</span></label><input type="number" id="in-phut" min="1" max="720" step="1" inputmode="numeric">
+      <div style="font-size:12px;color:#64748B;margin-top:4px">ⓘ Máy vẫn chạy, CT chậm — nhập tổng phút bị mất. Ghi là xong ngay.</div></div>
     <div class="field"><label>Vấn đề <span class="req">*</span></label><textarea id="in-van-de" placeholder="Mô tả ngắn gọn"></textarea></div>
     <div class="field"><label>Nội dung xử lý <span class="req">*</span></label><textarea id="in-xu-ly"></textarea></div>
     <div class="field ac-field">
@@ -1347,14 +1349,51 @@ async function openIncidentScreen(){
   document.getElementById('in-van-de').value = '';
   document.getElementById('in-xu-ly').value = '';
   document.getElementById('in-dam-nhiem').value = '';
+  document.getElementById('in-phut').value = '';
+  sel.onchange = inTheoPhutCapNhat; inTheoPhutCapNhat();   // T401
   SuCoMau.gan({ loai: sel, vanDe: document.getElementById('in-van-de'), xuLy: document.getElementById('in-xu-ly') });  // T302
   showScreen('scr-incident');
   anhSuCoM.add = await mountAnhSuCoM('in-anh', 'truoc', null, false);
+}
+// T401: D2 (đào tạo / người mới) — máy vẫn chạy nhưng CT chậm → nhập số phút ảnh hưởng.
+const laNhapPhut = v => ['D2'].includes(String(v || '').trim().slice(0, 2).toUpperCase());
+function inTheoPhutCapNhat(){
+  const p = laNhapPhut(document.getElementById('in-loai').value);
+  document.getElementById('in-gio-wrap').style.display = p ? 'none' : '';
+  document.getElementById('in-phut-wrap').style.display = p ? '' : 'none';
+}
+async function submitIncidentTheoPhutMobile(loai){
+  const phut = Math.round(Number(document.getElementById('in-phut').value));
+  if (!(phut >= 1 && phut <= 720)) return showToast('Nhập số phút ảnh hưởng (1–720)', true);
+  const vanDe = document.getElementById('in-van-de').value.trim(), xuLy = document.getElementById('in-xu-ly').value.trim();
+  const damNhiem = document.getElementById('in-dam-nhiem').value.trim();
+  if (!vanDe) return showToast('Nhập vấn đề', true);
+  if (!xuLy) return showToast('Nhập nội dung xử lý', true);
+  if (!damNhiem) return showToast('Nhập người đảm nhiệm', true);
+  if (!(await ensureAuth())) return;
+  showOverlay('Đang ghi nhận...');
+  try {
+    const d = await rpcWrite('duc_su_co_theo_phut', {
+      p_id_dong: state.currentIdDong, p_loai: loai, p_phut: phut, p_van_de: vanDe, p_noi_dung_xu_ly: xuLy,
+      p_dam_nhiem: damNhiem, p_truong_ca: document.getElementById('sel-truong-ca').value || '', p_user: state.user,
+    });
+    if (anhSuCoM.add && anhSuCoM.add.hasPending() && d && d.id_su_co) {
+      showOverlay('Đang tải ảnh...');
+      try { await SuCoAnh.uploadPending(anhSuCoM.add, d.id_su_co); }
+      catch (e) { showToast('Đã ghi nhưng chưa lưu được ảnh: ' + e.message, true); }
+    }
+    hideOverlay();
+    showToast('✓ Đã ghi ' + phut + ' phút ảnh hưởng');
+    addPersonnelToListMobile(damNhiem);
+    showScreen('scr-list');
+    loadShiftState();
+  } catch (e) { hideOverlay(); showToast('Lỗi: ' + e.message, true); }
 }
 async function submitIncidentMobile(){
   const loai = document.getElementById('in-loai').value;
   const gio = document.getElementById('in-gio').value;
   if (!loai) return showToast('Chọn loại sự cố', true);
+  if (laNhapPhut(loai)) return submitIncidentTheoPhutMobile(loai);   // T401
   if (!gio) return showToast('Nhập giờ phát sinh', true);
   if (!document.getElementById('in-van-de').value.trim()) return showToast('Nhập vấn đề', true);  // T305
   if (!document.getElementById('in-xu-ly').value.trim()) return showToast('Nhập nội dung xử lý', true);

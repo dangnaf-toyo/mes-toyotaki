@@ -399,9 +399,15 @@
     <label class="f"><span>Lý do dừng</span><select id="dmLoai"></select></label>
     <div class="two">
       <label class="f"><span>Bộ phận xử lý</span><select id="dmBoPhan"></select></label>
-      <label class="f"><span>Giờ dừng</span><input id="dmGio" type="datetime-local"></label>
+      <label class="f" id="dmGioWrap"><span>Giờ dừng</span><input id="dmGio" type="datetime-local"></label>
+      <label class="f" id="dmPhutWrap" hidden><span>Số phút ảnh hưởng</span><input id="dmPhut" type="number" min="1" max="720" step="1" inputmode="numeric"></label>
     </div>
+    <div id="dmPhutNote" hidden style="font-size:11px;color:var(--text-muted);margin:-2px 0 6px">ⓘ Máy vẫn chạy, CT chậm — nhập tổng phút bị mất. Ghi là xong ngay.</div>
     <label class="f"><span>Vấn đề</span><textarea id="dmVanDe" rows="3" placeholder="Mô tả ngắn: hiện tượng, vị trí…"></textarea></label>
+    <div id="dmTpWrap" hidden>
+      <label class="f"><span>Nội dung xử lý</span><textarea id="dmXuLy" rows="2"></textarea></label>
+      <label class="f"><span>Người xử lý</span><input id="dmNguoi" type="text" autocomplete="off"></label>
+    </div>
     <div class="err" id="dmErr"></div>
     <div class="acts">
       <button class="mbtn ghost" type="button" data-close>Huỷ</button>
@@ -585,6 +591,7 @@ function phutDungCa(m) {
   if (!D || !D.khung_ca) return 0;
   const tu = new Date(D.khung_ca.tu).getTime(), den = Math.min(new Date(D.khung_ca.den).getTime(), Date.now());
   return (m.su_co || []).reduce((s, x) => {
+    if (x.nhap_theo_phut) return s + Number(x.phut_dung || 0);   // T401: D2 nhập theo phút
     const a = Math.max(new Date(x.gio_phat_sinh).getTime(), tu);
     const b = Math.min(x.gio_tro_lai ? new Date(x.gio_tro_lai).getTime() : Date.now(), den);
     return s + Math.max(0, Math.round((b - a) / 60000));
@@ -796,7 +803,7 @@ function renderWs() {
   const SC = (m.su_co || []);
   if (SC.length) {
     h += '<div class="sec-t">Dừng máy trong ca <span class="chip mute">' + SC.length + ' lần · ' + fmt(phutDungCa(m)) + ' phút</span></div><div class="tbl"><table class="t"><thead><tr><th>Từ</th><th>Đến</th><th style="text-align:right">Phút</th><th>Lý do</th><th>Vấn đề</th><th>Xử lý</th><th>Người xử lý</th></tr></thead><tbody>' +
-      SC.map(x => '<tr><td class="mono">' + hm(x.gio_phat_sinh) + '</td><td class="mono">' + (x.gio_tro_lai ? hm(x.gio_tro_lai) : '<span class="chip bad">đang dừng</span>') + '</td><td class="n">' + fmt(x.phut_dung != null ? x.phut_dung : phutTu(x.gio_phat_sinh)) + '</td>' +
+      SC.map(x => '<tr><td class="mono">' + hm(x.gio_phat_sinh) + '</td><td class="mono">' + (x.nhap_theo_phut ? '<span class="chip mute">CT chậm</span>' : x.gio_tro_lai ? hm(x.gio_tro_lai) : '<span class="chip bad">đang dừng</span>') + '</td><td class="n">' + fmt(x.phut_dung != null ? x.phut_dung : phutTu(x.gio_phat_sinh)) + '</td>' +
         '<td>' + esc(x.loai_su_co) + '</td><td>' + esc(x.van_de) + '</td><td>' + esc(x.noi_dung_xu_ly || '') + '</td><td>' + esc(x.dam_nhiem || '') + '</td></tr>').join('') +
       '</tbody></table></div>';
   }
@@ -973,6 +980,10 @@ function renderSide() {
     (m.xong || []).forEach(b => ev.push([b.xong_luc, mm + ' xong thùng <b>' + esc(b.tag_no) + '</b> · ra ' + fmt(b.sl_ra), 'Bước ' + b.buoc + '/' + b.tong_buoc + (b.nguoi_lam ? ' · ' + b.nguoi_lam : '')]));
     (m.ng || []).forEach(g => ev.push([g.ngay_gio, mm + ' NG <b>' + fmt(g.so_luong) + '</b> · ' + esc(g.loai) + (g.ghi_chu ? ': ' + esc(g.ghi_chu) : ''), 'Tem ' + g.tag_no]));
     (m.su_co || []).forEach(s => {
+      if (s.nhap_theo_phut) {   // T401: D2 nhập theo phút — máy vẫn chạy
+        if (trong(s.gio_phat_sinh)) ev.push([s.gio_phat_sinh, mm + ' <span style="color:var(--warn-fg);font-weight:700">CT chậm ' + fmt(s.phut_dung) + "'</span> · " + esc(String(s.loai_su_co || '').split(' — ')[0]), s.van_de || '']);
+        return;
+      }
       if (trong(s.gio_phat_sinh)) ev.push([s.gio_phat_sinh, mm + ' <span style="color:var(--alarm-fg);font-weight:700">dừng</span> · ' + esc(String(s.loai_su_co || '').split(' — ')[0]), s.van_de || '']);
       if (s.gio_tro_lai && trong(s.gio_tro_lai)) ev.push([s.gio_tro_lai, mm + ' <span style="color:var(--run-fg);font-weight:700">chạy lại</span>', s.noi_dung_xu_ly || '']);
     });
@@ -1050,14 +1061,32 @@ function moDungModal(m) {
   $('#dmTitle').textContent = 'Báo dừng ' + m.ma_may;
   $('#dmLoai').innerHTML = '<option value="">— Chọn lý do —</option>' + groups.map(g => '<optgroup label="' + esc(g) + '">' + LOAI_DUNG.filter(x => x.group === g).map(x => '<option value="' + esc(x.code + ' — ' + x.name) + '" data-bp="' + esc(x.bp) + '">' + x.code + ' — ' + esc(x.name) + '</option>').join('') + '</optgroup>').join('');
   $('#dmBoPhan').innerHTML = BO_PHAN_XU_LY.map(x => '<option>' + esc(x) + '</option>').join('');
-  $('#dmLoai').onchange = () => { const o = $('#dmLoai').selectedOptions[0]; if (o && o.dataset.bp) $('#dmBoPhan').value = o.dataset.bp; };
+  // T401: D2 (đào tạo / người mới) — máy vẫn chạy, CT chậm → nhập số phút ảnh hưởng thay giờ dừng.
+  const tp = () => {
+    const p = String($('#dmLoai').value).slice(0, 2) === 'D2';
+    $('#dmGioWrap').hidden = p; $('#dmPhutWrap').hidden = !p; $('#dmPhutNote').hidden = !p; $('#dmTpWrap').hidden = !p;
+    $('#dmSave').textContent = p ? 'Ghi nhận' : 'Báo dừng';
+  };
+  $('#dmLoai').onchange = () => { const o = $('#dmLoai').selectedOptions[0]; if (o && o.dataset.bp) $('#dmBoPhan').value = o.dataset.bp; tp(); };
   $('#dmGio').value = toLocalInput(new Date());
+  $('#dmPhut').value = ''; $('#dmXuLy').value = ''; $('#dmNguoi').value = lsGet('gcdb_nguoi_' + m.ma_may, '') || ''; tp();
   $('#dmVanDe').value = ''; $('#dmErr').textContent = '';
   SuCoMau.gan(Object.assign({ loai: $('#dmLoai'), vanDe: $('#dmVanDe'), xuLy: null }, SCM_GC));   // T336
   $('#dungModal').hidden = false;
 }
 $('#dmSave').onclick = async () => {
   const m = curMay(); $('#dmErr').textContent = '';
+  if (String($('#dmLoai').value).slice(0, 2) === 'D2') {   // T401
+    try {
+      const phut = Math.round(Number($('#dmPhut').value));
+      if (!(phut >= 1 && phut <= 720)) { $('#dmErr').textContent = 'Nhập số phút ảnh hưởng (1–720)'; return; }
+      await rpc('gc_su_co_theo_phut', { p_id_tram: m.tram.id_tram, p_loai: $('#dmLoai').value, p_bo_phan: $('#dmBoPhan').value, p_phut: phut,
+        p_van_de: $('#dmVanDe').value, p_noi_dung: $('#dmXuLy').value, p_dam_nhiem: $('#dmNguoi').value });
+      $('#dungModal').hidden = true; setFlash('ok', '✓ ' + esc(m.ma_may) + ' — đã ghi ' + phut + ' phút ảnh hưởng (D2).');
+      await taiLai();
+    } catch (e) { $('#dmErr').textContent = errText(e); }
+    return;
+  }
   try {
     const g = $('#dmGio').value;
     const rs = await rpc('gc_su_co_mo', { p_id_tram: m.tram.id_tram, p_loai: $('#dmLoai').value, p_bo_phan: $('#dmBoPhan').value, p_van_de: $('#dmVanDe').value, p_gio_phat_sinh: g ? new Date(g).toISOString() : null });
